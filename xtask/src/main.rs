@@ -2,11 +2,13 @@
 //! ever (D33); no source dependency on any `wolf_*` crate or on
 //! wolf-interp (binaries and pinned data are the only couplings).
 //!
-//! Subcommands: `std-test`, `doctor`, `sync-pin`, `ledger-check`, `ci`.
+//! Subcommands: `std-test`, `doc-examples`, `doctor`, `sync-pin`,
+//! `ledger-check`, `ci`.
 
 mod anchors;
 mod bins;
 mod directive;
+mod doc_examples;
 mod doctor;
 mod exec;
 mod ledger;
@@ -34,13 +36,14 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         Some("std-test") => runner::std_test(),
+        Some("doc-examples") => doc_examples::doc_examples(),
         Some("ledger-check") => runner::ledger_check(),
         Some("doctor") => doctor::doctor(),
         Some("sync-pin") => sync_pin::sync_pin(),
         Some("ci") => ci(),
         other => {
             eprintln!(
-                "usage: cargo xtask <std-test|ledger-check|doctor|sync-pin|ci>{}",
+                "usage: cargo xtask <std-test|doc-examples|ledger-check|doctor|sync-pin|ci>{}",
                 other.map(|o| format!(" (got `{o}`)")).unwrap_or_default()
             );
             std::process::exit(2);
@@ -98,6 +101,8 @@ fn ci() -> Result<(), String> {
     runner::ledger_check()?;
     banner("std-test");
     runner::std_test()?;
+    banner("doc-examples");
+    doc_examples::doc_examples()?;
     println!("\nci: GREEN");
     Ok(())
 }

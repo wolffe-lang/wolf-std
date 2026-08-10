@@ -1,0 +1,32 @@
+//! check: run(exit=0, stdout="hit-len 1, miss-len 0, front 7")
+//! phase: run
+//! conforms: std.option, err.else
+//!
+//! The `to_list` idiom — an absence value becomes a 0/1-element
+//! `List[int]` via `else` around the push, the shape the blocked
+//! `option.to_list[T]` names (F-0002). Mutation is spelled at the call
+//! site per X1; wolfc's pinned typing of `List.push` as a read receiver
+//! rejects that spelling (E0804) — divergence F-0005, ledgered.
+
+fn find_lucky(x: int) -> int ! {None} {
+    if x == 7 { return x }
+    return None
+}
+
+fn one_or_none(x: int) -> List[int] {
+    var out = List[int]()
+    var missed = false
+    let v = find_lucky(x) else |_| {
+        missed = true
+        0
+    }
+    if missed {} else { (mut out).push(v) }
+    out
+}
+
+fn main() -> !int {
+    let hit = one_or_none(7)
+    let miss = one_or_none(3)
+    print("hit-len {hit.len}, miss-len {miss.len}, front {hit[0]}")
+    if hit.len == 1 && miss.len == 0 && hit[0] == 7 { 0 } else { 1 }
+}

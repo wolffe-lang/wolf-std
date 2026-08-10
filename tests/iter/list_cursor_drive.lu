@@ -1,0 +1,32 @@
+//! check: run(exit=0, stdout="total 42, empty -7")
+//! phase: run
+//! conforms: std.iter
+//!
+//! The second F1 prototype: a ListCursor consuming its list at
+//! construction (`take` — X1 true consumption), stepped by
+//! `list_next(mut c)` to the `Done` row. The push spells mutation per
+//! X1; wolfc's pinned List typing rejects that spelling (E0804,
+//! divergence F-0005) — ledgered. lupin executes all of it.
+
+use iter
+
+fn main() -> !int {
+    var xs = List[int]()
+    (mut xs).push(10)
+    (mut xs).push(32)
+    var c = iter.list_cursor(take xs)
+    var total = 0
+    var more = true
+    while more {
+        let v = iter.list_next(mut c) else |_| {
+            more = false
+            0
+        }
+        total = total + v
+    }
+    var ys = List[int]()
+    var empty = iter.list_cursor(take ys)
+    let none_step = iter.list_next(mut empty) else 0 - 7
+    print("total {total}, empty {none_step}")
+    if total == 42 && none_step == 0 - 7 { 0 } else { 1 }
+}

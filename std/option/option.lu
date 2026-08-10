@@ -1,0 +1,43 @@
+//! member: true
+//!
+//! std.option — the absence convention over `!T` rows. Stability tier:
+//! core. There is no `?T` and no null (D30): absence is the row tag
+//! `none` — `fn find(…) -> int ! {none}` — consumed by `else` (default
+//! and `|pat|` forms) and propagated by `?`. Domain-specific absence
+//! tags (`eof`, `gone` — `weak.upgrade()` already returns `T ! {gone}`
+//! per `[mem.shared.rc.3]`) are legal where the noun earns it; `none`
+//! is the default. API-CONVENTIONS §2 is the binding statement; this
+//! module is its worked home.
+//!
+//! INTERIM SPELLING (finding F-0003): the convention's tag is lowercase
+//! `none`, but neither pinned implementation resolves a lowercase bare
+//! tag in raise position (lupin: `does not resolve`, exit 4; wolfc:
+//! E0301). Until that lands, std spells the tag `None`; the flip to
+//! `none` rides the pin bump that fixes it, in the same commit.
+//!
+//! THE SIX HELPERS — ALL BLOCKED AT THE sc01 PINS (finding F-0002).
+//! Error rows exist only in return position: `!` in a parameter or
+//! `let` type is a parse error in the pinned grammar and in both
+//! implementations (E0201, observed at the sc01 workbench). A helper
+//! over an absence value therefore cannot be written — there is no type
+//! that names its argument. Each signature below is the reviewed shape
+//! that lands when rows become reifiable (or when the s16 generic-data
+//! thaw gives `Option[T]` and the s15 `try` bridge); until then the
+//! language form on the right IS the idiom, and this module's tests
+//! prove each one at the run rung:
+//!
+//! - `or[T](v: T ! {none}, default: T) -> T`      ≡ `v else default`
+//! - `expect[T](v: T ! {none}, msg: str) -> T`    ≡ `v else |_| { testing.fail(msg); … }`
+//!   (traps `assert` with `msg` on the miss)
+//! - `flatten` (collapse nested absence)          ≡ `f(x)?` chaining —
+//!   nested rows also cannot be spelled today: `(T ! {none}) ! {none}`
+//!   needs rows as first-class types twice over
+//! - `to_list[T](v: T ! {none}) -> List[T]`       ≡ 0/1 elements via
+//!   `else` around a push
+//! - `exists[T](v: T ! {none}) -> bool`           ≡ `else |_|` marking
+//! - `is_none[T](v: T ! {none}) -> bool`          ≡ `else |_|` marking
+//!
+//! All six are thin over `else` by design — users learn the language
+//! form first; the helpers are names for the four commonest shapes.
+//! Lazy (closure-taking) variants additionally wait on c05, as the
+//! contract records.

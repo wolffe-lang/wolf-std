@@ -1,0 +1,17 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.map
+//!
+//! `assert_ne` under `cmp.Eq`: the unequal pair passes silently, the
+//! equal pair traps `assert`. Same dispatch blocker and ledger story
+//! as assert_eq_trap.lu (F-0002).
+
+use testing
+
+fn main() -> !int {
+    let a: int = 4
+    let b: int = 9
+    testing.assert_ne(a, b)
+    testing.assert_ne(a, a)
+    0
+}

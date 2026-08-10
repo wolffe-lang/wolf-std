@@ -1,0 +1,28 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.cmp, ty.method.receiver-mode
+//!
+//! The Ordering method surface, statically: `reverse`, `then` and the
+//! six predicates called on values `total_cmp` produced. wolfc
+//! typechecks every call (method resolution, receiver modes, E0801
+//! totality of the bodies) and reaches mem before its checked tier
+//! refuses enum execution; lupin executes no user methods at the pin
+//! (F-0002). Neither lane reaches the exit today — ledgered — and the
+//! file flips to a running test on the pin bump that lands methods.
+
+use cmp
+
+fn main() -> !int {
+    let less = cmp.total_cmp(1.0, 2.0)
+    let greater = cmp.total_cmp(2.0, 1.0)
+    let equal = cmp.total_cmp(4.5, 4.5)
+    if less.reverse() == greater {} else { return 1 }
+    if equal.reverse() == equal {} else { return 2 }
+    if less.then(greater) == less {} else { return 3 }
+    if equal.then(greater) == greater {} else { return 4 }
+    if less.is_lt() && less.is_le() && less.is_ne() {} else { return 5 }
+    if equal.is_eq() && equal.is_le() && equal.is_ge() {} else { return 6 }
+    if greater.is_gt() && greater.is_ge() && greater.is_ne() {} else { return 7 }
+    if less.is_eq() || greater.is_lt() || equal.is_ne() { return 8 }
+    0
+}

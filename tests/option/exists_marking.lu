@@ -1,0 +1,28 @@
+//! check: run(exit=0, stdout="have 3: true, have -1: false")
+//! phase: run
+//! conforms: std.option, err.else
+//!
+//! The `exists` idiom — presence as a bool via `else |_|` marking, the
+//! shape the blocked `option.exists[T]` names (F-0002). No sentinel
+//! value stands in for absence; the marking rides the handler.
+
+fn find_positive(x: int) -> int ! {None} {
+    if x > 0 { return x }
+    return None
+}
+
+fn exists_positive(x: int) -> bool {
+    var present = true
+    let _ = find_positive(x) else |_| {
+        present = false
+        0
+    }
+    present
+}
+
+fn main() -> !int {
+    let a = exists_positive(3)
+    let b = exists_positive(0 - 1)
+    print("have 3: {a}, have -1: {b}")
+    if a && !b { 0 } else { 1 }
+}

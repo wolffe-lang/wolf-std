@@ -1,0 +1,15 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.map
+//!
+//! `unreachable` marks the impossible branch; reaching it is the bug
+//! and traps `assert`. The reachable-by-construction call here proves
+//! the trap identity.
+
+use testing
+
+fn main() -> !int {
+    var n = 1
+    if n == 1 { testing.unreachable() }
+    0
+}

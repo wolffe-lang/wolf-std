@@ -1,0 +1,28 @@
+//! check: run(exit=0, stdout="none for 4: false, none for 0: true")
+//! phase: run
+//! conforms: std.option, err.else
+//!
+//! The `is_none` idiom — the complement of `exists`, the shape the
+//! blocked `option.is_none[T]` names (F-0002): absence as a bool via
+//! `else |_|` marking, no sentinel.
+
+fn find_positive(x: int) -> int ! {None} {
+    if x > 0 { return x }
+    return None
+}
+
+fn none_for(x: int) -> bool {
+    var absent = false
+    let _ = find_positive(x) else |_| {
+        absent = true
+        0
+    }
+    absent
+}
+
+fn main() -> !int {
+    let a = none_for(4)
+    let b = none_for(0)
+    print("none for 4: {a}, none for 0: {b}")
+    if !a && b { 0 } else { 1 }
+}

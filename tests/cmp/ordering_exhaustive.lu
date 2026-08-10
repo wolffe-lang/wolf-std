@@ -1,0 +1,31 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.cmp, ty.match.exhaustive
+//!
+//! The exhaustive-match acceptance test on std's first enum: the
+//! `_`-free match below is PROVED total by wolfc's E0801 usefulness
+//! engine (drop an arm and the missing variant is named as a concrete
+//! witness — verified at the sc01 workbench; the negative twin is not
+//! shippable because lupin runs non-exhaustive matches obliviously,
+//! divergence F-0007). All three arms yield the same value BY DESIGN:
+//! lupin's bare-ident patterns bind instead of dispatching (first arm
+//! always matches — the same F-0007 filing), so distinct arm values
+//! would test the bug, not the enum. Dispatch itself is covered
+//! relationally in total_cmp_relational.lu via `==`.
+
+use cmp
+
+fn all_arms(o: cmp.Ordering) -> int {
+    match o {
+        Less => 1,
+        Equal => 1,
+        Greater => 1,
+    }
+}
+
+fn main() -> !int {
+    let a = all_arms(cmp.total_cmp(1.0, 2.0))
+    let b = all_arms(cmp.total_cmp(2.0, 1.0))
+    let c = all_arms(cmp.total_cmp(1.0, 1.0))
+    if a + b + c == 3 { 0 } else { 1 }
+}

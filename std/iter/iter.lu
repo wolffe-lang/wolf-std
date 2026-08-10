@@ -1,0 +1,75 @@
+//! member: true
+//!
+//! std.iter — the iterator protocol, prototyped. Stability tier: x
+//! (this module is the working evidence for the F1 spec-amendment
+//! filing; it graduates or dies with the filing, D31 clock).
+//!
+//! Today `for` over `List`/`Pool`/ranges is a sema builtin (s21) with
+//! no user-implementable iteration. The filed trait shape is
+//! `Iter[T]` with `next(mut self) -> T ! {done}` and a `for` desugar;
+//! these two monomorphic prototypes prove that shape's semantics
+//! execute — explicit `loop`/`next` driving, mut-receiver stepping, a
+//! row-tag end signal — before the spec moves. No `for` integration is
+//! faked.
+//!
+//! INTERIM SPELLINGS, each part of the filing's evidence:
+//! - The end tag is `Done`, not the filed lowercase `done` (finding
+//!   F-0003: lowercase bare tags resolve in neither implementation).
+//! - `next` is a free function with an explicit `mut` first parameter,
+//!   not a method: at the sc01 pins lupin executes no user methods
+//!   (finding F-0002), and free functions collide across element
+//!   sources — hence `range_next`/`list_next`. The collision IS
+//!   evidence for the trait: one `next`, dispatched, is the fix (F1).
+
+/// A half-open integer range `[cur, stop)` stepped by `next`.
+pub struct RangeIter {
+    cur: int,
+    stop: int,
+}
+
+/// A fresh iterator over `start..stop` (half-open; empty when
+/// `start >= stop`). Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var it = iter.range_iter(7, 9)
+/// (iter.range_next(mut it) else 0 - 1) == 7
+/// (iter.range_next(mut it) else 0 - 1) == 8
+/// (iter.range_next(mut it) else 0 - 1) == 0 - 1
+/// ```
+pub fn range_iter(start: int, stop: int) -> RangeIter {
+    RangeIter { cur: start, stop: stop }
+}
+
+/// The next element of the range, advancing the iterator; `Done` when
+/// exhausted — the row is the end signal, consumed by `else`. No traps
+/// (checked arithmetic cannot overflow here: `cur < stop` bounds the
+/// increment).
+pub fn range_next(mut it: RangeIter) -> int ! {Done} {
+    if it.cur >= it.stop { return Done }
+    let v = it.cur
+    it.cur = it.cur + 1
+    v
+}
+
+/// A cursor over an owned `List[int]`, consumed at construction.
+pub struct ListCursor {
+    xs: List[int],
+    i: int,
+}
+
+/// A fresh cursor over `xs`, which the cursor consumes (`take` — the
+/// caller is done with the list; X1 true consumption). Total: no error
+/// row, no traps.
+pub fn list_cursor(take xs: List[int]) -> ListCursor {
+    ListCursor { xs: xs, i: 0 }
+}
+
+/// The next element of the list, advancing the cursor; `Done` when
+/// exhausted — the row is the end signal, consumed by `else`. No traps
+/// (the index is bounds-guarded before the read).
+pub fn list_next(mut c: ListCursor) -> int ! {Done} {
+    if c.i >= c.xs.len { return Done }
+    let v = c.xs[c.i]
+    c.i = c.i + 1
+    v
+}

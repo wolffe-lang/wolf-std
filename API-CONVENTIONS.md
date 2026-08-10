@@ -49,6 +49,24 @@ folklore there.
   caller could not check (`[conf.trap.set]` kinds); recoverable outcomes
   ride the row.
 
+**§2 amendment (sc01) — the absence inventory.** The default absence tag
+is `none` and the consuming forms are the language's: `else` for
+defaults and handling, `?` for propagation. Domain tags in force:
+`gone` (dead weak upgrade, `[mem.shared.rc.3]`) and — reserved for the
+io tier — `eof`. A new absence-flavored tag cites this list or amends
+it here. Two recorded interims, each filed upstream and flipped with
+the pin bump that fixes it (`docs/findings.md`):
+- **Spelling:** std code writes the tag `None` today — neither pinned
+  implementation resolves a lowercase bare tag in raise position
+  (F-0003).
+- **The helper inventory is blocked:** rows exist only in return
+  position (a `!`-row in a parameter or `let` type is E0201 in the
+  pinned grammar and both implementations), so `or`/`expect`/`flatten`/
+  `to_list`/`exists`/`is_none` cannot be written as functions; the
+  language forms are the idiom and `std.option`'s module doc + tests
+  are their worked home (F-0002). Lazy variants additionally wait on
+  closures (c05); `Option[T]`/`Result[T, E]` as data wait on s16.
+
 ## 3. Parameter modes (X1)
 
 - The `read` default is sacred: the absence of a keyword *is* the mode,
@@ -101,8 +119,49 @@ folklore there.
   allocation story (D15: rt-thin); a module that needs more waits for
   stdc02, it does not shim.
 
+## 6. Ordering (sc01)
+
+- `std.cmp.Ordering` (`Less | Equal | Greater`) is the one comparison
+  verdict in std; no module invents an int-coded or bool-pair order.
+- `Eq` is equivalence (reflexive, symmetric, transitive); `Ord` is a
+  total order (trichotomy, antisymmetry, transitivity) that must agree
+  with `Eq` where both exist. `Ord` requires `Eq` by doctrine; the
+  pinned grammar has no supertrait clause, so the requirement is
+  documentary until the trait-composition question lands (F-0004).
+- **Float, decided:** `f64` has no `Eq` — IEEE partial comparison stays
+  on the builtin operators — and its `Ord` IS `total_cmp` (IEEE
+  totalOrder; NaN's one home is above `+inf`). Sorting floats is legal;
+  the two pin-era approximations (NaN sign/payload unobserved) are
+  documented on `total_cmp` itself.
+- Ties: `min` and `max` both return their FIRST argument on a tie —
+  stability callers can rely on.
+- `clamp(v, lo, hi)` traps `assert` when `lo > hi`: a caller contract
+  violation, not a row (per §2's trap rule).
+- The operator bridge (`==`/`<=>` desugaring to `Eq.eq`/`Ord.cmp` for
+  user types) is filed, not assumed (F-0004): today `<=>` is
+  builtin-only and yields an int in lupin, and enum `==` is refused by
+  wolfc — std code writes trait calls, never leans on the bridge.
+
+## 7. Assert (sc01)
+
+- `assert(cond)` is an intrinsic, not a prelude function: one name in
+  both tiers (comptime witness, s16; runtime trap `assert`,
+  `[conf.trap.map]`), silent and effect-free when satisfied.
+- **No std module defines a function named `assert`** — a module item
+  shadows the intrinsic module-wide (observed both implementations),
+  severing the module from the trap it needs. The two-argument
+  `assert(cond, msg)` is therefore filed (F4 / wolf-lang), not shipped;
+  its interim spelling is `if !cond { testing.fail(msg) }`.
+- `testing.fail`/`unreachable`/`todo` all trap `assert` and never
+  return normally; helpers print at most one fixed line before
+  trapping and render no values until sc05's fmt trait (`assert_eq`/
+  `assert_ne` say only which side of the relation broke).
+
 ## Review record
 
 - 2026-08-10 — drafted (sc00). Human review: **pending**; record the
   reviewer and date here when it lands, then flip Status above to
   binding.
+- 2026-08-10 — sc01 amendments: §2 absence inventory (with the two
+  filed interims), §6 ordering, §7 assert. Review rides the same
+  pending sc00 gate.

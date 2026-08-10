@@ -6,6 +6,14 @@
 # "run" means: satisfies the directive's `check:` in full. A test passing
 # deeper than its ledger claims fails CI — advancement is deliberate, in
 # its own commit. Paths are slash-relative to tests/.
+#
+# The sc01 pattern of rows (each stated in the test header too):
+# - rows/enums/traits execute under lupin only where no user METHOD or
+#   type-path expression is involved (F-0002); wolfc's checked tier
+#   refuses rows, enums and trait dispatch at the run rung with an
+#   honest `unsupported` after proving the static ladder through mem.
+# - `(mut xs).push` — the X1-correct spelling — is E0804 under wolfc's
+#   pinned List typing (divergence F-0005): those tests are lupin-only.
 
 [tests."prelude/prelude_smoke.lu"]
 lupin = "run"
@@ -13,3 +21,91 @@ lupin = "run"
 # already executes the staged exemplar under `--checked` (miri-lite run
 # rung, s23) — the truthful ledger records what IS.
 wolfc = "run"
+
+# ---- std.option: the six idioms the blocked helpers name (F-0002) ----
+
+[tests."option/or_else_default.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."option/expect_trap.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."option/flatten_propagate.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."option/to_list_roundtrip.lu"]
+lupin = "run"
+wolfc = "fail(E0804)"
+
+[tests."option/exists_marking.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."option/is_none_marking.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+# ---- std.cmp ----
+
+[tests."cmp/static_floor.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+
+[tests."cmp/total_cmp_relational.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."cmp/ordering_exhaustive.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."cmp/ordering_methods_static.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+
+[tests."cmp/clamp_bad_range.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+
+# ---- std.testing ----
+
+[tests."testing/assert_builtin_trap.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."testing/fail_trap.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."testing/unreachable_trap.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."testing/todo_trap.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."testing/assert_eq_trap.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+
+[tests."testing/assert_ne_trap.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+
+# ---- std.iter: the F1 prototypes ----
+
+[tests."iter/range_drive.lu"]
+lupin = "run"
+# Not the range prototype's own doing: wolfc typechecks the whole iter
+# module as freight, and list_next's `c.xs.len`-then-`c.xs[c.i]` reads
+# trip the pinned mem tier's List reads-as-moves (F-0005, same filing
+# as the E0804 push typing). The row flips with that fix.
+wolfc = "fail(E1001)"
+
+[tests."iter/list_cursor_drive.lu"]
+lupin = "run"
+wolfc = "fail(E0804)"

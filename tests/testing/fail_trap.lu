@@ -1,0 +1,15 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.map
+//!
+//! `fail` prints its one rendering line (`FAILED: boom` — observed on
+//! both lanes at the workbench; trap checks compare no stdout) and
+//! traps `assert`. The msg-carrying assertion form until the F4 filing
+//! settles `assert(cond, msg)`.
+
+use testing
+
+fn main() -> !int {
+    testing.fail("boom")
+    0
+}

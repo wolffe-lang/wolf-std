@@ -1,0 +1,18 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.map
+//!
+//! The intrinsic this module's docs define and file (F4): `assert`
+//! needs no import — that is the definition's point (one name, comptime
+//! and runtime, ambient). A satisfied assertion is silent first —
+//! pinning that — then a failed one traps `assert` at its own span, in
+//! every profile. Both lanes execute this file.
+
+fn main() -> !int {
+    assert(1 + 1 == 2)
+    var n = 40
+    n = n + 2
+    assert(n == 42)
+    assert(n == 41)
+    0
+}

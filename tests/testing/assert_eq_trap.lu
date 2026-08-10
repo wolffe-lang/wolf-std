@@ -1,0 +1,21 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.map
+//!
+//! `assert_eq` under `cmp.Eq`: the equal pair passes silently, the
+//! unequal pair traps `assert`. Neither lane executes trait dispatch
+//! at the sc01 pins (F-0002): wolfc proves the instantiation through
+//! mem then refuses honestly, lupin refuses at `Eq.eq` — ledgered; the
+//! file starts trapping on the pin bump that lands dispatch. Typed
+//! bindings dodge the i32-literal paper cut (F-0004).
+
+use testing
+
+fn main() -> !int {
+    let a: int = 4
+    let b: int = 4
+    let c: int = 9
+    testing.assert_eq(a, b)
+    testing.assert_eq(a, c)
+    0
+}

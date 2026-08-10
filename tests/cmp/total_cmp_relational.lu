@@ -1,0 +1,42 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.cmp
+//!
+//! `total_cmp` verified relationally: entry code cannot name
+//! `cmp.Ordering.Less` (lupin executes no type-path expressions at the
+//! pin, F-0002), but it can compare two returned Orderings with `==` —
+//! trichotomy makes the three verdicts distinguishable through known
+//! anchors (1<2 => Less, 2>1 => Greater, 4.5==4.5 => Equal). Covers
+//! the IEEE totalOrder decisions: NaN above +inf, all NaNs equal,
+//! -0.0 strictly below +0.0, and NaN != NaN never leaking through.
+//! wolfc's checked tier refuses enum values at the run rung (honest
+//! `unsupported`); lupin executes all of it.
+
+use cmp
+
+fn main() -> !int {
+    let less = cmp.total_cmp(1.0, 2.0)
+    let greater = cmp.total_cmp(2.0, 1.0)
+    let equal = cmp.total_cmp(4.5, 4.5)
+    // Trichotomy: the three anchors are pairwise distinct.
+    if less == greater { return 1 }
+    if less == equal { return 2 }
+    if greater == equal { return 3 }
+    // Ordinary reals and magnitudes.
+    if cmp.total_cmp(-1.0e9, 3.5) == less {} else { return 4 }
+    if cmp.total_cmp(3.5, -1.0e9) == greater {} else { return 5 }
+    // NaN: one home above +inf, equal to itself, on both sides.
+    let nan = 0.0 / 0.0
+    let inf = 1.0 / 0.0
+    if cmp.total_cmp(nan, inf) == greater {} else { return 6 }
+    if cmp.total_cmp(inf, nan) == less {} else { return 7 }
+    if cmp.total_cmp(nan, nan) == equal {} else { return 8 }
+    // Zeroes: -0.0 sorts strictly below +0.0, and equal to itself.
+    if cmp.total_cmp(-0.0, 0.0) == less {} else { return 9 }
+    if cmp.total_cmp(0.0, -0.0) == greater {} else { return 10 }
+    if cmp.total_cmp(-0.0, -0.0) == equal {} else { return 11 }
+    // Infinities order against reals.
+    if cmp.total_cmp(0.0 - inf, 1.0) == less {} else { return 12 }
+    if cmp.total_cmp(inf, 1.0e12) == greater {} else { return 13 }
+    0
+}

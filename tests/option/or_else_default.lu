@@ -1,0 +1,19 @@
+//! check: run(exit=0, stdout="hit 5, miss 9")
+//! phase: run
+//! conforms: std.option, err.else
+//!
+//! The `or` idiom — `v else default` is the eager-default form the
+//! blocked `option.or[T]` names (F-0002; the module documents the six
+//! blocked signatures). Absence spelled `None` per the F-0003 interim.
+
+fn find_positive(x: int) -> int ! {None} {
+    if x > 0 { return x }
+    return None
+}
+
+fn main() -> !int {
+    let hit = find_positive(5) else 9
+    let miss = find_positive(0 - 3) else 9
+    print("hit {hit}, miss {miss}")
+    if hit == 5 && miss == 9 { 0 } else { 1 }
+}

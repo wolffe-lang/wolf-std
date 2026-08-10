@@ -1,0 +1,27 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.option, err.else, conf.trap.map
+//!
+//! The `expect` idiom — assert-with-message on the miss, the shape the
+//! blocked `option.expect[T]` names (F-0002): the hit passes through
+//! silently first, then the miss traps `assert` via `testing.fail`.
+
+use testing
+
+fn find_positive(x: int) -> int ! {None} {
+    if x > 0 { return x }
+    return None
+}
+
+fn main() -> !int {
+    let hit = find_positive(2) else |_| {
+        testing.fail("expected a positive")
+        0
+    }
+    assert(hit == 2)
+    let miss = find_positive(0 - 8) else |_| {
+        testing.fail("expected a positive")
+        0
+    }
+    miss
+}

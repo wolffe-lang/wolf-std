@@ -1,0 +1,63 @@
+//! member: true
+//!
+//! std.testing — the assertion floor (sc06 owns the full story).
+//! Stability tier: core.
+//!
+//! `assert(cond)` — THE definition this sprint writes and files (F4):
+//! the language's one user-raised trap (`[conf.trap.map]`: `assert`).
+//! A satisfied assertion is silent and free of effects; a failed one
+//! traps `assert` at the call's span, in every profile. It is an
+//! intrinsic, not a prelude function: it must exist in the comptime
+//! sandbox as the witness primitive (s16) and at runtime under the same
+//! name — tier by context, one meaning. This module deliberately does
+//! NOT define a function named `assert`: a module item shadows the
+//! intrinsic module-wide (observed at the sc01 workbench, both
+//! implementations, E0402 arity), which would sever every helper here
+//! from the trap they raise.
+//!
+//! BLOCKED (F4): the two-argument form `assert(cond, msg)`. It needs
+//! either arity overloading (the language has none — one name, one
+//! signature) or the intrinsic itself to grow the parameter; both are
+//! the filing's to decide. Until then `msg`-carrying assertion is
+//! spelled `if !cond { testing.fail(msg) }` — `fail` is that form.
+//!
+//! Rendering is minimal until sc05's fmt trait: helpers print one
+//! fixed line to stdout before trapping, and never render values.
+
+use cmp
+
+/// Unconditional failure: prints `msg` one line, then traps `assert`
+/// (`[conf.trap.map]`). Never returns normally.
+///
+/// Example (prose — a trapping call cannot sit in a boolean example):
+/// `testing.fail("unreached branch")` prints
+/// `FAILED: unreached branch` and traps `assert`.
+pub fn fail(msg: str) {
+    print("FAILED: {msg}")
+    assert(false)
+}
+
+/// Marks code that must never execute; reaching it is the bug. Traps
+/// `assert` via `fail`. Never returns normally.
+pub fn unreachable() {
+    fail("entered unreachable code")
+}
+
+/// Marks unfinished code: reaching it traps `assert` via `fail`,
+/// naming `msg` as what remains to build. Never returns normally.
+pub fn todo(msg: str) {
+    fail("not yet implemented: {msg}")
+}
+
+/// Asserts `a` equals `b` under `cmp.Eq`; a miss prints one line and
+/// traps `assert`. Values are not rendered until sc05's fmt trait.
+pub fn assert_eq[T: cmp.Eq](a: T, b: T) {
+    if cmp.Eq.eq(a, b) {} else { fail("assert_eq: left != right") }
+}
+
+/// Asserts `a` differs from `b` under `cmp.Eq`; equality prints one
+/// line and traps `assert`. Values are not rendered until sc05's fmt
+/// trait.
+pub fn assert_ne[T: cmp.Eq](a: T, b: T) {
+    if cmp.Eq.eq(a, b) { fail("assert_ne: left == right") } else {}
+}

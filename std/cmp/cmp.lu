@@ -1,0 +1,283 @@
+//! member: true
+//!
+//! std.cmp — comparison and ordering: the `Ordering` enum, the `Eq` and
+//! `Ord` protocols, and the min/max/clamp family. Stability tier: core.
+//!
+//! Decided here and recorded (sc01): f64 ordering. `f64` has no
+//! `Eq` — IEEE partial comparison stays on the builtin operators — and
+//! its `Ord` is `total_cmp` (IEEE totalOrder), so sorting floats is
+//! legal and NaN has one home (above `+inf`). See `total_cmp` for the
+//! two documented approximations at the current pins.
+//!
+//! INTERIM SPELLINGS (each filed, flipped on the pin bump that fixes it):
+//! - Absence is spelled `None`, not the convention's `none`: neither
+//!   pinned implementation resolves a lowercase bare tag in raise
+//!   position (lupin: `does not resolve`; wolfc: E0301). Finding F-0003.
+//! - `Ord` requires `Eq` by doctrine, but the pinned grammar has no
+//!   supertrait clause (`trait_item` carries no bound list), so the
+//!   requirement is documentary until the F-0004 bridge filing settles
+//!   trait composition.
+//! - `impl Ord for str` is NOT shipped: wolfc rejects `<` on `str`
+//!   (E0409) and one rejected body poisons every test that imports this
+//!   module, while lupin runs str relational operators. Divergence
+//!   filed (F-0006); the impl lands with the pin that defines str
+//!   ordering in both implementations.
+
+pub enum Ordering {
+    Less,
+    Equal,
+    Greater,
+}
+
+impl Ordering {
+    /// The opposite verdict: `Less` <-> `Greater`; `Equal` is its own
+    /// reverse. Total: no error row, no traps.
+    ///
+    /// Example (prose until enum methods execute at the pins, F-0002):
+    /// `total_cmp(1.0, 2.0).reverse()` is `Greater`.
+    pub fn reverse(self) -> Ordering {
+        match self {
+            Less => Ordering.Greater,
+            Equal => Ordering.Equal,
+            Greater => Ordering.Less,
+        }
+    }
+
+    /// Lexicographic composition: keep `self` unless it is `Equal`, in
+    /// which case defer to `other`. Chains multi-key comparisons:
+    /// `by_name.then(by_id)`. Total: no error row, no traps.
+    pub fn then(self, other: Ordering) -> Ordering {
+        match self {
+            Less => Ordering.Less,
+            Equal => other,
+            Greater => Ordering.Greater,
+        }
+    }
+
+    /// True exactly for `Less`. Total: no error row, no traps.
+    pub fn is_lt(self) -> bool {
+        match self {
+            Less => true,
+            Equal => false,
+            Greater => false,
+        }
+    }
+
+    /// True for `Less` or `Equal`. Total: no error row, no traps.
+    pub fn is_le(self) -> bool {
+        match self {
+            Less => true,
+            Equal => true,
+            Greater => false,
+        }
+    }
+
+    /// True exactly for `Equal`. Total: no error row, no traps.
+    pub fn is_eq(self) -> bool {
+        match self {
+            Less => false,
+            Equal => true,
+            Greater => false,
+        }
+    }
+
+    /// True for anything but `Equal`. Total: no error row, no traps.
+    pub fn is_ne(self) -> bool {
+        match self {
+            Less => true,
+            Equal => false,
+            Greater => true,
+        }
+    }
+
+    /// True for `Greater` or `Equal`. Total: no error row, no traps.
+    pub fn is_ge(self) -> bool {
+        match self {
+            Less => false,
+            Equal => true,
+            Greater => true,
+        }
+    }
+
+    /// True exactly for `Greater`. Total: no error row, no traps.
+    pub fn is_gt(self) -> bool {
+        match self {
+            Less => false,
+            Equal => false,
+            Greater => true,
+        }
+    }
+}
+
+/// Equivalence. Law: `eq` is reflexive, symmetric, transitive; `Ord`
+/// implementors agree with it (`cmp(a, b).is_eq() == Eq.eq(a, b)`).
+pub trait Eq {
+    fn eq(self, other: Self) -> bool
+}
+
+/// Total order. Law: trichotomy (exactly one of Less/Equal/Greater),
+/// antisymmetry, transitivity. Requires `Eq` by doctrine (see the
+/// module header for why the requirement is documentary today).
+pub trait Ord {
+    fn cmp(self, other: Self) -> Ordering
+}
+
+impl Eq for int {
+    fn eq(self, other: Self) -> bool {
+        self == other
+    }
+}
+
+impl Ord for int {
+    fn cmp(self, other: Self) -> Ordering {
+        if self < other { return Ordering.Less }
+        if other < self { return Ordering.Greater }
+        Ordering.Equal
+    }
+}
+
+impl Eq for bool {
+    fn eq(self, other: Self) -> bool {
+        self == other
+    }
+}
+
+impl Ord for bool {
+    fn cmp(self, other: Self) -> Ordering {
+        // false < true, the conventional bool order.
+        match (self, other) {
+            (false, true) => Ordering.Less,
+            (true, false) => Ordering.Greater,
+            _ => Ordering.Equal,
+        }
+    }
+}
+
+impl Eq for str {
+    fn eq(self, other: Self) -> bool {
+        self == other
+    }
+}
+
+impl Eq for Ordering {
+    fn eq(self, other: Self) -> bool {
+        match (self, other) {
+            (Less, Less) => true,
+            (Equal, Equal) => true,
+            (Greater, Greater) => true,
+            _ => false,
+        }
+    }
+}
+
+impl Ord for Ordering {
+    fn cmp(self, other: Self) -> Ordering {
+        // Less < Equal < Greater.
+        match (self, other) {
+            (Less, Less) => Ordering.Equal,
+            (Less, _) => Ordering.Less,
+            (Equal, Less) => Ordering.Greater,
+            (Equal, Equal) => Ordering.Equal,
+            (Equal, Greater) => Ordering.Less,
+            (Greater, Greater) => Ordering.Equal,
+            (Greater, _) => Ordering.Greater,
+        }
+    }
+}
+
+impl Ord for f64 {
+    /// `Ord` for f64 IS `total_cmp` — the decision this module
+    /// records. See `total_cmp` for the order and its documented
+    /// approximations.
+    fn cmp(self, other: Self) -> Ordering {
+        total_cmp(self, other)
+    }
+}
+
+/// Least of `a` and `b` under `Ord`; returns `a` on a tie (the stable
+/// choice). Total: no error row, no traps.
+pub fn min[T: Ord](a: T, b: T) -> T {
+    match Ord.cmp(b, a) {
+        Less => b,
+        Equal => a,
+        Greater => a,
+    }
+}
+
+/// Greatest of `a` and `b` under `Ord`; returns `a` on a tie (the
+/// stable choice). Total: no error row, no traps.
+pub fn max[T: Ord](a: T, b: T) -> T {
+    match Ord.cmp(b, a) {
+        Less => a,
+        Equal => a,
+        Greater => b,
+    }
+}
+
+/// `v` limited to `[lo, hi]`: `lo` when `v < lo`, `hi` when `v > hi`,
+/// else `v`. Traps `assert` when `lo > hi` — a contract violation the
+/// callee cannot repair (`[conf.trap.map]`: user assertions).
+pub fn clamp[T: Ord](v: T, lo: T, hi: T) -> T {
+    match Ord.cmp(lo, hi) {
+        Greater => assert(false),
+        Less => {},
+        Equal => {},
+    }
+    match Ord.cmp(v, lo) {
+        Less => return lo,
+        Equal => {},
+        Greater => {},
+    }
+    match Ord.cmp(v, hi) {
+        Greater => hi,
+        Less => v,
+        Equal => v,
+    }
+}
+
+// BLOCKED at the sc01 pins — `min_of[T: Ord](xs: List[T]) -> T ! {None}`
+// and `max_of[T: Ord](xs: List[T]) -> T ! {None}` (least/greatest element,
+// `None` on empty). Every spelling of a generic `List[T]` traversal that
+// reads two overlapping places (`xs.len` then `xs[i]`, or a carried
+// `best`) is rejected by wolfc's mem tier: reads of generic-typed places
+// are treated as moves, so the second read is E1001 (the fix-it suggests
+// a `copy` operator that is not in the pinned grammar). lupin cannot run
+// them either (`Ord.cmp` dispatch). Filed with the List/mode divergence
+// (F-0005); the bodies land verbatim from the sc01 workbench when the
+// mem tier learns copyable reads.
+
+/// IEEE totalOrder over floats, monomorphic: -inf < negative reals <
+/// -0.0 < +0.0 < positive reals < +inf < NaN. Total: no error row, no
+/// traps (f64 division by zero is IEEE, not a trap — X3 governs
+/// integers).
+///
+/// Two documented approximations at the current pins (no f64 bit
+/// intrinsics exist to do better): NaN is one value — the sign and
+/// payload of a NaN are not observed, so every NaN sorts above `+inf`
+/// and all NaNs compare `Equal`; totalOrder's -NaN-below--inf home is
+/// not represented.
+///
+/// ```wolf-doc-example
+/// cmp.total_cmp(1.0, 2.0) == cmp.total_cmp(-1.0e9, 3.5)
+/// cmp.total_cmp(2.0, 1.0) == cmp.total_cmp(0.0 / 0.0, 1.0)
+/// cmp.total_cmp(4.5, 4.5) == cmp.total_cmp(0.0 / 0.0, 0.0 / 0.0)
+/// cmp.total_cmp(-0.0, 0.0) == cmp.total_cmp(1.0, 2.0)
+/// ```
+pub fn total_cmp(a: f64, b: f64) -> Ordering {
+    let a_nan = a != a
+    let b_nan = b != b
+    if a_nan && b_nan { return Ordering.Equal }
+    if a_nan { return Ordering.Greater }
+    if b_nan { return Ordering.Less }
+    if a < b { return Ordering.Less }
+    if b < a { return Ordering.Greater }
+    // a == b numerically; IEEE == conflates -0.0 and +0.0, totalOrder
+    // does not. The sign of zero is observable through division.
+    if a == 0.0 {
+        let a_neg = 1.0 / a < 0.0
+        let b_neg = 1.0 / b < 0.0
+        if a_neg && !b_neg { return Ordering.Less }
+        if b_neg && !a_neg { return Ordering.Greater }
+    }
+    Ordering.Equal
+}

@@ -1,0 +1,31 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.cmp, generics.golden.checked
+//!
+//! The module freight test: importing `cmp` makes wolfc typecheck the
+//! ENTIRE module — every `_`-free match under the E0801 usefulness
+//! engine, every generic body against its bounds alone (E0501), every
+//! receiver mode — and this entry instantiates `min`/`max`/`clamp` at
+//! `int`, which wolfc proves through the mem rung before its checked
+//! tier refuses trait dispatch (honest `unsupported`, ledgered). lupin
+//! executes no trait dispatch at the pin (F-0002) and refuses at
+//! `Ord.cmp` the same way. Neither lane reaches the exit today; the
+//! ledger records exactly that, and this file flips to a genuinely
+//! running test on the pin bump that lands dispatch.
+//!
+//! Literals stay in typed bindings: wolfc defaults a bare literal
+//! argument to `i32`, which does not meet an `impl … for int` (E0502
+//! observed) — the F-0004 filing carries that paper cut.
+
+use cmp
+
+fn main() -> !int {
+    let a: int = 3
+    let b: int = 7
+    let lo: int = 0
+    let hi: int = 5
+    let m = cmp.min(a, b)
+    let x = cmp.max(a, b)
+    let c = cmp.clamp(b, lo, hi)
+    if m == 3 && x == 7 && c == 5 { 0 } else { 1 }
+}
