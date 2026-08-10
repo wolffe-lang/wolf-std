@@ -1,0 +1,32 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! `reverse` in place, `extend` reading its donor, `concat` and `repeat`
+//! allocating fresh lists and leaving their operands alone.
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    list.push(mut xs, 2)
+    list.push(mut xs, 3)
+    list.reverse(mut xs)
+    if (list.first(xs) else 0) == 3 {} else { return 1 }
+    if (list.last(xs) else 0) == 1 {} else { return 2 }
+    var ys = List[int]()
+    list.push(mut ys, 9)
+    list.extend(mut xs, ys)
+    if list.len(xs) == 4 {} else { return 3 }
+    if (list.last(xs) else 0) == 9 {} else { return 4 }
+    if list.len(ys) == 1 {} else { return 5 }
+    let joined = list.concat(xs, ys)
+    if list.len(joined) == 5 {} else { return 6 }
+    if list.len(xs) == 4 {} else { return 7 }
+    let thrice = list.repeat(ys, 3)
+    if list.len(thrice) == 3 {} else { return 8 }
+    let none = list.repeat(ys, 0)
+    if list.is_empty(none) {} else { return 9 }
+    0
+}

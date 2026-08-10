@@ -1,0 +1,19 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! `first` and `last`: hit on a populated list, `None` on an empty one.
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    if (list.first(xs) else 0 - 1) == 0 - 1 {} else { return 1 }
+    if (list.last(xs) else 0 - 1) == 0 - 1 {} else { return 2 }
+    list.push(mut xs, 3)
+    list.push(mut xs, 4)
+    list.push(mut xs, 5)
+    if (list.first(xs) else 0) == 3 {} else { return 3 }
+    if (list.last(xs) else 0) == 5 {} else { return 4 }
+    0
+}

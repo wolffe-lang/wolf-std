@@ -1,0 +1,32 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.deque
+//!
+//! `pop_back` takes from the back and rebuilds the buffer (the
+//! representation's documented cost); `clear` empties and leaves the
+//! queue usable. Mixed pops from both ends keep the order straight.
+
+use std.x.deque_int
+
+fn main() -> !int {
+    var d = deque_int.new()
+    deque_int.push_back(mut d, 1)
+    deque_int.push_back(mut d, 2)
+    deque_int.push_back(mut d, 3)
+    let z = deque_int.pop_back(mut d) else 0 - 1
+    if z == 3 {} else { return 1 }
+    let a = deque_int.pop_front(mut d) else 0 - 1
+    if a == 1 {} else { return 2 }
+    if deque_int.len(d) == 1 {} else { return 3 }
+    let y = deque_int.pop_back(mut d) else 0 - 1
+    if y == 2 {} else { return 4 }
+    if deque_int.is_empty(d) {} else { return 5 }
+    let none = deque_int.pop_back(mut d) else 0 - 1
+    if none == 0 - 1 {} else { return 6 }
+    deque_int.push_back(mut d, 9)
+    deque_int.clear(mut d)
+    if deque_int.is_empty(d) {} else { return 7 }
+    deque_int.push_back(mut d, 8)
+    if (deque_int.front(d) else 0) == 8 {} else { return 8 }
+    0
+}

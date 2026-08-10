@@ -1,0 +1,18 @@
+//! check: run(exit=trap(stale-handle))
+//! phase: run
+//! conforms: mem.shared.handle.3
+//!
+//! X5, the whole contract in five lines: after `free`, the handle is
+//! stale and dereferencing it traps `stale-handle` — in every profile,
+//! with no static check anywhere. Both implementations trap by the same
+//! kind name.
+
+use std.pool
+
+fn main() -> !int {
+    var p = Pool[int]()
+    let h = pool.alloc(mut p, 1)
+    pool.free(mut p, h)
+    let v = p[h]
+    v
+}

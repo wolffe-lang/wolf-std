@@ -1,0 +1,35 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.deque
+//!
+//! `to_list` yields FRONT to BACK — the one order the type promises —
+//! and it survives a `pop_front` (the head offset must not leak into the
+//! copy).
+
+use std.x.deque_int
+
+fn main() -> !int {
+    var d = deque_int.new()
+    deque_int.push_back(mut d, 2)
+    deque_int.push_front(mut d, 1)
+    deque_int.push_back(mut d, 3)
+    var i = 0
+    var ok = 1
+    for x in deque_int.to_list(d) {
+        i = i + 1
+        if x == i {} else { ok = 0 }
+    }
+    if i == 3 {} else { return 1 }
+    if ok == 1 {} else { return 2 }
+    let gone = deque_int.pop_front(mut d) else 0 - 1
+    if gone == 1 {} else { return 3 }
+    var n = 0
+    var total = 0
+    for y in deque_int.to_list(d) {
+        n = n + 1
+        total = total + y
+    }
+    if n == 2 {} else { return 4 }
+    if total == 5 {} else { return 5 }
+    0
+}

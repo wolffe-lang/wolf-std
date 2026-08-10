@@ -1,0 +1,44 @@
+//! member: true
+//!
+//! std.deque — `Deque[T]`, the double-ended queue. Stability tier: core
+//! (the API; the generic implementation is blocked).
+//!
+//! Same blocker as `std.set`, same honesty: a `Deque[T]` is std-defined
+//! generic data, `struct Deque[T] { … }` is E0201 in both implementations
+//! at the pins (s16), and no implementation provides a deque builtin.
+//! The difference is that a deque needs no element protocol at all — only
+//! storage — so the semantics ARE provable today at a concrete element
+//! type: **`std/x/deque_int/` is the running prototype** (nursery, D31
+//! clock), a `DequeInt` over one `List[int]` plus a head index, with all
+//! ten operations executing under both implementations. This module's
+//! generic version is that prototype with `int` replaced by `T`.
+//!
+//! Reviewed inventory (10), each with its contract, exactly as it will
+//! land:
+//!
+//! ```text
+//! push_back[T](mut d: Deque[T], v: T)
+//!     Appends at the back. Amortized constant. Total.
+//! push_front[T](mut d: Deque[T], v: T)
+//!     Prepends at the front. Amortized constant. Total.
+//! pop_back[T](mut d: Deque[T]) -> T ! {None}
+//!     Removes and returns the back element; `None` when empty.
+//! pop_front[T](mut d: Deque[T]) -> T ! {None}
+//!     Removes and returns the front element; `None` when empty.
+//! front[T](d: Deque[T]) -> T ! {None}
+//!     The front element, left in place; `None` when empty.
+//! back[T](d: Deque[T]) -> T ! {None}
+//!     The back element, left in place; `None` when empty.
+//! len[T](d: Deque[T]) -> int
+//!     Number of elements. Total.
+//! is_empty[T](d: Deque[T]) -> bool
+//!     `len(d) == 0`. Total.
+//! clear[T](mut d: Deque[T])
+//!     Empties `d`, keeping it usable. Total.
+//! to_list[T](d: Deque[T]) -> List[T]
+//!     Fresh list, FRONT to BACK — the one order this type promises.
+//! ```
+//!
+//! No tests ship against this module (nothing to run; an itemless import
+//! is E0305). The prototype's tests are `tests/x/deque_int/*`, and they
+//! are the evidence for the contract above.

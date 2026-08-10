@@ -1,0 +1,24 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! `set` replaces one element in place; `swap` exchanges two, and a
+//! self-swap is a no-op.
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    list.push(mut xs, 2)
+    list.push(mut xs, 3)
+    list.set(mut xs, 1, 9)
+    if (list.get(xs, 1) else 0) == 9 {} else { return 1 }
+    if list.len(xs) == 3 {} else { return 2 }
+    list.swap(mut xs, 0, 2)
+    if (list.get(xs, 0) else 0) == 3 {} else { return 3 }
+    if (list.get(xs, 2) else 0) == 1 {} else { return 4 }
+    list.swap(mut xs, 1, 1)
+    if (list.get(xs, 1) else 0) == 9 {} else { return 5 }
+    0
+}

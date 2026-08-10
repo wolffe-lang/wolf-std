@@ -1,0 +1,16 @@
+//! check: run(exit=trap(bounds))
+//! phase: run
+//! conforms: conf.trap.set
+//!
+//! `remove(i)` with `i` out of range traps `bounds`: the caller asked
+//! for an element that is not there and could have checked `len` first,
+//! so it is a contract violation, not a row (§2's trap rule).
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    let gone = list.remove(mut xs, 4)
+    gone
+}

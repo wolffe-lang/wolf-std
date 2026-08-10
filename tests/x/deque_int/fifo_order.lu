@@ -1,0 +1,28 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.deque
+//!
+//! The queue discipline: `push_back` three, `pop_front` three, in order,
+//! then `None`. This is the prototype standing in for `std.deque`'s
+//! generic contract (blocked on s16 generic data types).
+
+use std.x.deque_int
+
+fn main() -> !int {
+    var d = deque_int.new()
+    if deque_int.is_empty(d) {} else { return 1 }
+    deque_int.push_back(mut d, 1)
+    deque_int.push_back(mut d, 2)
+    deque_int.push_back(mut d, 3)
+    if deque_int.len(d) == 3 {} else { return 2 }
+    let a = deque_int.pop_front(mut d) else 0 - 1
+    if a == 1 {} else { return 3 }
+    let b = deque_int.pop_front(mut d) else 0 - 1
+    if b == 2 {} else { return 4 }
+    let c = deque_int.pop_front(mut d) else 0 - 1
+    if c == 3 {} else { return 5 }
+    if deque_int.is_empty(d) {} else { return 6 }
+    let empty = deque_int.pop_front(mut d) else 0 - 1
+    if empty == 0 - 1 {} else { return 7 }
+    0
+}

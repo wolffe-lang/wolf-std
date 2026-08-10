@@ -1,0 +1,75 @@
+//! member: true
+//!
+//! std.pool — the ergonomic layer over the language's `Pool[T]` and
+//! `handle T` (X5). Stability tier: core.
+//!
+//! The X5 contract this module never softens: a handle is checked at
+//! DEREFERENCE, `pool[h]`, and a dead handle traps `stale-handle` there
+//! in every profile. There is deliberately no static staleness check, and
+//! nothing here turns a liveness question into a license — `has` (when it
+//! becomes writable, below) is a probe, and code that acts on its answer
+//! still dereferences and can still trap.
+//!
+//! **What is the language's and what is std's** (F-0011): `Pool[T]` is a
+//! language-blessed core type. The language owns construction
+//! (`Pool[T]()`), the two-phase `reserve`/`init` protocol
+//! (`[mem.shared.handle.1]`: reserve yields the handle, init fills the
+//! slot — no null handles ever exist), removal (`remove`), and the
+//! checked deref `pool[h]`. This module owns the named operations over
+//! them, starting with the one-step allocation the two-phase protocol
+//! makes verbose.
+//!
+//! Iteration order over a pool is UNSPECIFIED — and, at the pins, absent:
+//! neither implementation iterates a pool at all. Do not write code that
+//! depends on slot order even when iteration lands.
+
+/// Reserves a slot, initializes it with `v`, and hands back its handle —
+/// the two-phase protocol collapsed into the one-step form callers
+/// usually want. Total: no error row, no traps beyond allocation (the
+/// handle is live by construction; there are no null handles).
+///
+/// ```wolf-doc-example
+/// var p = Pool[int]()
+/// let h = pool.alloc(mut p, 41)
+/// p[h] == 41
+/// ```
+pub fn alloc[T](mut p: Pool[T], v: T) -> handle T {
+    let h = p.reserve()
+    p.init(h, v)
+    h
+}
+
+/// Releases `h`'s slot. Every copy of `h` is stale afterwards, and
+/// dereferencing any of them traps `stale-handle` — in every profile,
+/// by design (X5). Freeing an already-free handle is itself a stale use
+/// and traps the same way.
+///
+/// ```wolf-doc-example
+/// var p = Pool[int]()
+/// let h = pool.alloc(mut p, 1)
+/// pool.free(mut p, h)
+/// let g = pool.alloc(mut p, 2)
+/// p[g] == 2
+/// ```
+pub fn free[T](mut p: Pool[T], h: handle T) {
+    p.remove(h)
+}
+// BLOCKED — four of this module's six functions, all on the same
+// missing language surface, all filed with F-0011:
+//
+//   `has[T](p: Pool[T], h: handle T) -> bool`  — the liveness PROBE
+//   `len[T](p: Pool[T]) -> int`                — live slot count
+//   `capacity[T](p: Pool[T]) -> int`           — reserved slot count
+//   `clear[T](mut p: Pool[T])`                 — free every slot
+//
+// `Pool` exposes exactly `reserve`, `init`, `remove` and the checked
+// deref at both pins: no length, no capacity, no liveness predicate, no
+// iteration (`p.len` is `unsupported` in lupin — "Pool has no member
+// `len`" — and `for v in p` is "`for` cannot iterate Pool"; wolfc's
+// builtin table types the same three methods and nothing else). None of
+// the four can be written over that surface without inventing state std
+// has no right to invent — a shadow `List` of handles would be a second
+// source of truth about liveness, which is exactly what X5 forbids.
+// They land verbatim when the builtin grows the accessors; `has` needs
+// the spec sentence too (a probe that cannot be raced is only meaningful
+// single-task).

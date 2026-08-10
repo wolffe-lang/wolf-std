@@ -1,0 +1,18 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: mem.shared.handle.1
+//!
+//! `alloc` collapses the two-phase `reserve`/`init` protocol into one
+//! step and hands back a live handle; the checked deref `p[h]` reads it.
+//! Both implementations execute this.
+
+use std.pool
+
+fn main() -> !int {
+    var p = Pool[int]()
+    let h = pool.alloc(mut p, 41)
+    let g = pool.alloc(mut p, 42)
+    if p[h] == 41 {} else { return 1 }
+    if p[g] == 42 {} else { return 2 }
+    0
+}

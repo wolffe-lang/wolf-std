@@ -1,0 +1,28 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! `pop` takes from the back, shortens the list, and raises `None` once
+//! there is nothing left — exhaustion stays exhausted.
+//!
+//! Note the shape of every mutating call here: bound in a `let` or
+//! standing alone, never inside a string interpolation. A `mut` argument
+//! inside `print("{…}")` is finding F-0013 (lupin reports `ub(mem.ub)`
+//! reading through the stale borrow tag; wolfc answers `unsupported`).
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    list.push(mut xs, 2)
+    let a = list.pop(mut xs) else 0 - 1
+    if a == 2 {} else { return 1 }
+    if list.len(xs) == 1 {} else { return 2 }
+    let b = list.pop(mut xs) else 0 - 1
+    if b == 1 {} else { return 3 }
+    if list.is_empty(xs) {} else { return 4 }
+    let c = list.pop(mut xs) else 0 - 1
+    if c == 0 - 1 {} else { return 5 }
+    0
+}

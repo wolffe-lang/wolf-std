@@ -1,0 +1,495 @@
+//! member: true
+//!
+//! std.list — the documented API surface of the language's `List[T]`:
+//! the growable sequence every other module hands back. Stability tier:
+//! core.
+//!
+//! **What is the language's and what is std's** (sc02's structural
+//! finding, F-0011): `List[T]` is a language-blessed core type — both
+//! implementations provide it natively, the spec owns its semantics, and
+//! the three operations below stay the language's own:
+//!
+//! - construction: `List[T]()`;
+//! - indexing: `xs[i]` reads, and an out-of-range index traps `bounds`
+//!   in every profile (X3 posture) — every function here that names an
+//!   index inherits exactly that trap;
+//! - iteration: `for x in xs`.
+//!
+//! Everything else — this file — is std's. Functions take the container
+//! as their first parameter with an honest X1 mode: `mut` where mutation
+//! IS the operation, the bare `read` default everywhere else.
+//!
+//! Regions (D10): every function allocates in the ambient region and no
+//! signature asks for one. The `.in(r)` targets are s37's plumbing, not
+//! this module's.
+//!
+//! INTERIM SPELLINGS (each filed, flipped by the pin bump that fixes it):
+//! - Absence is spelled `None`, not the convention's `none`: wolfc does
+//!   not resolve a lowercase bare tag in raise position (E0301). lupin
+//!   0.1.1 resolves both — the divergence, not the convention, is the
+//!   reason we wait (F-0003).
+//! - **The single-read rule.** wolfc's pinned mem tier treats every read
+//!   of a container place as a MOVE, so two read SITES over one binding
+//!   in one body is E1001 (`xs.len` twice; `xs.len` then `xs[i]`; `for x
+//!   in xs` then anything). Passing the container to a function is not a
+//!   move, so every body here reads through `len` and `at` — one call
+//!   per site — instead of projecting twice. That is why `at` exists
+//!   (F-0005 / wolf-lang#6); the bodies simplify when the fix lands.
+//! - The `[T: Eq]` family (`contains`, `index_of`, `last_index_of`,
+//!   `dedup`, `starts_with`, `ends_with`) is NOT in this file: importing
+//!   std.cmp for the bound would make every importer of std.list
+//!   `unsupported` under wolfc's checked tier (its trait/enum items are
+//!   not executable there — F-0012), on top of trait dispatch running
+//!   nowhere (F-0002/F-0004). The six sit in `std/x/list_eq/` with their
+//!   bodies, and the stub comment below is their home here.
+
+/// The element at `i`, reading through the language's indexing so an
+/// out-of-range `i` traps `bounds` exactly where the caller would see it
+/// (`[conf.trap.set]`). Private: the public checked spelling is `get`.
+///
+/// This is also the module's one indexing site per body (see the header's
+/// single-read rule) — the bodies below call it instead of writing
+/// `xs[i]` twice.
+fn at[T](xs: List[T], i: int) -> T {
+    xs[i]
+}
+
+/// Appends `v` to the end of `xs`, growing it. Amortized constant time
+/// (the buffer doubles; no capacity contract beyond that is promised).
+/// Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 4)
+/// list.push(mut xs, 5)
+/// list.len(xs) == 2
+/// ```
+pub fn push[T](mut xs: List[T], v: T) {
+    xs.push(v)
+}
+
+/// Removes and returns the last element; `None` when `xs` is empty —
+/// the absence row, consumed by `else` or `?`. No traps: emptiness is a
+/// recoverable outcome, not a contract violation (§2).
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 7)
+/// (list.pop(mut xs) else 0 - 1) == 7
+/// (list.pop(mut xs) else 0 - 1) == 0 - 1
+/// ```
+pub fn pop[T](mut xs: List[T]) -> T ! {None} {
+    let n = len(xs)
+    if n == 0 {
+        return None
+    }
+    let v = at(xs, n - 1)
+    truncate(mut xs, n - 1)
+    v
+}
+
+/// The number of elements in `xs`. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.len(xs) == 1
+/// ```
+pub fn len[T](xs: List[T]) -> int {
+    xs.len
+}
+
+/// Whether `xs` holds no elements — `len(xs) == 0`, spelled as the
+/// predicate callers reach for (§1). Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.is_empty(xs) == true
+/// list.push(mut xs, 1)
+/// list.is_empty(xs) == false
+/// ```
+pub fn is_empty[T](xs: List[T]) -> bool {
+    len(xs) == 0
+}
+
+/// The element at `i`, checked: `None` when `i` is negative or at least
+/// `len(xs)` — the one checked-access spelling (§1: no `get_` prefix, no
+/// sentinel). No traps; the unchecked spelling is the language's `xs[i]`,
+/// which traps `bounds`.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 9)
+/// (list.get(xs, 0) else 0 - 1) == 9
+/// (list.get(xs, 4) else 0 - 1) == 0 - 1
+/// (list.get(xs, 0 - 1) else 0 - 1) == 0 - 1
+/// ```
+pub fn get[T](xs: List[T], i: int) -> T ! {None} {
+    if i < 0 {
+        return None
+    }
+    if i >= len(xs) {
+        return None
+    }
+    at(xs, i)
+}
+
+/// Replaces the element at `i` with `v`, in place. Traps `bounds` when
+/// `i` is out of range — the same contract as `xs[i]`, and a caller
+/// violation rather than a row (§2's trap rule).
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.set(mut xs, 0, 8)
+/// (list.get(xs, 0) else 0) == 8
+/// (list.get(xs, 1) else 0) == 2
+/// ```
+pub fn set[T](mut xs: List[T], i: int, v: T) {
+    let n = len(xs)
+    // Reading the target first is the bounds contract: an out-of-range
+    // `i` traps here, before anything is rebuilt.
+    let old = at(xs, i)
+    var out = List[T]()
+    var k = 0
+    while k < n {
+        if k == i {
+            out.push(v)
+        } else {
+            out.push(at(xs, k))
+        }
+        k = k + 1
+    }
+    xs = out
+}
+
+/// The first element; `None` when `xs` is empty. No traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 3)
+/// list.push(mut xs, 4)
+/// (list.first(xs) else 0) == 3
+/// ```
+pub fn first[T](xs: List[T]) -> T ! {None} {
+    for x in xs {
+        return x
+    }
+    None
+}
+
+/// The last element; `None` when `xs` is empty. No traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 3)
+/// list.push(mut xs, 4)
+/// (list.last(xs) else 0) == 4
+/// ```
+pub fn last[T](xs: List[T]) -> T ! {None} {
+    let n = len(xs)
+    if n == 0 {
+        return None
+    }
+    at(xs, n - 1)
+}
+
+/// Inserts `v` at `i`, shifting the elements from `i` onward one place
+/// to the right; `i == len(xs)` appends. Traps `bounds` when `i` is
+/// negative or greater than `len(xs)`.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 3)
+/// list.insert(mut xs, 1, 2)
+/// (list.get(xs, 1) else 0) == 2
+/// list.len(xs) == 3
+/// ```
+pub fn insert[T](mut xs: List[T], i: int, v: T) {
+    let n = len(xs)
+    if i < 0 || i > n {
+        // Out of range: index through the language to raise the same
+        // `bounds` trap `xs[i]` would (no invented trap kinds).
+        let bad = at(xs, i)
+    }
+    var out = List[T]()
+    var k = 0
+    while k < n {
+        if k == i {
+            out.push(v)
+        }
+        out.push(at(xs, k))
+        k = k + 1
+    }
+    if i == n {
+        out.push(v)
+    }
+    xs = out
+}
+
+/// Removes the element at `i`, shifting the rest left, and returns it.
+/// Traps `bounds` when `i` is out of range — the caller asked for an
+/// element that is not there and could have checked `len` first.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.remove(mut xs, 0) == 1
+/// list.len(xs) == 1
+/// ```
+pub fn remove[T](mut xs: List[T], i: int) -> T {
+    let n = len(xs)
+    let v = at(xs, i)
+    var out = List[T]()
+    var k = 0
+    while k < n {
+        if k != i {
+            out.push(at(xs, k))
+        }
+        k = k + 1
+    }
+    xs = out
+    v
+}
+
+/// Removes the element at `i` by moving the LAST element into its slot,
+/// and returns the removed element. Constant time, and the order of the
+/// remaining elements changes — that is the trade this name announces.
+/// Traps `bounds` when `i` is out of range.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.push(mut xs, 3)
+/// list.swap_remove(mut xs, 0) == 1
+/// (list.get(xs, 0) else 0) == 3
+/// list.len(xs) == 2
+/// ```
+pub fn swap_remove[T](mut xs: List[T], i: int) -> T {
+    let n = len(xs)
+    let v = at(xs, i)
+    let tail = at(xs, n - 1)
+    var out = List[T]()
+    var k = 0
+    while k < n - 1 {
+        if k == i {
+            out.push(tail)
+        } else {
+            out.push(at(xs, k))
+        }
+        k = k + 1
+    }
+    xs = out
+    v
+}
+
+/// Exchanges the elements at `i` and `j`, in place; `i == j` is a
+/// no-op. Traps `bounds` when either index is out of range.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.swap(mut xs, 0, 1)
+/// (list.get(xs, 0) else 0) == 2
+/// (list.get(xs, 1) else 0) == 1
+/// ```
+pub fn swap[T](mut xs: List[T], i: int, j: int) {
+    let n = len(xs)
+    let a = at(xs, i)
+    let b = at(xs, j)
+    var out = List[T]()
+    var k = 0
+    while k < n {
+        if k == i {
+            out.push(b)
+        } else if k == j {
+            out.push(a)
+        } else {
+            out.push(at(xs, k))
+        }
+        k = k + 1
+    }
+    xs = out
+}
+
+/// Empties `xs`, keeping it usable. Total: no error row, no traps.
+/// D10 note: the elements' storage belongs to the region, so clearing
+/// drops no elements one by one for POD element types.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.clear(mut xs)
+/// list.is_empty(xs) == true
+/// ```
+pub fn clear[T](mut xs: List[T]) {
+    xs = List[T]()
+}
+
+/// Shortens `xs` to at most `n` elements, dropping the tail; a `n` at or
+/// above `len(xs)` leaves it alone and a negative `n` empties it. Total:
+/// no error row, no traps (truncating is not an access).
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.push(mut xs, 3)
+/// list.truncate(mut xs, 2)
+/// list.len(xs) == 2
+/// ```
+pub fn truncate[T](mut xs: List[T], n: int) {
+    let have = len(xs)
+    var out = List[T]()
+    var k = 0
+    while k < have {
+        if k < n {
+            out.push(at(xs, k))
+        }
+        k = k + 1
+    }
+    xs = out
+}
+
+// BLOCKED — `reserve[T](mut xs: List[T], n: int)`, the capacity hint
+// (grow the buffer to hold `n` elements without reallocating). Neither
+// implementation exposes a capacity at all: `List` has no `capacity`
+// accessor, no reserving constructor, and no observable difference
+// between a reserved and an unreserved list, so a body here could only
+// be a lie (a no-op documented as a hint) or an invention (rebuilding to
+// force growth). Filed as part of F-0011 with the builtin-relationship
+// question — capacity is a language-side surface or it is nothing; the
+// signature lands verbatim when `List` grows one.
+
+// BLOCKED — the `Eq` family: `contains[T: Eq](xs, v) -> bool`,
+// `index_of[T: Eq](xs, v) -> int ! {None}`, `last_index_of[T: Eq]`,
+// `dedup[T: Eq](mut xs)`, `starts_with[T: Eq](xs, prefix) -> bool`,
+// `ends_with[T: Eq](xs, suffix) -> bool` — six element-comparing
+// functions whose bodies exist, run nowhere, and cannot live here.
+//
+// Two blockers, one filed each: (1) neither implementation EXECUTES
+// trait dispatch, so `cmp.Eq.eq(a, b)` is `unsupported` at the run rung
+// in both (F-0002 / F-0004); (2) worse for this module, `use std.cmp`
+// would drag std.cmp's trait/enum items into every importer, and
+// wolfc's checked tier reports `unsupported — module items in checked
+// execution` for them, which would turn EVERY std.list test's wolfc
+// row from `run` into `unsupported` (F-0012). Budgeting a module by its
+// worst body is house doctrine, so the six wait outside.
+//
+// Their reviewed bodies live in the nursery — `std/x/list_eq/` (D31
+// clock running) — with tests ledgered `unsupported`/`unsupported`;
+// they move here verbatim, imports and all, on the pin that executes
+// trait dispatch.
+
+/// Reverses `xs` in place. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.push(mut xs, 3)
+/// list.reverse(mut xs)
+/// (list.first(xs) else 0) == 3
+/// (list.last(xs) else 0) == 1
+/// ```
+pub fn reverse[T](mut xs: List[T]) {
+    let n = len(xs)
+    var out = List[T]()
+    var k = 0
+    while k < n {
+        out.push(at(xs, n - 1 - k))
+        k = k + 1
+    }
+    xs = out
+}
+
+/// Appends every element of `other` to `xs`, in order. `other` is read,
+/// not consumed — the caller keeps it. Total: no error row, no traps
+/// beyond allocation.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// var ys = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut ys, 2)
+/// list.extend(mut xs, ys)
+/// list.len(xs) == 2
+/// (list.last(xs) else 0) == 2
+/// ```
+pub fn extend[T](mut xs: List[T], other: List[T]) {
+    for y in other {
+        xs.push(y)
+    }
+}
+
+/// A new list holding `a`'s elements followed by `b`'s; both operands
+/// are read, not consumed (`to_`-style allocation, §1). Total: no error
+/// row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var a = List[int]()
+/// var b = List[int]()
+/// list.push(mut a, 1)
+/// list.push(mut b, 2)
+/// list.len(list.concat(a, b)) == 2
+/// ```
+pub fn concat[T](a: List[T], b: List[T]) -> List[T] {
+    var out = List[T]()
+    extend(mut out, a)
+    extend(mut out, b)
+    out
+}
+
+/// Overwrites every element of `xs` with `v`, keeping its length.
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.fill(mut xs, 9)
+/// (list.first(xs) else 0) == 9
+/// (list.last(xs) else 0) == 9
+/// ```
+pub fn fill[T](mut xs: List[T], v: T) {
+    let n = len(xs)
+    var out = List[T]()
+    var k = 0
+    while k < n {
+        out.push(v)
+        k = k + 1
+    }
+    xs = out
+}
+
+/// A new list with `xs`'s elements repeated `n` times; `n <= 0` yields
+/// an empty list. Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.len(list.repeat(xs, 3)) == 6
+/// ```
+pub fn repeat[T](xs: List[T], n: int) -> List[T] {
+    var out = List[T]()
+    var k = 0
+    while k < n {
+        extend(mut out, xs)
+        k = k + 1
+    }
+    out
+}
+// BLOCKED(c05) — the functional family, every one of them waiting on
+// closures (lambda values as parameters), and named here so nobody
+// re-invents them locally: `map`, `filter`, `fold`, `any`, `all`,
+// `each`, `retain`, `count_if`, `min_by`, `max_by`, `position`. Sorting
+// (`sort`, `sort_by`) is sc04's, and `sorted_by` in the wordcount
+// exemplar is the same closure blocker. No half-shipped variants: a
+// `map` that takes a named function only would be a different API from
+// the one that lands, and callers would have to change twice.

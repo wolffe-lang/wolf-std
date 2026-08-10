@@ -1,0 +1,35 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map
+//!
+//! `clear` empties and leaves the map usable; `extend` copies entries
+//! with the documented RIGHT-WINS rule for shared keys.
+//!
+//! Two shapes here are deliberate, both for finding F-0013 (lupin's
+//! provenance model reports a false `ub(mem.ub)` — "foreign write … while
+//! tag is PROTECTED" — for a `mut`-mode call followed by a read-mode call
+//! whose body allocates): population goes through the language's
+//! `m[k] = v`, and the values are read back through the language's
+//! `m[k]`, not through `map.values`. `keys_values_pairs.lu` covers those
+//! three views on a map no `mut` call has touched.
+
+use std.map
+
+fn main() -> !int {
+    var a = Map[str, int]()
+    var b = Map[str, int]()
+    a["k"] = 1
+    a["only_a"] = 3
+    b["k"] = 2
+    map.extend(mut a, b)
+    if map.len(a) == 2 {} else { return 1 }
+    // right wins on the shared key; the untouched entry survives.
+    if a["k"] == 2 {} else { return 2 }
+    if a["only_a"] == 3 {} else { return 3 }
+    map.clear(mut a)
+    if map.is_empty(a) {} else { return 4 }
+    a["again"] = 1
+    if map.len(a) == 1 {} else { return 5 }
+    if a["again"] == 1 {} else { return 6 }
+    0
+}

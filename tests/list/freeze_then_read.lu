@@ -1,0 +1,28 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! Freeze interaction, the half that is legal today: a region is frozen
+//! and the list allocated in the ambient region stays READABLE across
+//! the boundary — `len`, `get` and `for` all work on frozen data (D10,
+//! `freeze` makes a graph deeply immutable, never unreachable). Writing
+//! through a frozen path is E1012 statically and under-enforced
+//! dynamically (interp#2), so this test never attempts one.
+
+use std.list
+
+fn main() -> !int {
+    let r = region()
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    list.push(mut xs, 2)
+    freeze r
+    if list.len(xs) == 2 {} else { return 1 }
+    if (list.get(xs, 1) else 0) == 2 {} else { return 2 }
+    var total = 0
+    for x in xs {
+        total = total + x
+    }
+    if total == 3 {} else { return 3 }
+    0
+}

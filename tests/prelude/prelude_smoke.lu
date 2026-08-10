@@ -5,11 +5,12 @@
 //! The rig's proof loop: this entry is STAGED beside the std tree (the
 //! package root is the entry file's directory, [conf.directive.member] —
 //! run in place it does not resolve, and the rig's self-test asserts
-//! that). Interim spelling per finding F-0001: the staged tree exposes
-//! `std/prelude/` as `prelude/`, so the import is the bare module name
-//! until the std search path lands upstream (s37+).
+//! that). The import is the real spelling from sc02 on: s26's
+//! `--std-root` closed wolf-lang#1, the staged tree IS `std/`, and
+//! `use std.prelude` resolves against this repository. lupin needs the
+//! staged flat mirror to bind the same spelling (F-0010).
 
-use prelude
+use std.prelude
 
 fn main() -> !int {
     let a = prelude.least(3, 7)

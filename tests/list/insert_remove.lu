@@ -1,0 +1,28 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! `insert` at the middle and at the end (`i == len` appends), `remove`
+//! shifting left, and `swap_remove` trading order for constant time.
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    list.push(mut xs, 3)
+    list.insert(mut xs, 1, 2)
+    if list.len(xs) == 3 {} else { return 1 }
+    if (list.get(xs, 1) else 0) == 2 {} else { return 2 }
+    list.insert(mut xs, 3, 4)
+    if (list.last(xs) else 0) == 4 {} else { return 3 }
+    let gone = list.remove(mut xs, 0)
+    if gone == 1 {} else { return 4 }
+    if (list.first(xs) else 0) == 2 {} else { return 5 }
+    if list.len(xs) == 3 {} else { return 6 }
+    let taken = list.swap_remove(mut xs, 0)
+    if taken == 2 {} else { return 7 }
+    if (list.first(xs) else 0) == 4 {} else { return 8 }
+    if list.len(xs) == 2 {} else { return 9 }
+    0
+}

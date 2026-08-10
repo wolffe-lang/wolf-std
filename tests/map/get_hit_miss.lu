@@ -1,0 +1,27 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map
+//!
+//! `get` hit and miss. BLOCKED at both pins: the body compares keys
+//! through `cmp.Eq.eq`, and neither implementation executes trait
+//! dispatch (F-0002/F-0004) — lupin answers `unsupported` ("traits …
+//! have no dynamic semantics here") and wolfc the same at its run rung.
+//! The file ships because the day dispatch lands, this is the test that
+//! flips, and the ledger says so out loud.
+//!
+//! Population goes through the LANGUAGE's `m[k] = v`, not `map.set`, for
+//! one recorded reason (F-0013): under lupin a `mut`-mode call followed
+//! by a read-mode call whose body allocates (`keys`, `values`, `pairs`)
+//! is reported `ub(mem.ub)` — "foreign write … while tag is PROTECTED" —
+//! which is a false positive in the interpreter's provenance model, not a
+//! property of this code. `set` has its own test where the shape is safe.
+
+use std.map
+
+fn main() -> !int {
+    var m = Map[str, int]()
+    m["a"] = 1
+    if (map.get(m, "a") else 0 - 1) == 1 {} else { return 1 }
+    if (map.get(m, "z") else 0 - 1) == 0 - 1 {} else { return 2 }
+    0
+}

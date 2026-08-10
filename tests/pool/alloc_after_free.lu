@@ -1,0 +1,23 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: mem.shared.handle.1
+//!
+//! A pool stays usable after a free: the next `alloc` yields a live
+//! handle whose deref reads the new value. Slot reuse is unobservable by
+//! design (a reused slot must never resurrect the old handle — that is
+//! what the stale-handle test guards), and pool iteration order is
+//! unspecified, so nothing here asserts identity.
+
+use std.pool
+
+fn main() -> !int {
+    var p = Pool[int]()
+    let a = pool.alloc(mut p, 1)
+    pool.free(mut p, a)
+    let b = pool.alloc(mut p, 2)
+    if p[b] == 2 {} else { return 1 }
+    let c = pool.alloc(mut p, 3)
+    if p[c] == 3 {} else { return 2 }
+    if p[b] == 2 {} else { return 3 }
+    0
+}

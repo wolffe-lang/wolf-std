@@ -1,0 +1,28 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! THE cross-implementation triage case the sprint contract names, and
+//! it does NOT agree at these pins (finding F-0014):
+//!
+//! - wolfc REJECTS it statically — `fail(E1001)`, because `for x in xs`
+//!   moves `xs` and `xs.push` then reads a moved place. A rejection is a
+//!   fine answer; it is not the `exclusivity` trap `[conf.trap.map]`
+//!   would predict, and it arrives through the reads-as-moves lens
+//!   (F-0005) rather than a container-exclusivity rule.
+//! - lupin RUNS it to completion, silently, with no trap at all — the
+//!   under-enforcement half of the divergence.
+//!
+//! The directive therefore records the LUPIN behavior (run, exit 0) and
+//! the ledger records wolfc's `fail(E1001)`: the file exists so the
+//! divergence has a home in CI until one of the two moves.
+
+fn main() -> !int {
+    var xs = List[int]()
+    xs.push(1)
+    xs.push(2)
+    for x in xs {
+        xs.push(x)
+    }
+    0
+}

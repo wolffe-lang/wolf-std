@@ -1,0 +1,15 @@
+//! check: run(exit=trap(bounds))
+//! phase: run
+//! conforms: conf.trap.set
+//!
+//! `set(i, v)` out of range traps `bounds` — and traps BEFORE mutating
+//! anything, which is why the body reads the target element first.
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    list.set(mut xs, 7, 2)
+    0
+}

@@ -1,0 +1,222 @@
+//! member: true
+//!
+//! std.x.deque_int — the running prototype behind `std.deque`'s reviewed
+//! contract: a double-ended queue at ONE concrete element type, because
+//! `struct Deque[T]` does not parse until s16 delivers generic data
+//! types. Stability tier: x (nursery, D31 clock — this module graduates
+//! into `std.deque` with `int` replaced by `T`, or it is deleted, at the
+//! stdc01 closeout).
+//!
+//! What it proves, executing under BOTH implementations: the
+//! representation (one `List[int]` plus a head index — no second buffer),
+//! the amortization story, the front-to-back order `to_list` promises,
+//! and that every one of `std.deque`'s ten operations is expressible over
+//! the language's `List` surface alone.
+//!
+//! What it deliberately does not do: reclaim the space in front of
+//! `head`. A pop_front advances the head; the storage before it is
+//! released the next time the queue is rebuilt (`push_front`, `pop_back`,
+//! `clear`), or wholesale when the region dies (D10). A generic version
+//! would want a compaction rule; that is a decision for the graduating
+//! sprint, recorded here rather than guessed.
+//!
+//! Absence is spelled `None` pending F-0003; the bodies obey std.list's
+//! single-read rule (F-0005) — every length read goes through `count`.
+
+/// The queue: elements `items[head .. items.len]`, front first.
+pub struct DequeInt {
+    items: List[int],
+    head: int,
+}
+
+/// The length of a list, through one read site (F-0005's single-read
+/// rule — see std.list's header).
+fn count(xs: List[int]) -> int {
+    xs.len
+}
+
+/// The element at `i`, trapping `bounds` out of range.
+fn nth(xs: List[int], i: int) -> int {
+    xs[i]
+}
+
+/// A fresh empty queue. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// let d = deque_int.new()
+/// deque_int.len(d) == 0
+/// ```
+pub fn new() -> DequeInt {
+    DequeInt { items: List[int](), head: 0 }
+}
+
+/// The number of elements. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.push_back(mut d, 1)
+/// deque_int.len(d) == 1
+/// ```
+pub fn len(d: DequeInt) -> int {
+    count(d.items) - d.head
+}
+
+/// Whether the queue holds no elements. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.is_empty(d) == true
+/// deque_int.push_front(mut d, 1)
+/// deque_int.is_empty(d) == false
+/// ```
+pub fn is_empty(d: DequeInt) -> bool {
+    len(d) == 0
+}
+
+/// Appends `v` at the back. Amortized constant time. Total: no error row,
+/// no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.push_back(mut d, 1)
+/// deque_int.push_back(mut d, 2)
+/// (deque_int.back(d) else 0) == 2
+/// ```
+pub fn push_back(mut d: DequeInt, v: int) {
+    d.items.push(v)
+}
+
+/// Prepends `v` at the front. Rebuilds the buffer (this representation
+/// pays for `push_front`, which is the trade the prototype records).
+/// Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.push_back(mut d, 2)
+/// deque_int.push_front(mut d, 1)
+/// (deque_int.front(d) else 0) == 1
+/// ```
+pub fn push_front(mut d: DequeInt, v: int) {
+    let n = count(d.items)
+    var out = List[int]()
+    out.push(v)
+    var i = d.head
+    while i < n {
+        out.push(nth(d.items, i))
+        i = i + 1
+    }
+    d.items = out
+    d.head = 0
+}
+
+/// The front element, left in place; `None` when empty. No traps.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.push_back(mut d, 5)
+/// (deque_int.front(d) else 0) == 5
+/// ```
+pub fn front(d: DequeInt) -> int ! {None} {
+    if len(d) == 0 {
+        return None
+    }
+    nth(d.items, d.head)
+}
+
+/// The back element, left in place; `None` when empty. No traps.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.push_back(mut d, 5)
+/// deque_int.push_back(mut d, 6)
+/// (deque_int.back(d) else 0) == 6
+/// ```
+pub fn back(d: DequeInt) -> int ! {None} {
+    if len(d) == 0 {
+        return None
+    }
+    nth(d.items, count(d.items) - 1)
+}
+
+/// Removes and returns the front element; `None` when empty. Constant
+/// time: the head advances and no element moves. No traps.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.push_back(mut d, 1)
+/// deque_int.push_back(mut d, 2)
+/// (deque_int.pop_front(mut d) else 0) == 1
+/// (deque_int.pop_front(mut d) else 0) == 2
+/// (deque_int.pop_front(mut d) else 0 - 1) == 0 - 1
+/// ```
+pub fn pop_front(mut d: DequeInt) -> int ! {None} {
+    if len(d) == 0 {
+        return None
+    }
+    let v = nth(d.items, d.head)
+    d.head = d.head + 1
+    v
+}
+
+/// Removes and returns the back element; `None` when empty. Rebuilds the
+/// buffer (see the module header on compaction). No traps.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.push_back(mut d, 1)
+/// deque_int.push_back(mut d, 2)
+/// (deque_int.pop_back(mut d) else 0) == 2
+/// deque_int.len(d) == 1
+/// ```
+pub fn pop_back(mut d: DequeInt) -> int ! {None} {
+    if len(d) == 0 {
+        return None
+    }
+    let n = count(d.items)
+    let v = nth(d.items, n - 1)
+    var out = List[int]()
+    var i = d.head
+    while i < n - 1 {
+        out.push(nth(d.items, i))
+        i = i + 1
+    }
+    d.items = out
+    d.head = 0
+    v
+}
+
+/// Empties the queue, keeping it usable, and releases the buffer. Total:
+/// no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.push_back(mut d, 1)
+/// deque_int.clear(mut d)
+/// deque_int.is_empty(d) == true
+/// ```
+pub fn clear(mut d: DequeInt) {
+    d.items = List[int]()
+    d.head = 0
+}
+
+/// A fresh list of the elements, FRONT to BACK — the one order this type
+/// promises. Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var d = deque_int.new()
+/// deque_int.push_back(mut d, 1)
+/// deque_int.push_front(mut d, 0)
+/// var first = 0 - 1
+/// for x in deque_int.to_list(d) { first = first + 1 }
+/// first == 1
+/// ```
+pub fn to_list(d: DequeInt) -> List[int] {
+    let n = count(d.items)
+    var out = List[int]()
+    var i = d.head
+    while i < n {
+        out.push(nth(d.items, i))
+        i = i + 1
+    }
+    out
+}

@@ -1,0 +1,24 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! `dedup`, `starts_with`, `ends_with` — the rest of the `Eq` family,
+//! same nursery, same honest `unsupported` rows (F-0002/F-0004).
+
+use std.x.list_eq
+
+fn main() -> !int {
+    var xs = List[int]()
+    xs.push(1)
+    xs.push(1)
+    xs.push(2)
+    list_eq.dedup(mut xs)
+    if list_eq.contains(xs, 2) {} else { return 1 }
+    var prefix = List[int]()
+    prefix.push(1)
+    if list_eq.starts_with(xs, prefix) {} else { return 2 }
+    var suffix = List[int]()
+    suffix.push(2)
+    if list_eq.ends_with(xs, suffix) {} else { return 3 }
+    0
+}

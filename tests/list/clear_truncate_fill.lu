@@ -1,0 +1,30 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! `truncate` (shorter, longer, negative), `fill` (length preserved),
+//! `clear` (empty and still usable).
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    list.push(mut xs, 2)
+    list.push(mut xs, 3)
+    list.truncate(mut xs, 2)
+    if list.len(xs) == 2 {} else { return 1 }
+    list.truncate(mut xs, 9)
+    if list.len(xs) == 2 {} else { return 2 }
+    list.fill(mut xs, 7)
+    if (list.first(xs) else 0) == 7 {} else { return 3 }
+    if (list.last(xs) else 0) == 7 {} else { return 4 }
+    if list.len(xs) == 2 {} else { return 5 }
+    list.clear(mut xs)
+    if list.is_empty(xs) {} else { return 6 }
+    list.push(mut xs, 5)
+    if list.len(xs) == 1 {} else { return 7 }
+    list.truncate(mut xs, 0 - 1)
+    if list.is_empty(xs) {} else { return 8 }
+    0
+}

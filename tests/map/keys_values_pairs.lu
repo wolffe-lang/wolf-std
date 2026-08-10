@@ -1,0 +1,41 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map
+//!
+//! `keys`, `values` and `pairs` agree on cardinality and on ORDER (the
+//! order itself is unspecified — the test asserts only what the module
+//! promises: the three views line up for an unmodified map).
+//!
+//! Population goes through the LANGUAGE's `m[k] = v`, not `map.set`, for
+//! one recorded reason (F-0013): under lupin a `mut`-mode call followed
+//! by a read-mode call whose body allocates (`keys`, `values`, `pairs`)
+//! is reported `ub(mem.ub)` — "foreign write … while tag is PROTECTED" —
+//! which is a false positive in the interpreter's provenance model, not a
+//! property of this code. `set` has its own test where the shape is safe.
+
+use std.map
+
+fn main() -> !int {
+    var m = Map[str, int]()
+    m["a"] = 1
+    m["b"] = 2
+    var n_keys = 0
+    for k in map.keys(m) {
+        n_keys = n_keys + 1
+    }
+    if n_keys == 2 {} else { return 1 }
+    var total = 0
+    for v in map.values(m) {
+        total = total + v
+    }
+    if total == 3 {} else { return 2 }
+    var n_pairs = 0
+    var pair_total = 0
+    for pair in map.pairs(m) {
+        n_pairs = n_pairs + 1
+        pair_total = pair_total + pair.1
+    }
+    if n_pairs == 2 {} else { return 3 }
+    if pair_total == 3 {} else { return 4 }
+    0
+}

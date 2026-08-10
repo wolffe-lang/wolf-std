@@ -1,0 +1,56 @@
+//! member: true
+//!
+//! std.set — `Set[T]`, the unordered membership collection. Stability
+//! tier: core (the API; the implementation is blocked).
+//!
+//! **This module has no code yet, and that is the honest state.** A
+//! `Set[T]` is a std-DEFINED generic data type — no implementation
+//! provides a set builtin, and `struct Set[T] { … }` does not parse in
+//! either implementation at the pins: a generic parameter list on a data
+//! declaration is E0201 in both (s16 delivers generic data types; the
+//! observation is filed with F-0011). Writing a concrete `SetInt` here
+//! instead would ship the wrong API — callers would migrate twice — so
+//! the inventory below is a reviewed CONTRACT, not a stub to be filled
+//! in by guesswork, and it lands as wolf source in the sprint that
+//! follows s16.
+//!
+//! Reviewed inventory (13), each with its contract, exactly as it will
+//! land. `Eq` is the membership protocol; `Hash` is F-0011's open
+//! question, same as `Map`'s keys.
+//!
+//! ```text
+//! add[T: Eq](mut s: Set[T], v: T) -> bool
+//!     Inserts `v`; true when the set grew, false when `v` was present.
+//!     Total: no error row, no traps beyond allocation.
+//! remove[T: Eq](mut s: Set[T], v: T) -> bool
+//!     Removes `v`; true when it was there. No row: absence is the
+//!     answer, not an error.
+//! has[T: Eq](s: Set[T], v: T) -> bool
+//!     Membership. Total.
+//! len[T](s: Set[T]) -> int
+//!     Number of distinct elements. Total.
+//! is_empty[T](s: Set[T]) -> bool
+//!     `len(s) == 0`. Total.
+//! clear[T](mut s: Set[T])
+//!     Empties `s`, keeping it usable. Total.
+//! to_list[T](s: Set[T]) -> List[T]
+//!     Fresh list of the elements; order UNSPECIFIED (documented, not
+//!     promised). Allocates (`to_`, §1).
+//! union[T: Eq](a: Set[T], b: Set[T]) -> Set[T]
+//!     Elements in either; a fresh set, both operands read.
+//! intersect[T: Eq](a: Set[T], b: Set[T]) -> Set[T]
+//!     Elements in both.
+//! difference[T: Eq](a: Set[T], b: Set[T]) -> Set[T]
+//!     Elements of `a` not in `b` (asymmetric — the name says so).
+//! symmetric_difference[T: Eq](a: Set[T], b: Set[T]) -> Set[T]
+//!     Elements in exactly one of the two.
+//! is_subset[T: Eq](a: Set[T], b: Set[T]) -> bool
+//!     Every element of `a` is in `b`; the empty set is a subset of
+//!     everything, and a set is a subset of itself.
+//! is_disjoint[T: Eq](a: Set[T], b: Set[T]) -> bool
+//!     No shared element; two empty sets are disjoint.
+//! ```
+//!
+//! No tests ship for this module: there is nothing to run, and a test
+//! that imports an itemless module is E0305 (unused import) in both
+//! implementations. The ledger stays honest by having no row to lie in.

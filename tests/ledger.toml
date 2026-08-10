@@ -109,3 +109,131 @@ wolfc = "fail(E1001)"
 [tests."iter/list_cursor_drive.lu"]
 lupin = "run"
 wolfc = "fail(E0804)"
+
+# ---- sc02: std.list (the run-rung floor — push/len/index/for reach
+# wolfc's checked run rung; the row-raising family is where the two
+# machines part company) ----
+
+[tests."list/push_len_empty.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."list/get_hit_miss.lu"]
+lupin = "run"
+# The row raise lives in an imported module's body: wolfc's checked tier
+# answers `unsupported — module items in checked execution` (F-0015). The
+# same code inlined into an entry file runs.
+wolfc = "unsupported"
+
+[tests."list/first_last_hit_miss.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."list/pop_drains.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."list/set_and_swap.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."list/insert_remove.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."list/clear_truncate_fill.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."list/reverse_extend_concat_repeat.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."list/index_bounds_trap.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."list/remove_bounds_trap.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."list/set_bounds_trap.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."list/mutate_while_iterating.lu"]
+lupin = "run"
+wolfc = "fail(E1001)"
+
+[tests."list/freeze_then_read.lu"]
+lupin = "run"
+wolfc = "run"
+
+# ---- sc02: std.map (lupin executes the builtin; wolfc does not type
+# `Map` at all — F-0011) ----
+
+[tests."map/set_len_empty.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."map/keys_values_pairs.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."map/clear_and_extend.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."map/get_hit_miss.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+
+[tests."map/has_and_get_or.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+
+[tests."map/remove_and_tally.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+
+# ---- sc02: std.pool (X5 — the two-phase protocol and the stale-handle
+# trap execute in both) ----
+
+[tests."pool/alloc_and_deref.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."pool/free_then_deref_traps.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."pool/alloc_after_free.lu"]
+lupin = "run"
+wolfc = "run"
+
+# ---- sc02: the nursery (std.x) ----
+
+[tests."x/deque_int/fifo_order.lu"]
+lupin = "run"
+# Same F-0015 module-row ceiling as std.list's row family.
+wolfc = "unsupported"
+
+[tests."x/deque_int/both_ends.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."x/deque_int/pop_back_and_clear.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."x/deque_int/to_list_order.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."x/list_eq/contains_and_index_of.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+
+[tests."x/list_eq/dedup_and_affixes.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"

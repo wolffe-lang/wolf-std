@@ -1,0 +1,31 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map
+//!
+//! `remove` (hit and miss) and `tally` — the wordcount increment as a
+//! named operation. Same trait-dispatch blocker as the rest of the
+//! key-comparing family (F-0002/F-0004); `tally` additionally stands in
+//! for the corpus idiom `m[k] += 1`, which lupin refuses outright
+//! ("`m[\"a\"]` does not denote a place") — see F-0011.
+//!
+//! Population goes through the LANGUAGE's `m[k] = v`, not `map.set`, for
+//! one recorded reason (F-0013): under lupin a `mut`-mode call followed
+//! by a read-mode call whose body allocates (`keys`, `values`, `pairs`)
+//! is reported `ub(mem.ub)` — "foreign write … while tag is PROTECTED" —
+//! which is a false positive in the interpreter's provenance model, not a
+//! property of this code. `set` has its own test where the shape is safe.
+
+use std.map
+
+fn main() -> !int {
+    var m = Map[str, int]()
+    m["a"] = 1
+    let gone = map.remove(mut m, "a") else 0 - 1
+    if gone == 1 {} else { return 1 }
+    if map.is_empty(m) {} else { return 2 }
+    let missing = map.remove(mut m, "a") else 0 - 1
+    if missing == 0 - 1 {} else { return 3 }
+    if map.tally(mut m, "w") == 1 {} else { return 4 }
+    if map.tally(mut m, "w") == 2 {} else { return 5 }
+    0
+}

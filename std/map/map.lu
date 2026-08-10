@@ -1,0 +1,238 @@
+//! member: true
+//!
+//! std.map — the documented API surface of the prelude's `Map[K, V]`:
+//! the keyed store the wordcount exemplar is written against. Stability
+//! tier: core.
+//!
+//! **What is the language's and what is std's** (F-0011, this sprint's
+//! structural finding): `Map` is prelude-ambient today — the spec lists
+//! it, lupin executes it, wolfc does not type it — and that is
+//! SCAFFOLDING, not a decision. The recommendation filed upstream: `Map`
+//! becomes a std-defined generic type once s16 delivers generic data
+//! types, with the builtin as a documented interim that must not outlive
+//! s16. Until then this module is the API surface over whatever the
+//! implementation provides, and three questions ride the filing:
+//!
+//! - the **key protocol**: hashing lives inside the implementations and
+//!   is unspecified. The functions here that must compare keys take a
+//!   `[K: Eq]` bound, which is the honest half of the protocol; the
+//!   `Hash` half is the filing's open question.
+//! - **`tally`**: the corpus writes `tally[w] += 1` with absent keys
+//!   defaulting to the zero value. Neither half of that idiom works at
+//!   the pins — lupin refuses the compound assignment through an index
+//!   (`does not denote a place`) and reads an absent key as `()`, not a
+//!   zero — so is absent-key-defaulting a language rule or a std
+//!   function? Filed with the recommendation that std own it (`tally`),
+//!   because a defaulting read hides a lookup miss the row makes visible.
+//! - **iteration order**: unspecified, deliberately. `keys`, `values` and
+//!   `pairs` promise the SAME order as each other for an unmodified map,
+//!   and nothing more.
+//!
+//! Ledger reality at the current pins: every function here is
+//! `unsupported` under wolfc (`Map` is not typed there — the whole
+//! module is, honestly, freight), and the `[K: Eq]` five are
+//! `unsupported` under lupin too (no trait dispatch — F-0002/F-0004).
+//! Absence is spelled `None` pending F-0003.
+
+use std.cmp
+
+/// The number of key-value entries. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// map.set(mut m, "a", 1)
+/// map.len(m) == 1
+/// ```
+pub fn len[K, V](m: Map[K, V]) -> int {
+    m.len
+}
+
+/// Whether the map holds no entries. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// map.is_empty(m) == true
+/// map.set(mut m, "a", 1)
+/// map.is_empty(m) == false
+/// ```
+pub fn is_empty[K, V](m: Map[K, V]) -> bool {
+    len(m) == 0
+}
+
+/// Binds `k` to `v`, replacing any previous binding. Total: no error
+/// row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// map.set(mut m, "a", 1)
+/// map.set(mut m, "a", 2)
+/// map.len(m) == 1
+/// ```
+pub fn set[K, V](mut m: Map[K, V], k: K, v: V) {
+    m[k] = v
+}
+
+/// Every key, in the map's unspecified-but-consistent iteration order.
+/// Allocates a fresh list (`to_`-style, §1). Total: no error row, no
+/// traps beyond allocation.
+///
+/// The example populates through the language's `m[k] = v` rather than
+/// `set`: a `mut`-mode call followed by an allocating read-mode call is
+/// a false `ub(mem.ub)` under lupin's provenance model (F-0013), and a
+/// doc example never ships around a bug quietly.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// m["a"] = 1
+/// m["b"] = 2
+/// var seen = 0
+/// for k in map.keys(m) { seen = seen + 1 }
+/// seen == 2
+/// ```
+pub fn keys[K, V](m: Map[K, V]) -> List[K] {
+    var out = List[K]()
+    for pair in m.pairs() {
+        out.push(pair.0)
+    }
+    out
+}
+
+/// Every value, in the same order `keys` reports. Total: no error row,
+/// no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// m["a"] = 7
+/// var total = 0
+/// for v in map.values(m) { total = total + v }
+/// total == 7
+/// ```
+pub fn values[K, V](m: Map[K, V]) -> List[V] {
+    var out = List[V]()
+    for pair in m.pairs() {
+        out.push(pair.1)
+    }
+    out
+}
+
+/// Every entry as a `(key, value)` pair, in the map's iteration order —
+/// the shape `for (k, v) in map.pairs(m)` destructures. Total: no error
+/// row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// m["a"] = 1
+/// var count = 0
+/// for pair in map.pairs(m) { count = count + 1 }
+/// count == 1
+/// ```
+pub fn pairs[K, V](m: Map[K, V]) -> List[(K, V)] {
+    m.pairs()
+}
+
+/// Empties the map, keeping it usable. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// map.set(mut m, "a", 1)
+/// map.clear(mut m)
+/// map.is_empty(m) == true
+/// ```
+pub fn clear[K, V](mut m: Map[K, V]) {
+    m = Map[K, V]()
+}
+
+/// Copies every entry of `other` into `m`. **Right wins**: a key present
+/// in both ends up bound to `other`'s value. Total: no error row, no
+/// traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var a = Map[str, int]()
+/// var b = Map[str, int]()
+/// map.set(mut a, "k", 1)
+/// map.set(mut b, "k", 2)
+/// map.extend(mut a, b)
+/// map.len(a) == 1
+/// ```
+pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
+    for pair in other.pairs() {
+        m[pair.0] = pair.1
+    }
+}
+
+/// The value bound to `k`; `None` when the key is absent — the absence
+/// row, never a zero-value sentinel (§2). No traps.
+///
+/// Prose, not a fenced example (§4): `Eq` dispatch executes in neither
+/// implementation at the pins (F-0002/F-0004), so a runnable example
+/// would be a doc bug. For a map binding `"a"` to `1`, `get(m, "a")` is
+/// `1` and `get(m, "z")` raises `None`.
+pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {None} {
+    for pair in m.pairs() {
+        if cmp.Eq.eq(pair.0, k) {
+            return pair.1
+        }
+    }
+    None
+}
+
+/// The value bound to `k`, or `d` when the key is absent — the eager
+/// default (a lazy variant waits on closures, c05). Total: no error row,
+/// no traps.
+///
+/// Prose, not a fenced example (§4, `Eq` dispatch — F-0002):
+/// `get_or(m, "z", 0)` is `0` for a map without `"z"`.
+pub fn get_or[K: cmp.Eq, V](m: Map[K, V], k: K, d: V) -> V {
+    get(m, k) else d
+}
+
+/// Whether `k` is bound. Total: no error row, no traps.
+///
+/// Prose, not a fenced example (§4, `Eq` dispatch — F-0002):
+/// `has(m, "a")` is `true` exactly when `get(m, "a")` yields a value.
+pub fn has[K: cmp.Eq, V](m: Map[K, V], k: K) -> bool {
+    for pair in m.pairs() {
+        if cmp.Eq.eq(pair.0, k) {
+            return true
+        }
+    }
+    false
+}
+
+/// Removes `k`'s entry and returns the value it was bound to; `None`
+/// when the key was absent. No traps.
+///
+/// Prose, not a fenced example (§4, `Eq` dispatch — F-0002). Note the
+/// implementation cost this signature hides at the pins: no builtin
+/// erases a key, so the body rebuilds the map without it — filed with
+/// F-0011 (a `Map` that cannot erase is not a `Map`).
+pub fn remove[K: cmp.Eq, V](mut m: Map[K, V], k: K) -> V ! {None} {
+    let v = get(m, k)?
+    var out = Map[K, V]()
+    for pair in m.pairs() {
+        if !cmp.Eq.eq(pair.0, k) {
+            out[pair.0] = pair.1
+        }
+    }
+    m = out
+    v
+}
+
+/// Increments the count `k` is bound to and returns the new count,
+/// treating an absent key as zero — the wordcount idiom as a named
+/// operation instead of a defaulting index (`tally[w] += 1`, see the
+/// module header's filed question). Traps `overflow` when the count is
+/// at `int`'s maximum: arithmetic is checked in every profile (X3).
+///
+/// Prose, not a fenced example (§4, `Eq` dispatch — F-0002): tallying
+/// `"a"` twice leaves it bound to `2`.
+pub fn tally[K: cmp.Eq](mut m: Map[K, int], k: K) -> int {
+    let n = get(m, k) else 0
+    m[k] = n + 1
+    n + 1
+}
+// BLOCKED(c05) — the closure family, named so nobody re-invents it:
+// `each`, `map_values`, `retain`, `merge(other, fn(a, b))` (the
+// wordcount exemplar's combining merge — `extend`'s right-wins rule is
+// the closure-free half), and `entry`-style get-or-insert-with. Sorting
+// pairs is sc04's; `sorted_by` in the exemplar is the same blocker.

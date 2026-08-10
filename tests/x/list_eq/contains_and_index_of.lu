@@ -1,0 +1,21 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! The `Eq` family, parked in the nursery: `contains`, `index_of`,
+//! `last_index_of`. UNSUPPORTED in both implementations at these pins —
+//! the bodies dispatch through `cmp.Eq.eq` and neither machine executes
+//! trait dispatch (F-0002/F-0004). The test is the flip-day proof.
+
+use std.x.list_eq
+
+fn main() -> !int {
+    var xs = List[int]()
+    xs.push(5)
+    if list_eq.contains(xs, 5) {} else { return 1 }
+    if list_eq.contains(xs, 9) { return 2 }
+    if (list_eq.index_of(xs, 5) else 0 - 1) == 0 {} else { return 3 }
+    if (list_eq.index_of(xs, 9) else 0 - 1) == 0 - 1 {} else { return 4 }
+    if (list_eq.last_index_of(xs, 5) else 0 - 1) == 0 {} else { return 5 }
+    0
+}

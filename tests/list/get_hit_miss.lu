@@ -1,0 +1,21 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! `get`, both ways: a hit yields the element, a miss raises `None`
+//! (spelled `None` per F-0003) and the caller `else`s it. Negative
+//! indices are a miss, not a trap — the checked accessor never traps
+//! where a row will do (§2).
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 7)
+    list.push(mut xs, 8)
+    if (list.get(xs, 0) else 0 - 1) == 7 {} else { return 1 }
+    if (list.get(xs, 1) else 0 - 1) == 8 {} else { return 2 }
+    if (list.get(xs, 2) else 0 - 1) == 0 - 1 {} else { return 3 }
+    if (list.get(xs, 0 - 5) else 0 - 1) == 0 - 1 {} else { return 4 }
+    0
+}

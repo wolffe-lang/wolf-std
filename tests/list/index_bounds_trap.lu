@@ -1,0 +1,16 @@
+//! check: run(exit=trap(bounds))
+//! phase: run
+//! conforms: conf.trap.set
+//!
+//! The language's indexing traps `bounds` out of range, in every profile
+//! (X3 posture) — std.list documents this as the contract every one of
+//! its index-naming functions inherits. No import: the surface under test
+//! is the language's, and an unused import is E0305 in both
+//! implementations.
+
+fn main() -> !int {
+    var xs = List[int]()
+    xs.push(1)
+    let v = xs[3]
+    v
+}

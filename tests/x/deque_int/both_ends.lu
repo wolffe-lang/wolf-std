@@ -1,0 +1,23 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.deque
+//!
+//! Both ends: `push_front`/`push_back` build the sequence, `front`/`back`
+//! read it without removing, and both raise `None` on an empty queue.
+
+use std.x.deque_int
+
+fn main() -> !int {
+    var d = deque_int.new()
+    if (deque_int.front(d) else 0 - 1) == 0 - 1 {} else { return 1 }
+    if (deque_int.back(d) else 0 - 1) == 0 - 1 {} else { return 2 }
+    deque_int.push_back(mut d, 2)
+    deque_int.push_front(mut d, 1)
+    deque_int.push_back(mut d, 3)
+    if (deque_int.front(d) else 0) == 1 {} else { return 3 }
+    if (deque_int.back(d) else 0) == 3 {} else { return 4 }
+    if deque_int.len(d) == 3 {} else { return 5 }
+    // Reading an end leaves it in place.
+    if (deque_int.front(d) else 0) == 1 {} else { return 6 }
+    0
+}

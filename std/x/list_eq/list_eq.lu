@@ -1,0 +1,158 @@
+//! member: true
+//!
+//! std.x.list_eq — the six element-comparing `std.list` functions,
+//! parked outside the facade. Stability tier: x (nursery, D31 clock:
+//! they graduate INTO `std.list` verbatim, or are deleted, at the
+//! stdc01 closeout).
+//!
+//! Why they are here and not in `std.list`, in one sentence: comparing
+//! elements needs `cmp.Eq`, importing `std.cmp` drags its trait and enum
+//! items into every importer, and wolfc's checked tier answers
+//! `unsupported — module items in checked execution` for those items —
+//! which would flip EVERY std.list test's wolfc row from `run` to
+//! `unsupported` (F-0012). Budgeting a module by its worst body is house
+//! doctrine (sc01), so the six wait here where the cost is contained.
+//!
+//! The second blocker is the older one: neither implementation EXECUTES
+//! trait dispatch, so every test in `tests/x/list_eq/` is ledgered
+//! `unsupported`/`unsupported` (F-0002, F-0004). The bodies still earn
+//! their keep — they typecheck through wolfc's mem rung with the bound
+//! satisfied, which is the evidence that the signatures are writable at
+//! all.
+//!
+//! Absence is spelled `None` pending F-0003; the bodies obey std.list's
+//! single-read rule (F-0005) via the local `len`/`at` helpers.
+
+use std.cmp
+
+/// The length of `xs`, through one read site (F-0005).
+fn len[T](xs: List[T]) -> int {
+    xs.len
+}
+
+/// The element at `i`, trapping `bounds` out of range.
+fn at[T](xs: List[T], i: int) -> T {
+    xs[i]
+}
+
+/// Whether any element of `xs` equals `v` under `Eq`. Total: no error
+/// row, no traps.
+///
+/// Prose, not a fenced example (§4): neither implementation executes
+/// trait dispatch at the current pins, so a runnable example would be a
+/// doc bug. `contains(xs, 2)` is `true` for the list `[1, 2]`, and
+/// `false` for `[1, 3]` — the equality is `Eq.eq`'s, never `==`'s
+/// (F-0004 keeps the operator bridge a filing, not an assumption).
+pub fn contains[T: cmp.Eq](xs: List[T], v: T) -> bool {
+    for x in xs {
+        if cmp.Eq.eq(x, v) {
+            return true
+        }
+    }
+    false
+}
+
+/// The index of the first element equal to `v` under `Eq`; `None` when
+/// no element matches. No traps.
+///
+/// Prose, not a fenced example (§4, trait dispatch — F-0002): for
+/// `[5, 6, 5]`, `index_of(xs, 5)` is `0` and `index_of(xs, 9)` raises
+/// `None`.
+pub fn index_of[T: cmp.Eq](xs: List[T], v: T) -> int ! {None} {
+    let n = len(xs)
+    var k = 0
+    while k < n {
+        if cmp.Eq.eq(at(xs, k), v) {
+            return k
+        }
+        k = k + 1
+    }
+    None
+}
+
+/// The index of the LAST element equal to `v` under `Eq`; `None` when no
+/// element matches. No traps.
+///
+/// Prose, not a fenced example (§4, trait dispatch — F-0002): for
+/// `[5, 6, 5]`, `last_index_of(xs, 5)` is `2`.
+pub fn last_index_of[T: cmp.Eq](xs: List[T], v: T) -> int ! {None} {
+    let n = len(xs)
+    var k = n - 1
+    while k >= 0 {
+        if cmp.Eq.eq(at(xs, k), v) {
+            return k
+        }
+        k = k - 1
+    }
+    None
+}
+
+/// Collapses runs of CONSECUTIVE equal elements (under `Eq`) to one,
+/// in place — the sorted-input companion, not a set builder. Total: no
+/// error row, no traps.
+///
+/// Prose, not a fenced example (§4, trait dispatch — F-0002):
+/// `[1, 1, 2, 1]` dedups to `[1, 2, 1]`; sort first if you want
+/// uniqueness.
+pub fn dedup[T: cmp.Eq](mut xs: List[T]) {
+    let n = len(xs)
+    var out = List[T]()
+    var k = 0
+    while k < n {
+        let v = at(xs, k)
+        if k == 0 {
+            out.push(v)
+        } else {
+            let prev = at(xs, k - 1)
+            if !cmp.Eq.eq(prev, v) {
+                out.push(v)
+            }
+        }
+        k = k + 1
+    }
+    xs = out
+}
+
+/// Whether `xs` begins with every element of `prefix`, in order, under
+/// `Eq`; an empty `prefix` is always a prefix. Total: no error row, no
+/// traps.
+///
+/// Prose, not a fenced example (§4, trait dispatch — F-0002): `[1, 2, 3]`
+/// starts with `[1, 2]` and does not start with `[2]`.
+pub fn starts_with[T: cmp.Eq](xs: List[T], prefix: List[T]) -> bool {
+    let n = len(xs)
+    let m = len(prefix)
+    if m > n {
+        return false
+    }
+    var k = 0
+    while k < m {
+        if !cmp.Eq.eq(at(xs, k), at(prefix, k)) {
+            return false
+        }
+        k = k + 1
+    }
+    true
+}
+
+/// Whether `xs` ends with every element of `suffix`, in order, under
+/// `Eq`; an empty `suffix` is always a suffix. Total: no error row, no
+/// traps.
+///
+/// Prose, not a fenced example (§4, trait dispatch — F-0002): `[1, 2, 3]`
+/// ends with `[2, 3]` and does not end with `[3, 2]`.
+pub fn ends_with[T: cmp.Eq](xs: List[T], suffix: List[T]) -> bool {
+    let n = len(xs)
+    let m = len(suffix)
+    if m > n {
+        return false
+    }
+    var k = 0
+    while k < m {
+        if !cmp.Eq.eq(at(xs, n - m + k), at(suffix, k)) {
+            return false
+        }
+        k = k + 1
+    }
+    true
+}

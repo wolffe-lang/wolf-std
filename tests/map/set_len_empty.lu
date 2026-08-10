@@ -1,0 +1,22 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map
+//!
+//! `set`, `len`, `is_empty` over the prelude-ambient `Map`. lupin
+//! executes the builtin; wolfc does not type `Map` at all, so its row is
+//! honestly `unsupported` (F-0011's whole point). Rebinding a key
+//! replaces its value and never grows the map — the last two lines.
+
+use std.map
+
+fn main() -> !int {
+    var m = Map[str, int]()
+    if map.is_empty(m) {} else { return 1 }
+    map.set(mut m, "a", 1)
+    map.set(mut m, "b", 2)
+    if map.len(m) == 2 {} else { return 2 }
+    if map.is_empty(m) { return 3 }
+    map.set(mut m, "a", 5)
+    if map.len(m) == 2 {} else { return 4 }
+    0
+}

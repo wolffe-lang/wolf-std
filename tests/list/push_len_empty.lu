@@ -1,0 +1,28 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.list
+//!
+//! `push`/`len`/`is_empty` over the builtin, plus the two operations
+//! std.list documents as the LANGUAGE's: `xs[i]` and `for`. Both
+//! implementations execute all of it — this is the run-rung floor the
+//! sprint's ledger claim rests on.
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    if list.is_empty(xs) {} else { return 1 }
+    list.push(mut xs, 10)
+    list.push(mut xs, 20)
+    if list.len(xs) == 2 {} else { return 2 }
+    if list.is_empty(xs) { return 3 }
+    // The language's own surface, documented in std.list's header.
+    if xs[0] == 10 {} else { return 4 }
+    if xs[1] == 20 {} else { return 5 }
+    var total = 0
+    for x in xs {
+        total = total + x
+    }
+    if total == 30 {} else { return 6 }
+    0
+}
