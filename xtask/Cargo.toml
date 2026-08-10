@@ -1,0 +1,17 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "wolf-std test rig: std-test, doctor, sync-pin, ledger-check, ci"
+
+[dependencies]
+# Dependency-light by charter (sc00): serde_json parses the spec/06
+# observation records, sha2 checks stdout hashes against directives.
+# The ledger and pins files are parsed by the strict TOML subset in
+# tomlite.rs — no toml crate, no build scripts (D33), nothing else.
+serde_json = "1"
+sha2 = "0.10"
+
+[lints.rust]
+unsafe_code = "forbid"
