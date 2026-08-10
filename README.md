@@ -22,6 +22,12 @@ implementations through the spec/06 record protocol; `tests/ledger.toml`
 records what each implementation achieves per test, and passing deeper
 than the ledger claims fails CI.
 
+Imports are the real spelling — `use std.list` — from sc02 on: the
+compiler resolves them against the staged tree with `--std-root` (s26).
+lupin has no std root yet, so staging also mirrors each module directory
+flat under its last segment; that mirror is the last interim, documented
+in `xtask/src/stage.rs` and tracked as F-0010.
+
 ```sh
 cargo xtask std-test      # stage + run every test under lupin and wolf
 cargo xtask doctor        # which binaries resolved; do they match the pins
