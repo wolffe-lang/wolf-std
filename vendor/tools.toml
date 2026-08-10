@@ -11,11 +11,19 @@
 # nightly lane watches the drift, report-never-gate.
 
 [lupin]
-version = "0.1.0"
+# 0.1.1 (sc02 bump): DPOR completeness fix, frozen-write trap, when-arity
+# code alignment. Its own conformance pin is unchanged — lupin 0.1.1 still
+# names cbde620 in `--version`, which is the lawful two-upstream drift the
+# header describes.
+version = "0.1.1"
 pin = "cbde62012f10bbdf63e4ec1e2ebeeed026973d23"
 
 [wolf]
 version = "0.0.1"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver.
-pin = "f1f9d806507a30930f8d39808235d2935b3816d3"
+# sc02 bump: trunk a0c4564 (s26 real std-module resolution — --std-root
+# with WOLF_STD fallback, closing wolf-lang#1 — plus E0410 let
+# reassignment and s27's wir memory lowering); `cargo test --workspace`
+# green in the scratch clone at that sha before the bump.
+pin = "a0c4564f246e46dd14d66f82e7d106059b9d076a"
