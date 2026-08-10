@@ -22,8 +22,12 @@ pin = "cbde62012f10bbdf63e4ec1e2ebeeed026973d23"
 version = "0.0.1"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver.
-# sc02 bump: trunk a0c4564 (s26 real std-module resolution — --std-root
-# with WOLF_STD fallback, closing wolf-lang#1 — plus E0410 let
-# reassignment and s27's wir memory lowering); `cargo test --workspace`
-# green in the scratch clone at that sha before the bump.
-pin = "a0c4564f246e46dd14d66f82e7d106059b9d076a"
+# sc03 bump: trunk 12ae8c2 — the last green trunk CI run at sprint start,
+# and s27 complete: postfix rows in param/let positions (closes
+# wolf-lang#3), lowercase bare tags at raise sites (#4), List
+# mut-receiver + copy-read typing (#6), `str` ordering ruled
+# byte-lexicographic (#7, `[mem.str.order]`), the two-argument `assert`
+# intrinsic (#9), the iterator protocol with range-for (#8). Every one of
+# those closes a finding this repo filed. `cargo test --workspace` green
+# in the scratch clone at that sha before the bump.
+pin = "12ae8c2b602bc9fe2830d5d3672e2c6ce8731964"
