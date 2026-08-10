@@ -1,0 +1,40 @@
+//! member: true
+//!
+//! std.prelude — the ambient facade, listed in one place (D31).
+//! Stability tier: core (the facade itself); contents below are sc00
+//! SCAFFOLDING — three trivial functions that exist to prove the rig's
+//! staging loop end to end, replaced by the real facade listing when
+//! sc01 opens the language work. They follow API-CONVENTIONS.md so the
+//! first real module has a shaped example to copy.
+
+/// Least of two ints; returns `b` when they are equal. Total: no error
+/// row, no traps.
+///
+/// ```wolf-doc-example
+/// least(3, 7) == 3
+/// ```
+pub fn least(a: int, b: int) -> int {
+    if a < b { a } else { b }
+}
+
+/// Greatest of two ints; returns `b` when they are equal. Total: no
+/// error row, no traps.
+///
+/// ```wolf-doc-example
+/// greatest(3, 7) == 7
+/// ```
+pub fn greatest(a: int, b: int) -> int {
+    if a > b { a } else { b }
+}
+
+/// Magnitude of `n`. Traps `overflow` at the minimum int, because the
+/// magnitude of `int.min` is not representable and arithmetic is checked
+/// in every profile (X3) — spell a wrapping intent explicitly if you
+/// mean one.
+///
+/// ```wolf-doc-example
+/// magnitude(0 - 9) == 9
+/// ```
+pub fn magnitude(n: int) -> int {
+    if n < 0 { 0 - n } else { n }
+}

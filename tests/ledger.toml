@@ -1,0 +1,15 @@
+# tests/ledger.toml — per-test, per-implementation expectations (sc00 §3,
+# the is00 corpus-overlay pattern). The two implementations diverge by
+# design; each test records what each one is expected to achieve TODAY:
+#   lupin = "run" | "unsupported"
+#   wolfc = "run" | "unsupported" | "fail(E…)"
+# "run" means: satisfies the directive's `check:` in full. A test passing
+# deeper than its ledger claims fails CI — advancement is deliberate, in
+# its own commit. Paths are slash-relative to tests/.
+
+[tests."prelude/prelude_smoke.lu"]
+lupin = "run"
+# The sc00 plan expected `unsupported` here; the pinned wolf (f1f9d80)
+# already executes the staged exemplar under `--checked` (miri-lite run
+# rung, s23) — the truthful ledger records what IS.
+wolfc = "run"

@@ -1,0 +1,20 @@
+//! check: run(exit=0, stdout="least 3, greatest 7, magnitude 9")
+//! phase: run
+//! conforms: std.prelude
+//!
+//! The rig's proof loop: this entry is STAGED beside the std tree (the
+//! package root is the entry file's directory, [conf.directive.member] —
+//! run in place it does not resolve, and the rig's self-test asserts
+//! that). Interim spelling per finding F-0001: the staged tree exposes
+//! `std/prelude/` as `prelude/`, so the import is the bare module name
+//! until the std search path lands upstream (s37+).
+
+use prelude
+
+fn main() -> !int {
+    let a = prelude.least(3, 7)
+    let b = prelude.greatest(3, 7)
+    let c = prelude.magnitude(0 - 9)
+    print("least {a}, greatest {b}, magnitude {c}")
+    0
+}
