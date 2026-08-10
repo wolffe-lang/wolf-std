@@ -93,7 +93,10 @@ fn staging_round_trip_under_lupin() {
     // Staged: green, stdout hash checked.
     let scratch = repo.join("target/stage-selftest");
     let staged = stage::stage_test(&entry, &repo.join("std"), &scratch).unwrap();
-    let rec = conform(&lupin.path, &staged);
+    // The lupin half of staging is the flat mirror (F-0010): the tree
+    // also lands as `std/`, which is what the wolf lane is rooted at.
+    assert!(staged.std_root.join("prelude/prelude.lu").is_file());
+    let rec = conform(&lupin.path, &staged.entry);
     assert_eq!(rec.verdict, Verdict::Exit(0), "staged exemplar runs green");
     let src = std::fs::read_to_string(&entry).unwrap();
     let d = directive::parse(&src, "prelude_smoke.lu").unwrap();

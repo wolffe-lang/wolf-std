@@ -275,7 +275,7 @@ pub fn std_test() -> Result<(), String> {
 fn invoke(
     imp: Impl,
     bin: &Path,
-    staged_entry: &Path,
+    staged: &stage::Staged,
     check: &Check,
     phase: &str,
     ceiling: Duration,
@@ -287,10 +287,14 @@ fn invoke(
         // (miri-lite execution, budget-bounded; a blown budget reports an
         // honest `unsupported`, never a hang).
         cmd.arg("--checked");
+        // s26's real std resolution (wolf-lang#1): `use std.X` reads
+        // `<std-root>/X/`. lupin has no counterpart yet and resolves the
+        // staged flat mirror instead (F-0010).
+        cmd.arg("--std-root").arg(staged.std_root.as_os_str());
     }
     // Absolute entry path: the package root is the entry file's
     // directory, and a bare relative name resolves to an empty root.
-    cmd.arg(staged_entry.as_os_str());
+    cmd.arg(staged.entry.as_os_str());
     if matches!(check, Check::Pass) {
         // `pass` means "stopped at the requested phase, clean"
         // ([proto.record.verdict]) — only reachable with --phase.

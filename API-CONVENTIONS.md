@@ -107,6 +107,28 @@ the pin bump that fixes it (`docs/findings.md`):
   interpreter track enforces mechanically; the extractor is this repo's
   mechanism).
 
+**§4 amendment (sc02) — statements in examples.** A fenced example's
+lines are classified mechanically, and every line stays real wolf:
+
+- a line containing a relational operator (`==`, `!=`, `<`, `<=`, `>`,
+  `>=`) is an **assertion**, wrapped as `if LINE { } else { return N }`;
+- every other line is a **statement**, emitted verbatim — a `let`/`var`
+  binding, an assignment (`m[k] = v`), a unit-returning call
+  (`list.push(mut xs, 1)`), a one-line `for`;
+- a line that is neither an assertion nor a plausible statement is a
+  hard extractor error, so a typo cannot pass through unchecked.
+
+The rule exists because mutation is half of a container API: without it
+`push`, `set`, `clear` and `extend` could carry no runnable example at
+all. Its cost is one explicit spelling: a predicate is asserted as
+`list.is_empty(xs) == true`, never as a bare call, because a bare call
+is a statement.
+
+**§4 note (sc02) — one module per example.** The extractor imports
+exactly the documented module (`use std.<path>`), so an example may only
+name that module plus the language itself. Examples that would need a
+sibling module are restructured or written as prose.
+
 ## 5. Regions
 
 - Allocate in the ambient region by default; std code never demands a
@@ -157,6 +179,37 @@ the pin bump that fixes it (`docs/findings.md`):
   trapping and render no values until sc05's fmt trait (`assert_eq`/
   `assert_ne` say only which side of the relation broke).
 
+## 8. Containers (sc02)
+
+- **The language's, or std's** — stated in every container module's
+  header, never assumed: `List`/`Pool` construction (`List[T]()`),
+  indexing (`xs[i]`, `p[h]`), index assignment, `for` iteration and
+  `Pool`'s two-phase `reserve`/`init` are the LANGUAGE's; every named
+  operation over them is std's. The split itself is a filed
+  recommendation, not folklore (F-0011).
+- **Container first, mode honest.** A container operation takes its
+  container as the first parameter with the X1 mode the operation
+  deserves: `mut` for mutators (`push`, `set`, `clear`), the bare read
+  default for queries (`len`, `get`, `contains`), `take` only for true
+  consumption. Call sites spell it: `list.push(mut xs, 1)`.
+- **Absence over sentinels, traps for contract violations** (§2 applied):
+  `pop`, `get`, `first`, `last`, `pop_front` raise `None`; `remove(i)`,
+  `set(i, v)` and the language's `xs[i]` trap `bounds`, because a caller
+  that could have checked `len` and did not has violated a contract. A
+  container never returns `-1`, `0`, or an empty value to mean "absent".
+- **Order is promised only where it is meant.** `Map`'s iteration order
+  is unspecified — `keys`/`values`/`pairs` promise only to agree with each
+  other for an unmodified map; `Pool`'s slot order is unspecified;
+  `Deque.to_list` promises front-to-back, and says so.
+- **Naming across containers is one vocabulary**: `len`, `is_empty`,
+  `clear`, `extend`, `to_list`, `get`, `remove`, `has`/`contains`
+  (`contains` for sequences, `has` for keyed lookup — the difference is
+  documented on both). A new container adopts these names or argues in
+  review.
+- **No capacity API without a capacity.** `reserve` is not shipped while
+  the builtin exposes no capacity at all: a no-op documented as a hint
+  would be a lie (F-0011).
+
 ## Review record
 
 - 2026-08-10 — drafted (sc00). Human review: **pending**; record the
@@ -165,3 +218,6 @@ the pin bump that fixes it (`docs/findings.md`):
 - 2026-08-10 — sc01 amendments: §2 absence inventory (with the two
   filed interims), §6 ordering, §7 assert. Review rides the same
   pending sc00 gate.
+- 2026-08-11 — sc02 amendments: §4 statement-vs-assertion rule for
+  fenced examples plus the one-module note, and §8 Containers. Review
+  rides the same pending sc00 gate.
