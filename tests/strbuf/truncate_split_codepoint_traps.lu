@@ -1,0 +1,19 @@
+//! check: run(exit=trap(bounds))
+//! phase: run
+//! conforms: conf.trap.set, std.strbuf
+//!
+//! `truncate` inherits the language's checked slicing: a length that falls
+//! INSIDE a code point traps `bounds`, exactly as `s[..n]` does. That is
+//! the "checked boundary" the sprint contract asks of `truncate`, `insert`
+//! and `remove` — the recoverable form waits on `str.get` (F-0018), which
+//! is the only thing that could answer the boundary question without
+//! trapping it.
+
+use std.strbuf
+
+fn main() -> !int {
+    var b = strbuf.new()
+    strbuf.push_str(mut b, "é")
+    strbuf.truncate(mut b, 1)
+    strbuf.len(b)
+}

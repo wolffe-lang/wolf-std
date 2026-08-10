@@ -1,0 +1,30 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.strbuf
+//!
+//! The region half of the sprint's acceptance: a builder is filled inside a
+//! `region` block (D10 — the ambient region is the default and no
+//! annotation appears anywhere), the region is frozen, and the built string
+//! stays READABLE across the boundary. `freeze` makes a graph deeply
+//! immutable, never unreachable; writing through a frozen path is E1012
+//! statically and under-enforced dynamically (interp#2), so this test never
+//! attempts one.
+//!
+//! `strbuf.in(r)` — the region-EXPLICIT constructor — is not exercised: it
+//! is one of the three functions this sprint could not ship (compiler-side
+//! placement plumbing, s37). This is the legal subset today.
+
+use std.strbuf
+
+fn main() -> !int {
+    let r = region()
+    var b = strbuf.new()
+    strbuf.push_str(mut b, "the ")
+    strbuf.push_str(mut b, "wolf")
+    freeze r
+    if strbuf.len(b) == 8 {} else { return 1 }
+    if strbuf.to_str(b) == "the wolf" {} else { return 2 }
+    let out = strbuf.to_str(b)
+    if out[0..3] == "the" {} else { return 3 }
+    0
+}

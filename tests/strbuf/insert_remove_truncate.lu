@@ -1,0 +1,44 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.strbuf, str.slice
+//!
+//! The three offset-taking mutators, each at a code-point boundary: insert
+//! at the front, in the middle and at the end (`off == len` appends),
+//! remove a byte range, truncate to a shorter length. Every offset here is
+//! a valid boundary — the trap for one that is not gets its own test, since
+//! a trap ends the process.
+
+use std.strbuf
+
+fn main() -> !int {
+    var b = strbuf.new()
+    strbuf.push_str(mut b, "wolf")
+    strbuf.insert(mut b, 0, "the ")
+    if strbuf.to_str(b) == "the wolf" {} else { return 1 }
+    strbuf.insert(mut b, 8, " runs")
+    if strbuf.to_str(b) == "the wolf runs" {} else { return 2 }
+    strbuf.insert(mut b, 4, "grey ")
+    if strbuf.to_str(b) == "the grey wolf runs" {} else { return 3 }
+    strbuf.remove(mut b, 4, 9)
+    if strbuf.to_str(b) == "the wolf runs" {} else { return 4 }
+    // An empty range removes nothing.
+    strbuf.remove(mut b, 3, 3)
+    if strbuf.to_str(b) == "the wolf runs" {} else { return 5 }
+    strbuf.truncate(mut b, 8)
+    if strbuf.to_str(b) == "the wolf" {} else { return 6 }
+    // Truncating to the current length is a no-op; to 0 empties.
+    strbuf.truncate(mut b, 8)
+    if strbuf.len(b) == 8 {} else { return 7 }
+    strbuf.truncate(mut b, 0)
+    if strbuf.len(b) == 0 {} else { return 8 }
+    // Multi-byte content, sliced only at boundaries: é is [0, 2).
+    var u = strbuf.new()
+    strbuf.push_str(mut u, "é🐺")
+    strbuf.remove(mut u, 0, 2)
+    if strbuf.to_str(u) == "🐺" {} else { return 9 }
+    strbuf.insert(mut u, 0, "é")
+    if strbuf.to_str(u) == "é🐺" {} else { return 10 }
+    strbuf.truncate(mut u, 2)
+    if strbuf.to_str(u) == "é" {} else { return 11 }
+    0
+}

@@ -1,0 +1,46 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str
+//!
+//! `parse_int` across bases, signs and every miss shape. The `Parse` row is
+//! consumed by `else` (spelled `Parse` per F-0003's interim); the misses
+//! are as much of the contract as the hits — no leniency means no
+//! whitespace, no separators, no `0x` prefix, and an empty digit run is a
+//! miss rather than a zero.
+
+use std.str
+
+fn main() -> !int {
+    if (str.parse_int("0", 10) else 0 - 1) == 0 {} else { return 1 }
+    if (str.parse_int("42", 10) else 0 - 1) == 42 {} else { return 2 }
+    if (str.parse_int("-42", 10) else 0) == 0 - 42 {} else { return 3 }
+    if (str.parse_int("+42", 10) else 0 - 1) == 42 {} else { return 4 }
+    if (str.parse_int("1010", 2) else 0 - 1) == 10 {} else { return 5 }
+    if (str.parse_int("777", 8) else 0 - 1) == 511 {} else { return 6 }
+    if (str.parse_int("ff", 16) else 0 - 1) == 255 {} else { return 7 }
+    if (str.parse_int("FF", 16) else 0 - 1) == 255 {} else { return 8 }
+    if (str.parse_int("Ff", 16) else 0 - 1) == 255 {} else { return 9 }
+    if (str.parse_int("z", 36) else 0 - 1) == 35 {} else { return 10 }
+    if (str.parse_int("zz", 36) else 0 - 1) == 1295 {} else { return 11 }
+    if (str.parse_int("-1", 2) else 0) == 0 - 1 {} else { return 12 }
+    // Misses, one shape each.
+    if (str.parse_int("", 10) else 0 - 1) == 0 - 1 {} else { return 13 }
+    if (str.parse_int("-", 10) else 0 - 1) == 0 - 1 {} else { return 14 }
+    if (str.parse_int("4x", 10) else 0 - 1) == 0 - 1 {} else { return 15 }
+    if (str.parse_int("x4", 10) else 0 - 1) == 0 - 1 {} else { return 16 }
+    if (str.parse_int(" 4", 10) else 0 - 1) == 0 - 1 {} else { return 17 }
+    if (str.parse_int("4 ", 10) else 0 - 1) == 0 - 1 {} else { return 18 }
+    if (str.parse_int("0x10", 16) else 0 - 1) == 0 - 1 {} else { return 19 }
+    if (str.parse_int("1_0", 10) else 0 - 1) == 0 - 1 {} else { return 20 }
+    if (str.parse_int("2", 2) else 0 - 1) == 0 - 1 {} else { return 21 }
+    if (str.parse_int("g", 16) else 0 - 1) == 0 - 1 {} else { return 22 }
+    // A base outside 2..36 is a miss, not a trap: the base is data too.
+    if (str.parse_int("10", 1) else 0 - 1) == 0 - 1 {} else { return 23 }
+    if (str.parse_int("10", 37) else 0 - 1) == 0 - 1 {} else { return 24 }
+    if (str.parse_int("10", 0) else 0 - 1) == 0 - 1 {} else { return 25 }
+    // A non-ASCII digit run is a miss and NOT a trap — the property the
+    // boundary-safe `starts_with` probe buys (std.str's header).
+    if (str.parse_int("é", 10) else 0 - 1) == 0 - 1 {} else { return 26 }
+    if (str.parse_int("4🐺", 10) else 0 - 1) == 0 - 1 {} else { return 27 }
+    0
+}

@@ -101,11 +101,11 @@ pub fn dedup[T: cmp.Eq](mut xs: List[T]) {
     while k < n {
         let v = at(xs, k)
         if k == 0 {
-            out.push(v)
+            (mut out).push(v)
         } else {
             let prev = at(xs, k - 1)
             if !cmp.Eq.eq(prev, v) {
-                out.push(v)
+                (mut out).push(v)
             }
         }
         k = k + 1

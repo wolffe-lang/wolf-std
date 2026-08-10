@@ -12,8 +12,12 @@
 #   type-path expression is involved (F-0002); wolfc's checked tier
 #   refuses rows, enums and trait dispatch at the run rung with an
 #   honest `unsupported` after proving the static ladder through mem.
-# - `(mut xs).push` — the X1-correct spelling — is E0804 under wolfc's
-#   pinned List typing (divergence F-0005): those tests are lupin-only.
+# - `(mut xs).push` — the X1-correct spelling — was E0804 under wolfc's
+#   sc01/sc02 List typing (F-0005). CLOSED at the sc03 pin (12ae8c2,
+#   wolf-lang#6): the mode-spelled receiver is now the ONE legal spelling
+#   in both implementations and `.len`-then-`[i]` is a copy-read, so every
+#   std body and test writes `(mut xs).push(v)` and no row here says
+#   fail(E0804) any more.
 
 [tests."prelude/prelude_smoke.lu"]
 lupin = "run"
@@ -38,7 +42,11 @@ wolfc = "unsupported"
 
 [tests."option/to_list_roundtrip.lu"]
 lupin = "run"
-wolfc = "fail(E0804)"
+# sc03 pin bump: the static REJECTION is gone (F-0005 closed) — the ladder
+# runs clean to mem and the checked tier answers `unsupported` for the row
+# raise alone (F-0015). Depth 1 -> 0 in the rig's ranking; an advance in
+# truth, since nothing is refused any more.
+wolfc = "unsupported"
 
 [tests."option/exists_marking.lu"]
 lupin = "run"
@@ -100,15 +108,16 @@ wolfc = "unsupported"
 
 [tests."iter/range_drive.lu"]
 lupin = "run"
-# Not the range prototype's own doing: wolfc typechecks the whole iter
-# module as freight, and list_next's `c.xs.len`-then-`c.xs[c.i]` reads
-# trip the pinned mem tier's List reads-as-moves (F-0005, same filing
-# as the E0804 push typing). The row flips with that fix.
-wolfc = "fail(E1001)"
+# sc02 recorded fail(E1001) here: wolfc typechecks the whole iter module as
+# freight and list_next's `c.xs.len`-then-`c.xs[c.i]` tripped reads-as-moves
+# (F-0005). The sc03 pin closes that (wolf-lang#6, copy-reads), so the
+# ladder is clean and only the row raise keeps the run rung shut (F-0015).
+wolfc = "unsupported"
 
 [tests."iter/list_cursor_drive.lu"]
 lupin = "run"
-wolfc = "fail(E0804)"
+# Was fail(E0804) — the same F-0005 closure. See range_drive above.
+wolfc = "unsupported"
 
 # ---- sc02: std.list (the run-rung floor — push/len/index/for reach
 # wolfc's checked run rung; the row-raising family is where the two
@@ -236,4 +245,88 @@ wolfc = "unsupported"
 
 [tests."x/list_eq/dedup_and_affixes.lu"]
 lupin = "unsupported"
+wolfc = "unsupported"
+
+# ---- sc03: std.str. The whole module is a LUPIN lane, and the reason is
+# structural rather than incidental: wolfc answers `unsupported` at RESOLVE
+# for any method call on a builtin receiver (`s.len`, `s.trim()`) and for
+# `s[a..b]` slicing — the s37 prelude plumbing the sprint contract
+# predicted (F-0018). Every row below therefore reads `unsupported` for
+# wolfc, and the flip when s37 lands is a LEDGER commit, not a code change:
+# that property is the proof the rig was built right. ----
+
+[tests."str/byte_length_honesty.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."str/slice_oob_traps.lu"]
+lupin = "run"
+# No import at all here — the surface under test is the language's own
+# slicing — and wolfc still stops at resolve: `s[a..b]` on `str` is not
+# plumbed, so the trap it should raise cannot be observed on that lane.
+wolfc = "unsupported"
+
+[tests."str/slice_split_codepoint_traps.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."str/trim_whitespace_set.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."str/affix_and_case.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."str/lines_words_join.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."str/parse_int_bases.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."str/parse_float_shapes.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."str/interpolation_interplay.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."str/to_strbuf_round_trip.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+# ---- sc03: std.strbuf (a concrete struct plus free functions — the shape
+# sc02's deque_int proved runs on both lanes; what keeps wolfc dark here is
+# the `str` operations inside the bodies, not the struct) ----
+
+[tests."strbuf/build_and_read.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."strbuf/insert_remove_truncate.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."strbuf/truncate_split_codepoint_traps.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+[tests."strbuf/region_build_and_freeze.lu"]
+lupin = "run"
+wolfc = "unsupported"
+
+# ---- sc03: std.unicode. The one sc03 module with no `str` in its bodies —
+# pure integer predicates — and therefore the one with a wolfc `run` row:
+# both implementations execute the ASCII classification. The row-raising
+# pair is `unsupported` under wolfc for F-0015's reason alone. ----
+
+[tests."unicode/ascii_predicates.lu"]
+lupin = "run"
+wolfc = "run"
+
+[tests."unicode/scalar_values_and_utf8_len.lu"]
+lupin = "run"
 wolfc = "unsupported"

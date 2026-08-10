@@ -1,0 +1,47 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str, mem.str.order
+//!
+//! The size/affix/case family over the adversarial fixtures: `contains`,
+//! `starts_with`, `strip_prefix` (hit and miss), `eq_ignore_case`, `lower`,
+//! `upper`, `repeat` — plus the byte-lexicographic ordering the pin's
+//! `[mem.str.order]` ruling defines, which is what makes "sorting strings"
+//! mean something in wolf.
+
+use std.str
+
+fn main() -> !int {
+    if str.contains("the wolf runs", "wolf") {} else { return 1 }
+    if str.contains("the wolf runs", "moon") { return 2 }
+    if str.contains("", "") {} else { return 3 }
+    if str.contains("é🐺", "🐺") {} else { return 4 }
+    if str.starts_with("wolf-lang", "wolf") {} else { return 5 }
+    if str.starts_with("wolf-lang", "lang") { return 6 }
+    if str.starts_with("🐺!", "🐺") {} else { return 7 }
+    if str.starts_with("é", "e") { return 8 }
+    if (str.strip_prefix("wolf-lang", "wolf-") else "?") == "lang" {} else { return 9 }
+    if (str.strip_prefix("wolf-lang", "lang") else "?") == "?" {} else { return 10 }
+    if (str.strip_prefix("é🐺", "é") else "?") == "🐺" {} else { return 11 }
+    if (str.strip_prefix("", "") else "?") == "" {} else { return 12 }
+    if str.eq_ignore_case("WOLF", "wolf") {} else { return 13 }
+    if str.eq_ignore_case("wolf", "wolves") { return 14 }
+    if str.lower("WOLF") == "wolf" {} else { return 15 }
+    if str.upper("wolf") == "WOLF" {} else { return 16 }
+    // The pinned interpreter's case mapping is simple UNICODE, not ASCII —
+    // recorded as evidence for the tables filing (F-0018), not as a
+    // promise std makes.
+    if str.lower("ÉA") == "éa" {} else { return 17 }
+    if str.repeat("ab", 3) == "ababab" {} else { return 18 }
+    if str.repeat("ab", 0) == "" {} else { return 19 }
+    if str.repeat("é", 2) == "éé" {} else { return 20 }
+    // Byte-lexicographic order (`[mem.str.order]`): unsigned byte compare,
+    // shorter first on a shared prefix, and every multi-byte code point
+    // therefore sorts above every ASCII one.
+    if "a" < "b" {} else { return 21 }
+    if "wolf" < "wolves" {} else { return 22 }
+    if "wolf" < "wolf!" {} else { return 23 }
+    if "z" < "é" {} else { return 24 }
+    if "é" < "🐺" {} else { return 25 }
+    if "" < "a" {} else { return 26 }
+    0
+}

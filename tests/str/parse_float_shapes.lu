@@ -1,0 +1,48 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str
+//!
+//! `parse_float` over the shapes it accepts and the shapes it refuses.
+//! Every expected value here is one an f64 represents exactly (halves,
+//! quarters, powers of ten within range), because the accumulation is
+//! `acc * 10.0 + digit` and the module documents that a long literal can
+//! land a unit or two in the last place away from correctly-rounded — a
+//! test that pinned an inexact value would be pinning the rounding of the
+//! implementation, not the contract.
+
+use std.str
+
+fn main() -> !int {
+    if (str.parse_float("0") else 0.0 - 1.0) == 0.0 {} else { return 1 }
+    if (str.parse_float("3") else 0.0) == 3.0 {} else { return 2 }
+    if (str.parse_float("1.5") else 0.0) == 1.5 {} else { return 3 }
+    if (str.parse_float("-2.25") else 0.0) == 0.0 - 2.25 {} else { return 4 }
+    if (str.parse_float("+2.25") else 0.0) == 2.25 {} else { return 5 }
+    if (str.parse_float("0.5") else 0.0) == 0.5 {} else { return 6 }
+    if (str.parse_float(".5") else 0.0) == 0.5 {} else { return 7 }
+    if (str.parse_float("2.") else 0.0) == 2.0 {} else { return 8 }
+    if (str.parse_float("1e2") else 0.0) == 100.0 {} else { return 9 }
+    if (str.parse_float("1E2") else 0.0) == 100.0 {} else { return 10 }
+    if (str.parse_float("1e+2") else 0.0) == 100.0 {} else { return 11 }
+    if (str.parse_float("5e-1") else 0.0) == 0.5 {} else { return 12 }
+    if (str.parse_float("1.25e2") else 0.0) == 125.0 {} else { return 13 }
+    if (str.parse_float("-1.5e1") else 0.0) == 0.0 - 15.0 {} else { return 14 }
+    // Misses.
+    if (str.parse_float("") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 15 }
+    if (str.parse_float("x") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 16 }
+    if (str.parse_float(".") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 17 }
+    if (str.parse_float("-") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 18 }
+    if (str.parse_float("1.2.3") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 19 }
+    if (str.parse_float("1e") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 20 }
+    if (str.parse_float("1e+") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 21 }
+    if (str.parse_float("1e2x") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 22 }
+    if (str.parse_float(" 1.5") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 23 }
+    if (str.parse_float("1.5 ") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 24 }
+    if (str.parse_float("inf") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 25 }
+    if (str.parse_float("nan") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 26 }
+    // An exponent beyond f64's range is a miss, not an infinity.
+    if (str.parse_float("1e309") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 27 }
+    // Non-ASCII input misses without trapping.
+    if (str.parse_float("é") else 0.0 - 1.0) == 0.0 - 1.0 {} else { return 28 }
+    0
+}

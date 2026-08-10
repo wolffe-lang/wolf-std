@@ -1,0 +1,35 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str, std.strbuf
+//!
+//! The worked example `std.str.to_strbuf`'s doc comment cannot carry (the
+//! §4 extractor imports exactly one module, and this conversion spans
+//! two): `str` copied into a builder, mutated, and read back — with the
+//! original `str` untouched, because `str` is immutable and `to_strbuf`
+//! allocates (the `to_` half of §1's conversion rule; `strbuf.to_str` is
+//! the borrowing direction).
+
+use std.str
+use std.strbuf
+
+fn main() -> !int {
+    let s = "wolf"
+    var b = str.to_strbuf(s)
+    if strbuf.len(b) == 4 {} else { return 1 }
+    if strbuf.to_str(b) == "wolf" {} else { return 2 }
+    strbuf.push_str(mut b, "-lang")
+    if strbuf.to_str(b) == "wolf-lang" {} else { return 3 }
+    // The source string is untouched: a copy, not a view.
+    if s == "wolf" {} else { return 4 }
+    if str.len(s) == 4 {} else { return 5 }
+    // Round trip through both directions preserves multi-byte content.
+    let u = str.to_strbuf("é🐺")
+    if strbuf.len(u) == 6 {} else { return 6 }
+    if strbuf.to_str(u) == "é🐺" {} else { return 7 }
+    // An empty string makes an empty, usable builder.
+    var e = str.to_strbuf("")
+    if strbuf.len(e) == 0 {} else { return 8 }
+    strbuf.push_str(mut e, "x")
+    if strbuf.to_str(e) == "x" {} else { return 9 }
+    0
+}

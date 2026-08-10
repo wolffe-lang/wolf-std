@@ -1,0 +1,54 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str
+//!
+//! Splitting into lines and words, and the round trip back through `join`
+//! — the only three split/join functions this pin can execute (the general
+//! `split(sep)` needs the boundary primitive, F-0018). The edge cases are
+//! the contract: a trailing newline adds no empty final line, `\r\n` is one
+//! terminator with the `\r` dropped, the empty string has no lines and no
+//! words, and runs of whitespace never produce empty words.
+
+use std.str
+
+fn count(parts: List[str]) -> int {
+    var n = 0
+    for part in parts {
+        n = n + 1
+    }
+    n
+}
+
+fn main() -> !int {
+    if count(str.lines("a\nb\n")) == 2 {} else { return 1 }
+    if count(str.lines("a\nb")) == 2 {} else { return 2 }
+    if count(str.lines("")) == 0 {} else { return 3 }
+    if count(str.lines("a\r\nb")) == 2 {} else { return 4 }
+    let crlf = str.lines("a\r\nb")
+    if crlf[0] == "a" {} else { return 5 }
+    if count(str.words("  the   wolf  ")) == 2 {} else { return 6 }
+    if count(str.words("")) == 0 {} else { return 7 }
+    if count(str.words("   ")) == 0 {} else { return 8 }
+    if count(str.words("a\tb\nc")) == 3 {} else { return 9 }
+    // Unicode whitespace separates too — the same set `trim` uses.
+    if count(str.words("a\u{a0}b")) == 2 {} else { return 10 }
+    // join: no separator before the first or after the last part.
+    let words = str.words("the wolf runs")
+    if str.join(" ", words) == "the wolf runs" {} else { return 11 }
+    let again = str.words("the wolf runs")
+    if str.join("", again) == "thewolfruns" {} else { return 12 }
+    let dashed = str.words("the wolf runs")
+    if str.join("é", dashed) == "theéwolféruns" {} else { return 13 }
+    var empty = List[str]()
+    if str.join(",", empty) == "" {} else { return 14 }
+    var one = List[str]()
+    (mut one).push("wolf")
+    if str.join(",", one) == "wolf" {} else { return 15 }
+    // Empty parts are joined honestly: two separators, three empty pieces.
+    var blanks = List[str]()
+    (mut blanks).push("")
+    (mut blanks).push("")
+    (mut blanks).push("")
+    if str.join(",", blanks) == ",," {} else { return 16 }
+    0
+}

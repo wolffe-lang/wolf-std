@@ -65,7 +65,7 @@ fn at[T](xs: List[T], i: int) -> T {
 /// list.len(xs) == 2
 /// ```
 pub fn push[T](mut xs: List[T], v: T) {
-    xs.push(v)
+    (mut xs).push(v)
 }
 
 /// Removes and returns the last element; `None` when `xs` is empty —
@@ -155,9 +155,9 @@ pub fn set[T](mut xs: List[T], i: int, v: T) {
     var k = 0
     while k < n {
         if k == i {
-            out.push(v)
+            (mut out).push(v)
         } else {
-            out.push(at(xs, k))
+            (mut out).push(at(xs, k))
         }
         k = k + 1
     }
@@ -218,13 +218,13 @@ pub fn insert[T](mut xs: List[T], i: int, v: T) {
     var k = 0
     while k < n {
         if k == i {
-            out.push(v)
+            (mut out).push(v)
         }
-        out.push(at(xs, k))
+        (mut out).push(at(xs, k))
         k = k + 1
     }
     if i == n {
-        out.push(v)
+        (mut out).push(v)
     }
     xs = out
 }
@@ -247,7 +247,7 @@ pub fn remove[T](mut xs: List[T], i: int) -> T {
     var k = 0
     while k < n {
         if k != i {
-            out.push(at(xs, k))
+            (mut out).push(at(xs, k))
         }
         k = k + 1
     }
@@ -277,9 +277,9 @@ pub fn swap_remove[T](mut xs: List[T], i: int) -> T {
     var k = 0
     while k < n - 1 {
         if k == i {
-            out.push(tail)
+            (mut out).push(tail)
         } else {
-            out.push(at(xs, k))
+            (mut out).push(at(xs, k))
         }
         k = k + 1
     }
@@ -306,11 +306,11 @@ pub fn swap[T](mut xs: List[T], i: int, j: int) {
     var k = 0
     while k < n {
         if k == i {
-            out.push(b)
+            (mut out).push(b)
         } else if k == j {
-            out.push(a)
+            (mut out).push(a)
         } else {
-            out.push(at(xs, k))
+            (mut out).push(at(xs, k))
         }
         k = k + 1
     }
@@ -349,7 +349,7 @@ pub fn truncate[T](mut xs: List[T], n: int) {
     var k = 0
     while k < have {
         if k < n {
-            out.push(at(xs, k))
+            (mut out).push(at(xs, k))
         }
         k = k + 1
     }
@@ -402,7 +402,7 @@ pub fn reverse[T](mut xs: List[T]) {
     var out = List[T]()
     var k = 0
     while k < n {
-        out.push(at(xs, n - 1 - k))
+        (mut out).push(at(xs, n - 1 - k))
         k = k + 1
     }
     xs = out
@@ -423,7 +423,7 @@ pub fn reverse[T](mut xs: List[T]) {
 /// ```
 pub fn extend[T](mut xs: List[T], other: List[T]) {
     for y in other {
-        xs.push(y)
+        (mut xs).push(y)
     }
 }
 
@@ -461,7 +461,7 @@ pub fn fill[T](mut xs: List[T], v: T) {
     var out = List[T]()
     var k = 0
     while k < n {
-        out.push(v)
+        (mut out).push(v)
         k = k + 1
     }
     xs = out

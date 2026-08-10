@@ -1,0 +1,31 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: str.slice, std.str
+//!
+//! The sprint's documented byte-length test, over the adversarial fixture
+//! set: empty, ASCII, a two-byte code point, a four-byte astral code
+//! point, a combining-mark sequence, and a mixed kitchen-sink line. `len`
+//! is BYTES (D25) — every one of these numbers is a byte count, and the
+//! combining-mark case is the one that shows why "length" and "how many
+//! things a reader sees" are different questions.
+
+use std.str
+
+fn main() -> !int {
+    if str.len("") == 0 {} else { return 1 }
+    if str.len("wolf") == 4 {} else { return 2 }
+    if str.len("é") == 2 {} else { return 3 }
+    if str.len("🐺") == 4 {} else { return 4 }
+    if str.len("\u{1F43A}") == 4 {} else { return 5 }
+    // "e" + U+0301 COMBINING ACUTE ACCENT: one grapheme, two code points,
+    // three bytes — and it is NOT equal to the precomposed "é" (D24 ships
+    // no normalization; see std.unicode's posture).
+    if str.len("e\u{301}") == 3 {} else { return 6 }
+    if "e\u{301}" == "é" { return 7 }
+    // kitchen sink: ascii + 2-byte + 3-byte + 4-byte + combining
+    let sink = "a é \u{1680}\u{301} 🐺!"
+    if str.len(sink) == 16 {} else { return 8 }
+    if str.is_empty("") {} else { return 9 }
+    if str.is_empty(sink) { return 10 }
+    0
+}

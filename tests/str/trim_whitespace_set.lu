@@ -1,0 +1,77 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str
+//!
+//! std.str's whitespace table AGREES with the builtin `trim`, code point by
+//! code point — the assertion the module header promises. `trim_start` and
+//! `trim_end` are written over a table of Unicode `White_Space` because the
+//! builtin's set is Unicode, not ASCII; if the builtin ever narrows or
+//! widens its set, this test fails here instead of the two functions
+//! silently disagreeing with `trim`.
+//!
+//! Each code point is checked three ways: stripped from the front by
+//! `trim_start`, from the back by `trim_end`, and from both by the builtin
+//! through `trim`.
+
+use std.str
+
+fn agrees(ws: str) -> bool {
+    let lead = "{ws}x"
+    let trail = "x{ws}"
+    let both = "{ws}x{ws}"
+    if str.trim_start(lead) != "x" {
+        return false
+    }
+    if str.trim_end(trail) != "x" {
+        return false
+    }
+    if str.trim(both) != "x" {
+        return false
+    }
+    if str.trim_start(trail) != trail {
+        return false
+    }
+    if str.trim_end(lead) != lead {
+        return false
+    }
+    true
+}
+
+fn main() -> !int {
+    if agrees(" ") {} else { return 1 }
+    if agrees("\t") {} else { return 2 }
+    if agrees("\n") {} else { return 3 }
+    if agrees("\r") {} else { return 4 }
+    if agrees("\x0b") {} else { return 5 }
+    if agrees("\x0c") {} else { return 6 }
+    if agrees("\u{85}") {} else { return 7 }
+    if agrees("\u{a0}") {} else { return 8 }
+    if agrees("\u{1680}") {} else { return 9 }
+    if agrees("\u{2000}") {} else { return 10 }
+    if agrees("\u{2001}") {} else { return 11 }
+    if agrees("\u{2002}") {} else { return 12 }
+    if agrees("\u{2003}") {} else { return 13 }
+    if agrees("\u{2004}") {} else { return 14 }
+    if agrees("\u{2005}") {} else { return 15 }
+    if agrees("\u{2006}") {} else { return 16 }
+    if agrees("\u{2007}") {} else { return 17 }
+    if agrees("\u{2008}") {} else { return 18 }
+    if agrees("\u{2009}") {} else { return 19 }
+    if agrees("\u{200a}") {} else { return 20 }
+    if agrees("\u{2028}") {} else { return 21 }
+    if agrees("\u{2029}") {} else { return 22 }
+    if agrees("\u{202f}") {} else { return 23 }
+    if agrees("\u{205f}") {} else { return 24 }
+    if agrees("\u{3000}") {} else { return 25 }
+    // A non-whitespace code point is left alone by all three.
+    if str.trim_start("é x") != "é x" { return 26 }
+    if str.trim_end("x é") != "x é" { return 27 }
+    // All-whitespace strings collapse to empty on every side.
+    if str.trim_start("  \t\n ") != "" { return 28 }
+    if str.trim_end("  \t\n ") != "" { return 29 }
+    if str.trim("  \t\n ") != "" { return 30 }
+    // The empty string is a fixed point.
+    if str.trim_start("") != "" { return 31 }
+    if str.trim_end("") != "" { return 32 }
+    0
+}

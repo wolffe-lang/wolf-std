@@ -1,0 +1,21 @@
+//! check: run(exit=trap(bounds))
+//! phase: run
+//! conforms: conf.trap.set, str.slice
+//!
+//! D25's checked slicing, half two — the half that makes `str` honest: an
+//! offset INSIDE a code point traps `bounds` exactly like an out-of-range
+//! one. `"é"` is two bytes, so offset 1 is not a boundary. This is the
+//! reason std.str cannot write `find`/`split` in library code today: the
+//! only way to ask whether an offset is a boundary is to slice at it, and
+//! the answer to "no" is a trap that no caller can catch (D30: no
+//! unwinding). Recorded with the finding, F-0018.
+
+fn main() -> !int {
+    let s = "é"
+    let bad = s[0..1]
+    str_len(bad)
+}
+
+fn str_len(s: str) -> int {
+    s.len
+}

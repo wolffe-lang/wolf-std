@@ -34,8 +34,8 @@
 /// p[h] == 41
 /// ```
 pub fn alloc[T](mut p: Pool[T], v: T) -> handle T {
-    let h = p.reserve()
-    p.init(h, v)
+    let h = (mut p).reserve()
+    (mut p).init(h, v)
     h
 }
 
@@ -52,7 +52,7 @@ pub fn alloc[T](mut p: Pool[T], v: T) -> handle T {
 /// p[g] == 2
 /// ```
 pub fn free[T](mut p: Pool[T], h: handle T) {
-    p.remove(h)
+    (mut p).remove(h)
 }
 // BLOCKED — four of this module's six functions, all on the same
 // missing language surface, all filed with F-0011:

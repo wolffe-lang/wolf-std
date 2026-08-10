@@ -1,0 +1,63 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.unicode
+//!
+//! The ASCII-true classification, exhaustively at the boundaries of every
+//! range plus the code points just outside them — the only way a predicate
+//! table earns trust. The currency is a Unicode scalar value as `int`: the
+//! interim std.unicode's header explains (no `char` type exists at this
+//! pin), with the reviewed `char`-typed signatures recorded per function.
+//!
+//! The names promise ASCII and the assertions hold them to it: É (201) and
+//! the ideographic space (12288) are letters and whitespace in Unicode and
+//! answer false here.
+
+use std.unicode
+
+fn main() -> !int {
+    // is_ascii: 0..127
+    if unicode.is_ascii(0) {} else { return 1 }
+    if unicode.is_ascii(127) {} else { return 2 }
+    if unicode.is_ascii(128) { return 3 }
+    if unicode.is_ascii(0 - 1) { return 4 }
+    if unicode.is_ascii(128058) { return 5 }
+    // digits: 48..57
+    if unicode.is_ascii_digit(48) {} else { return 6 }
+    if unicode.is_ascii_digit(57) {} else { return 7 }
+    if unicode.is_ascii_digit(47) { return 8 }
+    if unicode.is_ascii_digit(58) { return 9 }
+    // upper: 65..90, lower: 97..122
+    if unicode.is_ascii_upper(65) {} else { return 10 }
+    if unicode.is_ascii_upper(90) {} else { return 11 }
+    if unicode.is_ascii_upper(64) { return 12 }
+    if unicode.is_ascii_upper(91) { return 13 }
+    if unicode.is_ascii_lower(97) {} else { return 14 }
+    if unicode.is_ascii_lower(122) {} else { return 15 }
+    if unicode.is_ascii_lower(96) { return 16 }
+    if unicode.is_ascii_lower(123) { return 17 }
+    // alpha is the union of the two cases, and nothing else.
+    if unicode.is_ascii_alpha(65) {} else { return 18 }
+    if unicode.is_ascii_alpha(97) {} else { return 19 }
+    if unicode.is_ascii_alpha(48) { return 20 }
+    if unicode.is_ascii_alpha(95) { return 21 }
+    if unicode.is_ascii_alpha(201) { return 22 }
+    // alnum is alpha plus digits.
+    if unicode.is_ascii_alnum(48) {} else { return 23 }
+    if unicode.is_ascii_alnum(122) {} else { return 24 }
+    if unicode.is_ascii_alnum(95) { return 25 }
+    // space: 9..13 and 32 — and NOT the Unicode whitespace std.str.trim
+    // strips, which is the difference the two names carry.
+    if unicode.is_ascii_space(9) {} else { return 26 }
+    if unicode.is_ascii_space(10) {} else { return 27 }
+    if unicode.is_ascii_space(11) {} else { return 28 }
+    if unicode.is_ascii_space(12) {} else { return 29 }
+    if unicode.is_ascii_space(13) {} else { return 30 }
+    if unicode.is_ascii_space(32) {} else { return 31 }
+    if unicode.is_ascii_space(8) { return 32 }
+    if unicode.is_ascii_space(14) { return 33 }
+    if unicode.is_ascii_space(31) { return 34 }
+    if unicode.is_ascii_space(33) { return 35 }
+    if unicode.is_ascii_space(160) { return 36 }
+    if unicode.is_ascii_space(12288) { return 37 }
+    0
+}

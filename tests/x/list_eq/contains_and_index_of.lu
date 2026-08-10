@@ -11,7 +11,7 @@ use std.x.list_eq
 
 fn main() -> !int {
     var xs = List[int]()
-    xs.push(5)
+    (mut xs).push(5)
     if list_eq.contains(xs, 5) {} else { return 1 }
     if list_eq.contains(xs, 9) { return 2 }
     if (list_eq.index_of(xs, 5) else 0 - 1) == 0 {} else { return 3 }

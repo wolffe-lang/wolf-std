@@ -1,0 +1,37 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.strbuf
+//!
+//! The builder's happy path: an empty buffer grows by `push_str`, reports
+//! its length in BYTES (the same unit as `str.len`), reads back through
+//! `to_str`, and `clear` leaves it usable. Non-ASCII content is part of the
+//! contract, not an afterthought — a builder that only handles ASCII would
+//! be a `str` with extra steps.
+
+use std.strbuf
+
+fn main() -> !int {
+    var b = strbuf.new()
+    if strbuf.len(b) == 0 {} else { return 1 }
+    if strbuf.to_str(b) == "" {} else { return 2 }
+    strbuf.push_str(mut b, "the")
+    strbuf.push_str(mut b, " ")
+    strbuf.push_str(mut b, "wolf")
+    if strbuf.len(b) == 8 {} else { return 3 }
+    if strbuf.to_str(b) == "the wolf" {} else { return 4 }
+    // Bytes, not code points: é is 2 and 🐺 is 4.
+    var u = strbuf.new()
+    strbuf.push_str(mut u, "é")
+    strbuf.push_str(mut u, "🐺")
+    if strbuf.len(u) == 6 {} else { return 5 }
+    if strbuf.to_str(u) == "é🐺" {} else { return 6 }
+    // Appending nothing changes nothing.
+    strbuf.push_str(mut u, "")
+    if strbuf.len(u) == 6 {} else { return 7 }
+    // clear leaves the buffer usable.
+    strbuf.clear(mut u)
+    if strbuf.len(u) == 0 {} else { return 8 }
+    strbuf.push_str(mut u, "again")
+    if strbuf.to_str(u) == "again" {} else { return 9 }
+    0
+}

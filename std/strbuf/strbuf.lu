@@ -1,0 +1,177 @@
+//! member: true
+//!
+//! std.strbuf — the one string builder (D24). Stability tier: core.
+//!
+//! **What is the language's and what is std's.** Nothing here is the
+//! language's yet: `str` is the language's immutable UTF-8 slice, and D24
+//! promises `strbuf` as an owned, growable, SSO-backed builder that
+//! auto-borrows to `str` — compiler-side plumbing (s37 §3) that does not
+//! exist at this pin. This module is the API surface that plumbing will
+//! back, written today over the one thing that does exist: a `str` field
+//! rebuilt by interpolation.
+//!
+//! THE BACKING IS AN INTERIM, and it is a performance interim, not a
+//! semantic one. `push_str` allocates a fresh `str` and copies both sides,
+//! so appending n times over a buffer of length m is O(n·m) where the SSO
+//! builder is amortized O(n+m). Every function's meaning is final; the
+//! complexity notes say "the SSO backing will make this O(1) amortized"
+//! wherever that is the only difference. No caller has to change when the
+//! backing lands (F-0019), and this file is where the layout note for
+//! s41/s43's ABI document will hang.
+//!
+//! `StrBuf` is CapCase per API-CONVENTIONS §1 even though the sprint
+//! contract writes the constructor as `strbuf()`: a callable type name is
+//! s37's builtin spelling, and `strbuf.new()` is the module spelling
+//! available today. That delta is recorded in the campaign closeout.
+//!
+//! THREE OF THE ELEVEN ARE NOT HERE, each for a stated reason:
+//!
+//! - `strbuf.in(r)` — the region-explicit constructor (API-CONVENTIONS §5,
+//!   the s37 `.in(r)` pattern). Placement syntax over a std type is
+//!   compiler plumbing this pin does not have; the ambient-region
+//!   constructor below is D10's default and needs no annotation.
+//! - `push(c: char)` — there is no `char` type at this pin: `'a'` does not
+//!   lex (E0101 lupin / E0107 wolfc) and no expression produces a code
+//!   point. Filed as F-0018; `push_str` covers every one-code-point case
+//!   through a one-code-point `str`.
+//! - `reserve(n)` — API-CONVENTIONS §8's rule ("no capacity API without a
+//!   capacity") applies verbatim: a `str`-backed buffer has no capacity to
+//!   reserve, and a documented no-op would be a lie. It lands with the SSO
+//!   backing that gives it meaning.
+//!
+//! Absence is spelled `None` where it appears, pending F-0003 (lupin does
+//! not resolve a lowercase bare tag at a raise site even though wolfc now
+//! does — the divergence, not the convention, is why std waits).
+
+/// The builder: an owned, growable string. The field is the interim
+/// backing described in the module header — never part of the API.
+pub struct StrBuf {
+    s: str,
+}
+
+/// A fresh empty builder in the ambient region (D10: no region argument,
+/// no annotation). Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// let b = strbuf.new()
+/// strbuf.len(b) == 0
+/// ```
+pub fn new() -> StrBuf {
+    StrBuf { s: "" }
+}
+
+/// The length of the buffer's contents in BYTES — the same honest unit as
+/// `str.len` (D25: byte offsets are the one currency). O(1). Total: no
+/// error row, no traps.
+///
+/// ```wolf-doc-example
+/// var b = strbuf.new()
+/// strbuf.push_str(mut b, "é")
+/// strbuf.len(b) == 2
+/// ```
+pub fn len(b: StrBuf) -> int {
+    b.s.len
+}
+
+/// Appends `s` to the end of the buffer. O(len(b) + len(s)) with the
+/// interim backing, amortized O(len(s)) once the SSO builder lands. Total:
+/// no error row, no traps beyond allocation.
+///
+/// The `+=` spelling the sprint contract mentions is not available: `+` on
+/// `str` runs in lupin and is E0409 in wolfc, and the operator-to-method
+/// bridge is F-0004's open question. `push_str` is the one spelling std
+/// writes.
+///
+/// ```wolf-doc-example
+/// var b = strbuf.new()
+/// strbuf.push_str(mut b, "wolf")
+/// strbuf.push_str(mut b, "-lang")
+/// strbuf.to_str(b) == "wolf-lang"
+/// ```
+pub fn push_str(mut b: StrBuf, s: str) {
+    b.s = "{b.s}{s}"
+}
+
+/// Inserts `s` at byte offset `off`, shifting everything at or after `off`
+/// to the right. `off == len(b)` appends; `off == 0` prepends.
+///
+/// Traps `bounds` (`[conf.trap.set]`) when `off` is out of range or falls
+/// inside a code point — the language's own checked slicing (D25), raised
+/// exactly where a caller would see it. That is the "checked boundary" the
+/// contract asks for; the recoverable form waits on the recoverable slice
+/// `str.get` (F-0018), because nothing at this pin can test an offset for
+/// being a boundary without slicing at it.
+///
+/// ```wolf-doc-example
+/// var b = strbuf.new()
+/// strbuf.push_str(mut b, "wolf")
+/// strbuf.insert(mut b, 0, "the ")
+/// strbuf.to_str(b) == "the wolf"
+/// ```
+pub fn insert(mut b: StrBuf, off: int, s: str) {
+    b.s = "{b.s[..off]}{s}{b.s[off..]}"
+}
+
+/// Removes the bytes in `[from, to)`, closing the gap. Empty when
+/// `from == to`.
+///
+/// Traps `bounds` when the range is out of order, out of range, or splits
+/// a code point (D25, as `insert`). The contract writes this as
+/// `remove(a..b)`; a range is not a value that can cross a function
+/// boundary at this pin (`fn f(r: Range)` is E0301 in wolfc), so the two
+/// offsets are spelled as two parameters — the same interim `str.get`
+/// carries, flipping together with it.
+///
+/// ```wolf-doc-example
+/// var b = strbuf.new()
+/// strbuf.push_str(mut b, "the wolf")
+/// strbuf.remove(mut b, 0, 4)
+/// strbuf.to_str(b) == "wolf"
+/// ```
+pub fn remove(mut b: StrBuf, from: int, to: int) {
+    b.s = "{b.s[..from]}{b.s[to..]}"
+}
+
+/// Shortens the buffer to `n` bytes, dropping everything after. Keeps the
+/// buffer usable and is a no-op when `n == len(b)`.
+///
+/// Traps `bounds` when `n` exceeds the length or splits a code point (D25)
+/// — truncation is exactly a checked slice.
+///
+/// ```wolf-doc-example
+/// var b = strbuf.new()
+/// strbuf.push_str(mut b, "wolf-lang")
+/// strbuf.truncate(mut b, 4)
+/// strbuf.to_str(b) == "wolf"
+/// ```
+pub fn truncate(mut b: StrBuf, n: int) {
+    b.s = b.s[..n]
+}
+
+/// Empties the buffer, keeping it usable. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var b = strbuf.new()
+/// strbuf.push_str(mut b, "wolf")
+/// strbuf.clear(mut b)
+/// strbuf.len(b) == 0
+/// ```
+pub fn clear(mut b: StrBuf) {
+    b.s = ""
+}
+
+/// The buffer's contents as a `str`. A borrow of the buffer's bytes under
+/// D24's auto-borrow story — `as_`/bare-noun territory in
+/// API-CONVENTIONS §1 rather than an allocating `to_`. The name is the
+/// contract's; with the interim backing the value shares the field's
+/// buffer, which is the borrow the final type promises. Total: no error
+/// row, no traps.
+///
+/// ```wolf-doc-example
+/// var b = strbuf.new()
+/// strbuf.push_str(mut b, "wolf")
+/// strbuf.to_str(b) == "wolf"
+/// ```
+pub fn to_str(b: StrBuf) -> str {
+    b.s
+}

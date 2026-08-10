@@ -92,7 +92,7 @@ pub fn set[K, V](mut m: Map[K, V], k: K, v: V) {
 pub fn keys[K, V](m: Map[K, V]) -> List[K] {
     var out = List[K]()
     for pair in m.pairs() {
-        out.push(pair.0)
+        (mut out).push(pair.0)
     }
     out
 }
@@ -110,7 +110,7 @@ pub fn keys[K, V](m: Map[K, V]) -> List[K] {
 pub fn values[K, V](m: Map[K, V]) -> List[V] {
     var out = List[V]()
     for pair in m.pairs() {
-        out.push(pair.1)
+        (mut out).push(pair.1)
     }
     out
 }

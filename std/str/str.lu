@@ -1,0 +1,751 @@
+//! member: true
+//!
+//! std.str — the documented API surface of the language's `str`: an
+//! immutable, guaranteed-valid UTF-8 slice, two machine words wide (D24).
+//! Stability tier: core.
+//!
+//! **What is the language's and what is std's** (the API-CONVENTIONS §8
+//! question, asked again for strings). The language owns:
+//!
+//! - every literal — every string literal is an f-string, `{x}`
+//!   interpolates, `{{`/`}}` escape, `"""` dedents by the closing
+//!   delimiter's column, `r"…"` is raw (`[gram.lex.str]`, D26/X9);
+//! - `s.len` — the length in BYTES, O(1) (D25);
+//! - `s[a..b]` — zero-copy byte-offset slicing, checked: an out-of-range
+//!   offset OR an offset inside a code point traps `bounds`
+//!   (`[conf.trap.set]`), deterministically, in every profile;
+//! - the relational family — `==`, `!=`, `<`, `<=`, `>`, `>=`, `<=>` are
+//!   byte-lexicographic over the UTF-8 bytes (`[mem.str.order]`, the
+//!   ruling this repo's F-0006 asked for);
+//! - the builtin method set this file delegates to where it exists:
+//!   `is_empty`, `contains`, `starts_with`, `trim`, `lower`, `upper`,
+//!   `repeat`, `lines`, `words`.
+//!
+//! Everything else is std's — this file. Functions take the string as
+//! their first parameter with the bare `read` mode, because `str` is
+//! immutable and nothing here mutates: the builder is `std.strbuf`.
+//!
+//! **NO CHAR INDEXING, and no negative indices** (D25). There is no
+//! `s[i]`: a byte offset is the one honest currency, so `find` returns
+//! offsets and iteration yields them. To reach the first code point, slice
+//! (`s[..n]`); to count code points, `chars()` — filed, see below. `^n`
+//! end-relative indexing (`s[..^1]`) is the language's spelling for the
+//! other end and does not resolve in either implementation at this pin
+//! (F-0018); there is deliberately no std function that papers over it.
+//!
+//! **THE BOUNDARY PROBLEM — why fifteen of this module's thirty-three
+//! functions are contracts and not code.** Every position-taking string algorithm needs
+//! one of three primitives to walk UTF-8 safely, and this pin has none of
+//! them: the recoverable slice `get(a..b) -> str ! {none}` (D25's
+//! anti-landmine form), a byte accessor (`bytes()` with `b[i] -> int`), or
+//! `chars()` yielding `(offset, char)`. Without one, a scan cannot advance
+//! past a code point of unknown length: the only way to ask "is offset k a
+//! boundary?" is to slice at k, and slicing at a non-boundary TRAPS —
+//! uncatchably, since wolf has no unwinding (D30). A `find` written by
+//! guessing offsets would therefore trap on perfectly legal input like
+//! `find("héllo", "l")`, which is a broken function, not a documented
+//! partial. So `find`, `rfind`, `count`, `split`, `split_once`,
+//! `rsplit_once`, `ends_with`, `strip_suffix`, `replace`, `replacen`,
+//! `get`, `bytes`, `chars`, `graphemes` and `to_list_chars` ship as
+//! REVIEWED CONTRACTS below and land verbatim on the pin that delivers any
+//! one of the three primitives (F-0018, s37 §4–§5).
+//!
+//! What IS shippable is everything expressible over `starts_with` plus
+//! advance-by-a-known-length — the boundary-safe probe: after
+//! `s.starts_with(p)` succeeds, `p.len` IS a code-point boundary of `s`.
+//! That single fact carries `strip_prefix`, `trim_start`, `trim_end`,
+//! `parse_int` and `parse_float` below.
+//!
+//! ```text
+//! find(s: str, needle: str) -> int ! {none}
+//!     Byte offset of the first occurrence of `needle`; `none` when it
+//!     does not occur. The empty needle occurs at 0. Total otherwise: no
+//!     traps (a needle longer than `s` is a miss, not a fault).
+//! rfind(s: str, needle: str) -> int ! {none}
+//!     Byte offset of the LAST occurrence; `none` when absent. The empty
+//!     needle occurs at `len(s)`.
+//! count(s: str, needle: str) -> int
+//!     Number of NON-OVERLAPPING occurrences, scanning left to right
+//!     ("aaa" contains 1 "aa"). The empty needle is defined as 0
+//!     occurrences, not len+1 — a count of nothing is nothing.
+//! split(s: str, sep: str) -> List[str]
+//!     Every piece between occurrences of `sep`, in order, keeping empty
+//!     pieces (`split("a,,b", ",")` is three pieces; `split("", ",")` is
+//!     one empty piece). An empty `sep` traps `assert`: a caller contract
+//!     violation, per §2's trap rule, since no piece boundary exists.
+//! split_once(s: str, sep: str) -> (str, str) ! {none}
+//!     The pieces before and after the FIRST occurrence of `sep`; `none`
+//!     when `sep` does not occur — the pair is only meaningful together.
+//! rsplit_once(s: str, sep: str) -> (str, str) ! {none}
+//!     As `split_once`, at the LAST occurrence.
+//! ends_with(s: str, suffix: str) -> bool
+//!     Whether `s` ends with `suffix`; the empty suffix always does.
+//!     Total.
+//! strip_suffix(s: str, suffix: str) -> str ! {none}
+//!     `s` without a trailing `suffix`; `none` when it is not there — the
+//!     absence row rather than returning `s` unchanged, so the caller can
+//!     tell (§2).
+//! replace(s: str, old: str, new: str) -> str
+//!     A fresh string with every non-overlapping occurrence of `old`
+//!     replaced by `new`, left to right, allocated in the ambient region.
+//!     Empty `old` traps `assert`, as `split`.
+//! replacen(s: str, old: str, new: str, n: int) -> str
+//!     As `replace`, stopping after `n` replacements; `n <= 0` replaces
+//!     nothing and copies.
+//! get(s: str, from: int, to: int) -> str ! {none}
+//!     The recoverable slice: the bytes in `[from, to)`, or `none` when
+//!     the range is out of order, out of range, or splits a code point —
+//!     the one function that answers the boundary question instead of
+//!     trapping it. Spelled with two offsets because a range is not a
+//!     value that crosses a function boundary at this pin. THIS IS THE
+//!     PRIMITIVE the other fourteen wait on; it cannot be written in
+//!     library code because writing it needs itself.
+//! bytes(s: str) -> Bytes
+//!     The raw byte view (std.bytes, blocked at the same root — see that
+//!     module's header).
+//! chars(s: str) -> List[(int, char)]
+//!     Code points with their byte offsets, in order — the offset-yielding
+//!     iteration D25 promises. Blocked twice: no `char` type exists, and
+//!     the shape wants the `Iter` protocol (F-0008) rather than a list.
+//! graphemes(s: str) -> List[str]
+//!     Extended grapheme clusters, as slices of `s`. A std call and never
+//!     the default unit (D24). Needs segmentation tables — the filed
+//!     budget decision, below.
+//! to_list_chars(s: str) -> List[char]
+//!     The code points alone. Same blocker as `chars`.
+//! ```
+//!
+//! **The unicode posture, written down** (the sprint's filed decision).
+//! What ships in v1: UTF-8 validity as a type invariant (the language's),
+//! byte-offset slicing that refuses to split a code point (the language's),
+//! and ASCII-true classification named as such (`std.unicode`). What is
+//! NOT here and is a budget decision filed upstream, not a silent gap:
+//! category tables, full case mapping, normalization, and grapheme
+//! segmentation data. The evidence this sprint adds: the pinned
+//! interpreter's `lower`/`upper` already perform SIMPLE UNICODE case
+//! mapping (`"ÉA".lower()` is `"éa"`, observed), which is MORE than the
+//! sprint contract promised for these two functions and means the tables
+//! are already being carried somewhere — so the decision to make is where
+//! they live and who pays for them, not whether to start. Filed as F-0018
+//! with `std.unicode`'s posture.
+//!
+//! INTERIM SPELLINGS (each filed, each flipped by the pin that fixes it):
+//! - Absence is spelled `None` and the parse miss `Parse`, not the
+//!   convention's lowercase `none`/`parse`: lupin does not resolve a
+//!   lowercase bare tag at a raise site (wolfc now does — the halves
+//!   swapped at this pin, F-0003).
+//! - A method call on a slice EXPRESSION over a binding
+//!   (`d[0..1].upper()`) is `unsupported` in lupin ("does not denote a
+//!   place at run time", F-0021); every body here binds the slice first.
+
+use std.strbuf
+
+/// The Unicode `White_Space` code points, as the byte length of the one
+/// starting `s`, or 0 when `s` does not start with whitespace. Private:
+/// the public surface is `trim_start`/`trim_end`.
+///
+/// This table exists because `trim_start` must agree with the builtin
+/// `trim` exactly (`trim_end` is derived from the two), and the builtin's
+/// set is Unicode `White_Space`, not ASCII — observed: `"\u{a0}x\u{a0}"`
+/// trims to `"x"`, and so do U+1680, U+2000 and U+3000. The agreement is
+/// pinned by `tests/str/trim_whitespace_set.lu`, one assertion per code
+/// point, so a builtin that changes its set fails CI here rather than
+/// silently disagreeing with std.
+fn ws_len(s: str) -> int {
+    if s.starts_with(" ") {
+        return 1
+    }
+    if s.starts_with("\t") {
+        return 1
+    }
+    if s.starts_with("\n") {
+        return 1
+    }
+    if s.starts_with("\r") {
+        return 1
+    }
+    if s.starts_with("\x0b") {
+        return 1
+    }
+    if s.starts_with("\x0c") {
+        return 1
+    }
+    if s.starts_with("\u{85}") {
+        return 2
+    }
+    if s.starts_with("\u{a0}") {
+        return 2
+    }
+    if s.starts_with("\u{1680}") {
+        return 3
+    }
+    if s.starts_with("\u{2028}") {
+        return 3
+    }
+    if s.starts_with("\u{2029}") {
+        return 3
+    }
+    if s.starts_with("\u{202f}") {
+        return 3
+    }
+    if s.starts_with("\u{205f}") {
+        return 3
+    }
+    if s.starts_with("\u{3000}") {
+        return 3
+    }
+    ws_len_quad(s)
+}
+
+/// The U+2000..U+200A block, split out only to keep one function's
+/// branch count readable. Every member is three bytes.
+fn ws_len_quad(s: str) -> int {
+    if s.starts_with("\u{2000}") {
+        return 3
+    }
+    if s.starts_with("\u{2001}") {
+        return 3
+    }
+    if s.starts_with("\u{2002}") {
+        return 3
+    }
+    if s.starts_with("\u{2003}") {
+        return 3
+    }
+    if s.starts_with("\u{2004}") {
+        return 3
+    }
+    if s.starts_with("\u{2005}") {
+        return 3
+    }
+    if s.starts_with("\u{2006}") {
+        return 3
+    }
+    if s.starts_with("\u{2007}") {
+        return 3
+    }
+    if s.starts_with("\u{2008}") {
+        return 3
+    }
+    if s.starts_with("\u{2009}") {
+        return 3
+    }
+    if s.starts_with("\u{200a}") {
+        return 3
+    }
+    0
+}
+
+/// The value of the digit `s` starts with in `base`, or -1 when `s` does
+/// not start with a digit of that base. Case-insensitive for bases above
+/// 10 (`"ff"` and `"FF"` both parse in base 16).
+///
+/// The digit alphabet is an ASCII literal this module owns, so slicing it
+/// one byte at a time is always a code-point boundary — and the probe runs
+/// in the safe direction (`starts_with` on the INPUT, never a slice of
+/// it), which is what makes `parse_int` total over arbitrary UTF-8.
+fn digit_of(s: str, base: int) -> int {
+    let alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    var i = 0
+    while i < base {
+        let lower_digit = alphabet[i..i + 1]
+        if s.starts_with(lower_digit) {
+            return i
+        }
+        let upper_digit = lower_digit.upper()
+        if s.starts_with(upper_digit) {
+            return i
+        }
+        i = i + 1
+    }
+    0 - 1
+}
+
+/// A decimal digit's value as `f64`. Written as a table because `n as f64`
+/// does not convert at this pin — lupin leaves the value an int, so
+/// `(3 as f64) == 3.0` is false while `(3 as f64) == 3` is true (F-0022).
+/// Ten branches beat one silent wrong answer.
+fn digit_f(d: int) -> f64 {
+    if d == 1 {
+        return 1.0
+    }
+    if d == 2 {
+        return 2.0
+    }
+    if d == 3 {
+        return 3.0
+    }
+    if d == 4 {
+        return 4.0
+    }
+    if d == 5 {
+        return 5.0
+    }
+    if d == 6 {
+        return 6.0
+    }
+    if d == 7 {
+        return 7.0
+    }
+    if d == 8 {
+        return 8.0
+    }
+    if d == 9 {
+        return 9.0
+    }
+    0.0
+}
+
+/// The length of `s` in BYTES, O(1) — the honest unit (D25). This is the
+/// documented byte-length test the sprint asks for: a two-byte code point
+/// has length 2, and the number of CODE POINTS is a different question
+/// that `chars()` answers (blocked, see the module header). Total: no
+/// error row, no traps.
+///
+/// ```wolf-doc-example
+/// str.len("wolf") == 4
+/// str.len("é") == 2
+/// str.len("🐺") == 4
+/// str.len("") == 0
+/// ```
+pub fn len(s: str) -> int {
+    s.len
+}
+
+/// Whether `s` holds no bytes. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// str.is_empty("") == true
+/// str.is_empty("wolf") == false
+/// ```
+pub fn is_empty(s: str) -> bool {
+    s.is_empty()
+}
+
+/// Whether `needle` occurs anywhere in `s`, as a byte sequence. The empty
+/// needle occurs in every string, including the empty one. Total: no error
+/// row, no traps.
+///
+/// ```wolf-doc-example
+/// str.contains("the wolf runs", "wolf") == true
+/// str.contains("the wolf runs", "moon") == false
+/// str.contains("", "") == true
+/// ```
+pub fn contains(s: str, needle: str) -> bool {
+    s.contains(needle)
+}
+
+/// Whether `s` begins with `prefix`. The empty prefix always matches.
+/// Total: no error row, no traps.
+///
+/// This is the boundary-safe probe the module header describes: when it
+/// answers true, `len(prefix)` is a code-point boundary of `s`.
+///
+/// ```wolf-doc-example
+/// str.starts_with("wolf-lang", "wolf") == true
+/// str.starts_with("wolf-lang", "lang") == false
+/// str.starts_with("🐺!", "🐺") == true
+/// ```
+pub fn starts_with(s: str, prefix: str) -> bool {
+    s.starts_with(prefix)
+}
+
+/// `s` without a leading `prefix`; `None` when `s` does not start with it
+/// — the absence row rather than `s` unchanged, so the caller can tell the
+/// two apart (§2). Consumed by `else` or `?`. No traps.
+///
+/// ```wolf-doc-example
+/// (str.strip_prefix("wolf-lang", "wolf-") else "?") == "lang"
+/// (str.strip_prefix("wolf-lang", "lang") else "?") == "?"
+/// (str.strip_prefix("wolf", "") else "?") == "wolf"
+/// ```
+pub fn strip_prefix(s: str, prefix: str) -> str ! {None} {
+    if s.starts_with(prefix) {
+        return s[prefix.len..]
+    }
+    return None
+}
+
+/// `s` with every code point lowercased, freshly allocated in the ambient
+/// region. Total: no error row, no traps beyond allocation.
+///
+/// The mapping is the implementation's, and it is worth stating plainly:
+/// the sprint contract planned ASCII-only case mapping here, but the
+/// pinned interpreter performs simple Unicode case mapping (`"ÉA"`
+/// lowercases to `"éa"`). std delegates rather than reimplement, because
+/// an in-library ASCII-only mapping is not writable without a byte
+/// accessor — so this function's contract is "the implementation's simple
+/// case mapping", and which mapping std should REQUIRE is the filed
+/// unicode-tables decision (F-0018). Locale is never a parameter, in core,
+/// ever.
+///
+/// ```wolf-doc-example
+/// str.lower("WOLF") == "wolf"
+/// str.lower("Wolf-Lang") == "wolf-lang"
+/// str.lower("") == ""
+/// ```
+pub fn lower(s: str) -> str {
+    s.lower()
+}
+
+/// `s` with every code point uppercased, freshly allocated in the ambient
+/// region. The mapping story is `lower`'s, exactly. Total: no error row,
+/// no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// str.upper("wolf") == "WOLF"
+/// str.upper("Wolf-Lang") == "WOLF-LANG"
+/// str.upper("") == ""
+/// ```
+pub fn upper(s: str) -> str {
+    s.upper()
+}
+
+/// Whether `a` and `b` are equal ignoring case, by comparing their
+/// case-folded forms. Total: no error row, no traps beyond allocation.
+///
+/// The sprint contract names this "ASCII, named honestly". The honest name
+/// at this pin drops the ASCII: the folding is `lower`'s, which the pinned
+/// interpreter performs over all of Unicode. Callers get case-insensitive
+/// comparison as strong as the implementation's `lower` — never weaker,
+/// and never locale-sensitive.
+///
+/// ```wolf-doc-example
+/// str.eq_ignore_case("WOLF", "wolf") == true
+/// str.eq_ignore_case("Wolf", "wolves") == false
+/// str.eq_ignore_case("", "") == true
+/// ```
+pub fn eq_ignore_case(a: str, b: str) -> bool {
+    a.lower() == b.lower()
+}
+
+/// `s` repeated `n` times, freshly allocated. `n == 0` gives the empty
+/// string, and so does a negative `n` — the implementation's answer,
+/// recorded because it is observable (`"ab".repeat(0 - 1)` is `""`, not a
+/// trap). Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// str.repeat("ab", 3) == "ababab"
+/// str.repeat("ab", 1) == "ab"
+/// str.repeat("ab", 0) == ""
+/// ```
+pub fn repeat(s: str, n: int) -> str {
+    s.repeat(n)
+}
+
+/// `s` with leading and trailing whitespace removed — a slice of `s`, no
+/// copy. Whitespace is Unicode `White_Space` (the builtin's set, pinned by
+/// this module's whitespace test). Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// str.trim("  wolf  ") == "wolf"
+/// str.trim("\n\twolf\r\n") == "wolf"
+/// str.trim("   ") == ""
+/// ```
+pub fn trim(s: str) -> str {
+    s.trim()
+}
+
+/// `s` with LEADING whitespace removed — a slice of `s`, no copy. Same
+/// whitespace set as `trim`, and the equality of the two sets is a test,
+/// not a hope. Total: no error row, no traps.
+///
+/// Written with the boundary-safe probe: each iteration matches one
+/// whitespace code point with `starts_with` and advances by exactly that
+/// code point's length, so the cursor is never anywhere but a boundary.
+///
+/// ```wolf-doc-example
+/// str.trim_start("  wolf  ") == "wolf  "
+/// str.trim_start("wolf") == "wolf"
+/// str.trim_start("   ") == ""
+/// ```
+pub fn trim_start(s: str) -> str {
+    var rest = s
+    var w = ws_len(rest)
+    while w > 0 {
+        rest = rest[w..]
+        w = ws_len(rest)
+    }
+    rest
+}
+
+/// `s` with TRAILING whitespace removed — a slice of `s`, no copy. Same
+/// whitespace set as `trim`. Total: no error row, no traps.
+///
+/// Derived rather than scanned backwards, because scanning backwards needs
+/// the boundary primitive this pin lacks: with `t = trim(s)` and
+/// `a = trim_start(s)`, the trailing run is exactly `len(a) - len(t)`
+/// bytes, and the offset where it starts is a boundary by construction.
+/// An all-whitespace `s` is the one case the arithmetic cannot see (both
+/// are empty), and it is handled first.
+///
+/// ```wolf-doc-example
+/// str.trim_end("  wolf  ") == "  wolf"
+/// str.trim_end("wolf") == "wolf"
+/// str.trim_end("   ") == ""
+/// ```
+pub fn trim_end(s: str) -> str {
+    let trimmed = s.trim()
+    if trimmed.len == 0 {
+        return ""
+    }
+    let started = trim_start(s)
+    s[..s.len - started.len + trimmed.len]
+}
+
+/// The lines of `s`, in order, each without its terminator. A trailing
+/// newline does NOT produce a final empty line, and the empty string has
+/// no lines at all. `\r\n` counts as one terminator and the `\r` is not
+/// part of the line. Allocates the list (`to_`-grade allocation, §1);
+/// the lines themselves are slices of `s`. Total: no error row, no traps
+/// beyond allocation.
+///
+/// ```wolf-doc-example
+/// var seen = 0
+/// for line in str.lines("a\nb\n") { seen = seen + 1 }
+/// seen == 2
+/// ```
+pub fn lines(s: str) -> List[str] {
+    s.lines()
+}
+
+/// The whitespace-separated words of `s`, in order, dropping empty runs:
+/// any run of whitespace separates, leading and trailing whitespace
+/// produce no empty words, and a string of only whitespace has no words.
+/// Whitespace is `trim`'s set. Allocates the list; the words are slices of
+/// `s`. Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var seen = 0
+/// for word in str.words("  the   wolf  ") { seen = seen + 1 }
+/// seen == 2
+/// ```
+pub fn words(s: str) -> List[str] {
+    s.words()
+}
+
+/// `parts` concatenated with the separator `sep` between consecutive
+/// items — the separator is the RECEIVER, as the sprint contract has it,
+/// which is why `sep` comes first. No separator is added before the first
+/// or after the last part; an empty list joins to the empty string and a
+/// one-item list to that item. Allocates in the ambient region. Total: no
+/// error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var parts = List[str]()
+/// (mut parts).push("the")
+/// (mut parts).push("wolf")
+/// str.join(" ", parts) == "the wolf"
+/// str.join("", parts) == "thewolf"
+/// ```
+pub fn join(sep: str, parts: List[str]) -> str {
+    let n = parts.len
+    var out = ""
+    var i = 0
+    while i < n {
+        let part = parts[i]
+        if i == 0 {
+            out = "{part}"
+        } else {
+            out = "{out}{sep}{part}"
+        }
+        i = i + 1
+    }
+    out
+}
+
+/// `s` parsed as a whole integer in `base` (2 through 36); `Parse` when it
+/// is not one. An optional leading `-` or `+` is accepted, digits above 9
+/// are letters in either case, and there is no other leniency: no
+/// separators, no whitespace, no prefixes like `0x`, and an empty digit
+/// run is a miss. A `base` outside 2..36 is itself a `Parse` miss rather
+/// than a trap, because the base is often data too.
+///
+/// Traps `overflow` (X3, checked arithmetic in every profile) when the
+/// value does not fit `int` — the parse succeeded and the arithmetic did
+/// not, which is a different failure from a malformed string. A row for it
+/// waits on a checked-multiply that reports instead of trapping; that is
+/// recorded rather than papered over.
+///
+/// ```wolf-doc-example
+/// (str.parse_int("42", 10) else 0 - 1) == 42
+/// (str.parse_int("-42", 10) else 0) == 0 - 42
+/// (str.parse_int("ff", 16) else 0) == 255
+/// (str.parse_int("FF", 16) else 0) == 255
+/// (str.parse_int("1010", 2) else 0) == 10
+/// (str.parse_int("z", 36) else 0) == 35
+/// (str.parse_int("", 10) else 0 - 1) == 0 - 1
+/// (str.parse_int("4x", 10) else 0 - 1) == 0 - 1
+/// (str.parse_int("12", 1) else 0 - 1) == 0 - 1
+/// ```
+pub fn parse_int(s: str, base: int) -> int ! {Parse} {
+    if base < 2 {
+        return Parse
+    }
+    if base > 36 {
+        return Parse
+    }
+    var rest = s
+    var negative = false
+    if rest.starts_with("-") {
+        negative = true
+        rest = rest[1..]
+    } else if rest.starts_with("+") {
+        rest = rest[1..]
+    }
+    if rest.len == 0 {
+        return Parse
+    }
+    var acc = 0
+    while rest.len > 0 {
+        let d = digit_of(rest, base)
+        if d < 0 {
+            return Parse
+        }
+        acc = acc * base + d
+        rest = rest[1..]
+    }
+    if negative {
+        return 0 - acc
+    }
+    acc
+}
+
+/// `s` parsed as a whole `f64`; `Parse` when it is not one. The accepted
+/// shape is an optional sign, decimal digits with an optional `.` and
+/// fractional digits (at least one digit total), and an optional `e`/`E`
+/// exponent with its own optional sign and at least one digit. No
+/// leniency beyond that: no whitespace, no separators, no `inf`/`nan`
+/// spellings (those are values a program can write, not text a caller
+/// should be able to smuggle), and an exponent magnitude above 308 is a
+/// miss rather than a saturation.
+///
+/// Accuracy is honest rather than perfect: the value is accumulated by
+/// `acc * 10.0 + digit` and the exponent applied by repeated multiply, so
+/// a long literal can land one or two units in the last place away from
+/// the correctly-rounded result. Exact decimal-to-binary conversion is a
+/// numerics job (sc05's `fmt` owns the printing side and will own the
+/// pairing), recorded here rather than claimed.
+///
+/// ```wolf-doc-example
+/// (str.parse_float("1.5") else 0.0) == 1.5
+/// (str.parse_float("-2.25") else 0.0) == 0.0 - 2.25
+/// (str.parse_float("3") else 0.0) == 3.0
+/// (str.parse_float("0.5") else 0.0) == 0.5
+/// (str.parse_float("1e2") else 0.0) == 100.0
+/// (str.parse_float("5e-1") else 0.0) == 0.5
+/// (str.parse_float("") else 0.0 - 1.0) == 0.0 - 1.0
+/// (str.parse_float("x") else 0.0 - 1.0) == 0.0 - 1.0
+/// (str.parse_float("1.2.3") else 0.0 - 1.0) == 0.0 - 1.0
+/// ```
+pub fn parse_float(s: str) -> f64 ! {Parse} {
+    var rest = s
+    var negative = false
+    if rest.starts_with("-") {
+        negative = true
+        rest = rest[1..]
+    } else if rest.starts_with("+") {
+        rest = rest[1..]
+    }
+    var seen = 0
+    var acc = 0.0
+    var d = digit_of(rest, 10)
+    while d >= 0 {
+        acc = acc * 10.0 + digit_f(d)
+        seen = seen + 1
+        rest = rest[1..]
+        d = digit_of(rest, 10)
+    }
+    if rest.starts_with(".") {
+        rest = rest[1..]
+        var scale = 1.0
+        d = digit_of(rest, 10)
+        while d >= 0 {
+            scale = scale / 10.0
+            acc = acc + digit_f(d) * scale
+            seen = seen + 1
+            rest = rest[1..]
+            d = digit_of(rest, 10)
+        }
+    }
+    if seen == 0 {
+        return Parse
+    }
+    if rest.starts_with("e") || rest.starts_with("E") {
+        rest = rest[1..]
+        acc = apply_exponent(acc, rest)?
+        return signed(acc, negative)
+    }
+    if rest.len > 0 {
+        return Parse
+    }
+    signed(acc, negative)
+}
+
+/// `value` negated when `negative`. Private: `0.0 - x` is the negation
+/// every float body writes, and naming it keeps the two parse paths from
+/// repeating the branch.
+fn signed(value: f64, negative: bool) -> f64 {
+    if negative {
+        return 0.0 - value
+    }
+    value
+}
+
+/// `value` scaled by the exponent `s` spells (`"2"`, `"-1"`, `"+3"`);
+/// `Parse` when `s` is not a whole exponent or its magnitude exceeds 308.
+/// Private: `parse_float`'s tail.
+fn apply_exponent(value: f64, s: str) -> f64 ! {Parse} {
+    var rest = s
+    var negative = false
+    if rest.starts_with("-") {
+        negative = true
+        rest = rest[1..]
+    } else if rest.starts_with("+") {
+        rest = rest[1..]
+    }
+    if rest.len == 0 {
+        return Parse
+    }
+    var exponent = 0
+    while rest.len > 0 {
+        let d = digit_of(rest, 10)
+        if d < 0 {
+            return Parse
+        }
+        exponent = exponent * 10 + d
+        if exponent > 308 {
+            return Parse
+        }
+        rest = rest[1..]
+    }
+    var acc = value
+    var i = 0
+    while i < exponent {
+        if negative {
+            acc = acc / 10.0
+        } else {
+            acc = acc * 10.0
+        }
+        i = i + 1
+    }
+    acc
+}
+
+/// `s` copied into a fresh `std.strbuf.StrBuf` — the allocating
+/// conversion into the builder (`to_`, §1: it allocates; `strbuf.to_str`
+/// is the borrowing direction back). Total: no error row, no traps beyond
+/// allocation.
+///
+/// No fenced example: asserting about the result needs `std.strbuf`, and
+/// the extractor imports exactly the documented module (§4's one-module
+/// note), so the worked example lives in
+/// `tests/str/to_strbuf_round_trip.lu` instead. In prose: after
+/// `let b = str.to_strbuf("wolf")`, `strbuf.len(b)` is 4 and
+/// `strbuf.to_str(b)` is `"wolf"` — and appending to `b` leaves `s`
+/// untouched, because `str` is immutable and this is a copy.
+pub fn to_strbuf(s: str) -> strbuf.StrBuf {
+    var b = strbuf.new()
+    strbuf.push_str(mut b, s)
+    b
+}

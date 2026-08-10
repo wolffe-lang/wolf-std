@@ -1,0 +1,238 @@
+//! member: true
+//!
+//! std.unicode — the posture module: what wolf promises about Unicode in
+//! v1, spelled as functions where it can be and as a filing where it
+//! cannot. Stability tier: core.
+//!
+//! **The posture, in one paragraph.** v1 ships three things and no more:
+//! UTF-8 validity as a type invariant (`str` is valid UTF-8 by
+//! construction, D24 — the language's, not this module's), byte-offset
+//! slicing that refuses to split a code point (D25, also the language's),
+//! and the ASCII-true classification below, named so that no caller can
+//! mistake it for Unicode-true classification. NOT in v1: general category
+//! tables, case mapping and folding, normalization (NFC/NFD/NFKC/NFKD),
+//! and grapheme segmentation data. Those are a BUDGET decision — table
+//! size, generation, and the maintenance cost of tracking Unicode
+//! releases — filed upstream (F-0018) with the recommendation that they
+//! land in penumbra or `std/x` rather than core, so that a core that must
+//! be welded to the compiler does not carry megabytes of derived data.
+//! Report 07's nursery clock applies to whichever nursery takes them.
+//!
+//! **THE INTERIM CURRENCY IS `int`, AND IT IS THE WHOLE STORY OF THIS
+//! MODULE'S SIGNATURES.** The sprint contract writes these functions over
+//! a `char` type — `char.code`, `is_ascii_digit(c: char)`,
+//! `utf8_len(char)`. There is no `char` type at this pin: `'a'` does not
+//! lex (E0101 in lupin, E0107 in wolfc), no `chars()` view exists to
+//! produce one, and no expression in the language has type `char`. So the
+//! interim spells a code point the way `char.code` would report it — a
+//! Unicode scalar value as `int` — which keeps every predicate's MEANING
+//! exactly the contract's and makes the whole set total and testable
+//! today. The reviewed final signatures are recorded per function; the
+//! flip is a signature change with identical bodies, in the same commit as
+//! the pin that lands `char` (F-0018).
+//!
+//! One of the contract's ten is therefore not here at all:
+//!
+//! - `char.code` — the `char`-to-`int` projection. With the interim
+//!   currency it would be the identity function, which is not a surface
+//!   worth shipping and would have to be deleted rather than migrated. It
+//!   lands with `char`, and `from_code` below is already its inverse.
+//!
+//! Absence is spelled `None` pending F-0003 (lupin does not resolve a
+//! lowercase bare tag at a raise site; wolfc now does).
+
+/// The largest Unicode scalar value, U+10FFFF. Private: the bound belongs
+/// to the standard, and callers ask `from_code` instead of comparing.
+fn max_code() -> int {
+    1114111
+}
+
+/// `n` as a Unicode scalar value; `None` when `n` is not one — negative,
+/// above U+10FFFF, or in the surrogate range U+D800..U+DFFF, which UTF-8
+/// may never encode. This is the validating constructor: the one place a
+/// number becomes a code point.
+///
+/// Reviewed final signature: `from_code(n: int) -> char ! {none}`.
+///
+/// ```wolf-doc-example
+/// (unicode.from_code(65) else 0 - 1) == 65
+/// (unicode.from_code(0) else 0 - 1) == 0
+/// (unicode.from_code(1114111) else 0 - 1) == 1114111
+/// (unicode.from_code(1114112) else 0 - 1) == 0 - 1
+/// (unicode.from_code(0 - 1) else 0 - 2) == 0 - 2
+/// (unicode.from_code(55296) else 0 - 1) == 0 - 1
+/// (unicode.from_code(57343) else 0 - 1) == 0 - 1
+/// ```
+pub fn from_code(n: int) -> int ! {None} {
+    if n < 0 {
+        return None
+    }
+    if n > max_code() {
+        return None
+    }
+    if n >= 55296 {
+        if n <= 57343 {
+            return None
+        }
+    }
+    n
+}
+
+/// The number of bytes `c` occupies in UTF-8 — 1, 2, 3 or 4; `None` when
+/// `c` is not a scalar value (`from_code`'s rules). Under the final
+/// `char`-typed signature this function is TOTAL and the row disappears:
+/// the row exists only because the interim's `int` can hold a non-scalar.
+///
+/// Reviewed final signature: `utf8_len(c: char) -> int`.
+///
+/// ```wolf-doc-example
+/// (unicode.utf8_len(65) else 0) == 1
+/// (unicode.utf8_len(127) else 0) == 1
+/// (unicode.utf8_len(128) else 0) == 2
+/// (unicode.utf8_len(233) else 0) == 2
+/// (unicode.utf8_len(2047) else 0) == 2
+/// (unicode.utf8_len(2048) else 0) == 3
+/// (unicode.utf8_len(65535) else 0) == 3
+/// (unicode.utf8_len(65536) else 0) == 4
+/// (unicode.utf8_len(128058) else 0) == 4
+/// (unicode.utf8_len(1114112) else 0) == 0
+/// ```
+pub fn utf8_len(c: int) -> int ! {None} {
+    let code = from_code(c)?
+    if code <= 127 {
+        return 1
+    }
+    if code <= 2047 {
+        return 2
+    }
+    if code <= 65535 {
+        return 3
+    }
+    4
+}
+
+/// Whether `c` is an ASCII code point, U+0000..U+007F. Total: no error
+/// row, no traps — a non-scalar `int` is simply not ASCII.
+///
+/// Reviewed final signature: `is_ascii(c: char) -> bool`.
+///
+/// ```wolf-doc-example
+/// unicode.is_ascii(65) == true
+/// unicode.is_ascii(0) == true
+/// unicode.is_ascii(127) == true
+/// unicode.is_ascii(128) == false
+/// unicode.is_ascii(128058) == false
+/// ```
+pub fn is_ascii(c: int) -> bool {
+    if c < 0 {
+        return false
+    }
+    c <= 127
+}
+
+/// Whether `c` is an ASCII letter, `A`..`Z` or `a`..`z`. ASCII-true, as
+/// the name says: a Unicode letter outside ASCII answers false, and
+/// unicode-true classification is the filed table decision. Total.
+///
+/// Reviewed final signature: `is_ascii_alpha(c: char) -> bool`.
+///
+/// ```wolf-doc-example
+/// unicode.is_ascii_alpha(65) == true
+/// unicode.is_ascii_alpha(122) == true
+/// unicode.is_ascii_alpha(48) == false
+/// unicode.is_ascii_alpha(233) == false
+/// ```
+pub fn is_ascii_alpha(c: int) -> bool {
+    is_ascii_upper(c) || is_ascii_lower(c)
+}
+
+/// Whether `c` is an ASCII decimal digit, `0`..`9`. Total.
+///
+/// Reviewed final signature: `is_ascii_digit(c: char) -> bool`.
+///
+/// ```wolf-doc-example
+/// unicode.is_ascii_digit(48) == true
+/// unicode.is_ascii_digit(57) == true
+/// unicode.is_ascii_digit(47) == false
+/// unicode.is_ascii_digit(65) == false
+/// ```
+pub fn is_ascii_digit(c: int) -> bool {
+    if c < 48 {
+        return false
+    }
+    c <= 57
+}
+
+/// Whether `c` is an ASCII letter or digit. Total.
+///
+/// Reviewed final signature: `is_ascii_alnum(c: char) -> bool`.
+///
+/// ```wolf-doc-example
+/// unicode.is_ascii_alnum(65) == true
+/// unicode.is_ascii_alnum(48) == true
+/// unicode.is_ascii_alnum(95) == false
+/// ```
+pub fn is_ascii_alnum(c: int) -> bool {
+    is_ascii_alpha(c) || is_ascii_digit(c)
+}
+
+/// Whether `c` is ASCII whitespace: tab (9), line feed (10), vertical tab
+/// (11), form feed (12), carriage return (13) or space (32). Total.
+///
+/// This is deliberately NARROWER than the whitespace `std.str.trim` and
+/// `std.str.words` use, which is Unicode `White_Space` (the builtin's set,
+/// pinned by a test there). The names are the difference: `is_ascii_space`
+/// promises ASCII and delivers ASCII.
+///
+/// Reviewed final signature: `is_ascii_space(c: char) -> bool`.
+///
+/// ```wolf-doc-example
+/// unicode.is_ascii_space(32) == true
+/// unicode.is_ascii_space(9) == true
+/// unicode.is_ascii_space(13) == true
+/// unicode.is_ascii_space(65) == false
+/// unicode.is_ascii_space(160) == false
+/// ```
+pub fn is_ascii_space(c: int) -> bool {
+    if c == 32 {
+        return true
+    }
+    if c < 9 {
+        return false
+    }
+    c <= 13
+}
+
+/// Whether `c` is an ASCII uppercase letter, `A`..`Z`. Total.
+///
+/// Reviewed final signature: `is_ascii_upper(c: char) -> bool`.
+///
+/// ```wolf-doc-example
+/// unicode.is_ascii_upper(65) == true
+/// unicode.is_ascii_upper(90) == true
+/// unicode.is_ascii_upper(97) == false
+/// unicode.is_ascii_upper(201) == false
+/// ```
+pub fn is_ascii_upper(c: int) -> bool {
+    if c < 65 {
+        return false
+    }
+    c <= 90
+}
+
+/// Whether `c` is an ASCII lowercase letter, `a`..`z`. Total.
+///
+/// Reviewed final signature: `is_ascii_lower(c: char) -> bool`.
+///
+/// ```wolf-doc-example
+/// unicode.is_ascii_lower(97) == true
+/// unicode.is_ascii_lower(122) == true
+/// unicode.is_ascii_lower(65) == false
+/// unicode.is_ascii_lower(233) == false
+/// ```
+pub fn is_ascii_lower(c: int) -> bool {
+    if c < 97 {
+        return false
+    }
+    c <= 122
+}

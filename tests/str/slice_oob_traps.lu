@@ -1,0 +1,19 @@
+//! check: run(exit=trap(bounds))
+//! phase: run
+//! conforms: conf.trap.set, str.slice
+//!
+//! D25's checked slicing, half one: an offset past the end traps `bounds`,
+//! deterministically, in every profile. No import — the surface under test
+//! is the language's, and an unused import is E0305 in both
+//! implementations. std.str's header documents this as the trap every
+//! offset-taking function inherits.
+
+fn main() -> !int {
+    let s = "wolf"
+    let bad = s[0..9]
+    str_len(bad)
+}
+
+fn str_len(s: str) -> int {
+    s.len
+}

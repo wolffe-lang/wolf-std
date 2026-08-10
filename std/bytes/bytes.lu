@@ -1,0 +1,82 @@
+//! member: true
+//!
+//! std.bytes — the raw byte view of a string: the honesty valve D25 buys
+//! by refusing `s[i]` on `str`. Stability tier: core (the API; the
+//! implementation is blocked).
+//!
+//! **This module has no code, and that is the honest state.** `bytes` is
+//! where the UTF-8 invariant is allowed to be absent — the type that says
+//! "these are bytes, validity is your problem, and `to_str` is the border
+//! post". Writing it needs two things this pin does not have:
+//!
+//! 1. **A byte value.** No expression anywhere produces the numeric value
+//!    of a byte. `str` has `len` and slicing; slicing yields `str`, never a
+//!    number, and a one-byte slice of a multi-byte code point does not
+//!    exist to be taken (it traps `bounds`, by design). So `b[i] -> int`
+//!    — the one indexing form D25 explicitly licenses — has no
+//!    implementation, and neither does anything derived from it.
+//! 2. **A type that can hold invalid UTF-8.** Backing `Bytes` with a `str`
+//!    field would make `to_str -> str ! {utf8}` a function that can never
+//!    raise, i.e. a documented lie, and would make `from_str` the only way
+//!    to construct one — a byte view that cannot hold the bytes it exists
+//!    for. The house rule (sc00) is that a gap in what the language can
+//!    express is a finding, not a workaround invented here, so the
+//!    inventory below is a reviewed CONTRACT and F-0018 carries it
+//!    upstream.
+//!
+//! The producers are also absent, which is why this is not urgent: bytes
+//! enter a program from io, FFI, and `str.bytes()` (s37 §2 and §5), and
+//! Phase A has neither io nor FFI. `std.bytes` becomes writable and
+//! immediately necessary in the same sprint that gives it something to
+//! view.
+//!
+//! Reviewed inventory (9), each with its contract, exactly as it will
+//! land. `Bytes` is CapCase per API-CONVENTIONS §1; the sprint contract's
+//! lowercase `bytes` is the module, as here.
+//!
+//! ```text
+//! len(b: Bytes) -> int
+//!     Number of bytes. O(1). Total: no error row, no traps.
+//! is_empty(b: Bytes) -> bool
+//!     `len(b) == 0`. Total.
+//! at(b: Bytes, i: int) -> int
+//!     The byte at index `i`, 0..255. BYTE INDEXING IS LEGAL HERE — this
+//!     is the whole point of the type (D25). Traps `bounds` out of range,
+//!     exactly as the language's own indexing does, because a caller that
+//!     could have checked `len` and did not has violated a contract (§8).
+//!     The contract writes this as `b[i]`; whether index syntax is
+//!     available to a std type is F-0011's builtin-versus-std question,
+//!     and `at` is the spelling that does not presume the answer.
+//! slice(b: Bytes, from: int, to: int) -> Bytes
+//!     The bytes in `[from, to)`, zero-copy. Traps `bounds` when the range
+//!     is out of order or out of range — and NEVER for splitting a code
+//!     point: there are no code points here, which is the freedom this
+//!     view sells. Two offsets rather than a range for the reason
+//!     `str.get` gives.
+//! find(b: Bytes, needle: Bytes) -> int ! {none}
+//!     Index of the first occurrence of `needle`; `none` when absent. The
+//!     empty needle occurs at 0. Total otherwise: no traps.
+//! starts_with(b: Bytes, prefix: Bytes) -> bool
+//!     Whether `b` begins with `prefix`; the empty prefix always does.
+//!     Total.
+//! ends_with(b: Bytes, suffix: Bytes) -> bool
+//!     Whether `b` ends with `suffix`; the empty suffix always does.
+//!     Total. (Note what byte-land buys: this one is trivial here and is
+//!     BLOCKED over `str`, where the tail offset may not be a boundary.)
+//! to_str(b: Bytes) -> str ! {utf8}
+//!     `b` viewed as a string, VALIDATED: `utf8` when the bytes are not
+//!     well-formed UTF-8 (overlong forms, surrogates, truncated
+//!     sequences, and stray continuation bytes all miss). Zero-copy on
+//!     success. This is the border post D24 demands — the one place bytes
+//!     become a `str`, and the reason `str` needs no validity checks
+//!     anywhere else. `utf8` is a new payload-free row tag; it earns its
+//!     own noun because a caller distinguishes "not text" from "absent".
+//! from_str(s: str) -> Bytes
+//!     `s`'s bytes, zero-copy and infallible — a valid `str` is always
+//!     valid bytes. A view, not a copy: bare-noun/`as_`-grade naming per
+//!     §1, and the direction that never fails.
+//! ```
+//!
+//! No tests ship for this module: there is nothing to run, and a test that
+//! imports an itemless module is E0305 (unused import) in both
+//! implementations. The ledger stays honest by having no row to lie in.

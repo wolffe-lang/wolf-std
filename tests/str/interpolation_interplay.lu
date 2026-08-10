@@ -1,0 +1,37 @@
+//! check: run(exit=0, stdout="wolf\n  3\nthe-3\n{literal}\nthe wolf\nthe moon\n")
+//! phase: run
+//! conforms: gram.lex.str, gram.amb.fmtcolon, gram.lex.str.multi, gram.lex.str.escape
+//!
+//! Where strings meet interpolation — smoke-tested here, OWNED by sc05
+//! (this sprint promises only that the two features do not interfere).
+//! Every literal is an f-string (D26/X9), so a slice expression inside
+//! braces, a format spec after the first top-level `:`
+//! (`[gram.amb.fmtcolon]`), `{{`/`}}` escapes and a `"""` block dedented by
+//! its closing delimiter's column all have to work together. The stdout
+//! hash is pinned in the directive: this is the one test in the sprint
+//! whose evidence IS its output.
+
+use std.str
+
+fn main() -> !int {
+    let s = "the wolf runs"
+    let n = 3
+    // A slice inside an interpolation: the byte offsets are the language's
+    // and the brace is the f-string's.
+    print("{s[4..8]}")
+    // The format spec begins at the first top-level `:`.
+    print("{n:>3}")
+    print("{s[0..3]}-{n}")
+    print("{{literal}}")
+    // `"""` ends at the closing delimiter, whose column sets the dedent;
+    // the first newline after the opener is dropped.
+    let poem = """
+        the wolf
+        the moon
+        """
+    print("{poem}")
+    // std.str sees exactly the same bytes the interpolation printed.
+    if str.len(poem) == 18 {} else { return 1 }
+    if str.starts_with(poem, "the wolf") {} else { return 2 }
+    0
+}

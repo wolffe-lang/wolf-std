@@ -83,7 +83,7 @@ pub fn is_empty(d: DequeInt) -> bool {
 /// (deque_int.back(d) else 0) == 2
 /// ```
 pub fn push_back(mut d: DequeInt, v: int) {
-    d.items.push(v)
+    (mut d.items).push(v)
 }
 
 /// Prepends `v` at the front. Rebuilds the buffer (this representation
@@ -99,10 +99,10 @@ pub fn push_back(mut d: DequeInt, v: int) {
 pub fn push_front(mut d: DequeInt, v: int) {
     let n = count(d.items)
     var out = List[int]()
-    out.push(v)
+    (mut out).push(v)
     var i = d.head
     while i < n {
-        out.push(nth(d.items, i))
+        (mut out).push(nth(d.items, i))
         i = i + 1
     }
     d.items = out
@@ -177,7 +177,7 @@ pub fn pop_back(mut d: DequeInt) -> int ! {None} {
     var out = List[int]()
     var i = d.head
     while i < n - 1 {
-        out.push(nth(d.items, i))
+        (mut out).push(nth(d.items, i))
         i = i + 1
     }
     d.items = out
@@ -215,7 +215,7 @@ pub fn to_list(d: DequeInt) -> List[int] {
     var out = List[int]()
     var i = d.head
     while i < n {
-        out.push(nth(d.items, i))
+        (mut out).push(nth(d.items, i))
         i = i + 1
     }
     out
