@@ -1,0 +1,21 @@
+# Binary pins — `cargo xtask doctor`'s contract. This repo consumes
+# `lupin` (wolf-interp) and `wolf` (wolf-lang) as binaries only: never
+# source, never cargo deps (the ls00 honesty, adopted verbatim).
+# Resolution order: $LUPIN_BIN / $WOLF_BIN → .wolf-bin/ → PATH.
+#
+# `pin` is the wolf-lang commit the binary conforms to. lupin names its
+# pin in `--version` and doctor verifies it; wolf pre-M1 names none
+# ("wolf 0.0.1 (pre-alpha)") — doctor reports that pin as trusted from
+# acquisition, unverifiable from the binary. Note the two binaries may
+# lawfully sit at different wolf-lang pins (two moving upstreams); the
+# nightly lane watches the drift, report-never-gate.
+
+[lupin]
+version = "0.1.0"
+pin = "cbde62012f10bbdf63e4ec1e2ebeeed026973d23"
+
+[wolf]
+version = "0.0.1"
+# Built from a clean checkout of wolf-lang at the DATA pin (below,
+# vendor/upstream/PIN): cargo build --release -p wolf_driver.
+pin = "f1f9d806507a30930f8d39808235d2935b3816d3"
