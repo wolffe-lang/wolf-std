@@ -1,0 +1,53 @@
+# 3-OS CI (sc00 §7). Binary-dependent lanes are conditional on
+# acquisition and SKIP loudly when dark — silence is what turns a lane
+# dark (ls00). The private upstream submodule is never cloned here; the
+# tracked vendor/ snapshot keeps sync-pin honest in CI.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rig:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        # No `submodules:` — upstream/ is private and CI cannot clone it
+        # (deploy keys disabled org-side); sync-pin runs snapshot-only.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+          components: rustfmt, clippy
+      - name: fmt
+        run: cargo fmt --all --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: test (rig internals; binary-guarded tests SKIP loudly)
+        run: cargo test --workspace
+      - name: sync-pin
+        run: cargo xtask sync-pin
+      - name: acquire implementation binaries (release artifacts keyed by pin)
+        shell: bash
+        run: |
+          # Pre-M1 honesty: neither upstream publishes release binaries
+          # yet, and the repos are private to this workflow's token. When
+          # releases keyed by the pins in vendor/tools.toml exist (and a
+          # readable token is configured), download into .wolf-bin/ here.
+          # Until then this lane is dark and says so:
+          echo "SKIP: no lupin release artifact at pin $(sed -n 's/^pin = \"\(.......\).*/\1/p' vendor/tools.toml | head -1) — lupin lane dark"
+          echo "SKIP: no wolf release artifact at pin $(sed -n 's/^pin = \"\(.......\).*/\1/p' vendor/tools.toml | tail -1) — wolfc lane dark"
+      - name: doctor
+        run: cargo xtask doctor
+      - name: ledger-check
+        run: cargo xtask ledger-check
+      - name: std-test (lanes conditional on binaries; SKIPs are loud)
+        run: cargo xtask std-test

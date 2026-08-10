@@ -1,0 +1,37 @@
+# Nightly drift watch (sc00 §7): run the rig against the LATEST upstream
+# binaries/pin and report divergence from the recorded pins — report,
+# never gate (continue-on-error at the job level; the scheduled lane is
+# a smoke alarm, not a merge blocker).
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+          components: rustfmt, clippy
+      - name: acquire LATEST implementation binaries
+        shell: bash
+        run: |
+          # Same pre-M1 honesty as ci.yml: no release artifacts exist
+          # yet, and the upstreams are private to this token. When they
+          # publish, fetch the latest here (NOT the pin) so std-test
+          # reports drift between recorded pins and reality.
+          echo "SKIP: no upstream release artifacts published — drift lane dark"
+      - name: doctor (report drift, never gate)
+        run: cargo xtask doctor
+      - name: std-test against latest
+        run: cargo xtask std-test
