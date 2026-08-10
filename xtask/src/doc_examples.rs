@@ -40,11 +40,12 @@ use std::time::Duration;
 /// Waivers for wolfc rejections caused by FILED upstream bugs, not by
 /// the example: (module, error code, finding). A waiver is loud in the
 /// output and dies with the pin bump that fixes its finding.
-const WOLFC_WAIVERS: &[(&str, &str, &str)] = &[
-    // The iter module's list_next body trips the pinned mem tier's
-    // List reads-as-moves; every import of `iter` fails E1001.
-    ("iter", "E1001", "F-0005"),
-];
+/// Empty at the sc03 pin, and that is the point: sc02's one waiver
+/// (`iter` / `E1001` / F-0005 — the pinned mem tier's List
+/// reads-as-moves) died with the pin bump that closed wolf-lang#6, exactly
+/// as the comment above it promised. A waiver is a debt with a name, not a
+/// permanent allowance.
+const WOLFC_WAIVERS: &[(&str, &str, &str)] = &[];
 
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,

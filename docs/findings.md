@@ -24,6 +24,13 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0015 | 2026-08-11 | wolfc checked tier: the row RAISE path inside an imported module's function is `unsupported — module items in checked execution` — the same call runs when it yields a value, and the same body inlined into the entry file runs both ways. Every `! {None}` miss test in std.list/x.deque_int is `unsupported` for this reason alone | wolf-lang s23/s31 | [filed: wolf-lang#13](https://github.com/tenseleyFlow/wolf-lang/issues/13) |
 | F-0016 | 2026-08-11 | `wolf fmt` splits a dotted call at the dot when a `//` comment line precedes it (`xs.push(1)` becomes `xs.` + newline + `push(1)`), idempotently — fmt is law (D34), so its output is the style, and this one is a defect | wolf-lang fmt owner | [filed: wolf-lang#14](https://github.com/tenseleyFlow/wolf-lang/issues/14) |
 | F-0017 | 2026-08-11 | lupin still accepts `let` reassignment after wolf-lang#2 closed compiler-side (wolfc now says E0410 with a `var` fix-it): the interpreter half of the divergence is open | wolf-interp | [filed: wolf-interp#8](https://github.com/tenseleyFlow/wolf-interp/issues/8) |
+| F-0018 | 2026-08-12 | (sc03 Targets 1–4) **The boundary primitive is missing**: no recoverable slice (`str.get`), no byte accessor, no `chars()`/`char` type — so no scan can advance past a code point of unknown length, and 28 of sc03's 64 functions are unwritable rather than merely unimplemented; plus `^n` resolving nowhere, `str` methods `unsupported` in wolfc, `str + str` diverging | wolf-lang s37 (core types) owners | [filed: wolf-lang#17](https://github.com/tenseleyFlow/wolf-lang/issues/17) |
+| F-0019 | 2026-08-12 | (sc03 Target 4) **Decision request — the unicode tables budget**: where category/case/normalization/segmentation data lives (std recommends penumbra or `std/x`, never core), with the evidence that lupin's `lower`/`upper` ALREADY do simple Unicode case mapping and `trim`/`words` already use Unicode `White_Space` — so std had to carry a 25-entry table to agree with the builtin | wolf-lang spec/std owners | [filed: wolf-lang#18](https://github.com/tenseleyFlow/wolf-lang/issues/18) |
+| F-0020 | 2026-08-12 | `assert(cond, msg)` traps `assert` even when `cond` HOLDS (wolfc 12ae8c2) — the two-argument intrinsic wolf-lang#9 just landed ignores its condition; the one-argument form is correct; contradicts `[conf.trap.assert]`'s "silent and effect-free when the condition holds" | wolf-lang (the #9 implementation) | [filed: wolf-lang#19](https://github.com/tenseleyFlow/wolf-lang/issues/19) |
+| F-0021 | 2026-08-12 | lupin: a method call on a SLICE EXPRESSION over a binding (`d[0..1].upper()`) is `unsupported` at resolve ("does not denote a place at run time") while the same shape over a literal runs — every std.str body binds the slice first | wolf-interp | [filed: wolf-interp#10](https://github.com/tenseleyFlow/wolf-interp/issues/10) |
+| F-0022 | 2026-08-12 | lupin: `n as f64` does not convert — the value stays an int, compares equal to ints and unequal to floats, and no diagnostic appears (wolfc correctly refuses the mixed comparison E0401); `std.str.parse_float` ships a ten-branch digit→f64 table to avoid it | wolf-interp | [filed: wolf-interp#11](https://github.com/tenseleyFlow/wolf-interp/issues/11) |
+| F-0023 | 2026-08-12 | lupin, the interpreter half of wolf-lang#3 and #4 (both closed compiler-side): postfix rows in param/`let` positions are E0201, lowercase bare tags do not resolve at raise sites — **and tag resolution is LAZY**, so a `return none` on an untaken branch certifies falsely, which is how sc02's F-0003 update came to be wrong | wolf-interp | [filed: wolf-interp#12](https://github.com/tenseleyFlow/wolf-interp/issues/12) |
+| F-0024 | 2026-08-12 | `cargo test --workspace` is deterministically RED at trunk `12ae8c2` (wolf_parse `blast_radius`: 4 added diagnostics, max 3, on `corpus/comptime/norm_witness.lu`) while that sha's trunk CI run reports success — so "the last green trunk run" is not by itself a sufficient pin criterion | wolf-lang CI/parser owners | [filed: wolf-lang#20](https://github.com/tenseleyFlow/wolf-lang/issues/20) |
 
 ## F-0001 — the std search path
 
@@ -66,6 +73,14 @@ half of the retirement, in this sprint:
 
 ## F-0002 — absence/result over rows (contract F2)
 
+UPDATE (sc03 pin `12ae8c2`): the GRAMMAR half is closed — wolf-lang#3
+landed postfix rows in every type position (`type '!' error_row`), and
+wolfc now carries `fn or(v: int ! {none}, d: int)` cleanly through mem.
+lupin does not (E0201 at parse, F-0023 / wolf-interp#12), and lupin is the
+only implementation that EXECUTES these shapes, so `std.option`'s six
+helpers stay unwritten and this finding stays open on the interpreter's
+half. Retested at the new pin, cheaply, exactly as the sprint asked.
+
 Evidence, both implementations at the sc01 pins: a `!`-row in a
 parameter or `let` type is a parse error — `fn or(v: int ! {None},
 d: int)` → E0201 `expected ')', found '!'` (wolfc and lupin agree; the
@@ -85,11 +100,23 @@ enums, and trait dispatch at the run rung after a clean static ladder.
 
 ## F-0003 — lowercase bare tags
 
-UPDATE (sc02 pins): half healed. lupin 0.1.1 now RESOLVES a lowercase
-bare tag at the raise site (`return none` under `-> int ! {none}` runs);
-wolfc at trunk `a0c4564` still answers E0301. std therefore keeps the
-`None`/`Done` interim — one spelling, both lanes — and flips repo-wide on
-the pin that teaches wolfc the same trick.
+UPDATE (sc03 pin `12ae8c2`): **the halves have SWAPPED, and sc02's
+update above was wrong.** wolf-lang#4 is closed — wolfc now resolves
+`return none` under `-> int ! {none}` (clean through mem) — and lupin
+does NOT: `unsupported: `none` does not resolve`. std therefore keeps the
+`None`/`Done`/`Parse` interim for the same reason as before, against the
+other implementation.
+
+sc02's claim that lupin 0.1.1 resolved lowercase tags was a
+false positive with a mechanism worth remembering: **lupin resolves row
+tags lazily, at run time, on the taken path only.** A `return none` on a
+branch the program never enters produces no diagnostic, so a probe that
+exercises only the hit path certifies a raise site that does not work.
+Recorded in F-0023 and filed (wolf-interp#12); the guide's learnings
+carry the rule.
+
+RETIRED (sc02 pins, superseded above): lupin 0.1.1 was reported to
+resolve a lowercase bare tag at the raise site. It does not.
 
 API-CONVENTIONS §2: payload-free marks are lowercase (`none`, `eof`,
 `gone`); `[mem.shared.rc.3]` already writes `T ! {gone}`. At the pins,
@@ -119,6 +146,20 @@ defined language-side.
 
 ## F-0005 — wolfc's pinned List typing
 
+**RETIRED (sc03 pin bump to trunk `12ae8c2`, wolf-lang#6 closed.)** The
+fix inverted which spelling is legal: `(mut xs).push(v)` — the X1-correct
+one — is now the ONLY accepted form in wolfc (`xs.push(v)` is E0804 with
+a fix-it naming `(mut …)`), lupin accepts it too, and `.len`-then-`[i]`
+is a copy-read rather than a move. This repo's half of the retirement, in
+sc03: every std body and every test writes the mode-spelled receiver (26
+call sites across `std.list`, `std.map`, `std.pool`, `std.x.deque_int`,
+`std.x.list_eq` and 13 test files), `std.list`'s `at` helper and the
+single-read rule it existed for are no longer load-bearing, three ledger
+rows moved from `fail(E…)` to `unsupported` (nothing is REFUSED any
+more), and the doc-example waiver list is empty for the first time.
+The original evidence follows.
+
+
 Three observations, one owner (s21 sema-builtin typing + s22 mem
 tier): (1) `List.push` is typed with a READ receiver — the X1-correct
 `(mut xs).push(v)` is rejected E0804 ("`push` reads its receiver");
@@ -134,11 +175,32 @@ spellings (its own under-enforcement of X1 is noted in the filing).
 
 ## F-0006 — str ordering
 
-`"a" < "b"` runs in lupin (byte order) and is rejected E0409 by wolfc.
-No str byte accessor exists to define ordering in-library, so
-`impl Ord for str` is unshippable without poisoning every wolfc
-importer of std.cmp. Needs: spec/typecheck to define str relational
-semantics (or a bytes view) — then the impl lands verbatim.
+**RETIRED (sc03 pin bump, wolf-lang#7 closed).** The spec answered with
+`[mem.str.order]`: the relational family on `str` × `str` is
+byte-lexicographic over the UTF-8 bytes, unsigned byte compare, shorter
+first on a shared prefix, total on all `str` values, with `==`/`!=` byte
+equality and `<=>` yielding the same ordering value as on integers.
+`[mem.str.impl]` draws the consequence this repo asked for: `impl Ord for
+str` is shippable in-library with no bytes accessor.
+
+Observed at the new pin: `"a" < "b"` no longer REJECTS in wolfc — it
+passes the static ladder and stops at the checked tier's `unsupported`
+(the ordinary `str`-method ceiling, F-0018) — and runs in lupin.
+`tests/str/affix_and_case.lu` pins the ruling's observable content on the
+lupin lane: `"wolf" < "wolves"` (shared prefix), `"wolf" < "wolf!"`,
+`"z" < "é"` and `"é" < "🐺"` (every multi-byte code point sorts above
+every ASCII one), and `"" < "a"`.
+
+The `impl Ord for str` block itself belongs to `std.cmp` — sc01's
+inventory — and lands in that module's own commit rather than here: it
+would be trait-dispatch freight (`unsupported` on both lanes, F-0002 /
+F-0012) and sc03's contract does not own std.cmp's surface. Recorded as
+unblocked-and-available for the stdc01 closeout.
+
+Original evidence: `"a" < "b"` ran in lupin (byte order) and was rejected
+E0409 by wolfc; no str byte accessor existed to define ordering
+in-library, so `impl Ord for str` was unshippable without poisoning every
+wolfc importer of std.cmp.
 
 ## F-0007 — lupin pattern semantics (filed to wolf-interp)
 
@@ -158,6 +220,14 @@ correctly.
 
 ## F-0008 — the iterator protocol (contract F1)
 
+UPDATE (sc03 pin `12ae8c2`): **CLOSED upstream** — wolf-lang#8 adopted the
+protocol with range-for, and `[mem.iter.*]` now specifies it (`List[T]`
+and `Pool[T]` adopt `Iter` builtin-side; user types implement by name, no
+structural conformance). Observed at the new pin: `for i in 0..3` runs in
+BOTH implementations. `std.iter`'s prototypes still ship as written — they
+are the record of what was proposed — and their retirement into the
+builtin protocol belongs to the stdc01 closeout, not to sc03.
+
 Amendment candidate: nominal trait `Iter[T]` with
 `next(mut self) -> T ! {done}`; `for pat in e` desugars to the
 explicit drive loop over `Iter`; range expressions get an owned range
@@ -173,6 +243,13 @@ signal was rejected — iteration's end is its own noun, and `done`
 keeps absence and exhaustion separable in rows that carry both.
 
 ## F-0009 — assert, defined (contract F4)
+
+UPDATE (sc03 pin `12ae8c2`): **CLOSED upstream** — wolf-lang#9 is closed
+and `[conf.trap.assert]` now specifies the intrinsic, including the
+two-argument form with `msg` evaluated only on the failing path. The
+implementation of the second arity is broken, though: it traps even when
+the condition holds (F-0020 / wolf-lang#19), so std.testing keeps the
+`if !cond { testing.fail(msg) }` interim for one more pin.
 
 Definition filed: `assert(cond)` is an INTRINSIC, one name in both
 tiers — comptime witness (s16) and runtime user trap
@@ -306,3 +383,153 @@ wolf-lang#2 is closed compiler-side (wolfc: `E0410` with a `var`
 fix-it); lupin still runs `let a = 1` / `a = 2` to `exit(0)` printing
 `2`. The guide's "never rely on it" stands, now against one
 implementation instead of two.
+
+## F-0018 — the boundary primitive (sc03's central filing)
+
+`wolf-lang#17`. A byte-offset string library cannot be written in wolf at
+this pin, and the reason is one missing primitive rather than a long list
+of missing conveniences.
+
+D25 gives `s[a..b]` with the checked fault, and the fault is right:
+`"wolf"[0..9]` traps `bounds` ("byte range 0..9 is outside a 4-byte
+string"), `"é"[0..1]` traps `bounds` ("byte range 0..1 splits a UTF-8 code
+point"), both deterministic, both pinned as tests here. What it leaves a
+library author is the problem: to scan for a needle, `find` must advance
+past code points of unknown length; it can learn a length only by slicing;
+a wrong guess is not `false`, it is process death, and there is no
+unwinding to catch it (D30). A `find` written over slicing would trap on
+`find("héllo", "l")` — legal input. That is a broken function, not a
+documented partial, so std shipped none of them.
+
+What IS writable is the **boundary-safe probe**: after `s.starts_with(p)`
+answers true, `p.len` is a code-point boundary of `s`. That one fact
+carried five real functions — `strip_prefix`, `trim_start`, `trim_end`,
+`parse_int`, `parse_float` — all total over arbitrary UTF-8, all
+executing. `parse_int` never slices the input except by one byte after
+matching an ASCII digit through `starts_with` against an alphabet literal
+std owns, which is why `parse_int("é", 10)` is a `Parse` miss and not a
+trap.
+
+Any ONE of three s37 primitives unblocks the family: the recoverable
+slice `str.get(a..b) -> str ! {none}` (cheapest, and it cannot be written
+in library code because writing it needs itself), a byte accessor
+(`bytes()` with `b[i] -> int`, which D25 explicitly licenses), or
+`chars()` yielding `(offset, char)`.
+
+Blocked inventory: `std.str` 15 of 33 (`find`, `rfind`, `count`, `split`,
+`split_once`, `rsplit_once`, `ends_with`, `strip_suffix`, `replace`,
+`replacen`, `get`, `bytes`, `chars`, `graphemes`, `to_list_chars` — note
+`ends_with` blocked while `starts_with` is trivial: the asymmetry is the
+bug's signature); `std.strbuf` 3 of 11 (`push(c)`, `strbuf.in(r)`,
+`reserve(n)`); `std.bytes` 9 of 9; `std.unicode` 1 of 10 (`char.code`).
+Every one is a reviewed contract in its module header, so the landing
+sprint implements a signature instead of redoing a design.
+
+Adjacent, filed in the same issue: there is **no `char` type at all**
+(`'a'` is E0101 in lupin / E0107 in wolfc; `for c in "abc"` is
+`unsupported` in both), `^n` end-relative indexing resolves in NEITHER
+implementation (`"hello"[..^1]`), wolfc answers `unsupported` at RESOLVE
+for every builtin-receiver `str` method and for `s[a..b]` (the s37 prelude
+plumbing sc03's contract predicted — which is why all 13 std.str/strbuf
+tests are lupin-lane and the wolfc column flips as a ledger commit), and
+`str + str` runs in lupin while wolfc says E0409 (std writes `"{a}{b}"`,
+which runs in both).
+
+## F-0019 — the unicode tables budget (a decision request)
+
+`wolf-lang#18`. sc03's acceptance requires this filing; it asks four
+questions and offers a recommendation, and it carries two pieces of
+evidence that change the question.
+
+The posture shipped: v1 promises UTF-8 validity as a type invariant and
+boundary-refusing slicing (both the language's) plus ASCII-true
+classification named as such (`std.unicode`, nine executing functions).
+Not shipped: category tables, case mapping/folding, normalization,
+grapheme segmentation. Recommendation: they land in **penumbra or
+`std/x`, never core** — core is welded to the compiler (D31) and the two
+things core needs (validity, boundaries) need no tables.
+
+Evidence 1: **the pinned interpreter already does simple Unicode case
+mapping.** `"ÉA".lower()` is `"éa"`. The contract planned ASCII-only
+`lower`/`upper` this sprint; the implementation is already past that, so
+the tables exist somewhere and the open question is where they live and
+which implementation is authoritative. std delegates (an in-library
+ASCII-only mapping is unwritable without a byte accessor) and documents
+these two as "the implementation's simple case mapping"; `eq_ignore_case`
+inherits it and the contract's "ASCII, named honestly" qualifier is
+dropped as no longer true.
+
+Evidence 2: **the whitespace set is Unicode too.** `trim` and `words` use
+`White_Space`, not ASCII — U+0085, U+00A0, U+1680, U+2000..U+200A,
+U+2028, U+2029, U+202F, U+205F and U+3000 all behave as whitespace
+(observed, all 25). std's `trim_start`/`trim_end` therefore carry a
+25-entry table of their own purely to AGREE with the builtin, and
+`tests/str/trim_whitespace_set.lu` pins the agreement code point by code
+point so a builtin that changes its set fails CI here instead of silently
+disagreeing with std. That table is the first Unicode data in wolf-std and
+it is the argument for deciding table ownership before every module grows
+its own.
+
+## F-0020 — `assert(cond, msg)` traps when the condition holds
+
+`wolf-lang#19`. At trunk `12ae8c2`, `assert(1 == 1, "one is one")` and
+`assert(2 > 1, msg)` both `trap(assert)` under wolfc while
+`assert(1 == 1)` exits 0 and lupin runs all three correctly. The
+two-argument intrinsic wolf-lang#9 just landed appears to ignore its
+condition. It contradicts `[conf.trap.assert]` ("silent and effect-free
+when the condition holds"), and the failure mode is the worst available
+for a test primitive: a PASSING assertion aborts the program. `std.testing`
+therefore keeps sc01's interim `if !cond { testing.fail(msg) }` at this
+pin — holding, not working around.
+
+## F-0021 — method call on a slice expression (lupin)
+
+`wolf-interp#10`. `d[0..1].upper()` where `d` is a binding is
+`unsupported` at resolve: "`d["0..1"]` does not denote a place at run
+time". The same shape over a literal (`"abc"[0..1].upper()`) runs, and
+`"abcd".lower()[0..1]` runs, so only `binding[range].method()` falls into
+the refusing path — and the diagnostic stringifies the range, suggesting
+the index is reduced to a string key before the place check. Sharp because
+it is exactly the shape a string library reaches for, and it fails at
+resolve, taking out the whole file. Every `std.str` body binds the slice
+first.
+
+## F-0022 — `n as f64` does not convert (lupin)
+
+`wolf-interp#11`. Silently wrong arithmetic: `(3 as f64) == 3.0` is
+false, `(3 as f64) == 3` is true — the cast is accepted and produces an
+int. wolfc refuses the mixed comparison outright (E0401), which is what
+makes the bug invisible on the lane that runs. `std.str.parse_float`
+therefore ships a ten-branch `digit_f(d: int) -> f64` literal table so
+that no `as` appears in its accumulation; the reason is documented on the
+helper, and 28 executing assertions depend on it.
+
+## F-0023 — the interpreter half of rows and tags (lupin)
+
+`wolf-interp#12`. wolf-lang#3 and #4 are closed compiler-side and neither
+landed in lupin: `fn or(v: int ! {none}, d: int)` is `fail(E0201)` at
+parse (wolfc reaches mem), `let a: int ! {none} = …` likewise, and
+`return none` is `unsupported: `none` does not resolve` (wolfc reaches
+mem). So `std.option`'s six helpers are STILL unwritable — the blocker
+moved from both implementations to the one that executes them, which is
+progress that changes nothing about what ships.
+
+The third part is the one to remember: **lupin resolves row tags lazily,
+at run time, on the taken path.** A `return none` on a branch the program
+never enters produces no diagnostic and the program exits 0 — which is
+how sc02's F-0003 update came to claim, wrongly, that lupin had learned
+lowercase tags. Any probe of raise-site behavior must exercise the raise.
+
+## F-0024 — trunk red locally, green in CI
+
+`wolf-lang#20`. `cargo test --workspace` at `12ae8c2` in a clean scratch
+clone fails `wolf_parse::blast_radius::single_token_mutations_have_bounded_blast_radius`
+deterministically (4 added diagnostics against a max of 3, on
+`corpus/comptime/norm_witness.lu`), on the rustc version
+`rust-toolchain.toml` pins, while that sha's trunk CI run — whose
+`cargo xtask ci` includes `cargo test --workspace` — reports success.
+sc03 pinned the sha anyway (the driver builds and behaves correctly across
+63 staged programs) with the asterisk in `vendor/tools.toml`. The
+downstream lesson: "the last green trunk run" is not by itself a
+sufficient pin criterion, and this repo's pin ritual should grow a second
+gate.

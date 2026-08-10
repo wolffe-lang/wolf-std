@@ -67,6 +67,24 @@ the pin bump that fixes it (`docs/findings.md`):
   are their worked home (F-0002). Lazy variants additionally wait on
   closures (c05); `Option[T]`/`Result[T, E]` as data wait on s16.
 
+**§2 amendment (sc03) — the `parse` tag, and one interim retired the hard
+way.** The absence inventory gains one domain tag: **`parse`**, the mark a
+text-to-value conversion raises when the text is not a value of that type
+(`std.str.parse_int`, `std.str.parse_float`). It earns its own noun rather
+than riding `none` because a caller distinguishes "no value here" from
+"these bytes are not a number", and sc05's `Parse` protocol will want the
+same tag. Reserved alongside it, for the sprint that ships them:
+**`utf8`** (bytes that are not well-formed UTF-8 — `std.bytes.to_str`).
+Both are payload-free marks, so both are lowercase by this section's rule
+and both ride the `None`-spelling interim below.
+
+The interim itself now has a different owner: at the sc03 pin **wolfc
+resolves lowercase bare tags and lupin does not** — the exact reverse of
+sc01's record (F-0003, F-0023). std keeps writing `None`/`Done`/`Parse`
+for the same reason as before, against the other implementation. The
+lesson recorded in the register: lupin resolves tags LAZILY on the taken
+path, so a raise site on an untaken branch proves nothing.
+
 ## 3. Parameter modes (X1)
 
 - The `read` default is sacred: the absence of a keyword *is* the mode,
@@ -210,6 +228,46 @@ sibling module are restructured or written as prose.
   the builtin exposes no capacity at all: a no-op documented as a hint
   would be a lie (F-0011).
 
+## 9. Strings (sc03)
+
+- **Byte offsets are the one currency, and `len` is bytes.** Every
+  position-taking or position-returning function in std deals in byte
+  offsets; `len` is a byte count, O(1), documented with the test that
+  proves it (`"é".len == 2`). A function that wants to count code points
+  says so in its name and is not called `len`. There is no `s[i]` and no
+  negative index (D25) — the redirects (`s[..n]`, `chars()`, `s[^1]`) are
+  documented in `std.str`'s header, not invented around.
+- **The three-way split, stated in the module header** (§8's rule, applied
+  to strings): the LANGUAGE owns literals and interpolation, `s.len`,
+  `s[a..b]` with its `bounds` trap, and the relational family
+  (byte-lexicographic, `[mem.str.order]`); the IMPLEMENTATION owns the
+  builtin method set std delegates to (`contains`, `starts_with`, `trim`,
+  `lower`, `upper`, `repeat`, `lines`, `words`, `is_empty`); std owns
+  everything else. A delegating function says it delegates, because the
+  delegate's semantics are then part of the contract — `lower`'s case
+  mapping is the clearest case (F-0019).
+- **`str` is immutable, so nothing in `std.str` takes `mut`.** Mutation
+  lives in `std.strbuf`, whose functions take `mut b` first and whose call
+  sites spell it (§3, §8).
+- **Traps versus rows at a boundary.** An offset that is out of range or
+  falls inside a code point traps `bounds` — the language's checked slice,
+  inherited by every std function that names an offset (`strbuf.insert`,
+  `remove`, `truncate`), and documented on each. The recoverable form is
+  `get`, which raises rather than traps; where `get` cannot yet exist, the
+  trap is documented as the only spelling available and the gap is filed
+  (F-0018) rather than papered over with a partial function.
+- **Delegation over reimplementation, refusal over approximation.** When a
+  builtin already provides an operation, std delegates and documents; when
+  std cannot implement an operation correctly for ALL inputs, it ships the
+  reviewed contract and a filing instead of a version that is right on
+  ASCII and traps on text. sc03's fifteen blocked `std.str` functions are
+  that rule in force.
+- **Case and whitespace are the implementation's sets, and std must
+  agree.** A std function whose behavior must match a builtin's set (as
+  `trim_start`/`trim_end` must match `trim`) carries a test that pins the
+  agreement member by member, so a builtin change fails CI instead of
+  drifting silently.
+
 ## Review record
 
 - 2026-08-10 — drafted (sc00). Human review: **pending**; record the
@@ -221,3 +279,6 @@ sibling module are restructured or written as prose.
 - 2026-08-11 — sc02 amendments: §4 statement-vs-assertion rule for
   fenced examples plus the one-module note, and §8 Containers. Review
   rides the same pending sc00 gate.
+- 2026-08-12 — sc03 amendments: §2 gains the `parse` tag (and reserves
+  `utf8`) with the interim's ownership flipped to lupin, and §9 Strings.
+  Review rides the same pending sc00 gate.
