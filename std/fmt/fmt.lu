@@ -8,12 +8,13 @@
 //! so a formatting module has to earn its place. It earns it twice. The
 //! first reason is that the interpolation grammar reserves a FORMAT SPEC
 //! — `INTERP ::= '{' expr FORMAT_SPEC? '}'` (spec/01 §1.5) — whose
-//! semantics spec §7.4 was supposed to define and does not, so today
-//! `{x:>8.2}` means whatever each implementation decided (measured at
-//! these pins: lupin implements `[[fill]align][width]` and REFUSES the
-//! rest with an honest `unsupported`; wolfc parses the spec and then
-//! IGNORES it, printing the unpadded value — the two disagree on stdout,
-//! F-0031). The second is that a spec is a spelling, not a capability: a
+//! semantics spec §7.4 was supposed to define and does not (F-0033) —
+//! though the IMPLEMENTATIONS have converged: re-measured at the sc08 pin,
+//! `{x:.2}`, `{s:.4}` and `{n:08}` render identically on all three lanes
+//! (`3.14`, `wolf`, `00000042`), including precision on a `str`, which
+//! F-0031 recorded as the one clause nothing implemented. F-0031's
+//! divergence — lupin padding while wolfc ignored the spec — is retired.
+//! The second is that a spec is a spelling, not a capability: a
 //! program that computes a column width, or pads a value it received as
 //! data, needs the operation as a FUNCTION. This module is that
 //! function set, and it is also the running reference implementation the

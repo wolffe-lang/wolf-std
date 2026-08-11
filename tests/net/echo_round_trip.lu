@@ -1,0 +1,51 @@
+//! check: run(exit=0, stdout="got: ping\nreply: pong\nsecond: two")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate
+//!
+//! The whole connected tier of `std.net` in one program: bind a listener,
+//! learn the port the host chose, dial it, exchange a message each way, and
+//! accept a SECOND connection on the same listener — which is the property
+//! `accept(mut l)` is spelled `mut` for. Every handle is closed exactly
+//! once, by the closer that consumes it.
+//!
+//! **Loopback and port 0, the discipline this whole module lives under.**
+//! `net.loopback(0)` asks the host for an ephemeral port on the interface
+//! that cannot leave the machine; the program learns the port through
+//! `net.port`. No test in this repo ever names a fixed port, a foreign
+//! host, or a name to resolve — there is no external network here, ever.
+//!
+//! **Why it is deterministic.** Every operation blocks, so the order is
+//! the source order: the client connects BEFORE the server accepts, and a
+//! loopback connect completes into the host's backlog, so `accept` finds
+//! the connection already waiting and never blocks on a peer that is not
+//! coming. Writing it the other way round would hang forever — an accept
+//! with nobody dialing has no timeout at this pin (F-0049).
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli = net.connect(net.loopback(p))?
+    net.write(mut cli, "ping")?
+    var conn = net.accept(mut srv)?
+    let msg = net.read(mut conn, 16)?
+    print("got: {msg}")
+    net.write(mut conn, "pong")?
+    let reply = net.read(mut cli, 16)?
+    print("reply: {reply}")
+    net.close(take cli)?
+    net.close(take conn)?
+    // The listener is still listening: a second dial gets a second
+    // socket, which is what makes `accept` a stream operation and why it
+    // takes `mut`.
+    var cli2 = net.connect(net.loopback(p))?
+    net.write(mut cli2, "two")?
+    var conn2 = net.accept(mut srv)?
+    let second = net.read(mut conn2, 16)?
+    print("second: {second}")
+    net.close(take cli2)?
+    net.close(take conn2)?
+    net.close_listener(take srv)?
+    0
+}

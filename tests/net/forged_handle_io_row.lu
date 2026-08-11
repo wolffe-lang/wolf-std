@@ -1,0 +1,41 @@
+//! check: run(exit=1, stdout="forged write: io\ndouble close: io\nforged accept: -1\nerror: io")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate, err.else
+//!
+//! A bad handle is a ROW, never a trap. Three ways to hold a bad handle and
+//! all of them answer `io`: a `Socket` a caller built out of a number, a
+//! descriptor closed twice, and a `Listener` that was closed before the
+//! accept.
+//!
+//! **Why a row and not a trap** (§2's rule, and §14's restatement): a
+//! public struct has no private field at this pin, so
+//! `net.Socket { fd: 4242 }` is ordinary code and a library cannot claim
+//! the caller violated a contract it had no way to state. The mode system
+//! prevents the staleness it CAN see — `close(take s)` makes use-after-close
+//! a static rejection (`use_after_close.lu`) — and everything it cannot see
+//! is a miss.
+//!
+//! The double close is the one worth reading twice: `net.close_listener`
+//! consumes its listener, so a second close of the SAME value would not
+//! compile. This file forges a second value carrying the same descriptor,
+//! which is the only way to reach the row at all — and a program that got
+//! its descriptor from data is the reason the row exists.
+
+use std.net
+
+fn main() -> !int {
+    var forged = net.Socket { fd: 4242 }
+    net.write(mut forged, "nope") else |_| print("forged write: io")
+    var srv = net.listen(net.loopback(0))?
+    let fd_of_srv = srv.fd
+    net.close_listener(take srv)?
+    var twin = net.Listener { fd: fd_of_srv }
+    net.close_listener(take twin) else |_| print("double close: io")
+    var closed_srv = net.Listener { fd: fd_of_srv }
+    let s = net.accept(mut closed_srv) else |_| net.Socket { fd: 0 - 1 }
+    print("forged accept: {s.fd}")
+    var again = net.Socket { fd: 4242 }
+    net.write(mut again, "still nope")?
+    print("unreachable")
+    0
+}

@@ -1,0 +1,43 @@
+//! check: run(exit=1, stdout="peer-gone: handled\nerror: closed")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate, err.else
+//!
+//! `closed` is the socket's `eof`: the peer finished, which is an OUTCOME
+//! and not a failure. The server closes its end; the client's next read
+//! misses, handled locally so the program keeps running, and the read after
+//! that propagates out of `main` — where the process outcome NAMES the tag
+//! on stdout and exits 1.
+//!
+//! **The propagation is the only witness of a tag's identity, and at this
+//! pin that is worse than it sounds.** sc07 recorded that a bare-identifier
+//! handler binds every tag (F-0043); the shape that was supposed to replace
+//! it — `else |e| match e { closed => …, io => … }` — now PARSES and RUNS on
+//! the executing lane, and its first arm still matches every tag, with no
+//! diagnostic. Measured both ways round (swap the arms and the answers swap
+//! with them), and it is a divergence: lupin 0.1.5 and the native rung
+//! discriminate correctly, the checked tier does not (F-0052). So this file
+//! deliberately does NOT contain a discriminating handler: a test that
+//! passed by agreeing with the wrong answer would fossilize it.
+//!
+//! What that costs `std.net` is written into the module header:
+//! `read_all` is a reviewed contract rather than a function, because a loop
+//! that cannot tell `closed` from `io` truncates data silently.
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli = net.connect(net.loopback(p))?
+    var conn = net.accept(mut srv)?
+    net.close(take conn)?
+    var handled = "not-fired"
+    let gone = net.read(mut cli, 16) else |_| {
+        handled = "handled"
+        ""
+    }
+    print("peer-gone: {handled}{gone}")
+    let strict = net.read(mut cli, 16)?
+    print("unreachable: {strict}")
+    0
+}

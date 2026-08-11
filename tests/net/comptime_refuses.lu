@@ -1,0 +1,39 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.net, comptime.sandbox, comptime.sandbox.net
+//!
+//! **D33, held as a rejection: no sockets at compile time.** The capability
+//! `std.net` carries (`net`, per I13) is refused categorically in the
+//! comptime sandbox — the loudest case of the rule, because `wolf add` must
+//! never mean arbitrary code talks to the network with the builder's
+//! credentials. The diagnostic is `E0701` ("reaches the network, which
+//! comptime code can never touch") and this file is its witness in this
+//! repository.
+//!
+//! **Why the refused call is the BUILTIN and not the facade.** A witness
+//! written as `comptime fn probe() { net.connect(…) }` does not reach the
+//! sandbox at all: the comptime engine has no cross-module call at this pin,
+//! so a `comptime fn` that calls ANY std module function is an honest
+//! `unsupported` at resolve — measured on the pure helper too, where no
+//! capability is involved (F-0051). So the refusal is witnessed one level
+//! down, at the builtin `std.net.connect` delegates to, and the pure
+//! `net.loopback` below is called at RUN time — which is also what keeps the
+//! import used (an unused import is E0305).
+//!
+//! What the file therefore proves: the capability is refused at comptime,
+//! and the two pure address helpers are the only members of this module a
+//! comptime program could ever use — the day the engine can call across a
+//! module boundary.
+
+use std.net
+
+comptime fn probe(addr: str) -> int ! {refused, timeout, io} {
+    net_connect(addr)
+}
+
+fn main() -> !int {
+    const FD = probe("127.0.0.1:1") else |_| 0
+    let addr = net.loopback(0)
+    print("addr: {addr} fd: {FD}")
+    0
+}

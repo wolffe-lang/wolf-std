@@ -1,0 +1,29 @@
+//! check: fail(E1001)
+//! phase: typecheck
+//! conforms: std.net, mem.tier0.move.1, mem.tier0.move.2
+//!
+//! **The staleness discipline, held as a rejection** — the `std.fs.File`
+//! precedent applied to a socket. `net.close` takes its `Socket` by `take`
+//! (X1), so writing to a closed socket is a use-after-move: caught
+//! statically, with no generation counter, no liveness bit and no run-time
+//! cost. This file is expected to be REJECTED, and if a future pin ever
+//! accepts it the rig goes red, which is exactly what a discipline that
+//! lives in the type system should do.
+//!
+//! It is also the argument for `take` over a `mut`-and-flag design: a
+//! `Socket` with an `is_open` field would move this error from compile time
+//! to run time and add a row to every operation for a condition the
+//! compiler can see. The forged-handle row (`forged_handle_io_row.lu`) is
+//! what remains for the descriptors the compiler cannot see.
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli = net.connect(net.loopback(p))?
+    net.close(take cli)?
+    net.write(mut cli, "after the close")?
+    net.close_listener(take srv)?
+    0
+}

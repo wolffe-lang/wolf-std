@@ -64,16 +64,18 @@
 //! - `io.Read`/`io.Write` traits and buffering — blocked on trait
 //!   dispatch (F-0004), not on the filesystem.
 //!
-//! **Lanes.** The compiler's checked tier is the executing lane for
-//! everything here: it performs real host operations (the comptime
-//! sandbox is the one place they are refused). lupin has no fs builtins
-//! at all — a program that imports this module is an honest
-//! `unsupported` at resolve, and that is the conservatism posture the
-//! rig records once rather than per test (F-0043). The native rung
-//! refuses the tier by name ("io/fs builtins in native lowering"). The
-//! pure path helpers would run everywhere the `str` surface does; they
-//! ride this module's lane because a module is budgeted by its worst
-//! body, and `fs_read_text` is that body on two of the three lanes.
+//! **Lanes (re-measured at the sc08 pin).** BOTH compiler rungs are
+//! executing lanes now: the checked tier performs real host operations, and
+//! the native rung lowers the whole fs tier as of #40 — six of this
+//! module's seven tests run natively, where every one of them was an
+//! honest `unsupported` in sc07. The comptime sandbox is the one place
+//! these operations are refused (D33). lupin still has no fs builtins by
+//! design, so a program that reaches one is an honest `unsupported` at
+//! resolve — but lupin resolves module bodies LAZILY, so the pure path
+//! helpers RUN there: `tests/fs/path_helpers.lu` is a lupin `run` row at
+//! this pin, which is a property of the lane split rather than a leak. The
+//! posture is the rig's to record once (`CONTRIBUTING.md`, the ledger's
+//! sc07/sc08 sections) rather than each test's to restate.
 
 /// An open file: the host descriptor this process may read from or
 /// write to, according to how it was opened.

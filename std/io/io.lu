@@ -45,17 +45,22 @@
 //! this pin and NOT written, for a reason worth reading:
 //!
 //! - `input_all() -> str ! {io, utf8}` — every remaining line, joined
-//!   with `"\n"`. Blocked twice. (1) An `else` handler cannot
-//!   distinguish `eof` from `io`: a bare identifier in the handler BINDS
-//!   rather than matching the tag (so it catches everything) and a
-//!   payload pattern is refused outright by wolfc (E0806) — so a loop
-//!   over `input_line` must treat a genuine read error as the end of
-//!   input, which is a silent wrong answer and this module will not ship
-//!   one (F-0043). (2) the line read strips the terminator, so even with
+//!   with `"\n"`. Blocked twice, and the first blocker got SHARPER at the
+//!   sc08 pin rather than closing. (1) A handler cannot distinguish `eof`
+//!   from `io`. A bare identifier in the handler BINDS rather than matching
+//!   (so it catches everything, F-0043), and the shape that should have
+//!   fixed it — `else |e| match e { eof => …, io => … }` — now parses and
+//!   RUNS on the checked lane, where it matches its FIRST ARM for every tag
+//!   with no diagnostic, while lupin and the native rung discriminate
+//!   correctly (F-0052). A loop written over it would report the wrong
+//!   thing on the lane that executes, so this module still ships no loop:
+//!   treating a read error as the end of input is a silent truncation of
+//!   someone's data. (2) the line read strips the terminator, so even with
 //!   a working handler the result cannot say whether the input ended with
 //!   a newline — the operation wants a `read_all` builtin that returns
-//!   the bytes as they are (F-0046). Both are filed; the function lands
-//!   the day either one closes.
+//!   the bytes as they are (F-0046, unmoved). Both are filed; the function
+//!   lands the day either one closes. `std.net` refuses its own `read_all`
+//!   for exactly the same reason, which is how a convention becomes a rule.
 //!
 //! **Why the reader is `input_line` and not `read_line`.** `read_line` is
 //! the name this module wanted, and it is a name std cannot have: it is an
@@ -73,17 +78,20 @@
 //! the real std surface replaces them" — and rule the shadowing question
 //! explicitly for the names that stay.
 //!
-//! **Lanes.** The compiler's checked tier executes everything here. Its
-//! stdin is EMPTY — `conform-run` has no stdin injection at this pin — so
-//! the `eof` path is the one the rig witnesses and the hit path is proven
-//! upstream (F-0046 asks for the flag). The writers' stdout is compared
-//! by hash; stderr is not in the record protocol, so `write_err` and
-//! `write_err_line` are witnessed by their exit status alone, which is
-//! stated rather than hidden. lupin has neither the `read_line` builtin
-//! nor `eprint`/`eprint_raw`, so its column is `run` for the two stdout
-//! writers and an honest `unsupported` for the other three — the
-//! capability posture the rig records once in its docs rather than per
-//! test (F-0043). The native rung refuses the tier.
+//! **Lanes (re-measured at the sc08 pin).** Both compiler rungs execute
+//! everything here — the native rung lowers the io tier as of #40, so both
+//! of this module's tests run natively where both were `unsupported` in
+//! sc07. Standard input is still EMPTY on the checked lane (`conform-run`
+//! has no stdin injection at this pin, F-0046 unmoved), so the `eof` path
+//! is the one the rig witnesses and the hit path is proven upstream. The
+//! writers' stdout is compared by hash; stderr is not in the record
+//! protocol, so `write_err` and `write_err_line` are witnessed by their
+//! exit status alone, which is stated rather than hidden. lupin gained
+//! `eprint`/`eprint_raw` at 0.1.5, which is what moved
+//! `tests/io/writers_and_streams.lu` to a lupin `run` row: all four
+//! writers work there now and only the line READ is refused (this machine
+//! has no injectable stdin by design). The capability posture is the rig's
+//! to record once rather than each test's to restate.
 
 /// Write `text` to standard output exactly as given — no newline, no
 /// reformatting.

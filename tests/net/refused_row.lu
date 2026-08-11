@@ -1,0 +1,36 @@
+//! check: run(exit=1, stdout="handled: -1\nerror: refused")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate, err.else
+//!
+//! The `refused` litmus, in both directions a caller can take it: an `else`
+//! handler that turns the miss into a value the program keeps running with,
+//! and a `?` that propagates it out of `main`, where the process outcome
+//! NAMES the tag on stdout and exits 1.
+//!
+//! Deterministic on any host without naming a port: bind port 0, ask the
+//! host which port it gave us, then CLOSE the listener — nothing is
+//! listening on that port now, and a loopback dial to it is refused
+//! immediately (no routing, no firewall, no timeout involved). It is the
+//! one way to name a dead port that is guaranteed dead and guaranteed
+//! local.
+//!
+//! Propagation is the ONLY witness of a tag's identity in this rig, and it
+//! stayed that way at this pin: the shape that was supposed to replace it —
+//! `else |e| match e { refused => …, io => … }` — parses and runs now, and
+//! its first arm matches every tag with no diagnostic (F-0052, a divergence:
+//! lupin and the native rung discriminate correctly). So the handler below
+//! is a wildcard, and the tag rides out through `?`.
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    net.close_listener(take srv)?
+    let dead = net.loopback(p)
+    let sock = net.connect(dead) else |_| net.Socket { fd: 0 - 1 }
+    print("handled: {sock.fd}")
+    let strict = net.connect(dead)?
+    print("unreachable: {strict.fd}")
+    0
+}

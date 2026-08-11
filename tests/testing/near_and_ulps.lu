@@ -8,6 +8,13 @@
 //! NaN against NaN under `assert_ulps`, and `f_max` against `+inf`.
 //! Grouping is safe here precisely because a satisfied assertion is
 //! silent and effect-free; the misses are in their own files.
+//!
+//! The signed zero is written `-0.0` and not `0.0 - 0.0`, which is what the
+//! header above always claimed it was: subtracting from a zero literal gives
+//! `+0.0` under round-to-nearest, so the old spelling asserted `+0.0` against
+//! `+0.0` and proved nothing about signs. The sc08 pin diagnoses the idiom
+//! (`W0402`, "`0.0 - x` is not negation") and that is how the mistake was
+//! found — a warning that pays for itself on its first run.
 
 use std.math.float
 use std.testing
@@ -16,13 +23,13 @@ fn main() -> !int {
     testing.assert_near(1.5, 1.5, 0.0)
     testing.assert_near(1.0, 1.0000001, 0.001)
     testing.assert_near(float.inf(), float.inf(), 0.0)
-    testing.assert_near(0.0 - 0.0, 0.0, 0.0)
+    testing.assert_near(-0.0, 0.0, 0.0)
     testing.assert_ulps(1.5, 1.5, 0)
     testing.assert_ulps(1.0, float.from_bits(float.to_bits(1.0) + 1), 1)
-    testing.assert_ulps(0.0 - 0.0, 0.0, 1)
+    testing.assert_ulps(-0.0, 0.0, 1)
     testing.assert_ulps(float.nan(), float.nan(), 0)
     testing.assert_ulps(float.f_max(), float.inf(), 1)
-    testing.assert_ulps(0.0 - 1.0, 1.0, 9223372036854775807)
+    testing.assert_ulps(-1.0, 1.0, 9223372036854775807)
     print("float asserts: silent")
     0
 }

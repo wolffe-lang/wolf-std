@@ -31,10 +31,13 @@ pub enum Expect {
     /// `unsupported — place projection outside the modelled surface` from
     /// the checked lane at random (measured 5/12 versus 7/12 on one file),
     /// and a ledger that claimed either one would fail CI at random too.
-    /// F-0048 is the finding; the day it closes, the row narrows to a
-    /// single value and this variant should stop appearing. A row here is
-    /// louder than a `run` row, not quieter: `std-test` prints an
-    /// instability ledger and names the finding every run.
+    /// F-0048 was the finding and it CLOSED at the sc08 pin: both rows were
+    /// re-measured deterministic (14 consecutive runs each) and narrowed to
+    /// `run`, so this variant is used by nothing in `tests/ledger.toml` today.
+    /// It stays because the honest record of a nondeterministic pin is worth
+    /// having ready, and because a row here is louder than a `run` row, not
+    /// quieter: `std-test` prints an instability ledger and names the finding
+    /// every run.
     Unstable(Vec<Expect>),
 }
 

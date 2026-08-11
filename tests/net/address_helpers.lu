@@ -1,0 +1,33 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.net
+//!
+//! The two pure members of a capability module: `endpoint` and `loopback`
+//! touch no host, carry no row, and are comptime-safe — the exception §14
+//! says to state explicitly, because in an os module the pure function is
+//! the surprising one.
+//!
+//! This file is also the only `std.net` test with two executing lanes, and
+//! the reason is worth recording: lupin has no `net_*` builtins by design,
+//! but it resolves module bodies LAZILY, so a program that calls only the
+//! pure helpers never reaches the ones it cannot resolve. The checked lane
+//! runs everything here; the native rung refuses the module by name. That
+//! asymmetry inside one module is exactly what sc07 measured for `std.io`
+//! and it is why the ledger records lanes per TEST rather than per module.
+
+use std.net
+
+fn main() -> !int {
+    if net.endpoint("127.0.0.1", 8080) != "127.0.0.1:8080" { return 1 }
+    if net.endpoint("localhost", 0) != "localhost:0" { return 2 }
+    // An IPv6 host is bracketed so the port stays unambiguous.
+    if net.endpoint("::1", 8080) != "[::1]:8080" { return 3 }
+    if net.endpoint("fe80::1", 1) != "[fe80::1]:1" { return 4 }
+    if net.loopback(0) != "127.0.0.1:0" { return 5 }
+    if net.loopback(8080) != "127.0.0.1:8080" { return 6 }
+    // Nothing is validated: the host is the authority on an address, and an
+    // address it cannot parse comes back as an `io` row from `listen` or
+    // `connect` rather than as a lie from this function.
+    if net.endpoint("", 0) != ":0" { return 7 }
+    0
+}

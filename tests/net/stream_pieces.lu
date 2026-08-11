@@ -1,0 +1,58 @@
+//! check: run(exit=0, stdout="one two three\nat-end\nempty: at-end")
+//! phase: run
+//! conforms: std.net, err.row, err.else
+//!
+//! A stream is bytes, not messages: three writes arrive as one sequence and
+//! a reader cuts it wherever it asks to. This file writes `"one "`,
+//! `"two "` and `"three"` from one end, closes it, and reads 4, 4 and 5
+//! bytes from the other — proving both halves of the contract at once.
+//!
+//! **`write` is complete, which is why there is no `write_all`.** The
+//! builtin loops internally, so each of the three calls delivers its whole
+//! string or raises; nothing here retries, and a `write_all` in `std.net`
+//! would be ceremony around a hazard this surface does not have.
+//!
+//! **The end of the stream is a ROW, not a length.** The fourth read misses,
+//! because the peer closed — handled with a plain `else` value, exactly as
+//! `tests/fs/fd_stream.lu` handles a file's `eof`. What this test does NOT
+//! do is claim to know WHICH tag the miss carried: a handler cannot tell
+//! them apart on the executing lane (F-0052 — a `match` in a handler binds
+//! its first arm, silently), so "the miss ends the stream" is all a caller
+//! may honestly conclude, and it is why `read_all` is a reviewed contract in
+//! the module header instead of a function.
+//!
+//! Determinism: the client writes and CLOSES before the server accepts, so
+//! all thirteen bytes are already buffered by the host when the reads run
+//! and a read of `n` returns exactly `n` while bytes remain. Byte counts are
+//! ASCII on purpose — a byte-count read of non-ASCII text can split a code
+//! point and raise `utf8` (documented on `net.read`, filed as F-0035/F-0044).
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli = net.connect(net.loopback(p))?
+    net.write(mut cli, "one ")?
+    net.write(mut cli, "two ")?
+    net.write(mut cli, "three")?
+    net.close(take cli)?
+    var conn = net.accept(mut srv)?
+    let a = net.read(mut conn, 4)?
+    let b = net.read(mut conn, 4)?
+    let c = net.read(mut conn, 5)?
+    print("{a}{b}{c}")
+    let ended = net.read(mut conn, 4) else "at-end"
+    print("{ended}")
+    net.close(take conn)?
+    // A peer that says nothing and goes away: the first read is already the
+    // end of the stream.
+    var quiet = net.connect(net.loopback(p))?
+    net.close(take quiet)?
+    var qconn = net.accept(mut srv)?
+    let nothing = net.read(mut qconn, 16) else "at-end"
+    print("empty: {nothing}")
+    net.close(take qconn)?
+    net.close_listener(take srv)?
+    0
+}

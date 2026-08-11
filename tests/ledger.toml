@@ -5,7 +5,28 @@
 #   wolfc = "run" | "unsupported" | "fail(E…)"
 # "run" means: satisfies the directive's `check:` in full. A test passing
 # deeper than its ledger claims fails CI — advancement is deliberate, in
-# its own commit. Paths are slash-relative to tests/.
+# its own commit.
+#
+# THE sc08 PIN BUMP (wolf trunk f0da6e6 -> 13b811f, the #40 merge; lupin
+# 0.1.4 -> 0.1.5) MOVED 44 ROWS, all `unsupported` -> `run`, and 41 of them
+# are in ONE column: the native rung went from 23 of 136 rows to 64. #40
+# landed native `str`, `List` and the fs/io builtin tier together, so the
+# refusals this ledger has recorded since sc04 ("the native rung refuses
+# `str`", "... `List`", "... `print`") are gone in one bump and both os
+# modules gained a second executing lane. The other three rows: lupin picked
+# up `fs/path_helpers.lu` (0.1.5 has the whole 18-method builtin `str` set —
+# F-0018's interpreter half, retired) and `io/writers_and_streams.lu` (0.1.5
+# has `eprint`/`eprint_raw`), and wolfc picked up `str/to_strbuf_round_trip.lu`.
+#
+# THE `unstable(...)` VOCABULARY IS RETIRED AND NOTHING USES IT. F-0048 (the
+# checked lane answering the same program two ways at random) is CLOSED
+# upstream and re-measured closed here: 14 consecutive runs of each of the two
+# files, all `exit(0)`, where sc07 measured 5 of 12. Both rows are plain `run`
+# now. The parser still accepts the spelling and `xtask/src/ledger.rs` still
+# documents it, because the honest record of a nondeterministic pin is worth
+# keeping available — but a row here should be rare enough to be shocking.
+#
+# Paths are slash-relative to tests/.
 #
 # The sc01 pattern of rows (each stated in the test header too):
 # - rows/enums/traits execute under lupin only where no user METHOD or
@@ -85,7 +106,7 @@ native = "unsupported"
 [tests."errors/payload_shapes.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."errors/coarsen_and_chain.lu"]
 lupin = "run"
@@ -219,13 +240,13 @@ lupin = "run"
 # (F-0005). The sc03 pin closes that (wolf-lang#6, copy-reads), so the
 # ladder is clean and only the row raise keeps the run rung shut (F-0015).
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."iter/list_cursor_drive.lu"]
 lupin = "run"
 # Was fail(E0804) — the same F-0005 closure. See range_drive above.
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 # ---- sc02: std.list (the run-rung floor — push/len/index/for reach
 # wolfc's checked run rung; the row-raising family is where the two
@@ -277,7 +298,7 @@ native = "unsupported"
 [tests."list/index_bounds_trap.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."list/remove_bounds_trap.lu"]
 lupin = "run"
@@ -356,22 +377,22 @@ native = "unsupported"
 lupin = "run"
 # Same F-0015 module-row ceiling as std.list's row family.
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."x/deque_int/both_ends.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."x/deque_int/pop_back_and_clear.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."x/deque_int/to_list_order.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."x/list_eq/contains_and_index_of.lu"]
 lupin = "unsupported"
@@ -427,15 +448,15 @@ native = "unsupported"
 # wolfc, and the flip when s37 lands is a LEDGER commit, not a code change:
 # that property is the proof the rig was built right. ----
 
-# UNSTABLE at this pin (F-0048): the checked lane answers `run` or
-# `unsupported — place projection outside the modelled surface` at random
-# for the SAME program and binary — measured 5 runs of 12 one way, 7 the
-# other. Both outcomes are recorded so the gate stays honest; the row
-# narrows to one value the day the finding closes.
+# Was `unstable(run|unsupported)` at the sc07 pin (F-0048: the checked lane
+# answered the same program two ways at random — 5 runs of 12 one way, 7 the
+# other). NARROWED to `run` at the sc08 pin: 14 consecutive runs, all
+# `exit(0)`, plus the rig's own. The finding is closed upstream (wolf-lang#42)
+# and the vocabulary is retired from this file.
 [tests."str/byte_length_honesty.lu"]
 lupin = "run"
-wolfc = "unstable(run|unsupported)"
-native = "unsupported"
+wolfc = "run"  # sc08 pin bump (13b811f)
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."str/slice_oob_traps.lu"]
 lupin = "run"
@@ -443,38 +464,38 @@ lupin = "run"
 # slicing — and wolfc still stops at resolve: `s[a..b]` on `str` is not
 # plumbed, so the trap it should raise cannot be observed on that lane.
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."str/slice_split_codepoint_traps.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."str/trim_whitespace_set.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."str/affix_and_case.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."str/lines_words_join.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
-# UNSTABLE at this pin, same finding as above (F-0048).
+# The second of the two sc07 unstable rows, narrowed the same way (F-0048).
 [tests."str/interpolation_interplay.lu"]
 lupin = "run"
-wolfc = "unstable(run|unsupported)"
-native = "unsupported"
+wolfc = "run"  # sc08 pin bump (13b811f)
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."str/to_strbuf_round_trip.lu"]
 lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
+wolfc = "run"  # sc08 pin bump (13b811f)
+native = "run"  # sc08 pin bump (13b811f)
 
 # ---- sc03: std.strbuf (a concrete struct plus free functions — the shape
 # sc02's deque_int proved runs on both lanes; what keeps wolfc dark here is
@@ -483,22 +504,22 @@ native = "unsupported"
 [tests."strbuf/build_and_read.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."strbuf/insert_remove_truncate.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."strbuf/truncate_split_codepoint_traps.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."strbuf/region_build_and_freeze.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 # ---- sc03: std.unicode. The one sc03 module with no `str` in its bodies —
 # pure integer predicates — and therefore the one with a wolfc `run` row:
@@ -513,7 +534,7 @@ native = "run"
 [tests."unicode/scalar_values_and_utf8_len.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 # ---- sc04: std.math (integers). The one family in this sprint that runs
 # on ALL THREE lanes — `int` arithmetic, module-qualified calls, no
@@ -729,32 +750,32 @@ native = "fail(E0301)"
 [tests."fmt/pad_and_align.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fmt/pad_fill_must_be_one_byte_trap.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fmt/int_bases.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fmt/sign_and_group.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fmt/parse_int_bases.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fmt/parse_int_overflow_trap.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fmt/parse_bool.lu"]
 lupin = "run"
@@ -779,32 +800,32 @@ native = "unsupported"
 [tests."hex/round_trip.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."hex/decode_misses.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."hex/encode_non_byte_trap.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."base64/round_trip.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."base64/strict_and_lenient.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."base64/url_variant.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 # std.json additionally carries an enum and a `Map`, either of which alone
 # would darken the compiler lanes (F-0012, F-0029) — the sprint contract
@@ -853,26 +874,26 @@ native = "unsupported"
 [tests."fs/text_round_trip.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fs/copy_and_move.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fs/fd_stream.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 # The pure path helpers would run on any lane with the `str` surface; they
 # ride this module's posture because a module is budgeted by its worst body.
 # lupin refuses them one step earlier than the fs tier — `ends_with` is not
 # in its `str` subset — which is the same `unsupported`, honestly reached.
 [tests."fs/path_helpers.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc08 pin bump (13b811f)
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 # The two row litmuses. A tag's IDENTITY is witnessed by propagating it out
 # of `main`, where the process outcome names it on stdout and exits 1: an
@@ -881,12 +902,12 @@ native = "unsupported"
 [tests."fs/not_found_row.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fs/forged_handle_io_row.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 # The staleness discipline, held as a REJECTION on both compiler lanes:
 # `close` consumes its `File` (X1 `take`), so a read afterwards is E1001.
@@ -902,14 +923,90 @@ native = "run"
 # writers are witnessed by the program finishing cleanly and by their bytes
 # NOT appearing in the hash. lupin refuses at `eprint_raw`.
 [tests."io/writers_and_streams.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc08 pin bump (13b811f)
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc08 pin bump (13b811f)
 
 # `conform-run` has no stdin injection, so standard input is empty and the
 # witnessable path is `eof` (F-0046 asks for the flag; the hit path is
 # proven in the compiler's own io tests).
 [tests."io/input_line_eof.lu"]
 lupin = "unsupported"
+wolfc = "run"
+native = "run"  # sc08 pin bump (13b811f)
+
+
+# ---- std.net: the s39 builtin tier, one lane deep (sc08) ----
+# The posture for the whole module, stated here and in CONTRIBUTING rather
+# than in eight file headers. The checked tier is the executing lane: it
+# opens REAL sockets on the loopback interface at port 0 (the comptime
+# sandbox is the one place the net builtins are refused, D33 — held as
+# `comptime_refuses.lu`). lupin has no `net_*` builtins by design, so its
+# column is an honest `unsupported` at resolve — with ONE exception that is
+# a property rather than an accident: lupin resolves module bodies lazily,
+# so `address_helpers.lu`, which calls only the two pure helpers, RUNS
+# there. The native rung refuses the tier with the construct named ("net
+# builtins in native lowering (checked lane only at s39)") and refuses the
+# whole module with it, the pure helpers included — the two rejection
+# witnesses are the exception, because neither ever reaches lowering.
+#
+# Every test binds `127.0.0.1:0` and learns its port through `net.port`:
+# no fixed ports, no foreign hosts, no name resolution, no external network
+# EVER. Every one of them dials BEFORE it accepts, because a blocking
+# accept with no peer coming has no deadline to rescue it (F-0049).
+
+[tests."net/echo_round_trip.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+[tests."net/stream_pieces.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+# The three row litmuses. A tag's IDENTITY rides out of `main` — the process
+# outcome names it on stdout and exits 1 — and that is still the ONLY witness
+# of one: the shape that was supposed to replace it (`else |e| match e { … }`)
+# parses and runs at this pin and matches its first arm for every tag, with no
+# diagnostic and against two lanes that get it right (F-0052). None of these
+# files contains a discriminating handler, on purpose.
+[tests."net/refused_row.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+[tests."net/closed_row.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+[tests."net/forged_handle_io_row.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+# The staleness discipline, held as a REJECTION on both compiler lanes:
+# `close` consumes its `Socket` (X1 `take`), so a write afterwards is E1001.
+# `run` here means "satisfies the directive", and the directive is
+# `fail(E1001)`.
+[tests."net/use_after_close.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# D33 held as a rejection: the capability is refused at comptime (E0701).
+# The refused call is the BUILTIN, because a `comptime fn` cannot call
+# across a module boundary at all at this pin (F-0051) — the file's header
+# explains why that is the honest witness.
+[tests."net/comptime_refuses.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# The two pure members: no host, no row, comptime-safe. lupin's lazy body
+# resolution is what gives this module a second executing lane.
+[tests."net/address_helpers.lu"]
+lupin = "run"
 wolfc = "run"
 native = "unsupported"
