@@ -37,6 +37,13 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0028 | 2026-08-12 | (sc04 Target 2) The pure-wolf transcendentals and the intrinsics request: 29 functions, measured ≤ 1 ulp except `cbrt` (2) and `powf` (3), bit-identical on BOTH executing lanes over 200 pinned values — plus the two asks, that the wolf source stay the semantic reference and that `sqrt` be re-derived from the hardware instruction rather than the other way round | wolf-lang s37 intrinsics / s41 llvm | [filed: wolf-lang#25](https://github.com/tenseleyFlow/wolf-lang/issues/25) |
 | F-0029 | 2026-08-12 | Cross-module enum consumption: an enum's VALUES cross a module boundary but nothing that inspects them does — variant patterns do not resolve against an imported enum (lupin), methods do not dispatch, and an enum-returning call is `unsupported` in the checked tier and has "no recorded type" natively. Blocks `sort_by`, `is_sorted_by`, `binary_search_by` — and the sorting STABILITY WITNESS, which is only observable through a comparator that ignores part of the value | wolf-lang #12's family + wolf-interp | [filed: wolf-lang#23](https://github.com/tenseleyFlow/wolf-lang/issues/23) |
 | F-0030 | 2026-08-12 | (sc04 Target 5) A range value has no bounds accessor under any spelling (`start`/`end`/`len`/`lo`/`hi`/`first`/`last` all "no member") and `range` does not resolve as a TYPE in wolfc (E0301, both rungs) — so `contains`, `len` and `clamp_to` are unwritable (only by iterating, which hangs on `0..2^63`) and `std.range` ships one function | wolf-lang s37 core types | [filed: wolf-lang#24](https://github.com/tenseleyFlow/wolf-lang/issues/24) |
+| F-0031 | 2026-08-13 | (sc05 Target 1) **The format spec means two different things**: `{x:>8}` pads under lupin and is IGNORED by wolfc, which parses the spec and prints the unpadded value — a stdout divergence with no diagnostic on either side; lupin additionally implements only `[[fill]align][width]`, refusing sign/zero-pad/precision/type as `unsupported`, and silently reads `{n:08}` as width 8 with a space fill | wolf-lang s38 (f-string lowering) + spec §7.4 owners | [filed: wolf-lang#10](https://github.com/tenseleyFlow/wolf-lang/issues/10) |
+| F-0032 | 2026-08-13 | lupin's `as` accepts an UNKNOWN target type silently: `s as int` and `s as nonsense` both pass the value through unchanged with no diagnostic, while `n as f64` converts correctly — a typo in a cast is invisible, and so is a cast the machine has no rule for | wolf-interp | [filed: wolf-interp#17](https://github.com/tenseleyFlow/wolf-interp/issues/17) |
+| F-0033 | 2026-08-13 | (sc05 Target 1) **spec §7.4 does not exist**: `FORMAT_SPEC` is in the grammar with its semantics an explicit IOU, so every question a formatter must answer is unanswered — what each spec means per builtin type, what a malformed or type-mismatched spec does, and how a USER type formats. Candidate section text filed with a running reference implementation (`std.fmt`, whose functions are the spec's worked examples) plus the **`Show` proposal** (`fmt(self, spec) -> str`) and the s38 dispatch hook it needs | wolf-lang spec owners + s38 | [filed: wolf-lang#28](https://github.com/tenseleyFlow/wolf-lang/issues/28) |
+| F-0034 | 2026-08-13 | The module namespace is FLAT at the last path segment: `std.fmt.float` cannot import `std.math.float` (lupin: "this import completes a cycle: `float` → `float`", E0303) and cannot be imported beside it (wolfc: E0306 — while lupin silently binds one of the two and drops the other). Two facades may never grow a same-named leaf, so §10's "the float family lives in its own module" pattern is unrepeatable; sc05's module is `std.fmt.decimal` because of it | wolf-lang resolve owners + wolf-interp | [filed: wolf-lang#29](https://github.com/tenseleyFlow/wolf-lang/issues/29) |
+| F-0035 | 2026-08-13 | (sc05 Targets 3-4) **The encoders have no byte type**: `std.bytes` is still 0/9 (F-0018 re-tested, unchanged), so `std.hex` and `std.base64` ship over `List[int]` with a documented 0..255 element contract — and `hex.encode(str)`, the commonest use of a hex encoder anywhere, cannot exist because nothing reads a `str`'s bytes. The same root blocks `json.parse`, `json.unescape`, `fmt.truncate_to`, and forces `json.escape`'s one refusal | wolf-lang s37 core types | [filed: wolf-lang#17](https://github.com/tenseleyFlow/wolf-lang/issues/17) (sc05 evidence on F-0018's issue) |
+| F-0036 | 2026-08-13 | **Silent wrong answer**: a row tag that shares a name with anything in the value namespace at the raise site resolves to that THING instead of raising — `-> int ! {tagmod}` inside module `tagmod` hands the caller the module value, `else` never fires and no diagnostic appears. Found three ways in one sprint (`std.hex` raising `hex`, `std.json`'s `kind` function versus its `kind` tag, and `std.fmt.decimal` nearly raising `range` beside `std.range`) | wolf-lang resolve + wolf-interp | [filed: wolf-lang#30](https://github.com/tenseleyFlow/wolf-lang/issues/30) |
+| F-0037 | 2026-08-13 | **Silent wrong answer**: a function whose return type is an ENUM and whose signature carries an error row takes the MISS path on every call — `fn id(v: Value) -> Value ! {none} { v }` raises instead of returning `v`, in one line, with no diagnostic. Blocks `json.get` and `json.at`, which were written, tested and withdrawn to reviewed contracts; until it closes, no std accessor may return an enum through a row | wolf-interp (row/enum value representation) | [filed: wolf-interp#16](https://github.com/tenseleyFlow/wolf-interp/issues/16) |
 
 ## F-0001 — the std search path
 
@@ -690,6 +697,163 @@ does not ship, so it did not. `clamp_to` has no spelling at all.
 function — the demonstration that the blocker is the accessor and not the
 iteration.
 
+## F-0031 / F-0033 — the format spec, and the section that defines it
+
+`wolf-lang#10` (re-measured) and `wolf-lang#28` (the amendment). sc05's
+acceptance requires the second; the first is what makes it urgent.
+
+The grammar has the hook — `INTERP ::= '{' expr FORMAT_SPEC? '}'` — and
+spec §7.4, named as the home of its semantics, does not exist. Each
+implementation therefore decided for itself, and they decided differently:
+
+| program | lupin 0.1.3 | wolfc 6bfff9a `--checked` |
+|---|---|---|
+| `"[{s:8}]"`, `s = "hi"` | `[hi      ]` | `[hi]` |
+| `"[{n:>6}]"`, `n = 42` | `[    42]` | `[42]` |
+| `"[{n:*>8}]"` | `[******42]` | `[42]` |
+| `"[{n:08}]"` | `[      42]` | `[42]` |
+| `"[{n:+}]"` | `unsupported` | `[42]` |
+| `"[{f:.2}]"` | `unsupported` | `[3.14159]` |
+| `"[{n:x}]"` | `unsupported` | `[42]` |
+
+Three separable facts. **wolfc parses the spec and silently ignores it** —
+two implementations printing different bytes for one program, which is the
+class the differential rig exists to catch, and neither is *wrong* because
+there is nothing to be wrong against. **lupin refuses honestly** outside
+`[[fill]align][width]`, which is the right posture for an unimplemented
+spec. And **`{n:08}` is wrong even under lupin's own semantics**: the
+zero-pad flag is absorbed into the width, so a reader who asked for
+`00000042` gets spaces.
+
+The amendment filed on #28 carries: the grammar
+(`[[fill] align] [sign] ['0'] [width] ['.' precision] [type]`), the meaning
+of each field per builtin type (width in BYTES per D25, default alignment
+left for `str`/`bool` and right for numbers, zero-pad after the sign,
+precision as a code-point-boundary-respecting maximum on `str`, `b`/`o`/
+`x`/`X`/`e`/`E`/`f` as the type set, and shortest-round-trip as the
+default float rendering), the posture that a malformed or type-mismatched
+spec is a COMPILE-TIME error at the interpolation's span (D22 quality —
+possible precisely because the grammar admits no computed spec), and the
+`Show` proposal: `fn fmt(self, spec: str) -> str`, with `"{v:spec}"`
+lowering to `Show.fmt(v, "spec")`, no fallback rendering for a type
+without an impl, and the dispatch hook named as s38's.
+
+The reference implementation is not a sketch: every meaning in the
+candidate text is a function in `std.fmt`/`std.fmt.decimal` with tests, so
+the spec's worked-example table and this repo's test table can be the same
+table. The one entry std cannot fill is `{s:.8}` — precision on a string —
+because truncating at a byte width needs F-0018's primitive.
+
+## F-0032 — `as` accepts an unknown target type (lupin)
+
+`wolf-interp#17`. The cast matrix landed and converts numerics correctly;
+what it does not do is resolve the target type. `s as int`, `s as bytes`
+and `s as nonsense` are all accepted and all no-ops — the last one names a
+type that exists nowhere, which rules out any "permissive conversion"
+reading. A typo in a cast is invisible. wolfc rejects an unknown type in
+cast position at resolve, so this is an interpreter-side divergence.
+
+## F-0034 — module identity is the last path segment
+
+`wolf-lang#29`. `std.fmt.float` — the obvious name for the float half of
+the formatting facade, following §10's `std.math`/`std.math.float` pattern
+— cannot exist beside `std.math.float`:
+
+- from inside it, `use std.math.float` is `E0303: this import completes a
+  cycle: float → float` (lupin);
+- from an entry, `use std.fmt.float` + `use std.math.float` is
+  `fail(E0306)` (wolfc) and, worse, RUNS under lupin with one of the two
+  silently dropped — the call resolved to whichever binding survived.
+
+D32 makes the tree the namespace; if the leaf is the identity, every
+facade competes for a flat pool of short nouns and `std.io.error` /
+`std.net.error` are already impossible. sc05 shipped `std.fmt.decimal`,
+which is a better name anyway — the module owns the decimal boundary — so
+nothing was lost this time. The filing asks for full-path identity and, if
+two same-leaf modules should be nameable in one file, a `use … as …` form,
+which the pinned grammar does not have.
+
+## F-0035 — the encoders have no byte type
+
+`wolf-lang#17` (sc05's evidence on F-0018's issue). Re-tested at these
+pins: `str.get`, `bytes()`, `chars()`, byte indexing and `for c in s` are
+all still absent, so `std.bytes` remains 0/9 and this sprint paid for it
+three more times.
+
+`std.json.parse` and `json.unescape` are contracts rather than code: a
+JSON reader must walk past code points of unknown length, and a `parse`
+that guesses offsets traps `bounds` on `{"name": "café"}`. `std.hex` and
+`std.base64` ship over `List[int]` with a documented 0..255 element
+contract, and `hex.encode(str)` — hex-encoding TEXT, the commonest use of
+the module anywhere — cannot be written at all. `std.fmt.truncate_to` is a
+contract for the same reason, and it is the one format-spec meaning std
+could not offer as a function.
+
+What the sprint proved on the other side is worth as much: sc03's
+inversion (probe the input with `starts_with` against an alphabet the
+library owns, advance only by a matched literal's length) carried
+`parse_int_base` over 36 radices, a correctly-rounded `parse_float`,
+`hex.decode`, all three base64 decoders and `json.escape`'s ASCII walk —
+every one TOTAL over arbitrary UTF-8. **Decoding a known alphabet is
+already safe; copying or skipping unknown text is what is impossible.**
+`json.escape` marks the line exactly: it returns `s` unchanged when nothing
+needs escaping (so `"café 🐺"` works) and walks ASCII-by-ASCII when
+something does, but it cannot step over a non-ASCII code point — so a
+string with a non-ASCII character followed by something needing an escape
+raises `boundary`. One primitive retires all of it.
+
+## F-0036 — a row tag that collides with a name in scope
+
+`wolf-lang#30`. Silent wrong answer, and the sprint found it three ways.
+
+```wolf
+pub fn miss(k: int) -> int ! {tagmod} {
+    if k < 0 {
+        return tagmod
+    }
+    k
+}
+```
+
+In module `tagmod`, `miss(-1) else -7` yields **the module value**, printed
+`tagmod`, bound to an `int`. The raise resolved its tag in the value
+namespace first, found the module (a module's own name is in scope inside
+it), and returned it. No diagnostic, and `else` never fires.
+
+The three collisions, each of which changed a shipped API: `std.hex.decode
+-> List[int] ! {hex}` (the tag the sprint contract specifies) became
+`! {parse}`; `std.json`'s `pub fn kind` versus its `kind` accessor tag —
+`as_int(json.null())` returned the FUNCTION as its `int` — so the function
+became `type_name`; and `std.fmt.decimal.parse_float`'s `range` tag, which
+would have collided with the `std.range` MODULE at any call site importing
+both, became `overflow`. The ask: resolve a bare identifier in raise
+position against the declared row first (the fix #4 made when nothing else
+was in scope), or diagnose the collision.
+
+## F-0037 — an enum through an error row is always a miss
+
+`wolf-interp#16`. Silent wrong answer, one line of body:
+
+```wolf
+pub fn id(v: W) -> W ! {none} {
+    v
+}
+```
+
+`id(mknum(3)) else mkobj()` takes the `else`. An enum returned with NO row
+is fine; a `List[W]` or `Map[str, W]` through a row is fine; an `int`
+through the same row is fine. It is specifically an enum value riding a
+row-typed return, and the likely mechanism is that a raise and an enum
+variant share a tagged representation.
+
+What it cost: `std.json.get` and `std.json.at` — written, tested, and
+WITHDRAWN to reviewed contracts in the module header, because every call
+missed including the hits. `std.json` navigates with `has` +
+`as_obj`/`as_arr` and the language's own indexing instead, which works and
+is uglier. The rule this repo now writes into its guide — "no std accessor
+returns an enum through a row" — is a rule about an interpreter bug and
+should not outlive the issue.
+
 ## Retirements at the sc04 pins
 
 Four findings this repo filed died with lupin 0.1.2, and one with wolfc
@@ -736,3 +900,45 @@ imported module containing an `enum` no longer makes every importer
 **F-0015** (the row raise inside a module) is unchanged in the checked
 tier and does not apply to the native rung, which is why every miss test
 in this sprint has a `run` in its native column.
+
+## Retirements at the sc05 pins
+
+Four findings died with lupin 0.1.3; each was retested with its original
+reproducer before being written off, and each has a comment on the
+upstream issue recording the downstream half.
+
+- **F-0021 (wolf-interp#10) RETIRED** — a method call on a slice-of-binding
+  receiver runs: `d[0..4].upper()` is `WOLF` where it was `unsupported` at
+  resolve. `std.str`'s bind-the-slice-first bodies are now merely verbose;
+  they stay until a sprint owns that module again.
+- **F-0022 (wolf-interp#11) RETIRED** — `n as f64` converts. sc04 had
+  reopened it with fresh evidence; the cast matrix in 0.1.3 fixes it.
+  Downstream: `parse_float`'s ten-branch `digit_f` table is deleted (the
+  function moved to `std.fmt.decimal` in the same sprint and now writes
+  `digit as f64`), and `std.fmt.decimal.estimate` uses the cast on a
+  17-digit significand where exactness matters. The cast's remaining hole
+  is F-0032.
+- **F-0023 (wolf-interp#12) RETIRED**, all three parts: a `!`-row parses in
+  parameter and `let` positions and RUNS (`fn or(v: int ! {none}, d: int)`
+  answers 42 and 7), lowercase bare tags resolve at a raise site, and raise
+  resolution is eager rather than lazy — the last being the part that made
+  sc02 certify a fix that had not happened.
+- **F-0003 RETIRED with it** — the `None`/`Parse`/`Overflow`/`DivZero`
+  interim spelling is no longer a language constraint on either
+  implementation. sc05's five new modules write the convention's lowercase
+  tags throughout; renaming sc01–sc04's CapCase tags is a mechanical
+  repo-wide commit that this sprint deliberately did not fold into its own
+  diff, and `std.str`'s header says so where the interim was documented.
+- **F-0002's remaining half FALLS with F-0023**: `std.option`'s six helpers
+  (`or`, `expect`, `flatten`, `to_list`, `exists`, `is_none`) are writable
+  for the first time, on the implementation that executes them. sc05 does
+  not own `std.option`; the module's reviewed signatures are already in its
+  header, so this is a landing job for whichever sprint takes it next, and
+  it is the last thing wolf-lang#3 was waiting on.
+
+Retested and still open: **F-0018** (the boundary primitive — see F-0035
+for the three new casualties), **F-0012** and **F-0015** (the checked
+tier's module-boundary ceilings, unchanged), **F-0026** (the two rungs
+refuse the same things at 6bfff9a as at d147a54 — the pin bump is
+pin hygiene, not capability), and **F-0029** (cross-module enum
+consumption, which is why `std.json`'s constructors are functions).

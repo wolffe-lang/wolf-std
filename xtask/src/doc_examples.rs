@@ -187,7 +187,40 @@ fn run_lane(
 const RELATIONS: &[&str] = &["==", "!=", "<=", ">=", "<", ">"];
 
 fn is_assertion(line: &str) -> bool {
-    RELATIONS.iter().any(|op| line.contains(op))
+    let bare = mask_strings(line);
+    RELATIONS.iter().any(|op| bare.contains(op))
+}
+
+/// The line with every string literal's CONTENTS blanked out, so that an
+/// operator inside a literal cannot decide the line's kind. sc05 found
+/// this the hard way: `let bad = base64.decode("T!==") else List[int]()`
+/// is a statement whose payload contains `!=`, and classifying it as an
+/// assertion wrapped a `let` in an `if` (E0201). Escapes are honoured so
+/// that a `\"` inside a literal does not end it early.
+fn mask_strings(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut in_string = false;
+    let mut escaped = false;
+    for c in line.chars() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                in_string = false;
+                out.push(c);
+                continue;
+            }
+            out.push(' ');
+        } else {
+            if c == '"' {
+                in_string = true;
+            }
+            out.push(c);
+        }
+    }
+    out
 }
 
 fn render_entry(b: &Block) -> String {
@@ -369,5 +402,31 @@ mod tests {
     fn unclosed_fence_is_an_error() {
         let src = "/// ```wolf-doc-example\n/// 1 == 1\nfn x() {}\n";
         assert!(scan_file("m", Path::new("f.lu"), src).is_err());
+    }
+}
+
+#[cfg(test)]
+mod classifier_tests {
+    use super::{is_assertion, mask_strings};
+
+    #[test]
+    fn a_relation_inside_a_string_literal_does_not_make_an_assertion() {
+        // sc05's base64 example: a STATEMENT whose payload carries `!=`.
+        let line = r#"let bad = base64.decode("T!==") else List[int]()"#;
+        assert!(!is_assertion(line));
+        // The real relation, outside any literal, still decides.
+        assert!(is_assertion(r#"base64.encode(b) == "TQ==""#));
+        assert!(is_assertion("fmt.to_str(3) == \"3\""));
+        assert!(is_assertion("math.int_max() > 0"));
+        assert!(!is_assertion("(mut xs).push(1)"));
+    }
+
+    #[test]
+    fn masking_keeps_structure_and_honours_escapes() {
+        assert_eq!(mask_strings(r#"f("a==b") == 1"#), r#"f("    ") == 1"#);
+        // An escaped quote does not end the literal early, so the `<`
+        // after it is still inside.
+        assert_eq!(mask_strings(r#"f("a\"<b")"#), r#"f("     ")"#);
+        assert_eq!(mask_strings("no strings here"), "no strings here");
     }
 }

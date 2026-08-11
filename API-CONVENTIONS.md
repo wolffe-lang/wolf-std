@@ -353,6 +353,76 @@ matching a builtin's set carries a test pinning the agreement member by
 member stands, and `tests/str/trim_whitespace_set.lu` remains the
 worked example until the tables land.
 
+## 11. Formatting, text↔number, and encodings (sc05)
+
+- **The format spec is a spelling; std owns the operations.** Every
+  meaning `{x:spec}` will carry exists here as a FUNCTION —
+  `fmt.pad_left`/`pad_right`/`center` (+ `_with` fill variants),
+  `with_sign`, the base family, `decimal.to_str_fixed`/`to_str_exp` — and
+  that is not a stopgap. A program that computes a column width, or pads a
+  value it received as data, needs the operation as a function whatever
+  the f-string can do; the lowering is the ergonomic surface over the same
+  semantics. The obligation the split creates: **the spec text and these
+  functions must agree clause for clause**, which is why §7.4's candidate
+  text was filed WITH this module as its reference implementation
+  (F-0031 / F-0033) rather than after it.
+- **Width is a BYTE count everywhere, and the doc says so.** `len` is
+  bytes (§9), so padding is bytes. Display width needs East Asian Width
+  and grapheme tables (the F-0019 budget question) and no core function
+  pretends to know it; when the tables land, the display-width family
+  arrives under its OWN name and `pad_left` keeps meaning bytes.
+- **Exact beats approximate at the number boundary, and it is testable.**
+  `std.fmt.decimal` rounds the EXACT value of a double (half-even) rather
+  than a float approximation of it, `to_str` emits the shortest digit
+  string that reads back as the same bits, and `parse_float` is correctly
+  rounded. §10's "accuracy is a documented, measured, per-function
+  contract" is satisfied here by there being no ulp budget to state: the
+  contract is exactness, and the round trip
+  (`to_bits(parse_float(to_str(x))) == to_bits(x)`) is a test over the
+  torture corpus rather than a claim. A formatter that cannot say that
+  about itself has not finished.
+- **One value, one text, both directions.** Every encoder ships beside its
+  decoder in the same module, the round-trip property is a test, and where
+  the text direction is canonical (`base64.decode`'s strict profile) the
+  module says which of the two round trips it promises and enforces the
+  canonicity that makes the second one true.
+- **Byte sequences are `List[int]` with a documented 0..255 element
+  contract — an interim, and marked as one.** `std.bytes` cannot be
+  written (F-0018/F-0035), and an encoder cannot wait for the type it
+  converts. Element-range violations trap `assert` (a caller contract, §2)
+  rather than encoding something the caller did not mean. Every signature
+  keeps its shape when `Bytes` lands.
+- **§2's inventory gains three tags**: **`base`** (a radix outside 2..36 —
+  the CALLER's mistake, distinct from `parse`'s bad DATA), **`deep`** (a
+  nesting limit reached, which a serializer raises instead of exhausting
+  the stack), and **`boundary`** (this pin cannot find the code-point
+  boundary an operation needs — an interim tag that disappears with
+  F-0018). `overflow` is reused from §10 unchanged, for a decimal that
+  rounds outside the finite range.
+- **A row tag may not share a name with anything else in scope**, and this
+  is a house rule only because the implementation makes it one: a
+  colliding tag resolves to the module, function or binding it collides
+  with and rides out as a VALUE, silently (F-0036). Three of this sprint's
+  tags were renamed for it (`hex`→`parse`, `range`→`overflow`, and
+  `std.json`'s `kind` function became `type_name` so the tag could keep
+  its name). Until the filing closes, every new tag gets grepped against
+  the module names in std and the item names in its own module.
+- **No std accessor returns an enum through an error row** — the same
+  shape is a silent wrong answer (F-0037), which is why `json.get`/`at`
+  ship as contracts. Return a total value, or a non-enum payload, or wait.
+- **Locale is never a parameter, in core, ever.** Grouping separators are
+  the caller's argument; digit-group size is fixed at three; no function
+  reads an environment.
+
+**§11 note (sc05) — the parse family is re-homed.** `parse_int` and
+`parse_float` moved from `std.str` to `std.fmt` / `std.fmt.decimal`: the
+module that PRINTS numbers owns the whole number↔text boundary, so the two
+directions can be read — and tested — as inverses. The general rule this
+sets, for the closeout to confirm: **a conversion belongs to the module
+that owns the target representation, not to the module that owns the
+source type.** `std.str` keeps the string operations and no longer carries
+a digit table.
+
 ## Review record
 
 - 2026-08-10 — drafted (sc00). Human review: **pending**; record the
@@ -374,3 +444,9 @@ worked example until the tables land.
   and the documented sorted-input precondition), plus the two closed
   rulings: the iterator combinator is `limit(n)` and unicode tables are
   std-carried committed source. Review rides the same pending sc00 gate.
+- 2026-08-13 — sc05 amendments: §11 Formatting, text↔number, and encodings
+  (the spec-is-a-spelling split with its agree-clause-for-clause
+  obligation, byte width, exactness at the number boundary, encoder/decoder
+  pairing, the `List[int]` byte interim, the `base`/`deep`/`boundary` tags,
+  the tag-name-collision and enum-through-a-row house rules, and the
+  re-home rule for conversions). Review rides the same pending sc00 gate.
