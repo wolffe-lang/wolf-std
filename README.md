@@ -1,5 +1,7 @@
 # wolf-std
 
+<img src="assets/wolf-logo.svg" alt="the wolf mark" width="120" align="right"/>
+
 The wolf standard library: the modules behind `use std.*`.
 
 Written in wolf, tested from day one under two independent
