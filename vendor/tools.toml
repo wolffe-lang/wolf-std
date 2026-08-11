@@ -11,23 +11,37 @@
 # nightly lane watches the drift, report-never-gate.
 
 [lupin]
-# 0.1.1 (sc02 bump): DPOR completeness fix, frozen-write trap, when-arity
-# code alignment. Its own conformance pin is unchanged — lupin 0.1.1 still
-# names cbde620 in `--version`, which is the lawful two-upstream drift the
-# header describes.
-version = "0.1.1"
-pin = "cbde62012f10bbdf63e4ec1e2ebeeed026973d23"
+# 0.1.2 (sc04 bump, tag v0.1.2): four of this repo's filings fixed at once
+# — bare-ident patterns dispatch as variant/tag patterns (wolf-interp#5,
+# F-0007), both false `ub(mem.ub)` shapes gone with the `drop_frame`
+# key repair (#7, F-0013), `let` reassignment rejects at resolve with
+# wolfc's exact E0410 (#8, F-0017), and `--std-root`/`LUPIN_STD` lands
+# (#6, F-0010) — which is what retired this rig's flat-mirror staging.
+# lupin names its own conformance pin a0c4564 in `--version`; the binaries
+# sitting at different wolf-lang pins is the lawful two-upstream drift the
+# header describes, and the nightly lane watches it.
+version = "0.1.2"
+pin = "a0c4564f246e46dd14d66f82e7d106059b9d076a"
 
 [wolf]
 version = "0.0.1"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver.
-# sc03 bump: trunk 12ae8c2 — the last green trunk CI run at sprint start,
-# and s27 complete: postfix rows in param/let positions (closes
-# wolf-lang#3), lowercase bare tags at raise sites (#4), List
-# mut-receiver + copy-read typing (#6), `str` ordering ruled
-# byte-lexicographic (#7, `[mem.str.order]`), the two-argument `assert`
-# intrinsic (#9), the iterator protocol with range-for (#8). Every one of
-# those closes a finding this repo filed. `cargo test --workspace` green
-# in the scratch clone at that sha before the bump.
-pin = "12ae8c2b602bc9fe2830d5d3672e2c6ce8731964"
+# sc04 bump: trunk d147a54 — the last green trunk CI run at sprint start,
+# and s28 complete: `wolf build` and `conform-run --native` compile, link
+# and EXECUTE (cranelift-object, the scalar core with checked/wrap/sat
+# arithmetic and traps surviving as `__wolf_rt_trap` calls), plus the
+# ubcheck repair that stops treating `assert`'s message as a second
+# condition — which closes F-0020 / wolf-lang#19, the two-argument
+# `assert` this repo could not use.
+#
+# THE SECOND GATE (F-0024's lesson, applied): "the last green trunk CI
+# run" is not sufficient by itself, so the pin is also verified by
+# `cargo test --workspace` in a clean scratch clone at the sha. It is
+# GREEN at d147a54 (96 test binaries), where 12ae8c2 was red — the gate
+# earns its keep on its first use.
+#
+# The native rung needs `libwolf_rt.a` beside the binary
+# (`cargo build -p wolf_rt` at the same sha, or `$WOLF_RT_LIB`); doctor
+# reports its absence and the lane goes dark rather than silent.
+pin = "d147a548fa114052fb070e5a7815acd0500fb3d9"
