@@ -37,6 +37,7 @@ cargo xtask ulp           # std.math.float's accuracy + bit-for-bit agreement
 cargo xtask doctor        # which binaries resolved; do they match the pins
 cargo xtask sync-pin      # vendor snapshot == upstream submodule at PIN
 cargo xtask ledger-check  # tests and ledger are 1:1
+cargo xtask std-test --lint-conventions   # the §13 test-authoring rules
 cargo xtask ci            # all of the above behind fmt/clippy/test
 ```
 
@@ -49,6 +50,11 @@ wolf-lang submodule (sparse `spec/` + `corpus/`), `vendor/upstream/` the
 CI-visible snapshot, `vendor/tools.toml` the binary pins. Surface
 conventions live in `API-CONVENTIONS.md`; language gaps become filed
 findings (`docs/findings.md`), never local inventions.
+
+Phase A closed with sc06: 253 public functions across 26 facade modules
+and 5 nursery residents, 127 ledgered tests, 211 executed doc examples,
+and 98 named-and-unbuilt functions whose blockers are filed upstream and
+counted by blocker in `docs/phase-a-census.md`.
 
 Sprint plan: the `std` track (`scNN`) in the wolf metarepo.
 Dual-licensed MIT or Apache-2.0.
