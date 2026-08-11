@@ -62,6 +62,116 @@ pub fn ledger_check() -> Result<(), String> {
     }
 }
 
+/// `cargo xtask std-test --lint-conventions` — the mechanical half of
+/// sc06's test-authoring conventions (API-CONVENTIONS §13), checked so
+/// that they are a gate rather than a wish.
+///
+/// Five rules, every one of them decidable from the directive block and
+/// the file's own code lines. What is NOT here is as deliberate: "happy
+/// paths group by theme" and "fixtures are shared" are judgements a lint
+/// would have to guess at, and a lint that guesses trains authors to
+/// work around it.
+pub fn lint_conventions() -> Result<(), String> {
+    let repo = repo_root();
+    let (tests, _) = load_tests_and_ledger(&repo)?;
+    let mut errors = Vec::new();
+    for t in &tests {
+        let path = repo.join("tests").join(t);
+        let src = std::fs::read_to_string(&path).map_err(|e| format!("tests/{t}: {e}"))?;
+        let d = directive::parse(&src, &format!("tests/{t}"))?;
+        d.validate_entry(&format!("tests/{t}"))?;
+        errors.extend(lint_one(t, &d, &src));
+    }
+    if errors.is_empty() {
+        println!(
+            "lint-conventions: {} test(s), all conforming (5 rules)",
+            tests.len()
+        );
+        Ok(())
+    } else {
+        Err(errors.join("\n"))
+    }
+}
+
+/// Helpers that never return normally — calling one is a trap, so a file
+/// that calls one is a trap expectation whatever its directive says.
+const TRAPPING_CALLS: &[&str] = &["testing.fail(", "testing.unreachable(", "testing.todo("];
+
+fn lint_one(rel: &str, d: &directive::Directive, src: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let check = d.check.clone().expect("validated");
+    let (is_trap, kind, stdout) = match &check {
+        Check::Run {
+            exit: ExitExpect::Trap(k),
+            stdout,
+        } => (true, k.clone(), stdout.clone()),
+        Check::Run { stdout, .. } => (false, None, stdout.clone()),
+        _ => (false, None, None),
+    };
+    // R1: a trap expectation names its KIND. `trap` alone would pass for
+    // a program that traps the wrong way, which is the failure a trap
+    // test exists to catch ([conf.trap.exit]).
+    if is_trap && kind.is_none() {
+        out.push(format!(
+            "tests/{rel}: `exit=trap` names no kind — write `exit=trap(<kind>)` (§13)"
+        ));
+    }
+    // R2: a trap expectation is its OWN entry file, and the file name
+    // says so. The rule a reader can see without opening the file.
+    let stem = rel
+        .rsplit('/')
+        .next()
+        .unwrap_or(rel)
+        .trim_end_matches(".lu");
+    let named_trap = stem.ends_with("_trap") || stem.ends_with("_traps");
+    if is_trap && !named_trap {
+        out.push(format!(
+            "tests/{rel}: expects a trap but is not named `…_trap.lu` — one trap ends the \
+             process, so the expectation gets its own file and its own name (§13)"
+        ));
+    }
+    if !is_trap && named_trap {
+        out.push(format!(
+            "tests/{rel}: named `…_trap.lu` but expects no trap — the name is a promise (§13)"
+        ));
+    }
+    // R3: trap records carry no stdout ([proto.record]), so a `stdout=`
+    // beside a trap expectation is a claim nothing checks.
+    if is_trap && stdout.is_some() {
+        out.push(format!(
+            "tests/{rel}: `stdout=` beside a trap expectation — a trap record carries no \
+             stdout, so the hash would never be compared (§13)"
+        ));
+    }
+    // R4: every test names what it conforms to; an unanchored test
+    // proves something about nothing.
+    if d.conforms.is_empty() {
+        out.push(format!(
+            "tests/{rel}: no `conforms:` line — name the anchors this test holds (§4)"
+        ));
+    }
+    // R5: `fail`/`unreachable`/`todo` never return, so a file that calls
+    // one and does not expect a trap is either mis-directed or dead after
+    // the call. Comment lines are not code.
+    if !is_trap {
+        for line in src.lines() {
+            let code = line.trim_start();
+            if code.starts_with("//") {
+                continue;
+            }
+            for call in TRAPPING_CALLS {
+                if code.contains(call) {
+                    out.push(format!(
+                        "tests/{rel}: calls `{call}…` but expects no trap — these never \
+                         return (§13); make it a `…_trap.lu` file"
+                    ));
+                }
+            }
+        }
+    }
+    out
+}
+
 fn load_tests_and_ledger(repo: &Path) -> Result<(Vec<String>, ledger::Ledger), String> {
     let ledger_path = repo.join("tests/ledger.toml");
     let text =

@@ -66,6 +66,11 @@ the pin bump that fixes it (`docs/findings.md`):
   language forms are the idiom and `std.option`'s module doc + tests
   are their worked home (F-0002). Lazy variants additionally wait on
   closures (c05); `Option[T]`/`Result[T, E]` as data wait on s16.
+  **RESOLVED at the sc06 pins** — rows parse and execute in parameter
+  position, all six are written, and four of them are in the facade
+  (`expect` and `flatten` sit in the nursery behind F-0040 and F-0039).
+  Both spellings above are retired: the tag is lowercase everywhere and
+  the helpers exist. Lazy variants and the data forms still wait.
 
 **§2 amendment (sc03) — the `parse` tag, and one interim retired the hard
 way.** The absence inventory gains one domain tag: **`parse`**, the mark a
@@ -423,6 +428,101 @@ that owns the target representation, not to the module that owns the
 source type.** `std.str` keeps the string operations and no longer carries
 a digit table.
 
+## 12. The error taxonomy (sc06) — and §2's interim, retired
+
+This section is the binding statement about what an error row CARRIES;
+§2 remains the binding statement about when a row is used at all.
+`docs/error-taxonomy.md` is the audit behind it — every row shipped in
+sc01–sc05, its sites, and its verdict — and `std.errors` is its worked
+home, as `std.option` is §2's.
+
+- **Marks are lowercase, payload-carrying tags are CapCase.** A mark is a
+  payload-free tag naming a failure mode: `none`, `gone`, `eof`, `done`,
+  `parse`, `base`, `utf8`, `overflow`, `div_zero`, `deep`, `boundary`. A
+  payload-carrying tag is CapCase and names its payload TYPE:
+  `Parse(ParseErr)`. The case is the reader's signal about whether there
+  is anything to destructure.
+- **§2's spelling interim is RETIRED and the rename is applied.** std
+  wrote `None`/`Done`/`Overflow`/`DivZero` from sc01 to sc05 because no
+  implementation resolved a lowercase bare tag at a raise site (F-0003,
+  whose ownership flipped implementations twice before dying at the sc05
+  pins). Every occurrence — 148 across 32 files — is lowercase as of
+  sc06, at zero cost to the ledger: no row moved.
+- **A payload is DATA, never a rendered string.** `ParseErr {offset,
+  kind}` is the pattern: where it failed, and which way. A payload that
+  carried a sentence would force every caller to accept this library's
+  wording and would make the position unrecoverable. Rendering is
+  `describe`'s job and lives beside the type.
+- **One tag per failure mode the caller can ACT on** — not one per call
+  site, not one per internal cause. `hex.decode` raising a single `parse`
+  for "odd length" and "bad digit" is right while no caller branches on
+  the difference; the day one does, the tag gains a payload rather than a
+  sibling.
+- **Absence is not an error.** `none` never carries a payload and never
+  joins a cause vocabulary. "There is nothing here" and "this went wrong"
+  are answered by different tags on purpose (§2).
+- **Coarsening is a named call the caller writes.**
+  `errors.coarsen(e)` turns a `ParseErr` into a `Failure`; no std
+  signature widens a row silently, and there is no `From` conversion to
+  make it implicit (D30). The precision given up is the ability to branch
+  on the kind, and giving it up should be visible in the caller's source.
+- **The chain idiom is a FIELD.** wolf has no existentials and no
+  boxing, so a wrapping error carries its cause as a field of its own
+  payload (`Failure.cause`), not as a hidden box. A wrapper that needs
+  more context grows another field.
+- **Kinds are `int` until enums cross a module boundary.** An enum's
+  values cross, but nothing that inspects them does (F-0029), so a
+  payload's classifier is an `int` from a table its module documents.
+  This is a recorded interim with a named exit, not a house style.
+- **`errdefer` is the error-path cleanup form**, and Phase A ships none:
+  no core function owns a resource that outlives a failure. The
+  convention is recorded here so the io tier inherits it rather than
+  inventing it — `errdefer` releases what the function acquired, `defer`
+  releases what it borrowed, and neither ever changes the row.
+- **A tag may not share a name with anything else in scope at the raise
+  site** (§11's rule, restated because it is the sharpest edge in the
+  area): the tag resolves to that thing and rides out as a value with no
+  diagnostic (F-0036). Grep std's module list and your own module's items
+  before naming a tag.
+
+## 13. Test-authoring conventions (sc06) — binding for every sc sprint
+
+`std.testing`'s module header carries the same list; this is its
+normative home, and `cargo xtask std-test --lint-conventions` enforces
+the five rules that can be decided mechanically. The rest are judgement,
+and a lint that guessed at them would train authors to work around it.
+
+- **A trap ends the process, so the RIG is the catch mechanism.** There
+  is no in-language trap catching and there will not be (D30, no
+  unwinding). A trap expectation is a directive — `check:
+  run(exit=trap(kind))` — never a `catch`.
+- **Happy-path assertions group into one entry file per theme**; grouping
+  is safe only because a satisfied assertion is silent and effect-free.
+- **Every trap expectation is its own entry file, named `…_trap.lu`**
+  (`…_traps.lu` for a file whose one program can trap in several ways).
+  The name is a promise, and the lint checks it both ways: a trap file
+  that is not named so, and a `…_trap.lu` that expects no trap, are both
+  errors.
+- **A trap expectation names its KIND.** Bare `exit=trap` would pass for
+  a program that trapped the wrong way, which is the failure the test
+  exists to catch (`[conf.trap.exit]`).
+- **No `stdout=` beside a trap expectation**: a trap record carries no
+  stdout, so the hash would never be compared.
+- **`testing.fail`/`unreachable`/`todo` appear only in trap files.** They
+  never return, so a call in a file that expects `exit=0` is either a
+  mis-directed test or dead code after the call.
+- **Error-row expectations assert through `else |Tag(p)|` — tag AND
+  payload.** The binding in `else |e|` is the TAG (`e.offset` is "error
+  Parse has no member `offset`"), so a test that wants the payload
+  destructures it in the pattern. `tests/errors/coarsen_and_chain.lu` is
+  the worked example.
+- **Table tests are a `List` of tuples plus a loop** until closures land
+  (c05); the loop body is one indexing site, per the container rules.
+- **Golden output rides the directive's `stdout=` hash**, and fixtures
+  are shared rather than inlined twice.
+- **Every test names its anchors** with `conforms:` (§4), and the doc
+  examples are tests too: fenced means executable, always.
+
 ## Review record
 
 - 2026-08-10 — drafted (sc00). Human review: **pending**; record the
@@ -444,6 +544,17 @@ a digit table.
   and the documented sorted-input precondition), plus the two closed
   rulings: the iterator combinator is `limit(n)` and unicode tables are
   std-carried committed source. Review rides the same pending sc00 gate.
+- 2026-08-13 — sc06 amendments (the campaign's last): §12 The error
+  taxonomy — mark-versus-payload casing, payloads as data, one tag per
+  actionable failure mode, absence-is-not-an-error, coarsening as a named
+  call, the chain-as-a-field idiom, int kinds as a recorded interim, the
+  `errdefer` convention Phase A records without using, and §2's
+  `None`-spelling interim retired with the rename applied tree-wide —
+  and §13 Test-authoring conventions, five of whose rules are enforced by
+  `cargo xtask std-test --lint-conventions`. Review rides the same
+  pending sc00 gate. **§2's helper inventory is no longer blocked**:
+  `std.option`'s six are written and executing (four in the facade, two
+  in the nursery behind F-0039/F-0040).
 - 2026-08-13 — sc05 amendments: §11 Formatting, text↔number, and encodings
   (the spec-is-a-spelling split with its agree-clause-for-clause
   obligation, byte width, exactness at the number boundary, encoder/decoder

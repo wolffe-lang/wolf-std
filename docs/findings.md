@@ -44,6 +44,11 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0035 | 2026-08-13 | (sc05 Targets 3-4) **The encoders have no byte type**: `std.bytes` is still 0/9 (F-0018 re-tested, unchanged), so `std.hex` and `std.base64` ship over `List[int]` with a documented 0..255 element contract — and `hex.encode(str)`, the commonest use of a hex encoder anywhere, cannot exist because nothing reads a `str`'s bytes. The same root blocks `json.parse`, `json.unescape`, `fmt.truncate_to`, and forces `json.escape`'s one refusal | wolf-lang s37 core types | [filed: wolf-lang#17](https://github.com/tenseleyFlow/wolf-lang/issues/17) (sc05 evidence on F-0018's issue) |
 | F-0036 | 2026-08-13 | **Silent wrong answer**: a row tag that shares a name with anything in the value namespace at the raise site resolves to that THING instead of raising — `-> int ! {tagmod}` inside module `tagmod` hands the caller the module value, `else` never fires and no diagnostic appears. Found three ways in one sprint (`std.hex` raising `hex`, `std.json`'s `kind` function versus its `kind` tag, and `std.fmt.decimal` nearly raising `range` beside `std.range`) | wolf-lang resolve + wolf-interp | [filed: wolf-lang#30](https://github.com/tenseleyFlow/wolf-lang/issues/30) |
 | F-0037 | 2026-08-13 | **Silent wrong answer**: a function whose return type is an ENUM and whose signature carries an error row takes the MISS path on every call — `fn id(v: Value) -> Value ! {none} { v }` raises instead of returning `v`, in one line, with no diagnostic. Blocks `json.get` and `json.at`, which were written, tested and withdrawn to reviewed contracts; until it closes, no std accessor may return an enum through a row | wolf-interp (row/enum value representation) | [filed: wolf-interp#16](https://github.com/tenseleyFlow/wolf-interp/issues/16) |
+| F-0038 | 2026-08-13 | **Absence has no literal**: a row VALUE cannot be written as an expression — `none` resolves at a raise site and nowhere else, so `f(none)` is `unsupported` — which means no doc example can call a row-taking function and `std.option`'s six ship with prose examples instead of fenced ones | wolf-lang s15/resolve owners + wolf-interp | [filed: wolf-lang#38](https://github.com/tenseleyFlow/wolf-lang/issues/38) |
+| F-0039 | 2026-08-13 | **Nested rows diverge**: `T ! {none} ! {none}` parses and EXECUTES in lupin and is `fail(E0201)` at parse in wolfc, in both return and parameter position — the grammar's `type` production admits one `!`. `std.option.flatten` is the only helper whose type needs two, so it ships from the nursery to keep the module's other four out of a rejection | wolf-lang s03 grammar + s37 | [filed: wolf-lang#34](https://github.com/tenseleyFlow/wolf-lang/issues/34) |
+| F-0040 | 2026-08-13 | **No bottom type**: a diverging `else` handler cannot typecheck generically — wolfc types an `else \|_\| { … }` block by its last expression, `assert(false)` is `()`, and the block must produce `T` (E0401). A monomorphic helper writes an unreachable dummy; a generic one has no `T` to conjure, so `std.option.expect` ships from the nursery. lupin accepts and runs it | wolf-lang s14 typecheck + spec (D30's no-unwinding makes divergence ordinary) | [filed: wolf-lang#35](https://github.com/tenseleyFlow/wolf-lang/issues/35) |
+| F-0041 | 2026-08-13 | (sc06 Target 2) **The error-set alias surface** — s15's parked amendment, filed with the measured cost: 49 `pub` signatures carry a row across 16 modules, 11 distinct shapes, 45 of them one tag and 4 of them two, and NOTHING exceeds two. Core does not need aliases yet and the filing says so; what it argues is the semantics (`error Set Name = {…}` as a transparent name, never nominal — from D30) and the io taxonomy that makes it urgent in stdc02, plus the `try`⇄Result bridge's standing dependency on s16 | wolf-lang s03 grammar + s37 (std error taxonomy owners) | [filed: wolf-lang#36](https://github.com/tenseleyFlow/wolf-lang/issues/36) |
+| F-0042 | 2026-08-13 | (sc06 Target 6) **`wolf test` must subsume this rig without rewrites** — the s39 alignment requirements, with the rig as the working reference: directive-header compatibility (`check:`/`phase:`/`conforms:` verbatim), one trap expectation per entry file as the catch mechanism, subtest naming (Go 12166), a `--json` record stream (Go 2981), the three-lane ledger as a first-class concept, and the D36 bench-format reservation so `std.bench` can land in stdc02+ without a format war | wolf-lang s39 (+ D36 owners) | [filed: wolf-lang#34](https://github.com/tenseleyFlow/wolf-lang/issues/34) |
 
 ## F-0001 — the std search path
 
@@ -942,3 +947,186 @@ tier's module-boundary ceilings, unchanged), **F-0026** (the two rungs
 refuse the same things at 6bfff9a as at d147a54 — the pin bump is
 pin hygiene, not capability), and **F-0029** (cross-module enum
 consumption, which is why `std.json`'s constructors are functions).
+
+## F-0038 — absence has no literal
+
+`wolf-lang#38`. A parameter can have a row type at these pins; no
+expression can produce a value of one. `or(none, 9)` is
+`unsupported: none does not resolve` in lupin, because `none` resolves at
+a raise site and nowhere else, while `or(7, 9)` works — the hit side has
+a literal and the miss side does not.
+
+The cost is not aesthetic. §4's doc-example format is "every line is a
+boolean expression or a statement over the documented module, extracted
+into an entry file and RUN", and the one-module rule (sc02) forbids
+importing a sibling. A function that takes a row therefore cannot have a
+fenced example at all: there is no expression to pass it and no way to
+bring a producer. All six of `std.option`'s helpers — the module whose
+whole subject is absence — carry prose examples, with the runnable
+evidence in `tests/option/` and `tests/x/option_*/`: one entry file per
+helper, each with a local `find_positive`-style producer and both a hit
+and a miss.
+
+The ask offers two closes: a literal for a bare mark in value position
+where the expected type admits it (the same declared-row-first rule
+wolf-lang#4 applied one position wider), or a spec ruling that rows are
+producer-only, so downstream doc tooling stops trying.
+
+## F-0039 — nested rows diverge
+
+`wolf-lang#34`. `T ! {none} ! {none}` parses and executes in lupin 0.1.4
+and is `fail(E0201)` at PARSE in wolfc `29a9d9c`, in return position
+("expected `{` or line end after the function header") and in parameter
+position ("expected `,` or `)` in the parameter list") alike. A single
+row in parameter position is fine on both sides at these pins, so this is
+specifically nesting: the `type` production admits one `!`.
+
+One consequence worth naming, because D34 makes it a process problem:
+**`wolf fmt` cannot format a file with a nested row.** It warns
+`W0301: this file has syntax errors, so it was only partially formatted`
+and leaves the region byte-for-byte untouched — correct behaviour, and it
+means the two files carrying this shape are outside the formatter until
+the grammar catches up.
+
+`std.option.flatten` is the only one of the six helpers whose type needs
+two, and it ships from `std/x/option_flatten` for the reason the nursery
+exists: one rejected body poisons a module for every importer, and
+keeping it in the facade moved `or`, `to_list`, `exists` and `is_none`
+from `unsupported` (an honest refusal after a clean ladder) to
+`fail(E0201)`. `tests/x/option_flatten/flatten_propagate.lu` holds the
+rejection as a ledger row — `run` / `fail(E0201)` / `fail(E0201)` — so
+the divergence cannot rot quietly.
+
+## F-0040 — no bottom type
+
+`wolf-lang#35`. A diverging handler cannot typecheck in a generic
+function. wolfc types an `else |_| { … }` block by its last expression;
+`assert(false)` is `()`; the block must produce `T`:
+`error[E0401]: this is (), but the else fallback must produce T`. lupin
+accepts it and runs it.
+
+The rule is right for an ordinary block. What is missing is a type that
+says "this does not come back". A monomorphic helper works around it with
+an unreachable dummy after the trap; a generic one has no `T` to conjure,
+which is precisely what a bottom type is for — and D30 makes divergence
+ORDINARY in wolf (no unwinding, traps end the process,
+`fail`/`unreachable`/`todo` are the standard vocabulary for a branch that
+is a bug), so this shape is one library code reaches for constantly.
+
+`std.option.expect` ships from `std/x/option_expect` because of it, with
+`tests/x/option_expect/expect_trap.lu` ledgered `run` / `fail(E0401)` /
+`fail(E0401)`. The filing asks for a `never` type first (which would also
+give `testing.fail` an honest signature) and a block-level divergence
+rule as the cheaper alternative.
+
+## F-0041 — the error-set alias surface (sc06 Target 2)
+
+`wolf-lang#36`. s15 parked the amendment pending "s37 with the std error
+taxonomy"; the taxonomy exists now (§12 + `docs/error-taxonomy.md`), so
+the amendment is filed with the measurement it was waiting for — and the
+measurement argues against urgency, which is why the filing says so.
+
+49 `pub` signatures carry a row across 16 modules; 11 distinct shapes; 45
+carry one tag, 4 carry two, and **nothing carries three**. Repeating
+`{none}` 23 times costs nothing an alias would save: a one-tag row is its
+own name. What the numbers show is a family beginning — `parse` already
+pairs with `overflow` and with `base` — and what makes the feature urgent
+is the io tier one campaign away, where `{not_found, permission, io,
+utf8}` repeats across a module and then composes with `{parse}` at every
+caller.
+
+The semantics asked for: `error Set Name = {…}` at module scope,
+**transparent and never nominal** (argued from D30 — rows are structural,
+`?` propagates by width subtyping, and a nominal set would create two
+ways to be the same type and a conversion between them), composable by
+union, expanded in diagnostics so the missing-tag message still names
+TAGS, and forbidden from introducing tags that do not exist
+independently. Recorded with it: the `try`⇄`Result` bridge still waits on
+s16, and std's position is unchanged — exactly one of reified rows or
+`Result[T, E]` as data, and with rows now executing in parameter position
+the row half is the one carrying weight.
+
+## F-0042 — the s39 alignment requirements (sc06 Target 6)
+
+`wolf-lang#37`. `wolf test` must subsume this rig without a rewrite, and
+the rig is offered as its working reference: 127 tests, 211 doc examples,
+three lanes. Seven requirements, each with the reason it is not
+negotiable rather than a preference:
+
+1. **Directive headers verbatim** (`check:`/`phase:`/`conforms:`) — the
+   same files are conform-run inputs; extra keys must be additive.
+2. **One trap expectation per entry file**, because D30 makes a trap end
+   the process — this is a scheduling constraint on `wolf test`, not a
+   style rule.
+3. **Kinds, never exit numbers** (`[conf.trap.exit]`).
+4. **Subtest naming** (Go 12166), before closures make table tests
+   idiomatic and unnamed rows become the norm.
+5. **A `--json` record stream** (Go 2981) reusing `conform-run`'s record
+   protocol rather than inventing a second format.
+6. **Per-implementation expectations as a first-class concept** — the
+   ledger, where a test that passes DEEPER than its row is a CI failure.
+   It has no analogue in Go or Rust and it is the most valuable thing
+   this rig does.
+7. **The bench format reserved** (D36 / Go 14313) so `std.bench` can land
+   in stdc02+ without a format war.
+
+What the rig does when s39 lands: delete the runner, keep the ledger, the
+doc-example extractor and the convention lint.
+
+## Retirements and movements at the sc06 pins
+
+The pin bump is wolfc `6bfff9a` → trunk `29a9d9c` (both gates green in a
+clean scratch clone: `cargo test --workspace` and `cargo run -p xtask --
+ci`, "all steps green") and lupin 0.1.3 → 0.1.4 (tag `v0.1.4`, its own
+conformance pin `ad6cef7` — the lawful two-upstream drift). Every claim
+below was re-measured at the new pins.
+
+- **F-0002 RETIRED, and the retirement is a landing.** The six
+  `std.option` helpers are written, tested and executing: `or`,
+  `to_list`, `exists`, `is_none` in the facade, `expect` and `flatten` in
+  the nursery behind F-0040 and F-0039. This is the finding this repo
+  filed first and it took five sprints and three pin bumps to die.
+- **F-0003's rename EXECUTED.** The finding retired at the sc05 pins; the
+  tree still said `None`/`Done`/`Overflow`/`DivZero`. All 148 occurrences
+  across 32 files are lowercase now, and the rig is byte-identical either
+  side of the change: 127 tests, 211 doc examples, no row moved. The
+  audit is `docs/error-taxonomy.md`.
+- **F-0020's INTERIM retired** (the finding itself died at sc04).
+  `assert(cond, msg)` is silent when the condition holds on both
+  implementations at these pins, so `if !cond { testing.fail(msg) }` is
+  no longer required. `tests/testing/assert_msg_holds.lu` and
+  `assert_msg_trap.lu` are what keep the interim from returning by habit;
+  existing tests were not churned to change their spelling.
+- **F-0025 two-thirds RETIRED** (lupin #14). `INT_MIN` is writable in
+  every annotated spelling (`let a: int = -9223372036854775808` and
+  `0 - 9223372036854775807 - 1` both give -2^63) and a cross-module
+  `-> int` call types its own operator (`math.int_max() - 1` is
+  9223372036854775806 where it used to trap). What remains is
+  deliberate: `var k = 0` is still `i32` — the rule wolfc implements,
+  now documented rather than a bug — so std keeps annotating every
+  accumulator. `std.math`'s constants-as-functions stay: their other
+  half is F-0026, which is unmoved.
+- **E1007 is STATIC in lupin now** (#15): a call that omits `mut` where
+  the signature demands it was a silent wrong answer and is a resolve
+  rejection at this pin, matching wolfc's code and span. Nothing in std
+  moved — the X1-correct spelling has been the only one written here
+  since sc03 — but the class of bug it prevents is the one this repo
+  spent sc02 working around.
+- **`copy` EXISTS, in both implementations.** The fix-it that sc01 and
+  sc02 recorded as "a `copy` operator that is not in the pinned grammar"
+  is real: `for x in copy xs` then `xs.len` runs to `exit(0)` under lupin
+  and wolfc's checked tier. std's bodies are not rewritten around it in
+  this sprint (they read lengths before iterating, which needs no
+  syntax), but the workaround note in `std.list`'s header is now history
+  rather than law.
+- **The native lane advanced by five rows.** `print` lowers to
+  per-segment runtime writes at this pin, so `prelude/prelude_smoke.lu`
+  runs natively where it was `unsupported`; the four old `option/*`
+  idiom tests ran natively too, and were then rewritten to call the
+  landed helpers, which returns them to `unsupported` (generic + row).
+  The lane's refusals otherwise stand exactly as F-0026 maps them.
+- **Retested and still open**: F-0004 (no trait dispatch anywhere — the
+  reason seven of `std.testing`'s thirteen are freight), F-0012 and
+  F-0015 (the checked tier's module-boundary ceilings), F-0018 (the
+  boundary primitive, whose resolve-level half is what put
+  `assert_starts_with` in the nursery), F-0026, F-0029, F-0036, F-0037.

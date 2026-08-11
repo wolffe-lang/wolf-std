@@ -36,6 +36,13 @@ pub fn repo_root() -> PathBuf {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
+        // `std-test --lint-conventions` (sc06) checks the test-authoring
+        // conventions of API-CONVENTIONS §13 without running anything —
+        // it reads directives and source text only, so it is instant and
+        // is a `ci` step in its own right.
+        Some("std-test") if args.iter().any(|a| a == "--lint-conventions") => {
+            runner::lint_conventions()
+        }
         Some("std-test") => runner::std_test(),
         Some("doc-examples") => doc_examples::doc_examples(),
         Some("ulp") => ulp::ulp(),
@@ -46,7 +53,8 @@ fn main() {
         other => {
             eprintln!(
                 "usage: cargo xtask \
-                 <std-test|doc-examples|ulp|ledger-check|doctor|sync-pin|ci>{}",
+                 <std-test [--lint-conventions]|doc-examples|ulp|ledger-check\
+                 |doctor|sync-pin|ci>{}",
                 other.map(|o| format!(" (got `{o}`)")).unwrap_or_default()
             );
             std::process::exit(2);
@@ -102,6 +110,8 @@ fn ci() -> Result<(), String> {
     doctor::doctor()?;
     banner("ledger-check");
     runner::ledger_check()?;
+    banner("lint-conventions");
+    runner::lint_conventions()?;
     banner("std-test");
     runner::std_test()?;
     banner("doc-examples");
