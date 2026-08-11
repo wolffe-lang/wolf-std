@@ -98,9 +98,9 @@ pub fn push_str(mut b: StrBuf, s: str) {
 /// Traps `bounds` (`[conf.trap.set]`) when `off` is out of range or falls
 /// inside a code point — the language's own checked slicing (D25), raised
 /// exactly where a caller would see it. That is the "checked boundary" the
-/// contract asks for; the recoverable form waits on the recoverable slice
-/// `str.get` (F-0018), because nothing at this pin can test an offset for
-/// being a boundary without slicing at it.
+/// contract asks for; the recoverable form — an `insert` that raises
+/// rather than traps — is writable over `str.get` as of s37 (sc09) and is
+/// a `std.strbuf` sprint's to add, under its own name, beside this one.
 ///
 /// ```wolf-doc-example
 /// var b = strbuf.new()

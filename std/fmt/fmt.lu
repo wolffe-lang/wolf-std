@@ -55,13 +55,16 @@
 //!   is `int_min()` instead of an overflow trap. Positive `int_min()` has
 //!   no value to be, and still traps.
 //!
-//! **One function here is a contract and not code.** `truncate_to` cannot
-//! be written at this pin for the same single reason fifteen `std.str`
-//! functions cannot: cutting a string at a byte offset requires knowing
-//! that the offset is a code-point boundary, the only way to ask is to
-//! slice there, and slicing at a non-boundary traps uncatchably (D30,
-//! F-0018). A truncation that is right on ASCII and fatal on `"héllo"`
-//! does not ship (§9's refusal-over-approximation rule).
+//! **One function here is a contract and not code, and its blocker is
+//! gone.** `truncate_to` could not be written for the reason fifteen
+//! `std.str` functions could not: cutting a string at a byte offset
+//! requires knowing the offset is a code-point boundary, the only way to
+//! ask was to slice there, and slicing at a non-boundary traps uncatchably
+//! (D30, F-0018). s37's `str.get` answers that question with a row, and
+//! `std.str` spends it in full as of sc09 — so `truncate_to` is now three
+//! lines over `str.get` (walk down from `width` until the range is
+//! accepted) and is UNWRITTEN rather than unwritable. It waits for a
+//! `std.fmt` sprint; the contract below is unchanged.
 //!
 //! ```text
 //! truncate_to(s: str, width: int) -> str
@@ -69,8 +72,8 @@
 //!     ends on a code-point boundary; `s` itself when it already fits.
 //!     Total: never traps, never splits a code point, and never appends
 //!     an ellipsis (that is the caller's to add, and its width is the
-//!     caller's to subtract). Blocked on any one of F-0018's three
-//!     primitives — `str.get`, a byte accessor, or `chars()`.
+//!     caller's to subtract). Writable at these pins over `str.get`
+//!     (sc09); scheduled, not blocked.
 //! ```
 //!
 //! Float printing and parsing live in `std.fmt.float`: wolf has no

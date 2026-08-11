@@ -1,0 +1,48 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: mem.str.get, std.str, str.slice
+//!
+//! `str.get` — the boundary primitive, from the caller's side. This is the
+//! file that proves the five-sprint blocker is gone: every offset a caller
+//! can name gets an ANSWER, and the three ways a range can be wrong (out of
+//! order, out of range, inside a code point) are one honest `none` rather
+//! than the uncatchable `bounds` trap `s[a..b]` raises for the same input.
+//!
+//! The fixture is "héllo" throughout — h at 0, é at 1..3, then l, l, o — so
+//! offset 2 is the interior byte of a two-byte code point and offset 3 is
+//! the boundary after it. `tests/str/slice_split_codepoint_traps.lu` is the
+//! same offset through the LANGUAGE's slice, where it faults; the pair is
+//! the whole D25 story in two files.
+
+use std.str
+
+fn main() -> !int {
+    if (str.get("héllo", 0, 1) else "?") == "h" {} else { return 1 }
+    if (str.get("héllo", 0, 3) else "?") == "hé" {} else { return 2 }
+    if (str.get("héllo", 1, 3) else "?") == "é" {} else { return 3 }
+    if (str.get("héllo", 3, 6) else "?") == "llo" {} else { return 4 }
+    if (str.get("héllo", 0, 6) else "?") == "héllo" {} else { return 5 }
+    // The empty range at every legal boundary is the empty string, not a
+    // miss: zero bytes starting at a boundary is a slice.
+    if (str.get("héllo", 0, 0) else "?") == "" {} else { return 6 }
+    if (str.get("héllo", 3, 3) else "?") == "" {} else { return 7 }
+    if (str.get("héllo", 6, 6) else "?") == "" {} else { return 8 }
+    // Inside the code point, from either side.
+    if (str.get("héllo", 0, 2) else "?") == "?" {} else { return 9 }
+    if (str.get("héllo", 2, 3) else "?") == "?" {} else { return 10 }
+    if (str.get("héllo", 2, 2) else "?") == "?" {} else { return 11 }
+    // Out of range, out of order, negative.
+    if (str.get("héllo", 0, 7) else "?") == "?" {} else { return 12 }
+    if (str.get("héllo", 7, 7) else "?") == "?" {} else { return 13 }
+    if (str.get("héllo", 4, 1) else "?") == "?" {} else { return 14 }
+    if (str.get("héllo", 0 - 1, 3) else "?") == "?" {} else { return 15 }
+    // Four-byte code points behave the same way: only 0 and 4 are
+    // boundaries of a lone wolf.
+    if (str.get("🐺", 0, 4) else "?") == "🐺" {} else { return 16 }
+    if (str.get("🐺", 0, 1) else "?") == "?" {} else { return 17 }
+    if (str.get("🐺", 0, 2) else "?") == "?" {} else { return 18 }
+    if (str.get("🐺", 0, 3) else "?") == "?" {} else { return 19 }
+    if (str.get("", 0, 0) else "?") == "" {} else { return 20 }
+    if (str.get("", 0, 1) else "?") == "?" {} else { return 21 }
+    0
+}

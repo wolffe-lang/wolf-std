@@ -1010,3 +1010,97 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "unsupported"
+
+# ---- sc09: std.str's census flip and std.bytes' first code ----
+# Sixteen new rows and every one of them is `run` on ALL THREE LANES — the
+# first time a sprint has landed a clean three-lane block, and the reason is
+# the whole sprint: the s37 `str` set (`get`, `find`, `rfind`, `split`,
+# `count`, `ends_with`, `strip_suffix`, `replace`, `bytes`) executes on
+# every rung, so the twelve census-blocked `std.str` functions and the eight
+# writable `std.bytes` ones are monomorphic code over builtins that no lane
+# refuses. No generics, no `Map`, no `const`, no trait/enum/impl, no
+# capability — the four things that darken a column are simply absent here.
+
+[tests."str/boundary_get.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."str/search_family.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."str/split_family.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."str/split_join_round_trip.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."str/replace_family.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."str/affix_sets.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."str/code_point_view.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# The two empty-argument guards (F-0055). std traps `assert` where the
+# builtin's answer is three different things on three lanes.
+[tests."str/split_empty_separator_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."str/replace_empty_pattern_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# The correction (F-0056): a negative repeat traps `bounds` everywhere, where
+# this module's doc claimed `""` from sc03 to sc08.
+[tests."str/repeat_negative_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."bytes/view_and_access.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."bytes/search_and_affixes.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."bytes/utf8_validation.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."bytes/at_out_of_range_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."bytes/slice_out_of_order_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."bytes/slice_past_end_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"

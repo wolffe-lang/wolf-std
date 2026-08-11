@@ -1,82 +1,345 @@
 //! member: true
 //!
 //! std.bytes — the raw byte view of a string: the honesty valve D25 buys
-//! by refusing `s[i]` on `str`. Stability tier: core (the API; the
-//! implementation is blocked).
+//! by refusing `s[i]` on `str`. Stability tier: core.
 //!
-//! **This module has no code, and that is the honest state.** `bytes` is
-//! where the UTF-8 invariant is allowed to be absent — the type that says
-//! "these are bytes, validity is your problem, and `to_str` is the border
-//! post". Writing it needs two things this pin does not have:
+//! **This module had no code for five sprints, and s37 is what changed.**
+//! `str.bytes()` now produces the byte view (`List[int]`, one element per
+//! byte, 0..255) on all three lanes, so every function below has both a
+//! producer and a body. What has NOT arrived is the other direction: no
+//! expression anywhere turns bytes back into a `str`, which is why exactly
+//! one function of the reviewed nine is still a contract (`to_str`, at the
+//! bottom of this header) and why `is_utf8` exists.
 //!
-//! 1. **A byte value.** No expression anywhere produces the numeric value
-//!    of a byte. `str` has `len` and slicing; slicing yields `str`, never a
-//!    number, and a one-byte slice of a multi-byte code point does not
-//!    exist to be taken (it traps `bounds`, by design). So `b[i] -> int`
-//!    — the one indexing form D25 explicitly licenses — has no
-//!    implementation, and neither does anything derived from it.
-//! 2. **A type that can hold invalid UTF-8.** Backing `Bytes` with a `str`
-//!    field would make `to_str -> str ! {utf8}` a function that can never
-//!    raise, i.e. a documented lie, and would make `from_str` the only way
-//!    to construct one — a byte view that cannot hold the bytes it exists
-//!    for. The house rule (sc00) is that a gap in what the language can
-//!    express is a finding, not a workaround invented here, so the
-//!    inventory below is a reviewed CONTRACT and F-0018 carries it
-//!    upstream.
+//! **THE TYPE IS `List[int]`, AND THAT IS A RECORDED INTERIM** (§11's byte
+//! currency, the same one `std.hex` and `std.base64` carry). A real `Bytes`
+//! wants two things this pin has not got: a byte-width element type, and a
+//! type that can hold invalid UTF-8 while `str` cannot. Every signature
+//! below keeps its shape when `Bytes` lands — `List[int]` becomes `Bytes`
+//! and nothing else moves. The ELEMENT CONTRACT is 0..255 per element, and
+//! it matters to exactly one function here (`is_utf8`, which answers
+//! `false` rather than trapping — see its doc); the container operations do
+//! not inspect values at all.
 //!
-//! The producers are also absent, which is why this is not urgent: bytes
-//! enter a program from io, FFI, and `str.bytes()` (s37 §2 and §5), and
-//! Phase A has neither io nor FFI. `std.bytes` becomes writable and
-//! immediately necessary in the same sprint that gives it something to
-//! view.
+//! **Why these five duplicate `std.list`'s names, and why that is right.**
+//! `len`, `is_empty`, `at`, `find`, `starts_with` and `ends_with` all have
+//! `std.list` counterparts, and the reason to have both is measured rather
+//! than aesthetic: `std.list`'s are GENERIC, and a generic std function
+//! runs on the interpreter lane alone (both compiler rungs refuse
+//! monomorphization at a module boundary, F-0026), while these are
+//! monomorphic over `List[int]` and run on all three. A program that has
+//! bytes wants the byte-tier operations to be available wherever it
+//! compiles. The vocabulary is §8's, deliberately: one concept, one name,
+//! across all of std — `len`, `is_empty`, `find`, `starts_with`,
+//! `ends_with`, `slice`, `at`.
 //!
-//! Reviewed inventory (9), each with its contract, exactly as it will
-//! land. `Bytes` is CapCase per API-CONVENTIONS §1; the sprint contract's
-//! lowercase `bytes` is the module, as here.
+//! **What byte-land buys, in one line each.** `ends_with` is trivial here
+//! and needed the boundary primitive over `str`; `slice` can never split a
+//! code point because there are no code points here; `at` is legal
+//! indexing where `s[i]` is refused for `str` (D25 licenses exactly this).
+//! The freedom has a price, and it is the whole reason `to_str` validates:
+//! bytes are where the UTF-8 invariant is ALLOWED to be absent.
+//!
+//! The one function still blocked, with its contract exactly as it will
+//! land:
 //!
 //! ```text
-//! len(b: Bytes) -> int
-//!     Number of bytes. O(1). Total: no error row, no traps.
-//! is_empty(b: Bytes) -> bool
-//!     `len(b) == 0`. Total.
-//! at(b: Bytes, i: int) -> int
-//!     The byte at index `i`, 0..255. BYTE INDEXING IS LEGAL HERE — this
-//!     is the whole point of the type (D25). Traps `bounds` out of range,
-//!     exactly as the language's own indexing does, because a caller that
-//!     could have checked `len` and did not has violated a contract (§8).
-//!     The contract writes this as `b[i]`; whether index syntax is
-//!     available to a std type is F-0011's builtin-versus-std question,
-//!     and `at` is the spelling that does not presume the answer.
-//! slice(b: Bytes, from: int, to: int) -> Bytes
-//!     The bytes in `[from, to)`, zero-copy. Traps `bounds` when the range
-//!     is out of order or out of range — and NEVER for splitting a code
-//!     point: there are no code points here, which is the freedom this
-//!     view sells. Two offsets rather than a range for the reason
-//!     `str.get` gives.
-//! find(b: Bytes, needle: Bytes) -> int ! {none}
-//!     Index of the first occurrence of `needle`; `none` when absent. The
-//!     empty needle occurs at 0. Total otherwise: no traps.
-//! starts_with(b: Bytes, prefix: Bytes) -> bool
-//!     Whether `b` begins with `prefix`; the empty prefix always does.
-//!     Total.
-//! ends_with(b: Bytes, suffix: Bytes) -> bool
-//!     Whether `b` ends with `suffix`; the empty suffix always does.
-//!     Total. (Note what byte-land buys: this one is trivial here and is
-//!     BLOCKED over `str`, where the tail offset may not be a boundary.)
 //! to_str(b: Bytes) -> str ! {utf8}
 //!     `b` viewed as a string, VALIDATED: `utf8` when the bytes are not
 //!     well-formed UTF-8 (overlong forms, surrogates, truncated
-//!     sequences, and stray continuation bytes all miss). Zero-copy on
-//!     success. This is the border post D24 demands — the one place bytes
-//!     become a `str`, and the reason `str` needs no validity checks
-//!     anywhere else. `utf8` is a new payload-free row tag; it earns its
-//!     own noun because a caller distinguishes "not text" from "absent".
-//! from_str(s: str) -> Bytes
-//!     `s`'s bytes, zero-copy and infallible — a valid `str` is always
-//!     valid bytes. A view, not a copy: bare-noun/`as_`-grade naming per
-//!     §1, and the direction that never fails.
-//! ```
+//!     sequences, stray continuation bytes and scalars above U+10FFFF all
+//!     miss). Zero-copy on success. This is the border post D24 demands —
+//!     the one place bytes become a `str`, and the reason `str` needs no
+//!     validity check anywhere else.
 //!
-//! No tests ship for this module: there is nothing to run, and a test that
-//! imports an itemless module is E0305 (unused import) in both
-//! implementations. The ledger stays honest by having no row to lie in.
+//!     BLOCKED on a primitive, not on tables: nothing in the language
+//!     builds a `str` from a number. There is no `char`, no `from_utf8`
+//!     builtin, no way to append a byte to a `strbuf` — so the
+//!     materialization step has no spelling, and a version of this
+//!     function that only handled ASCII would be a `to_str` that refuses
+//!     text, which is worse than not having one (§9: refusal over
+//!     approximation). `is_utf8` below is its PREDICATE half, written and
+//!     tested, so a program can at least ask the border's question; the
+//!     day a bytes-to-str primitive lands, this function is four lines
+//!     over that predicate. Filed as F-0057.
+//! ```
+
+/// The number of bytes in `b`. O(1). Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// bytes.len(bytes.from_str("wolf")) == 4
+/// bytes.len(bytes.from_str("é")) == 2
+/// bytes.len(bytes.from_str("")) == 0
+/// ```
+pub fn len(b: List[int]) -> int {
+    b.len
+}
+
+/// Whether `b` holds no bytes. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// bytes.is_empty(bytes.from_str("")) == true
+/// bytes.is_empty(bytes.from_str("x")) == false
+/// ```
+pub fn is_empty(b: List[int]) -> bool {
+    b.len == 0
+}
+
+/// The byte at index `i`. **BYTE INDEXING IS LEGAL HERE** — it is the
+/// whole point of this type (D25 licenses `b[i]` exactly where it refuses
+/// `s[i]`), and this function is the spelling that does not presume the
+/// answer to F-0011's builtin-versus-std question.
+///
+/// Traps `bounds` when `i` is out of range — the language's own fault from
+/// the language's own indexing, because a caller that could have checked
+/// `len` and did not has violated a contract (§8). The recoverable
+/// spelling is `std.list.get`, which raises `none`.
+///
+/// ```wolf-doc-example
+/// bytes.at(bytes.from_str("hé"), 0) == 104
+/// bytes.at(bytes.from_str("hé"), 1) == 195
+/// bytes.at(bytes.from_str("hé"), 2) == 169
+/// ```
+pub fn at(b: List[int], i: int) -> int {
+    b[i]
+}
+
+/// The bytes in `[from, to)`, as a fresh list. Never splits a code point,
+/// because there are no code points here — the freedom this view sells.
+///
+/// Traps `assert` when the range is out of order (`to < from`), starts
+/// below zero, or ends past `len(b)`. **This is a recorded delta from the
+/// reviewed contract**, which said `bounds`: with `List[int]` as the
+/// interim currency there is no slice SYNTAX to inherit the language's
+/// fault from, so the check is std's own and the kind is the one std can
+/// raise (§2 — either way it is a caller contract violation, and either
+/// way the process ends). It becomes `bounds` when `Bytes` lands with a
+/// slicing form.
+///
+/// ```wolf-doc-example
+/// let b = bytes.from_str("wolf")
+/// bytes.len(bytes.slice(b, 1, 3)) == 2
+/// bytes.at(bytes.slice(b, 1, 3), 0) == 111
+/// bytes.len(bytes.slice(b, 2, 2)) == 0
+/// bytes.len(bytes.slice(b, 0, 4)) == 4
+/// ```
+pub fn slice(b: List[int], from: int, to: int) -> List[int] {
+    let n = b.len
+    if from < 0 {
+        assert(false, "bytes.slice: the start cannot be negative")
+    }
+    if to < from {
+        assert(false, "bytes.slice: the range is out of order")
+    }
+    if to > n {
+        assert(false, "bytes.slice: the range ends past the last byte")
+    }
+    var out = List[int]()
+    var k = from
+    while k < to {
+        (mut out).push(b[k])
+        k = k + 1
+    }
+    out
+}
+
+/// The index of the first occurrence of `needle` in `b`; `none` when it
+/// does not occur. The empty needle occurs at 0, exactly as `str.find`'s
+/// does. A needle longer than `b` is a miss, not a fault. Total otherwise:
+/// no traps.
+///
+/// ```wolf-doc-example
+/// (bytes.find(bytes.from_str("wolf"), bytes.from_str("lf")) else 0 - 1) == 2
+/// (bytes.find(bytes.from_str("wolf"), bytes.from_str("z")) else 0 - 1) == 0 - 1
+/// (bytes.find(bytes.from_str("wolf"), bytes.from_str("")) else 0 - 1) == 0
+/// ```
+pub fn find(b: List[int], needle: List[int]) -> int ! {none} {
+    let n = b.len
+    let m = needle.len
+    if m == 0 {
+        return 0
+    }
+    if m > n {
+        return none
+    }
+    var i = 0
+    while i <= n - m {
+        var k = 0
+        var same = true
+        while k < m {
+            if b[i + k] != needle[k] {
+                same = false
+                k = m
+            } else {
+                k = k + 1
+            }
+        }
+        if same {
+            return i
+        }
+        i = i + 1
+    }
+    return none
+}
+
+/// Whether `b` begins with `prefix`; the empty prefix always does. Total:
+/// no error row, no traps.
+///
+/// ```wolf-doc-example
+/// bytes.starts_with(bytes.from_str("wolf"), bytes.from_str("wo")) == true
+/// bytes.starts_with(bytes.from_str("wolf"), bytes.from_str("lf")) == false
+/// bytes.starts_with(bytes.from_str("wolf"), bytes.from_str("")) == true
+/// ```
+pub fn starts_with(b: List[int], prefix: List[int]) -> bool {
+    let n = b.len
+    let m = prefix.len
+    if m > n {
+        return false
+    }
+    var i = 0
+    while i < m {
+        if b[i] != prefix[i] {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+/// Whether `b` ends with `suffix`; the empty suffix always does. Total: no
+/// error row, no traps.
+///
+/// Note what byte-land buys: this one is three lines here and needed the
+/// boundary primitive to exist at all over `str`, where the tail offset
+/// may fall inside a code point.
+///
+/// ```wolf-doc-example
+/// bytes.ends_with(bytes.from_str("wolf"), bytes.from_str("lf")) == true
+/// bytes.ends_with(bytes.from_str("wolf"), bytes.from_str("wo")) == false
+/// bytes.ends_with(bytes.from_str("wolf"), bytes.from_str("")) == true
+/// ```
+pub fn ends_with(b: List[int], suffix: List[int]) -> bool {
+    let n = b.len
+    let m = suffix.len
+    if m > n {
+        return false
+    }
+    var i = 0
+    while i < m {
+        if b[n - m + i] != suffix[i] {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+/// `s`'s bytes — infallible, because a valid `str` is always valid bytes.
+/// The bare-noun/`as_`-grade direction of §1 (a view, not a conversion of
+/// meaning), and the only producer of bytes this pin has: `str.bytes(s)`
+/// is the same view from the other side, and the io tier's byte reads are
+/// filed and unbuilt (F-0044).
+///
+/// This pin MATERIALIZES the view (the builtin returns a `List`), so it
+/// allocates; the zero-copy form arrives with D28's iterator protocol and
+/// changes nothing about this signature. Total: no error row, no traps
+/// beyond allocation.
+///
+/// ```wolf-doc-example
+/// bytes.at(bytes.from_str("A"), 0) == 65
+/// bytes.len(bytes.from_str("🐺")) == 4
+/// bytes.at(bytes.from_str("🐺"), 0) == 240
+/// ```
+pub fn from_str(s: str) -> List[int] {
+    s.bytes()
+}
+
+/// Whether `b` is well-formed UTF-8 — the predicate half of the blocked
+/// `to_str` (module header), and the one function here that reads the
+/// bytes as text rather than as numbers. The empty sequence is valid.
+///
+/// It rejects everything the standard rejects, not merely truncation: a
+/// stray continuation byte, a truncated multi-byte sequence, an OVERLONG
+/// form (`C0 80` for U+0000, `E0 80 80`, `F0 80 80 80`), a surrogate
+/// (U+D800..U+DFFF, `ED A0 80`), a scalar above U+10FFFF (`F4 90 80 80`),
+/// and the bytes `C0`, `C1`, `F5`..`FF` which begin no sequence at all.
+///
+/// **An element outside 0..255 makes it `false`, not a trap.** §11 has
+/// element-range violations trap `assert`, and that rule is an ENCODER's:
+/// `hex.encode` must not render a number it was not given. A validator is
+/// the opposite case — the question "are these bytes text?" has an answer
+/// for a non-byte, the answer is no, and a predicate that traps is a
+/// predicate every caller must guard before calling, which defeats it.
+///
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// bytes.is_utf8(bytes.from_str("héllo 🐺")) == true
+/// bytes.is_utf8(bytes.from_str("")) == true
+/// var bad = List[int]()
+/// (mut bad).push(255)
+/// bytes.is_utf8(bad) == false
+/// ```
+pub fn is_utf8(b: List[int]) -> bool {
+    let n = b.len
+    var i = 0
+    while i < n {
+        let b0 = b[i]
+        if b0 < 0 {
+            return false
+        } else if b0 < 128 {
+            i = i + 1
+        } else if b0 < 194 {
+            return false
+        } else if b0 < 224 {
+            if i + 1 >= n {
+                return false
+            }
+            if !is_cont(b[i + 1]) {
+                return false
+            }
+            i = i + 2
+        } else if b0 < 240 {
+            if i + 2 >= n {
+                return false
+            }
+            let b1 = b[i + 1]
+            if !is_cont(b1) || !is_cont(b[i + 2]) {
+                return false
+            }
+            if b0 == 224 && b1 < 160 {
+                return false
+            }
+            if b0 == 237 && b1 > 159 {
+                return false
+            }
+            i = i + 3
+        } else if b0 < 245 {
+            if i + 3 >= n {
+                return false
+            }
+            let b1 = b[i + 1]
+            if !is_cont(b1) || !is_cont(b[i + 2]) || !is_cont(b[i + 3]) {
+                return false
+            }
+            if b0 == 240 && b1 < 144 {
+                return false
+            }
+            if b0 == 244 && b1 > 143 {
+                return false
+            }
+            i = i + 4
+        } else {
+            return false
+        }
+    }
+    true
+}
+
+/// Whether `x` is a UTF-8 continuation byte (`10xxxxxx`, 128..191).
+/// Private: spelled as a comparison pair rather than a mask because `&` on
+/// a plain `int` is `unsupported` on the checked lane (F-0026), which is
+/// the whole reason this module's decoder is written in arithmetic.
+fn is_cont(x: int) -> bool {
+    x > 127 && x < 192
+}

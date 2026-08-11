@@ -1,0 +1,90 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str, str.chars
+//!
+//! The code-point view: `char_count`, `char_offsets`, `code_points`,
+//! `is_ascii` and `bytes`. These are the interim faces of the two functions
+//! that are still blocked on a `char` type (`chars`, `to_list_chars` — see
+//! the module header), written in the `int` currency `std.unicode` already
+//! spells a code point with.
+//!
+//! The invariants this file pins, because they are what makes the interim
+//! usable rather than merely present:
+//!
+//! - `char_count(s) == len(char_offsets(s)) == len(code_points(s))` — three
+//!   functions, one walk, always agreeing;
+//! - every offset in `char_offsets(s)` is a boundary `get` accepts, and the
+//!   slice starting there begins with the matching code point;
+//! - `is_ascii(s)` is exactly `char_count(s) == len(s)`;
+//! - the scalar values are the real Unicode ones (U+00E9 is 233, U+1F43A is
+//!   128058), so `std.unicode`'s ASCII classifiers can be fed from here.
+
+use std.str
+
+fn main() -> !int {
+    if str.char_count("wolf") == 4 {} else { return 1 }
+    if str.char_count("héllo") == 5 {} else { return 2 }
+    if str.char_count("é🐺") == 2 {} else { return 3 }
+    if str.char_count("") == 0 {} else { return 4 }
+    if str.char_count("🐺🐺🐺") == 3 {} else { return 5 }
+    if str.len("é🐺") == 6 {} else { return 6 }
+    if str.is_ascii("wolf-lang") {} else { return 7 }
+    if str.is_ascii("") {} else { return 8 }
+    if str.is_ascii("héllo") { return 9 }
+    if str.is_ascii("🐺") { return 10 }
+    // The three walks agree.
+    var offsets = 0
+    for at in str.char_offsets("héllo") { offsets = offsets + 1 }
+    if offsets == str.char_count("héllo") {} else { return 11 }
+    var scalars = 0
+    for c in str.code_points("héllo") { scalars = scalars + 1 }
+    if scalars == str.char_count("héllo") {} else { return 12 }
+    // Offsets are boundaries, in order, starting at 0.
+    var walked = "|"
+    for at in str.char_offsets("héllo") { walked = "{walked}{at}|" }
+    if walked == "|0|1|3|4|5|" {} else { return 13 }
+    var wide_offsets = "|"
+    for at in str.char_offsets("é🐺é") { wide_offsets = "{wide_offsets}{at}|" }
+    if wide_offsets == "|0|2|6|" {} else { return 14 }
+    var empty_offsets = 0
+    for at in str.char_offsets("") { empty_offsets = empty_offsets + 1 }
+    if empty_offsets == 0 {} else { return 15 }
+    // Every offset is a boundary `get` accepts.
+    var all_boundaries = true
+    for at in str.char_offsets("é🐺é") {
+        let piece = str.get("é🐺é", 0, at) else "\u{7}"
+        if piece == "\u{7}" {
+            all_boundaries = false
+        }
+    }
+    if all_boundaries {} else { return 16 }
+    // The scalar values are the real ones.
+    var scalar_trail = "|"
+    for c in str.code_points("aé🐺") { scalar_trail = "{scalar_trail}{c}|" }
+    if scalar_trail == "|97|233|128058|" {} else { return 17 }
+    var ascii_trail = "|"
+    for c in str.code_points("wolf") { ascii_trail = "{ascii_trail}{c}|" }
+    if ascii_trail == "|119|111|108|102|" {} else { return 18 }
+    var three_byte = "|"
+    for c in str.code_points("\u{20ac}") { three_byte = "{three_byte}{c}|" }
+    if three_byte == "|8364|" {} else { return 19 }
+    var boundary_scalars = "|"
+    for c in str.code_points("\u{80}\u{7ff}\u{800}\u{ffff}\u{10000}\u{10ffff}") {
+        boundary_scalars = "{boundary_scalars}{c}|"
+    }
+    if boundary_scalars == "|128|2047|2048|65535|65536|1114111|" {} else { return 20 }
+    var empty_scalars = 0
+    for c in str.code_points("") { empty_scalars = empty_scalars + 1 }
+    if empty_scalars == 0 {} else { return 21 }
+    // The byte view is the other unit, and it is the bigger number.
+    var byte_count = 0
+    for b in str.bytes("é🐺") { byte_count = byte_count + 1 }
+    if byte_count == 6 {} else { return 22 }
+    var byte_trail = "|"
+    for b in str.bytes("hé") { byte_trail = "{byte_trail}{b}|" }
+    if byte_trail == "|104|195|169|" {} else { return 23 }
+    var no_bytes = 0
+    for b in str.bytes("") { no_bytes = no_bytes + 1 }
+    if no_bytes == 0 {} else { return 24 }
+    0
+}

@@ -1,0 +1,22 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: conf.trap.map, std.bytes
+//!
+//! `bytes.slice` past the end traps `assert` — the second of the three
+//! conditions the range check refuses (out of order, negative start, past
+//! the end), and the one a loop bound gets wrong.
+//!
+//! It is its own file rather than a second call in the out-of-order one
+//! because a trap ends the process, so one program can witness exactly one
+//! trap (§13). The negative-start condition is the third and is covered by
+//! the same guard; a file per condition would be three files proving one
+//! `if`, so the doc names it and these two hold the shape.
+
+use std.bytes
+
+fn main() -> !int {
+    let b = bytes.from_str("wolf")
+    let over = bytes.slice(b, 2, 5)
+    if bytes.len(over) == 2 {} else { return 1 }
+    0
+}

@@ -1,0 +1,62 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str
+//!
+//! The affix family, both ends and both forms: `ends_with` and
+//! `strip_suffix` (blocked until s37, because a suffix offset may not be a
+//! boundary and only the implementation could know), plus the SET forms
+//! `starts_with_any`/`ends_with_any` a parser and a file walker actually
+//! write.
+//!
+//! The empty affix is the edge that decides an API: it matches everywhere
+//! (`ends_with(s, "")` is true, `strip_suffix(s, "")` is `s`), so a set
+//! containing it matches everything — recorded here rather than left for a
+//! caller to discover with a list built from user input.
+
+use std.str
+
+fn main() -> !int {
+    if str.ends_with("main.lu", ".lu") {} else { return 1 }
+    if str.ends_with("main.lu", ".rs") { return 2 }
+    if str.ends_with("main.lu", "main.lu") {} else { return 3 }
+    if str.ends_with("lu", "main.lu") { return 4 }
+    if str.ends_with("wolf", "") {} else { return 5 }
+    if str.ends_with("", "") {} else { return 6 }
+    if str.ends_with("", "x") { return 7 }
+    if str.ends_with("a🐺", "🐺") {} else { return 8 }
+    // The byte-level trap this replaces: "é" is C3 A9 and "©" is C2 A9, so
+    // a naive last-byte comparison would say yes here. The builtin does not.
+    if str.ends_with("é", "©") { return 9 }
+    if (str.strip_suffix("main.lu", ".lu") else "?") == "main" {} else { return 10 }
+    if (str.strip_suffix("main.lu", ".rs") else "?") == "?" {} else { return 11 }
+    if (str.strip_suffix("wolf", "") else "?") == "wolf" {} else { return 12 }
+    if (str.strip_suffix("wolf", "wolf") else "?") == "" {} else { return 13 }
+    if (str.strip_suffix("é🐺", "🐺") else "?") == "é" {} else { return 14 }
+    if (str.strip_suffix("", "x") else "?") == "?" {} else { return 15 }
+    if (str.strip_prefix("wolf-lang", "wolf-") else "?") == "lang" {} else { return 16 }
+    if (str.strip_prefix("wolf-lang", "lang") else "?") == "?" {} else { return 17 }
+    if (str.strip_prefix("é🐺", "é") else "?") == "🐺" {} else { return 18 }
+    var schemes = List[str]()
+    (mut schemes).push("http://")
+    (mut schemes).push("https://")
+    (mut schemes).push("file://")
+    if str.starts_with_any("https://wolf.lang", schemes) {} else { return 19 }
+    if str.starts_with_any("file://tmp", schemes) {} else { return 20 }
+    if str.starts_with_any("ftp://wolf.lang", schemes) { return 21 }
+    if str.starts_with_any("", schemes) { return 22 }
+    var wolf_files = List[str]()
+    (mut wolf_files).push(".lu")
+    (mut wolf_files).push(".wolfi")
+    if str.ends_with_any("main.wolfi", wolf_files) {} else { return 23 }
+    if str.ends_with_any("main.lu", wolf_files) {} else { return 24 }
+    if str.ends_with_any("main.rs", wolf_files) { return 25 }
+    var nothing = List[str]()
+    if str.starts_with_any("anything", nothing) { return 26 }
+    if str.ends_with_any("anything", nothing) { return 27 }
+    var with_empty = List[str]()
+    (mut with_empty).push("zzz")
+    (mut with_empty).push("")
+    if str.starts_with_any("anything", with_empty) {} else { return 28 }
+    if str.ends_with_any("anything", with_empty) {} else { return 29 }
+    0
+}

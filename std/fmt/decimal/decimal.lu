@@ -870,8 +870,8 @@ fn render_shortest(sign: str, digits: str, exponent: int) -> str {
 /// (decimal.parse_float("5e-1") else 0.0) == 0.5
 /// (decimal.parse_float("0.1") else 0.0) == 0.1
 /// (decimal.parse_float("1e400") else 0.0) == 0.0
-/// (decimal.parse_float("") else 0.0 - 1.0) == 0.0 - 1.0
-/// (decimal.parse_float("1.2.3") else 0.0 - 1.0) == 0.0 - 1.0
+/// (decimal.parse_float("") else -1.0) == -1.0
+/// (decimal.parse_float("1.2.3") else -1.0) == -1.0
 /// ```
 pub fn parse_float(s: str) -> f64 ! {parse, overflow} {
     var rest = s

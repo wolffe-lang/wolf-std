@@ -3,17 +3,23 @@
 //! std.json — the JSON data model, its accessors, and the serializer.
 //! Stability tier: core.
 //!
-//! **What ships and what cannot, stated first.** `parse` is NOT here, and
-//! it is not a scheduling decision: a JSON reader has to walk a string
-//! past code points whose length it does not know (any character may
-//! appear inside a JSON string), the only way to learn a code point's
-//! length is to slice at a guessed offset, and a wrong guess traps
-//! `bounds` uncatchably (D30). That is F-0018, the boundary primitive, and
-//! a `parse` written by guessing would die on `{"name": "café"}` — legal
-//! input. §9's refusal-over-approximation rule says such a function does
-//! not ship, so it ships as a reviewed contract instead (below), together
-//! with `unescape`, which has the same shape. `escape` is here and is
-//! honest about its one refusal.
+//! **What ships and what does not, stated first — and the reason CHANGED
+//! under this module's feet.** `parse` is not here, and until sc09 it
+//! could not be: a JSON reader walks a string past code points whose
+//! length it does not know, the only way to learn a length was to slice at
+//! a guessed offset, and a wrong guess traps `bounds` uncatchably (D30).
+//! That was F-0018, and a `parse` written by guessing would have died on
+//! `{"name": "café"}` — legal input.
+//!
+//! **That blocker is gone.** s37's `s.get(a..b) -> str ! {none}` answers
+//! the boundary question instead of faulting on it, and `std.str` spends
+//! it in full as of sc09 (`find`, `split_once`, `code_points`, the lot).
+//! So `parse`, `unescape` and `escape`'s one refusal are all WRITABLE at
+//! these pins; they are simply not written, because the sprint that spent
+//! the primitive owned `std.str` and `std.bytes`, not this module. They
+//! stay reviewed contracts below — with a scheduling note now, not a
+//! language gap — and the day a `std.json` sprint lands them, nothing in
+//! the value model or the serializer moves.
 //!
 //! What that leaves is still most of a JSON library: the value model, the
 //! accessors, and a serializer that turns wolf data into text. A program
@@ -51,8 +57,9 @@
 //! `lupin = run, wolfc = unsupported, native = unsupported`, exactly as
 //! the sprint contract's non-target predicted.
 //!
-//! Reviewed contracts, blocked on F-0018 and landing verbatim on the pin
-//! that delivers `str.get`, a byte accessor, or `chars()`:
+//! Reviewed contracts, WRITABLE at these pins over `str.get` and the rest
+//! of the s37 set (the blocker retired at sc09) and landing verbatim in a
+//! `std.json` sprint:
 //!
 //! ```text
 //! parse(s: str) -> Value ! {syntax, deep}
@@ -432,8 +439,13 @@ pub fn len(v: Value) -> int ! {kind} {
 /// verbatim, because RFC 8259 permits raw UTF-8 and escaping it would
 /// only make the output bigger.
 ///
-/// **The one refusal, and it is F-0018 again.** (The tag is `boundary`,
-/// naming the code-point boundary the walk cannot find, and not `escape`:
+/// **The one refusal, and it is now a debt rather than a wall.** The
+/// primitive that would remove it landed at s37 and `std.str` spends it
+/// (sc09), so this function can become total in a `std.json` sprint by
+/// walking with `str.code_points` instead of one ASCII character at a
+/// time; the row and the tag survive only until then. (The tag is
+/// `boundary`, naming the code-point boundary the walk cannot find, and
+/// deliberately not `escape`:
 /// a tag that shares a name with anything else in scope at the raise site
 /// — here, this very function — resolves to that thing and leaves the
 /// function as a silent value, F-0036. The tag disappears entirely when

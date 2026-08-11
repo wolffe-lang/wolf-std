@@ -1,0 +1,24 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: conf.trap.map, std.bytes
+//!
+//! `bytes.slice` with an out-of-order range traps `assert`, and the KIND is
+//! a recorded delta the module's doc explains: the reviewed contract said
+//! `bounds`, which is what a `Bytes` type with slicing syntax would
+//! inherit from the language — but the interim currency is `List[int]`,
+//! there is no slice syntax to fault, so the check is std's own and
+//! `assert` is the kind std can raise.
+//!
+//! It is held as a test rather than left to the doc because a range check
+//! that silently returned an empty list would be the exact failure §2's
+//! trap rule exists to prevent: a caller's arithmetic mistake answered with
+//! plausible data.
+
+use std.bytes
+
+fn main() -> !int {
+    let b = bytes.from_str("wolf")
+    let backwards = bytes.slice(b, 3, 1)
+    if bytes.is_empty(backwards) {} else { return 1 }
+    0
+}

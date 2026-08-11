@@ -1,0 +1,22 @@
+//! check: run(exit=trap(bounds))
+//! phase: run
+//! conforms: conf.trap.set, std.str
+//!
+//! A negative repeat count traps `bounds` — the builtin's own fault ("a
+//! repeat count cannot be negative", `[mem.ub.defined]`), on all three
+//! lanes, and std does not guard it.
+//!
+//! This file is a CORRECTION held as a test. sc03 measured `"ab".repeat(-1)`
+//! as `""` under the interpreter and `std.str.repeat`'s doc claimed that
+//! answer for five sprints; at the sc09 pin every lane traps, so the doc
+//! was wrong for at least one bump before anyone looked (F-0056). A claim
+//! about an implementation's answer that no test holds is a claim that
+//! rots — this is the test.
+
+use std.str
+
+fn main() -> !int {
+    let out = str.repeat("ab", 0 - 1)
+    if out == "" {} else { return 1 }
+    0
+}

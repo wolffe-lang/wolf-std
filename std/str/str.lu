@@ -17,9 +17,11 @@
 //! - the relational family — `==`, `!=`, `<`, `<=`, `>`, `>=`, `<=>` are
 //!   byte-lexicographic over the UTF-8 bytes (`[mem.str.order]`, the
 //!   ruling this repo's F-0006 asked for);
-//! - the builtin method set this file delegates to where it exists:
-//!   `is_empty`, `contains`, `starts_with`, `trim`, `lower`, `upper`,
-//!   `repeat`, `lines`, `words`.
+//! - the builtin method set this file delegates to, which is now the whole
+//!   s37 set: `is_empty`, `get`, `bytes`, `contains`, `starts_with`,
+//!   `ends_with`, `find`, `rfind`, `count`, `split`, `words`, `lines`,
+//!   `trim`, `trim_start`, `trim_end`, `lower`, `upper`, `strip_prefix`,
+//!   `strip_suffix`, `repeat`, `replace`.
 //!
 //! Everything else is std's — this file. Functions take the string as
 //! their first parameter with the bare `read` mode, because `str` is
@@ -27,35 +29,65 @@
 //!
 //! **NO CHAR INDEXING, and no negative indices** (D25). There is no
 //! `s[i]`: a byte offset is the one honest currency, so `find` returns
-//! offsets and iteration yields them. To reach the first code point, slice
-//! (`s[..n]`); to count code points, `chars()` — filed, see below. `^n`
+//! offsets and `char_offsets` yields them. To reach the first code point,
+//! slice (`s[..n]`) or ask `get` for a range it may refuse. `^n`
 //! end-relative indexing (`s[..^1]`) is the language's spelling for the
 //! other end and does not resolve in either implementation at this pin
-//! (F-0018); there is deliberately no std function that papers over it.
+//! (F-0018's last living clause); there is deliberately no std function
+//! that papers over it.
 //!
-//! **THE BOUNDARY PROBLEM — why fifteen of this module's thirty-three
-//! functions are contracts and not code.** Every position-taking string algorithm needs
-//! one of three primitives to walk UTF-8 safely, and this pin has none of
-//! them: the recoverable slice `get(a..b) -> str ! {none}` (D25's
-//! anti-landmine form), a byte accessor (`bytes()` with `b[i] -> int`), or
-//! `chars()` yielding `(offset, char)`. Without one, a scan cannot advance
-//! past a code point of unknown length: the only way to ask "is offset k a
-//! boundary?" is to slice at k, and slicing at a non-boundary TRAPS —
-//! uncatchably, since wolf has no unwinding (D30). A `find` written by
-//! guessing offsets would therefore trap on perfectly legal input like
-//! `find("héllo", "l")`, which is a broken function, not a documented
-//! partial. So `find`, `rfind`, `count`, `split`, `split_once`,
-//! `rsplit_once`, `ends_with`, `strip_suffix`, `replace`, `replacen`,
-//! `get`, `bytes`, `chars`, `graphemes` and `to_list_chars` ship as
-//! REVIEWED CONTRACTS below and land verbatim on the pin that delivers any
-//! one of the three primitives (F-0018, s37 §4–§5).
+//! **THE BOUNDARY PRIMITIVE LANDED, AND THIS MODULE IS WHAT IT BOUGHT.**
+//! For five sprints fifteen of this module's functions were reviewed
+//! contracts with no bodies, because every position-taking string
+//! algorithm needs a way to ask "is offset k a code-point boundary?" and
+//! the only way to ask was to slice at k — which TRAPS when the answer is
+//! no, uncatchably (D30, no unwinding). s37 shipped the recoverable slice
+//! `s.get(a..b) -> str ! {none}` (`[mem.str.get]`) plus `find`/`rfind`/
+//! `split`/`count`/`ends_with`/`strip_suffix`/`replace` and the byte view
+//! `s.bytes() -> List[int]`, and all three lanes execute them (wolfc at
+//! s37, lupin at 0.1.5, native at #40). Twelve of the fifteen are code
+//! below. What remains is exactly what needs a type wolf does not have:
 //!
-//! What IS shippable is everything expressible over `starts_with` plus
-//! advance-by-a-known-length — the boundary-safe probe: after
-//! `s.starts_with(p)` succeeds, `p.len` IS a code-point boundary of `s`.
-//! That single fact carries `strip_prefix`, `trim_start` and `trim_end`
-//! below — and it carried `parse_int`/`parse_float`, which are no longer
-//! here.
+//! ```text
+//! chars(s: str) -> List[(int, char)]
+//!     Code points with their byte offsets. Blocked twice over: no `char`
+//!     type exists, and wolfc does not type a `List` of tuples at all
+//!     (`List[(int, int)]` is `unsupported`), so even the interim
+//!     currency cannot carry the pair. `char_offsets` below is the offset
+//!     half and `code_points` the value half; the day `char` lands they
+//!     fuse into this one function and the `Iter` protocol (F-0008)
+//!     decides whether it yields or allocates.
+//! to_list_chars(s: str) -> List[char]
+//!     The code points alone. `code_points` below IS this function in
+//!     `std.unicode`'s interim currency — a Unicode scalar value as
+//!     `int` — and the flip is a signature change with an identical body.
+//! graphemes(s: str) -> List[str]
+//!     Extended grapheme clusters, as slices of `s`. A std call and never
+//!     the default unit (D24). Needs segmentation TABLES, which is the
+//!     filed budget decision (F-0018) and not a primitive gap: nothing
+//!     about this pin's `str` brings it closer.
+//! ```
+//!
+//! **THE EMPTY NEEDLE IS STD'S PROBLEM, AND STD SOLVES IT ONCE** (F-0055).
+//! Three builtins are undefined on an empty argument and the three lanes
+//! disagree about what that means: `count("")`, `split("")` and
+//! `replace(s, "", …)` are refused as `unsupported` by lupin and by the
+//! checked tier, and DEFINED by the native runtime (0, one whole piece,
+//! identity). std never lets that reach a caller: `count` answers 0 before
+//! delegating, `split`/`replace`/`replacen`/`splitn`/`rsplit` trap `assert`
+//! on an empty separator (the reviewed contract's kind — a caller
+//! contract violation, §2), and every lane therefore agrees about every
+//! call this module makes. The functions defined in terms of `find`
+//! (`split_once`, `rsplit_once`, `find_all`) inherit `find`'s answer for
+//! the empty needle instead, and say so on themselves.
+//!
+//! **PADDING LIVES IN `std.fmt`** (§11: the format spec is a spelling and
+//! std owns the operations). `pad_left`, `pad_right`, `center`, their
+//! `_with` fill variants and `with_sign` are `std.fmt`'s, not this
+//! module's — one concept, one name, one home (§1). This module has no
+//! width family and will not grow one; when display width (East Asian
+//! Width plus graphemes) becomes computable it arrives under its own name
+//! in the module that owns the tables.
 //!
 //! **THE PARSE FAMILY MOVED (sc05).** `parse_int` and `parse_float` were
 //! shipped here by sc03 because this is where the boundary-safe probe was
@@ -68,193 +100,26 @@
 //! than "honest but approximate". Nothing in `std.str` calls them, so
 //! this module no longer carries a digit table at all.
 //!
-//! ```text
-//! find(s: str, needle: str) -> int ! {none}
-//!     Byte offset of the first occurrence of `needle`; `none` when it
-//!     does not occur. The empty needle occurs at 0. Total otherwise: no
-//!     traps (a needle longer than `s` is a miss, not a fault).
-//! rfind(s: str, needle: str) -> int ! {none}
-//!     Byte offset of the LAST occurrence; `none` when absent. The empty
-//!     needle occurs at `len(s)`.
-//! count(s: str, needle: str) -> int
-//!     Number of NON-OVERLAPPING occurrences, scanning left to right
-//!     ("aaa" contains 1 "aa"). The empty needle is defined as 0
-//!     occurrences, not len+1 — a count of nothing is nothing.
-//! split(s: str, sep: str) -> List[str]
-//!     Every piece between occurrences of `sep`, in order, keeping empty
-//!     pieces (`split("a,,b", ",")` is three pieces; `split("", ",")` is
-//!     one empty piece). An empty `sep` traps `assert`: a caller contract
-//!     violation, per §2's trap rule, since no piece boundary exists.
-//! split_once(s: str, sep: str) -> (str, str) ! {none}
-//!     The pieces before and after the FIRST occurrence of `sep`; `none`
-//!     when `sep` does not occur — the pair is only meaningful together.
-//! rsplit_once(s: str, sep: str) -> (str, str) ! {none}
-//!     As `split_once`, at the LAST occurrence.
-//! ends_with(s: str, suffix: str) -> bool
-//!     Whether `s` ends with `suffix`; the empty suffix always does.
-//!     Total.
-//! strip_suffix(s: str, suffix: str) -> str ! {none}
-//!     `s` without a trailing `suffix`; `none` when it is not there — the
-//!     absence row rather than returning `s` unchanged, so the caller can
-//!     tell (§2).
-//! replace(s: str, old: str, new: str) -> str
-//!     A fresh string with every non-overlapping occurrence of `old`
-//!     replaced by `new`, left to right, allocated in the ambient region.
-//!     Empty `old` traps `assert`, as `split`.
-//! replacen(s: str, old: str, new: str, n: int) -> str
-//!     As `replace`, stopping after `n` replacements; `n <= 0` replaces
-//!     nothing and copies.
-//! get(s: str, from: int, to: int) -> str ! {none}
-//!     The recoverable slice: the bytes in `[from, to)`, or `none` when
-//!     the range is out of order, out of range, or splits a code point —
-//!     the one function that answers the boundary question instead of
-//!     trapping it. Spelled with two offsets because a range is not a
-//!     value that crosses a function boundary at this pin. THIS IS THE
-//!     PRIMITIVE the other fourteen wait on; it cannot be written in
-//!     library code because writing it needs itself.
-//! bytes(s: str) -> Bytes
-//!     The raw byte view (std.bytes, blocked at the same root — see that
-//!     module's header).
-//! chars(s: str) -> List[(int, char)]
-//!     Code points with their byte offsets, in order — the offset-yielding
-//!     iteration D25 promises. Blocked twice: no `char` type exists, and
-//!     the shape wants the `Iter` protocol (F-0008) rather than a list.
-//! graphemes(s: str) -> List[str]
-//!     Extended grapheme clusters, as slices of `s`. A std call and never
-//!     the default unit (D24). Needs segmentation tables — the filed
-//!     budget decision, below.
-//! to_list_chars(s: str) -> List[char]
-//!     The code points alone. Same blocker as `chars`.
-//! ```
-//!
 //! **The unicode posture, written down** (the sprint's filed decision).
 //! What ships in v1: UTF-8 validity as a type invariant (the language's),
 //! byte-offset slicing that refuses to split a code point (the language's),
-//! and ASCII-true classification named as such (`std.unicode`). What is
-//! NOT here and is a budget decision filed upstream, not a silent gap:
-//! category tables, full case mapping, normalization, and grapheme
-//! segmentation data. The evidence this sprint adds: the pinned
-//! interpreter's `lower`/`upper` already perform SIMPLE UNICODE case
-//! mapping (`"ÉA".lower()` is `"éa"`, observed), which is MORE than the
-//! sprint contract promised for these two functions and means the tables
-//! are already being carried somewhere — so the decision to make is where
-//! they live and who pays for them, not whether to start. Filed as F-0018
-//! with `std.unicode`'s posture.
-//!
-//! INTERIM SPELLINGS (each filed, each flipped by the pin that fixes it):
-//! - Absence is spelled `none` here, not the convention's lowercase
-//!   `none`. That interim is OVER as of the sc05 pins — lupin 0.1.3
-//!   resolves lowercase bare tags at a raise site and wolfc has since
-//!   wolf-lang#4 — so this spelling is now a repo-wide rename waiting for
-//!   its own commit rather than a language constraint (F-0003 / F-0023,
-//!   both retired). New std code, `std.fmt` included, writes lowercase.
-//! - A method call on a slice EXPRESSION over a binding
-//!   (`d[0..1].upper()`) is `unsupported` in lupin ("does not denote a
-//!   place at run time", F-0021); every body here binds the slice first.
+//! and ASCII-true classification named as such (`std.unicode`, over the
+//! `int` code points `code_points` now produces). What is NOT here and is
+//! a budget decision filed upstream, not a silent gap: category tables,
+//! full case mapping, normalization, and grapheme segmentation data. The
+//! evidence: the implementations' `lower`/`upper` already perform SIMPLE
+//! UNICODE case mapping (`"ÉA".lower()` is `"éa"`, observed on every
+//! lane), which is MORE than the sprint contract promised and means the
+//! tables are already being carried somewhere — so the decision to make
+//! is where they live and who pays for them, not whether to start
+//! (F-0018, with `std.unicode`'s posture).
 
 use std.strbuf
-
-/// The Unicode `White_Space` code points, as the byte length of the one
-/// starting `s`, or 0 when `s` does not start with whitespace. Private:
-/// the public surface is `trim_start`/`trim_end`.
-///
-/// This table exists because `trim_start` must agree with the builtin
-/// `trim` exactly (`trim_end` is derived from the two), and the builtin's
-/// set is Unicode `White_Space`, not ASCII — observed: `"\u{a0}x\u{a0}"`
-/// trims to `"x"`, and so do U+1680, U+2000 and U+3000. The agreement is
-/// pinned by `tests/str/trim_whitespace_set.lu`, one assertion per code
-/// point, so a builtin that changes its set fails CI here rather than
-/// silently disagreeing with std.
-fn ws_len(s: str) -> int {
-    if s.starts_with(" ") {
-        return 1
-    }
-    if s.starts_with("\t") {
-        return 1
-    }
-    if s.starts_with("\n") {
-        return 1
-    }
-    if s.starts_with("\r") {
-        return 1
-    }
-    if s.starts_with("\x0b") {
-        return 1
-    }
-    if s.starts_with("\x0c") {
-        return 1
-    }
-    if s.starts_with("\u{85}") {
-        return 2
-    }
-    if s.starts_with("\u{a0}") {
-        return 2
-    }
-    if s.starts_with("\u{1680}") {
-        return 3
-    }
-    if s.starts_with("\u{2028}") {
-        return 3
-    }
-    if s.starts_with("\u{2029}") {
-        return 3
-    }
-    if s.starts_with("\u{202f}") {
-        return 3
-    }
-    if s.starts_with("\u{205f}") {
-        return 3
-    }
-    if s.starts_with("\u{3000}") {
-        return 3
-    }
-    ws_len_quad(s)
-}
-
-/// The U+2000..U+200A block, split out only to keep one function's
-/// branch count readable. Every member is three bytes.
-fn ws_len_quad(s: str) -> int {
-    if s.starts_with("\u{2000}") {
-        return 3
-    }
-    if s.starts_with("\u{2001}") {
-        return 3
-    }
-    if s.starts_with("\u{2002}") {
-        return 3
-    }
-    if s.starts_with("\u{2003}") {
-        return 3
-    }
-    if s.starts_with("\u{2004}") {
-        return 3
-    }
-    if s.starts_with("\u{2005}") {
-        return 3
-    }
-    if s.starts_with("\u{2006}") {
-        return 3
-    }
-    if s.starts_with("\u{2007}") {
-        return 3
-    }
-    if s.starts_with("\u{2008}") {
-        return 3
-    }
-    if s.starts_with("\u{2009}") {
-        return 3
-    }
-    if s.starts_with("\u{200a}") {
-        return 3
-    }
-    0
-}
 
 /// The length of `s` in BYTES, O(1) — the honest unit (D25). This is the
 /// documented byte-length test the sprint asks for: a two-byte code point
 /// has length 2, and the number of CODE POINTS is a different question
-/// that `chars()` answers (blocked, see the module header). Total: no
-/// error row, no traps.
+/// that `char_count` answers. Total: no error row, no traps.
 ///
 /// ```wolf-doc-example
 /// str.len("wolf") == 4
@@ -276,6 +141,50 @@ pub fn is_empty(s: str) -> bool {
     s.is_empty()
 }
 
+/// The bytes in `[from, to)` — the RECOVERABLE slice, and the primitive
+/// the rest of this module is written over (`[mem.str.get]`, D25's
+/// anti-landmine form). `none` when the range is out of order, out of
+/// range, or would split a code point: the one function that ANSWERS the
+/// boundary question where `s[from..to]` faults on it. Never traps.
+///
+/// Spelled with two offsets rather than a range because a range value
+/// crossing a std function boundary is not something every lane types
+/// (F-0030); the builtin takes the range and this wrapper builds it.
+///
+/// Use `get` when the offsets are DATA (a caller's input, an offset from
+/// another source) and `s[from..to]` when they are yours by construction —
+/// an offset `find` returned is a boundary and a trap there would be a
+/// bug, not a fault.
+///
+/// ```wolf-doc-example
+/// (str.get("héllo", 0, 3) else "?") == "hé"
+/// (str.get("héllo", 0, 2) else "?") == "?"
+/// (str.get("héllo", 1, 2) else "?") == "?"
+/// (str.get("héllo", 0, 99) else "?") == "?"
+/// (str.get("héllo", 3, 1) else "?") == "?"
+/// (str.get("héllo", 0, 0) else "?") == ""
+/// ```
+pub fn get(s: str, from: int, to: int) -> str ! {none} {
+    s.get(from..to)?
+}
+
+/// The raw bytes of `s`, in order, as the 0..255 element values §11's
+/// interim byte currency uses — `std.bytes` is the module that operates on
+/// them and `bytes.from_str` is the same view from that side. Allocates
+/// the list (`to_`-grade, §1: the name is the bare noun the convention
+/// reserves for a view, and it is a view of `s`'s bytes even though this
+/// pin materializes it). Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var n = 0
+/// for b in str.bytes("hé") { n = n + b }
+/// n = n + 0
+/// n == 468
+/// ```
+pub fn bytes(s: str) -> List[int] {
+    s.bytes()
+}
+
 /// Whether `needle` occurs anywhere in `s`, as a byte sequence. The empty
 /// needle occurs in every string, including the empty one. Total: no error
 /// row, no traps.
@@ -289,11 +198,101 @@ pub fn contains(s: str, needle: str) -> bool {
     s.contains(needle)
 }
 
+/// The byte offset of the FIRST occurrence of `needle` in `s`; `none` when
+/// it does not occur. The empty needle occurs at 0. Total otherwise: a
+/// needle longer than `s` is a miss, not a fault, and no input traps.
+///
+/// The offset is a code-point boundary of `s` by construction, so slicing
+/// at it is safe — which is what makes `split_once`, `find_all`,
+/// `replacen` and `splitn` writable below.
+///
+/// ```wolf-doc-example
+/// (str.find("the wolf runs", "wolf") else 0 - 1) == 4
+/// (str.find("the wolf runs", "moon") else 0 - 1) == 0 - 1
+/// (str.find("héllo", "l") else 0 - 1) == 3
+/// (str.find("wolf", "") else 0 - 1) == 0
+/// ```
+pub fn find(s: str, needle: str) -> int ! {none} {
+    s.find(needle)?
+}
+
+/// The byte offset of the LAST occurrence of `needle` in `s`; `none` when
+/// it does not occur. The empty needle occurs at `len(s)` — the end, which
+/// is what "last" means for something that occurs everywhere. Total
+/// otherwise: no traps.
+///
+/// ```wolf-doc-example
+/// (str.rfind("a/b/c", "/") else 0 - 1) == 3
+/// (str.rfind("a/b/c", "x") else 0 - 1) == 0 - 1
+/// (str.rfind("héllo", "l") else 0 - 1) == 4
+/// (str.rfind("wolf", "") else 0 - 1) == 4
+/// ```
+pub fn rfind(s: str, needle: str) -> int ! {none} {
+    s.rfind(needle)?
+}
+
+/// The byte offsets of every NON-OVERLAPPING occurrence of `needle`, left
+/// to right — the find-all family's one member, and the plural of `find`
+/// rather than a new vocabulary. `count(s, needle)` is its length.
+///
+/// The empty needle yields no offsets, for `count`'s reason: a list of
+/// every position in the string is not an answer any caller wants, and
+/// nothing is a stronger answer than something wrong. Allocates the list.
+/// Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var n = 0
+/// for at in str.find_all("a,b,c", ",") { n = n + at }
+/// n = n + 0
+/// n == 4
+/// ```
+pub fn find_all(s: str, needle: str) -> List[int] {
+    var out = List[int]()
+    if needle.is_empty() {
+        return out
+    }
+    var base = 0
+    var rest = s
+    var more = true
+    while more {
+        let at = rest.find(needle) else 0 - 1
+        if at < 0 {
+            more = false
+        } else {
+            (mut out).push(base + at)
+            let step = at + needle.len
+            rest = rest[step..]
+            base = base + step
+        }
+    }
+    out
+}
+
+/// The number of NON-OVERLAPPING occurrences of `needle` in `s`, scanning
+/// left to right — `"aaa"` contains one `"aa"`, not two. The empty needle
+/// counts 0, not `len + 1`: a count of nothing is nothing (the reviewed
+/// contract, and the reason this function guards before delegating —
+/// F-0055). Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// str.count("a,b,c", ",") == 2
+/// str.count("aaa", "aa") == 1
+/// str.count("wolf", "z") == 0
+/// str.count("wolf", "") == 0
+/// ```
+pub fn count(s: str, needle: str) -> int {
+    if needle.is_empty() {
+        return 0
+    }
+    s.count(needle)
+}
+
 /// Whether `s` begins with `prefix`. The empty prefix always matches.
 /// Total: no error row, no traps.
 ///
-/// This is the boundary-safe probe the module header describes: when it
-/// answers true, `len(prefix)` is a code-point boundary of `s`.
+/// When it answers true, `len(prefix)` is a code-point boundary of `s` —
+/// the property sc03 built this module's first bodies on, kept here
+/// because it is still the cheapest way to reason about an offset.
 ///
 /// ```wolf-doc-example
 /// str.starts_with("wolf-lang", "wolf") == true
@@ -302,6 +301,69 @@ pub fn contains(s: str, needle: str) -> bool {
 /// ```
 pub fn starts_with(s: str, prefix: str) -> bool {
     s.starts_with(prefix)
+}
+
+/// Whether `s` ends with `suffix`. The empty suffix always matches.
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// str.ends_with("wolf.lu", ".lu") == true
+/// str.ends_with("wolf.lu", ".rs") == false
+/// str.ends_with("a🐺", "🐺") == true
+/// str.ends_with("wolf", "") == true
+/// ```
+pub fn ends_with(s: str, suffix: str) -> bool {
+    s.ends_with(suffix)
+}
+
+/// Whether `s` begins with ANY of `prefixes` — the set form of
+/// `starts_with`, for the switch a parser writes over a keyword list. An
+/// empty list matches nothing; an empty prefix IN the list matches
+/// everything, exactly as `starts_with` does. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// var ps = List[str]()
+/// (mut ps).push("http://")
+/// (mut ps).push("https://")
+/// str.starts_with_any("https://wolf.lang", ps) == true
+/// str.starts_with_any("ftp://wolf.lang", ps) == false
+/// ```
+pub fn starts_with_any(s: str, prefixes: List[str]) -> bool {
+    let n = prefixes.len
+    var i = 0
+    while i < n {
+        let p = prefixes[i]
+        if s.starts_with(p) {
+            return true
+        }
+        i = i + 1
+    }
+    false
+}
+
+/// Whether `s` ends with ANY of `suffixes` — the set form of `ends_with`,
+/// for the extension test a file walker writes. An empty list matches
+/// nothing. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var ss = List[str]()
+/// (mut ss).push(".lu")
+/// (mut ss).push(".wolfi")
+/// str.ends_with_any("main.wolfi", ss) == true
+/// str.ends_with_any("main.rs", ss) == false
+/// ```
+pub fn ends_with_any(s: str, suffixes: List[str]) -> bool {
+    let n = suffixes.len
+    var i = 0
+    while i < n {
+        let x = suffixes[i]
+        if s.ends_with(x) {
+            return true
+        }
+        i = i + 1
+    }
+    false
 }
 
 /// `s` without a leading `prefix`; `none` when `s` does not start with it
@@ -314,22 +376,214 @@ pub fn starts_with(s: str, prefix: str) -> bool {
 /// (str.strip_prefix("wolf", "") else "?") == "wolf"
 /// ```
 pub fn strip_prefix(s: str, prefix: str) -> str ! {none} {
-    if s.starts_with(prefix) {
-        return s[prefix.len..]
+    s.strip_prefix(prefix)?
+}
+
+/// `s` without a trailing `suffix`; `none` when it is not there — the
+/// absence row for `strip_prefix`'s reason (§2). Consumed by `else` or
+/// `?`. No traps.
+///
+/// ```wolf-doc-example
+/// (str.strip_suffix("main.lu", ".lu") else "?") == "main"
+/// (str.strip_suffix("main.lu", ".rs") else "?") == "?"
+/// (str.strip_suffix("wolf", "") else "?") == "wolf"
+/// ```
+pub fn strip_suffix(s: str, suffix: str) -> str ! {none} {
+    s.strip_suffix(suffix)?
+}
+
+/// Every piece of `s` between occurrences of `sep`, in order, keeping
+/// empty pieces: `split("a,,b", ",")` is three pieces and `split("", ",")`
+/// is one empty piece. The pieces are slices of `s`; the list allocates.
+///
+/// An empty `sep` traps `assert` — no piece boundary exists, so the caller
+/// has violated a contract it could have checked (§2's trap rule, and the
+/// reviewed contract's kind). The guard is std's own, because the three
+/// lanes do not agree about the builtin's answer (F-0055).
+///
+/// ```wolf-doc-example
+/// var n = 0
+/// for p in str.split("a,,b", ",") { n = n + 1 }
+/// n = n + 0
+/// n == 3
+/// ```
+pub fn split(s: str, sep: str) -> List[str] {
+    if sep.is_empty() {
+        assert(false, "str.split: the separator cannot be empty")
     }
-    return none
+    s.split(sep)
+}
+
+/// `split` stopping after `n` pieces: at most `n` are produced and the
+/// LAST one keeps the whole unsplit remainder, separators and all. `n <= 0`
+/// produces no pieces at all — the honest reading of "at most n" — and
+/// `n == 1` is the whole string as one piece.
+///
+/// An empty `sep` traps `assert`, as `split`. Allocates the list; the
+/// pieces are slices of `s`. No other traps.
+///
+/// ```wolf-doc-example
+/// var n = 0
+/// for p in str.splitn("a,b,c", ",", 2) { n = n + 1 }
+/// n = n + 0
+/// n == 2
+/// ```
+pub fn splitn(s: str, sep: str, n: int) -> List[str] {
+    if sep.is_empty() {
+        assert(false, "str.splitn: the separator cannot be empty")
+    }
+    var out = List[str]()
+    if n <= 0 {
+        return out
+    }
+    var rest = s
+    var left = n
+    while left > 1 {
+        let at = rest.find(sep) else 0 - 1
+        if at < 0 {
+            left = 1
+        } else {
+            (mut out).push(rest[0..at])
+            rest = rest[at + sep.len..]
+            left = left - 1
+        }
+    }
+    (mut out).push(rest)
+    out
+}
+
+/// `split`'s pieces in REVERSE order — last piece first. The pieces
+/// themselves are not reversed and no byte moves: only the list order
+/// differs, so `rsplit(s, sep)` and `split(s, sep)` always have the same
+/// length and the same members.
+///
+/// An empty `sep` traps `assert`, as `split`. Allocates the list.
+///
+/// ```wolf-doc-example
+/// var first = "?"
+/// for p in str.rsplit("a,b,c", ",") { first = "{first}{p}" }
+/// first == "?cba"
+/// ```
+pub fn rsplit(s: str, sep: str) -> List[str] {
+    let parts = split(s, sep)
+    let n = parts.len
+    var out = List[str]()
+    var i = n
+    while i > 0 {
+        (mut out).push(parts[i - 1])
+        i = i - 1
+    }
+    out
+}
+
+/// The pieces of `s` before and after the FIRST occurrence of `sep`;
+/// `none` when `sep` does not occur — the pair is only meaningful
+/// together, so absence is one row and not two empty strings (§2).
+///
+/// The empty separator occurs at 0 (`find`'s contract), so
+/// `split_once(s, "")` is `("", s)` rather than a trap: unlike `split`
+/// there IS a well-defined answer, and this function's only obligation is
+/// to agree with `find`. Both pieces are slices of `s`. No traps.
+///
+/// ```wolf-doc-example
+/// let p = str.split_once("key=value=more", "=") else ("?", "?")
+/// p.0 == "key"
+/// p.1 == "value=more"
+/// let q = str.split_once("nosep", "=") else ("?", "?")
+/// q.0 == "?"
+/// ```
+pub fn split_once(s: str, sep: str) -> (str, str) ! {none} {
+    let at = s.find(sep)?
+    let head = s[0..at]
+    let tail = s[at + sep.len..]
+    (head, tail)
+}
+
+/// `split_once` at the LAST occurrence of `sep`: the pieces before and
+/// after it, or `none` when it does not occur. The empty separator occurs
+/// at `len(s)` (`rfind`'s contract), so `rsplit_once(s, "")` is `(s, "")`.
+/// Both pieces are slices of `s`. No traps.
+///
+/// This is the extension-and-stem shape: `rsplit_once("archive.tar.gz",
+/// ".")` is `("archive.tar", "gz")`, where `split_once` would have given
+/// `("archive", "tar.gz")`.
+///
+/// ```wolf-doc-example
+/// let p = str.rsplit_once("archive.tar.gz", ".") else ("?", "?")
+/// p.0 == "archive.tar"
+/// p.1 == "gz"
+/// let q = str.rsplit_once("nodot", ".") else ("?", "?")
+/// q.1 == "?"
+/// ```
+pub fn rsplit_once(s: str, sep: str) -> (str, str) ! {none} {
+    let at = s.rfind(sep)?
+    let head = s[0..at]
+    let tail = s[at + sep.len..]
+    (head, tail)
+}
+
+/// A fresh string with every NON-OVERLAPPING occurrence of `old` replaced
+/// by `new`, left to right, allocated in the ambient region. Scanning
+/// resumes AFTER each replacement, so `replace("aaa", "aa", "b")` is
+/// `"ba"` and a `new` that contains `old` does not feed itself.
+///
+/// An empty `old` traps `assert`, as `split` — and for the same three-lane
+/// reason (F-0055). No other traps.
+///
+/// ```wolf-doc-example
+/// str.replace("a,b,c", ",", ";") == "a;b;c"
+/// str.replace("aaa", "aa", "b") == "ba"
+/// str.replace("wolf", "z", "y") == "wolf"
+/// str.replace("héllo", "l", "L") == "héLLo"
+/// ```
+pub fn replace(s: str, old: str, new: str) -> str {
+    if old.is_empty() {
+        assert(false, "str.replace: the pattern cannot be empty")
+    }
+    s.replace(old, new)
+}
+
+/// `replace` stopping after `n` replacements; the rest of `s` is copied
+/// unchanged. `n <= 0` replaces nothing and returns `s`.
+///
+/// An empty `old` traps `assert`, as `replace`. No other traps.
+///
+/// ```wolf-doc-example
+/// str.replacen("a,b,c", ",", ";", 1) == "a;b,c"
+/// str.replacen("a,b,c", ",", ";", 9) == "a;b;c"
+/// str.replacen("a,b,c", ",", ";", 0) == "a,b,c"
+/// ```
+pub fn replacen(s: str, old: str, new: str, n: int) -> str {
+    if old.is_empty() {
+        assert(false, "str.replacen: the pattern cannot be empty")
+    }
+    var out = ""
+    var rest = s
+    var left = n
+    while left > 0 {
+        let at = rest.find(old) else 0 - 1
+        if at < 0 {
+            left = 0
+        } else {
+            let head = rest[0..at]
+            out = "{out}{head}{new}"
+            rest = rest[at + old.len..]
+            left = left - 1
+        }
+    }
+    "{out}{rest}"
 }
 
 /// `s` with every code point lowercased, freshly allocated in the ambient
 /// region. Total: no error row, no traps beyond allocation.
 ///
 /// The mapping is the implementation's, and it is worth stating plainly:
-/// the sprint contract planned ASCII-only case mapping here, but the
-/// pinned interpreter performs simple Unicode case mapping (`"ÉA"`
+/// the sprint contract planned ASCII-only case mapping here, but every
+/// pinned implementation performs simple Unicode case mapping (`"ÉA"`
 /// lowercases to `"éa"`). std delegates rather than reimplement, because
-/// an in-library ASCII-only mapping is not writable without a byte
-/// accessor — so this function's contract is "the implementation's simple
-/// case mapping", and which mapping std should REQUIRE is the filed
+/// an in-library mapping would need the case tables nothing carries in
+/// wolf source yet — so this function's contract is "the implementation's
+/// simple case mapping", and which mapping std should REQUIRE is the filed
 /// unicode-tables decision (F-0018). Locale is never a parameter, in core,
 /// ever.
 ///
@@ -359,10 +613,10 @@ pub fn upper(s: str) -> str {
 /// case-folded forms. Total: no error row, no traps beyond allocation.
 ///
 /// The sprint contract names this "ASCII, named honestly". The honest name
-/// at this pin drops the ASCII: the folding is `lower`'s, which the pinned
-/// interpreter performs over all of Unicode. Callers get case-insensitive
-/// comparison as strong as the implementation's `lower` — never weaker,
-/// and never locale-sensitive.
+/// at this pin drops the ASCII: the folding is `lower`'s, which every
+/// pinned implementation performs over all of Unicode. Callers get
+/// case-insensitive comparison as strong as the implementation's `lower` —
+/// never weaker, and never locale-sensitive.
 ///
 /// ```wolf-doc-example
 /// str.eq_ignore_case("WOLF", "wolf") == true
@@ -374,9 +628,14 @@ pub fn eq_ignore_case(a: str, b: str) -> bool {
 }
 
 /// `s` repeated `n` times, freshly allocated. `n == 0` gives the empty
-/// string, and so does a negative `n` — the implementation's answer,
-/// recorded because it is observable (`"ab".repeat(0 - 1)` is `""`, not a
-/// trap). Total: no error row, no traps beyond allocation.
+/// string. A NEGATIVE `n` traps `bounds` — the language's own fault, from
+/// the builtin, on all three lanes at this pin: "a repeat count cannot be
+/// negative" (`[mem.ub.defined]`). std does not guard it, because the trap
+/// is the right answer for a contract violation the caller could have
+/// checked (§2) and because a guard would hide the one place the
+/// implementations agree. Recorded as a change: sc03 measured this as `""`
+/// under the interpreter and this module's doc claimed it until sc09
+/// re-measured (F-0056).
 ///
 /// ```wolf-doc-example
 /// str.repeat("ab", 3) == "ababab"
@@ -388,8 +647,9 @@ pub fn repeat(s: str, n: int) -> str {
 }
 
 /// `s` with leading and trailing whitespace removed — a slice of `s`, no
-/// copy. Whitespace is Unicode `White_Space` (the builtin's set, pinned by
-/// this module's whitespace test). Total: no error row, no traps.
+/// copy. Whitespace is Unicode `White_Space` (the builtin's set, pinned
+/// code point by code point by `tests/str/trim_whitespace_set.lu`). Total:
+/// no error row, no traps.
 ///
 /// ```wolf-doc-example
 /// str.trim("  wolf  ") == "wolf"
@@ -402,11 +662,14 @@ pub fn trim(s: str) -> str {
 
 /// `s` with LEADING whitespace removed — a slice of `s`, no copy. Same
 /// whitespace set as `trim`, and the equality of the two sets is a test,
-/// not a hope. Total: no error row, no traps.
+/// not a hope (§9). Total: no error row, no traps.
 ///
-/// Written with the boundary-safe probe: each iteration matches one
-/// whitespace code point with `starts_with` and advances by exactly that
-/// code point's length, so the cursor is never anywhere but a boundary.
+/// This body was 95 lines until sc09: a `White_Space` table written as
+/// `starts_with` probes, because sc03 had no way to scan a string it did
+/// not already know the shape of. s37's builtin `trim_start` replaced the
+/// table with a delegation, and the whitespace-set test outlived it — what
+/// it pins now is the BUILTIN's set, which is what it was always really
+/// checking.
 ///
 /// ```wolf-doc-example
 /// str.trim_start("  wolf  ") == "wolf  "
@@ -414,24 +677,11 @@ pub fn trim(s: str) -> str {
 /// str.trim_start("   ") == ""
 /// ```
 pub fn trim_start(s: str) -> str {
-    var rest = s
-    var w = ws_len(rest)
-    while w > 0 {
-        rest = rest[w..]
-        w = ws_len(rest)
-    }
-    rest
+    s.trim_start()
 }
 
 /// `s` with TRAILING whitespace removed — a slice of `s`, no copy. Same
 /// whitespace set as `trim`. Total: no error row, no traps.
-///
-/// Derived rather than scanned backwards, because scanning backwards needs
-/// the boundary primitive this pin lacks: with `t = trim(s)` and
-/// `a = trim_start(s)`, the trailing run is exactly `len(a) - len(t)`
-/// bytes, and the offset where it starts is a boundary by construction.
-/// An all-whitespace `s` is the one case the arithmetic cannot see (both
-/// are empty), and it is handled first.
 ///
 /// ```wolf-doc-example
 /// str.trim_end("  wolf  ") == "  wolf"
@@ -439,12 +689,7 @@ pub fn trim_start(s: str) -> str {
 /// str.trim_end("   ") == ""
 /// ```
 pub fn trim_end(s: str) -> str {
-    let trimmed = s.trim()
-    if trimmed.len == 0 {
-        return ""
-    }
-    let started = trim_start(s)
-    s[..s.len - started.len + trimmed.len]
+    s.trim_end()
 }
 
 /// The lines of `s`, in order, each without its terminator. A trailing
@@ -457,6 +702,7 @@ pub fn trim_end(s: str) -> str {
 /// ```wolf-doc-example
 /// var seen = 0
 /// for line in str.lines("a\nb\n") { seen = seen + 1 }
+/// seen = seen + 0
 /// seen == 2
 /// ```
 pub fn lines(s: str) -> List[str] {
@@ -472,6 +718,7 @@ pub fn lines(s: str) -> List[str] {
 /// ```wolf-doc-example
 /// var seen = 0
 /// for word in str.words("  the   wolf  ") { seen = seen + 1 }
+/// seen = seen + 0
 /// seen == 2
 /// ```
 pub fn words(s: str) -> List[str] {
@@ -484,6 +731,10 @@ pub fn words(s: str) -> List[str] {
 /// or after the last part; an empty list joins to the empty string and a
 /// one-item list to that item. Allocates in the ambient region. Total: no
 /// error row, no traps beyond allocation.
+///
+/// `join` and `split` are inverses whenever no part contains `sep`:
+/// `join(sep, split(s, sep)) == s` for every `s` and every non-empty
+/// `sep`, which `tests/str/split_join_round_trip.lu` holds them to.
 ///
 /// ```wolf-doc-example
 /// var parts = List[str]()
@@ -506,6 +757,141 @@ pub fn join(sep: str, parts: List[str]) -> str {
         i = i + 1
     }
     out
+}
+
+/// The number of CODE POINTS in `s` — the count `len` deliberately does
+/// not give (§9: a function that counts code points says so in its name).
+/// O(bytes), and equal to `len(s)` exactly when `s` is ASCII.
+///
+/// Counted by the UTF-8 invariant rather than by decoding: a lead byte is
+/// anything outside 128..191, so the count is the number of non-
+/// continuation bytes and no arithmetic can overflow. Total: no error row,
+/// no traps beyond the byte view's allocation.
+///
+/// ```wolf-doc-example
+/// str.char_count("wolf") == 4
+/// str.char_count("héllo") == 5
+/// str.char_count("é🐺") == 2
+/// str.char_count("") == 0
+/// ```
+pub fn char_count(s: str) -> int {
+    let bs = s.bytes()
+    let n = bs.len
+    var seen = 0
+    var i = 0
+    while i < n {
+        let b = bs[i]
+        if b < 128 || b > 191 {
+            seen = seen + 1
+        }
+        i = i + 1
+    }
+    seen
+}
+
+/// The byte offset at which each code point of `s` STARTS, in order — the
+/// offset half of the blocked `chars()` (see the module header), and every
+/// offset in it is a boundary `get` will accept. `len(s)` is deliberately
+/// NOT included: this lists code points, and there is none at the end.
+///
+/// Allocates the list. Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var last = 0 - 1
+/// for at in str.char_offsets("héllo") { last = at }
+/// last == 5
+/// ```
+pub fn char_offsets(s: str) -> List[int] {
+    let bs = s.bytes()
+    let n = bs.len
+    var out = List[int]()
+    var i = 0
+    while i < n {
+        let b = bs[i]
+        if b < 128 || b > 191 {
+            (mut out).push(i)
+        }
+        i = i + 1
+    }
+    out
+}
+
+/// The Unicode SCALAR VALUES of `s`'s code points, in order — the interim
+/// face of the blocked `to_list_chars` (module header), in the `int`
+/// currency `std.unicode` already spells a code point with. Feed them to
+/// `std.unicode`'s classifiers: `unicode.is_ascii_digit(c)` over this list
+/// is the character classification a scanner wants, and it is the reason
+/// this function exists rather than waiting for `char`.
+///
+/// Total over every `str`: a `str` is valid UTF-8 by construction (D24), so
+/// the decode below has no error path and needs no validation — the
+/// version of it that DOES validate is `std.bytes.is_utf8`, over bytes
+/// nobody promised anything about. Allocates the list.
+///
+/// ```wolf-doc-example
+/// var sum = 0
+/// for c in str.code_points("aé") { sum = sum + c }
+/// sum = sum + 0
+/// sum == 330
+/// ```
+pub fn code_points(s: str) -> List[int] {
+    let bs = s.bytes()
+    let n = bs.len
+    var out = List[int]()
+    var i = 0
+    while i < n {
+        let b0 = bs[i]
+        if b0 < 128 {
+            (mut out).push(b0)
+            i = i + 1
+        } else if b0 < 224 {
+            let b1 = bs[i + 1]
+            (mut out).push((b0 - 192) * 64 + (b1 - 128))
+            i = i + 2
+        } else if b0 < 240 {
+            let b1 = bs[i + 1]
+            let b2 = bs[i + 2]
+            (mut out).push((b0 - 224) * 4096 + (b1 - 128) * 64 + (b2 - 128))
+            i = i + 3
+        } else {
+            let b1 = bs[i + 1]
+            let b2 = bs[i + 2]
+            let b3 = bs[i + 3]
+            let hi = (b0 - 240) * 262144 + (b1 - 128) * 4096
+            (mut out).push(hi + (b2 - 128) * 64 + (b3 - 128))
+            i = i + 4
+        }
+    }
+    out
+}
+
+/// Whether every code point in `s` is ASCII (below U+0080) — the cheap
+/// question a caller asks before treating byte offsets as character
+/// positions, and the one classification that needs no tables at all.
+/// The empty string is ASCII. Total: no error row, no traps beyond the
+/// byte view's allocation.
+///
+/// `is_ascii(s)` is exactly `char_count(s) == len(s)`, and it is a
+/// function rather than that expression because the equality is a fact
+/// about UTF-8 the caller should not have to know.
+///
+/// ```wolf-doc-example
+/// str.is_ascii("wolf-lang") == true
+/// str.is_ascii("héllo") == false
+/// str.is_ascii("") == true
+/// ```
+pub fn is_ascii(s: str) -> bool {
+    let bs = s.bytes()
+    let n = bs.len
+    var i = 0
+    while i < n {
+        let b = bs[i]
+        if b > 127 {
+            return false
+        }
+        i = i + 1
+    }
+    true
 }
 
 /// `s` copied into a fresh `std.strbuf.StrBuf` — the allocating

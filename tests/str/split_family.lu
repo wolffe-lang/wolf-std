@@ -1,0 +1,96 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str, str.split
+//!
+//! `split`, `splitn`, `rsplit`, `split_once` and `rsplit_once` — the split
+//! family and the four decisions it encodes: empty pieces are KEPT (so a
+//! split's length is one more than the separator count, always), `splitn`'s
+//! last piece keeps the unsplit remainder, `rsplit` reverses the ORDER and
+//! nothing else, and the `_once` pair is a tuple through an absence row so
+//! that "no separator" is one answer rather than two empty strings.
+//!
+//! The pieces are compared by joining them back with a marker rather than
+//! by index, because a `List[str]` cannot be indexed twice in one body
+//! under the container rules and because the concatenation witnesses ORDER,
+//! which is the property `rsplit` exists to change.
+
+use std.str
+
+fn main() -> !int {
+    var n = 0
+    for p in str.split("a,b,c", ",") { n = n + 1 }
+    if n == 3 {} else { return 1 }
+    var kept = 0
+    for p in str.split("a,,b", ",") { kept = kept + 1 }
+    if kept == 3 {} else { return 2 }
+    var whole = 0
+    for p in str.split("nosep", ",") { whole = whole + 1 }
+    if whole == 1 {} else { return 3 }
+    var of_empty = 0
+    for p in str.split("", ",") { of_empty = of_empty + 1 }
+    if of_empty == 1 {} else { return 4 }
+    var edges = 0
+    for p in str.split(",a,", ",") { edges = edges + 1 }
+    if edges == 3 {} else { return 5 }
+    var order = "|"
+    for p in str.split("a,b,c", ",") { order = "{order}{p}|" }
+    if order == "|a|b|c|" {} else { return 6 }
+    var wide = "|"
+    for p in str.split("é🐺é", "🐺") { wide = "{wide}{p}|" }
+    if wide == "|é|é|" {} else { return 7 }
+    var multi = "|"
+    for p in str.split("a::b", "::") { multi = "{multi}{p}|" }
+    if multi == "|a|b|" {} else { return 8 }
+    // splitn: at most n pieces, the last keeps the rest.
+    var two = "|"
+    for p in str.splitn("a,b,c", ",", 2) { two = "{two}{p}|" }
+    if two == "|a|b,c|" {} else { return 9 }
+    var one = "|"
+    for p in str.splitn("a,b,c", ",", 1) { one = "{one}{p}|" }
+    if one == "|a,b,c|" {} else { return 10 }
+    var plenty = "|"
+    for p in str.splitn("a,b,c", ",", 9) { plenty = "{plenty}{p}|" }
+    if plenty == "|a|b|c|" {} else { return 11 }
+    var none_at_all = 0
+    for p in str.splitn("a,b,c", ",", 0) { none_at_all = none_at_all + 1 }
+    if none_at_all == 0 {} else { return 12 }
+    var negative = 0
+    for p in str.splitn("a,b,c", ",", 0 - 1) { negative = negative + 1 }
+    if negative == 0 {} else { return 13 }
+    // rsplit: the same members, the other order.
+    var reversed = "|"
+    for p in str.rsplit("a,b,c", ",") { reversed = "{reversed}{p}|" }
+    if reversed == "|c|b|a|" {} else { return 14 }
+    var reversed_empties = 0
+    for p in str.rsplit("a,,b", ",") { reversed_empties = reversed_empties + 1 }
+    if reversed_empties == 3 {} else { return 15 }
+    // split_once / rsplit_once: the pair, and the miss.
+    let first = str.split_once("key=value=more", "=") else ("?", "?")
+    if first.0 == "key" {} else { return 16 }
+    if first.1 == "value=more" {} else { return 17 }
+    let last = str.rsplit_once("key=value=more", "=") else ("?", "?")
+    if last.0 == "key=value" {} else { return 18 }
+    if last.1 == "more" {} else { return 19 }
+    let stem = str.rsplit_once("archive.tar.gz", ".") else ("?", "?")
+    if stem.0 == "archive.tar" {} else { return 20 }
+    if stem.1 == "gz" {} else { return 21 }
+    let missing = str.split_once("nosep", "=") else ("?", "?")
+    if missing.0 == "?" {} else { return 22 }
+    let missing_r = str.rsplit_once("nosep", "=") else ("?", "?")
+    if missing_r.1 == "?" {} else { return 23 }
+    let at_edge = str.split_once("=v", "=") else ("?", "?")
+    if at_edge.0 == "" {} else { return 24 }
+    if at_edge.1 == "v" {} else { return 25 }
+    let wide_once = str.split_once("é🐺é", "🐺") else ("?", "?")
+    if wide_once.0 == "é" {} else { return 26 }
+    if wide_once.1 == "é" {} else { return 27 }
+    // The empty separator is `find`'s answer here, not `split`'s trap: it
+    // occurs at 0 for `split_once` and at `len` for `rsplit_once`.
+    let empty_sep = str.split_once("wolf", "") else ("?", "?")
+    if empty_sep.0 == "" {} else { return 28 }
+    if empty_sep.1 == "wolf" {} else { return 29 }
+    let empty_sep_r = str.rsplit_once("wolf", "") else ("?", "?")
+    if empty_sep_r.0 == "wolf" {} else { return 30 }
+    if empty_sep_r.1 == "" {} else { return 31 }
+    0
+}

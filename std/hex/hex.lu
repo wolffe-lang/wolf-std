@@ -4,21 +4,23 @@
 //!
 //! **The byte sequence is `List[int]`, and that is an interim with a
 //! filing behind it.** The sprint contract spells these functions over
-//! `bytes`, the type `std.bytes` describes; that module ships zero of its
-//! nine functions because no expression in wolf produces the numeric value
-//! of a byte and no type can hold invalid UTF-8 (F-0018, re-tested at
-//! these pins and unchanged). An encoder cannot wait for that: encoding is
-//! how bytes BECOME text, and a program that has bytes at all today has
-//! them as numbers it computed. So the currency here is `List[int]` with
-//! every element in 0..255 — documented, checked at the boundary, and
-//! trivially replaced by `Bytes` when `Bytes` exists, since every
-//! signature keeps its shape (F-0035).
+//! `bytes`, the type `std.bytes` describes. That module has code as of
+//! sc09 — eight of its nine functions, over exactly this currency — and it
+//! still describes a `Bytes` TYPE that does not exist: a byte-width element
+//! type that can hold invalid UTF-8 (F-0018/F-0057). So the currency here
+//! is unchanged and so is the interim: `List[int]` with every element in
+//! 0..255 — documented, checked at the boundary, and trivially replaced by
+//! `Bytes` when `Bytes` exists, since every signature keeps its shape
+//! (F-0035). `std.bytes` is now the module to reach for when a program
+//! wants to LOOK at those bytes rather than encode them.
 //!
-//! What this costs, stated plainly: `hex.encode(str)` does not exist and
-//! cannot, because there is no way to read a `str`'s bytes (that is
-//! `std.bytes.from_str`, blocked at the same root). Hex-encoding text is
-//! the single most common use of this module in other languages and it is
-//! exactly the one this pin cannot serve.
+//! What this costs is one function, and the cost is now a debt rather than
+//! a wall: `hex.encode(str)` still does not exist here, but it is
+//! WRITABLE at these pins — `s.bytes()` reads a `str`'s bytes on every
+//! lane (s37, and `std.bytes.from_str` wraps it), so the blocker F-0035
+//! recorded is gone and what remains is a `std.hex` sprint's work rather
+//! than a language gap. Hex-encoding text is the commonest use of this
+//! module in other languages; it is one delegation away.
 //!
 //! **Round-tripping is the doctrine** (the sprint contract's word): every
 //! encoder here ships beside its decoder, `decode(encode(b))` is `b` for

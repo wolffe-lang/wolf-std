@@ -4,10 +4,11 @@
 //! core.
 //!
 //! The byte sequence is `List[int]` with every element in 0..255, for the
-//! reason `std.hex`'s header gives at length: `std.bytes` ships no code at
-//! these pins because nothing in wolf produces a byte value (F-0018), and
-//! an encoder cannot wait for the type it converts (F-0035). Every
-//! signature keeps its shape when `Bytes` lands.
+//! reason `std.hex`'s header gives at length: the `Bytes` TYPE still does
+//! not exist (F-0018/F-0057), even though `std.bytes` has had code over
+//! this same currency since sc09, and an encoder cannot wait for the type
+//! it converts (F-0035). Every signature keeps its shape when `Bytes`
+//! lands.
 //!
 //! **Strictness is spelled in the name, and documented on each function.**
 //! `decode` is the strict RFC 4648 §4 profile: the standard alphabet, the

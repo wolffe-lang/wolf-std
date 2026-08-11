@@ -1,0 +1,43 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str, str.replace
+//!
+//! `replace` and `replacen`, and the three questions a replacer has to
+//! answer out loud: does scanning resume after the replacement (yes — so
+//! `replace("aaa", "aa", "b")` is `"ba"`, not `"bb"` and not an infinite
+//! walk), does a replacement that contains the pattern feed itself (no),
+//! and what does a count of zero or less mean (nothing is replaced).
+//!
+//! `replacen` is std's own loop over `find` rather than a builtin, so the
+//! multi-byte rows matter: every offset it slices at came from `find` and
+//! is therefore a code-point boundary, which is the property that makes the
+//! loop total instead of a trap waiting for a non-ASCII input.
+
+use std.str
+
+fn main() -> !int {
+    if str.replace("a,b,c", ",", ";") == "a;b;c" {} else { return 1 }
+    if str.replace("wolf", "wolf", "lupus") == "lupus" {} else { return 2 }
+    if str.replace("wolf", "z", "y") == "wolf" {} else { return 3 }
+    if str.replace("", "x", "y") == "" {} else { return 4 }
+    if str.replace("aaa", "aa", "b") == "ba" {} else { return 5 }
+    if str.replace("aaaa", "aa", "b") == "bb" {} else { return 6 }
+    if str.replace("a", "a", "aa") == "aa" {} else { return 7 }
+    if str.replace("a,b", ",", "") == "ab" {} else { return 8 }
+    if str.replace("héllo", "l", "L") == "héLLo" {} else { return 9 }
+    if str.replace("é🐺é", "🐺", "-") == "é-é" {} else { return 10 }
+    if str.replace("x", "x", "é") == "é" {} else { return 11 }
+    if str.replacen("a,b,c", ",", ";", 1) == "a;b,c" {} else { return 12 }
+    if str.replacen("a,b,c", ",", ";", 2) == "a;b;c" {} else { return 13 }
+    if str.replacen("a,b,c", ",", ";", 9) == "a;b;c" {} else { return 14 }
+    if str.replacen("a,b,c", ",", ";", 0) == "a,b,c" {} else { return 15 }
+    if str.replacen("a,b,c", ",", ";", 0 - 1) == "a,b,c" {} else { return 16 }
+    if str.replacen("wolf", "z", "y", 3) == "wolf" {} else { return 17 }
+    if str.replacen("aaa", "aa", "b", 1) == "ba" {} else { return 18 }
+    if str.replacen("héllo", "l", "L", 1) == "héLlo" {} else { return 19 }
+    if str.replacen("é🐺é", "é", "e", 1) == "e🐺é" {} else { return 20 }
+    if str.replacen("a", "a", "aa", 5) == "aa" {} else { return 21 }
+    // The two agree whenever the count cannot bind.
+    if str.replacen("a,b,c", ",", ";", 5) == str.replace("a,b,c", ",", ";") {} else { return 22 }
+    0
+}

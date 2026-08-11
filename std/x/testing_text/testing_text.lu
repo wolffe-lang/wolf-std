@@ -14,10 +14,13 @@
 //! `todo` off the compiler lane they run on today, to buy one assertion
 //! that runs on lupin either way.
 //!
-//! Its siblings do not exist yet for the older reason: `assert_ends_with`
-//! and a substring assertion need `ends_with`/`find`, which cannot be
-//! written at all (F-0018). When the boundary primitive lands, this
-//! module gains them and then dissolves into `std.testing`.
+//! Its siblings do not exist yet, and the reason is now the SAME as this
+//! module's own: `assert_ends_with` and a substring assertion need
+//! `ends_with`/`find`, which exist and execute as of s37 (sc09 spends
+//! them in `std.str`) — so what keeps all three out of the facade is
+//! purely the resolve-level half above, not the primitive. This module
+//! gains them and then dissolves into `std.testing` when a builtin `str`
+//! method stops costing every importer its wolfc lane.
 //!
 //! It delegates the failure line to `std.testing.fail` rather than
 //! printing its own: one concept, one name (§1), and the nursery may

@@ -1,0 +1,58 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.bytes, str.bytes
+//!
+//! `std.bytes`' container half: `from_str`, `len`, `is_empty`, `at` and
+//! `slice`. This is the module's first test file ever — it had no code
+//! until s37 gave it a producer — and what it pins is that byte indexing
+//! MEANS something here: `at(from_str("é"), 0)` is 195, the first byte of a
+//! two-byte code point, which is precisely the value `str` refuses to hand
+//! out and `Bytes` exists to expose (D25).
+//!
+//! The 0..255 element contract is visible in every assertion: a byte is a
+//! number in that range, and the multi-byte fixtures spell out the UTF-8
+//! encodings so that a change in the byte view would fail here rather than
+//! somewhere downstream.
+
+use std.bytes
+
+fn main() -> !int {
+    if bytes.len(bytes.from_str("wolf")) == 4 {} else { return 1 }
+    if bytes.len(bytes.from_str("é")) == 2 {} else { return 2 }
+    if bytes.len(bytes.from_str("🐺")) == 4 {} else { return 3 }
+    if bytes.len(bytes.from_str("")) == 0 {} else { return 4 }
+    if bytes.is_empty(bytes.from_str("")) {} else { return 5 }
+    if bytes.is_empty(bytes.from_str("x")) { return 6 }
+    if bytes.at(bytes.from_str("A"), 0) == 65 {} else { return 7 }
+    if bytes.at(bytes.from_str("wolf"), 3) == 102 {} else { return 8 }
+    // The encodings, spelled out: é is C3 A9, 🐺 is F0 9F 90 BA.
+    if bytes.at(bytes.from_str("é"), 0) == 195 {} else { return 9 }
+    if bytes.at(bytes.from_str("é"), 1) == 169 {} else { return 10 }
+    if bytes.at(bytes.from_str("🐺"), 0) == 240 {} else { return 11 }
+    if bytes.at(bytes.from_str("🐺"), 1) == 159 {} else { return 12 }
+    if bytes.at(bytes.from_str("🐺"), 2) == 144 {} else { return 13 }
+    if bytes.at(bytes.from_str("🐺"), 3) == 186 {} else { return 14 }
+    // slice: a fresh list, and every legal range answers.
+    let b = bytes.from_str("wolf")
+    if bytes.len(bytes.slice(b, 0, 4)) == 4 {} else { return 15 }
+    if bytes.len(bytes.slice(b, 1, 3)) == 2 {} else { return 16 }
+    if bytes.at(bytes.slice(b, 1, 3), 0) == 111 {} else { return 17 }
+    if bytes.at(bytes.slice(b, 1, 3), 1) == 108 {} else { return 18 }
+    if bytes.len(bytes.slice(b, 2, 2)) == 0 {} else { return 19 }
+    if bytes.len(bytes.slice(b, 4, 4)) == 0 {} else { return 20 }
+    if bytes.is_empty(bytes.slice(b, 0, 0)) {} else { return 21 }
+    // A slice through the middle of a code point is ORDINARY here — the
+    // freedom byte-land sells, and the reason `to_str` has to validate.
+    let wide = bytes.from_str("é")
+    if bytes.len(bytes.slice(wide, 0, 1)) == 1 {} else { return 22 }
+    if bytes.at(bytes.slice(wide, 0, 1), 0) == 195 {} else { return 23 }
+    // A byte list a program built itself is the same type, and every
+    // operation takes it.
+    var made = List[int]()
+    (mut made).push(104)
+    (mut made).push(105)
+    if bytes.len(made) == 2 {} else { return 24 }
+    if bytes.at(made, 1) == 105 {} else { return 25 }
+    if bytes.len(bytes.slice(made, 0, 1)) == 1 {} else { return 26 }
+    0
+}

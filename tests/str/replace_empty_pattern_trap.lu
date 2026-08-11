@@ -1,0 +1,16 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: conf.trap.map, std.str
+//!
+//! `replace` with an empty pattern traps `assert`, for `split`'s reason and
+//! with `split`'s guard (F-0055): there is no occurrence of nothing to
+//! replace, the three lanes disagree about what the builtin does with it,
+//! and std answers the same way everywhere by refusing before it delegates.
+
+use std.str
+
+fn main() -> !int {
+    let out = str.replace("a,b", "", "-")
+    if out == "a,b" {} else { return 1 }
+    0
+}

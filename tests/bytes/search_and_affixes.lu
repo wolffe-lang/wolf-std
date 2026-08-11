@@ -1,0 +1,61 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.bytes
+//!
+//! `find`, `starts_with` and `ends_with` over bytes — the byte-tier
+//! siblings of `std.str`'s, with the same contracts at the edges (the empty
+//! needle occurs at 0, a needle longer than the haystack is a miss, the
+//! empty affix always matches) so that a program moving between the two
+//! tiers does not have to relearn them.
+//!
+//! The row this file exists to catch: a byte search can find a match that
+//! is NOT a code-point boundary — `find(from_str("é"), [169])` is 1, the
+//! continuation byte — and that is correct behaviour here and impossible
+//! over `str`. It is also exactly why `to_str` must validate rather than
+//! trust its input.
+
+use std.bytes
+
+fn main() -> !int {
+    let hay = bytes.from_str("the wolf runs")
+    if (bytes.find(hay, bytes.from_str("wolf")) else 0 - 1) == 4 {} else { return 1 }
+    if (bytes.find(hay, bytes.from_str("the")) else 0 - 1) == 0 {} else { return 2 }
+    if (bytes.find(hay, bytes.from_str("runs")) else 0 - 1) == 9 {} else { return 3 }
+    if (bytes.find(hay, bytes.from_str("moon")) else 0 - 1) == 0 - 1 {} else { return 4 }
+    if (bytes.find(hay, bytes.from_str("")) else 0 - 1) == 0 {} else { return 5 }
+    if (bytes.find(bytes.from_str(""), bytes.from_str("")) else 0 - 1) == 0 {} else { return 6 }
+    if (bytes.find(bytes.from_str(""), bytes.from_str("x")) else 0 - 1) == 0 - 1 {} else {
+        return 7
+    }
+    if (bytes.find(bytes.from_str("ab"), bytes.from_str("abc")) else 0 - 1) == 0 - 1 {} else {
+        return 8
+    }
+    // Non-overlapping is not a question `find` asks: the FIRST match wins,
+    // wherever it starts.
+    if (bytes.find(bytes.from_str("aaa"), bytes.from_str("aa")) else 0 - 1) == 0 {} else {
+        return 9
+    }
+    if (bytes.find(bytes.from_str("baa"), bytes.from_str("aa")) else 0 - 1) == 1 {} else {
+        return 10
+    }
+    // A match inside a code point — legal here, impossible over `str`.
+    var continuation = List[int]()
+    (mut continuation).push(169)
+    if (bytes.find(bytes.from_str("é"), continuation) else 0 - 1) == 1 {} else { return 11 }
+    if bytes.starts_with(bytes.from_str("wolf"), bytes.from_str("wo")) {} else { return 12 }
+    if bytes.starts_with(bytes.from_str("wolf"), bytes.from_str("wolf")) {} else { return 13 }
+    if bytes.starts_with(bytes.from_str("wolf"), bytes.from_str("lf")) { return 14 }
+    if bytes.starts_with(bytes.from_str("wolf"), bytes.from_str("")) {} else { return 15 }
+    if bytes.starts_with(bytes.from_str(""), bytes.from_str("")) {} else { return 16 }
+    if bytes.starts_with(bytes.from_str("wo"), bytes.from_str("wolf")) { return 17 }
+    if bytes.ends_with(bytes.from_str("wolf"), bytes.from_str("lf")) {} else { return 18 }
+    if bytes.ends_with(bytes.from_str("wolf"), bytes.from_str("wolf")) {} else { return 19 }
+    if bytes.ends_with(bytes.from_str("wolf"), bytes.from_str("wo")) { return 20 }
+    if bytes.ends_with(bytes.from_str("wolf"), bytes.from_str("")) {} else { return 21 }
+    if bytes.ends_with(bytes.from_str("lf"), bytes.from_str("wolf")) { return 22 }
+    if bytes.ends_with(bytes.from_str("é"), continuation) {} else { return 23 }
+    // The byte-level near-miss `str.ends_with` also refuses: é is C3 A9 and
+    // © is C2 A9, one byte apart at the front.
+    if bytes.ends_with(bytes.from_str("é"), bytes.from_str("©")) { return 24 }
+    0
+}

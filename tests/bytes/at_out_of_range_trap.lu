@@ -1,0 +1,22 @@
+//! check: run(exit=trap(bounds))
+//! phase: run
+//! conforms: conf.trap.set, std.bytes
+//!
+//! `bytes.at` out of range traps `bounds` — the LANGUAGE's fault, from the
+//! language's own indexing, because `at` is `b[i]` and nothing else. This
+//! is the half of D25 that says byte indexing is legal: the operation
+//! exists here, and it is checked here exactly as `s[a..b]` is checked over
+//! `str`.
+//!
+//! The recoverable spelling is `std.list.get`, which raises `none`; a
+//! caller that could have compared against `len` and did not has violated a
+//! contract (§8), which is why this one ends the process.
+
+use std.bytes
+
+fn main() -> !int {
+    let b = bytes.from_str("wolf")
+    let past = bytes.at(b, 4)
+    if past == 0 {} else { return 1 }
+    0
+}

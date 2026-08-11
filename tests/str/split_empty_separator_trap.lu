@@ -1,0 +1,21 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: conf.trap.map, std.str
+//!
+//! An empty separator has no piece boundary, so `split` traps `assert`: a
+//! caller contract violation it could have checked, per §2's trap rule and
+//! the reviewed contract's kind.
+//!
+//! The guard is std's own and it exists because the LANES DISAGREE about
+//! the builtin (F-0055): `"abc".split("")` is refused as `unsupported` by
+//! lupin and by the checked tier, and answers one whole piece natively. A
+//! std function that delegated would have three behaviours; this one has
+//! one, and this file is what holds it to that.
+
+use std.str
+
+fn main() -> !int {
+    let pieces = str.split("a,b", "")
+    if pieces.len == 0 {} else { return 1 }
+    0
+}

@@ -1,0 +1,81 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str, str.split
+//!
+//! The property this family owes: **`join(sep, split(s, sep)) == s`, for
+//! every `s` and every non-empty `sep`** — unconditionally, including when
+//! `s` is empty, when it is all separators, when the separator is
+//! multi-byte, and when it does not occur at all. It holds because `split`
+//! keeps empty pieces; a `split` that dropped them would fail the first
+//! table row here, which is exactly why it does not.
+//!
+//! Written as a table plus one loop (§13's shape until closures land), so
+//! that the property is stated once and the rows are data. `replace`'s
+//! inverse-ish partner rides along: replacing a separator is the same walk,
+//! so `join(new, split(s, old)) == replace(s, old, new)` — a second
+//! property over the same rows, and the one that says the two functions
+//! agree about what an occurrence is.
+
+use std.str
+
+fn subject(i: int) -> str {
+    if i == 0 {
+        return "a,b,c"
+    }
+    if i == 1 {
+        return ""
+    }
+    if i == 2 {
+        return ","
+    }
+    if i == 3 {
+        return ",,,"
+    }
+    if i == 4 {
+        return "no-separator-here"
+    }
+    if i == 5 {
+        return ",leading"
+    }
+    if i == 6 {
+        return "trailing,"
+    }
+    if i == 7 {
+        return "a,,b"
+    }
+    if i == 8 {
+        return "é,🐺,é"
+    }
+    "one"
+}
+
+fn main() -> !int {
+    var i = 0
+    while i < 10 {
+        let s = subject(i)
+        let rebuilt = str.join(",", str.split(s, ","))
+        if rebuilt == s {} else { return 1 }
+        let swapped = str.join(";", str.split(s, ","))
+        if swapped == str.replace(s, ",", ";") {} else { return 2 }
+        i = i + 1
+    }
+    // The same property over a multi-byte separator, and over one whose
+    // pieces are multi-byte: the walk is byte-wise and the round trip does
+    // not care.
+    let wide = "é🐺é🐺é"
+    if str.join("🐺", str.split(wide, "🐺")) == wide {} else { return 3 }
+    if str.join("::", str.split("a::b::c", "::")) == "a::b::c" {} else { return 4 }
+    // A separator that does not occur: one piece, and joining one piece
+    // adds nothing.
+    if str.join(",", str.split("solo", ",")) == "solo" {} else { return 5 }
+    // `count` and `split` agree by construction: the piece count is the
+    // occurrence count plus one, for every subject above.
+    var k = 0
+    while k < 10 {
+        let s = subject(k)
+        let pieces = str.split(s, ",")
+        if pieces.len == str.count(s, ",") + 1 {} else { return 6 }
+        k = k + 1
+    }
+    0
+}
