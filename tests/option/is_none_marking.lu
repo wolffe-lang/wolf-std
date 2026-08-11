@@ -1,28 +1,22 @@
-//! check: run(exit=0, stdout="none for 4: false, none for 0: true")
+//! check: run(exit=0, stdout="miss: true, hit: false")
 //! phase: run
 //! conforms: std.option, err.else
 //!
-//! The `is_none` idiom — the complement of `exists`, the shape the
-//! blocked `option.is_none[T]` names (F-0002): absence as a bool via
-//! `else |_|` marking, no sentinel.
+//! `option.is_none` — `exists`'s complement, and the pair's agreement is
+//! the property worth pinning: for one producer and one input, exactly
+//! one of them is true.
 
-fn find_positive(x: int) -> int ! {None} {
+use std.option
+
+fn find_positive(x: int) -> int ! {none} {
     if x > 0 { return x }
-    return None
-}
-
-fn none_for(x: int) -> bool {
-    var absent = false
-    let _ = find_positive(x) else |_| {
-        absent = true
-        0
-    }
-    absent
+    return none
 }
 
 fn main() -> !int {
-    let a = none_for(4)
-    let b = none_for(0)
-    print("none for 4: {a}, none for 0: {b}")
-    if !a && b { 0 } else { 1 }
+    let miss = option.is_none(find_positive(0 - 4))
+    let hit = option.is_none(find_positive(4))
+    let agree = option.exists(find_positive(4)) && !hit
+    print("miss: {miss}, hit: {hit}")
+    if miss && !hit && agree { 0 } else { 1 }
 }

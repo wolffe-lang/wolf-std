@@ -1,0 +1,41 @@
+//! check: run(exit=0, stdout="deep 4, shallow -1, chained -1")
+//! phase: run
+//! conforms: std.option, err.else, err.propagate
+//!
+//! `option_flatten.flatten` — one layer of absence removed from a
+//! doubly-rowed value, beside the `?` propagation it is the explicit form
+//! of. The two misses are one miss by construction, since `none` carries
+//! no payload.
+//!
+//! This file is lupin-only and its ledger row says `fail(E0201)` on both
+//! compiler lanes: the entry declares `nest`, whose return type nests a
+//! row, and wolfc's grammar admits one `!` per type (F-0039). The
+//! rejection is the finding, held here as a test rather than described in
+//! a comment.
+
+use std.x.option_flatten
+
+fn nest(x: int) -> int ! {none} ! {none} {
+    if x < 0 { return none }
+    if x % 4 == 0 { return x / 4 }
+    return none
+}
+
+fn half(x: int) -> int ! {none} {
+    if x % 2 == 0 { return x / 2 }
+    return none
+}
+
+fn quarter(x: int) -> int ! {none} {
+    let h = half(x)?
+    let q = half(h)?
+    q
+}
+
+fn main() -> !int {
+    let deep = option_flatten.flatten(nest(16)) else 0 - 1
+    let shallow = option_flatten.flatten(nest(6)) else 0 - 1
+    let chained = quarter(6) else 0 - 1
+    print("deep {deep}, shallow {shallow}, chained {chained}")
+    if deep == 4 && shallow == 0 - 1 && chained == 0 - 1 { 0 } else { 1 }
+}

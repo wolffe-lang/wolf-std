@@ -38,7 +38,7 @@
 //!   worth shipping and would have to be deleted rather than migrated. It
 //!   lands with `char`, and `from_code` below is already its inverse.
 //!
-//! Absence is spelled `None` pending F-0003 (lupin does not resolve a
+//! Absence is spelled `none` pending F-0003 (lupin does not resolve a
 //! lowercase bare tag at a raise site; wolfc now does).
 
 /// The largest Unicode scalar value, U+10FFFF. Private: the bound belongs
@@ -47,7 +47,7 @@ fn max_code() -> int {
     1114111
 }
 
-/// `n` as a Unicode scalar value; `None` when `n` is not one — negative,
+/// `n` as a Unicode scalar value; `none` when `n` is not one — negative,
 /// above U+10FFFF, or in the surrogate range U+D800..U+DFFF, which UTF-8
 /// may never encode. This is the validating constructor: the one place a
 /// number becomes a code point.
@@ -63,22 +63,22 @@ fn max_code() -> int {
 /// (unicode.from_code(55296) else 0 - 1) == 0 - 1
 /// (unicode.from_code(57343) else 0 - 1) == 0 - 1
 /// ```
-pub fn from_code(n: int) -> int ! {None} {
+pub fn from_code(n: int) -> int ! {none} {
     if n < 0 {
-        return None
+        return none
     }
     if n > max_code() {
-        return None
+        return none
     }
     if n >= 55296 {
         if n <= 57343 {
-            return None
+            return none
         }
     }
     n
 }
 
-/// The number of bytes `c` occupies in UTF-8 — 1, 2, 3 or 4; `None` when
+/// The number of bytes `c` occupies in UTF-8 — 1, 2, 3 or 4; `none` when
 /// `c` is not a scalar value (`from_code`'s rules). Under the final
 /// `char`-typed signature this function is TOTAL and the row disappears:
 /// the row exists only because the interim's `int` can hold a non-scalar.
@@ -97,7 +97,7 @@ pub fn from_code(n: int) -> int ! {None} {
 /// (unicode.utf8_len(128058) else 0) == 4
 /// (unicode.utf8_len(1114112) else 0) == 0
 /// ```
-pub fn utf8_len(c: int) -> int ! {None} {
+pub fn utf8_len(c: int) -> int ! {none} {
     let code = from_code(c)?
     if code <= 127 {
         return 1

@@ -25,21 +25,17 @@ lupin = "run"
 # already executes the staged exemplar under `--checked` (miri-lite run
 # rung, s23) — the truthful ledger records what IS.
 wolfc = "run"
-native = "unsupported"
+# sc06 pin bump (trunk 29a9d9c): the native rung executes it. `print`
+# lowers to per-segment runtime writes now, which is what the exemplar
+# needed — an advance the pin brought, recorded in the bump's own commit.
+native = "run"
 
-# ---- std.option: the six idioms the blocked helpers name (F-0002) ----
+# ---- std.option: the six helpers, LANDED in sc06 (F-0002 retired) ----
+# Four here and two in the nursery. Every row is lupin-only: the helpers
+# are generic AND take a row, so the checked tier stops at the module
+# boundary (F-0015) and the native rung refuses monomorphization.
 
 [tests."option/or_else_default.lu"]
-lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
-
-[tests."option/expect_trap.lu"]
-lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
-
-[tests."option/flatten_propagate.lu"]
 lupin = "run"
 wolfc = "unsupported"
 native = "unsupported"
@@ -59,6 +55,22 @@ wolfc = "unsupported"
 native = "unsupported"
 
 [tests."option/is_none_marking.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+# ---- std.errors: the payload taxonomy (sc06) ----
+# The only sc06 module with two executing lanes: monomorphic structs and
+# ints throughout. The native rung refuses the renderers (an interpolated
+# string in value position is an allocating materialization, c08) and the
+# chain test (a `str` method in the producer, F-0018).
+
+[tests."errors/payload_shapes.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+[tests."errors/coarsen_and_chain.lu"]
 lupin = "run"
 wolfc = "unsupported"
 native = "unsupported"
@@ -91,7 +103,7 @@ lupin = "unsupported"
 wolfc = "unsupported"
 native = "unsupported"
 
-[tests."cmp/clamp_bad_range.lu"]
+[tests."cmp/clamp_bad_range_trap.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
 native = "unsupported"
@@ -127,6 +139,59 @@ native = "unsupported"
 lupin = "unsupported"
 wolfc = "unsupported"
 native = "unsupported"
+
+# sc06: the comparison family as a static contract. Trait dispatch runs
+# in no implementation (F-0002 / F-0004), so the pass/trap pair the sprint
+# asks for cannot exist for these seven — the ladder is the evidence, and
+# the file says so in its header rather than passing by not running.
+
+[tests."testing/comparison_contract.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# sc06: the float assertions. Monomorphic over f64, so lupin runs them;
+# the checked tier refuses every f64 literal (F-0026) and the native rung
+# refuses `std.testing` for the interpolation in `fail` (c08).
+
+[tests."testing/near_and_ulps.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."testing/near_far_trap.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."testing/near_nan_trap.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."testing/ulps_far_trap.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."testing/ulps_nan_mixed_trap.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+# sc06: the two-argument `assert` intrinsic, both halves. F-0020 (it
+# trapped when the condition HELD) is retired and these two files are
+# what keeps it retired; they import nothing, so all three lanes see them.
+
+[tests."testing/assert_msg_holds.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+[tests."testing/assert_msg_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
 
 # ---- std.iter: the F1 prototypes ----
 
@@ -298,6 +363,42 @@ native = "unsupported"
 
 [tests."x/list_eq/dedup_and_affixes.lu"]
 lupin = "unsupported"
+wolfc = "unsupported"
+native = "unsupported"
+
+# ---- sc06's three nursery residents, each with a diagnostic behind it ----
+# These are the only `fail(...)` rows in the tree besides F-0014's and
+# F-0030's, and both are the point: a rejection held as a test is a
+# finding that cannot rot.
+
+[tests."x/option_flatten/flatten_propagate.lu"]
+lupin = "run"
+# The entry's own `nest` returns `int ! {none} ! {none}`, and wolfc's
+# grammar admits one `!` per type in every position (F-0039). The
+# rejection is at PARSE, so the module never gets a chance either.
+wolfc = "fail(E0201)"
+native = "fail(E0201)"
+
+[tests."x/option_expect/expect_trap.lu"]
+lupin = "run"
+# `option_expect.expect`'s handler traps, so it produces nothing, and
+# wolfc types an `else` block by its last expression: `E0401: this is (),
+# but the else fallback must produce T`. A generic function has no `T` to
+# conjure — the missing bottom type, F-0040.
+wolfc = "fail(E0401)"
+native = "fail(E0401)"
+
+[tests."x/testing_text/starts_with_pass.lu"]
+lupin = "run"
+# A builtin `str` method makes wolfc `unsupported` at resolve (F-0018's
+# resolve-level half) — which is exactly why this assertion is outside
+# `std.testing`: there it would have taken `fail`/`unreachable`/`todo`
+# off the compiler lane with it.
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."x/testing_text/starts_with_trap.lu"]
+lupin = "run"
 wolfc = "unsupported"
 native = "unsupported"
 
@@ -607,7 +708,7 @@ lupin = "run"
 wolfc = "unsupported"
 native = "unsupported"
 
-[tests."fmt/pad_fill_must_be_one_byte.lu"]
+[tests."fmt/pad_fill_must_be_one_byte_trap.lu"]
 lupin = "run"
 wolfc = "unsupported"
 native = "unsupported"

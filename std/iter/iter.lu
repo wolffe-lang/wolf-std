@@ -13,7 +13,7 @@
 //! faked.
 //!
 //! INTERIM SPELLINGS, each part of the filing's evidence:
-//! - The end tag is `Done`, not the filed lowercase `done` (finding
+//! - The end tag is `done`, not the filed lowercase `done` (finding
 //!   F-0003: lowercase bare tags resolve in neither implementation).
 //! - `next` is a free function with an explicit `mut` first parameter,
 //!   not a method: at the sc01 pins lupin executes no user methods
@@ -40,12 +40,12 @@ pub fn range_iter(start: int, stop: int) -> RangeIter {
     RangeIter { cur: start, stop: stop }
 }
 
-/// The next element of the range, advancing the iterator; `Done` when
+/// The next element of the range, advancing the iterator; `done` when
 /// exhausted — the row is the end signal, consumed by `else`. No traps
 /// (checked arithmetic cannot overflow here: `cur < stop` bounds the
 /// increment).
-pub fn range_next(mut it: RangeIter) -> int ! {Done} {
-    if it.cur >= it.stop { return Done }
+pub fn range_next(mut it: RangeIter) -> int ! {done} {
+    if it.cur >= it.stop { return done }
     let v = it.cur
     it.cur = it.cur + 1
     v
@@ -64,11 +64,11 @@ pub fn list_cursor(take xs: List[int]) -> ListCursor {
     ListCursor { xs: xs, i: 0 }
 }
 
-/// The next element of the list, advancing the cursor; `Done` when
+/// The next element of the list, advancing the cursor; `done` when
 /// exhausted — the row is the end signal, consumed by `else`. No traps
 /// (the index is bounds-guarded before the read).
-pub fn list_next(mut c: ListCursor) -> int ! {Done} {
-    if c.i >= c.xs.len { return Done }
+pub fn list_next(mut c: ListCursor) -> int ! {done} {
+    if c.i >= c.xs.len { return done }
     let v = c.xs[c.i]
     c.i = c.i + 1
     v

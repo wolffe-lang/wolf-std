@@ -32,7 +32,7 @@
 //! `unsupported` under wolfc (`Map` is not typed there — the whole
 //! module is, honestly, freight), and the `[K: Eq]` five are
 //! `unsupported` under lupin too (no trait dispatch — F-0002/F-0004).
-//! Absence is spelled `None` pending F-0003.
+//! Absence is spelled `none` pending F-0003.
 
 use std.cmp
 
@@ -160,20 +160,20 @@ pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
     }
 }
 
-/// The value bound to `k`; `None` when the key is absent — the absence
+/// The value bound to `k`; `none` when the key is absent — the absence
 /// row, never a zero-value sentinel (§2). No traps.
 ///
 /// Prose, not a fenced example (§4): `Eq` dispatch executes in neither
 /// implementation at the pins (F-0002/F-0004), so a runnable example
 /// would be a doc bug. For a map binding `"a"` to `1`, `get(m, "a")` is
-/// `1` and `get(m, "z")` raises `None`.
-pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {None} {
+/// `1` and `get(m, "z")` raises `none`.
+pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
     for pair in m.pairs() {
         if cmp.Eq.eq(pair.0, k) {
             return pair.1
         }
     }
-    None
+    none
 }
 
 /// The value bound to `k`, or `d` when the key is absent — the eager
@@ -199,14 +199,14 @@ pub fn has[K: cmp.Eq, V](m: Map[K, V], k: K) -> bool {
     false
 }
 
-/// Removes `k`'s entry and returns the value it was bound to; `None`
+/// Removes `k`'s entry and returns the value it was bound to; `none`
 /// when the key was absent. No traps.
 ///
 /// Prose, not a fenced example (§4, `Eq` dispatch — F-0002). Note the
 /// implementation cost this signature hides at the pins: no builtin
 /// erases a key, so the body rebuilds the map without it — filed with
 /// F-0011 (a `Map` that cannot erase is not a `Map`).
-pub fn remove[K: cmp.Eq, V](mut m: Map[K, V], k: K) -> V ! {None} {
+pub fn remove[K: cmp.Eq, V](mut m: Map[K, V], k: K) -> V ! {none} {
     let v = get(m, k)?
     var out = Map[K, V]()
     for pair in m.pairs() {

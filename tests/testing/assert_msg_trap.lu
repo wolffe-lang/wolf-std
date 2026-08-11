@@ -1,0 +1,12 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.assert
+//!
+//! The other half of the two-argument intrinsic: a failing condition
+//! traps `assert` at the call's span. Its own entry file, per the
+//! convention — and the reason `assert_msg_holds.lu` is a separate one.
+
+fn main() -> !int {
+    assert(1 == 2, "one is not two")
+    0
+}

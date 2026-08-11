@@ -1,0 +1,17 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.assert
+//!
+//! `assert_near(nan, nan, eps)` TRAPS, and that is the documented
+//! decision rather than an oversight: every comparison against NaN is
+//! false, a tolerance says nothing about a value with no magnitude, and a
+//! test that means "both are NaN" says so with `float.is_nan` or with
+//! `assert_ulps`, which treats NaN as one value.
+
+use std.math.float
+use std.testing
+
+fn main() -> !int {
+    testing.assert_near(float.nan(), float.nan(), 1.0)
+    0
+}

@@ -1,0 +1,26 @@
+//! check: run(exit=0, stdout="two-argument assert is silent when it holds")
+//! phase: run
+//! conforms: std.testing, conf.trap.assert
+//!
+//! The F-0020 retirement, pinned. `assert(cond, msg)` landed trapping
+//! even when its condition HELD, which is the worst failure mode a test
+//! primitive has, and it is why sc01–sc05 wrote
+//! `if !cond { testing.fail(msg) }` everywhere. At these pins both
+//! implementations are silent on the holding path and `msg` is evaluated
+//! only on the failing one — so this file is what stops the interim from
+//! coming back by habit.
+//!
+//! No `use` line: `assert` is an intrinsic, not a std function, and
+//! nothing here needs the module.
+
+fn message() -> str {
+    "one is one"
+}
+
+fn main() -> !int {
+    assert(1 == 1, "one is one")
+    assert(2 > 1, message())
+    assert(true)
+    print("two-argument assert is silent when it holds")
+    0
+}

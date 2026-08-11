@@ -1,0 +1,47 @@
+//! member: true
+//!
+//! std.x.option_expect — `std.option`'s assert-on-absence helper, parked
+//! outside the facade for one missing type. Stability tier: x (nursery,
+//! D31 clock: it graduates INTO `std.option` verbatim, or is deleted, at
+//! the stdc02 closeout).
+//!
+//! Why it is here and not in `std.option`: the handler traps, so it
+//! produces no value — but wolfc types an `else |_| { … }` block by its
+//! last expression, `assert(false)` is `()`, and the block must produce
+//! `T` (`E0401: this is (), but the else fallback must produce T`). A
+//! MONOMORPHIC helper works around it with an unreachable dummy after the
+//! trap; a generic one has no `T` to conjure, and conjuring one is
+//! precisely what a bottom type (`never`, `!`) exists for. wolf does not
+//! spell one and D30's no-unwinding makes divergence ordinary rather than
+//! exceptional, so the gap is filed rather than papered over (F-0040).
+//! lupin accepts the diverging handler and executes it, which is where
+//! the evidence below comes from.
+//!
+//! One rejected body poisons a module for every importer, so the cost of
+//! keeping this beside `or`/`to_list`/`exists`/`is_none` would be their
+//! static ladder. It moves back on the pin that gives the language a
+//! bottom type or gives `else` a diverging-handler rule.
+
+/// `v`'s value, or a trap carrying `msg` when `v` is absent — the
+/// assertion form of absence handling, for a miss the caller has already
+/// ruled out by construction.
+///
+/// Rows: consumes `none`.
+/// Traps `assert` (`[conf.trap.map]`) on the miss, after printing one
+/// `FAILED: {msg}` line, exactly as `testing.fail` does. It never returns
+/// normally on a miss: a trap ends the process (D30, no unwinding), which
+/// is why this is the wrong tool for data-driven absence and the right
+/// one for an invariant.
+///
+/// Example (prose — a row value has no literal, F-0038; runnable in
+/// `tests/x/option_expect/expect_trap.lu`):
+/// `option_expect.expect(find(5), "5 is positive")` is `5`;
+/// `option_expect.expect(find(0), "0 is positive")` prints
+/// `FAILED: 0 is positive` and traps `assert`.
+pub fn expect[T](v: T ! {none}, msg: str) -> T {
+    let hit = v else |_| {
+        print("FAILED: {msg}")
+        assert(false)
+    }
+    hit
+}

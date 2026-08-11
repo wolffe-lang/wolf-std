@@ -1,0 +1,28 @@
+//! check: run(exit=0, stdout="float asserts: silent")
+//! phase: run
+//! conforms: std.testing, conf.trap.assert
+//!
+//! The grouped happy path for the two float assertions: exact equality,
+//! a value inside the tolerance, zero and one ulp apart, the two signed
+//! zeros (one step apart, not zero — they are distinct bit patterns),
+//! NaN against NaN under `assert_ulps`, and `f_max` against `+inf`.
+//! Grouping is safe here precisely because a satisfied assertion is
+//! silent and effect-free; the misses are in their own files.
+
+use std.math.float
+use std.testing
+
+fn main() -> !int {
+    testing.assert_near(1.5, 1.5, 0.0)
+    testing.assert_near(1.0, 1.0000001, 0.001)
+    testing.assert_near(float.inf(), float.inf(), 0.0)
+    testing.assert_near(0.0 - 0.0, 0.0, 0.0)
+    testing.assert_ulps(1.5, 1.5, 0)
+    testing.assert_ulps(1.0, float.from_bits(float.to_bits(1.0) + 1), 1)
+    testing.assert_ulps(0.0 - 0.0, 0.0, 1)
+    testing.assert_ulps(float.nan(), float.nan(), 0)
+    testing.assert_ulps(float.f_max(), float.inf(), 1)
+    testing.assert_ulps(0.0 - 1.0, 1.0, 9223372036854775807)
+    print("float asserts: silent")
+    0
+}

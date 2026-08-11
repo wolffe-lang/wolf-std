@@ -1,0 +1,20 @@
+//! check: run(exit=0, stdout="prefix assertions: silent")
+//! phase: run
+//! conforms: std.testing, std.str
+//!
+//! The satisfied side of the one string assertion, grouped: an ASCII
+//! prefix, the empty prefix (every string starts with it), the whole
+//! string, and a multi-byte prefix — `starts_with` is total over
+//! arbitrary UTF-8, which is the property that makes it the only string
+//! assertion std can offer (sc03, F-0018).
+
+use std.x.testing_text
+
+fn main() -> !int {
+    testing_text.assert_starts_with("wolf", "wo")
+    testing_text.assert_starts_with("wolf", "")
+    testing_text.assert_starts_with("wolf", "wolf")
+    testing_text.assert_starts_with("héllo", "hé")
+    print("prefix assertions: silent")
+    0
+}

@@ -1,32 +1,78 @@
 //! member: true
 //!
-//! std.testing — the assertion floor (sc06 owns the full story).
-//! Stability tier: core.
+//! std.testing — the assertion vocabulary, and the conventions that hold
+//! until `wolf test` exists (s39). Stability tier: core.
 //!
-//! `assert(cond)` — THE definition this sprint writes and files (F4):
-//! the language's one user-raised trap (`[conf.trap.map]`: `assert`).
-//! A satisfied assertion is silent and free of effects; a failed one
-//! traps `assert` at the call's span, in every profile. It is an
-//! intrinsic, not a prelude function: it must exist in the comptime
-//! sandbox as the witness primitive (s16) and at runtime under the same
-//! name — tier by context, one meaning. This module deliberately does
-//! NOT define a function named `assert`: a module item shadows the
-//! intrinsic module-wide (observed at the sc01 workbench, both
-//! implementations, E0402 arity), which would sever every helper here
-//! from the trap they raise.
+//! **`assert(cond)` and `assert(cond, msg)` are INTRINSICS, not functions
+//! here.** One name in both tiers — comptime witness (s16) and runtime
+//! user trap (`[conf.trap.map]`: `assert`) — silent and effect-free when
+//! satisfied, trapping at the call's span when not. This module
+//! deliberately defines nothing called `assert`: a module item shadows
+//! the intrinsic module-wide (file boundaries create no scopes) and there
+//! is no arity overloading, so a helper named `assert` would sever every
+//! function here from the trap it raises.
 //!
-//! BLOCKED (F4): the two-argument form `assert(cond, msg)`. It needs
-//! either arity overloading (the language has none — one name, one
-//! signature) or the intrinsic itself to grow the parameter; both are
-//! the filing's to decide. Until then `msg`-carrying assertion is
-//! spelled `if !cond { testing.fail(msg) }` — `fail` is that form.
+//! The two-argument form WORKS at these pins and the sc01 interim is
+//! retired with this sprint. It landed broken — `assert(1 == 1, "msg")`
+//! trapped even when the condition held (F-0020) — so sc01 through sc05
+//! wrote `if !cond { testing.fail(msg) }` everywhere. That spelling is no
+//! longer required: `assert(cond, msg)` is the msg-carrying assertion,
+//! `msg` is evaluated only on the failing path, and both implementations
+//! agree. The old spelling still works and the existing tests were not
+//! churned to change it.
 //!
-//! Rendering is minimal until sc05's fmt trait: helpers print one
-//! fixed line to stdout before trapping, and never render values.
+//! **A trap ends the process, so trap-testing is the RIG's job** (D30: no
+//! unwinding, no `catch`, no `recover` — this track will not be the one
+//! to bend it). The convention that follows, binding for every sc sprint
+//! and restated in API-CONVENTIONS §13:
+//!
+//! - Happy-path assertions GROUP into one entry file per theme. Grouping
+//!   is safe only because none of them trap when the code is right.
+//! - Every trap expectation is its OWN entry file, with
+//!   `check: run(exit=trap(kind))` naming the kind. One trap ends the
+//!   program, so a second expectation in the same file would never run.
+//! - Error-row expectations assert through `else |Tag(p)|`, tag AND
+//!   payload — the binding in `else |e|` is the tag itself and has no
+//!   members (`std.errors`' test is the worked example).
+//! - Table tests are a `List` of tuples plus a loop, until closures (c05).
+//! - Golden output rides the directive's `stdout=` hash; fixtures are
+//!   shared, never inlined twice.
+//!
+//! `cargo xtask std-test --lint-conventions` checks the mechanical half
+//! of that list, so it is a gate rather than a wish.
+//!
+//! **What executes, and what is freight.** Five of the twelve functions
+//! below are monomorphic and run: `fail`, `unreachable`, `todo`,
+//! `assert_near`, `assert_ulps`. The comparison family — `assert_eq`,
+//! `assert_ne`, `assert_lt`, `assert_le`, `assert_gt`, `assert_ge`,
+//! `assert_contains` — is generic over `cmp.Eq`/`cmp.Ord`, and NO
+//! implementation executes trait dispatch at these pins (F-0002,
+//! F-0004): the bodies typecheck against their bounds through wolfc's mem
+//! rung and run nowhere. That is stated per function rather than hidden,
+//! and it is the single largest reason this module is smaller in practice
+//! than it looks: at these pins the assertion a test actually writes is
+//! `assert(a == b, "…")` on concrete types, and these helpers are the
+//! names that become useful the day dispatch lands.
+//!
+//! **The thirteenth is in the nursery.** `assert_starts_with` lives in
+//! `std/x/testing_text`, and the measurement that put it there is worth
+//! recording: a builtin `str` method ANYWHERE in this module makes every
+//! importer of `std.testing` `unsupported` at resolve under wolfc
+//! (F-0018's resolve-level half). One helper would have cost the whole
+//! assertion floor its compiler lane — `fail`, `unreachable` and `todo`
+//! run there today — so it waits outside the facade and graduates in
+//! verbatim when `str` methods resolve.
+//!
+//! **Rendering stops at the relation.** No helper renders the values it
+//! compared: a generic renderer needs `Show` (F-0033) and the s38
+//! dispatch hook. `assert_eq` says which side of the relation broke and
+//! nothing else — a diff that lies about types would be worse than a
+//! sentence that admits it cannot show them.
 
 use std.cmp
+use std.math.float
 
-/// Unconditional failure: prints `msg` one line, then traps `assert`
+/// Unconditional failure: prints `msg` on one line, then traps `assert`
 /// (`[conf.trap.map]`). Never returns normally.
 ///
 /// Example (prose — a trapping call cannot sit in a boolean example):
@@ -43,21 +89,177 @@ pub fn unreachable() {
     fail("entered unreachable code")
 }
 
-/// Marks unfinished code: reaching it traps `assert` via `fail`,
-/// naming `msg` as what remains to build. Never returns normally.
+/// Marks unfinished code: reaching it traps `assert` via `fail`, naming
+/// `msg` as what remains to build. Never returns normally.
 pub fn todo(msg: str) {
     fail("not yet implemented: {msg}")
 }
 
 /// Asserts `a` equals `b` under `cmp.Eq`; a miss prints one line and
-/// traps `assert`. Values are not rendered until sc05's fmt trait.
+/// traps `assert`. Values are not rendered (`Show`, F-0033).
+///
+/// BLOCKED from executing: trait dispatch runs in no implementation at
+/// these pins (F-0002 / F-0004), so this body's evidence is its static
+/// ladder. Write `assert(a == b, "…")` on concrete types meanwhile.
 pub fn assert_eq[T: cmp.Eq](a: T, b: T) {
     if cmp.Eq.eq(a, b) {} else { fail("assert_eq: left != right") }
 }
 
-/// Asserts `a` differs from `b` under `cmp.Eq`; equality prints one
-/// line and traps `assert`. Values are not rendered until sc05's fmt
-/// trait.
+/// Asserts `a` differs from `b` under `cmp.Eq`; equality prints one line
+/// and traps `assert`. Values are not rendered (`Show`, F-0033).
+///
+/// BLOCKED from executing, as `assert_eq` (F-0002 / F-0004).
 pub fn assert_ne[T: cmp.Eq](a: T, b: T) {
     if cmp.Eq.eq(a, b) { fail("assert_ne: left == right") } else {}
+}
+
+/// Asserts `a < b` under `cmp.Ord`. A miss prints one line and traps
+/// `assert`.
+///
+/// BLOCKED from executing (F-0002 / F-0004), and doubly so for a reason
+/// worth knowing: the verdict comes back as a `cmp.Ordering`, and an
+/// enum's values cross a module boundary while nothing that INSPECTS them
+/// does (F-0029) — so even with dispatch, reading this result outside
+/// `std.cmp` needs that filing closed too.
+pub fn assert_lt[T: cmp.Ord](a: T, b: T) {
+    let verdict = cmp.Ord.cmp(a, b)
+    if verdict.is_lt() {} else { fail("assert_lt: left >= right") }
+}
+
+/// Asserts `a <= b` under `cmp.Ord`. A miss prints one line and traps
+/// `assert`. BLOCKED from executing exactly as `assert_lt`.
+pub fn assert_le[T: cmp.Ord](a: T, b: T) {
+    let verdict = cmp.Ord.cmp(a, b)
+    if verdict.is_le() {} else { fail("assert_le: left > right") }
+}
+
+/// Asserts `a > b` under `cmp.Ord`. A miss prints one line and traps
+/// `assert`. BLOCKED from executing exactly as `assert_lt`.
+pub fn assert_gt[T: cmp.Ord](a: T, b: T) {
+    let verdict = cmp.Ord.cmp(a, b)
+    if verdict.is_gt() {} else { fail("assert_gt: left <= right") }
+}
+
+/// Asserts `a >= b` under `cmp.Ord`. A miss prints one line and traps
+/// `assert`. BLOCKED from executing exactly as `assert_lt`.
+pub fn assert_ge[T: cmp.Ord](a: T, b: T) {
+    let verdict = cmp.Ord.cmp(a, b)
+    if verdict.is_ge() {} else { fail("assert_ge: left < right") }
+}
+
+/// Asserts `xs` contains an element equal to `x` under `cmp.Eq`. A miss
+/// prints one line and traps `assert`.
+///
+/// BLOCKED from executing (F-0002 / F-0004): the same bound, the same
+/// dispatch. The list is read once and iterated once, so the body is
+/// clean under the mem tier either way.
+pub fn assert_contains[T: cmp.Eq](xs: List[T], x: T) {
+    var found = false
+    for e in xs {
+        if cmp.Eq.eq(e, x) {
+            found = true
+        }
+    }
+    if found {} else { fail("assert_contains: no element equals the wanted value") }
+}
+
+/// Asserts `a` and `b` are within `eps` of each other — the absolute
+/// tolerance form, for a magnitude the test already knows.
+///
+/// NaN never passes: every comparison against NaN is false, so
+/// `assert_near(nan, nan, 1.0)` traps. That is deliberate — a test
+/// comparing two NaNs wants `float.is_nan` on each, and a tolerance says
+/// nothing about a value that has no magnitude. `+inf` against `+inf`
+/// passes, since their difference is not taken until they differ.
+///
+/// `eps` is used as written; a negative `eps` can never be satisfied and
+/// is not diagnosed (the caller's arithmetic, not this function's).
+///
+/// Traps `assert` on a miss, after one line. Executes on every lane that
+/// has `f64` at all (lupin and the native rung; the checked tier refuses
+/// float literals, F-0026).
+pub fn assert_near(a: f64, b: f64, eps: f64) {
+    if a == b {
+        return
+    }
+    let d = a - b
+    var m = d
+    if d < 0.0 {
+        // `d * (0.0 - 1.0)`, never `0.0 - d`: the latter turns -0.0 into
+        // +0.0 under round-to-nearest and loses the sign of a zero.
+        m = d * (0.0 - 1.0)
+    }
+    if m <= eps {} else { fail("assert_near: |left - right| exceeds eps") }
+}
+
+/// Asserts `a` and `b` are at most `n` representable steps apart — the
+/// RELATIVE tolerance a float test actually wants, in the currency
+/// `std.math.float` documents its accuracy in (sc04's ulp harness).
+///
+/// The distance is counted over IEEE totalOrder keys, so it is exact at
+/// every magnitude including across zero (`-0.0` and `+0.0` are one step
+/// apart, not zero: they are distinct bit patterns, which is what a bit
+/// distance measures) and it never traps on overflow.
+///
+/// NaN matches NaN and nothing else: two NaNs of any payload pass at any
+/// `n`, a NaN against a number never passes. Infinities are ordinary
+/// keys — `f_max` and `+inf` are one step apart.
+///
+/// Traps `assert` on a miss, after one line. Executes on lupin and the
+/// native rung.
+pub fn assert_ulps(a: f64, b: f64, n: int) {
+    // `!(x == x)`, never `x != x`: the native backend lowers `!=` on f64
+    // to an ordered comparison (F-0027 / wolf-lang#22).
+    let a_nan = !(a == a)
+    let b_nan = !(b == b)
+    if a_nan && b_nan {
+        return
+    }
+    if a_nan || b_nan {
+        fail("assert_ulps: one side is NaN and the other is not")
+        return
+    }
+    let ka = order_key(a)
+    let kb = order_key(b)
+    var lo = ka
+    var hi = kb
+    if kb < ka {
+        lo = kb
+        hi = ka
+    }
+    if within(lo, hi, n) {} else { fail("assert_ulps: more than n steps apart") }
+}
+
+/// `x`'s IEEE totalOrder key: the bit pattern for a positive float, and
+/// the sign-magnitude reflection for a negative one, so that `<` on keys
+/// is `<` on floats and the difference of two keys counts representable
+/// steps. Private.
+fn order_key(x: f64) -> int {
+    let bits = float.to_bits(x)
+    if bits < 0 {
+        // INT_MIN - bits: exact for every negative pattern (`-0.0`'s
+        // INT_MIN maps to 0, all-ones maps to INT_MIN + 1), and never
+        // overflows because the result stays in [INT_MIN + 1, 0].
+        let int_min: int = -9223372036854775808
+        return int_min - bits
+    }
+    bits
+}
+
+/// `hi - lo <= n` computed so that no intermediate leaves `int`. Checked
+/// arithmetic traps on overflow (X3), and two keys can be nearly the full
+/// range apart, so the straddling case is answered without subtracting.
+/// Private.
+fn within(lo: int, hi: int, n: int) -> bool {
+    if lo > 0 {
+        return hi - lo <= n
+    }
+    if hi <= 0 {
+        return hi - lo <= n
+    }
+    if hi > n {
+        return false
+    }
+    let up = 0 - lo
+    up <= n - hi
 }

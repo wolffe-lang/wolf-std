@@ -1,0 +1,209 @@
+//! member: true
+//!
+//! std.errors — the payload half of the error taxonomy: what a row tag
+//! carries, how it is read, how it is rendered, and how a precise error
+//! becomes a coarse one on purpose. Stability tier: core.
+//!
+//! **The taxonomy in five rules** (API-CONVENTIONS §12 is the binding
+//! statement; this module is its worked home, as `std.option` is §2's):
+//!
+//! 1. A **mark** is a payload-free tag and is spelled lowercase:
+//!    `none`, `gone`, `eof`, `done`, `parse`, `base`, `utf8`, `overflow`,
+//!    `div_zero`, `deep`, `boundary`. Every row std shipped in sc01–sc05
+//!    is a mark, and after sc06's rename every one of them is lowercase
+//!    in the source too.
+//! 2. A **payload-carrying** tag is CapCase and names its payload type:
+//!    `Parse(ParseErr)`. The payload is DATA — position, limit, the
+//!    offending value — never a pre-rendered string. A caller that wants
+//!    a sentence calls `describe`; a caller that wants to recover reads
+//!    the fields.
+//! 3. One tag per failure mode **the caller can act on**, not per call
+//!    site. `hex.decode` raising one `parse` for both "odd length" and
+//!    "bad digit" is right while no caller can act differently on them;
+//!    it becomes `Parse(ParseErr)` the day the offset is worth reporting.
+//! 4. **Absence is not an error.** `none` never carries a payload and
+//!    never joins an error row's vocabulary of causes; "there is nothing
+//!    here" and "this went wrong" are different questions (§2).
+//! 5. **Coarsening is a named operation** the caller opts into —
+//!    `coarsen` below is the exemplar — never something a std signature
+//!    does silently, and never a `From` conversion (there is none, D30).
+//!
+//! **The chain idiom, documented rather than invented.** wolf has no
+//! existentials and no boxing, so an error cannot hold an arbitrary other
+//! error. A cause is carried as a FIELD of the coarse payload: `Failure`
+//! keeps the `cause` kind of the `ParseErr` it came from, which is enough
+//! to say "the config failed at byte 12 because a number was malformed"
+//! without a type that can hold anything. Where a wrapper needs more, it
+//! grows a field of its own — a named field is the whole mechanism, and
+//! `std.json`'s `escape`-inside-`json` case is the shape it serves.
+//!
+//! **Why kinds are `int` and not an enum.** An enum's VALUES cross a
+//! module boundary but nothing that inspects them does (F-0029): a
+//! `match` on an imported enum does not resolve, a method on one does not
+//! dispatch, and both compiler rungs refuse the shape. A caller of this
+//! module must be able to branch on the kind, so the kind is an `int`
+//! from a table this module owns and documents:
+//!
+//! - `0` unspecified — the kind was not recorded
+//! - `1` not a value of this type (a byte that cannot start or continue
+//!   one — the commonest `parse` cause)
+//! - `2` unexpected end of input
+//! - `3` trailing text after a complete value
+//! - `4` the value is outside the type's range
+//!
+//! The table becomes an enum in the sprint that closes F-0029, with these
+//! numbers as its discriminants, and `describe` is where the mapping to
+//! words already lives so that no caller has written its own.
+//!
+//! **Rendering stops at the payload.** `describe` renders THIS module's
+//! payload types and nothing else: a generic `describe[T: Show]` needs
+//! the `Show` trait proposed with the format-spec amendment (F-0033) and
+//! the s38 dispatch hook, so it is not written here. Nor is there
+//! overloading — one name, one signature — which is why the two
+//! renderers below are `describe` and `describe_failure` rather than one
+//! name twice.
+//!
+//! **Lanes**: everything here is monomorphic over structs and `int`, so
+//! lupin and the checked tier both execute it; the native rung refuses
+//! the two renderers because an interpolated string in value position is
+//! an allocating materialization it does not lower yet (c08).
+
+/// The payload of a `Parse(ParseErr)` row: WHERE the text stopped being a
+/// value of the wanted type, and WHICH way it failed.
+///
+/// `offset` is a byte offset from the start of the input (§9: byte
+/// offsets are the one currency) and is `0` when the position is not
+/// known. `kind` is a code from the module header's table. Both fields
+/// are public and readable directly (`e.offset`); the accessors exist for
+/// the call sites that read better with a name.
+pub struct ParseErr {
+    offset: int,
+    kind: int,
+}
+
+/// The payload of a coarsened row: a failure that happened at a position,
+/// remembering the kind of the precise error it came from.
+///
+/// `cause` is the `kind` of the `ParseErr` this was coarsened from, or
+/// `0` when there was none — the chain idiom of the module header, which
+/// is a field and not a hidden box.
+pub struct Failure {
+    offset: int,
+    cause: int,
+}
+
+/// A `ParseErr` at byte `offset` with kind `kind` (the header's table).
+/// The canonical constructor: raise sites write
+/// `return Parse(errors.parse_err(i, 1))` rather than a struct literal,
+/// so that a field added later does not break them.
+///
+/// Total: no rows, no traps. A negative `offset` or an unknown `kind` is
+/// not rejected — this type reports a failure and must never become one.
+///
+/// ```wolf-doc-example
+/// let e = errors.parse_err(7, 2)
+/// e.offset == 7
+/// e.kind == 2
+/// ```
+pub fn parse_err(offset: int, kind: int) -> ParseErr {
+    ParseErr { offset: offset, kind: kind }
+}
+
+/// The byte offset `e` reports. The named accessor of the `offset` field
+/// — the `offset_of` convention every position-carrying payload in std
+/// answers to, so that a caller reads one spelling across payload types.
+///
+/// Total: no rows, no traps.
+///
+/// ```wolf-doc-example
+/// errors.offset_of(errors.parse_err(12, 1)) == 12
+/// errors.offset_of(errors.parse_err(0, 0)) == 0
+/// ```
+pub fn offset_of(e: ParseErr) -> int {
+    e.offset
+}
+
+/// One line of English for `e`: what went wrong and where. The rendering
+/// convention — a payload is data, and `describe` is the one place that
+/// turns it into words, so no two callers word it differently.
+///
+/// The text names the kind from the header's table and always ends with
+/// the byte offset. Unknown kinds render as "not a value of that type",
+/// deliberately: a code from a newer library version must still produce a
+/// sentence.
+///
+/// Total: no rows, no traps.
+///
+/// ```wolf-doc-example
+/// errors.describe(errors.parse_err(4, 2)) == "unexpected end of input at byte 4"
+/// errors.describe(errors.parse_err(0, 3)) == "trailing text after a complete value at byte 0"
+/// errors.describe(errors.parse_err(9, 99)) == "not a value of that type at byte 9"
+/// ```
+pub fn describe(e: ParseErr) -> str {
+    let what = kind_text(e.kind)
+    "{what} at byte {e.offset}"
+}
+
+/// One line of English for a coarsened failure, naming its cause when it
+/// has one. The counterpart of `describe`, spelled with the payload type
+/// in its name because wolf has no overloading (§1: one concept, one
+/// name — and two payload types are two concepts).
+///
+/// Total: no rows, no traps.
+///
+/// ```wolf-doc-example
+/// errors.describe_failure(errors.coarsen(errors.parse_err(4, 2))) == "failed at byte 4: unexpected end of input"
+/// errors.describe_failure(errors.coarsen(errors.parse_err(1, 0))) == "failed at byte 1"
+/// ```
+pub fn describe_failure(f: Failure) -> str {
+    if f.cause == 0 {
+        return "failed at byte {f.offset}"
+    }
+    let why = kind_text(f.cause)
+    "failed at byte {f.offset}: {why}"
+}
+
+/// `e` widened into a `Failure`: the precise parse error becomes "this
+/// operation failed here, and here is why it did" — the exemplar of §2's
+/// coarsening rule.
+///
+/// The rule it exists to demonstrate: a function whose row is
+/// `{Failed(Failure)}` may not silently absorb a callee's
+/// `{Parse(ParseErr)}`. It calls THIS, at the site, in the caller's own
+/// source, so that a reader sees precision being given up. There is no
+/// `From` conversion and none is wanted (D30): coarsening is a decision,
+/// not a coercion.
+///
+/// The kind survives as `cause` (the chain idiom), so nothing is lost
+/// that a message needs; what is given up is the ability to BRANCH on the
+/// kind, which is exactly what coarsening means.
+///
+/// Total: no rows, no traps.
+///
+/// ```wolf-doc-example
+/// let wide = errors.coarsen(errors.parse_err(5, 1))
+/// wide.offset == 5
+/// wide.cause == 1
+/// ```
+pub fn coarsen(e: ParseErr) -> Failure {
+    Failure { offset: e.offset, cause: e.kind }
+}
+
+/// The header table's words for one kind code. Private: the mapping is
+/// `describe`'s and `describe_failure`'s shared property, and a caller
+/// who wants the words calls one of them.
+fn kind_text(kind: int) -> str {
+    if kind == 0 {
+        return "unspecified failure"
+    }
+    if kind == 2 {
+        return "unexpected end of input"
+    }
+    if kind == 3 {
+        return "trailing text after a complete value"
+    }
+    if kind == 4 {
+        return "value out of range"
+    }
+    "not a value of that type"
+}

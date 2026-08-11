@@ -1,0 +1,16 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.assert
+//!
+//! Two adjacent doubles are one step apart, so a budget of zero traps.
+//! The pair is built through `to_bits`/`from_bits` rather than written as
+//! literals: a decimal literal cannot name its own neighbour.
+
+use std.math.float
+use std.testing
+
+fn main() -> !int {
+    let next = float.from_bits(float.to_bits(1.0) + 1)
+    testing.assert_ulps(1.0, next, 0)
+    0
+}

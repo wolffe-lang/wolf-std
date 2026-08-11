@@ -1,43 +1,150 @@
 //! member: true
 //!
-//! std.option — the absence convention over `!T` rows. Stability tier:
-//! core. There is no `?T` and no null (D30): absence is the row tag
-//! `none` — `fn find(…) -> int ! {none}` — consumed by `else` (default
-//! and `|pat|` forms) and propagated by `?`. Domain-specific absence
-//! tags (`eof`, `gone` — `weak.upgrade()` already returns `T ! {gone}`
-//! per `[mem.shared.rc.3]`) are legal where the noun earns it; `none`
-//! is the default. API-CONVENTIONS §2 is the binding statement; this
-//! module is its worked home.
+//! std.option — the absence convention over `!T` rows, and the six
+//! helpers that name its commonest shapes. Stability tier: core.
 //!
-//! INTERIM SPELLING (finding F-0003): the convention's tag is lowercase
-//! `none`, but neither pinned implementation resolves a lowercase bare
-//! tag in raise position (lupin: `does not resolve`, exit 4; wolfc:
-//! E0301). Until that lands, std spells the tag `None`; the flip to
-//! `none` rides the pin bump that fixes it, in the same commit.
+//! There is no `?T` and no null (D30): absence is the row tag `none` —
+//! `fn find(…) -> int ! {none}` — consumed by `else` (default and
+//! `|pat|` forms) and propagated by `?`. Domain-specific absence tags
+//! (`eof`, `gone` — `weak.upgrade()` already returns `T ! {gone}` per
+//! `[mem.shared.rc.3]`) are legal where the noun earns it; `none` is the
+//! default. API-CONVENTIONS §2 is the binding statement; this module is
+//! its worked home.
 //!
-//! THE SIX HELPERS — ALL BLOCKED AT THE sc01 PINS (finding F-0002).
-//! Error rows exist only in return position: `!` in a parameter or
-//! `let` type is a parse error in the pinned grammar and in both
-//! implementations (E0201, observed at the sc01 workbench). A helper
-//! over an absence value therefore cannot be written — there is no type
-//! that names its argument. Each signature below is the reviewed shape
-//! that lands when rows become reifiable (or when the s16 generic-data
-//! thaw gives `Option[T]` and the s15 `try` bridge); until then the
-//! language form on the right IS the idiom, and this module's tests
-//! prove each one at the run rung:
+//! **THE SIX LAND HERE (sc06), five sprints after they were designed.**
+//! They were blocked from sc01 to sc05 by one grammar fact: a `!`-row
+//! parsed only in RETURN position, so no helper could name its own
+//! argument (F-0002, then its interpreter half F-0023). lupin 0.1.3
+//! landed rows in parameter and `let` positions and 0.1.4 executes them,
+//! so every signature this header used to carry as a comment is a body
+//! below. Each is thin over `else` by design — a reader learns the
+//! language form first, and these are names for the four commonest
+//! shapes plus the two that ask a question about absence:
 //!
-//! - `or[T](v: T ! {none}, default: T) -> T`      ≡ `v else default`
-//! - `expect[T](v: T ! {none}, msg: str) -> T`    ≡ `v else |_| { testing.fail(msg); … }`
-//!   (traps `assert` with `msg` on the miss)
-//! - `flatten` (collapse nested absence)          ≡ `f(x)?` chaining —
-//!   nested rows also cannot be spelled today: `(T ! {none}) ! {none}`
-//!   needs rows as first-class types twice over
-//! - `to_list[T](v: T ! {none}) -> List[T]`       ≡ 0/1 elements via
-//!   `else` around a push
-//! - `exists[T](v: T ! {none}) -> bool`           ≡ `else |_|` marking
-//! - `is_none[T](v: T ! {none}) -> bool`          ≡ `else |_|` marking
+//! - `or(v, default)`  ≡ `v else default`
+//! - `to_list(v)`      ≡ 0 or 1 elements
+//! - `exists(v)`       ≡ `else |_|` marking
+//! - `is_none(v)`      ≡ `else |_|` marking, negated
+//! - `expect(v, msg)`  ≡ `v else |_| { … trap … }` — written, executing,
+//!   and homed in `std/x/option_expect` (F-0040: a diverging handler
+//!   needs a bottom type wolf does not spell)
+//! - `flatten(v)`      ≡ collapsing `(T ! {none}) ! {none}` — written,
+//!   executing, and homed in `std/x/option_flatten` (F-0039: wolfc's
+//!   grammar admits one `!` per type)
 //!
-//! All six are thin over `else` by design — users learn the language
-//! form first; the helpers are names for the four commonest shapes.
-//! Lazy (closure-taking) variants additionally wait on c05, as the
-//! contract records.
+//! The two nursery residents are not a hedge: each is a complete body
+//! with a test, refused by ONE implementation for a reason with an issue
+//! number, and one rejected body poisons a module for every importer — so
+//! keeping them on this page would cost the other four their clean static
+//! ladder. They graduate back here verbatim, in the pin bump's own
+//! commit, when their diagnostics stop firing.
+//!
+//! **Absence has no literal, which is why nothing here carries a fenced
+//! example.** A row VALUE can only be produced by a function that raises:
+//! `none` resolves at a raise site and nowhere else, so `option.or(none,
+//! 9)` is `unsupported: none does not resolve` and there is no expression
+//! an example line could pass to any function on this page (F-0038). §4's
+//! rule then applies exactly as written — unrunnable means prose — and
+//! the runnable evidence lives in `tests/option/`: six entry files, one
+//! per helper, each with a local producer and both a hit and a miss.
+//!
+//! **The lane story**: these six are generic over `T` and take a row, so
+//! lupin runs them, the checked tier answers `unsupported` at the module
+//! boundary (F-0015: a raise inside an imported module's item), and the
+//! native rung refuses monomorphization. One executing lane is what a
+//! generic row helper gets at these pins, and it is the lane that matters
+//! here — the bodies are three lines each; what they encode is a
+//! convention.
+//!
+//! Lazy (closure-taking) variants — `or_else` and friends — still wait on
+//! c05, and `Option[T]`/`Result[T, E]` as DATA still wait on s16 plus the
+//! s15 `try` bridge. The recorded decision stands: std wants exactly one
+//! of reified rows or generic data, and now that the row helpers execute,
+//! the row half is the one carrying its weight.
+
+/// `v`'s value, or `default` when `v` is absent. The eager-default form:
+/// `default` is evaluated whether or not it is needed, so keep it cheap
+/// (a lazy `or_else` waits on closures, c05).
+///
+/// Rows: consumes `none` — the caller receives a `T` and no row.
+/// Total: no traps of its own.
+///
+/// Example (prose — a row value has no literal, F-0038; the runnable form
+/// is `tests/option/or_else_default.lu`): with
+/// `fn find(x: int) -> int ! {none}`, `option.or(find(5), 9)` is `5` and
+/// `option.or(find(0), 9)` is `9`.
+pub fn or[T](v: T ! {none}, default: T) -> T {
+    v else default
+}
+
+// `expect` IS WRITTEN AND IT IS NOT HERE EITHER — `std/x/option_expect`
+// holds it, blocked on the language's missing BOTTOM TYPE (F-0040). Its
+// handler traps and therefore produces nothing, but wolfc types an
+// `else |_| { … }` block by its last expression and `assert(false)` is
+// `()`: `E0401: this is (), but the else fallback must produce T`. For a
+// MONOMORPHIC helper the workaround is a dummy value after the trap
+// (`0`, unreachable); for a generic one there is no `T` to conjure, which
+// is exactly what a `never`/`!` type is for. lupin accepts the diverging
+// handler and runs it. Same containment reasoning as `flatten` above.
+
+// `flatten` IS WRITTEN AND IT IS NOT HERE — `std/x/option_flatten` holds
+// it, and the reason is a grammar divergence rather than a design choice
+// (F-0039). Its type is the only one of the six that nests a row inside a
+// row (`T ! {none} ! {none}`), and wolfc's grammar admits exactly one `!`
+// per type in every position: the nested form is `fail(E0201)` at PARSE
+// there, where lupin parses and executes it. A rejected body poisons the
+// whole module for every importer, so keeping `flatten` on this page
+// would cost the other five their clean static ladder — 5 rows moving
+// from `unsupported` (honest refusal, ladder proven) to `fail(E0201)`
+// (refused outright). The nursery is where sc01 put the same shape of
+// problem, and this is what it is for. The function moves back into this
+// module, verbatim, on the pin that makes wolfc's `type` production
+// right-recursive.
+
+/// `v` as a list: one element when present, empty when absent. The bridge
+/// from absence into the container vocabulary — `for x in
+/// option.to_list(v)` is the loop that runs zero times or once.
+///
+/// Rows: consumes `none`.
+/// Total: no traps. The list is allocated in the ambient region (§5).
+///
+/// Example (prose, F-0038; runnable in
+/// `tests/option/to_list_roundtrip.lu`): `option.to_list(find(5)).len` is
+/// `1` and `option.to_list(find(0)).len` is `0`.
+pub fn to_list[T](v: T ! {none}) -> List[T] {
+    var out = List[T]()
+    let hit = v else |_| { return out }
+    (mut out).push(hit)
+    out
+}
+
+/// True when `v` is present. This is the question `else` answers by
+/// marking, and answering it CONSUMES the value — a caller that wants the
+/// value should reach for `or`/`expect` rather than asking first and
+/// calling again.
+///
+/// Rows: consumes `none`.
+/// Total: no traps.
+///
+/// Example (prose, F-0038; runnable in `tests/option/exists_marking.lu`):
+/// `option.exists(find(5))` is `true`, `option.exists(find(0))` is
+/// `false`.
+pub fn exists[T](v: T ! {none}) -> bool {
+    let hit = v else |_| { return false }
+    true
+}
+
+/// True when `v` is absent — `exists`'s complement, shipped because
+/// `if option.is_none(v)` reads better than `if !option.exists(v)` at the
+/// call sites that ask it that way round. Same consumption caveat.
+///
+/// Rows: consumes `none`.
+/// Total: no traps.
+///
+/// Example (prose, F-0038; runnable in
+/// `tests/option/is_none_marking.lu`): `option.is_none(find(0))` is
+/// `true`, `option.is_none(find(5))` is `false`.
+pub fn is_none[T](v: T ! {none}) -> bool {
+    let hit = v else |_| { return true }
+    false
+}

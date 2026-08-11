@@ -1,0 +1,13 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.assert
+//!
+//! `assert_near` outside its tolerance traps `assert`. Its own entry
+//! file, because the trap ends the process.
+
+use std.testing
+
+fn main() -> !int {
+    testing.assert_near(1.0, 1.5, 0.1)
+    0
+}

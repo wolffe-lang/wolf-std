@@ -276,7 +276,7 @@ pub fn rem_euclid(a: int, b: int) -> int {
     r
 }
 
-/// `a + b`, or the `Overflow` mark when the sum leaves `int`. The
+/// `a + b`, or the `overflow` mark when the sum leaves `int`. The
 /// recoverable complement of `+`: same operands, no trap. Total — it
 /// never performs the operation it is asked to check.
 ///
@@ -286,21 +286,21 @@ pub fn rem_euclid(a: int, b: int) -> int {
 /// (math.checked_add(math.int_min(), -1) else -1) == -1
 /// (math.checked_add(math.int_max(), -1) else 0) == 9223372036854775806
 /// ```
-pub fn checked_add(a: int, b: int) -> int ! {Overflow} {
+pub fn checked_add(a: int, b: int) -> int ! {overflow} {
     if b > 0 {
         if a > int_max() - b {
-            return Overflow
+            return overflow
         }
     }
     if b < 0 {
         if a < int_min() - b {
-            return Overflow
+            return overflow
         }
     }
     a + b
 }
 
-/// `a - b`, or the `Overflow` mark when the difference leaves `int`.
+/// `a - b`, or the `overflow` mark when the difference leaves `int`.
 ///
 /// ```wolf-doc-example
 /// (math.checked_sub(5, 3) else 0) == 2
@@ -308,21 +308,21 @@ pub fn checked_add(a: int, b: int) -> int ! {Overflow} {
 /// (math.checked_sub(math.int_max(), -1) else 0) == 0
 /// (math.checked_sub(0, math.int_min()) else 0) == 0
 /// ```
-pub fn checked_sub(a: int, b: int) -> int ! {Overflow} {
+pub fn checked_sub(a: int, b: int) -> int ! {overflow} {
     if b < 0 {
         if a > int_max() + b {
-            return Overflow
+            return overflow
         }
     }
     if b > 0 {
         if a < int_min() + b {
-            return Overflow
+            return overflow
         }
     }
     a - b
 }
 
-/// `a * b`, or the `Overflow` mark when the product leaves `int`. The
+/// `a * b`, or the `overflow` mark when the product leaves `int`. The
 /// four sign cases are checked by division, so nothing here can trap.
 ///
 /// ```wolf-doc-example
@@ -332,7 +332,7 @@ pub fn checked_sub(a: int, b: int) -> int ! {Overflow} {
 /// (math.checked_mul(math.int_min(), -1) else 0) == 0
 /// (math.checked_mul(0, math.int_min()) else -1) == 0
 /// ```
-pub fn checked_mul(a: int, b: int) -> int ! {Overflow} {
+pub fn checked_mul(a: int, b: int) -> int ! {overflow} {
     if a == 0 {
         return 0
     }
@@ -345,44 +345,44 @@ pub fn checked_mul(a: int, b: int) -> int ! {Overflow} {
     // themselves overflow (`lo / -1`), so it answers first.
     if a == 0 - 1 {
         if b == lo {
-            return Overflow
+            return overflow
         }
         return 0 - b
     }
     if b == 0 - 1 {
         if a == lo {
-            return Overflow
+            return overflow
         }
         return 0 - a
     }
     if a > 0 {
         if b > 0 {
             if a > hi / b {
-                return Overflow
+                return overflow
             }
         }
         if b < 0 {
             if b < lo / a {
-                return Overflow
+                return overflow
             }
         }
     }
     if a < 0 {
         if b > 0 {
             if a < lo / b {
-                return Overflow
+                return overflow
             }
         }
         if b < 0 {
             if a < hi / b {
-                return Overflow
+                return overflow
             }
         }
     }
     a * b
 }
 
-/// `a / b` truncating toward zero, or the `DivZero` mark when `b` is 0.
+/// `a / b` truncating toward zero, or the `div_zero` mark when `b` is 0.
 /// The one fault it does NOT recover is `checked_div(int_min(), -1)`,
 /// whose quotient leaves `int`: that traps `overflow`, because the row
 /// this signature carries is about the divisor, not the range (the
@@ -395,9 +395,9 @@ pub fn checked_mul(a: int, b: int) -> int ! {Overflow} {
 /// (math.checked_div(1, 0) else -99) == -99
 /// (math.checked_div(0, 5) else -1) == 0
 /// ```
-pub fn checked_div(a: int, b: int) -> int ! {DivZero} {
+pub fn checked_div(a: int, b: int) -> int ! {div_zero} {
     if b == 0 {
-        return DivZero
+        return div_zero
     }
     a / b
 }

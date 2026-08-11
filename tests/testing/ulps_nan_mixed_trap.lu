@@ -1,0 +1,15 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.testing, conf.trap.assert
+//!
+//! NaN matches NaN and nothing else: a NaN against a number is not a
+//! large distance, it is no distance at all, so `assert_ulps` traps
+//! however generous the budget.
+
+use std.math.float
+use std.testing
+
+fn main() -> !int {
+    testing.assert_ulps(float.nan(), 1.0, 9223372036854775807)
+    0
+}

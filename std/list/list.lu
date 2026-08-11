@@ -24,7 +24,7 @@
 //! this module's.
 //!
 //! INTERIM SPELLINGS (each filed, flipped by the pin bump that fixes it):
-//! - Absence is spelled `None`, not the convention's `none`: wolfc does
+//! - Absence is spelled `none`, not the convention's `none`: wolfc does
 //!   not resolve a lowercase bare tag in raise position (E0301). lupin
 //!   0.1.1 resolves both — the divergence, not the convention, is the
 //!   reason we wait (F-0003).
@@ -68,7 +68,7 @@ pub fn push[T](mut xs: List[T], v: T) {
     (mut xs).push(v)
 }
 
-/// Removes and returns the last element; `None` when `xs` is empty —
+/// Removes and returns the last element; `none` when `xs` is empty —
 /// the absence row, consumed by `else` or `?`. No traps: emptiness is a
 /// recoverable outcome, not a contract violation (§2).
 ///
@@ -78,10 +78,10 @@ pub fn push[T](mut xs: List[T], v: T) {
 /// (list.pop(mut xs) else 0 - 1) == 7
 /// (list.pop(mut xs) else 0 - 1) == 0 - 1
 /// ```
-pub fn pop[T](mut xs: List[T]) -> T ! {None} {
+pub fn pop[T](mut xs: List[T]) -> T ! {none} {
     let n = len(xs)
     if n == 0 {
-        return None
+        return none
     }
     let v = at(xs, n - 1)
     truncate(mut xs, n - 1)
@@ -112,7 +112,7 @@ pub fn is_empty[T](xs: List[T]) -> bool {
     len(xs) == 0
 }
 
-/// The element at `i`, checked: `None` when `i` is negative or at least
+/// The element at `i`, checked: `none` when `i` is negative or at least
 /// `len(xs)` — the one checked-access spelling (§1: no `get_` prefix, no
 /// sentinel). No traps; the unchecked spelling is the language's `xs[i]`,
 /// which traps `bounds`.
@@ -124,12 +124,12 @@ pub fn is_empty[T](xs: List[T]) -> bool {
 /// (list.get(xs, 4) else 0 - 1) == 0 - 1
 /// (list.get(xs, 0 - 1) else 0 - 1) == 0 - 1
 /// ```
-pub fn get[T](xs: List[T], i: int) -> T ! {None} {
+pub fn get[T](xs: List[T], i: int) -> T ! {none} {
     if i < 0 {
-        return None
+        return none
     }
     if i >= len(xs) {
-        return None
+        return none
     }
     at(xs, i)
 }
@@ -164,7 +164,7 @@ pub fn set[T](mut xs: List[T], i: int, v: T) {
     xs = out
 }
 
-/// The first element; `None` when `xs` is empty. No traps.
+/// The first element; `none` when `xs` is empty. No traps.
 ///
 /// ```wolf-doc-example
 /// var xs = List[int]()
@@ -172,14 +172,14 @@ pub fn set[T](mut xs: List[T], i: int, v: T) {
 /// list.push(mut xs, 4)
 /// (list.first(xs) else 0) == 3
 /// ```
-pub fn first[T](xs: List[T]) -> T ! {None} {
+pub fn first[T](xs: List[T]) -> T ! {none} {
     for x in xs {
         return x
     }
-    None
+    none
 }
 
-/// The last element; `None` when `xs` is empty. No traps.
+/// The last element; `none` when `xs` is empty. No traps.
 ///
 /// ```wolf-doc-example
 /// var xs = List[int]()
@@ -187,10 +187,10 @@ pub fn first[T](xs: List[T]) -> T ! {None} {
 /// list.push(mut xs, 4)
 /// (list.last(xs) else 0) == 4
 /// ```
-pub fn last[T](xs: List[T]) -> T ! {None} {
+pub fn last[T](xs: List[T]) -> T ! {none} {
     let n = len(xs)
     if n == 0 {
-        return None
+        return none
     }
     at(xs, n - 1)
 }
@@ -367,7 +367,7 @@ pub fn truncate[T](mut xs: List[T], n: int) {
 // signature lands verbatim when `List` grows one.
 
 // BLOCKED — the `Eq` family: `contains[T: Eq](xs, v) -> bool`,
-// `index_of[T: Eq](xs, v) -> int ! {None}`, `last_index_of[T: Eq]`,
+// `index_of[T: Eq](xs, v) -> int ! {none}`, `last_index_of[T: Eq]`,
 // `dedup[T: Eq](mut xs)`, `starts_with[T: Eq](xs, prefix) -> bool`,
 // `ends_with[T: Eq](xs, suffix) -> bool` — six element-comparing
 // functions whose bodies exist, run nowhere, and cannot live here.

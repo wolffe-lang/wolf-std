@@ -20,7 +20,7 @@
 //! satisfied, which is the evidence that the signatures are writable at
 //! all.
 //!
-//! Absence is spelled `None` pending F-0003; the bodies obey std.list's
+//! Absence is spelled `none` pending F-0003; the bodies obey std.list's
 //! single-read rule (F-0005) via the local `len`/`at` helpers.
 
 use std.cmp
@@ -52,13 +52,13 @@ pub fn contains[T: cmp.Eq](xs: List[T], v: T) -> bool {
     false
 }
 
-/// The index of the first element equal to `v` under `Eq`; `None` when
+/// The index of the first element equal to `v` under `Eq`; `none` when
 /// no element matches. No traps.
 ///
 /// Prose, not a fenced example (§4, trait dispatch — F-0002): for
 /// `[5, 6, 5]`, `index_of(xs, 5)` is `0` and `index_of(xs, 9)` raises
-/// `None`.
-pub fn index_of[T: cmp.Eq](xs: List[T], v: T) -> int ! {None} {
+/// `none`.
+pub fn index_of[T: cmp.Eq](xs: List[T], v: T) -> int ! {none} {
     let n = len(xs)
     var k = 0
     while k < n {
@@ -67,15 +67,15 @@ pub fn index_of[T: cmp.Eq](xs: List[T], v: T) -> int ! {None} {
         }
         k = k + 1
     }
-    None
+    none
 }
 
-/// The index of the LAST element equal to `v` under `Eq`; `None` when no
+/// The index of the LAST element equal to `v` under `Eq`; `none` when no
 /// element matches. No traps.
 ///
 /// Prose, not a fenced example (§4, trait dispatch — F-0002): for
 /// `[5, 6, 5]`, `last_index_of(xs, 5)` is `2`.
-pub fn last_index_of[T: cmp.Eq](xs: List[T], v: T) -> int ! {None} {
+pub fn last_index_of[T: cmp.Eq](xs: List[T], v: T) -> int ! {none} {
     let n = len(xs)
     var k = n - 1
     while k >= 0 {
@@ -84,7 +84,7 @@ pub fn last_index_of[T: cmp.Eq](xs: List[T], v: T) -> int ! {None} {
         }
         k = k - 1
     }
-    None
+    none
 }
 
 /// Collapses runs of CONSECUTIVE equal elements (under `Eq`) to one,

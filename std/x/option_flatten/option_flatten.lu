@@ -1,0 +1,39 @@
+//! member: true
+//!
+//! std.x.option_flatten — `std.option`'s sixth helper, parked outside the
+//! facade for one grammar fact. Stability tier: x (nursery, D31 clock: it
+//! graduates INTO `std.option` verbatim, or is deleted, at the stdc02
+//! closeout).
+//!
+//! Why it is here and not in `std.option`, in one sentence: `flatten` is
+//! the only helper whose type nests a row inside a row
+//! (`T ! {none} ! {none}`), wolfc's grammar admits exactly one `!` per
+//! type in every position and calls the nested form `fail(E0201)` at
+//! parse, and one rejected body poisons a module for every importer —
+//! so keeping it beside the other five would cost them their clean static
+//! ladder (F-0039). lupin parses and executes the nested row, which is
+//! how the body below was written and tested.
+//!
+//! Nothing else is different: this is the reviewed signature from
+//! `std.option`'s header, with the same contract, the same tag, and the
+//! same one-executing-lane story. It moves back on the pin that makes
+//! wolfc's `type` production right-recursive, in that pin's own commit.
+
+/// One layer of absence removed: a doubly-absent value is absent, and an
+/// inner miss is absent too. The two misses are indistinguishable by
+/// construction — `none` carries no payload (§2), so there is nothing to
+/// tell an outer miss from an inner one, and a caller who needs to know
+/// wants two named tags rather than nesting.
+///
+/// Rows: raises `none` when either layer is absent.
+/// Total otherwise: no traps.
+///
+/// Example (prose — a row value has no literal, F-0038; runnable in
+/// `tests/x/option_flatten/flatten_propagate.lu`): with
+/// `fn nest(x: int) -> int ! {none} ! {none}`,
+/// `option_flatten.flatten(nest(16)) else 0 - 1` is `4` and
+/// `option_flatten.flatten(nest(6)) else 0 - 1` is `-1`.
+pub fn flatten[T](v: T ! {none} ! {none}) -> T ! {none} {
+    let inner = v else |_| { return none }
+    inner
+}

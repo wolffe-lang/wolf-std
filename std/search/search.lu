@@ -10,7 +10,7 @@
 //! than the search does. `std.sort.is_sorted` is the check, and the docs
 //! say to call it in a debug path if you cannot prove it.
 //!
-//! **Absence is a row, never a sentinel** (§2, §8): a miss raises `None`
+//! **Absence is a row, never a sentinel** (§2, §8): a miss raises `none`
 //! and no function here returns -1. `lower_bound` and `upper_bound` are
 //! the total complements — an insertion POSITION always exists, so they
 //! return a plain `int`.
@@ -40,7 +40,7 @@
 
 use std.cmp
 
-/// The index of some element equal to `x`, or `None` when `xs` holds
+/// The index of some element equal to `x`, or `none` when `xs` holds
 /// none. `xs` must be ascending (see the module header). On a run of
 /// equal elements the index returned is unspecified — `lower_bound` and
 /// `equal_range` are the functions that promise a position.
@@ -56,7 +56,7 @@ use std.cmp
 /// (search.binary_search(xs, 10) else -1) == 0
 /// (search.binary_search(xs, 25) else -1) == -1
 /// ```
-pub fn binary_search(xs: List[int], x: int) -> int ! {None} {
+pub fn binary_search(xs: List[int], x: int) -> int ! {none} {
     var lo = 0
     var hi = xs.len
     while lo < hi {
@@ -73,11 +73,11 @@ pub fn binary_search(xs: List[int], x: int) -> int ! {None} {
             hi = mid
         }
     }
-    None
+    none
 }
 
 /// The index of the one element for which `by` answers `Equal`, or
-/// `None`. `by` is a *probe*: it receives an element and reports how
+/// `none`. `by` is a *probe*: it receives an element and reports how
 /// that element compares to the sought value, so the value itself never
 /// crosses the boundary.
 ///
@@ -85,7 +85,7 @@ pub fn binary_search(xs: List[int], x: int) -> int ! {None} {
 /// outside the module that declares it is `unsupported` in both
 /// implementations (F-0029). The static ladder is clean and the body is
 /// the one that lands. Prose, not a fenced example, for that reason.
-pub fn binary_search_by(xs: List[int], by: fn(int) -> cmp.Ordering) -> int ! {None} {
+pub fn binary_search_by(xs: List[int], by: fn(int) -> cmp.Ordering) -> int ! {none} {
     var lo = 0
     var hi = xs.len
     while lo < hi {
@@ -100,7 +100,7 @@ pub fn binary_search_by(xs: List[int], by: fn(int) -> cmp.Ordering) -> int ! {No
             hi = mid
         }
     }
-    None
+    none
 }
 
 /// The first index at which `x` could be inserted keeping `xs`
@@ -179,7 +179,7 @@ pub fn equal_range(xs: List[int], x: int) -> (int, int) {
     (lower_bound(xs, x), upper_bound(xs, x))
 }
 
-/// The least element of `xs`, or `None` when `xs` is empty. Linear;
+/// The least element of `xs`, or `none` when `xs` is empty. Linear;
 /// `xs` need not be sorted. On a tie the FIRST least element's value is
 /// returned, which is the same value either way — `min_index` is the
 /// function whose tie rule is observable. No traps.
@@ -191,7 +191,7 @@ pub fn equal_range(xs: List[int], x: int) -> (int, int) {
 /// (mut xs).push(2)
 /// (search.min_of(xs) else 0) == 1
 /// ```
-pub fn min_of(xs: List[int]) -> int ! {None} {
+pub fn min_of(xs: List[int]) -> int ! {none} {
     var seen = false
     var best = 0
     for v in xs {
@@ -203,12 +203,12 @@ pub fn min_of(xs: List[int]) -> int ! {None} {
         }
     }
     if !seen {
-        return None
+        return none
     }
     best
 }
 
-/// The greatest element of `xs`, or `None` when `xs` is empty. Linear;
+/// The greatest element of `xs`, or `none` when `xs` is empty. Linear;
 /// `xs` need not be sorted. No traps.
 ///
 /// ```wolf-doc-example
@@ -218,7 +218,7 @@ pub fn min_of(xs: List[int]) -> int ! {None} {
 /// (mut xs).push(2)
 /// (search.max_of(xs) else 0) == 3
 /// ```
-pub fn max_of(xs: List[int]) -> int ! {None} {
+pub fn max_of(xs: List[int]) -> int ! {none} {
     var seen = false
     var best = 0
     for v in xs {
@@ -230,12 +230,12 @@ pub fn max_of(xs: List[int]) -> int ! {None} {
         }
     }
     if !seen {
-        return None
+        return none
     }
     best
 }
 
-/// The index of the least element, or `None` when `xs` is empty. Ties go
+/// The index of the least element, or `none` when `xs` is empty. Ties go
 /// to the FIRST — the same stability promise `std.cmp.min` makes. No
 /// traps.
 ///
@@ -246,10 +246,10 @@ pub fn max_of(xs: List[int]) -> int ! {None} {
 /// (mut xs).push(1)
 /// (search.min_index(xs) else -1) == 1
 /// ```
-pub fn min_index(xs: List[int]) -> int ! {None} {
+pub fn min_index(xs: List[int]) -> int ! {none} {
     let n = xs.len
     if n == 0 {
-        return None
+        return none
     }
     var best = 0
     var i = 1
@@ -262,7 +262,7 @@ pub fn min_index(xs: List[int]) -> int ! {None} {
     best
 }
 
-/// The index of the greatest element, or `None` when `xs` is empty.
+/// The index of the greatest element, or `none` when `xs` is empty.
 /// Ties go to the FIRST. No traps.
 ///
 /// ```wolf-doc-example
@@ -272,10 +272,10 @@ pub fn min_index(xs: List[int]) -> int ! {None} {
 /// (mut xs).push(1)
 /// (search.max_index(xs) else -1) == 0
 /// ```
-pub fn max_index(xs: List[int]) -> int ! {None} {
+pub fn max_index(xs: List[int]) -> int ! {none} {
     let n = xs.len
     if n == 0 {
-        return None
+        return none
     }
     var best = 0
     var i = 1

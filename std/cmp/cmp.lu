@@ -10,7 +10,7 @@
 //! two documented approximations at the current pins.
 //!
 //! INTERIM SPELLINGS (each filed, flipped on the pin bump that fixes it):
-//! - Absence is spelled `None`, not the convention's `none`: neither
+//! - Absence is spelled `none`, not the convention's `none`: neither
 //!   pinned implementation resolves a lowercase bare tag in raise
 //!   position (lupin: `does not resolve`; wolfc: E0301). Finding F-0003.
 //! - `Ord` requires `Eq` by doctrine, but the pinned grammar has no
@@ -235,9 +235,9 @@ pub fn clamp[T: Ord](v: T, lo: T, hi: T) -> T {
     }
 }
 
-// BLOCKED at the sc01 pins — `min_of[T: Ord](xs: List[T]) -> T ! {None}`
-// and `max_of[T: Ord](xs: List[T]) -> T ! {None}` (least/greatest element,
-// `None` on empty). Every spelling of a generic `List[T]` traversal that
+// BLOCKED at the sc01 pins — `min_of[T: Ord](xs: List[T]) -> T ! {none}`
+// and `max_of[T: Ord](xs: List[T]) -> T ! {none}` (least/greatest element,
+// `none` on empty). Every spelling of a generic `List[T]` traversal that
 // reads two overlapping places (`xs.len` then `xs[i]`, or a carried
 // `best`) is rejected by wolfc's mem tier: reads of generic-typed places
 // are treated as moves, so the second read is E1001 (the fix-it suggests

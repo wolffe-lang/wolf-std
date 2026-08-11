@@ -1,32 +1,35 @@
-//! check: run(exit=0, stdout="hit-len 1, miss-len 0, front 7")
+//! check: run(exit=0, stdout="present 1 (5), absent 0")
 //! phase: run
 //! conforms: std.option, err.else
 //!
-//! The `to_list` idiom — an absence value becomes a 0/1-element
-//! `List[int]` via `else` around the push, the shape the blocked
-//! `option.to_list[T]` names (F-0002). Mutation is spelled at the call
-//! site per X1; wolfc's pinned typing of `List.push` as a read receiver
-//! rejects that spelling (E0804) — divergence F-0005, ledgered.
+//! `option.to_list` — absence as a container: one element on a hit, none
+//! on a miss, so `for x in option.to_list(v)` is the loop that runs zero
+//! times or once. The list is allocated in the ambient region; no region
+//! annotation appears in the helper or here (D10).
+//!
+//! Both lengths are read BEFORE the loop: `for x in present` MOVES the
+//! list under wolfc's mem tier, so a later `present.len` is E1001. The
+//! fix-it names `for x in copy present`, and at these pins that operator
+//! EXISTS and runs in both implementations (sc06's measurement — it was
+//! "not in the pinned grammar" as recently as sc02); reading the length
+//! first needs no new syntax, so that is what this file does.
 
-fn find_lucky(x: int) -> int ! {None} {
-    if x == 7 { return x }
-    return None
-}
+use std.option
 
-fn one_or_none(x: int) -> List[int] {
-    var out = List[int]()
-    var missed = false
-    let v = find_lucky(x) else |_| {
-        missed = true
-        0
-    }
-    if missed {} else { (mut out).push(v) }
-    out
+fn find_positive(x: int) -> int ! {none} {
+    if x > 0 { return x }
+    return none
 }
 
 fn main() -> !int {
-    let hit = one_or_none(7)
-    let miss = one_or_none(3)
-    print("hit-len {hit.len}, miss-len {miss.len}, front {hit[0]}")
-    if hit.len == 1 && miss.len == 0 && hit[0] == 7 { 0 } else { 1 }
+    let present = option.to_list(find_positive(5))
+    let absent = option.to_list(find_positive(0 - 2))
+    let n_present = present.len
+    let n_absent = absent.len
+    var seen: int = 0
+    for x in present {
+        seen = x
+    }
+    print("present {n_present} ({seen}), absent {n_absent}")
+    if n_present == 1 && seen == 5 && n_absent == 0 { 0 } else { 1 }
 }

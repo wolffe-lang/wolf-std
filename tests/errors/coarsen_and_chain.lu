@@ -1,0 +1,42 @@
+//! check: run(exit=0, stdout="offset 2 kind 1 | failed at byte 2: not a value of that type")
+//! phase: run
+//! conforms: std.errors, err.row, err.else
+//!
+//! The whole error-context story in one program: a producer raises a
+//! payload-carrying tag, the caller destructures the payload at the
+//! handler (`else |Parse(p)|` — the binding in `else |e|` is the TAG, and
+//! `e.offset` is "error Parse has no member `offset`"), reads its fields
+//! through the accessor, coarsens it into the wider payload at an
+//! explicit named call, and renders the result with the cause preserved.
+//!
+//! The row expectation is asserted through the handler's pattern, tag and
+//! payload both, which is the convention this sprint writes down for
+//! every row test in std.
+
+use std.errors
+
+fn digit_value(s: str) -> int ! {Parse(errors.ParseErr)} {
+    if s.starts_with("0") { return 0 }
+    if s.starts_with("1") { return 1 }
+    if s.starts_with("2") { return 2 }
+    return Parse(errors.parse_err(2, 1))
+}
+
+fn main() -> !int {
+    let hit = digit_value("2") else 0 - 1
+    var offset: int = 0 - 1
+    var kind: int = 0 - 1
+    var text = ""
+    let miss = digit_value("x") else |Parse(p)| {
+        offset = errors.offset_of(p)
+        kind = p.kind
+        text = errors.describe_failure(errors.coarsen(p))
+        0 - 1
+    }
+    print("offset {offset} kind {kind} | {text}")
+    if hit != 2 { return 1 }
+    if miss != 0 - 1 { return 2 }
+    if offset != 2 { return 3 }
+    if kind != 1 { return 4 }
+    0
+}

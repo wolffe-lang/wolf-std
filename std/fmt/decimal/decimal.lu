@@ -486,7 +486,7 @@ fn pow10_high(q: int) -> f64 {
 
 /// A starting estimate for `digits * 10^exp`, accurate to a few ulp: the
 /// leading digits converted exactly, then scaled by exact powers of ten
-/// in chunks of 10^22. Private. Overflow saturates at `inf()` and
+/// in chunks of 10^22. Private. overflow saturates at `inf()` and
 /// underflow at zero; the exact search that follows fixes either.
 fn estimate(dg: str, exp: int) -> f64 {
     let used = 17
@@ -859,7 +859,7 @@ fn render_shortest(sign: str, digits: str, exponent: int) -> str {
 ///
 /// Underflow is IEEE's and not an error: a value below half the smallest
 /// subnormal rounds to a signed zero, exactly as the arithmetic would.
-/// Overflow IS an error, because rounding `1e400` to `inf()` would turn
+/// overflow IS an error, because rounding `1e400` to `inf()` would turn
 /// text that names no `f64` into a value that looks like one.
 ///
 /// ```wolf-doc-example

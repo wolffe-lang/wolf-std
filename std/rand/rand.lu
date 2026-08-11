@@ -205,7 +205,7 @@ pub fn shuffle(mut r: Rng, mut xs: List[int]) {
     }
 }
 
-/// A uniformly chosen element of `xs`, or `None` when `xs` is empty.
+/// A uniformly chosen element of `xs`, or `none` when `xs` is empty.
 /// No traps.
 ///
 /// ```wolf-doc-example
@@ -214,10 +214,10 @@ pub fn shuffle(mut r: Rng, mut xs: List[int]) {
 /// (mut xs).push(9)
 /// (rand.choose(mut r, xs) else 0) == 9
 /// ```
-pub fn choose(mut r: Rng, xs: List[int]) -> int ! {None} {
+pub fn choose(mut r: Rng, xs: List[int]) -> int ! {none} {
     let n = list.len(xs)
     if n == 0 {
-        return None
+        return none
     }
     let i = below(mut r, n)
     xs[i]

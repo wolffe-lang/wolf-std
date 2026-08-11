@@ -142,7 +142,7 @@
 //! with `std.unicode`'s posture.
 //!
 //! INTERIM SPELLINGS (each filed, each flipped by the pin that fixes it):
-//! - Absence is spelled `None` here, not the convention's lowercase
+//! - Absence is spelled `none` here, not the convention's lowercase
 //!   `none`. That interim is OVER as of the sc05 pins — lupin 0.1.3
 //!   resolves lowercase bare tags at a raise site and wolfc has since
 //!   wolf-lang#4 — so this spelling is now a repo-wide rename waiting for
@@ -304,7 +304,7 @@ pub fn starts_with(s: str, prefix: str) -> bool {
     s.starts_with(prefix)
 }
 
-/// `s` without a leading `prefix`; `None` when `s` does not start with it
+/// `s` without a leading `prefix`; `none` when `s` does not start with it
 /// — the absence row rather than `s` unchanged, so the caller can tell the
 /// two apart (§2). Consumed by `else` or `?`. No traps.
 ///
@@ -313,11 +313,11 @@ pub fn starts_with(s: str, prefix: str) -> bool {
 /// (str.strip_prefix("wolf-lang", "lang") else "?") == "?"
 /// (str.strip_prefix("wolf", "") else "?") == "wolf"
 /// ```
-pub fn strip_prefix(s: str, prefix: str) -> str ! {None} {
+pub fn strip_prefix(s: str, prefix: str) -> str ! {none} {
     if s.starts_with(prefix) {
         return s[prefix.len..]
     }
-    return None
+    return none
 }
 
 /// `s` with every code point lowercased, freshly allocated in the ambient

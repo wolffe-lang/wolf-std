@@ -1,0 +1,39 @@
+//! check: pass
+//! phase: mem
+//! conforms: std.testing, std.cmp
+//!
+//! The seven trait-bounded assertions, as a static contract rather than a
+//! run. `assert_eq`, `assert_ne`, `assert_lt`, `assert_le`, `assert_gt`,
+//! `assert_ge` and `assert_contains` all resolve through `cmp.Eq`/
+//! `cmp.Ord`, and NO implementation executes trait dispatch at these pins
+//! (F-0002 / F-0004) — so the pass/trap pair the sprint's acceptance asks
+//! for cannot exist for these seven, and saying so is the honest
+//! alternative to writing files that would pass by not running.
+//!
+//! What this file DOES prove is what a contract test can: the signatures
+//! are writable, the bounds are satisfiable at `int`, and every body
+//! typechecks and passes the mem tier with the bound as its only evidence
+//! (the golden rule — a generic body checks against its bounds alone).
+//! It flips to `run(exit=trap(assert))` files, one per assertion, in the
+//! sprint that lands dispatch.
+
+use std.testing
+
+fn drive() {
+    let a: int = 1
+    let b: int = 2
+    testing.assert_eq(a, a)
+    testing.assert_ne(a, b)
+    testing.assert_lt(a, b)
+    testing.assert_le(a, b)
+    testing.assert_gt(b, a)
+    testing.assert_ge(b, a)
+    var xs = List[int]()
+    (mut xs).push(a)
+    testing.assert_contains(xs, a)
+}
+
+fn main() -> !int {
+    drive()
+    0
+}

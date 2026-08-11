@@ -1,0 +1,32 @@
+//! check: run(exit=0, stdout="not a value of that type at byte 3 | unspecified failure at byte 0")
+//! phase: run
+//! conforms: std.errors, err.row
+//!
+//! The payload type, its accessor and its renderer, over the whole kind
+//! table plus an unknown code — the grouped happy-path file for
+//! `std.errors` (one entry per theme; nothing here traps, which is what
+//! makes grouping safe).
+
+use std.errors
+
+fn main() -> !int {
+    let bad_digit = errors.parse_err(3, 1)
+    let unknown = errors.parse_err(0, 0)
+    let ended = errors.parse_err(4, 2)
+    let trailing = errors.parse_err(11, 3)
+    let ranged = errors.parse_err(2, 4)
+    let future = errors.parse_err(9, 99)
+    let a = errors.describe(bad_digit)
+    let b = errors.describe(unknown)
+    print("{a} | {b}")
+    if errors.offset_of(bad_digit) != 3 { return 1 }
+    if errors.offset_of(unknown) != 0 { return 2 }
+    if bad_digit.kind != 1 { return 3 }
+    if !(errors.describe(ended) == "unexpected end of input at byte 4") { return 4 }
+    if !(errors.describe(trailing) == "trailing text after a complete value at byte 11") {
+        return 5
+    }
+    if !(errors.describe(ranged) == "value out of range at byte 2") { return 6 }
+    if !(errors.describe(future) == "not a value of that type at byte 9") { return 7 }
+    0
+}

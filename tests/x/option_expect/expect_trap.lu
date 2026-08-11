@@ -1,0 +1,26 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.option, err.else, conf.trap.map
+//!
+//! `option_expect.expect` — the hit passes through silently, then the
+//! miss prints its one line and traps `assert`. Its own entry file,
+//! because a trap ends the process (D30): the rig is the catch mechanism
+//! and a grouped file would hide every assertion after the first trap.
+//!
+//! lupin-only, and the ledger says why: the helper's diverging handler is
+//! `fail(E0401)` under wolfc, which is the finding this test holds
+//! (F-0040).
+
+use std.x.option_expect
+
+fn find_positive(x: int) -> int ! {none} {
+    if x > 0 { return x }
+    return none
+}
+
+fn main() -> !int {
+    let hit = option_expect.expect(find_positive(2), "2 is positive")
+    assert(hit == 2)
+    let miss = option_expect.expect(find_positive(0 - 8), "expected a positive")
+    miss
+}

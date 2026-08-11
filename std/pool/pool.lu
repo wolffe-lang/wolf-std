@@ -66,7 +66,7 @@ pub fn free[T](mut p: Pool[T], h: handle T) {
 // deref at both pins: no length, no capacity, no liveness predicate, no
 // iteration (`p.len` is `unsupported` in lupin — "Pool has no member
 // `len`" — and `for v in p` is "`for` cannot iterate Pool"; wolfc's
-// builtin table types the same three methods and nothing else). None of
+// builtin table types the same three methods and nothing else). none of
 // the four can be written over that surface without inventing state std
 // has no right to invent — a shadow `List` of handles would be a second
 // source of truth about liveness, which is exactly what X5 forbids.

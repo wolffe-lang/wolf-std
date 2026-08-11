@@ -4,9 +4,9 @@
 //!
 //! The F1 prototype executing: a RangeIter driven by explicit
 //! `range_next(mut it)` calls under a `loop`-shaped `while`, the row
-//! tag `Done` as the end signal consumed by `else |_|`. This is the
+//! tag `done` as the end signal consumed by `else |_|`. This is the
 //! shape the iterator filing proposes as `next(mut self) -> T ! {done}`
-//! — free-fn spelling and `Done` casing per the module's interim notes
+//! — free-fn spelling and `done` casing per the module's interim notes
 //! (F-0002, F-0003). lupin executes it; wolfc rejects the MODULE at the
 //! mem rung (E1001 — list_next's List reads count as moves, F-0005
 //! freight from the sibling prototype), honestly ledgered.
@@ -24,7 +24,7 @@ fn main() -> !int {
         }
         sum = sum + v
     }
-    // Exhausted stays exhausted: the next call is Done again.
+    // Exhausted stays exhausted: the next call is done again.
     let after = iter.range_next(mut it) else 3
     print("sum {sum}, after {after}")
     if sum == 6 && after == 3 { 0 } else { 1 }

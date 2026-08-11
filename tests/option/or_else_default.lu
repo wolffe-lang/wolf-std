@@ -2,18 +2,22 @@
 //! phase: run
 //! conforms: std.option, err.else
 //!
-//! The `or` idiom — `v else default` is the eager-default form the
-//! blocked `option.or[T]` names (F-0002; the module documents the six
-//! blocked signatures). Absence spelled `None` per the F-0003 interim.
+//! `option.or` — the eager-default helper, landed in sc06 after five
+//! sprints as a comment (F-0002 / F-0023: a `!`-row parses in parameter
+//! position now, and lupin 0.1.4 executes it). The producer is local
+//! because absence has no literal (F-0038): only a raising function makes
+//! a row value, so every test on this page brings its own.
 
-fn find_positive(x: int) -> int ! {None} {
+use std.option
+
+fn find_positive(x: int) -> int ! {none} {
     if x > 0 { return x }
-    return None
+    return none
 }
 
 fn main() -> !int {
-    let hit = find_positive(5) else 9
-    let miss = find_positive(0 - 3) else 9
+    let hit = option.or(find_positive(5), 9)
+    let miss = option.or(find_positive(0 - 3), 9)
     print("hit {hit}, miss {miss}")
     if hit == 5 && miss == 9 { 0 } else { 1 }
 }

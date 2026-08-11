@@ -1,0 +1,41 @@
+//! member: true
+//!
+//! std.x.testing_text — the string assertion, parked outside the facade
+//! because of what it costs there. Stability tier: x (nursery, D31 clock:
+//! it graduates INTO `std.testing` verbatim, or is deleted, at the stdc02
+//! closeout).
+//!
+//! The measurement, made in this sprint and worth keeping: a builtin
+//! `str` method anywhere in an imported module makes every importer
+//! `unsupported` at RESOLVE under wolfc (F-0018's resolve-level half,
+//! mapped in F-0026). `assert_starts_with` needs exactly one such call,
+//! and `std.testing` is imported by every trap test in the tree — so
+//! keeping it in the facade would have taken `fail`, `unreachable` and
+//! `todo` off the compiler lane they run on today, to buy one assertion
+//! that runs on lupin either way.
+//!
+//! Its siblings do not exist yet for the older reason: `assert_ends_with`
+//! and a substring assertion need `ends_with`/`find`, which cannot be
+//! written at all (F-0018). When the boundary primitive lands, this
+//! module gains them and then dissolves into `std.testing`.
+//!
+//! It delegates the failure line to `std.testing.fail` rather than
+//! printing its own: one concept, one name (§1), and the nursery may
+//! depend on the facade even though the facade may not depend on it.
+
+use std.testing
+
+/// Asserts `s` begins with `p`; a miss prints one line and traps
+/// `assert` (`[conf.trap.map]`). Never returns normally on a miss.
+///
+/// `starts_with` is the one boundary-safe string probe (sc03): it is
+/// total over arbitrary UTF-8 and cannot trap `bounds`, which is why this
+/// is the only string assertion std can offer honestly today.
+///
+/// Example (prose — a trapping call cannot sit in a boolean example):
+/// `testing_text.assert_starts_with("wolf", "wo")` is silent;
+/// `testing_text.assert_starts_with("wolf", "x")` prints
+/// `FAILED: assert_starts_with: prefix not found` and traps `assert`.
+pub fn assert_starts_with(s: str, p: str) {
+    if s.starts_with(p) {} else { testing.fail("assert_starts_with: prefix not found") }
+}

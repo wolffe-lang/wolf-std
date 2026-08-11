@@ -20,7 +20,7 @@
 //! would want a compaction rule; that is a decision for the graduating
 //! sprint, recorded here rather than guessed.
 //!
-//! Absence is spelled `None` pending F-0003; the bodies obey std.list's
+//! Absence is spelled `none` pending F-0003; the bodies obey std.list's
 //! single-read rule (F-0005) — every length read goes through `count`.
 
 /// The queue: elements `items[head .. items.len]`, front first.
@@ -109,21 +109,21 @@ pub fn push_front(mut d: DequeInt, v: int) {
     d.head = 0
 }
 
-/// The front element, left in place; `None` when empty. No traps.
+/// The front element, left in place; `none` when empty. No traps.
 ///
 /// ```wolf-doc-example
 /// var d = deque_int.new()
 /// deque_int.push_back(mut d, 5)
 /// (deque_int.front(d) else 0) == 5
 /// ```
-pub fn front(d: DequeInt) -> int ! {None} {
+pub fn front(d: DequeInt) -> int ! {none} {
     if len(d) == 0 {
-        return None
+        return none
     }
     nth(d.items, d.head)
 }
 
-/// The back element, left in place; `None` when empty. No traps.
+/// The back element, left in place; `none` when empty. No traps.
 ///
 /// ```wolf-doc-example
 /// var d = deque_int.new()
@@ -131,14 +131,14 @@ pub fn front(d: DequeInt) -> int ! {None} {
 /// deque_int.push_back(mut d, 6)
 /// (deque_int.back(d) else 0) == 6
 /// ```
-pub fn back(d: DequeInt) -> int ! {None} {
+pub fn back(d: DequeInt) -> int ! {none} {
     if len(d) == 0 {
-        return None
+        return none
     }
     nth(d.items, count(d.items) - 1)
 }
 
-/// Removes and returns the front element; `None` when empty. Constant
+/// Removes and returns the front element; `none` when empty. Constant
 /// time: the head advances and no element moves. No traps.
 ///
 /// ```wolf-doc-example
@@ -149,16 +149,16 @@ pub fn back(d: DequeInt) -> int ! {None} {
 /// (deque_int.pop_front(mut d) else 0) == 2
 /// (deque_int.pop_front(mut d) else 0 - 1) == 0 - 1
 /// ```
-pub fn pop_front(mut d: DequeInt) -> int ! {None} {
+pub fn pop_front(mut d: DequeInt) -> int ! {none} {
     if len(d) == 0 {
-        return None
+        return none
     }
     let v = nth(d.items, d.head)
     d.head = d.head + 1
     v
 }
 
-/// Removes and returns the back element; `None` when empty. Rebuilds the
+/// Removes and returns the back element; `none` when empty. Rebuilds the
 /// buffer (see the module header on compaction). No traps.
 ///
 /// ```wolf-doc-example
@@ -168,9 +168,9 @@ pub fn pop_front(mut d: DequeInt) -> int ! {None} {
 /// (deque_int.pop_back(mut d) else 0) == 2
 /// deque_int.len(d) == 1
 /// ```
-pub fn pop_back(mut d: DequeInt) -> int ! {None} {
+pub fn pop_back(mut d: DequeInt) -> int ! {none} {
     if len(d) == 0 {
-        return None
+        return none
     }
     let n = count(d.items)
     let v = nth(d.items, n - 1)
