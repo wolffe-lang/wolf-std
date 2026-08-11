@@ -1,0 +1,55 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.json
+//!
+//! Two contract clauses that need their own test.
+//!
+//! The NUMBER POSTURE at the i53 boundary: `Int` keeps 64-bit exactness
+//! and `Num` does not, which is the whole reason the model has two
+//! numeric variants. 9007199254740993 is the smallest integer a double
+//! cannot represent, so it is the value where the two postures visibly
+//! disagree.
+//!
+//! The DEPTH LIMIT, at the limit and one past it: a serializer that dies
+//! on a deep value is a denial-of-service surface, so nesting past
+//! `depth_limit()` is the `deep` row and never a stack trap.
+
+use std.json
+
+fn nest(depth: int) -> json.Value {
+    var v = json.null()
+    var i: int = 0
+    while i < depth {
+        var xs = List[json.Value]()
+        (mut xs).push(v)
+        v = json.from_list(xs)
+        i = i + 1
+    }
+    v
+}
+
+fn main() -> !int {
+    // The i53 boundary.
+    let big: int = 9007199254740993
+    if (json.as_int(json.from_int(big)) else 0) == big {} else { return 1 }
+    if (json.stringify(json.from_int(big)) else "?") == "9007199254740993" {} else { return 2 }
+    // The same value through `Num` loses its last bit, visibly.
+    if (json.stringify(json.from_num(9007199254740993.0)) else "?") == "9007199254740992" {} else {
+        return 3
+    }
+    // And the widening accessor reports the rounded value, which is why
+    // `as_int` refuses to do it.
+    if (json.as_float(json.from_int(big)) else 0.0) == 9007199254740992.0 {} else { return 4 }
+    // One below the boundary is exact in both.
+    if (json.stringify(json.from_num(9007199254740992.0)) else "?") == "9007199254740992" {} else {
+        return 5
+    }
+    // The depth limit, at the limit and one past it.
+    if json.depth_limit() == 64 {} else { return 6 }
+    let ok = json.stringify(nest(64)) else "DEEP"
+    if ok.len == 132 {} else { return 7 }
+    if (json.stringify(nest(65)) else "DEEP") == "DEEP" {} else { return 8 }
+    // The pretty printer shares the limit.
+    if (json.stringify_pretty(nest(65), 1) else "DEEP") == "DEEP" {} else { return 9 }
+    0
+}

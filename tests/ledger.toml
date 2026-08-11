@@ -342,16 +342,6 @@ lupin = "run"
 wolfc = "unsupported"
 native = "unsupported"
 
-[tests."str/parse_int_bases.lu"]
-lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
-
-[tests."str/parse_float_shapes.lu"]
-lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
-
 [tests."str/interpolation_interplay.lu"]
 lupin = "run"
 wolfc = "unsupported"
@@ -596,3 +586,122 @@ native = "unsupported"
 lupin = "run"
 wolfc = "fail(E0301)"
 native = "fail(E0301)"
+
+# ---- sc05: std.fmt, std.fmt.decimal, std.hex, std.base64, std.json ----
+#
+# One column, and the reason is structural rather than incidental: every
+# module in this sprint is a STRING module, and wolfc answers
+# `unsupported` at RESOLVE for every builtin-receiver `str` method and for
+# `s[a..b]` (F-0018's compiler half), while the native rung refuses `str`,
+# `List` and `print` outright (F-0026). Nothing here is REFUSED — the
+# static ladder is clean on both rungs — so the whole sprint is lupin-run
+# with two dark compiler lanes, exactly as sc03's string sprint was.
+#
+# `fmt/parse_int_bases.lu` and `fmt/decimal/parse_float_shapes.lu` are
+# sc03's tests, moved with the functions they cover (the contract's
+# re-home) and extended by what the move changed. Their rows are
+# unchanged, which is the point: a re-home is not an advance.
+
+[tests."fmt/pad_and_align.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."fmt/pad_fill_must_be_one_byte.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."fmt/int_bases.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."fmt/sign_and_group.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."fmt/parse_int_bases.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."fmt/parse_int_overflow_trap.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."fmt/parse_bool.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."fmt/decimal/fixed_and_exp.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."fmt/decimal/shortest_round_trip.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."fmt/decimal/parse_float_shapes.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."hex/round_trip.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."hex/decode_misses.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."hex/encode_non_byte_trap.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."base64/round_trip.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."base64/strict_and_lenient.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."base64/url_variant.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+# std.json additionally carries an enum and a `Map`, either of which alone
+# would darken the compiler lanes (F-0012, F-0029) — the sprint contract
+# predicted this row before the module was written.
+
+[tests."json/values_and_accessors.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."json/stringify_shapes.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."json/pretty_and_escape.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."json/number_posture_and_depth.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"

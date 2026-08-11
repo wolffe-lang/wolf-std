@@ -1,0 +1,55 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.base64
+//!
+//! The difference between the two decoders, stated as tests: `decode`
+//! demands a multiple of four, exact padding and ZERO unused bits in a
+//! short final group (so exactly one text decodes to any byte sequence);
+//! `decode_lenient` forgives the first two and the third. Both refuse a
+//! character outside the alphabet and a trailing group of one character,
+//! which encodes no byte at all.
+
+use std.base64
+
+fn missed(s: str) -> bool {
+    let sentinel = List[int]()
+    let got = base64.decode(s) else sentinel
+    got.len == 0
+}
+
+fn missed_lenient(s: str) -> bool {
+    let sentinel = List[int]()
+    let got = base64.decode_lenient(s) else sentinel
+    got.len == 0
+}
+
+fn main() -> !int {
+    // Strict: padding is required.
+    if missed("TQ") {} else { return 1 }
+    if missed("TWE") {} else { return 2 }
+    // Strict: the unused bits of a short group must be zero. "TQ==" and
+    // "TR==" would name the same byte; only the first is canonical.
+    if missed("TR==") {} else { return 3 }
+    if missed("TWF=") {} else { return 4 }
+    // Strict: nothing after the padding.
+    if missed("TQ==TQ==") {} else { return 5 }
+    // Both: not in the alphabet, and a one-character tail.
+    if missed("T!==") {} else { return 6 }
+    if missed("T") {} else { return 7 }
+    if missed_lenient("T") {} else { return 8 }
+    if missed_lenient("TQ=Q") {} else { return 9 }
+    if missed_lenient("é") {} else { return 10 }
+    // Lenient: padding optional, unused bits ignored.
+    let a = base64.decode_lenient("TQ") else List[int]()
+    if a.len == 1 {} else { return 11 }
+    if a[0] == 77 {} else { return 12 }
+    let b = base64.decode_lenient("TR") else List[int]()
+    if b.len == 1 {} else { return 13 }
+    if b[0] == 77 {} else { return 14 }
+    let c = base64.decode_lenient("TWE") else List[int]()
+    if c.len == 2 {} else { return 15 }
+    // Lenient still accepts well-formed input.
+    let d = base64.decode_lenient("TWFu") else List[int]()
+    if d.len == 3 {} else { return 16 }
+    0
+}

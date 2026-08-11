@@ -1,0 +1,47 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fmt
+//!
+//! Integers in every base, including the two values every base
+//! conversion gets wrong: zero (which has no digits to emit) and
+//! `int_min()` (whose magnitude does not fit, which is why the digit
+//! loop runs on the NEGATIVE side).
+
+use std.fmt
+
+fn main() -> !int {
+    if fmt.to_str(42) == "42" {} else { return 1 }
+    if fmt.to_str(0) == "0" {} else { return 2 }
+    if fmt.to_str(0 - 42) == "-42" {} else { return 3 }
+    if fmt.to_hex(255) == "ff" {} else { return 4 }
+    if fmt.to_hex(0) == "0" {} else { return 5 }
+    if fmt.to_hex_upper(48879) == "BEEF" {} else { return 6 }
+    if fmt.to_oct(511) == "777" {} else { return 7 }
+    if fmt.to_bin(10) == "1010" {} else { return 8 }
+    if fmt.to_bin(1) == "1" {} else { return 9 }
+    if fmt.to_bin(0) == "0" {} else { return 10 }
+    // Sign-magnitude, never two's complement.
+    if fmt.to_hex(0 - 255) == "-ff" {} else { return 11 }
+    if fmt.to_bin(0 - 5) == "-101" {} else { return 12 }
+    // The radix-taking form, and its `base` row.
+    if (fmt.to_str_base(255, 16) else "?") == "ff" {} else { return 13 }
+    if (fmt.to_str_base(35, 36) else "?") == "z" {} else { return 14 }
+    if (fmt.to_str_base(1295, 36) else "?") == "zz" {} else { return 15 }
+    if (fmt.to_str_base(7, 2) else "?") == "111" {} else { return 16 }
+    if (fmt.to_str_base(10, 1) else "?") == "?" {} else { return 17 }
+    if (fmt.to_str_base(10, 37) else "?") == "?" {} else { return 18 }
+    if (fmt.to_str_base(10, 0) else "?") == "?" {} else { return 19 }
+    // int_min renders in full, in every base.
+    let zero: int = 0
+    let smallest = zero - 9223372036854775807 - 1
+    if fmt.to_str(smallest) == "-9223372036854775808" {} else { return 20 }
+    if fmt.to_hex(smallest) == "-8000000000000000" {} else { return 21 }
+    if fmt.to_bin(smallest).len == 65 {} else { return 22 }
+    // And so does int_max.
+    if fmt.to_str(9223372036854775807) == "9223372036854775807" {} else { return 23 }
+    if fmt.to_hex(9223372036854775807) == "7fffffffffffffff" {} else { return 24 }
+    // Padding composes with the base functions — the `{x:08b}` spelling
+    // the f-string cannot do (F-0031).
+    if fmt.pad_left_with(fmt.to_bin(5), 8, "0") == "00000101" {} else { return 25 }
+    0
+}

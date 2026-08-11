@@ -1,0 +1,519 @@
+//! member: true
+//!
+//! std.fmt — the text side of every value: padding, alignment, integers
+//! in every base, and the text→number boundary. Stability tier: core.
+//!
+//! **Why this module exists at all, given `{x}`.** Every string literal
+//! in wolf is an f-string (X9/D26) and `"{n}"` already renders an `int`,
+//! so a formatting module has to earn its place. It earns it twice. The
+//! first reason is that the interpolation grammar reserves a FORMAT SPEC
+//! — `INTERP ::= '{' expr FORMAT_SPEC? '}'` (spec/01 §1.5) — whose
+//! semantics spec §7.4 was supposed to define and does not, so today
+//! `{x:>8.2}` means whatever each implementation decided (measured at
+//! these pins: lupin implements `[[fill]align][width]` and REFUSES the
+//! rest with an honest `unsupported`; wolfc parses the spec and then
+//! IGNORES it, printing the unpadded value — the two disagree on stdout,
+//! F-0031). The second is that a spec is a spelling, not a capability: a
+//! program that computes a column width, or pads a value it received as
+//! data, needs the operation as a FUNCTION. This module is that
+//! function set, and it is also the running reference implementation the
+//! §7.4 amendment cites (F-0033) — the spec text and these bodies are
+//! meant to agree clause for clause.
+//!
+//! **Width is measured in BYTES** (§9's one currency, applied). `len` is
+//! bytes everywhere in std, so `pad_left("é", 3)` adds one byte of fill,
+//! not two, and a column of CJK text will not line up in a terminal. This
+//! is honest rather than convenient: display width needs East Asian Width
+//! tables and grapheme segmentation (the F-0019 budget decision), and a
+//! function that pretended to count columns would be wrong on exactly the
+//! text that makes people care. When the tables land, the display-width
+//! family joins them under its own name — `pad_left` will keep meaning
+//! bytes.
+//!
+//! **What is the language's, the implementation's, and std's** (§8's
+//! question again). The language owns interpolation and its (unspecified)
+//! format spec; the implementation owns `repeat`, `starts_with`, `upper`
+//! and the rendering of `{n}` for a builtin; std owns everything named
+//! here. `to_str` delegates to interpolation and says so, because that
+//! makes the interpolated rendering part of this function's contract.
+//!
+//! **The parse family is re-homed here** (the sprint contract's word).
+//! sc03 shipped `parse_int`/`parse_float` in `std.str` because that is
+//! where the boundary-safe probe was proven; the number boundary belongs
+//! to the module that also owns printing, so that `to_str_base` and
+//! `parse_int_base` can be read — and tested — as inverses. `std.str` no
+//! longer declares them. The re-home refined two behaviors, both
+//! deliberate:
+//!
+//! - a radix outside 2..36 now raises `base` rather than `parse`, because
+//!   a bad radix is the CALLER's mistake and a bad digit run is the
+//!   DATA's, and a caller that cannot tell them apart cannot report
+//!   either one usefully (§2, §10's trap-versus-raise rule read one step
+//!   further);
+//! - the accumulator runs NEGATIVE, so `parse_int("-9223372036854775808")`
+//!   is `int_min()` instead of an overflow trap. Positive `int_min()` has
+//!   no value to be, and still traps.
+//!
+//! **One function here is a contract and not code.** `truncate_to` cannot
+//! be written at this pin for the same single reason fifteen `std.str`
+//! functions cannot: cutting a string at a byte offset requires knowing
+//! that the offset is a code-point boundary, the only way to ask is to
+//! slice there, and slicing at a non-boundary traps uncatchably (D30,
+//! F-0018). A truncation that is right on ASCII and fatal on `"héllo"`
+//! does not ship (§9's refusal-over-approximation rule).
+//!
+//! ```text
+//! truncate_to(s: str, width: int) -> str
+//!     The longest prefix of `s` that is at most `width` BYTES long and
+//!     ends on a code-point boundary; `s` itself when it already fits.
+//!     Total: never traps, never splits a code point, and never appends
+//!     an ellipsis (that is the caller's to add, and its width is the
+//!     caller's to subtract). Blocked on any one of F-0018's three
+//!     primitives — `str.get`, a byte accessor, or `chars()`.
+//! ```
+//!
+//! Float printing and parsing live in `std.fmt.float`: wolf has no
+//! overloading, so one module cannot spell both `to_str(n: int)` and
+//! `to_str(x: f64)` — the same split, for the same reason, as
+//! `std.math`/`std.math.float` (§10).
+
+/// The digit character for `d` in the 36-digit lowercase alphabet.
+/// Private. Slicing an ASCII literal this module owns is always a
+/// code-point boundary — the safe direction of sc03's inversion.
+fn digit_char(d: int) -> str {
+    let alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    alphabet[d..d + 1]
+}
+
+/// The value of the digit `s` starts with in `radix`, or -1 when `s` does
+/// not start with one. Case-insensitive above radix 10. Private; the
+/// public entry points are the `parse_*` family.
+///
+/// The probe runs in the safe direction: `starts_with` against a literal
+/// this module owns, never a slice of the caller's input. That is what
+/// makes `parse_int("é")` a miss rather than a `bounds` trap (F-0018).
+fn digit_of(s: str, radix: int) -> int {
+    var i: int = 0
+    while i < radix {
+        let lower_digit = digit_char(i)
+        if s.starts_with(lower_digit) {
+            return i
+        }
+        let upper_digit = lower_digit.upper()
+        if s.starts_with(upper_digit) {
+            return i
+        }
+        i = i + 1
+    }
+    0 - 1
+}
+
+/// `n` written in `radix` with a leading `-` when negative, assuming a
+/// radix in 2..36. Private: the public `to_str_base` validates the radix
+/// first.
+///
+/// The accumulator is NEGATIVE on purpose. Negating `int_min()` traps
+/// (X3), so a digit loop that works on `0 - n` cannot render the smallest
+/// `int` at all; running the loop on the non-positive side renders every
+/// `int` there is. Both `/` and `%` truncate toward zero, so the
+/// remainder of a negative value is non-positive and `0 - v % radix` is
+/// the digit.
+fn digits(n: int, radix: int) -> str {
+    if n == 0 {
+        return "0"
+    }
+    var v = n
+    if v > 0 {
+        v = 0 - v
+    }
+    var out = ""
+    while v < 0 {
+        let d = 0 - v % radix
+        let c = digit_char(d)
+        out = "{c}{out}"
+        v = v / radix
+    }
+    if n < 0 {
+        return "-{out}"
+    }
+    out
+}
+
+/// `s` padded on the LEFT with spaces to at least `width` bytes —
+/// right-alignment, the `{x:>w}` spec's meaning. A string already at
+/// least `width` bytes long comes back unchanged: this function pads and
+/// never truncates, so no data is ever lost to a column. A negative or
+/// zero `width` is not an error, it simply pads nothing. Total: no error
+/// row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// fmt.pad_left("42", 5) == "   42"
+/// fmt.pad_left("42", 2) == "42"
+/// fmt.pad_left("42", 0) == "42"
+/// fmt.pad_left("", 3) == "   "
+/// ```
+pub fn pad_left(s: str, width: int) -> str {
+    pad_left_with(s, width, " ")
+}
+
+/// `pad_left` with an explicit one-byte `fill`. Traps `assert` when
+/// `fill` is not exactly one byte: a multi-byte fill cannot reach an
+/// arbitrary byte width, and silently overshooting the column would make
+/// the width promise a lie — the caller could have checked, so it is a
+/// trap and not a row (§2).
+///
+/// ```wolf-doc-example
+/// fmt.pad_left_with("42", 5, "0") == "00042"
+/// fmt.pad_left_with("42", 5, ".") == "...42"
+/// fmt.pad_left_with("42", 1, "0") == "42"
+/// ```
+pub fn pad_left_with(s: str, width: int, fill: str) -> str {
+    if fill.len != 1 {
+        assert(false)
+    }
+    let missing = width - s.len
+    if missing <= 0 {
+        return s
+    }
+    let pad = fill.repeat(missing)
+    "{pad}{s}"
+}
+
+/// `s` padded on the RIGHT with spaces to at least `width` bytes —
+/// left-alignment, the `{x:<w}` spec's meaning. Pads, never truncates.
+/// Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// fmt.pad_right("42", 5) == "42   "
+/// fmt.pad_right("42", 2) == "42"
+/// fmt.pad_right("", 3) == "   "
+/// ```
+pub fn pad_right(s: str, width: int) -> str {
+    pad_right_with(s, width, " ")
+}
+
+/// `pad_right` with an explicit one-byte `fill`; the `assert` trap on a
+/// multi-byte fill is `pad_left_with`'s, for the same reason.
+///
+/// ```wolf-doc-example
+/// fmt.pad_right_with("42", 5, "0") == "42000"
+/// fmt.pad_right_with("ab", 4, "-") == "ab--"
+/// ```
+pub fn pad_right_with(s: str, width: int, fill: str) -> str {
+    if fill.len != 1 {
+        assert(false)
+    }
+    let missing = width - s.len
+    if missing <= 0 {
+        return s
+    }
+    let pad = fill.repeat(missing)
+    "{s}{pad}"
+}
+
+/// `s` centered in `width` bytes with spaces — the `{x:^w}` spec's
+/// meaning. An odd remainder goes to the RIGHT (`center("a", 4)` is
+/// `"a   "` with one space before and two after), which is the choice
+/// every other language with this spec makes and therefore the one that
+/// surprises nobody. Pads, never truncates. Total: no error row, no traps
+/// beyond allocation.
+///
+/// ```wolf-doc-example
+/// fmt.center("ab", 6) == "  ab  "
+/// fmt.center("a", 4) == " a  "
+/// fmt.center("abc", 2) == "abc"
+/// ```
+pub fn center(s: str, width: int) -> str {
+    center_with(s, width, " ")
+}
+
+/// `center` with an explicit one-byte `fill`; the `assert` trap on a
+/// multi-byte fill is `pad_left_with`'s.
+///
+/// ```wolf-doc-example
+/// fmt.center_with("ab", 6, "*") == "**ab**"
+/// fmt.center_with("a", 4, "-") == "-a--"
+/// ```
+pub fn center_with(s: str, width: int, fill: str) -> str {
+    if fill.len != 1 {
+        assert(false)
+    }
+    let missing = width - s.len
+    if missing <= 0 {
+        return s
+    }
+    let left = missing / 2
+    let right = missing - left
+    let head = fill.repeat(left)
+    let tail = fill.repeat(right)
+    "{head}{s}{tail}"
+}
+
+/// `n` in base ten — the decimal rendering of an `int`, sign included,
+/// no separators, no padding. Total: no error row, no traps.
+///
+/// This function DELEGATES to interpolation (`"{n}"`), which makes the
+/// implementation's rendering of a builtin part of this contract: base
+/// ten, ASCII digits, a leading `-` for negatives, no `+` for positives,
+/// no grouping, and `int_min()` rendered in full. `with_sign` and `group`
+/// are the two departures from that, and they are functions rather than
+/// flags because wolf has no formatting flags to hang them on.
+///
+/// ```wolf-doc-example
+/// fmt.to_str(42) == "42"
+/// fmt.to_str(0) == "0"
+/// fmt.to_str(0 - 42) == "-42"
+/// ```
+pub fn to_str(n: int) -> str {
+    "{n}"
+}
+
+/// `n` in `radix` (2 through 36) with lowercase digits; `base` when the
+/// radix is outside that range. Negative values are rendered
+/// SIGN-MAGNITUDE — `to_str_base(0 - 255, 16)` is `"-ff"`, never a
+/// two's-complement `"ffffffffffffff01"` — because `int` is a signed
+/// 64-bit value and the bit pattern is `wrapping[u64]`'s business, not a
+/// text function's. Total otherwise: no traps, `int_min()` included.
+///
+/// The radix parameter is spelled `radix` rather than `base` for one
+/// mechanical reason worth knowing: the error tag IS `base`, and a
+/// parameter of the same name shadows it at the raise site.
+///
+/// ```wolf-doc-example
+/// (fmt.to_str_base(255, 16) else "?") == "ff"
+/// (fmt.to_str_base(255, 2) else "?") == "11111111"
+/// (fmt.to_str_base(0, 7) else "?") == "0"
+/// (fmt.to_str_base(0 - 255, 16) else "?") == "-ff"
+/// (fmt.to_str_base(35, 36) else "?") == "z"
+/// (fmt.to_str_base(10, 1) else "?") == "?"
+/// (fmt.to_str_base(10, 37) else "?") == "?"
+/// ```
+pub fn to_str_base(n: int, radix: int) -> str ! {base} {
+    if radix < 2 {
+        return base
+    }
+    if radix > 36 {
+        return base
+    }
+    digits(n, radix)
+}
+
+/// `n` in base sixteen with lowercase digits and no `0x` prefix; the
+/// sign-magnitude rendering `to_str_base` documents. Total: no error row
+/// (the radix is not the caller's here), no traps.
+///
+/// ```wolf-doc-example
+/// fmt.to_hex(255) == "ff"
+/// fmt.to_hex(0) == "0"
+/// fmt.to_hex(4096) == "1000"
+/// fmt.to_hex(0 - 1) == "-1"
+/// ```
+pub fn to_hex(n: int) -> str {
+    digits(n, 16)
+}
+
+/// `to_hex` with uppercase digits (`"FF"`). The uppercasing is the
+/// implementation's `upper` applied to ASCII hex digits, where every
+/// Unicode case-mapping question is moot. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// fmt.to_hex_upper(255) == "FF"
+/// fmt.to_hex_upper(48879) == "BEEF"
+/// fmt.to_hex_upper(0 - 255) == "-FF"
+/// ```
+pub fn to_hex_upper(n: int) -> str {
+    let lower_digits = digits(n, 16)
+    lower_digits.upper()
+}
+
+/// `n` in base eight, no `0o` prefix. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// fmt.to_oct(8) == "10"
+/// fmt.to_oct(511) == "777"
+/// fmt.to_oct(0) == "0"
+/// ```
+pub fn to_oct(n: int) -> str {
+    digits(n, 8)
+}
+
+/// `n` in base two, no `0b` prefix and no leading zeros — the shortest
+/// binary rendering, so `to_bin(1)` is `"1"` and not a 64-bit field. Pad
+/// it with `pad_left_with(…, 64, "0")` when a field is what you want.
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// fmt.to_bin(10) == "1010"
+/// fmt.to_bin(1) == "1"
+/// fmt.to_bin(0) == "0"
+/// fmt.pad_left_with(fmt.to_bin(5), 8, "0") == "00000101"
+/// ```
+pub fn to_bin(n: int) -> str {
+    digits(n, 2)
+}
+
+/// `n` in base ten with an explicit sign — `"+42"`, `"-42"`, and `"+0"`
+/// for zero. This is the `{x:+}` spec's meaning. Zero takes a `+` because
+/// the flag asks for a sign and zero's sign, for an `int`, is positive;
+/// the float family's `-0.0` is a different question and
+/// `std.fmt.float` answers it there. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// fmt.with_sign(42) == "+42"
+/// fmt.with_sign(0 - 42) == "-42"
+/// fmt.with_sign(0) == "+0"
+/// ```
+pub fn with_sign(n: int) -> str {
+    if n < 0 {
+        return "{n}"
+    }
+    "+{n}"
+}
+
+/// `n` in base ten with `sep` inserted every three digits from the right
+/// — thousands grouping, sign in front of the first group. `sep` may be
+/// any string, including a multi-byte one (`group(1234, "\u{2009}")`
+/// works), because grouping makes no width promise to break. Total: no
+/// error row, no traps, `int_min()` included.
+///
+/// Grouping is a presentation choice and never a locale one: std does not
+/// know your locale, will not learn it, and the digit-group size is fixed
+/// at three (core has no locale-aware number formatting, ever — the
+/// sprint contract's non-target, and it is a decision rather than an
+/// omission).
+///
+/// ```wolf-doc-example
+/// fmt.group(1234567, ",") == "1,234,567"
+/// fmt.group(100, ",") == "100"
+/// fmt.group(1000, "_") == "1_000"
+/// fmt.group(0 - 1234, ",") == "-1,234"
+/// fmt.group(0, ",") == "0"
+/// ```
+pub fn group(n: int, sep: str) -> str {
+    let rendered = digits(n, 10)
+    var sign = ""
+    var body = rendered
+    if rendered.starts_with("-") {
+        sign = "-"
+        body = rendered[1..]
+    }
+    let count = body.len
+    var out = ""
+    var i: int = 0
+    while i < count {
+        let c = body[i..i + 1]
+        let remaining = count - i
+        if i > 0 && remaining % 3 == 0 {
+            out = "{out}{sep}{c}"
+        } else {
+            out = "{out}{c}"
+        }
+        i = i + 1
+    }
+    "{sign}{out}"
+}
+
+/// `s` parsed as a whole decimal integer; `parse` when it is not one.
+/// `parse_int_base(s, 10)` exactly, named for the case that is almost
+/// always meant.
+///
+/// ```wolf-doc-example
+/// (fmt.parse_int("42") else 0 - 1) == 42
+/// (fmt.parse_int("-42") else 0) == 0 - 42
+/// (fmt.parse_int("+7") else 0) == 7
+/// (fmt.parse_int("") else 0 - 1) == 0 - 1
+/// (fmt.parse_int("4x") else 0 - 1) == 0 - 1
+/// (fmt.parse_int("0x10") else 0 - 1) == 0 - 1
+/// ```
+pub fn parse_int(s: str) -> int ! {parse} {
+    parse_in_radix(s, 10)?
+}
+
+/// `s` parsed as a whole integer in `radix`; `parse` when the text is not
+/// one and `base` when the radix is outside 2..36 — two tags because a
+/// caller distinguishes bad data from a bad call (§2, and this module's
+/// header on the re-home).
+///
+/// An optional leading `-` or `+` is accepted, digits above nine are
+/// letters in either case, and there is no other leniency: no separators,
+/// no whitespace, no `0x`-style prefixes, and an empty digit run is a
+/// miss. Non-ASCII input is a miss and never a trap — the boundary-safe
+/// probe (F-0018) is what buys that.
+///
+/// Traps `overflow` (X3) when the value does not fit `int`: the parse
+/// succeeded and the arithmetic did not, which is a different failure
+/// from malformed text. `int_min()` itself parses, because the
+/// accumulator runs negative.
+///
+/// ```wolf-doc-example
+/// (fmt.parse_int_base("ff", 16) else 0) == 255
+/// (fmt.parse_int_base("FF", 16) else 0) == 255
+/// (fmt.parse_int_base("1010", 2) else 0) == 10
+/// (fmt.parse_int_base("z", 36) else 0) == 35
+/// let zero: int = 0
+/// (fmt.parse_int_base("-9223372036854775808", 10) else 0) == zero - 9223372036854775807 - 1
+/// (fmt.parse_int_base("2", 2) else 0 - 1) == 0 - 1
+/// (fmt.parse_int_base("10", 1) else 0 - 1) == 0 - 1
+/// ```
+pub fn parse_int_base(s: str, radix: int) -> int ! {parse, base} {
+    if radix < 2 {
+        return base
+    }
+    if radix > 36 {
+        return base
+    }
+    parse_in_radix(s, radix)?
+}
+
+/// `s` parsed in a radix already known to be in 2..36. Private: the two
+/// public entry points differ only in how they answer for a radix that is
+/// not, and sharing the loop is what keeps their answers identical.
+fn parse_in_radix(s: str, radix: int) -> int ! {parse} {
+    var rest = s
+    var negative = false
+    if rest.starts_with("-") {
+        negative = true
+        rest = rest[1..]
+    } else if rest.starts_with("+") {
+        rest = rest[1..]
+    }
+    if rest.len == 0 {
+        return parse
+    }
+    var acc: int = 0
+    while rest.len > 0 {
+        let d = digit_of(rest, radix)
+        if d < 0 {
+            return parse
+        }
+        acc = acc * radix - d
+        rest = rest[1..]
+    }
+    if negative {
+        return acc
+    }
+    0 - acc
+}
+
+/// `s` parsed as a boolean; `parse` when it is neither `"true"` nor
+/// `"false"`. Exactly those two spellings, lowercase, with nothing around
+/// them: `"True"`, `"TRUE"`, `"1"`, `"yes"` and `" true"` are all misses.
+/// The strictness is the point — a configuration file that means `true`
+/// should say so, and a parser that guesses turns a typo into a value.
+///
+/// ```wolf-doc-example
+/// (fmt.parse_bool("true") else false) == true
+/// (fmt.parse_bool("false") else true) == false
+/// (fmt.parse_bool("True") else false) == false
+/// (fmt.parse_bool("1") else false) == false
+/// (fmt.parse_bool("") else false) == false
+/// ```
+pub fn parse_bool(s: str) -> bool ! {parse} {
+    if s == "true" {
+        return true
+    }
+    if s == "false" {
+        return false
+    }
+    return parse
+}

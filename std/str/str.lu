@@ -53,8 +53,20 @@
 //! What IS shippable is everything expressible over `starts_with` plus
 //! advance-by-a-known-length — the boundary-safe probe: after
 //! `s.starts_with(p)` succeeds, `p.len` IS a code-point boundary of `s`.
-//! That single fact carries `strip_prefix`, `trim_start`, `trim_end`,
-//! `parse_int` and `parse_float` below.
+//! That single fact carries `strip_prefix`, `trim_start` and `trim_end`
+//! below — and it carried `parse_int`/`parse_float`, which are no longer
+//! here.
+//!
+//! **THE PARSE FAMILY MOVED (sc05).** `parse_int` and `parse_float` were
+//! shipped here by sc03 because this is where the boundary-safe probe was
+//! proven; the sprint that owns PRINTING numbers owns the whole
+//! number↔text boundary, so they now live in `std.fmt` and
+//! `std.fmt.decimal` beside `to_str_base` and `to_str`, where a reader can
+//! see the two directions as inverses and a test can hold them to it. Two
+//! behaviours improved in the move: a radix outside 2..36 raises `base`
+//! rather than `parse`, and `parse_float` is correctly rounded rather
+//! than "honest but approximate". Nothing in `std.str` calls them, so
+//! this module no longer carries a digit table at all.
 //!
 //! ```text
 //! find(s: str, needle: str) -> int ! {none}
@@ -130,10 +142,12 @@
 //! with `std.unicode`'s posture.
 //!
 //! INTERIM SPELLINGS (each filed, each flipped by the pin that fixes it):
-//! - Absence is spelled `None` and the parse miss `Parse`, not the
-//!   convention's lowercase `none`/`parse`: lupin does not resolve a
-//!   lowercase bare tag at a raise site (wolfc now does — the halves
-//!   swapped at this pin, F-0003).
+//! - Absence is spelled `None` here, not the convention's lowercase
+//!   `none`. That interim is OVER as of the sc05 pins — lupin 0.1.3
+//!   resolves lowercase bare tags at a raise site and wolfc has since
+//!   wolf-lang#4 — so this spelling is now a repo-wide rename waiting for
+//!   its own commit rather than a language constraint (F-0003 / F-0023,
+//!   both retired). New std code, `std.fmt` included, writes lowercase.
 //! - A method call on a slice EXPRESSION over a binding
 //!   (`d[0..1].upper()`) is `unsupported` in lupin ("does not denote a
 //!   place at run time", F-0021); every body here binds the slice first.
@@ -234,66 +248,6 @@ fn ws_len_quad(s: str) -> int {
         return 3
     }
     0
-}
-
-/// The value of the digit `s` starts with in `base`, or -1 when `s` does
-/// not start with a digit of that base. Case-insensitive for bases above
-/// 10 (`"ff"` and `"FF"` both parse in base 16).
-///
-/// The digit alphabet is an ASCII literal this module owns, so slicing it
-/// one byte at a time is always a code-point boundary — and the probe runs
-/// in the safe direction (`starts_with` on the INPUT, never a slice of
-/// it), which is what makes `parse_int` total over arbitrary UTF-8.
-fn digit_of(s: str, base: int) -> int {
-    let alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
-    var i = 0
-    while i < base {
-        let lower_digit = alphabet[i..i + 1]
-        if s.starts_with(lower_digit) {
-            return i
-        }
-        let upper_digit = lower_digit.upper()
-        if s.starts_with(upper_digit) {
-            return i
-        }
-        i = i + 1
-    }
-    0 - 1
-}
-
-/// A decimal digit's value as `f64`. Written as a table because `n as f64`
-/// does not convert at this pin — lupin leaves the value an int, so
-/// `(3 as f64) == 3.0` is false while `(3 as f64) == 3` is true (F-0022).
-/// Ten branches beat one silent wrong answer.
-fn digit_f(d: int) -> f64 {
-    if d == 1 {
-        return 1.0
-    }
-    if d == 2 {
-        return 2.0
-    }
-    if d == 3 {
-        return 3.0
-    }
-    if d == 4 {
-        return 4.0
-    }
-    if d == 5 {
-        return 5.0
-    }
-    if d == 6 {
-        return 6.0
-    }
-    if d == 7 {
-        return 7.0
-    }
-    if d == 8 {
-        return 8.0
-    }
-    if d == 9 {
-        return 9.0
-    }
-    0.0
 }
 
 /// The length of `s` in BYTES, O(1) — the honest unit (D25). This is the
@@ -552,184 +506,6 @@ pub fn join(sep: str, parts: List[str]) -> str {
         i = i + 1
     }
     out
-}
-
-/// `s` parsed as a whole integer in `base` (2 through 36); `Parse` when it
-/// is not one. An optional leading `-` or `+` is accepted, digits above 9
-/// are letters in either case, and there is no other leniency: no
-/// separators, no whitespace, no prefixes like `0x`, and an empty digit
-/// run is a miss. A `base` outside 2..36 is itself a `Parse` miss rather
-/// than a trap, because the base is often data too.
-///
-/// Traps `overflow` (X3, checked arithmetic in every profile) when the
-/// value does not fit `int` — the parse succeeded and the arithmetic did
-/// not, which is a different failure from a malformed string. A row for it
-/// waits on a checked-multiply that reports instead of trapping; that is
-/// recorded rather than papered over.
-///
-/// ```wolf-doc-example
-/// (str.parse_int("42", 10) else 0 - 1) == 42
-/// (str.parse_int("-42", 10) else 0) == 0 - 42
-/// (str.parse_int("ff", 16) else 0) == 255
-/// (str.parse_int("FF", 16) else 0) == 255
-/// (str.parse_int("1010", 2) else 0) == 10
-/// (str.parse_int("z", 36) else 0) == 35
-/// (str.parse_int("", 10) else 0 - 1) == 0 - 1
-/// (str.parse_int("4x", 10) else 0 - 1) == 0 - 1
-/// (str.parse_int("12", 1) else 0 - 1) == 0 - 1
-/// ```
-pub fn parse_int(s: str, base: int) -> int ! {Parse} {
-    if base < 2 {
-        return Parse
-    }
-    if base > 36 {
-        return Parse
-    }
-    var rest = s
-    var negative = false
-    if rest.starts_with("-") {
-        negative = true
-        rest = rest[1..]
-    } else if rest.starts_with("+") {
-        rest = rest[1..]
-    }
-    if rest.len == 0 {
-        return Parse
-    }
-    var acc = 0
-    while rest.len > 0 {
-        let d = digit_of(rest, base)
-        if d < 0 {
-            return Parse
-        }
-        acc = acc * base + d
-        rest = rest[1..]
-    }
-    if negative {
-        return 0 - acc
-    }
-    acc
-}
-
-/// `s` parsed as a whole `f64`; `Parse` when it is not one. The accepted
-/// shape is an optional sign, decimal digits with an optional `.` and
-/// fractional digits (at least one digit total), and an optional `e`/`E`
-/// exponent with its own optional sign and at least one digit. No
-/// leniency beyond that: no whitespace, no separators, no `inf`/`nan`
-/// spellings (those are values a program can write, not text a caller
-/// should be able to smuggle), and an exponent magnitude above 308 is a
-/// miss rather than a saturation.
-///
-/// Accuracy is honest rather than perfect: the value is accumulated by
-/// `acc * 10.0 + digit` and the exponent applied by repeated multiply, so
-/// a long literal can land one or two units in the last place away from
-/// the correctly-rounded result. Exact decimal-to-binary conversion is a
-/// numerics job (sc05's `fmt` owns the printing side and will own the
-/// pairing), recorded here rather than claimed.
-///
-/// ```wolf-doc-example
-/// (str.parse_float("1.5") else 0.0) == 1.5
-/// (str.parse_float("-2.25") else 0.0) == 0.0 - 2.25
-/// (str.parse_float("3") else 0.0) == 3.0
-/// (str.parse_float("0.5") else 0.0) == 0.5
-/// (str.parse_float("1e2") else 0.0) == 100.0
-/// (str.parse_float("5e-1") else 0.0) == 0.5
-/// (str.parse_float("") else 0.0 - 1.0) == 0.0 - 1.0
-/// (str.parse_float("x") else 0.0 - 1.0) == 0.0 - 1.0
-/// (str.parse_float("1.2.3") else 0.0 - 1.0) == 0.0 - 1.0
-/// ```
-pub fn parse_float(s: str) -> f64 ! {Parse} {
-    var rest = s
-    var negative = false
-    if rest.starts_with("-") {
-        negative = true
-        rest = rest[1..]
-    } else if rest.starts_with("+") {
-        rest = rest[1..]
-    }
-    var seen = 0
-    var acc = 0.0
-    var d = digit_of(rest, 10)
-    while d >= 0 {
-        acc = acc * 10.0 + digit_f(d)
-        seen = seen + 1
-        rest = rest[1..]
-        d = digit_of(rest, 10)
-    }
-    if rest.starts_with(".") {
-        rest = rest[1..]
-        var scale = 1.0
-        d = digit_of(rest, 10)
-        while d >= 0 {
-            scale = scale / 10.0
-            acc = acc + digit_f(d) * scale
-            seen = seen + 1
-            rest = rest[1..]
-            d = digit_of(rest, 10)
-        }
-    }
-    if seen == 0 {
-        return Parse
-    }
-    if rest.starts_with("e") || rest.starts_with("E") {
-        rest = rest[1..]
-        acc = apply_exponent(acc, rest)?
-        return signed(acc, negative)
-    }
-    if rest.len > 0 {
-        return Parse
-    }
-    signed(acc, negative)
-}
-
-/// `value` negated when `negative`. Private: `0.0 - x` is the negation
-/// every float body writes, and naming it keeps the two parse paths from
-/// repeating the branch.
-fn signed(value: f64, negative: bool) -> f64 {
-    if negative {
-        return 0.0 - value
-    }
-    value
-}
-
-/// `value` scaled by the exponent `s` spells (`"2"`, `"-1"`, `"+3"`);
-/// `Parse` when `s` is not a whole exponent or its magnitude exceeds 308.
-/// Private: `parse_float`'s tail.
-fn apply_exponent(value: f64, s: str) -> f64 ! {Parse} {
-    var rest = s
-    var negative = false
-    if rest.starts_with("-") {
-        negative = true
-        rest = rest[1..]
-    } else if rest.starts_with("+") {
-        rest = rest[1..]
-    }
-    if rest.len == 0 {
-        return Parse
-    }
-    var exponent = 0
-    while rest.len > 0 {
-        let d = digit_of(rest, 10)
-        if d < 0 {
-            return Parse
-        }
-        exponent = exponent * 10 + d
-        if exponent > 308 {
-            return Parse
-        }
-        rest = rest[1..]
-    }
-    var acc = value
-    var i = 0
-    while i < exponent {
-        if negative {
-            acc = acc / 10.0
-        } else {
-            acc = acc * 10.0
-        }
-        i = i + 1
-    }
-    acc
 }
 
 /// `s` copied into a fresh `std.strbuf.StrBuf` — the allocating

@@ -1,0 +1,15 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.fmt
+//!
+//! A fill that is not exactly one byte traps `assert`: the width promise
+//! cannot be kept with a two-byte fill (§2's trap rule — the caller could
+//! have checked). `"é"` is the shape that makes the rule visible, since
+//! it looks like one character and is two bytes.
+
+use std.fmt
+
+fn main() -> !int {
+    let _ = fmt.pad_left_with("42", 6, "é")
+    0
+}

@@ -1,0 +1,17 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.hex
+//!
+//! A `List[int]` element outside 0..255 is not a byte, and the caller
+//! promised bytes: that is a contract violation and traps `assert`
+//! (§2's trap rule), rather than encoding something that is not what the
+//! caller meant.
+
+use std.hex
+
+fn main() -> !int {
+    var b = List[int]()
+    (mut b).push(256)
+    let _ = hex.encode(b)
+    0
+}

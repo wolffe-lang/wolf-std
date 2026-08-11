@@ -1,0 +1,29 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fmt
+//!
+//! `with_sign` (the `{x:+}` spec, as a function) and `group` (thousands
+//! separators, which no format spec offers at all). Zero takes a `+`,
+//! grouping puts the sign in front, and `int_min()` groups like any other
+//! value.
+
+use std.fmt
+
+fn main() -> !int {
+    if fmt.with_sign(42) == "+42" {} else { return 1 }
+    if fmt.with_sign(0 - 42) == "-42" {} else { return 2 }
+    if fmt.with_sign(0) == "+0" {} else { return 3 }
+    if fmt.group(1234567, ",") == "1,234,567" {} else { return 4 }
+    if fmt.group(100, ",") == "100" {} else { return 5 }
+    if fmt.group(1000, ",") == "1,000" {} else { return 6 }
+    if fmt.group(999, ",") == "999" {} else { return 7 }
+    if fmt.group(0, ",") == "0" {} else { return 8 }
+    if fmt.group(0 - 1234, ",") == "-1,234" {} else { return 9 }
+    if fmt.group(1000, "_") == "1_000" {} else { return 10 }
+    // A multi-byte separator is fine here: grouping makes no width promise.
+    if fmt.group(1000, "\u{2009}") == "1\u{2009}000" {} else { return 11 }
+    let zero: int = 0
+    let smallest = zero - 9223372036854775807 - 1
+    if fmt.group(smallest, ",") == "-9,223,372,036,854,775,808" {} else { return 12 }
+    0
+}

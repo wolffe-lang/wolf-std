@@ -1,0 +1,972 @@
+//! member: true
+//!
+//! std.fmt.decimal — the `f64`↔decimal-string boundary, done exactly.
+//! Stability tier: core.
+//!
+//! **What this module promises.** Every finite `f64` is exactly a decimal
+//! number (a 53-bit integer times a power of two is a finite decimal), so
+//! there is a right answer for every question here and this module gives
+//! it: `to_str_fixed` and `to_str_exp` round the EXACT value of the input
+//! — never a floating-point approximation of it — with round-half-even at
+//! the last kept digit, and `to_str` produces the SHORTEST digit string
+//! that reads back as the same bits. `parse_float` is correctly rounded:
+//! the returned `f64` is the one nearest the exact decimal the text
+//! denotes, ties to even. The two are inverses on the round trip the
+//! sprint contract names: `parse_float(to_str(x))` has `to_bits` equal to
+//! `x`'s for every finite `x`, and `tests/fmt/decimal/round_trip.lu`
+//! proves it over the torture corpus rather than asserting it.
+//!
+//! **How, without a bignum type.** The exactness comes from one small
+//! engine: a non-negative big integer as a `List[int]` of base-10^9 limbs,
+//! with the only two operations these algorithms need — multiply by a
+//! small factor, and render to digits. A double `m * 2^e` becomes an exact
+//! decimal by multiplying `m` by `2^e` when `e >= 0` and by `5^(-e)` when
+//! `e < 0` (because `m / 2^k` is `m * 5^k / 10^k`, and dividing by a power
+//! of ten in base 10^9 is just where the point goes). Everything else —
+//! rounding, shortest-digit search, and the comparisons the parser needs —
+//! is string arithmetic over ASCII digits, which is cheap and exact. The
+//! shortest search never calls the parser: it compares the candidate
+//! against the two exact MIDPOINTS of the input's rounding interval, so
+//! "round-trips" is decided by arithmetic rather than by trying.
+//!
+//! **Why the module is not called `std.fmt.float`.** That is its natural
+//! name (`std.math`/`std.math.float` set the pattern in §10), and it is
+//! unavailable: the module namespace is flat at the LAST path segment at
+//! these pins, so `std.fmt.float` cannot import `std.math.float` (lupin
+//! calls it an import cycle, `float` → `float`, E0303) and cannot be
+//! imported beside it (wolfc rejects the second binding, E0306, while
+//! lupin silently keeps one of the two). Filed as F-0034. `decimal` is
+//! the noun for the boundary this module owns, so the name the defect
+//! forced is also the better name, and std keeps it when the defect
+//! closes.
+//!
+//! **Accuracy, stated as §10 requires.** Exact, not approximate: no ulp
+//! budget appears here because none is spent. The printing side rounds the
+//! exact value once; the parsing side rounds the exact value once. The
+//! only inexactness in the module is the first ESTIMATE the parser's slow
+//! path starts from, and an estimate that is wrong by any number of ulps
+//! costs time and not accuracy — the exact comparison that follows moves
+//! it to the right answer or the guard trips and the estimate is rejected.
+//!
+//! **Not here**: locale-aware anything (a non-target, forever, in core),
+//! hexadecimal float literals (`0x1p-3`, a lexer question), `%g`-style
+//! "shortest of fixed and exponential" (`to_str` already answers the
+//! question `%g` was invented for), and any rendering of a `f64` that
+//! rounds to fewer digits than it takes to round-trip — that is
+//! `to_str_fixed`'s job and it is spelled with the precision the caller
+//! asked for.
+
+use std.fmt
+use std.math.float
+
+/// The limb base: 10^9, the largest power of ten whose product with the
+/// multipliers below stays inside `int`. Private.
+fn limb_base() -> int {
+    1000000000
+}
+
+/// `n >= 0` as a big integer (little-endian base-10^9 limbs). Private.
+fn big_from_int(n: int) -> List[int] {
+    var out = List[int]()
+    var v = n
+    if v == 0 {
+        (mut out).push(0)
+        return out
+    }
+    while v > 0 {
+        (mut out).push(v % limb_base())
+        v = v / limb_base()
+    }
+    out
+}
+
+/// `x * k` for a small non-negative `k`. Private, and the reason every
+/// multiplier in this file is bounded: a limb is below 10^9 < 2^30, so
+/// `k` must stay below 2^33 for `limb * k + carry` to fit an `int`. The
+/// two multipliers used are 2^29 and 5^12, with plenty of room.
+///
+/// A fresh list rather than an in-place update: index assignment
+/// (`xs[i] = v`) executes in only one of the two implementations, and
+/// pushing into a new list is the portable spelling with the same cost
+/// (sc04's rule for `std.sort`, applied again).
+fn big_mul_small(x: List[int], k: int) -> List[int] {
+    var out = List[int]()
+    var carry: int = 0
+    var i: int = 0
+    let n = x.len
+    while i < n {
+        let cur = x[i] * k + carry
+        (mut out).push(cur % limb_base())
+        carry = cur / limb_base()
+        i = i + 1
+    }
+    while carry > 0 {
+        (mut out).push(carry % limb_base())
+        carry = carry / limb_base()
+    }
+    out
+}
+
+/// The decimal digits of `x`, without leading zeros (`"0"` for zero).
+/// Private.
+fn big_digits(x: List[int]) -> str {
+    var top = x.len - 1
+    while top > 0 && x[top] == 0 {
+        top = top - 1
+    }
+    let head = x[top]
+    var out = "{head}"
+    var i = top - 1
+    while i >= 0 {
+        let limb = x[i]
+        let padded = fmt.pad_left_with("{limb}", 9, "0")
+        out = "{out}{padded}"
+        i = i - 1
+    }
+    out
+}
+
+/// `b^e` for small non-negative arguments, without importing `std.math`
+/// (one function is cheaper than one more module in the namespace).
+/// Private.
+fn ipow(b: int, e: int) -> int {
+    var out: int = 1
+    var i: int = 0
+    while i < e {
+        out = out * b
+        i = i + 1
+    }
+    out
+}
+
+/// `"0"` repeated `n` times (empty for `n <= 0`). Private.
+fn zeros(n: int) -> str {
+    if n <= 0 {
+        return ""
+    }
+    "0".repeat(n)
+}
+
+/// The exact decimal digits of `m * 2^e` for `m >= 0`, paired with the
+/// number of those digits that sit AFTER the decimal point: the value is
+/// `digits * 10^-scale`. Private, and the whole engine.
+///
+/// `e >= 0` multiplies by `2^e` in chunks of 2^29; `e < 0` multiplies by
+/// `5^(-e)` in chunks of 5^12 and reports the scale, because
+/// `m * 2^-k == m * 5^k * 10^-k` exactly.
+fn exact_decimal(m: int, e: int) -> (str, int) {
+    var x = big_from_int(m)
+    var k = e
+    if e >= 0 {
+        while k >= 29 {
+            x = big_mul_small(x, 536870912)
+            k = k - 29
+        }
+        if k > 0 {
+            x = big_mul_small(x, ipow(2, k))
+        }
+        return (big_digits(x), 0)
+    }
+    k = 0 - e
+    var left = k
+    while left >= 12 {
+        x = big_mul_small(x, 244140625)
+        left = left - 12
+    }
+    if left > 0 {
+        x = big_mul_small(x, ipow(5, left))
+    }
+    (big_digits(x), k)
+}
+
+/// The significand and exponent of a non-negative finite `x`: the pair
+/// `(m, e)` with `x == m * 2^e` exactly, `m` a non-negative integer.
+/// Subnormals come back with `e == -1074` and a mantissa below 2^52.
+/// Private.
+fn decompose(x: f64) -> (int, int) {
+    let bits = float.to_bits(float.abs(x))
+    let biased = bits / 4503599627370496
+    let frac = bits % 4503599627370496
+    if biased == 0 {
+        return (frac, 0 - 1074)
+    }
+    (frac + 4503599627370496, biased - 1075)
+}
+
+/// The decimal digit `c` starts with, or -1. Private: the probe runs
+/// against a literal this module owns (sc03's inversion), so it is total
+/// over arbitrary input.
+fn dval(c: str) -> int {
+    let alphabet = "0123456789"
+    var i: int = 0
+    while i < 10 {
+        let d = alphabet[i..i + 1]
+        if c.starts_with(d) {
+            return i
+        }
+        i = i + 1
+    }
+    0 - 1
+}
+
+/// `dg` with its leading zeros removed (`"0"` when every digit is zero).
+/// Private.
+fn strip_leading(dg: str) -> str {
+    var rest = dg
+    while rest.len > 1 {
+        if rest.starts_with("0") {
+            rest = rest[1..]
+        } else {
+            return rest
+        }
+    }
+    rest
+}
+
+/// Whether every character of `s` is `"0"` (vacuously true when empty).
+/// Private.
+fn all_zeros(s: str) -> bool {
+    var rest = s
+    while rest.len > 0 {
+        if rest.starts_with("0") {
+            rest = rest[1..]
+        } else {
+            return false
+        }
+    }
+    true
+}
+
+/// `dg` with its trailing zeros removed (`"0"` when every digit is zero).
+/// Private.
+fn strip_trailing(dg: str) -> str {
+    var n = dg.len
+    while n > 1 {
+        let last = dg[n - 1..n]
+        if last.starts_with("0") {
+            n = n - 1
+        } else {
+            return dg[0..n]
+        }
+    }
+    dg[0..n]
+}
+
+/// The decimal digit string `dg` plus one. Private; the result is one
+/// digit longer when the carry runs off the top (`"99"` becomes `"100"`).
+fn increment_digits(dg: str) -> str {
+    var i = dg.len - 1
+    var out = ""
+    var carry: int = 1
+    while i >= 0 {
+        let d = dval(dg[i..i + 1]) + carry
+        if d >= 10 {
+            out = "{d - 10}{out}"
+            carry = 1
+        } else {
+            out = "{d}{out}"
+            carry = 0
+        }
+        i = i - 1
+    }
+    if carry == 1 {
+        return "1{out}"
+    }
+    out
+}
+
+/// `dg` rounded to `keep` digits, half-even, or zero-extended to `keep`
+/// digits when it is shorter. The result is `keep` digits long, or
+/// `keep + 1` when the rounding carried off the top. Private; `keep` is
+/// always at least 1 at every call site.
+fn scale_digits(dg: str, keep: int) -> str {
+    let n = dg.len
+    if keep >= n {
+        let tail = zeros(keep - n)
+        return "{dg}{tail}"
+    }
+    let head = dg[0..keep]
+    let rest = dg[keep..]
+    let first = dval(rest[0..1])
+    var up = false
+    if first > 5 {
+        up = true
+    }
+    if first == 5 {
+        if all_zeros(rest[1..]) {
+            // Exactly half: round half to EVEN on the last kept digit.
+            let last = dval(head[keep - 1..keep])
+            if last % 2 == 1 {
+                up = true
+            }
+        } else {
+            up = true
+        }
+    }
+    if up {
+        return increment_digits(head)
+    }
+    head
+}
+
+/// The integer and fractional halves of `digits * 10^-scale`: the
+/// fraction is exactly `scale` digits long, zero-padded on the left, and
+/// the integer part is `"0"` rather than empty. Private.
+fn point_split(dg: str, scale: int) -> (str, str) {
+    if scale <= 0 {
+        return (dg, "")
+    }
+    let n = dg.len
+    if n > scale {
+        return (dg[0..n - scale], dg[n - scale..])
+    }
+    let pad = zeros(scale - n)
+    ("0", "{pad}{dg}")
+}
+
+/// Compares `a * 10^ea` against `b * 10^eb`, both digit strings of
+/// non-negative integers: -1, 0 or 1. Private.
+///
+/// The comparison is exact and cheap: pad the one with the larger
+/// exponent with zeros so both denote integers at the same scale, strip
+/// leading zeros, and then compare lengths first and the strings second.
+/// Equal-length ASCII digit strings compare byte-lexicographically, which
+/// `[mem.str.order]` makes numeric order for digits — the one place this
+/// file leans on the language's string ordering rather than `dval`.
+fn cmp_scaled(a: str, ea: int, b: str, eb: int) -> int {
+    var left = a
+    var right = b
+    if ea > eb {
+        let pad = zeros(ea - eb)
+        left = "{a}{pad}"
+    }
+    if eb > ea {
+        let pad = zeros(eb - ea)
+        right = "{b}{pad}"
+    }
+    left = strip_leading(left)
+    right = strip_leading(right)
+    if left.len > right.len {
+        return 1
+    }
+    if left.len < right.len {
+        return 0 - 1
+    }
+    if left == right {
+        return 0
+    }
+    if left < right {
+        return 0 - 1
+    }
+    1
+}
+
+/// The exact value of the double with bit pattern `bits` (non-negative,
+/// finite), as a `(digits, exponent)` pair denoting `digits * 10^exp`.
+/// Private.
+fn bits_as_scaled(bits: int) -> (str, int) {
+    let x = float.from_bits(bits)
+    let parts = decompose(x)
+    let exact = exact_decimal(parts.0, parts.1)
+    (exact.0, 0 - exact.1)
+}
+
+/// The exact midpoint between the double with bit pattern `bits` and its
+/// successor, as `(digits, exponent)`. Private: the midpoint of
+/// `m * 2^e` and `(m + 1) * 2^e` is `(2m + 1) * 2^(e - 1)`, which is exact
+/// whether or not the successor crosses into the next binade.
+fn upper_mid_scaled(bits: int) -> (str, int) {
+    let x = float.from_bits(bits)
+    let parts = decompose(x)
+    let exact = exact_decimal(parts.0 * 2 + 1, parts.1 - 1)
+    (exact.0, 0 - exact.1)
+}
+
+/// The exact midpoint between the double with bit pattern `bits` and its
+/// PREDECESSOR, as `(digits, exponent)`. Private: `(2m - 1) * 2^(e - 1)`,
+/// except at a power of two with an exponent to spare, where the gap
+/// below is half the gap above and the midpoint is `(4m - 1) * 2^(e - 2)`.
+fn lower_mid_scaled(bits: int) -> (str, int) {
+    let x = float.from_bits(bits)
+    let parts = decompose(x)
+    let m = parts.0
+    let e = parts.1
+    if m == 4503599627370496 {
+        if e > 0 - 1074 {
+            let tight = exact_decimal(m * 4 - 1, e - 2)
+            return (tight.0, 0 - tight.1)
+        }
+    }
+    let exact = exact_decimal(m * 2 - 1, e - 1)
+    (exact.0, 0 - exact.1)
+}
+
+/// 10^q as an exact `f64`, for 0 <= q <= 22 — the powers of ten that are
+/// exactly representable. Private: the fast path's correctness rests on
+/// this being exact, so it is a table and not a loop.
+fn pow10_exact(q: int) -> f64 {
+    if q == 0 {
+        return 1.0
+    }
+    if q <= 11 {
+        return pow10_low(q)
+    }
+    pow10_high(q)
+}
+
+/// 10^q for 1 <= q <= 11. Private.
+fn pow10_low(q: int) -> f64 {
+    if q == 1 {
+        return 10.0
+    }
+    if q == 2 {
+        return 100.0
+    }
+    if q == 3 {
+        return 1000.0
+    }
+    if q == 4 {
+        return 10000.0
+    }
+    if q == 5 {
+        return 100000.0
+    }
+    if q == 6 {
+        return 1000000.0
+    }
+    if q == 7 {
+        return 10000000.0
+    }
+    if q == 8 {
+        return 100000000.0
+    }
+    if q == 9 {
+        return 1000000000.0
+    }
+    if q == 10 {
+        return 10000000000.0
+    }
+    100000000000.0
+}
+
+/// 10^q for 12 <= q <= 22. Private.
+fn pow10_high(q: int) -> f64 {
+    if q == 12 {
+        return 1000000000000.0
+    }
+    if q == 13 {
+        return 10000000000000.0
+    }
+    if q == 14 {
+        return 100000000000000.0
+    }
+    if q == 15 {
+        return 1000000000000000.0
+    }
+    if q == 16 {
+        return 10000000000000000.0
+    }
+    if q == 17 {
+        return 100000000000000000.0
+    }
+    if q == 18 {
+        return 1000000000000000000.0
+    }
+    if q == 19 {
+        return 10000000000000000000.0
+    }
+    if q == 20 {
+        return 100000000000000000000.0
+    }
+    if q == 21 {
+        return 1000000000000000000000.0
+    }
+    10000000000000000000000.0
+}
+
+/// A starting estimate for `digits * 10^exp`, accurate to a few ulp: the
+/// leading digits converted exactly, then scaled by exact powers of ten
+/// in chunks of 10^22. Private. Overflow saturates at `inf()` and
+/// underflow at zero; the exact search that follows fixes either.
+fn estimate(dg: str, exp: int) -> f64 {
+    let used = 17
+    var head = dg
+    var q = exp
+    if dg.len > used {
+        head = dg[0..used]
+        q = exp + dg.len - used
+    }
+    let significand = fmt.parse_int(head) else 0
+    var v = significand as f64
+    var k = q
+    while k >= 22 {
+        v = v * pow10_exact(22)
+        k = k - 22
+    }
+    while k <= 0 - 22 {
+        v = v / pow10_exact(22)
+        k = k + 22
+    }
+    if k > 0 {
+        v = v * pow10_exact(k)
+    }
+    if k < 0 {
+        v = v / pow10_exact(0 - k)
+    }
+    v
+}
+
+/// The correctly rounded `f64` nearest `digits * 10^exp`, for a digit
+/// string with no sign and a value that fits the finite range;
+/// `overflow` when it rounds beyond `f_max()`. Private: `parse_float` handles signs,
+/// syntax and the zero cases before calling this.
+fn value_of(dg: str, exp: int) -> f64 ! {overflow} {
+    let digits = strip_leading(dg)
+    if digits == "0" {
+        return 0.0
+    }
+    if digits.len <= 15 {
+        if exp >= 0 - 22 {
+            if exp <= 22 {
+                let significand = fmt.parse_int(digits) else 0
+                let v = significand as f64
+                if exp >= 0 {
+                    return v * pow10_exact(exp)
+                }
+                return v / pow10_exact(0 - exp)
+            }
+        }
+    }
+    let start = estimate(digits, exp)
+    if float.is_nan(start) {
+        return overflow
+    }
+    var bits: int = 0
+    if float.is_finite(start) {
+        bits = float.to_bits(start)
+    } else {
+        bits = 9218868437227405311
+    }
+    if bits < 0 {
+        bits = 0
+    }
+    // Walk to the double whose value is the largest not above the target.
+    // Each step costs one exact expansion, and the estimate is within a
+    // handful of ulp, so the guard is generous rather than load-bearing.
+    var guard: int = 0
+    while guard < 200 && bits > 0 {
+        let here = bits_as_scaled(bits)
+        if cmp_scaled(here.0, here.1, digits, exp) > 0 {
+            bits = bits - 1
+            guard = guard + 1
+        } else {
+            break
+        }
+    }
+    guard = 0
+    while guard < 200 && bits < 9218868437227405311 {
+        let next = bits_as_scaled(bits + 1)
+        if cmp_scaled(next.0, next.1, digits, exp) <= 0 {
+            bits = bits + 1
+            guard = guard + 1
+        } else {
+            break
+        }
+    }
+    // `bits` is now the largest double at or below the target; the answer
+    // is it or its successor, decided by the exact midpoint with ties to
+    // even.
+    let mid = upper_mid_scaled(bits)
+    let side = cmp_scaled(mid.0, mid.1, digits, exp)
+    var chosen = bits
+    if side < 0 {
+        chosen = bits + 1
+    }
+    if side == 0 {
+        if bits % 2 == 1 {
+            chosen = bits + 1
+        }
+    }
+    if chosen > 9218868437227405311 {
+        return overflow
+    }
+    float.from_bits(chosen)
+}
+
+/// `x` rendered with exactly `prec` digits after the decimal point, the
+/// exact value rounded half-even at the last one — `%.*f`, done right.
+/// A negative `prec` traps `assert` (a caller contract violation, §2);
+/// `prec == 0` renders no point at all. `-0.0` keeps its sign, because
+/// the sign of zero is observable and a formatter that hides it is
+/// lying about the value it was given.
+///
+/// Non-finite inputs render as `"nan"`, `"inf"` and `"-inf"` — the
+/// spellings `parse_float` deliberately does NOT accept, so a round trip
+/// through text is not a way to smuggle an infinity into a program.
+///
+/// Total otherwise: no error row, no traps beyond allocation. The cost is
+/// linear in the number of exact digits, which for a subnormal is about
+/// 750 — bounded, but not free.
+///
+/// ```wolf-doc-example
+/// decimal.to_str_fixed(1.5, 2) == "1.50"
+/// decimal.to_str_fixed(1.0, 0) == "1"
+/// decimal.to_str_fixed(0.5, 0) == "0"
+/// decimal.to_str_fixed(1.5, 0) == "2"
+/// decimal.to_str_fixed(2.5, 0) == "2"
+/// decimal.to_str_fixed(0.1, 20) == "0.10000000000000000555"
+/// decimal.to_str_fixed(-0.0, 1) == "-0.0"
+/// decimal.to_str_fixed(0.0, 3) == "0.000"
+/// ```
+pub fn to_str_fixed(x: f64, prec: int) -> str {
+    if prec < 0 {
+        assert(false)
+    }
+    if float.is_nan(x) {
+        return "nan"
+    }
+    if float.is_inf(x) {
+        if float.is_sign_negative(x) {
+            return "-inf"
+        }
+        return "inf"
+    }
+    var sign = ""
+    if float.is_sign_negative(x) {
+        sign = "-"
+    }
+    let parts = decompose(x)
+    let exact = exact_decimal(parts.0, parts.1)
+    let halves = point_split(exact.0, exact.1)
+    let all = "{halves.0}{halves.1}"
+    let keep = halves.0.len + prec
+    let rounded = scale_digits(all, keep)
+    let int_len = rounded.len - prec
+    let head = rounded[0..int_len]
+    if prec == 0 {
+        return "{sign}{head}"
+    }
+    let tail = rounded[int_len..]
+    "{sign}{head}.{tail}"
+}
+
+/// `x` in exponential notation with exactly `prec` digits after the
+/// point in the mantissa — `%.*e`, over the exact value, rounded
+/// half-even. The exponent carries a sign and at least two digits
+/// (`"1.50e+00"`), and `prec == 0` renders the mantissa alone
+/// (`"2e+00"`). A negative `prec` traps `assert`.
+///
+/// Zero renders with a zero exponent (`"0.00e+00"`), `-0.0` keeps its
+/// sign, and the non-finite spellings are `to_str_fixed`'s.
+///
+/// ```wolf-doc-example
+/// decimal.to_str_exp(1.5, 2) == "1.50e+00"
+/// decimal.to_str_exp(1500.0, 2) == "1.50e+03"
+/// decimal.to_str_exp(0.015, 1) == "1.5e-02"
+/// decimal.to_str_exp(2.0, 0) == "2e+00"
+/// decimal.to_str_exp(0.0, 2) == "0.00e+00"
+/// decimal.to_str_exp(9.99, 1) == "1.0e+01"
+/// ```
+pub fn to_str_exp(x: f64, prec: int) -> str {
+    if prec < 0 {
+        assert(false)
+    }
+    if float.is_nan(x) {
+        return "nan"
+    }
+    if float.is_inf(x) {
+        if float.is_sign_negative(x) {
+            return "-inf"
+        }
+        return "inf"
+    }
+    var sign = ""
+    if float.is_sign_negative(x) {
+        sign = "-"
+    }
+    let parts = decompose(x)
+    if parts.0 == 0 {
+        let zero_tail = zeros(prec)
+        if prec == 0 {
+            return "{sign}0e+00"
+        }
+        return "{sign}0.{zero_tail}e+00"
+    }
+    let exact = exact_decimal(parts.0, parts.1)
+    let digits = strip_leading(exact.0)
+    var exponent = digits.len - 1 - exact.1
+    let keep = prec + 1
+    var rounded = scale_digits(digits, keep)
+    if rounded.len > keep {
+        exponent = exponent + 1
+        rounded = rounded[0..keep]
+    }
+    render_exp(sign, rounded, exponent)
+}
+
+/// `sign` + a mantissa built from `digits` + the exponent suffix.
+/// Private: the shared tail of `to_str_exp` and `to_str`'s scientific
+/// branch.
+fn render_exp(sign: str, digits: str, exponent: int) -> str {
+    let lead = digits[0..1]
+    var mantissa = lead
+    if digits.len > 1 {
+        let rest = digits[1..]
+        mantissa = "{lead}.{rest}"
+    }
+    var exp_sign = "+"
+    var magnitude = exponent
+    if exponent < 0 {
+        exp_sign = "-"
+        magnitude = 0 - exponent
+    }
+    let exp_digits = fmt.pad_left_with("{magnitude}", 2, "0")
+    "{sign}{mantissa}e{exp_sign}{exp_digits}"
+}
+
+/// `x` as the SHORTEST decimal string that reads back as exactly `x` —
+/// the round-trip contract the sprint names, and the rendering ordinary
+/// code wants: `to_str(0.1)` is `"0.1"`, not `0.1`'s exact 55-digit
+/// expansion, and `parse_float` maps it back to the same bits.
+///
+/// The digit count is genuinely minimal: the candidate is compared
+/// against the exact midpoints of `x`'s rounding interval, and a
+/// candidate that lands exactly ON a midpoint counts when the tie goes
+/// this way (round-half-even, so when `x`'s mantissa is even). That
+/// boundary rule is the difference between `to_str(9.999999999999999e22)`
+/// being `"1e+23"` and being seventeen digits, and it is why the shortest
+/// search must know how the READER breaks ties.
+///
+/// Layout: positional when the decimal exponent of the leading digit is
+/// in -4..16, scientific otherwise (`"1e+17"`, `"1e-05"`) — the rule
+/// every language with this function picks, with the crossover written
+/// down instead of discovered. Integral values render without a trailing
+/// `".0"` (`to_str(3.0)` is `"3"`); `to_str_fixed(x, 1)` is the spelling
+/// that keeps one. `-0.0` renders `"-0"`, and the non-finite spellings
+/// are `to_str_fixed`'s.
+///
+/// ```wolf-doc-example
+/// decimal.to_str(0.1) == "0.1"
+/// decimal.to_str(1.5) == "1.5"
+/// decimal.to_str(3.0) == "3"
+/// decimal.to_str(100.0) == "100"
+/// decimal.to_str(0.0) == "0"
+/// decimal.to_str(-0.0) == "-0"
+/// decimal.to_str(1e17) == "1e+17"
+/// decimal.to_str(0.00001) == "1e-05"
+/// decimal.to_str(0.3333333333333333) == "0.3333333333333333"
+/// ```
+pub fn to_str(x: f64) -> str {
+    if float.is_nan(x) {
+        return "nan"
+    }
+    if float.is_inf(x) {
+        if float.is_sign_negative(x) {
+            return "-inf"
+        }
+        return "inf"
+    }
+    var sign = ""
+    if float.is_sign_negative(x) {
+        sign = "-"
+    }
+    let parts = decompose(x)
+    if parts.0 == 0 {
+        return "{sign}0"
+    }
+    let exact = exact_decimal(parts.0, parts.1)
+    let digits = strip_leading(exact.0)
+    let exponent = digits.len - 1 - exact.1
+    let bits = float.to_bits(float.abs(x))
+    let low = lower_mid_scaled(bits)
+    let high = upper_mid_scaled(bits)
+    // A candidate sitting exactly ON a midpoint is readable back only
+    // when the tie goes to this value — round-half-even, so when this
+    // value's mantissa is the even one. That inclusivity is what makes
+    // `to_str(9.999999999999999e22)` the one digit `1e+23` rather than
+    // seventeen.
+    let inclusive = parts.0 % 2 == 0
+    var keep: int = 1
+    var chosen = strip_trailing(digits)
+    var chosen_exp = exponent
+    while keep <= 25 {
+        var candidate = scale_digits(digits, keep)
+        var candidate_exp = exponent
+        if candidate.len > keep {
+            candidate_exp = candidate_exp + 1
+            candidate = candidate[0..keep]
+        }
+        // The candidate denotes `candidate * 10^(candidate_exp - keep + 1)`.
+        let scale = candidate_exp - keep + 1
+        let above_low = cmp_scaled(candidate, scale, low.0, low.1)
+        let below_high = cmp_scaled(candidate, scale, high.0, high.1)
+        var fits = above_low > 0 && below_high < 0
+        if inclusive {
+            if above_low >= 0 && below_high <= 0 {
+                fits = true
+            }
+        }
+        if fits {
+            chosen = strip_trailing(candidate)
+            chosen_exp = candidate_exp
+            break
+        }
+        keep = keep + 1
+    }
+    render_shortest(sign, chosen, chosen_exp)
+}
+
+/// `sign` + `digits` laid out around the decimal point for a leading
+/// digit at 10^exponent. Private: `to_str`'s layout rule.
+fn render_shortest(sign: str, digits: str, exponent: int) -> str {
+    if exponent > 16 {
+        return render_exp(sign, digits, exponent)
+    }
+    if exponent < 0 - 4 {
+        return render_exp(sign, digits, exponent)
+    }
+    let count = digits.len
+    if exponent < 0 {
+        let pad = zeros(0 - exponent - 1)
+        return "{sign}0.{pad}{digits}"
+    }
+    if exponent >= count - 1 {
+        let pad = zeros(exponent - count + 1)
+        return "{sign}{digits}{pad}"
+    }
+    let head = digits[0..exponent + 1]
+    let tail = digits[exponent + 1..]
+    "{sign}{head}.{tail}"
+}
+
+/// `s` parsed as an `f64`, correctly rounded: the result is the double
+/// nearest the exact decimal value the text denotes, ties to even.
+/// `parse` when the text is not a number; `overflow` when the value
+/// rounds beyond the finite range (§10's tag, meaning here exactly what
+/// it means for integers: a result outside the type). It is NOT spelled
+/// `range`: a row tag that shares a name with a module in scope — and
+/// `std.range` is one — resolves to that MODULE and leaves the function
+/// as an ordinary value, with no diagnostic and no `else` firing
+/// (F-0036).
+///
+/// The accepted shape is an optional sign, decimal digits with an
+/// optional `.` and fractional digits (at least one digit in total), and
+/// an optional `e`/`E` exponent with its own optional sign and at least
+/// one digit. Nothing else: no whitespace, no digit separators, no `0x`,
+/// and no `inf`/`nan` spellings — those are values a program can write
+/// and not text a caller should be able to smuggle. Non-ASCII input is a
+/// miss and never a trap (F-0018's boundary-safe probe).
+///
+/// Underflow is IEEE's and not an error: a value below half the smallest
+/// subnormal rounds to a signed zero, exactly as the arithmetic would.
+/// Overflow IS an error, because rounding `1e400` to `inf()` would turn
+/// text that names no `f64` into a value that looks like one.
+///
+/// ```wolf-doc-example
+/// (decimal.parse_float("1.5") else 0.0) == 1.5
+/// (decimal.parse_float("-2.25") else 0.0) == -2.25
+/// (decimal.parse_float("3") else 0.0) == 3.0
+/// (decimal.parse_float("1e2") else 0.0) == 100.0
+/// (decimal.parse_float("5e-1") else 0.0) == 0.5
+/// (decimal.parse_float("0.1") else 0.0) == 0.1
+/// (decimal.parse_float("1e400") else 0.0) == 0.0
+/// (decimal.parse_float("") else 0.0 - 1.0) == 0.0 - 1.0
+/// (decimal.parse_float("1.2.3") else 0.0 - 1.0) == 0.0 - 1.0
+/// ```
+pub fn parse_float(s: str) -> f64 ! {parse, overflow} {
+    var rest = s
+    var negative = false
+    if rest.starts_with("-") {
+        negative = true
+        rest = rest[1..]
+    } else if rest.starts_with("+") {
+        rest = rest[1..]
+    }
+    var digits = ""
+    var scale: int = 0
+    var seen: int = 0
+    var d = dval(rest)
+    while d >= 0 {
+        digits = "{digits}{d}"
+        seen = seen + 1
+        rest = rest[1..]
+        d = dval(rest)
+    }
+    if rest.starts_with(".") {
+        rest = rest[1..]
+        d = dval(rest)
+        while d >= 0 {
+            digits = "{digits}{d}"
+            scale = scale + 1
+            seen = seen + 1
+            rest = rest[1..]
+            d = dval(rest)
+        }
+    }
+    if seen == 0 {
+        return parse
+    }
+    var exponent: int = 0
+    if rest.starts_with("e") || rest.starts_with("E") {
+        rest = rest[1..]
+        exponent = exponent_of(rest)?
+    } else if rest.len > 0 {
+        return parse
+    }
+    let trimmed = strip_leading(digits)
+    if trimmed == "0" {
+        return signed(0.0, negative)
+    }
+    let exp = exponent - scale
+    // A magnitude this far outside the range needs no exact arithmetic to
+    // settle: the smallest subnormal is 5e-324 and the largest finite
+    // value is below 1.8e308.
+    if exp + trimmed.len > 310 {
+        return overflow
+    }
+    if exp + trimmed.len < 0 - 324 {
+        return signed(0.0, negative)
+    }
+    let magnitude = value_of(trimmed, exp)?
+    signed(magnitude, negative)
+}
+
+/// The exponent an `e`-suffix spells; `parse` when it is not a whole
+/// number, and capped rather than overflowing on an absurd one. Private.
+fn exponent_of(s: str) -> int ! {parse} {
+    var rest = s
+    var negative = false
+    if rest.starts_with("-") {
+        negative = true
+        rest = rest[1..]
+    } else if rest.starts_with("+") {
+        rest = rest[1..]
+    }
+    if rest.len == 0 {
+        return parse
+    }
+    var acc: int = 0
+    while rest.len > 0 {
+        let d = dval(rest)
+        if d < 0 {
+            return parse
+        }
+        if acc < 100000 {
+            acc = acc * 10 + d
+        }
+        rest = rest[1..]
+    }
+    if negative {
+        return 0 - acc
+    }
+    acc
+}
+
+/// `value` negated when `negative`, preserving the sign of zero (which
+/// `0.0 - x` does not — sc04's rule). Private.
+fn signed(value: f64, negative: bool) -> f64 {
+    if negative {
+        return value * (0.0 - 1.0)
+    }
+    value
+}

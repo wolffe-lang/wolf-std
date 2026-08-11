@@ -1,0 +1,65 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fmt.decimal
+//!
+//! The sprint's acceptance property, held over the torture corpus:
+//! `parse_float(to_str(x))` has the same BITS as `x`, for the values that
+//! break naive implementations — 0.1, the largest finite double, the
+//! smallest subnormal, the normal/subnormal boundary, powers of two,
+//! negative zero, and 9.999999999999999e22, whose shortest form is one
+//! digit only because the reader breaks ties to even.
+//!
+//! The round trip is asserted through `to_bits` rather than `==` because
+//! `-0.0 == 0.0` is true and this test is about the encoding, not the
+//! value.
+
+use std.fmt.decimal
+use std.math.float
+
+fn trips(x: f64) -> bool {
+    let text = decimal.to_str(x)
+    let back = decimal.parse_float(text) else float.nan()
+    float.to_bits(back) == float.to_bits(x)
+}
+
+fn main() -> !int {
+    if trips(0.1) {} else { return 1 }
+    if trips(0.2) {} else { return 2 }
+    if trips(0.3) {} else { return 3 }
+    if trips(1.0) {} else { return 4 }
+    if trips(-0.0) {} else { return 5 }
+    if trips(0.0) {} else { return 6 }
+    if trips(1024.0) {} else { return 7 }
+    if trips(0.5) {} else { return 8 }
+    if trips(1.7976931348623157e308) {} else { return 9 }
+    if trips(2.2250738585072014e-308) {} else { return 10 }
+    if trips(0.3333333333333333) {} else { return 11 }
+    if trips(123456789.123456789) {} else { return 12 }
+    if trips(9.999999999999999e22) {} else { return 13 }
+    // The smallest subnormal and its neighbour, built from bits so the
+    // test does not depend on the parser it is testing.
+    if trips(float.from_bits(1)) {} else { return 14 }
+    if trips(float.from_bits(2)) {} else { return 15 }
+    // The largest subnormal: mantissa all ones, exponent field zero.
+    if trips(float.from_bits(4503599627370495)) {} else { return 16 }
+    // The shortest forms themselves, pinned as text.
+    if decimal.to_str(0.1) == "0.1" {} else { return 17 }
+    if decimal.to_str(1.5) == "1.5" {} else { return 18 }
+    if decimal.to_str(3.0) == "3" {} else { return 19 }
+    if decimal.to_str(100.0) == "100" {} else { return 20 }
+    if decimal.to_str(0.0) == "0" {} else { return 21 }
+    if decimal.to_str(-0.0) == "-0" {} else { return 22 }
+    if decimal.to_str(0.3333333333333333) == "0.3333333333333333" {} else { return 23 }
+    if decimal.to_str(9.999999999999999e22) == "1e+23" {} else { return 24 }
+    if decimal.to_str(float.from_bits(1)) == "5e-324" {} else { return 25 }
+    if decimal.to_str(1e308) == "1e+308" {} else { return 26 }
+    // The layout rule: positional in -4..16, scientific outside it.
+    if decimal.to_str(1e16) == "10000000000000000" {} else { return 27 }
+    if decimal.to_str(1e17) == "1e+17" {} else { return 28 }
+    if decimal.to_str(0.0001) == "0.0001" {} else { return 29 }
+    if decimal.to_str(0.00001) == "1e-05" {} else { return 30 }
+    // Non-finite values have no digits at all.
+    if decimal.to_str(1.0 / 0.0) == "inf" {} else { return 31 }
+    if decimal.to_str(0.0 / 0.0) == "nan" {} else { return 32 }
+    0
+}

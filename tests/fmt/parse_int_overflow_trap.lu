@@ -1,0 +1,16 @@
+//! check: run(exit=trap(overflow))
+//! phase: run
+//! conforms: std.fmt
+//!
+//! The parse succeeded and the arithmetic did not: a digit run that
+//! leaves `int` traps `overflow` (X3, checked in every profile) rather
+//! than raising, and the doc says so. A row for it waits on a
+//! checked-multiply that reports instead of trapping — recorded rather
+//! than papered over.
+
+use std.fmt
+
+fn main() -> !int {
+    let _ = fmt.parse_int("9223372036854775808") else 0
+    0
+}

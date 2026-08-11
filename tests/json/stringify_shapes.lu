@@ -1,0 +1,63 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.json
+//!
+//! The serializer over every variant. Numbers are the interesting half:
+//! an `Int` renders exactly (a 64-bit id survives), a `Num` renders
+//! through the shortest round-tripping decimal, and a non-finite `Num`
+//! renders as `null` because JSON has no spelling for it — the choice
+//! JavaScript's own `JSON.stringify` made, documented rather than
+//! discovered.
+//!
+//! Multi-key objects are NOT asserted here: `Map` iteration order is
+//! unspecified (§8), so the module promises nothing about key order and
+//! neither does this test.
+
+use std.json
+
+fn main() -> !int {
+    if (json.stringify(json.null()) else "?") == "null" {} else { return 1 }
+    if (json.stringify(json.from_bool(true)) else "?") == "true" {} else { return 2 }
+    if (json.stringify(json.from_bool(false)) else "?") == "false" {} else { return 3 }
+    if (json.stringify(json.from_int(42)) else "?") == "42" {} else { return 4 }
+    if (json.stringify(json.from_int(0 - 7)) else "?") == "-7" {} else { return 5 }
+    if (json.stringify(json.from_num(1.5)) else "?") == "1.5" {} else { return 6 }
+    if (json.stringify(json.from_num(3.0)) else "?") == "3" {} else { return 7 }
+    if (json.stringify(json.from_num(0.1)) else "?") == "0.1" {} else { return 8 }
+    if (json.stringify(json.from_str("hi")) else "?") == "\"hi\"" {} else { return 9 }
+    if (json.stringify(json.from_str("")) else "?") == "\"\"" {} else { return 10 }
+    // Non-finite numbers become null.
+    if (json.stringify(json.from_num(1.0 / 0.0)) else "?") == "null" {} else { return 11 }
+    if (json.stringify(json.from_num(0.0 / 0.0)) else "?") == "null" {} else { return 12 }
+    // Arrays, including the empty one and nesting.
+    var empty = List[json.Value]()
+    if (json.stringify(json.from_list(empty)) else "?") == "[]" {} else { return 13 }
+    var xs = List[json.Value]()
+    (mut xs).push(json.from_int(1))
+    (mut xs).push(json.null())
+    (mut xs).push(json.from_str("x"))
+    if (json.stringify(json.from_list(xs)) else "?") == "[1,null,\"x\"]" {} else { return 14 }
+    var outer = List[json.Value]()
+    (mut outer).push(json.from_list(xs))
+    if (json.stringify(json.from_list(outer)) else "?") == "[[1,null,\"x\"]]" {} else { return 15 }
+    // Objects: empty, and one key (order is only unambiguous with one).
+    var none_keys = Map[str, json.Value]()
+    if (json.stringify(json.from_map(none_keys)) else "?") == "{{}}" {} else { return 16 }
+    var m = Map[str, json.Value]()
+    m["a"] = json.from_int(1)
+    if (json.stringify(json.from_map(m)) else "?") == "{{\"a\":1}}" {} else { return 17 }
+    // An escaped key and an escaped value.
+    var q = Map[str, json.Value]()
+    q["a\"b"] = json.from_str("c\nd")
+    if (json.stringify(json.from_map(q)) else "?") == "{{\"a\\\"b\":\"c\\nd\"}}" {} else {
+        return 18
+    }
+    // A 64-bit id survives as an Int and would not as a Num.
+    if (json.stringify(json.from_int(9007199254740993)) else "?") == "9007199254740993" {} else {
+        return 19
+    }
+    if (json.stringify(json.from_num(9007199254740993.0)) else "?") == "9007199254740992" {} else {
+        return 20
+    }
+    0
+}

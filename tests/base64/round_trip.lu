@@ -1,0 +1,69 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.base64
+//!
+//! `decode(encode(b)) == b` across all three group remainders — where
+//! every base-64 implementation's bugs live — plus the canonical text
+//! direction, `encode(decode(s)) == s`, which only the strict profile can
+//! promise. The vectors are RFC 4648's own (`"M"`, `"Ma"`, `"Man"`).
+
+use std.base64
+
+fn same(a: List[int], b: List[int]) -> bool {
+    if a.len == b.len {} else {
+        return false
+    }
+    var i: int = 0
+    while i < a.len {
+        if a[i] == b[i] {} else {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+fn main() -> !int {
+    var empty = List[int]()
+    if base64.encode(empty) == "" {} else { return 1 }
+    if same(base64.decode("") else empty, empty) {} else { return 2 }
+    // RFC 4648's vectors: one, two and three bytes.
+    var one = List[int]()
+    (mut one).push(77)
+    if base64.encode(one) == "TQ==" {} else { return 3 }
+    var two = List[int]()
+    (mut two).push(77)
+    (mut two).push(97)
+    if base64.encode(two) == "TWE=" {} else { return 4 }
+    var three = List[int]()
+    (mut three).push(77)
+    (mut three).push(97)
+    (mut three).push(110)
+    if base64.encode(three) == "TWFu" {} else { return 5 }
+    if same(base64.decode("TQ==") else empty, one) {} else { return 6 }
+    if same(base64.decode("TWE=") else empty, two) {} else { return 7 }
+    if same(base64.decode("TWFu") else empty, three) {} else { return 8 }
+    // Every byte value, both directions, exercising all three remainders
+    // by taking prefixes of 256, 257 and 258 bytes.
+    var all = List[int]()
+    var i: int = 0
+    while i < 256 {
+        (mut all).push(i)
+        i = i + 1
+    }
+    let text = base64.encode(all)
+    let round = base64.decode(text) else empty
+    if same(round, all) {} else { return 9 }
+    if base64.encode(round) == text {} else { return 10 }
+    (mut all).push(0)
+    let text257 = base64.encode(all)
+    if same(base64.decode(text257) else empty, all) {} else { return 11 }
+    (mut all).push(255)
+    let text258 = base64.encode(all)
+    if same(base64.decode(text258) else empty, all) {} else { return 12 }
+    // Output length is always a multiple of four.
+    if text.len % 4 == 0 {} else { return 13 }
+    if text257.len % 4 == 0 {} else { return 14 }
+    if text258.len % 4 == 0 {} else { return 15 }
+    0
+}

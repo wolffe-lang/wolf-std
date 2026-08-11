@@ -1,0 +1,65 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.json
+//!
+//! The value model and its accessors: every constructor answers its own
+//! `type_name`, every `as_*` returns the payload for its variant and
+//! raises `kind` for the rest, and the widening rule is exactly one —
+//! `as_float` accepts an `Int`, `as_int` never accepts a `Num`.
+//!
+//! Navigation is `has` + `as_obj`/`as_arr` and the language's own
+//! indexing, because `get` and `at` cannot execute at these pins: a
+//! function returning an ENUM through an error row takes the miss path on
+//! every call (F-0037). The module header carries their contracts.
+
+use std.json
+
+fn main() -> !int {
+    if json.type_name(json.null()) == "null" {} else { return 1 }
+    if json.type_name(json.from_bool(true)) == "bool" {} else { return 2 }
+    if json.type_name(json.from_int(1)) == "int" {} else { return 3 }
+    if json.type_name(json.from_num(1.5)) == "num" {} else { return 4 }
+    if json.type_name(json.from_str("s")) == "str" {} else { return 5 }
+    if json.is_null(json.null()) {} else { return 6 }
+    if json.is_null(json.from_int(0)) == false {} else { return 7 }
+    // Payload accessors: hit and miss.
+    if (json.as_bool(json.from_bool(true)) else false) == true {} else { return 8 }
+    if (json.as_bool(json.from_int(1)) else false) == false {} else { return 9 }
+    if (json.as_int(json.from_int(42)) else 0) == 42 {} else { return 10 }
+    if (json.as_int(json.from_num(42.0)) else 0) == 0 {} else { return 11 }
+    if (json.as_float(json.from_num(1.5)) else 0.0) == 1.5 {} else { return 12 }
+    if (json.as_float(json.from_int(3)) else 0.0) == 3.0 {} else { return 13 }
+    if (json.as_float(json.from_str("3")) else 0.0) == 0.0 {} else { return 14 }
+    if (json.as_str(json.from_str("wolf")) else "?") == "wolf" {} else { return 15 }
+    if (json.as_str(json.null()) else "?") == "?" {} else { return 16 }
+    // Arrays.
+    var xs = List[json.Value]()
+    (mut xs).push(json.from_int(1))
+    (mut xs).push(json.null())
+    let arr = json.from_list(xs)
+    if json.type_name(arr) == "arr" {} else { return 17 }
+    if (json.len(arr) else 0 - 1) == 2 {} else { return 18 }
+    let got = json.as_arr(arr) else List[json.Value]()
+    if got.len == 2 {} else { return 19 }
+    if (json.as_int(got[0]) else 0) == 1 {} else { return 20 }
+    if json.is_null(got[1]) {} else { return 21 }
+    // Objects.
+    var m = Map[str, json.Value]()
+    m["a"] = json.from_str("x")
+    let obj = json.from_map(m)
+    if json.type_name(obj) == "obj" {} else { return 22 }
+    if (json.len(obj) else 0 - 1) == 1 {} else { return 23 }
+    if json.has(obj, "a") {} else { return 24 }
+    if json.has(obj, "b") == false {} else { return 25 }
+    if json.has(json.from_int(1), "a") == false {} else { return 26 }
+    let ks = json.keys(obj) else List[str]()
+    if ks.len == 1 {} else { return 27 }
+    if ks[0] == "a" {} else { return 28 }
+    if (json.keys(json.from_int(1)) else List[str]()).len == 0 {} else { return 29 }
+    let fields = json.as_obj(obj) else Map[str, json.Value]()
+    if (json.as_str(fields["a"]) else "?") == "x" {} else { return 30 }
+    // `len` is for containers only.
+    if (json.len(json.from_int(1)) else 0 - 1) == 0 - 1 {} else { return 31 }
+    if (json.len(json.from_str("abc")) else 0 - 1) == 0 - 1 {} else { return 32 }
+    0
+}

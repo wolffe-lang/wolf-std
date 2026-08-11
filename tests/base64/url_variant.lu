@@ -1,0 +1,36 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.base64
+//!
+//! RFC 4648 §5: `-` and `_` in place of `+` and `/`, and no padding on
+//! the way out because `=` needs escaping in a query string. The two
+//! alphabets are kept apart on the way in — a `/` in URL-safe input is a
+//! sign the caller mixed the variants, and that is a miss rather than a
+//! silent success.
+
+use std.base64
+
+fn main() -> !int {
+    var b = List[int]()
+    (mut b).push(255)
+    (mut b).push(239)
+    // The two bytes whose standard encoding uses both special characters.
+    if base64.encode(b) == "/+8=" {} else { return 1 }
+    if base64.url_encode(b) == "_-8" {} else { return 2 }
+    let round = base64.url_decode(base64.url_encode(b)) else List[int]()
+    if round.len == 2 {} else { return 3 }
+    if round[0] == 255 {} else { return 4 }
+    if round[1] == 239 {} else { return 5 }
+    // url_decode takes padding too, since other encoders emit it.
+    let padded = base64.url_decode("_-8=") else List[int]()
+    if padded.len == 2 {} else { return 6 }
+    // Mixing the alphabets misses, both ways.
+    let mixed = base64.url_decode("/+8=") else List[int]()
+    if mixed.len == 0 {} else { return 7 }
+    let mixed_back = base64.decode("_-8=") else List[int]()
+    if mixed_back.len == 0 {} else { return 8 }
+    // The empty sequence is empty in both variants.
+    var empty = List[int]()
+    if base64.url_encode(empty) == "" {} else { return 9 }
+    0
+}

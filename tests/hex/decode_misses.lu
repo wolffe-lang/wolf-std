@@ -1,0 +1,33 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.hex
+//!
+//! Every way `decode` can miss, and the property that matters most: a
+//! miss is a ROW and never a trap, including on non-ASCII input. That is
+//! the boundary-safe probe (F-0018) doing its job — the alphabet is
+//! sliced, the caller's string never is.
+
+use std.hex
+
+fn missed(s: str) -> bool {
+    let sentinel = List[int]()
+    let got = hex.decode(s) else sentinel
+    got.len == 0
+}
+
+fn main() -> !int {
+    // Odd length.
+    if missed("0") {} else { return 1 }
+    if missed("0f0") {} else { return 2 }
+    // Not a hex digit.
+    if missed("0g") {} else { return 3 }
+    if missed("zz") {} else { return 4 }
+    if missed(" 00") {} else { return 5 }
+    if missed("00 ") {} else { return 6 }
+    if missed("0x00") {} else { return 7 }
+    // Non-ASCII: a miss, not a `bounds` trap.
+    if missed("é") {} else { return 8 }
+    if missed("00é") {} else { return 9 }
+    if missed("🐺00") {} else { return 10 }
+    0
+}

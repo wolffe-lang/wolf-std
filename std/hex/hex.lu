@@ -1,0 +1,160 @@
+//! member: true
+//!
+//! std.hex — base-16 encoding and decoding. Stability tier: core.
+//!
+//! **The byte sequence is `List[int]`, and that is an interim with a
+//! filing behind it.** The sprint contract spells these functions over
+//! `bytes`, the type `std.bytes` describes; that module ships zero of its
+//! nine functions because no expression in wolf produces the numeric value
+//! of a byte and no type can hold invalid UTF-8 (F-0018, re-tested at
+//! these pins and unchanged). An encoder cannot wait for that: encoding is
+//! how bytes BECOME text, and a program that has bytes at all today has
+//! them as numbers it computed. So the currency here is `List[int]` with
+//! every element in 0..255 — documented, checked at the boundary, and
+//! trivially replaced by `Bytes` when `Bytes` exists, since every
+//! signature keeps its shape (F-0035).
+//!
+//! What this costs, stated plainly: `hex.encode(str)` does not exist and
+//! cannot, because there is no way to read a `str`'s bytes (that is
+//! `std.bytes.from_str`, blocked at the same root). Hex-encoding text is
+//! the single most common use of this module in other languages and it is
+//! exactly the one this pin cannot serve.
+//!
+//! **Round-tripping is the doctrine** (the sprint contract's word): every
+//! encoder here ships beside its decoder, `decode(encode(b))` is `b` for
+//! every byte sequence, and `tests/hex/round_trip.lu` holds the property
+//! over the shared adversarial fixtures rather than over a happy path.
+//!
+//! Decoding is TOTAL over arbitrary UTF-8 input: the digit probe runs
+//! against an ASCII alphabet this module owns rather than slicing the
+//! caller's string at a guessed offset, so `decode("é")` is a `parse`
+//! miss and never a `bounds` trap (sc03's inversion, F-0018).
+
+/// The value of the hex digit `s` starts with, or -1. Case-insensitive.
+/// Private.
+fn digit_of(s: str) -> int {
+    let alphabet = "0123456789abcdef"
+    var i: int = 0
+    while i < 16 {
+        let lower_digit = alphabet[i..i + 1]
+        if s.starts_with(lower_digit) {
+            return i
+        }
+        let upper_digit = lower_digit.upper()
+        if s.starts_with(upper_digit) {
+            return i
+        }
+        i = i + 1
+    }
+    0 - 1
+}
+
+/// The two lowercase hex digits of one byte. Private; traps `assert` on a
+/// value outside 0..255, which is this module's one caller-contract
+/// check.
+fn byte_digits(b: int) -> str {
+    if b < 0 {
+        assert(false)
+    }
+    if b > 255 {
+        assert(false)
+    }
+    let alphabet = "0123456789abcdef"
+    let hi = b / 16
+    let lo = b % 16
+    let high_digit = alphabet[hi..hi + 1]
+    let low_digit = alphabet[lo..lo + 1]
+    "{high_digit}{low_digit}"
+}
+
+/// `b` as lowercase hexadecimal, two digits per byte, no separators and
+/// no `0x` prefix. The empty sequence encodes to the empty string.
+///
+/// Traps `assert` when an element is outside 0..255: the caller promised
+/// bytes and did not deliver them, which is a contract violation and not
+/// a datum (§2's trap rule). Total otherwise: no error row.
+///
+/// ```wolf-doc-example
+/// var b = List[int]()
+/// (mut b).push(0)
+/// (mut b).push(15)
+/// (mut b).push(255)
+/// hex.encode(b) == "000fff"
+/// var empty = List[int]()
+/// hex.encode(empty) == ""
+/// ```
+pub fn encode(b: List[int]) -> str {
+    var out = ""
+    let n = b.len
+    var i: int = 0
+    while i < n {
+        let pair = byte_digits(b[i])
+        out = "{out}{pair}"
+        i = i + 1
+    }
+    out
+}
+
+/// `encode` with uppercase digits (`"000FFF"`). The uppercasing is the
+/// implementation's `upper` over ASCII hex digits, where no Unicode
+/// case-mapping question arises. Same `assert` trap on a non-byte.
+///
+/// ```wolf-doc-example
+/// var b = List[int]()
+/// (mut b).push(171)
+/// (mut b).push(205)
+/// hex.encode_upper(b) == "ABCD"
+/// ```
+pub fn encode_upper(b: List[int]) -> str {
+    let lower_text = encode(b)
+    lower_text.upper()
+}
+
+/// `s` decoded from hexadecimal; `parse` when the length is odd or any
+/// character is not a hex digit. Upper and lower case both decode, and
+/// they may be mixed. The empty string decodes to the empty sequence.
+///
+/// The tag is `parse` — sc03's "these bytes are not a value of that
+/// type" — and not the `hex` the sprint contract spells, for a reason
+/// worth knowing before naming any tag: a row tag that shares a name with
+/// a module in scope at the raise site resolves to the MODULE and rides
+/// out of the function as a value, silently, with no diagnostic and no
+/// `else` firing (F-0036). `std.hex` raising `hex` was the shape that
+/// found it. The two miss cases an even more precise row would separate —
+/// odd length and bad digit — wait for sc06's payload conventions rather
+/// than being spelled as two bare tags.
+///
+/// Total: every input either decodes or misses — no traps, including on
+/// non-ASCII input, which is a miss like any other non-digit.
+///
+/// ```wolf-doc-example
+/// let b = hex.decode("00ff") else List[int]()
+/// b.len == 2
+/// let bad = hex.decode("0f0") else List[int]()
+/// bad.len == 0
+/// let mixed = hex.decode("AbCd") else List[int]()
+/// mixed.len == 2
+/// let unicode = hex.decode("é") else List[int]()
+/// unicode.len == 0
+/// ```
+pub fn decode(s: str) -> List[int] ! {parse} {
+    var out = List[int]()
+    var rest = s
+    while rest.len > 0 {
+        let hi = digit_of(rest)
+        if hi < 0 {
+            return parse
+        }
+        rest = rest[1..]
+        if rest.len == 0 {
+            return parse
+        }
+        let lo = digit_of(rest)
+        if lo < 0 {
+            return parse
+        }
+        rest = rest[1..]
+        (mut out).push(hi * 16 + lo)
+    }
+    out
+}

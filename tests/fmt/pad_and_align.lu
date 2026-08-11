@@ -1,0 +1,36 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fmt
+//!
+//! The three alignments and their fill variants, plus the two promises
+//! that make them safe to reach for: padding NEVER truncates (a value
+//! wider than the column comes back whole), and the width is a BYTE
+//! count, so a multi-byte code point pads by bytes and says so.
+
+use std.fmt
+
+fn main() -> !int {
+    if fmt.pad_left("42", 5) == "   42" {} else { return 1 }
+    if fmt.pad_right("42", 5) == "42   " {} else { return 2 }
+    if fmt.center("ab", 6) == "  ab  " {} else { return 3 }
+    // An odd remainder goes to the right.
+    if fmt.center("a", 4) == " a  " {} else { return 4 }
+    if fmt.center("abc", 6) == " abc  " {} else { return 5 }
+    // Fill variants.
+    if fmt.pad_left_with("42", 5, "0") == "00042" {} else { return 6 }
+    if fmt.pad_right_with("ab", 4, "-") == "ab--" {} else { return 7 }
+    if fmt.center_with("ab", 6, "*") == "**ab**" {} else { return 8 }
+    // Never truncates, never errors on a width that is already met.
+    if fmt.pad_left("wolves", 3) == "wolves" {} else { return 9 }
+    if fmt.pad_right("wolves", 0) == "wolves" {} else { return 10 }
+    if fmt.center("wolves", 0 - 5) == "wolves" {} else { return 11 }
+    // The empty string is a value like any other.
+    if fmt.pad_left("", 3) == "   " {} else { return 12 }
+    if fmt.center("", 2) == "  " {} else { return 13 }
+    // BYTES, not code points: "é" is two bytes, so a width of 3 adds one.
+    if fmt.pad_left("é", 3) == " é" {} else { return 14 }
+    if fmt.pad_right("é", 3) == "é " {} else { return 15 }
+    // And a four-byte code point already fills a four-column field.
+    if fmt.pad_left("🐺", 4) == "🐺" {} else { return 16 }
+    0
+}

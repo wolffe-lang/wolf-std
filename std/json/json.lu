@@ -1,0 +1,764 @@
+//! member: true
+//!
+//! std.json — the JSON data model, its accessors, and the serializer.
+//! Stability tier: core.
+//!
+//! **What ships and what cannot, stated first.** `parse` is NOT here, and
+//! it is not a scheduling decision: a JSON reader has to walk a string
+//! past code points whose length it does not know (any character may
+//! appear inside a JSON string), the only way to learn a code point's
+//! length is to slice at a guessed offset, and a wrong guess traps
+//! `bounds` uncatchably (D30). That is F-0018, the boundary primitive, and
+//! a `parse` written by guessing would die on `{"name": "café"}` — legal
+//! input. §9's refusal-over-approximation rule says such a function does
+//! not ship, so it ships as a reviewed contract instead (below), together
+//! with `unescape`, which has the same shape. `escape` is here and is
+//! honest about its one refusal.
+//!
+//! What that leaves is still most of a JSON library: the value model, the
+//! accessors, and a serializer that turns wolf data into text. A program
+//! that WRITES JSON — a log line, a request body, a config dump — is
+//! served completely.
+//!
+//! **The value model.** `Value` is one recursive enum with seven
+//! variants: `Null`, `Bool(bool)`, `Int(int)`, `Num(f64)`, `Str(str)`,
+//! `Arr(List[Value])` and `Obj(Map[str, Value])`. The number posture is
+//! the sprint contract's: integers keep their exactness in `Int` and only
+//! non-integral (or out-of-range) numbers become `Num`, so a document
+//! carrying a 64-bit id round-trips through wolf without passing through
+//! a `f64` that cannot hold it. The i53 boundary is where the two
+//! postures visibly differ and `tests/json/number_posture.lu` pins it.
+//!
+//! **Constructors are functions, not `Value.Int(3)`.** An enum's variants
+//! cannot be named from outside the declaring module at these pins —
+//! `json.Value.Int(3)` is "`Value` is an enum; traits, enums and
+//! type-level items have no dynamic semantics here" (F-0029) — so the
+//! seven `from_*`/`null` constructors below exist to give importers any
+//! way at all to build a value. They are not the API the contract
+//! imagined; they are the API the language currently allows, and the
+//! filing says so.
+//!
+//! **Ordering.** `Obj` is a `Map`, whose iteration order is unspecified
+//! (§8), so `stringify`'s key order is unspecified too and no test in this
+//! repo asserts it for a multi-key object. That is a promise deliberately
+//! not made rather than an omission; when the ordering question settles
+//! upstream, this module states whatever the answer is.
+//!
+//! **The wolfc lane is dark for this module, by construction**: an
+//! imported module that PRODUCES an enum value is `unsupported` in the
+//! checked tier and has no recorded type natively (F-0029, F-0012), and
+//! `Map` is not typed by the compiler at all. Every test here is
+//! `lupin = run, wolfc = unsupported, native = unsupported`, exactly as
+//! the sprint contract's non-target predicted.
+//!
+//! Reviewed contracts, blocked on F-0018 and landing verbatim on the pin
+//! that delivers `str.get`, a byte accessor, or `chars()`:
+//!
+//! ```text
+//! parse(s: str) -> Value ! {syntax, deep}
+//!     The strict RFC 8259 profile: no comments, no trailing commas, no
+//!     leading `+` or bare `.5`, `\u` escapes decoded with surrogate
+//!     pairs joined, duplicate keys keeping the LAST occurrence, and a
+//!     nesting depth limit (`depth_limit()`) whose breach is the `deep`
+//!     tag and never a stack trap. Numbers follow the posture above:
+//!     `Int` when the text denotes an integer that fits `int`, `Num`
+//!     otherwise, with the conversion correctly rounded
+//!     (`std.fmt.decimal.parse_float`, which is already here and already
+//!     exact). `syntax` carries the byte offset when sc06's payload
+//!     conventions land; at this pin it would be a bare mark.
+//! get(v: Value, key: str) -> Value ! {kind, none}
+//!     The value at `key`; `none` when the object has no such entry and
+//!     `kind` when `v` is not an object. Written, tested, and WITHDRAWN
+//!     before it shipped: a function whose return type is an ENUM and
+//!     whose signature carries an error row takes the MISS path on every
+//!     call, value or not — `fn id(v: Value) -> Value ! {none} { v }`
+//!     hands its caller a raise (F-0037, filed with that one-line
+//!     reproducer). The two functions here that would return a `Value`
+//!     through a row are therefore contracts, and `has` + `as_obj` are
+//!     the navigation that executes in the meantime.
+//! at(v: Value, i: int) -> Value ! {kind, none}
+//!     The element at `i`; `none` outside the array, `kind` when `v` is
+//!     not one. A row rather than `List`'s `bounds` trap (§8): an index
+//!     into a document is data, and a caller cannot have checked what the
+//!     document contains. Blocked by F-0037 with `get`; `as_arr` plus the
+//!     language's own indexing is today's spelling.
+//! unescape(s: str) -> str ! {boundary}
+//!     The inverse of `escape`: `\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`,
+//!     `\t` and `\uXXXX` (surrogate pairs joined into one code point),
+//!     with any other backslash sequence and any lone surrogate a
+//!     `boundary` miss. Blocked for the same reason as `parse`: the scan
+//!     cannot pass a code point of unknown length.
+//! ```
+
+use std.fmt
+use std.fmt.decimal
+
+/// A JSON value. Seven variants, one recursive type — the whole data
+/// model (RFC 8259 §3-§7) with the number split the module header
+/// explains.
+pub enum Value {
+    Null,
+    Bool(bool),
+    Int(int),
+    Num(f64),
+    Str(str),
+    Arr(List[Value]),
+    Obj(Map[str, Value]),
+}
+
+/// The nesting depth `stringify` and `stringify_pretty` will render
+/// before raising `deep`. A limit rather than a stack overflow: a JSON
+/// value can be built to any depth by a program, and a serializer that
+/// dies on one is a denial-of-service surface rather than a function
+/// (the sprint contract's rule for `parse`, applied to the direction that
+/// ships).
+///
+/// ```wolf-doc-example
+/// json.depth_limit() == 64
+/// ```
+pub fn depth_limit() -> int {
+    64
+}
+
+/// The JSON null.
+///
+/// ```wolf-doc-example
+/// json.is_null(json.null()) == true
+/// ```
+pub fn null() -> Value {
+    Value.Null
+}
+
+/// A JSON boolean.
+///
+/// ```wolf-doc-example
+/// (json.as_bool(json.from_bool(true)) else false) == true
+/// json.type_name(json.from_bool(false)) == "bool"
+/// ```
+pub fn from_bool(b: bool) -> Value {
+    Value.Bool(b)
+}
+
+/// A JSON number that is an integer, kept exact — the posture the module
+/// header describes. `from_int(9007199254740993)` survives a round trip
+/// through this model; the same value through `from_num` does not.
+///
+/// ```wolf-doc-example
+/// (json.as_int(json.from_int(42)) else 0) == 42
+/// json.type_name(json.from_int(42)) == "int"
+/// ```
+pub fn from_int(n: int) -> Value {
+    Value.Int(n)
+}
+
+/// A JSON number that is not (or need not be) an integer. Non-finite
+/// inputs are legal here and render as `null`, because JSON has no
+/// spelling for them — see `stringify`.
+///
+/// ```wolf-doc-example
+/// (json.as_float(json.from_num(1.5)) else 0.0) == 1.5
+/// json.type_name(json.from_num(1.5)) == "num"
+/// ```
+pub fn from_num(x: f64) -> Value {
+    Value.Num(x)
+}
+
+/// A JSON string. The text is stored as given; escaping happens at
+/// `stringify` time and never here, so a value that came from a program
+/// is never double-escaped.
+///
+/// ```wolf-doc-example
+/// (json.as_str(json.from_str("wolf")) else "?") == "wolf"
+/// json.type_name(json.from_str("")) == "str"
+/// ```
+pub fn from_str(s: str) -> Value {
+    Value.Str(s)
+}
+
+/// A JSON array over an already-built list of values.
+///
+/// ```wolf-doc-example
+/// var xs = List[json.Value]()
+/// (mut xs).push(json.from_int(1))
+/// let arr = json.from_list(xs)
+/// (json.len(arr) else 0) == 1
+/// ```
+pub fn from_list(xs: List[Value]) -> Value {
+    Value.Arr(xs)
+}
+
+/// A JSON object over an already-built map. The map's iteration order is
+/// unspecified and so is the rendered key order (§8).
+///
+/// ```wolf-doc-example
+/// var m = Map[str, json.Value]()
+/// m["a"] = json.from_int(1)
+/// let obj = json.from_map(m)
+/// json.type_name(obj) == "obj"
+/// ```
+pub fn from_map(m: Map[str, Value]) -> Value {
+    Value.Obj(m)
+}
+
+/// The variant's name — `"null"`, `"bool"`, `"int"`, `"num"`, `"str"`,
+/// `"arr"` or `"obj"`. The one accessor that never fails, and the one a
+/// diagnostic wants: the `kind` row tag says a value was the wrong shape,
+/// and this says which shape it was. Total: no error row, no traps.
+///
+/// Spelled `type_name` and not `kind`, which is what it would be called
+/// in any other library: a function and a row tag with the same name in
+/// one module make the tag resolve to the FUNCTION at the raise site —
+/// silently, so `as_int(json.null())` yielded a function value instead of
+/// raising, and `else` never fired (F-0036). `"int"` and `"num"` are not
+/// RFC 8259 type names; they are this model's, and the header explains
+/// why the number split exists.
+///
+/// ```wolf-doc-example
+/// json.type_name(json.null()) == "null"
+/// json.type_name(json.from_str("x")) == "str"
+/// ```
+pub fn type_name(v: Value) -> str {
+    match v {
+        Null => "null",
+        Bool(b) => "bool",
+        Int(n) => "int",
+        Num(x) => "num",
+        Str(s) => "str",
+        Arr(xs) => "arr",
+        Obj(m) => "obj",
+    }
+}
+
+/// Whether `v` is the JSON null. A predicate rather than a row, because
+/// "is it null" is a question with a boolean answer (§1). Total.
+///
+/// ```wolf-doc-example
+/// json.is_null(json.null()) == true
+/// json.is_null(json.from_int(0)) == false
+/// ```
+pub fn is_null(v: Value) -> bool {
+    match v {
+        Null => true,
+        _ => false,
+    }
+}
+
+/// The boolean `v` holds; `kind` when it holds something else. No
+/// coercion: `as_bool` of `Int(0)` is a miss, not `false`, because JSON's
+/// types are the document's and guessing across them is how a parser
+/// loses data.
+///
+/// ```wolf-doc-example
+/// (json.as_bool(json.from_bool(true)) else false) == true
+/// (json.as_bool(json.from_int(1)) else false) == false
+/// ```
+pub fn as_bool(v: Value) -> bool ! {kind} {
+    match v {
+        Bool(b) => b,
+        _ => kind,
+    }
+}
+
+/// The integer `v` holds; `kind` for every other variant, `Num`
+/// included. A `Num` that happens to be integral is still not an `Int`:
+/// the model records which one the document had, and `as_float` is the
+/// widening direction that always works.
+///
+/// ```wolf-doc-example
+/// (json.as_int(json.from_int(42)) else 0) == 42
+/// (json.as_int(json.from_num(42.0)) else 0) == 0
+/// ```
+pub fn as_int(v: Value) -> int ! {kind} {
+    match v {
+        Int(n) => n,
+        _ => kind,
+    }
+}
+
+/// The number `v` holds as `f64`; `kind` for every non-numeric variant.
+/// This one DOES widen: an `Int` converts, because every JSON number is a
+/// number and a caller asking for `f64` has said it accepts the rounding.
+/// Beyond 2^53 that rounding is lossy, which is exactly why `as_int`
+/// exists and does not do it.
+///
+/// ```wolf-doc-example
+/// (json.as_float(json.from_num(1.5)) else 0.0) == 1.5
+/// (json.as_float(json.from_int(3)) else 0.0) == 3.0
+/// (json.as_float(json.from_str("3")) else 0.0) == 0.0
+/// ```
+pub fn as_float(v: Value) -> f64 ! {kind} {
+    match v {
+        Num(x) => x,
+        Int(n) => n as f64,
+        _ => kind,
+    }
+}
+
+/// The string `v` holds, unescaped (the model stores text, not JSON
+/// source); `kind` otherwise.
+///
+/// ```wolf-doc-example
+/// (json.as_str(json.from_str("wolf")) else "?") == "wolf"
+/// (json.as_str(json.null()) else "?") == "?"
+/// ```
+pub fn as_str(v: Value) -> str ! {kind} {
+    match v {
+        Str(s) => s,
+        _ => kind,
+    }
+}
+
+/// The array `v` holds; `kind` otherwise. The list is the value's own —
+/// reading it is free, and this module never hands out a copy it did not
+/// have to make.
+///
+/// ```wolf-doc-example
+/// var xs = List[json.Value]()
+/// (mut xs).push(json.null())
+/// let got = json.as_arr(json.from_list(xs)) else List[json.Value]()
+/// got.len == 1
+/// ```
+pub fn as_arr(v: Value) -> List[Value] ! {kind} {
+    match v {
+        Arr(xs) => xs,
+        _ => kind,
+    }
+}
+
+/// The object `v` holds; `kind` otherwise.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, json.Value]()
+/// m["k"] = json.from_int(1)
+/// let got = json.as_obj(json.from_map(m)) else Map[str, json.Value]()
+/// got.len == 1
+/// ```
+pub fn as_obj(v: Value) -> Map[str, Value] ! {kind} {
+    match v {
+        Obj(m) => m,
+        _ => kind,
+    }
+}
+
+/// Whether `v` is an object with an entry at `key`. `false` for every
+/// other variant, because "does this document have this field" has a
+/// useful answer for a non-object too, and it is no.
+///
+/// This is what `get` would be if `get` could execute — see the module
+/// header's contract block and F-0037. Together with `as_obj`, it is the
+/// navigation path that works today: ask `has`, then read the map.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, json.Value]()
+/// m["a"] = json.from_int(7)
+/// let obj = json.from_map(m)
+/// json.has(obj, "a") == true
+/// json.has(obj, "b") == false
+/// json.has(json.from_int(1), "a") == false
+/// ```
+pub fn has(v: Value, key: str) -> bool {
+    match v {
+        Obj(m) => obj_has(m, key),
+        _ => false,
+    }
+}
+
+/// The lookup itself. Private, and a linear scan for two recorded
+/// reasons: the builtin `Map` has no `has` and its absent-key read
+/// answers `()` rather than raising (F-0011), and `std.map.has` — the
+/// std function whose job this is — carries an `Eq` bound, so calling it
+/// is "`Eq` is a trait; traits, enums and type-level items have no
+/// dynamic semantics here" (F-0002). Comparing `str` keys with `==` runs;
+/// this body flips back to `map.has` the day trait dispatch does.
+fn obj_has(m: Map[str, Value], key: str) -> bool {
+    for pair in m.pairs() {
+        if pair.0 == key {
+            return true
+        }
+    }
+    false
+}
+
+/// The keys of an object, in the map's unspecified order; `kind` for
+/// every other variant. Allocates the list (`to_`-grade, §1).
+///
+/// ```wolf-doc-example
+/// var m = Map[str, json.Value]()
+/// m["only"] = json.null()
+/// let ks = json.keys(json.from_map(m)) else List[str]()
+/// ks.len == 1
+/// let none_here = json.keys(json.from_int(1)) else List[str]()
+/// none_here.len == 0
+/// ```
+pub fn keys(v: Value) -> List[str] ! {kind} {
+    match v {
+        Obj(m) => obj_keys(m),
+        _ => kind,
+    }
+}
+
+/// The key list. Private.
+fn obj_keys(m: Map[str, Value]) -> List[str] {
+    var out = List[str]()
+    for pair in m.pairs() {
+        (mut out).push(pair.0)
+    }
+    out
+}
+
+/// The number of elements in an array or entries in an object; `kind` for
+/// every scalar. Not a string length: JSON strings are text and
+/// `std.str.len` is where text length lives.
+///
+/// ```wolf-doc-example
+/// var xs = List[json.Value]()
+/// (mut xs).push(json.null())
+/// (mut xs).push(json.null())
+/// (json.len(json.from_list(xs)) else 0) == 2
+/// (json.len(json.from_int(1)) else 0 - 1) == 0 - 1
+/// ```
+pub fn len(v: Value) -> int ! {kind} {
+    match v {
+        Arr(xs) => xs.len,
+        Obj(m) => m.len,
+        _ => kind,
+    }
+}
+
+/// `s` with the characters JSON forbids inside a string replaced by their
+/// escapes: `"` and `\` by their backslash forms, and every control
+/// character below U+0020 by `\b`, `\f`, `\n`, `\r`, `\t` or `\u00XX`.
+/// Every other character — including every non-ASCII one — passes through
+/// verbatim, because RFC 8259 permits raw UTF-8 and escaping it would
+/// only make the output bigger.
+///
+/// **The one refusal, and it is F-0018 again.** (The tag is `boundary`,
+/// naming the code-point boundary the walk cannot find, and not `escape`:
+/// a tag that shares a name with anything else in scope at the raise site
+/// — here, this very function — resolves to that thing and leaves the
+/// function as a silent value, F-0036. The tag disappears entirely when
+/// the primitive lands and `escape` becomes total.)
+/// A string that needs no
+/// escaping at all comes back unchanged, whatever it contains; a string
+/// that needs escaping is rewritten by walking it one ASCII character at
+/// a time. The walk cannot pass a NON-ASCII code point, because nothing
+/// at this pin can measure one — so a string that contains both a
+/// non-ASCII character AND, after it, a character needing an escape,
+/// raises `boundary`. `"café"` escapes fine (it needs nothing);
+/// `"say \"hi\""` escapes fine (all ASCII); `"café \"x\""` is the shape
+/// that refuses, and it refuses loudly instead of trapping or corrupting.
+///
+/// ```wolf-doc-example
+/// (json.escape("wolf") else "?") == "wolf"
+/// (json.escape("café") else "?") == "café"
+/// (json.escape("a\"b") else "?") == "a\\\"b"
+/// (json.escape("a\\b") else "?") == "a\\\\b"
+/// (json.escape("a\nb") else "?") == "a\\nb"
+/// ```
+pub fn escape(s: str) -> str ! {boundary} {
+    if !needs_escape(s) {
+        return s
+    }
+    var out = ""
+    var rest = s
+    while rest.len > 0 {
+        if !needs_escape(rest) {
+            return "{out}{rest}"
+        }
+        let mapped = escape_next(rest)
+        if mapped == "" {
+            // The next code point is not ASCII and a later one needs an
+            // escape: the walk cannot step over it (F-0018). Note the
+            // order — the ASCII probe comes FIRST and the one-byte
+            // advance only after it matched, because slicing to find out
+            // is exactly the trap this module refuses to take.
+            return boundary
+        }
+        out = "{out}{mapped}"
+        rest = rest[1..]
+    }
+    out
+}
+
+/// Whether `s` contains any character that must be escaped inside a JSON
+/// string. Private: the fast path's whole job, and the walk's stopping
+/// rule.
+fn needs_escape(s: str) -> bool {
+    if s.contains("\"") {
+        return true
+    }
+    if s.contains("\\") {
+        return true
+    }
+    control_index(s) >= 0
+}
+
+/// The index in the control table of the first control character `s`
+/// contains, or -1. Private.
+fn control_index(s: str) -> int {
+    var i: int = 0
+    while i < 32 {
+        if s.contains(control_char(i)) {
+            return i
+        }
+        i = i + 1
+    }
+    0 - 1
+}
+
+/// The control character with code `i` (0..31), as a one-byte string.
+/// Private: written as four literals of eight rather than thirty-two
+/// branches, and sliced by this module rather than by the caller, so the
+/// offset is always a code-point boundary.
+fn control_char(i: int) -> str {
+    let table = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"
+    table[i..i + 1]
+}
+
+/// The JSON escape for the ASCII character `rest` STARTS WITH — the
+/// character itself when it needs none — or the empty string when the
+/// next code point is not ASCII at all, which is the signal `escape`
+/// stops on. Private.
+///
+/// Every probe is `starts_with` against a literal this module owns, and
+/// nothing here slices the caller's string: that is what makes the
+/// function total over arbitrary UTF-8 instead of a `bounds` trap waiting
+/// for its input (sc03's inversion, F-0018).
+fn escape_next(rest: str) -> str {
+    if rest.starts_with("\"") {
+        return "\\\""
+    }
+    if rest.starts_with("\\") {
+        return "\\\\"
+    }
+    var i: int = 0
+    while i < 32 {
+        if rest.starts_with(control_char(i)) {
+            return control_escape(i)
+        }
+        i = i + 1
+    }
+    let printable = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{{|}}~"
+    var j: int = 0
+    while j < 95 {
+        let c = printable[j..j + 1]
+        if rest.starts_with(c) {
+            return c
+        }
+        j = j + 1
+    }
+    if rest.starts_with("\x7f") {
+        return "\x7f"
+    }
+    ""
+}
+
+/// The escape for the control character with code `i`: the five
+/// two-character forms JSON names, and `\u00XX` for the rest. Private.
+fn control_escape(i: int) -> str {
+    if i == 8 {
+        return "\\b"
+    }
+    if i == 9 {
+        return "\\t"
+    }
+    if i == 10 {
+        return "\\n"
+    }
+    if i == 12 {
+        return "\\f"
+    }
+    if i == 13 {
+        return "\\r"
+    }
+    let digits = fmt.pad_left_with(fmt.to_hex(i), 4, "0")
+    "\\u{digits}"
+}
+
+/// `v` rendered as compact JSON text — no spaces, no newlines, keys in
+/// the map's unspecified order. `boundary` when a string payload is the
+/// shape `escape` refuses; `deep` when nesting passes `depth_limit()`.
+///
+/// Numbers: an `Int` renders as a decimal integer, exactly; a `Num`
+/// renders through `std.fmt.decimal.to_str`, the shortest text that reads
+/// back as the same double — so `stringify` of a document a program built
+/// loses nothing. A non-finite `Num` renders as `null`, because JSON has
+/// no spelling for infinity or NaN and the alternative (a raise, or
+/// inventing `1e999`) is worse for the caller and worse for the reader;
+/// JavaScript's own `JSON.stringify` made the same choice.
+///
+/// ```wolf-doc-example
+/// (json.stringify(json.null()) else "?") == "null"
+/// (json.stringify(json.from_bool(true)) else "?") == "true"
+/// (json.stringify(json.from_int(42)) else "?") == "42"
+/// (json.stringify(json.from_num(1.5)) else "?") == "1.5"
+/// (json.stringify(json.from_str("hi")) else "?") == "\"hi\""
+/// var xs = List[json.Value]()
+/// (mut xs).push(json.from_int(1))
+/// (mut xs).push(json.null())
+/// (json.stringify(json.from_list(xs)) else "?") == "[1,null]"
+/// ```
+pub fn stringify(v: Value) -> str ! {boundary, deep} {
+    render(v, 0)?
+}
+
+/// `v` rendered as JSON text with `indent` spaces per nesting level and
+/// one entry per line — the human-readable form. An `indent` of zero
+/// gives newlines without indentation; a negative `indent` traps
+/// `assert`. Empty arrays and objects stay on one line (`[]`, `{}`),
+/// which is what every pretty-printer does and what every diff wants.
+/// The rows are `stringify`'s.
+///
+/// ```wolf-doc-example
+/// (json.stringify_pretty(json.from_int(1), 2) else "?") == "1"
+/// var xs = List[json.Value]()
+/// (mut xs).push(json.from_int(1))
+/// (json.stringify_pretty(json.from_list(xs), 2) else "?") == "[\n  1\n]"
+/// var empty = List[json.Value]()
+/// (json.stringify_pretty(json.from_list(empty), 2) else "?") == "[]"
+/// ```
+pub fn stringify_pretty(v: Value, indent: int) -> str ! {boundary, deep} {
+    if indent < 0 {
+        assert(false)
+    }
+    render_pretty(v, indent, 0)?
+}
+
+/// The compact renderer. Private; `depth` is checked against
+/// `depth_limit()` on entry so that a cycle-free but very deep value
+/// raises instead of exhausting the stack.
+fn render(v: Value, depth: int) -> str ! {boundary, deep} {
+    if depth > depth_limit() {
+        return deep
+    }
+    match v {
+        Null => "null",
+        Bool(b) => "{b}",
+        Int(n) => fmt.to_str(n),
+        Num(x) => render_num(x),
+        Str(s) => quote(s)?,
+        Arr(xs) => render_arr(xs, depth)?,
+        Obj(m) => render_obj(m, depth)?,
+    }
+}
+
+/// A `Num`'s text: the shortest round-tripping decimal, or `null` for the
+/// values JSON cannot spell. Private.
+fn render_num(x: f64) -> str {
+    let text = decimal.to_str(x)
+    if text == "nan" {
+        return "null"
+    }
+    if text == "inf" {
+        return "null"
+    }
+    if text == "-inf" {
+        return "null"
+    }
+    text
+}
+
+/// A string payload, escaped and quoted. Private.
+fn quote(s: str) -> str ! {boundary} {
+    let body = escape(s)?
+    "\"{body}\""
+}
+
+/// The compact array body. Private.
+fn render_arr(xs: List[Value], depth: int) -> str ! {boundary, deep} {
+    var out = "["
+    let n = xs.len
+    var i: int = 0
+    while i < n {
+        let piece = render(xs[i], depth + 1)?
+        if i == 0 {
+            out = "{out}{piece}"
+        } else {
+            out = "{out},{piece}"
+        }
+        i = i + 1
+    }
+    "{out}]"
+}
+
+/// The compact object body. Private.
+fn render_obj(m: Map[str, Value], depth: int) -> str ! {boundary, deep} {
+    var out = "{{"
+    var first = true
+    for pair in m.pairs() {
+        let key = quote(pair.0)?
+        let piece = render(pair.1, depth + 1)?
+        if first {
+            out = "{out}{key}:{piece}"
+            first = false
+        } else {
+            out = "{out},{key}:{piece}"
+        }
+    }
+    "{out}}}"
+}
+
+/// The indented renderer. Private.
+fn render_pretty(v: Value, indent: int, depth: int) -> str ! {boundary, deep} {
+    if depth > depth_limit() {
+        return deep
+    }
+    match v {
+        Arr(xs) => pretty_arr(xs, indent, depth)?,
+        Obj(m) => pretty_obj(m, indent, depth)?,
+        _ => render(v, depth)?,
+    }
+}
+
+/// `indent * level` spaces. Private.
+fn pad(indent: int, level: int) -> str {
+    let width = indent * level
+    if width <= 0 {
+        return ""
+    }
+    " ".repeat(width)
+}
+
+/// The indented array body. Private.
+fn pretty_arr(xs: List[Value], indent: int, depth: int) -> str ! {boundary, deep} {
+    let n = xs.len
+    if n == 0 {
+        return "[]"
+    }
+    let inner = pad(indent, depth + 1)
+    let outer = pad(indent, depth)
+    var out = "["
+    var i: int = 0
+    while i < n {
+        let piece = render_pretty(xs[i], indent, depth + 1)?
+        if i == 0 {
+            out = "{out}\n{inner}{piece}"
+        } else {
+            out = "{out},\n{inner}{piece}"
+        }
+        i = i + 1
+    }
+    "{out}\n{outer}]"
+}
+
+/// The indented object body. Private.
+fn pretty_obj(m: Map[str, Value], indent: int, depth: int) -> str ! {boundary, deep} {
+    if m.len == 0 {
+        return "{{}}"
+    }
+    let inner = pad(indent, depth + 1)
+    let outer = pad(indent, depth)
+    var out = "{{"
+    var first = true
+    for pair in m.pairs() {
+        let key = quote(pair.0)?
+        let piece = render_pretty(pair.1, indent, depth + 1)?
+        if first {
+            out = "{out}\n{inner}{key}: {piece}"
+            first = false
+        } else {
+            out = "{out},\n{inner}{key}: {piece}"
+        }
+    }
+    "{out}\n{outer}}}"
+}

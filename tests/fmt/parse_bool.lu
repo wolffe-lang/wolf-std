@@ -1,0 +1,23 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fmt
+//!
+//! `parse_bool` is strict on purpose: exactly `"true"` and `"false"`,
+//! lowercase, nothing around them. A parser that guesses turns a typo
+//! into a value, and a configuration that means `true` should say so.
+
+use std.fmt
+
+fn main() -> !int {
+    if (fmt.parse_bool("true") else false) == true {} else { return 1 }
+    if (fmt.parse_bool("false") else true) == false {} else { return 2 }
+    if (fmt.parse_bool("True") else false) == false {} else { return 3 }
+    if (fmt.parse_bool("TRUE") else false) == false {} else { return 4 }
+    if (fmt.parse_bool("1") else false) == false {} else { return 5 }
+    if (fmt.parse_bool("yes") else false) == false {} else { return 6 }
+    if (fmt.parse_bool(" true") else false) == false {} else { return 7 }
+    if (fmt.parse_bool("true ") else false) == false {} else { return 8 }
+    if (fmt.parse_bool("") else false) == false {} else { return 9 }
+    if (fmt.parse_bool("é") else false) == false {} else { return 10 }
+    0
+}

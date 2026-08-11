@@ -1,0 +1,53 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fmt.decimal
+//!
+//! `to_str_fixed` and `to_str_exp` over the EXACT value of the input,
+//! rounded half-even at the last kept digit. The pins that matter are the
+//! ones a floating-point formatter usually gets wrong: the half cases
+//! (0.5 down, 1.5 up, 2.5 down — half to even, not half away from zero),
+//! the exact expansion of 0.1 (which is not 0.1), the carry that grows
+//! the exponent (9.99 to one place is 1.0e+01), and the sign of zero.
+
+use std.fmt.decimal
+
+fn main() -> !int {
+    if decimal.to_str_fixed(1.5, 2) == "1.50" {} else { return 1 }
+    if decimal.to_str_fixed(1.0, 0) == "1" {} else { return 2 }
+    if decimal.to_str_fixed(0.0, 3) == "0.000" {} else { return 3 }
+    // Half to even.
+    if decimal.to_str_fixed(0.5, 0) == "0" {} else { return 4 }
+    if decimal.to_str_fixed(1.5, 0) == "2" {} else { return 5 }
+    if decimal.to_str_fixed(2.5, 0) == "2" {} else { return 6 }
+    if decimal.to_str_fixed(3.5, 0) == "4" {} else { return 7 }
+    // 0.25 and 0.75 are exact, so these are true half cases too.
+    if decimal.to_str_fixed(0.25, 1) == "0.2" {} else { return 8 }
+    if decimal.to_str_fixed(0.75, 1) == "0.8" {} else { return 9 }
+    // 0.1 is not 0.1, and twenty places show it.
+    if decimal.to_str_fixed(0.1, 20) == "0.10000000000000000555" {} else { return 10 }
+    if decimal.to_str_fixed(0.1, 1) == "0.1" {} else { return 11 }
+    // The sign of zero is part of the value.
+    if decimal.to_str_fixed(-0.0, 1) == "-0.0" {} else { return 12 }
+    if decimal.to_str_fixed(-0.0, 0) == "-0" {} else { return 13 }
+    // Carry across the point.
+    if decimal.to_str_fixed(9.99, 1) == "10.0" {} else { return 14 }
+    if decimal.to_str_fixed(0.999, 2) == "1.00" {} else { return 15 }
+    // Non-finite spellings, which `parse_float` deliberately will not read.
+    if decimal.to_str_fixed(1.0 / 0.0, 2) == "inf" {} else { return 16 }
+    if decimal.to_str_fixed(-1.0 / 0.0, 2) == "-inf" {} else { return 17 }
+    if decimal.to_str_fixed(0.0 / 0.0, 2) == "nan" {} else { return 18 }
+    // Exponential form: `%e`, with a signed two-digit exponent.
+    if decimal.to_str_exp(1.5, 2) == "1.50e+00" {} else { return 19 }
+    if decimal.to_str_exp(1500.0, 2) == "1.50e+03" {} else { return 20 }
+    if decimal.to_str_exp(0.015, 1) == "1.5e-02" {} else { return 21 }
+    if decimal.to_str_exp(2.0, 0) == "2e+00" {} else { return 22 }
+    if decimal.to_str_exp(0.0, 2) == "0.00e+00" {} else { return 23 }
+    if decimal.to_str_exp(-0.0, 0) == "-0e+00" {} else { return 24 }
+    // The carry that moves the exponent.
+    if decimal.to_str_exp(9.99, 1) == "1.0e+01" {} else { return 25 }
+    if decimal.to_str_exp(9.99, 3) == "9.990e+00" {} else { return 26 }
+    // Three digits of exponent when three are needed.
+    if decimal.to_str_exp(1e308, 2) == "1.00e+308" {} else { return 27 }
+    if decimal.to_str_exp(5e-324, 2) == "4.94e-324" {} else { return 28 }
+    0
+}

@@ -1,0 +1,302 @@
+//! member: true
+//!
+//! std.base64 — RFC 4648 base-64, standard and URL-safe. Stability tier:
+//! core.
+//!
+//! The byte sequence is `List[int]` with every element in 0..255, for the
+//! reason `std.hex`'s header gives at length: `std.bytes` ships no code at
+//! these pins because nothing in wolf produces a byte value (F-0018), and
+//! an encoder cannot wait for the type it converts (F-0035). Every
+//! signature keeps its shape when `Bytes` lands.
+//!
+//! **Strictness is spelled in the name, and documented on each function.**
+//! `decode` is the strict RFC 4648 §4 profile: the standard alphabet, the
+//! length a multiple of four, padding present and correct, and the unused
+//! low bits of a truncated group required to be ZERO — so exactly one text
+//! decodes to any given byte sequence, which is what makes
+//! `encode(decode(s)) == s` hold as well as the other direction.
+//! `decode_lenient` relaxes padding and canonicity for input that came
+//! from somewhere less careful. `url_decode` is §5's alphabet with
+//! optional padding, because `url_encode` omits it.
+//!
+//! Round-tripping is the doctrine: `decode(encode(b))` is `b` for every
+//! byte sequence, held over the shared adversarial fixtures in
+//! `tests/base64/round_trip.lu` — including the three group remainders,
+//! which is where every base-64 implementation's bugs live.
+//!
+//! Decoding is TOTAL over arbitrary UTF-8: the alphabet probe runs against
+//! literals this module owns, so a non-ASCII character is a `parse` miss
+//! and never a `bounds` trap. The tag is `parse` and not the contract's
+//! `base64` because a row tag that shares a name with a module in scope
+//! resolves to the MODULE, silently (F-0036) — and this module is named
+//! `base64`.
+
+/// The standard alphabet (RFC 4648 §4). Private.
+fn alphabet_std() -> str {
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+}
+
+/// The URL- and filename-safe alphabet (RFC 4648 §5): `-` and `_` in
+/// place of `+` and `/`. Private.
+fn alphabet_url() -> str {
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+}
+
+/// The character for a 6-bit value. Private.
+fn char_of(v: int, alphabet: str) -> str {
+    alphabet[v..v + 1]
+}
+
+/// The 6-bit value of the character `s` starts with, or -1. Private: the
+/// probe runs against the owned alphabet, never a slice of the input.
+fn value_of(s: str, alphabet: str) -> int {
+    var i: int = 0
+    while i < 64 {
+        let c = alphabet[i..i + 1]
+        if s.starts_with(c) {
+            return i
+        }
+        i = i + 1
+    }
+    0 - 1
+}
+
+/// One byte, checked. Private: an element outside 0..255 is a caller
+/// contract violation and traps `assert` (§2's trap rule).
+fn byte_at(b: List[int], i: int) -> int {
+    let v = b[i]
+    if v < 0 {
+        assert(false)
+    }
+    if v > 255 {
+        assert(false)
+    }
+    v
+}
+
+/// `b` encoded with `alphabet`, padded with `=` when `padded`. Private:
+/// the shared body of `encode` and `url_encode`.
+fn encode_with(b: List[int], alphabet: str, padded: bool) -> str {
+    var out = ""
+    let n = b.len
+    var i: int = 0
+    while i + 3 <= n {
+        let group = byte_at(b, i) * 65536 + byte_at(b, i + 1) * 256 + byte_at(b, i + 2)
+        let c0 = char_of(group / 262144, alphabet)
+        let c1 = char_of(group / 4096 % 64, alphabet)
+        let c2 = char_of(group / 64 % 64, alphabet)
+        let c3 = char_of(group % 64, alphabet)
+        out = "{out}{c0}{c1}{c2}{c3}"
+        i = i + 3
+    }
+    let rest = n - i
+    if rest == 1 {
+        let group = byte_at(b, i) * 16
+        let c0 = char_of(group / 64, alphabet)
+        let c1 = char_of(group % 64, alphabet)
+        out = "{out}{c0}{c1}"
+        if padded {
+            out = "{out}=="
+        }
+    }
+    if rest == 2 {
+        let group = byte_at(b, i) * 1024 + byte_at(b, i + 1) * 4
+        let c0 = char_of(group / 4096, alphabet)
+        let c1 = char_of(group / 64 % 64, alphabet)
+        let c2 = char_of(group % 64, alphabet)
+        out = "{out}{c0}{c1}{c2}"
+        if padded {
+            out = "{out}="
+        }
+    }
+    out
+}
+
+/// `s` decoded with `alphabet`; `strict` demands a length that is a
+/// multiple of four, exact padding, and zero unused bits in a short final
+/// group. Private: the shared body of all three decoders.
+fn decode_with(s: str, alphabet: str, strict: bool) -> List[int] ! {parse} {
+    var out = List[int]()
+    var rest = s
+    var finished = false
+    while rest.len > 0 {
+        if finished {
+            return parse
+        }
+        var slots: int = 0
+        var chars: int = 0
+        var pads: int = 0
+        var group: int = 0
+        while slots < 4 {
+            if rest.len == 0 {
+                if strict {
+                    return parse
+                }
+                slots = 4
+            } else if rest.starts_with("=") {
+                rest = rest[1..]
+                pads = pads + 1
+                group = group * 64
+                slots = slots + 1
+            } else {
+                if pads > 0 {
+                    return parse
+                }
+                let v = value_of(rest, alphabet)
+                if v < 0 {
+                    return parse
+                }
+                rest = rest[1..]
+                group = group * 64 + v
+                chars = chars + 1
+                slots = slots + 1
+            }
+        }
+        // Slots the lenient profile never saw, because the input ended.
+        var missing = 4 - chars - pads
+        while missing > 0 {
+            group = group * 64
+            missing = missing - 1
+        }
+        if chars < 2 {
+            // One character carries six bits and no whole byte; zero
+            // characters is a group of pure padding.
+            return parse
+        }
+        let kept = chars - 1
+        if kept < 3 {
+            finished = true
+            if strict {
+                let unused = group % pow2(8 * (3 - kept))
+                if unused > 0 {
+                    return parse
+                }
+            }
+        }
+        (mut out).push(group / 65536 % 256)
+        if kept > 1 {
+            (mut out).push(group / 256 % 256)
+        }
+        if kept > 2 {
+            (mut out).push(group % 256)
+        }
+    }
+    out
+}
+
+/// 2^e for a small non-negative `e`. Private.
+fn pow2(e: int) -> int {
+    var out: int = 1
+    var i: int = 0
+    while i < e {
+        out = out * 2
+        i = i + 1
+    }
+    out
+}
+
+/// `b` encoded with the standard alphabet and `=` padding — RFC 4648 §4,
+/// the encoding every `Authorization: Basic` header and every PEM block
+/// uses. The empty sequence encodes to the empty string; output length is
+/// always a multiple of four.
+///
+/// Traps `assert` when an element is outside 0..255 (§2's trap rule).
+/// Total otherwise: no error row.
+///
+/// ```wolf-doc-example
+/// var b = List[int]()
+/// (mut b).push(77)
+/// base64.encode(b) == "TQ=="
+/// (mut b).push(97)
+/// base64.encode(b) == "TWE="
+/// (mut b).push(110)
+/// base64.encode(b) == "TWFu"
+/// var empty = List[int]()
+/// base64.encode(empty) == ""
+/// ```
+pub fn encode(b: List[int]) -> str {
+    encode_with(b, alphabet_std(), true)
+}
+
+/// `b` encoded with the URL- and filename-safe alphabet (`-` and `_` for
+/// `+` and `/`) and NO padding — RFC 4648 §5 with its padding sentence
+/// taken: `=` needs escaping in a query string, which is the whole point
+/// of the variant. `url_decode` accepts padding anyway, so text from a
+/// padding-emitting encoder still reads.
+///
+/// ```wolf-doc-example
+/// var b = List[int]()
+/// (mut b).push(255)
+/// (mut b).push(239)
+/// base64.url_encode(b) == "_-8"
+/// base64.encode(b) == "/+8="
+/// ```
+pub fn url_encode(b: List[int]) -> str {
+    encode_with(b, alphabet_url(), false)
+}
+
+/// `s` decoded with the standard alphabet, STRICTLY: `parse` unless the
+/// length is a multiple of four, the padding is exactly what the byte
+/// count requires, every other character is in the alphabet, and the
+/// unused low bits of a short final group are zero. That last clause is
+/// what makes the encoding canonical — `"TQ=="` decodes and `"TR=="`,
+/// which names the same byte with different ignored bits, does not — and
+/// it is why `encode(decode(s)) == s` holds for every `s` this function
+/// accepts.
+///
+/// Total: no traps. Non-ASCII input is an ordinary miss.
+///
+/// ```wolf-doc-example
+/// let one = base64.decode("TQ==") else List[int]()
+/// one.len == 1
+/// let three = base64.decode("TWFu") else List[int]()
+/// three.len == 3
+/// let unpadded = base64.decode("TQ") else List[int]()
+/// unpadded.len == 0
+/// let noncanonical = base64.decode("TR==") else List[int]()
+/// noncanonical.len == 0
+/// let bad = base64.decode("T!==") else List[int]()
+/// bad.len == 0
+/// ```
+pub fn decode(s: str) -> List[int] ! {parse} {
+    decode_with(s, alphabet_std(), true)?
+}
+
+/// `s` decoded with the URL-safe alphabet, padding optional. `parse` on
+/// any character outside that alphabet — including `+` and `/`, which
+/// belong to the other variant and are a sign the caller mixed the two.
+///
+/// ```wolf-doc-example
+/// let a = base64.url_decode("_-8") else List[int]()
+/// a.len == 2
+/// let b = base64.url_decode("_-8=") else List[int]()
+/// b.len == 2
+/// let mixed = base64.url_decode("/+8=") else List[int]()
+/// mixed.len == 0
+/// ```
+pub fn url_decode(s: str) -> List[int] ! {parse} {
+    decode_with(s, alphabet_url(), false)?
+}
+
+/// `s` decoded with the standard alphabet, forgivingly: padding may be
+/// absent or short, and a final group's unused bits may be anything.
+/// `parse` still answers for a character outside the alphabet and for a
+/// trailing group of one character, which encodes no byte at all.
+///
+/// Use it for input from elsewhere; use `decode` for input your program
+/// will re-encode, because only the strict profile promises the text back
+/// unchanged.
+///
+/// ```wolf-doc-example
+/// let a = base64.decode_lenient("TQ") else List[int]()
+/// a.len == 1
+/// let b = base64.decode_lenient("TR") else List[int]()
+/// b.len == 1
+/// let c = base64.decode_lenient("TWFu") else List[int]()
+/// c.len == 3
+/// let bad = base64.decode_lenient("T") else List[int]()
+/// bad.len == 0
+/// ```
+pub fn decode_lenient(s: str) -> List[int] ! {parse} {
+    decode_with(s, alphabet_std(), false)?
+}

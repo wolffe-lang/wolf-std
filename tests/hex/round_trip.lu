@@ -1,0 +1,66 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.hex
+//!
+//! `decode(encode(b)) == b` over the adversarial fixture set — the
+//! doctrine the sprint contract states for every encoder. The fixtures
+//! are the ones that catch real bugs: the empty sequence, the boundary
+//! bytes 0 and 255, a byte whose high nibble is zero (the leading-zero
+//! case a naive `to_hex` drops), and a run of every value in 0..255.
+
+use std.hex
+
+fn same(a: List[int], b: List[int]) -> bool {
+    if a.len == b.len {} else {
+        return false
+    }
+    var i: int = 0
+    while i < a.len {
+        if a[i] == b[i] {} else {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+fn main() -> !int {
+    var empty = List[int]()
+    if hex.encode(empty) == "" {} else { return 1 }
+    if same(hex.decode("") else empty, empty) {} else { return 2 }
+    var edges = List[int]()
+    (mut edges).push(0)
+    (mut edges).push(1)
+    (mut edges).push(15)
+    (mut edges).push(16)
+    (mut edges).push(127)
+    (mut edges).push(128)
+    (mut edges).push(254)
+    (mut edges).push(255)
+    if hex.encode(edges) == "00010f107f80feff" {} else { return 3 }
+    if hex.encode_upper(edges) == "00010F107F80FEFF" {} else { return 4 }
+    let back = hex.decode(hex.encode(edges)) else empty
+    if same(back, edges) {} else { return 5 }
+    let back_upper = hex.decode(hex.encode_upper(edges)) else empty
+    if same(back_upper, edges) {} else { return 6 }
+    // Every byte value, both directions.
+    var all = List[int]()
+    var i: int = 0
+    while i < 256 {
+        (mut all).push(i)
+        i = i + 1
+    }
+    let text = hex.encode(all)
+    if text.len == 512 {} else { return 7 }
+    let round = hex.decode(text) else empty
+    if same(round, all) {} else { return 8 }
+    // And the other direction: text this module produced reads back as
+    // the same text, which is what makes the encoding canonical.
+    if hex.encode(round) == text {} else { return 9 }
+    // Case is not significant on the way in.
+    let mixed = hex.decode("AbCd") else empty
+    if mixed.len == 2 {} else { return 10 }
+    if mixed[0] == 171 {} else { return 11 }
+    if mixed[1] == 205 {} else { return 12 }
+    0
+}

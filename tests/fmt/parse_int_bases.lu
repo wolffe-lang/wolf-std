@@ -1,46 +1,60 @@
 //! check: run(exit=0)
 //! phase: run
-//! conforms: std.str
+//! conforms: std.fmt
 //!
-//! `parse_int` across bases, signs and every miss shape. The `Parse` row is
-//! consumed by `else` (spelled `Parse` per F-0003's interim); the misses
-//! are as much of the contract as the hits — no leniency means no
-//! whitespace, no separators, no `0x` prefix, and an empty digit run is a
-//! miss rather than a zero.
+//! `parse_int` and `parse_int_base` across bases, signs and every miss
+//! shape — sc03's test, re-homed with its module (this sprint's contract)
+//! and extended by the two behaviours the re-home changed: a radix
+//! outside 2..36 raises `base` rather than `parse`, and `int_min()`
+//! parses instead of trapping, because the accumulator runs negative.
+//!
+//! The misses are as much of the contract as the hits: no leniency means
+//! no whitespace, no separators, no `0x` prefix, and an empty digit run
+//! is a miss rather than a zero.
 
-use std.str
+use std.fmt
 
 fn main() -> !int {
-    if (str.parse_int("0", 10) else 0 - 1) == 0 {} else { return 1 }
-    if (str.parse_int("42", 10) else 0 - 1) == 42 {} else { return 2 }
-    if (str.parse_int("-42", 10) else 0) == 0 - 42 {} else { return 3 }
-    if (str.parse_int("+42", 10) else 0 - 1) == 42 {} else { return 4 }
-    if (str.parse_int("1010", 2) else 0 - 1) == 10 {} else { return 5 }
-    if (str.parse_int("777", 8) else 0 - 1) == 511 {} else { return 6 }
-    if (str.parse_int("ff", 16) else 0 - 1) == 255 {} else { return 7 }
-    if (str.parse_int("FF", 16) else 0 - 1) == 255 {} else { return 8 }
-    if (str.parse_int("Ff", 16) else 0 - 1) == 255 {} else { return 9 }
-    if (str.parse_int("z", 36) else 0 - 1) == 35 {} else { return 10 }
-    if (str.parse_int("zz", 36) else 0 - 1) == 1295 {} else { return 11 }
-    if (str.parse_int("-1", 2) else 0) == 0 - 1 {} else { return 12 }
+    if (fmt.parse_int("0") else 0 - 1) == 0 {} else { return 1 }
+    if (fmt.parse_int("42") else 0 - 1) == 42 {} else { return 2 }
+    if (fmt.parse_int("-42") else 0) == 0 - 42 {} else { return 3 }
+    if (fmt.parse_int("+42") else 0 - 1) == 42 {} else { return 4 }
+    if (fmt.parse_int_base("1010", 2) else 0 - 1) == 10 {} else { return 5 }
+    if (fmt.parse_int_base("777", 8) else 0 - 1) == 511 {} else { return 6 }
+    if (fmt.parse_int_base("ff", 16) else 0 - 1) == 255 {} else { return 7 }
+    if (fmt.parse_int_base("FF", 16) else 0 - 1) == 255 {} else { return 8 }
+    if (fmt.parse_int_base("Ff", 16) else 0 - 1) == 255 {} else { return 9 }
+    if (fmt.parse_int_base("z", 36) else 0 - 1) == 35 {} else { return 10 }
+    if (fmt.parse_int_base("zz", 36) else 0 - 1) == 1295 {} else { return 11 }
+    if (fmt.parse_int_base("-1", 2) else 0) == 0 - 1 {} else { return 12 }
     // Misses, one shape each.
-    if (str.parse_int("", 10) else 0 - 1) == 0 - 1 {} else { return 13 }
-    if (str.parse_int("-", 10) else 0 - 1) == 0 - 1 {} else { return 14 }
-    if (str.parse_int("4x", 10) else 0 - 1) == 0 - 1 {} else { return 15 }
-    if (str.parse_int("x4", 10) else 0 - 1) == 0 - 1 {} else { return 16 }
-    if (str.parse_int(" 4", 10) else 0 - 1) == 0 - 1 {} else { return 17 }
-    if (str.parse_int("4 ", 10) else 0 - 1) == 0 - 1 {} else { return 18 }
-    if (str.parse_int("0x10", 16) else 0 - 1) == 0 - 1 {} else { return 19 }
-    if (str.parse_int("1_0", 10) else 0 - 1) == 0 - 1 {} else { return 20 }
-    if (str.parse_int("2", 2) else 0 - 1) == 0 - 1 {} else { return 21 }
-    if (str.parse_int("g", 16) else 0 - 1) == 0 - 1 {} else { return 22 }
-    // A base outside 2..36 is a miss, not a trap: the base is data too.
-    if (str.parse_int("10", 1) else 0 - 1) == 0 - 1 {} else { return 23 }
-    if (str.parse_int("10", 37) else 0 - 1) == 0 - 1 {} else { return 24 }
-    if (str.parse_int("10", 0) else 0 - 1) == 0 - 1 {} else { return 25 }
+    if (fmt.parse_int("") else 0 - 1) == 0 - 1 {} else { return 13 }
+    if (fmt.parse_int("-") else 0 - 1) == 0 - 1 {} else { return 14 }
+    if (fmt.parse_int("4x") else 0 - 1) == 0 - 1 {} else { return 15 }
+    if (fmt.parse_int("x4") else 0 - 1) == 0 - 1 {} else { return 16 }
+    if (fmt.parse_int(" 4") else 0 - 1) == 0 - 1 {} else { return 17 }
+    if (fmt.parse_int("4 ") else 0 - 1) == 0 - 1 {} else { return 18 }
+    if (fmt.parse_int_base("0x10", 16) else 0 - 1) == 0 - 1 {} else { return 19 }
+    if (fmt.parse_int("1_0") else 0 - 1) == 0 - 1 {} else { return 20 }
+    if (fmt.parse_int_base("2", 2) else 0 - 1) == 0 - 1 {} else { return 21 }
+    if (fmt.parse_int_base("g", 16) else 0 - 1) == 0 - 1 {} else { return 22 }
+    // A radix outside 2..36 raises `base`, consumed by the same `else`.
+    if (fmt.parse_int_base("10", 1) else 0 - 1) == 0 - 1 {} else { return 23 }
+    if (fmt.parse_int_base("10", 37) else 0 - 1) == 0 - 1 {} else { return 24 }
+    if (fmt.parse_int_base("10", 0) else 0 - 1) == 0 - 1 {} else { return 25 }
     // A non-ASCII digit run is a miss and NOT a trap — the property the
-    // boundary-safe `starts_with` probe buys (std.str's header).
-    if (str.parse_int("é", 10) else 0 - 1) == 0 - 1 {} else { return 26 }
-    if (str.parse_int("4🐺", 10) else 0 - 1) == 0 - 1 {} else { return 27 }
+    // boundary-safe `starts_with` probe buys (F-0018).
+    if (fmt.parse_int("é") else 0 - 1) == 0 - 1 {} else { return 26 }
+    if (fmt.parse_int("4🐺") else 0 - 1) == 0 - 1 {} else { return 27 }
+    // int_min parses; its positive twin does not exist and overflows,
+    // which `parse_int_overflow_trap.lu` pins.
+    let zero: int = 0
+    let smallest = zero - 9223372036854775807 - 1
+    if (fmt.parse_int("-9223372036854775808") else 0) == smallest {} else { return 28 }
+    if (fmt.parse_int("9223372036854775807") else 0) == 9223372036854775807 {} else { return 29 }
+    // Round trip against the printing side, in three bases.
+    if (fmt.parse_int_base(fmt.to_hex(48879), 16) else 0) == 48879 {} else { return 30 }
+    if (fmt.parse_int_base(fmt.to_bin(12345), 2) else 0) == 12345 {} else { return 31 }
+    if (fmt.parse_int(fmt.to_str(smallest)) else 0) == smallest {} else { return 32 }
     0
 }
