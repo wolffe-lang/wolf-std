@@ -214,3 +214,98 @@ is now all three. Phase A's rule ("the reference machine runs it") stands
 unrelaxed, and the narrow reading of §14's capability posture — an
 implementation that genuinely lacks a capability — remains the only reading
 this repo has ever needed.
+
+## 7. sc09 — the F-0018 prize, spent
+
+Re-measured at the sc09 pins (wolf trunk `8321aba`, lupin 0.1.6). This is
+the sprint §5 was written for: the 30 census-blocked functions §3 of the
+Phase-A census grouped under "the boundary primitive", claimable at last on
+every lane.
+
+| measure | sc08 | sc09 |
+|---|---|---|
+| modules in `std/` with code | 27 | **28** (`std.bytes` had none) |
+| free `pub fn` in `std/` | 284 | **314** (+30) |
+| `std.str` functions | 16 | **37** (+21) |
+| `std.bytes` functions | 0 | **9** (+9) |
+| entry tests | 144 | **160** (+16) |
+| fenced doc examples, extracted and RUN | 242 | **272** (+30) |
+| findings filed | 6 (F-0049…F-0054) | **3** (F-0055…F-0057, issues #56–#58) |
+| findings retired | 3 | **1 whole** (F-0018's last two clauses minus `char`; see below) |
+
+### The census flip, exactly
+
+The blocked block was **30 functions**: 15 in `std.str`, 9 in `std.bytes`
+(the whole module), 2 in `std.json`, 1 each in `std.strbuf`,
+`std.unicode`, `std.fmt` and `std.hex`. sc09 lands **20 of the 30**:
+
+- **`std.str`: 12 of 15.** `get`, `find`, `rfind`, `count`, `split`,
+  `split_once`, `rsplit_once`, `ends_with`, `strip_suffix`, `replace`,
+  `replacen`, `bytes`. Still contracts: `chars`, `to_list_chars`,
+  `graphemes` — all three need a `char` type or segmentation tables, not a
+  primitive (F-0018's surviving clause).
+- **`std.bytes`: 8 of 9.** `len`, `is_empty`, `at`, `slice`, `find`,
+  `starts_with`, `ends_with`, `from_str`. Still a contract: `to_str`,
+  blocked on the missing bytes→str materialization (F-0057, new).
+- **The other 10 belong to other modules' sprints**, and the sprint that
+  takes each one will find the blocker gone for four of them: `json.parse`
+  and `json.unescape` (a scanner over arbitrary text is writable with
+  `get`+`find`), `fmt.truncate_to` (boundary-safe truncation is `get`), and
+  `hex.encode(str)` (`s.bytes()`). The remaining two —
+  `strbuf.push(c: char)` and `unicode.char.code` — wait on `char` with
+  `std.str`'s three.
+
+**Ten functions land that the census never named**, because the primitive
+made a family obvious once it existed: `str.find_all`, `splitn`, `rsplit`,
+`starts_with_any`, `ends_with_any`, `char_count`, `char_offsets`,
+`code_points`, `is_ascii`, and `bytes.is_utf8`. Two of them are interim
+faces of blocked contracts — `code_points` IS `to_list_chars` in
+`std.unicode`'s `int` currency, and `char_offsets` is the offset half of
+`chars` — so the `char` flip will be a signature change with identical
+bodies, exactly as `std.unicode` planned its own.
+
+**Padding is not here and will not be.** The sprint contract lists
+"pad/center/justify" under `std.str`; those are `std.fmt`'s
+(`pad_left`/`pad_right`/`center` + `_with` variants, shipped sc05), and §1
+allows one home per concept. `std.str`'s header says so rather than
+growing a second width family.
+
+### The lane table at these pins
+
+160 tests × 3 lanes:
+
+| lane | run | unsupported | fail(E…) |
+|---|---|---|---|
+| lupin | **133** | 27 | 0 |
+| wolfc `--checked` | **125** | 30 | 5 |
+| native | **82** | 73 | 5 |
+
+Every one of the 16 new rows is `run` on all three lanes — the first
+all-three block a sprint has landed, and the reason is structural rather
+than lucky: this code is monomorphic functions over `str`, `int`, `bool`
+and `List[int]`/`List[str]`, and the four things that darken a column
+(generics, `trait`/`enum`/`impl` modules, `Map`, `const`) are absent from
+it. A capability module cannot say that; a text module can.
+
+### What sc09 changed about the rig
+
+`cargo xtask std-test` and `doc-examples` now **deny warnings**: a
+non-empty `warnings` array in the observation record is RED, on every lane
+that reports one. `conform-run` still rejects `--deny-warnings` (F-0046,
+re-verified at this sha), so the rig denies them itself — and there are two
+reporting lanes now, because lupin 0.1.6's lint wave populates the array
+per `[proto.record.warn]` where sc08 had wolfc alone. It found three real
+doc bugs on its first run (four `0.0 - 1.0` sites in `std.fmt.decimal`'s
+`parse_float` example and two `0.0 - x` sites in `std.math.float`'s
+`neg_inf`/`f_min` examples — W0402, the lint sc08's guide entry was written
+about), all now spelled with unary minus. F-0053's open half stands: the
+array covers the ENTRY file only, so a warning inside a std module body is
+still invisible from here.
+
+### The os-tier blocked inventory (unchanged, plus one)
+
+F-0049 (5), F-0052 (2), F-0050 (1), F-0044 (6), F-0046 (1), F-0004 (2) all
+stand as sc08 recorded them. **F-0057 joins them with 1**
+(`std.bytes.to_str`), and it is the one to watch: `fs_read_bytes` (F-0044)
+and `to_str` unblock each other's usefulness, so the sprint that lands
+either should land both.

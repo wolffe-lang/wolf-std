@@ -36,6 +36,20 @@ pub struct Record {
     pub verdict: Verdict,
     pub stdout_sha256: Option<String>,
     pub stdout_inline: Option<String>,
+    /// The `warnings` array (`[proto.record.warn]`), one rendered string
+    /// per diagnostic. OPTIONAL and additive in the protocol, so an
+    /// implementation that emits none is not malformed — an absent array
+    /// and an empty one are the same record to this rig.
+    ///
+    /// This is the whole warning signal available here: `conform-run`
+    /// still rejects `--deny-warnings` (F-0046, re-verified at the sc09
+    /// pin), so the gate `runner` applies is "the array is empty" rather
+    /// than a flag. It covers the ENTRY file only — a warning in a std
+    /// module body is invisible from here, which is the open half of
+    /// F-0053. Both executing implementations populate it as of the sc09
+    /// pins (wolfc since s67, lupin since 0.1.6's lint wave), so the gate
+    /// now reads two lanes where sc08 could read one.
+    pub warnings: Vec<String>,
 }
 
 /// Validate against `[proto.record.fields]` and parse the fields the
@@ -82,12 +96,31 @@ pub fn parse(stdout: &str, who: &str) -> Result<Record, String> {
         return Err(format!("{who}: unknown phase_reached `{phase_reached}`"));
     }
     let opt_str = |key: &str| obj.get(key).and_then(Value::as_str).map(str::to_string);
+    // `[proto.record.warn]`: additive, so absence is legal and means none.
+    // A present-but-not-an-array `warnings` is malformed, and saying so is
+    // cheaper than silently reading zero warnings out of a broken record.
+    let warnings = match obj.get("warnings") {
+        None | Some(Value::Null) => Vec::new(),
+        Some(Value::Array(items)) => items
+            .iter()
+            .map(|w| match w {
+                Value::String(s) => s.clone(),
+                other => other.to_string(),
+            })
+            .collect(),
+        Some(other) => {
+            return Err(format!(
+                "{who}: `warnings` is {other}, not an array [proto.record.warn]"
+            ));
+        }
+    };
     let rec = Record {
         impl_name: obj["impl"].as_str().unwrap_or("?").to_string(),
         phase_reached,
         verdict,
         stdout_sha256: opt_str("stdout_sha256"),
         stdout_inline: opt_str("stdout_inline"),
+        warnings,
     };
     if matches!(rec.verdict, Verdict::Exit(_))
         && rec.stdout_sha256.is_none()
@@ -169,6 +202,26 @@ mod tests {
         assert!(parse(&missing, "x").is_err(), "missing required field");
         let bad = OK.replace("exit(0)", "explode(9)");
         assert!(parse(&bad, "x").is_err(), "unknown verdict");
+    }
+
+    #[test]
+    fn warnings_are_optional_additive_and_typed() {
+        // Absent (every pre-s67 record, and lupin before 0.1.6).
+        assert!(parse(OK, "x").unwrap().warnings.is_empty());
+        // Present and empty — the state a green rig expects.
+        let empty = OK.replace("\"diagnostics\":[],", "\"diagnostics\":[],\"warnings\":[],");
+        assert!(parse(&empty, "x").unwrap().warnings.is_empty());
+        // Present and populated: the gate's input.
+        let warned = OK.replace(
+            "\"diagnostics\":[],",
+            "\"diagnostics\":[],\"warnings\":[\"W0402: `0.0 - x` is not negation\"],",
+        );
+        let rec = parse(&warned, "x").unwrap();
+        assert_eq!(rec.warnings.len(), 1);
+        assert!(rec.warnings[0].contains("W0402"));
+        // Present and malformed: a tool-level failure, not zero warnings.
+        let broken = OK.replace("\"diagnostics\":[],", "\"diagnostics\":[],\"warnings\":7,");
+        assert!(parse(&broken, "x").is_err());
     }
 
     #[test]

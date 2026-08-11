@@ -61,6 +61,9 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0052 | 2026-08-15 | **Silent wrong answer, and a three-lane divergence: a `match` inside an `else` handler matches its FIRST ARM for every tag** on wolfc's checked lane. `miss_io() else \|e\| match e { eof => "said-eof", io => "said-io", _ => … }` answers `said-eof`; swap the arms and it answers `said-io` — measured both ways, no diagnostic. lupin 0.1.5 and the native rung both discriminate CORRECTLY, so one program has two meanings across three lanes. It is F-0043's successor rather than its fix: sc07's `E0201` on the shape is gone and what replaced it is worse, because a rejection cannot ship and this can (the `E0806` on payload patterns is unmoved). It costs `std.net.read_all` and keeps `std.io.input_all` a contract: a loop that cannot tell `closed`/`eof` from `io` truncates data silently | wolf-lang s14/s15 + s23 (checked execution) | [filed: wolf-lang#48](https://github.com/wolffe-lang/wolf-lang/issues/48) |
 | F-0053 | 2026-08-15 | **The warning signal covers the ENTRY file only**, so the `--deny-warnings` gate F-0046 asked for would not see std at all: over 144 staged programs the record's `warnings` array reports only the entry's own spans, while `std/math/float/float.lu` carries 40-plus `0.0 - x` sites that W0402 diagnoses and no importing test surfaces one. `conform-run` still rejects `--deny-warnings` (re-verified at this pin; the flag exists on `wolf build`/`wolf test`). The warning system's first real catch is recorded with it: W0402 found 29 sites in two std TEST files, one of which claimed to assert the two signed zeros and asserted `+0.0` against `+0.0` | wolf-lang s67/s69 (warnings) + s39 (`wolf test` surface) | [filed: wolf-lang#49](https://github.com/wolffe-lang/wolf-lang/issues/49) |
 | F-0054 | 2026-08-15 | **The pin's own ritual gates are load-flaky**: `cargo test --workspace` and `cargo run -p xtask -- ci` each failed once at trunk `13b811f` in a clean scratch clone and each passed on re-run, both times in `wolf_rt::task::proc`'s scheduler-seam tests (`seam_observes_proc_events` missed a `ProcExit` event; `killed_proc_skips_defers_and_frees_regions` counted 0 where it wanted 1). Run alone the crate is 14-for-14 green, so the failures are timing under full-workspace parallelism — which makes a green pin a probabilistic claim and F-0024's two-gate ritual a coin flip rather than a check | wolf-lang s32/s34 (task runtime) + CI owners | [filed: wolf-lang#50](https://github.com/wolffe-lang/wolf-lang/issues/50) |
+| F-0055 | 2026-08-16 | **The empty needle is three different things**: `count("")`, `split("")` and `replace(s, "", …)` are refused as `unsupported` by lupin 0.1.6 AND the checked tier, and DEFINED by the native runtime (0, one whole piece, identity) — a three-lane split on a shape every caller-supplied separator can reach. `wolf_rt` calls its answers "the documented deterministic placeholder" and `wolf_mem` refuses the same three, so both sides know; neither is ruled. `std.str` guards all six affected functions before delegating (`count` answers 0, the rest trap `assert`) so no caller sees it | wolf-lang s37 (core types) + spec owners | [filed: wolf-lang#56](https://github.com/wolffe-lang/wolf-lang/issues/56) |
+| F-0056 | 2026-08-16 | **`repeat(-1)` traps `bounds` on every lane and no clause says so** — and it silently CHANGED: sc03 measured `""` under the interpreter and `std.str.repeat`'s doc claimed that answer for five sprints with no test holding it. `bounds` is also arguably the wrong kind for a caller contract violation (`[conf.trap.map]` spells that `assert`), and `wolf_rt`'s own `__wolf_rt_str_repeat` clamps with `count.max(0)` — so the three lanes agree by construction, not by rule | wolf-lang spec (`[conf.trap.map]` / `[mem.str.*]`) | [filed: wolf-lang#57](https://github.com/wolffe-lang/wolf-lang/issues/57) |
+| F-0057 | 2026-08-16 | **s37 gave the language a byte VIEW and no byte SOURCE**: `s.bytes()` exists on every lane and nothing turns bytes back into a `str`, so `std.bytes.to_str -> str ! {utf8}` — the D24 border post, the last unwritten member of the census's byte block — has no spelling. Needs one of `str.from_utf8`, a `char` type with scalar-to-`str` (F-0018's half), or `strbuf.push_byte`. std ships the predicate half instead (`bytes.is_utf8`, full validation in wolf source, 31 rows on three lanes) so the gap is visible rather than silent | wolf-lang s37 core types | [filed: wolf-lang#58](https://github.com/wolffe-lang/wolf-lang/issues/58) |
 
 ## F-0001 — the std search path
 
@@ -1712,3 +1715,116 @@ The ask: make the proc seam tests wait on the event they assert rather than on
 elapsed time (or serialize them), so that a red gate means a red pin. This
 repo's own posture in the meantime is to state the re-run in the pin's
 `vendor/tools.toml` note rather than quietly re-running until green.
+
+## F-0055 — the empty needle is three different things
+
+The sprint that spends F-0018's prize found the prize has one hole in it,
+and it is the hole every caller-supplied separator falls through.
+
+```
+"abc".count("")            // lupin: unsupported · checked: unsupported · native: 0
+"abc".split("")            // lupin: unsupported · checked: unsupported · native: ["abc"]
+"abc".replace("", "-")     // lupin: unsupported · checked: unsupported · native: "abc"
+```
+
+Both sides of the toolchain know they are doing this. `wolf_rt`'s
+`__wolf_rt_str_count` documents "Empty needle: 0 (the documented
+deterministic placeholder — the checked lane refuses, see the design
+note)", and `wolf_mem`'s ubcheck answers `refuse("count of an empty
+needle")` for the same call. So this is not a bug in one lane: it is an
+unruled semantics with two implementations of "we decided not to decide"
+and one implementation of a decision.
+
+**Why `unsupported` is the worst of the three answers.** A trap would be a
+program outcome a test can name; a defined answer would be a contract a
+library can delegate to. `unsupported` is neither — it says "this
+implementation cannot do this", which is plainly false (all three can), and
+it takes a whole ledger row with it: a std function that reached this shape
+would be `unsupported` on two lanes for one branch of one input.
+
+**What std did.** Every `std.str` function that takes a separator or a
+pattern guards before it delegates:
+
+- `count(s, "")` returns 0 — the reviewed contract's answer ("a count of
+  nothing is nothing"), and now std's own rather than the builtin's;
+- `split`, `splitn`, `rsplit`, `replace`, `replacen` trap `assert` on an
+  empty separator — also the reviewed contract's, and held as
+  `tests/str/split_empty_separator_trap.lu` and
+  `tests/str/replace_empty_pattern_trap.lu` on all three lanes;
+- `split_once`/`rsplit_once`/`find_all` are defined over `find`/`rfind`
+  instead, which ARE defined for the empty needle (0 and `len`
+  respectively, on every lane), and each says so in its doc.
+
+The cost is six guards and a branch per call. The benefit is that
+`std.str`'s answer to an empty separator is the same sentence on every
+lane, which is the only thing a library can honestly promise.
+
+Asks, in order: rule the semantics (native's answers are the obvious
+ruling) and make the other two lanes obey; failing that, make it a `trap`
+everywhere rather than an `unsupported` on two lanes; either way, do not
+leave a shape where two rungs refuse and one answers.
+
+## F-0056 — `repeat(-1)` traps, and the doc that said otherwise rotted
+
+At this pin `"ab".repeat(0 - 1)` is `trap(bounds)` with clause
+`[mem.ub.defined]` on all three lanes ("a repeat count cannot be
+negative"). sc03 measured it as `""` under the interpreter and wrote that
+into `std.str.repeat`'s doc — "the implementation's answer, recorded
+because it is observable (`"ab".repeat(0 - 1)` is `""`, not a trap)" —
+where it sat for five sprints and four pin bumps.
+
+Three things are wrong here and only one of them is upstream's.
+
+1. **Ours**: a doc claimed an implementation's observable behaviour and no
+   test held it, so the claim rotted silently. Fixed by
+   `tests/str/repeat_negative_trap.lu`, which names the kind. The general
+   rule, now in the guide: a sentence about what an implementation ANSWERS
+   is a test, or it is a rumour.
+2. **The spec's**: nothing says a negative repeat count is a fault, or
+   which kind it raises. `[conf.trap.set]` lists the kinds and
+   `[mem.ub.defined]` is what the implementations cite, but no clause
+   connects the two for this operation.
+3. **Arguably the kind's**: a negative count is a caller contract violation
+   — `[conf.trap.map]`'s `assert` — not an out-of-range access. And the
+   agreement is fragile: `wolf_rt::__wolf_rt_str_repeat` clamps with
+   `count.max(0)` and would have returned `""`, so the native lane traps
+   above the runtime rather than in it. Three lanes agreeing by
+   construction is the state that drifts.
+
+std does NOT guard this one, deliberately: the trap is the right answer for
+a contract violation the caller could have checked (§2), and a guard would
+hide the one place the implementations agree.
+
+## F-0057 — a byte view with no way back
+
+`s.bytes()` executes on all three lanes as of #40, so `std.bytes` finally
+has a producer and eight of its nine reviewed functions are code. The
+ninth is the important one and it has no spelling at all:
+
+```text
+to_str(b: Bytes) -> str ! {utf8}
+```
+
+Nothing in the language builds a `str` from a number. There is no `char`,
+no `from_utf8` builtin, no `strbuf.push_byte` — so the VALIDATION half is
+writable in wolf source (and is written: `bytes.is_utf8`, 31 rows on three
+lanes, rejecting stray continuations, truncations, overlong forms,
+surrogates and scalars above U+10FFFF) while the MATERIALIZATION half has
+nowhere to happen.
+
+An ASCII-only `to_str` would be a border post that refuses text, which §9
+forbids std from shipping, so the function stays a contract in the module
+header with this finding beside it.
+
+What would unblock it, cheapest first: `str.from_utf8(b) -> str ! {utf8}`
+as a builtin (the validity check belongs where the invariant lives);
+`strbuf.push_byte` plus a validating `finish`; or the `char` type F-0018
+already asks for, with a scalar-to-`str` constructor.
+
+Two notes for whoever takes it. The decoder in `bytes.is_utf8` is written
+in divisions and range comparisons rather than masks because `&`, `|`, `^`
+and `>>` on a plain `int` are still `unsupported` on the checked lane
+(F-0026) — a `to_str` in library code would pay the same tax, which is one
+more argument for the builtin. And the io tier will want this the moment
+`fs_read_bytes` lands (F-0044): a byte read with no way back to text is a
+byte read nobody can use.

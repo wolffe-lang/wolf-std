@@ -292,6 +292,23 @@ pub fn std_test() -> Result<(), String> {
                     continue;
                 }
             };
+            // THE WARNING GATE (sc09). `conform-run` still rejects
+            // `--deny-warnings` (F-0046, re-verified at this pin), so the
+            // rig denies them itself: a non-empty `warnings` array is RED
+            // on every lane that reports one. Two lanes do now — wolfc
+            // since s67, lupin since 0.1.6's lint wave — and sc08 paid for
+            // the absence of this check by committing a signed-zero
+            // assertion the compiler had already flagged. Entry file only
+            // (F-0053's open half).
+            if !rec.warnings.is_empty() {
+                reds.push(format!(
+                    "tests/{test} [{}]: {} warning(s) — this rig denies warnings \
+                     (F-0046/F-0053):\n    {}",
+                    imp.ledger_name(),
+                    rec.warnings.len(),
+                    rec.warnings.join("\n    ")
+                ));
+            }
             let achieved = match classify(&rec, &check) {
                 Ok(a) => a,
                 Err(mismatch) => {
@@ -556,6 +573,7 @@ mod tests {
             verdict,
             stdout_sha256: sha.map(str::to_string),
             stdout_inline: None,
+            warnings: Vec::new(),
         }
     }
 

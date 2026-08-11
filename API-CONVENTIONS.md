@@ -282,6 +282,54 @@ sibling module are restructured or written as prose.
   agreement member by member, so a builtin change fails CI instead of
   drifting silently.
 
+**§9 amendment (sc09) — the primitive landed, and four rules came with it.**
+`std.str` delegates to the whole s37 builtin set now and ships 37 functions;
+`std.bytes` ships 9. Writing them settled four things §9 could only gesture at
+while the boundary primitive was missing.
+
+- **`get` is for the caller's offsets; `s[a..b]` is for yours.** The
+  recoverable slice (`get -> str ! {none}`) exists so that an offset a
+  program received as DATA can be refused instead of faulting. An offset std
+  computed — the one `find` just returned, `prefix.len` after a successful
+  `starts_with` — is a boundary by construction, so std slices it with the
+  language's checked form and lets a trap there mean what it would mean: a
+  bug in std. Writing those sites as `get(...) else ""` would convert std's
+  own bug into a wrong answer, which is the failure mode §9's
+  refusal-over-approximation rule exists to prevent.
+- **Where the lanes disagree about a primitive, the std function decides —
+  before it delegates.** `count("")`, `split("")` and `replace(s, "", …)`
+  are `unsupported` on two lanes and defined on the third (F-0055), so six
+  `std.str` functions guard the empty argument themselves: `count` answers
+  0, the rest trap `assert`. The guard is not a workaround for a bug in one
+  implementation (which §0's house rule would file rather than paper over) —
+  it is std stating a contract the toolchain has not stated, in the one
+  place a caller can rely on it, with the filing attached. A std function may
+  never have three behaviours because it has three lanes.
+- **A code point is an `int` until `char` exists, and the interim is
+  `std.unicode`'s.** `str.code_points`, `char_offsets` and `char_count` ship
+  in the same currency `std.unicode` chose for its classifiers, so the two
+  modules compose today and flip together the day `char` lands. Neither
+  function is named `chars`: the blocked contract keeps its name, and the
+  interim faces take descriptive ones, so nothing has to be renamed when the
+  real one arrives.
+- **Byte width is `List[int]` and monomorphic beats generic.**
+  `std.bytes`' `len`/`is_empty`/`at`/`find`/`starts_with`/`ends_with`
+  duplicate `std.list` names by design: `std.list`'s are generic and
+  therefore execute on the interpreter lane alone, while these are concrete
+  and execute on all three. When a std function could be generic or concrete
+  and the concrete type is the one programs actually hold, ship the concrete
+  one and say why in the header. Two modules may share function names as
+  long as no program imports both (F-0026 is a per-program linker
+  collision), which is why `std.bytes` has its own producer (`from_str`) and
+  its tests never import `std.str`.
+
+One naming ruling rides with them: **a PREDICATE does not trap.**
+`bytes.is_utf8` answers `false` for an element outside 0..255 where §11 has
+an ENCODER trap `assert` on the same input, and the difference is the
+question being asked: "are these bytes text?" has an answer for a non-byte,
+and a predicate a caller must guard before calling is not a predicate. §11's
+rule is unchanged for the encoders it was written for.
+
 ## 10. Numerics, and the iterator combinator's name (sc04)
 
 - **Checked is the default, recoverable is the complement, and the docs
@@ -532,6 +580,20 @@ and a lint that guessed at them would train authors to work around it.
 - **Every test names its anchors** with `conforms:` (§4), and the doc
   examples are tests too: fenced means executable, always.
 
+**§13 amendment (sc09) — the rig denies warnings.** A non-empty `warnings`
+array in the observation record (`[proto.record.warn]`) is a RED in
+`cargo xtask std-test` and in `doc-examples`, on every lane that reports
+one. `conform-run` still rejects `--deny-warnings` (F-0046, re-verified at
+the sc09 pin), so the rig does it: the flag this repo asked for twice is
+approximated by the one signal the protocol does give, and both executing
+implementations populate it now (wolfc since s67, lupin since 0.1.6's lint
+wave). It paid on its first run — three doc examples carried `0.0 - x`
+sites that W0402 had been flagging into a void. Two limits, stated so nobody
+reads more into a green rig than it says: the array covers the ENTRY file
+only, so a warning inside a std module body is invisible from here (F-0053's
+open half), and a lane with no lint tier reports nothing rather than
+reporting clean.
+
 ## 14. The os tier (sc07) — capabilities, rows, paths, handles
 
 Phase B's first two modules (`std.fs`, `std.io`) are the worked home of
@@ -628,6 +690,13 @@ path" is the version that loses someone's data.
 
 ## Review record
 
+- 2026-08-16 — sc09 amendments: §9 gains the four rules writing the landed
+  `str`/`bytes` surface settled (`get` versus `s[a..b]` by whose offset it
+  is; a std function decides where the lanes disagree about a primitive, and
+  files; the `int` code-point interim shared with `std.unicode`; byte width
+  as `List[int]` with monomorphic-beats-generic and the shared-name rule),
+  plus the predicate-does-not-trap ruling — and §13 gains the warning gate.
+  Review rides the same pending sc00 gate.
 - 2026-08-10 — drafted (sc00). Human review: **pending**; record the
   reviewer and date here when it lands, then flip Status above to
   binding.

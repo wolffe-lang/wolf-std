@@ -112,7 +112,17 @@ pub fn doc_examples() -> Result<(), String> {
         let capability = CAPABILITY_MODULES.contains(&b.module.as_str());
         let mut any_ran = false;
         for (imp, bin) in &lanes {
-            let verdict = run_lane(*imp, bin, &staged, ceiling)?;
+            let (verdict, warnings) = run_lane(*imp, bin, &staged, ceiling)?;
+            if !warnings.is_empty() {
+                reds.push(format!(
+                    "{} [{}]: {} warning(s) — this rig denies warnings \
+                     (F-0046/F-0053):\n    {}",
+                    b.origin,
+                    imp.ledger_name(),
+                    warnings.len(),
+                    warnings.join("\n    ")
+                ));
+            }
             let compiler_lane = matches!(imp, Impl::Wolf | Impl::Native);
             let waived = matches!(&verdict, Verdict::Fail(code)
                 if compiler_lane
@@ -177,7 +187,7 @@ fn run_lane(
     bin: &Path,
     staged: &stage::Staged,
     ceiling: Duration,
-) -> Result<Verdict, String> {
+) -> Result<(Verdict, Vec<String>), String> {
     let mut cmd = Command::new(bin);
     // The staged package root is the working directory (sc07), so an
     // os-facing example writes its scratch files there and nowhere else.
@@ -206,7 +216,12 @@ fn run_lane(
             got.stderr.trim()
         ));
     }
-    Ok(record::parse(&got.stdout, imp.ledger_name())?.verdict)
+    let rec = record::parse(&got.stdout, imp.ledger_name())?;
+    // The verdict AND the warnings: the gate applies to documentation too
+    // (sc09), and a warning is reported like any other doc bug — collected,
+    // named, and never allowed to stop the sweep, so one bad example does
+    // not hide the next one. See `runner`'s gate and F-0046/F-0053.
+    Ok((rec.verdict, rec.warnings))
 }
 
 /// Relational operators an assertion line must carry (§4 amendment,
