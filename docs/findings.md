@@ -6,55 +6,61 @@ finding gets a row; the filing link is the proof it left the building.
 
 | id | filed | title | routed to | status |
 |---|---|---|---|---|
-| F-0001 | 2026-08-10 | No std search path: `use std.*` resolves against a builtin stub (wolfc) / builtin ambient (lupin), never the package; lupin resolves no nested package directory | wolf-lang (s37+ prelude/build plumbing), interp counterpart noted in the filing | [filed: wolf-lang#1](https://github.com/tenseleyFlow/wolf-lang/issues/1) |
-| F-0002 | 2026-08-10 | (contract F2) Absence/result over rows: rows are second-class — `!`-rows parse only in return position, so the six `std.option` helpers cannot be written; `try`⇄`Result` blocked twice over (s16 generic data + reification); plus the pin-era execution floor (no trait/method/enum dynamics) | wolf-lang s15-revisit/s37 owners | [filed: wolf-lang#3](https://github.com/tenseleyFlow/wolf-lang/issues/3) |
-| F-0003 | 2026-08-10 | Lowercase bare row tags (`none`, `done`, …) resolve in neither implementation at the raise site; API-CONVENTIONS §2 mandates lowercase pure marks — std spells `None`/`Done` interim | wolf-lang s15/resolve owners, interp counterpart | [filed: wolf-lang#4](https://github.com/tenseleyFlow/wolf-lang/issues/4) |
-| F-0004 | 2026-08-10 | (contract F3) Operator↔trait bridge: `<=>` builtin-only, yields int (lupin); enum `==` refused by wolfc at resolve; no supertrait clause spells `Ord requires Eq`; bare literals default `i32` and miss `impl … for int` bounds (E0502) | wolf-lang s14/s17 owners | [filed: wolf-lang#5](https://github.com/tenseleyFlow/wolf-lang/issues/5) |
-| F-0005 | 2026-08-10 | wolfc's pinned List typing: `push` typed as read receiver (X1-correct `(mut xs).push` is E0804; bare push then E1001); `.len`-then-`[i]` reads count as moves (E1001; fix-it names a `copy` operator outside the pinned grammar) — blocks `min_of`/`max_of` and every List-building wolfc lane | wolf-lang s21/s22 mem-tier owners | [filed: wolf-lang#6](https://github.com/tenseleyFlow/wolf-lang/issues/6) |
-| F-0006 | 2026-08-10 | str ordering divergence: lupin runs `<`/`>` on str, wolfc rejects E0409; no byte accessor exists to define it in-library — blocks `impl Ord for str` | wolf-lang typecheck/spec owners | [filed: wolf-lang#7](https://github.com/tenseleyFlow/wolf-lang/issues/7) |
-| F-0007 | 2026-08-10 | lupin pattern semantics: bare-ident patterns BIND instead of resolving in-scope variants/tags — first arm always matches (silently wrong), non-exhaustive matches run, qualified path patterns accepted though outside the pinned grammar | wolf-interp | [filed: wolf-interp#5](https://github.com/tenseleyFlow/wolf-interp/issues/5) |
-| F-0008 | 2026-08-10 | (contract F1) The iterator protocol: `Iter[T]` with `next(mut self) -> T ! {done}`, the `for` desugar, range-type ownership, builtin adoption — prototyped executing in `std.iter` | wolf-lang spec/01 + s37 owners | [filed: wolf-lang#8](https://github.com/tenseleyFlow/wolf-lang/issues/8) |
-| F-0009 | 2026-08-10 | (contract F4) `assert`, defined: an intrinsic, not a prelude fn (a module fn named `assert` shadows it module-wide, E0402 both implementations); the two-argument form needs arity overloading or intrinsic growth; comptime/runtime duality | wolf-lang spec comptime/forward-std owners | [filed: wolf-lang#9](https://github.com/tenseleyFlow/wolf-lang/issues/9) |
+| F-0001 | 2026-08-10 | No std search path: `use std.*` resolves against a builtin stub (wolfc) / builtin ambient (lupin), never the package; lupin resolves no nested package directory | wolf-lang (s37+ prelude/build plumbing), interp counterpart noted in the filing | [filed: wolf-lang#1](https://github.com/wolffe-lang/wolf-lang/issues/1) |
+| F-0002 | 2026-08-10 | (contract F2) Absence/result over rows: rows are second-class — `!`-rows parse only in return position, so the six `std.option` helpers cannot be written; `try`⇄`Result` blocked twice over (s16 generic data + reification); plus the pin-era execution floor (no trait/method/enum dynamics) | wolf-lang s15-revisit/s37 owners | [filed: wolf-lang#3](https://github.com/wolffe-lang/wolf-lang/issues/3) |
+| F-0003 | 2026-08-10 | Lowercase bare row tags (`none`, `done`, …) resolve in neither implementation at the raise site; API-CONVENTIONS §2 mandates lowercase pure marks — std spells `None`/`Done` interim | wolf-lang s15/resolve owners, interp counterpart | [filed: wolf-lang#4](https://github.com/wolffe-lang/wolf-lang/issues/4) |
+| F-0004 | 2026-08-10 | (contract F3) Operator↔trait bridge: `<=>` builtin-only, yields int (lupin); enum `==` refused by wolfc at resolve; no supertrait clause spells `Ord requires Eq`; bare literals default `i32` and miss `impl … for int` bounds (E0502) | wolf-lang s14/s17 owners | [filed: wolf-lang#5](https://github.com/wolffe-lang/wolf-lang/issues/5) |
+| F-0005 | 2026-08-10 | wolfc's pinned List typing: `push` typed as read receiver (X1-correct `(mut xs).push` is E0804; bare push then E1001); `.len`-then-`[i]` reads count as moves (E1001; fix-it names a `copy` operator outside the pinned grammar) — blocks `min_of`/`max_of` and every List-building wolfc lane | wolf-lang s21/s22 mem-tier owners | [filed: wolf-lang#6](https://github.com/wolffe-lang/wolf-lang/issues/6) |
+| F-0006 | 2026-08-10 | str ordering divergence: lupin runs `<`/`>` on str, wolfc rejects E0409; no byte accessor exists to define it in-library — blocks `impl Ord for str` | wolf-lang typecheck/spec owners | [filed: wolf-lang#7](https://github.com/wolffe-lang/wolf-lang/issues/7) |
+| F-0007 | 2026-08-10 | lupin pattern semantics: bare-ident patterns BIND instead of resolving in-scope variants/tags — first arm always matches (silently wrong), non-exhaustive matches run, qualified path patterns accepted though outside the pinned grammar | wolf-interp | [filed: wolf-interp#5](https://github.com/wolffe-lang/wolf-interp/issues/5) |
+| F-0008 | 2026-08-10 | (contract F1) The iterator protocol: `Iter[T]` with `next(mut self) -> T ! {done}`, the `for` desugar, range-type ownership, builtin adoption — prototyped executing in `std.iter` | wolf-lang spec/01 + s37 owners | [filed: wolf-lang#8](https://github.com/wolffe-lang/wolf-lang/issues/8) |
+| F-0009 | 2026-08-10 | (contract F4) `assert`, defined: an intrinsic, not a prelude fn (a module fn named `assert` shadows it module-wide, E0402 both implementations); the two-argument form needs arity overloading or intrinsic growth; comptime/runtime duality | wolf-lang spec comptime/forward-std owners | [filed: wolf-lang#9](https://github.com/wolffe-lang/wolf-lang/issues/9) |
 
-| F-0010 | 2026-08-11 | lupin has no std root: `use std.X` resolves nothing against a package `std/` tree (it binds the path's LAST segment and looks for a top-level package directory) — the interpreter half of F-0001, still open after wolfc closed its half with `--std-root`/`WOLF_STD`; the rig stages a flat mirror beside the real tree | wolf-interp | [filed: wolf-interp#6](https://github.com/tenseleyFlow/wolf-interp/issues/6) |
-| F-0011 | 2026-08-11 | (contract Target-1) **What is builtin and what is std**: recommendation + four gaps — `List`/`Pool` language-blessed core types with std owning their API mass; `Map`/`Set`/`Deque` std-defined once s16 lands generic data types (`struct X[T]` is E0201 in BOTH implementations today); the `Hash`/`Eq` key protocol is unspecified; `Pool` exposes no `len`/`capacity`/liveness probe/iteration; `Map` cannot erase a key; the wordcount `tally[w] += 1` idiom runs nowhere (lupin: index is not a place; absent key reads `()`, not a zero) | wolf-lang s16/s21/s37 owners | [filed: wolf-lang#11](https://github.com/tenseleyFlow/wolf-lang/issues/11) |
-| F-0012 | 2026-08-11 | wolfc checked tier: an imported module whose items include a `trait`/`enum`/`impl` makes every importer `unsupported — module items in checked execution` — so `use std.cmp` costs a module every wolfc run row, which is why std.list's `Eq` family sits in `std/x/list_eq` | wolf-lang s23/s31 (checked execution) | [filed: wolf-lang#12](https://github.com/tenseleyFlow/wolf-lang/issues/12) |
-| F-0013 | 2026-08-11 | lupin false `ub(mem.ub)` on std-shaped code, two shapes: (a) a `mut` argument inside an f-string interpolation leaves a stale borrow tag — a later read is "read through tag … which is Disabled"; (b) a `mut`-mode call followed by a read-mode call whose body ALLOCATES is "foreign write … while tag … is PROTECTED". Both are false positives in the provenance model; both are avoidable only by writing around them | wolf-interp (Tier-3 provenance) | [filed: wolf-interp#7](https://github.com/tenseleyFlow/wolf-interp/issues/7) |
-| F-0014 | 2026-08-11 | Mutate-while-iterating does not agree: wolfc rejects statically as `fail(E1001)` (reads-as-moves, F-0005's lens — not an exclusivity rule), lupin RUNS it silently with no trap at all, where `[conf.trap.map]` predicts `exclusivity`. The sprint contract's designated triage case, recorded in `tests/list/mutate_while_iterating.lu` | wolf-lang s22 + wolf-interp | [filed: wolf-lang#15](https://github.com/tenseleyFlow/wolf-lang/issues/15) + [wolf-interp#9](https://github.com/tenseleyFlow/wolf-interp/issues/9) |
-| F-0015 | 2026-08-11 | wolfc checked tier: the row RAISE path inside an imported module's function is `unsupported — module items in checked execution` — the same call runs when it yields a value, and the same body inlined into the entry file runs both ways. Every `! {None}` miss test in std.list/x.deque_int is `unsupported` for this reason alone | wolf-lang s23/s31 | [filed: wolf-lang#13](https://github.com/tenseleyFlow/wolf-lang/issues/13) |
-| F-0016 | 2026-08-11 | `wolf fmt` splits a dotted call at the dot when a `//` comment line precedes it (`xs.push(1)` becomes `xs.` + newline + `push(1)`), idempotently — fmt is law (D34), so its output is the style, and this one is a defect | wolf-lang fmt owner | [filed: wolf-lang#14](https://github.com/tenseleyFlow/wolf-lang/issues/14) |
-| F-0017 | 2026-08-11 | lupin still accepts `let` reassignment after wolf-lang#2 closed compiler-side (wolfc now says E0410 with a `var` fix-it): the interpreter half of the divergence is open | wolf-interp | [filed: wolf-interp#8](https://github.com/tenseleyFlow/wolf-interp/issues/8) |
-| F-0018 | 2026-08-12 | (sc03 Targets 1–4) **The boundary primitive is missing**: no recoverable slice (`str.get`), no byte accessor, no `chars()`/`char` type — so no scan can advance past a code point of unknown length, and 28 of sc03's 64 functions are unwritable rather than merely unimplemented; plus `^n` resolving nowhere, `str` methods `unsupported` in wolfc, `str + str` diverging | wolf-lang s37 (core types) owners | [filed: wolf-lang#17](https://github.com/tenseleyFlow/wolf-lang/issues/17) |
-| F-0019 | 2026-08-12 | (sc03 Target 4) **Decision request — the unicode tables budget**: where category/case/normalization/segmentation data lives (std recommends penumbra or `std/x`, never core), with the evidence that lupin's `lower`/`upper` ALREADY do simple Unicode case mapping and `trim`/`words` already use Unicode `White_Space` — so std had to carry a 25-entry table to agree with the builtin | wolf-lang spec/std owners | [filed: wolf-lang#18](https://github.com/tenseleyFlow/wolf-lang/issues/18) |
-| F-0020 | 2026-08-12 | `assert(cond, msg)` traps `assert` even when `cond` HOLDS (wolfc 12ae8c2) — the two-argument intrinsic wolf-lang#9 just landed ignores its condition; the one-argument form is correct; contradicts `[conf.trap.assert]`'s "silent and effect-free when the condition holds" | wolf-lang (the #9 implementation) | [filed: wolf-lang#19](https://github.com/tenseleyFlow/wolf-lang/issues/19) |
-| F-0021 | 2026-08-12 | lupin: a method call on a SLICE EXPRESSION over a binding (`d[0..1].upper()`) is `unsupported` at resolve ("does not denote a place at run time") while the same shape over a literal runs — every std.str body binds the slice first | wolf-interp | [filed: wolf-interp#10](https://github.com/tenseleyFlow/wolf-interp/issues/10) |
-| F-0022 | 2026-08-12 | lupin: `n as f64` does not convert — the value stays an int, compares equal to ints and unequal to floats, and no diagnostic appears (wolfc correctly refuses the mixed comparison E0401); `std.str.parse_float` ships a ten-branch digit→f64 table to avoid it | wolf-interp | [filed: wolf-interp#11](https://github.com/tenseleyFlow/wolf-interp/issues/11) |
-| F-0023 | 2026-08-12 | lupin, the interpreter half of wolf-lang#3 and #4 (both closed compiler-side): postfix rows in param/`let` positions are E0201, lowercase bare tags do not resolve at raise sites — **and tag resolution is LAZY**, so a `return none` on an untaken branch certifies falsely, which is how sc02's F-0003 update came to be wrong | wolf-interp | [filed: wolf-interp#12](https://github.com/tenseleyFlow/wolf-interp/issues/12) |
-| F-0024 | 2026-08-12 | `cargo test --workspace` is deterministically RED at trunk `12ae8c2` (wolf_parse `blast_radius`: 4 added diagnostics, max 3, on `corpus/comptime/norm_witness.lu`) while that sha's trunk CI run reports success — so "the last green trunk run" is not by itself a sufficient pin criterion | wolf-lang CI/parser owners | [filed: wolf-lang#20](https://github.com/tenseleyFlow/wolf-lang/issues/20) |
-| F-0025 | 2026-08-12 | Integer literals ignore their context in lupin: `INT_MIN` has NO spelling (`-9223372036854775808`, `-MAX - 1`, `0 - MAX - 1` all trap `overflow` at `i32` whatever the annotation says), `var k = 0` infers `i32`, and a cross-module `-> int` call does not type its own operator (`math.int_max() - 1` traps) — the only working shape puts a typed binding on the left | wolf-interp | [filed: wolf-interp#14](https://github.com/tenseleyFlow/wolf-interp/issues/14) |
-| F-0026 | 2026-08-12 | Capability map of the compiler's two rungs, with std's cost per refusal: the checked tier refuses every f64 literal, every `const` USE and `&`/`^`/`>>`/`\|`; the native rung refuses `const` DECLARATIONS, `List`, generics, `print` and `str` — and refuses two modules that declare a function with the same name (a real mangling bug: `std.list.len` and `std.str.len` already collide) | wolf-lang backend/checked-tier owners | [filed: wolf-lang#26](https://github.com/tenseleyFlow/wolf-lang/issues/26) |
-| F-0027 | 2026-08-12 | **Silent wrong answer**: the native rung lowers `!=` on `f64` to an ORDERED comparison, so `nan != nan` is FALSE natively and true in the interpreter (`==`, `<`, `<=`, `>`, `>=` are all correct). `x != x` is the portable NaN test and was `std.cmp.total_cmp`'s; every float inequality in std now spells `!(x == y)` | wolf-lang s28 codegen | [filed: wolf-lang#22](https://github.com/tenseleyFlow/wolf-lang/issues/22) |
-| F-0028 | 2026-08-12 | (sc04 Target 2) The pure-wolf transcendentals and the intrinsics request: 29 functions, measured ≤ 1 ulp except `cbrt` (2) and `powf` (3), bit-identical on BOTH executing lanes over 200 pinned values — plus the two asks, that the wolf source stay the semantic reference and that `sqrt` be re-derived from the hardware instruction rather than the other way round | wolf-lang s37 intrinsics / s41 llvm | [filed: wolf-lang#25](https://github.com/tenseleyFlow/wolf-lang/issues/25) |
-| F-0029 | 2026-08-12 | Cross-module enum consumption: an enum's VALUES cross a module boundary but nothing that inspects them does — variant patterns do not resolve against an imported enum (lupin), methods do not dispatch, and an enum-returning call is `unsupported` in the checked tier and has "no recorded type" natively. Blocks `sort_by`, `is_sorted_by`, `binary_search_by` — and the sorting STABILITY WITNESS, which is only observable through a comparator that ignores part of the value | wolf-lang #12's family + wolf-interp | [filed: wolf-lang#23](https://github.com/tenseleyFlow/wolf-lang/issues/23) |
-| F-0030 | 2026-08-12 | (sc04 Target 5) A range value has no bounds accessor under any spelling (`start`/`end`/`len`/`lo`/`hi`/`first`/`last` all "no member") and `range` does not resolve as a TYPE in wolfc (E0301, both rungs) — so `contains`, `len` and `clamp_to` are unwritable (only by iterating, which hangs on `0..2^63`) and `std.range` ships one function | wolf-lang s37 core types | [filed: wolf-lang#24](https://github.com/tenseleyFlow/wolf-lang/issues/24) |
-| F-0031 | 2026-08-13 | (sc05 Target 1) **The format spec means two different things**: `{x:>8}` pads under lupin and is IGNORED by wolfc, which parses the spec and prints the unpadded value — a stdout divergence with no diagnostic on either side; lupin additionally implements only `[[fill]align][width]`, refusing sign/zero-pad/precision/type as `unsupported`, and silently reads `{n:08}` as width 8 with a space fill | wolf-lang s38 (f-string lowering) + spec §7.4 owners | [filed: wolf-lang#10](https://github.com/tenseleyFlow/wolf-lang/issues/10) |
-| F-0032 | 2026-08-13 | lupin's `as` accepts an UNKNOWN target type silently: `s as int` and `s as nonsense` both pass the value through unchanged with no diagnostic, while `n as f64` converts correctly — a typo in a cast is invisible, and so is a cast the machine has no rule for | wolf-interp | [filed: wolf-interp#17](https://github.com/tenseleyFlow/wolf-interp/issues/17) |
-| F-0033 | 2026-08-13 | (sc05 Target 1) **spec §7.4 does not exist**: `FORMAT_SPEC` is in the grammar with its semantics an explicit IOU, so every question a formatter must answer is unanswered — what each spec means per builtin type, what a malformed or type-mismatched spec does, and how a USER type formats. Candidate section text filed with a running reference implementation (`std.fmt`, whose functions are the spec's worked examples) plus the **`Show` proposal** (`fmt(self, spec) -> str`) and the s38 dispatch hook it needs | wolf-lang spec owners + s38 | [filed: wolf-lang#28](https://github.com/tenseleyFlow/wolf-lang/issues/28) |
-| F-0034 | 2026-08-13 | The module namespace is FLAT at the last path segment: `std.fmt.float` cannot import `std.math.float` (lupin: "this import completes a cycle: `float` → `float`", E0303) and cannot be imported beside it (wolfc: E0306 — while lupin silently binds one of the two and drops the other). Two facades may never grow a same-named leaf, so §10's "the float family lives in its own module" pattern is unrepeatable; sc05's module is `std.fmt.decimal` because of it | wolf-lang resolve owners + wolf-interp | [filed: wolf-lang#29](https://github.com/tenseleyFlow/wolf-lang/issues/29) |
-| F-0035 | 2026-08-13 | (sc05 Targets 3-4) **The encoders have no byte type**: `std.bytes` is still 0/9 (F-0018 re-tested, unchanged), so `std.hex` and `std.base64` ship over `List[int]` with a documented 0..255 element contract — and `hex.encode(str)`, the commonest use of a hex encoder anywhere, cannot exist because nothing reads a `str`'s bytes. The same root blocks `json.parse`, `json.unescape`, `fmt.truncate_to`, and forces `json.escape`'s one refusal | wolf-lang s37 core types | [filed: wolf-lang#17](https://github.com/tenseleyFlow/wolf-lang/issues/17) (sc05 evidence on F-0018's issue) |
-| F-0036 | 2026-08-13 | **Silent wrong answer**: a row tag that shares a name with anything in the value namespace at the raise site resolves to that THING instead of raising — `-> int ! {tagmod}` inside module `tagmod` hands the caller the module value, `else` never fires and no diagnostic appears. Found three ways in one sprint (`std.hex` raising `hex`, `std.json`'s `kind` function versus its `kind` tag, and `std.fmt.decimal` nearly raising `range` beside `std.range`) | wolf-lang resolve + wolf-interp | [filed: wolf-lang#30](https://github.com/tenseleyFlow/wolf-lang/issues/30) |
-| F-0037 | 2026-08-13 | **Silent wrong answer**: a function whose return type is an ENUM and whose signature carries an error row takes the MISS path on every call — `fn id(v: Value) -> Value ! {none} { v }` raises instead of returning `v`, in one line, with no diagnostic. Blocks `json.get` and `json.at`, which were written, tested and withdrawn to reviewed contracts; until it closes, no std accessor may return an enum through a row | wolf-interp (row/enum value representation) | [filed: wolf-interp#16](https://github.com/tenseleyFlow/wolf-interp/issues/16) |
-| F-0038 | 2026-08-13 | **Absence has no literal**: a row VALUE cannot be written as an expression — `none` resolves at a raise site and nowhere else, so `f(none)` is `unsupported` — which means no doc example can call a row-taking function and `std.option`'s six ship with prose examples instead of fenced ones | wolf-lang s15/resolve owners + wolf-interp | [filed: wolf-lang#38](https://github.com/tenseleyFlow/wolf-lang/issues/38) |
-| F-0039 | 2026-08-13 | **Nested rows diverge**: `T ! {none} ! {none}` parses and EXECUTES in lupin and is `fail(E0201)` at parse in wolfc, in both return and parameter position — the grammar's `type` production admits one `!`. `std.option.flatten` is the only helper whose type needs two, so it ships from the nursery to keep the module's other four out of a rejection | wolf-lang s03 grammar + s37 | [filed: wolf-lang#34](https://github.com/tenseleyFlow/wolf-lang/issues/34) |
-| F-0040 | 2026-08-13 | **No bottom type**: a diverging `else` handler cannot typecheck generically — wolfc types an `else \|_\| { … }` block by its last expression, `assert(false)` is `()`, and the block must produce `T` (E0401). A monomorphic helper writes an unreachable dummy; a generic one has no `T` to conjure, so `std.option.expect` ships from the nursery. lupin accepts and runs it | wolf-lang s14 typecheck + spec (D30's no-unwinding makes divergence ordinary) | [filed: wolf-lang#35](https://github.com/tenseleyFlow/wolf-lang/issues/35) |
-| F-0041 | 2026-08-13 | (sc06 Target 2) **The error-set alias surface** — s15's parked amendment, filed with the measured cost: 49 `pub` signatures carry a row across 16 modules, 11 distinct shapes, 45 of them one tag and 4 of them two, and NOTHING exceeds two. Core does not need aliases yet and the filing says so; what it argues is the semantics (`error Set Name = {…}` as a transparent name, never nominal — from D30) and the io taxonomy that makes it urgent in stdc02, plus the `try`⇄Result bridge's standing dependency on s16 | wolf-lang s03 grammar + s37 (std error taxonomy owners) | [filed: wolf-lang#36](https://github.com/tenseleyFlow/wolf-lang/issues/36) |
-| F-0042 | 2026-08-13 | (sc06 Target 6) **`wolf test` must subsume this rig without rewrites** — the s39 alignment requirements, with the rig as the working reference: directive-header compatibility (`check:`/`phase:`/`conforms:` verbatim), one trap expectation per entry file as the catch mechanism, subtest naming (Go 12166), a `--json` record stream (Go 2981), the three-lane ledger as a first-class concept, and the D36 bench-format reservation so `std.bench` can land in stdc02+ without a format war | wolf-lang s39 (+ D36 owners) | [filed: wolf-lang#34](https://github.com/tenseleyFlow/wolf-lang/issues/34) |
-| F-0043 | 2026-08-14 | (sc07 Targets 1-3) **A multi-tag error row cannot be branched on at all**, which is the io tier's whole vocabulary: a bare identifier in an `else` handler BINDS instead of matching (`else \|eof\|` fires for `io` too — measured on a `-> str ! {eof, io}` raising each tag), and a payload pattern is now refused by wolfc as refutable (`E0806: this pattern can fail to match, but a binding cannot`) even for a ONE-tag row, while lupin executes it. So API-CONVENTIONS §13's own row-expectation convention (`else \|Tag(p)\|`) is a compiler rejection, `std.io.input_all` cannot tell end-of-input from a read error, and the `NotFound{path}` payload retrofit the sprint contract predicted would not help until this closes | wolf-lang s14/s15 (else-handler patterns) + wolf-interp | filing pending (evidence: `tests/errors/coarsen_and_chain.lu` held at `fail(E0806)`, `tests/fs/not_found_row.lu`) |
-| F-0044 | 2026-08-14 | (sc07 Target 1) **The fs builtin set is nine calls wide and five std functions cannot be written honestly over it**: no `read_dir` (so no directory listing at all), no byte-level read or write (so `copy_file`/`move_file` are TEXT operations that refuse a non-UTF-8 file, and a fixed-size `read` can split a code point and raise `utf8`), no atomic `rename`, no `create_dir`/`remove_dir`, no metadata (`size`, `modified`, `is_file`). Also: `denied` and `utf8` have no portable litmus, so std ships two documented tags it cannot test | wolf-lang s38 owners (the fs builtin tier) | filing pending (evidence: `std/fs/fs.lu`'s absent-inventory header) |
-| F-0045 | 2026-08-14 | (sc07 Target 1) **`fs_open` has no mode**: it opens read-only and `fs_create` truncates, so there is no append-mode open and no read-write handle. `std.fs.append_text` is therefore read-concat-write — linear in the FILE's size rather than the text's, non-atomic, and carrying a `utf8` row for the existing contents it must decode. The ask is an open-mode argument (or `fs_open_append`), and a positioned write | wolf-lang s38 owners | filing pending (evidence: `std.fs.append_text`'s doc) |
-| F-0046 | 2026-08-14 | (sc07 Target 2) **The io tier's three gaps, from writing the facade**: `conform-run` cannot inject stdin (the checked machine's `run_checked_with_input` exists but no flag reaches it), so std can witness only `eof` and `read_all`/`prompt`'s hit paths are untestable in this rig; there is no `read_all` builtin, and a line read strips the terminator, so the whole-input operation cannot be composed from `read_line` even with a working handler; and writes are infallible with no flush, so `prompt` cannot guarantee its prompt appears before the read | wolf-lang s38 + s39 (`wolf test` stdin) | filing pending (evidence: `tests/io/input_line_eof.lu`, `std/io/io.lu`'s contract for `input_all`) |
-| F-0047 | 2026-08-14 | (sc07 Target 2) **Silent wrong answer, and a name std cannot have**: a module item whose name matches an AMBIENT PRELUDE name resolves differently in the two implementations. `pub fn read_line() { read_line()? }` in `std.io` — the obvious facade — delegates to the builtin under wolfc and recurses forever under lupin (`unsupported — call depth exceeded 512 frames`), with no diagnostic on either side; the reverse case (`assert`) shadows the intrinsic module-wide in both. std renamed its reader `input_line` rather than depend on a resolution order. The ask: retire the ambient host names now that the real std surface exists (the prelude's own comment promises exactly that), and rule the shadowing question for the names that stay | wolf-lang resolve owners + wolf-interp | filing pending (evidence: `std/io/io.lu`'s naming note) |
-| F-0048 | 2026-08-14 | **The checked lane's verdict is not deterministic**: the same program, same binary, same inputs answers `exit(0)` or `unsupported — place projection outside the modelled surface` at random — measured 5 of 12 runs one way and 7 the other on `tests/str/byte_length_honesty.lu`, and reproduced on `tests/str/interpolation_interplay.lu` (2 of 136 tests, both `str`-heavy). Verdict stability is a conformance property, not a nicety: spec/06's differential protocol compares records across implementations, and this rig's ledger gate cannot express "sometimes" without the `unstable(…)` vocabulary this sprint had to add | wolf-lang s23/s31 (checked execution) | filing pending (evidence: two `unstable(run\|unsupported)` ledger rows) |
+| F-0010 | 2026-08-11 | lupin has no std root: `use std.X` resolves nothing against a package `std/` tree (it binds the path's LAST segment and looks for a top-level package directory) — the interpreter half of F-0001, still open after wolfc closed its half with `--std-root`/`WOLF_STD`; the rig stages a flat mirror beside the real tree | wolf-interp | [filed: wolf-interp#6](https://github.com/wolffe-lang/wolf-interp/issues/6) |
+| F-0011 | 2026-08-11 | (contract Target-1) **What is builtin and what is std**: recommendation + four gaps — `List`/`Pool` language-blessed core types with std owning their API mass; `Map`/`Set`/`Deque` std-defined once s16 lands generic data types (`struct X[T]` is E0201 in BOTH implementations today); the `Hash`/`Eq` key protocol is unspecified; `Pool` exposes no `len`/`capacity`/liveness probe/iteration; `Map` cannot erase a key; the wordcount `tally[w] += 1` idiom runs nowhere (lupin: index is not a place; absent key reads `()`, not a zero) | wolf-lang s16/s21/s37 owners | [filed: wolf-lang#11](https://github.com/wolffe-lang/wolf-lang/issues/11) |
+| F-0012 | 2026-08-11 | wolfc checked tier: an imported module whose items include a `trait`/`enum`/`impl` makes every importer `unsupported — module items in checked execution` — so `use std.cmp` costs a module every wolfc run row, which is why std.list's `Eq` family sits in `std/x/list_eq` | wolf-lang s23/s31 (checked execution) | [filed: wolf-lang#12](https://github.com/wolffe-lang/wolf-lang/issues/12) |
+| F-0013 | 2026-08-11 | lupin false `ub(mem.ub)` on std-shaped code, two shapes: (a) a `mut` argument inside an f-string interpolation leaves a stale borrow tag — a later read is "read through tag … which is Disabled"; (b) a `mut`-mode call followed by a read-mode call whose body ALLOCATES is "foreign write … while tag … is PROTECTED". Both are false positives in the provenance model; both are avoidable only by writing around them | wolf-interp (Tier-3 provenance) | [filed: wolf-interp#7](https://github.com/wolffe-lang/wolf-interp/issues/7) |
+| F-0014 | 2026-08-11 | Mutate-while-iterating does not agree: wolfc rejects statically as `fail(E1001)` (reads-as-moves, F-0005's lens — not an exclusivity rule), lupin RUNS it silently with no trap at all, where `[conf.trap.map]` predicts `exclusivity`. The sprint contract's designated triage case, recorded in `tests/list/mutate_while_iterating.lu` | wolf-lang s22 + wolf-interp | [filed: wolf-lang#15](https://github.com/wolffe-lang/wolf-lang/issues/15) + [wolf-interp#9](https://github.com/wolffe-lang/wolf-interp/issues/9) |
+| F-0015 | 2026-08-11 | wolfc checked tier: the row RAISE path inside an imported module's function is `unsupported — module items in checked execution` — the same call runs when it yields a value, and the same body inlined into the entry file runs both ways. Every `! {None}` miss test in std.list/x.deque_int is `unsupported` for this reason alone | wolf-lang s23/s31 | [filed: wolf-lang#13](https://github.com/wolffe-lang/wolf-lang/issues/13) |
+| F-0016 | 2026-08-11 | `wolf fmt` splits a dotted call at the dot when a `//` comment line precedes it (`xs.push(1)` becomes `xs.` + newline + `push(1)`), idempotently — fmt is law (D34), so its output is the style, and this one is a defect | wolf-lang fmt owner | [filed: wolf-lang#14](https://github.com/wolffe-lang/wolf-lang/issues/14) |
+| F-0017 | 2026-08-11 | lupin still accepts `let` reassignment after wolf-lang#2 closed compiler-side (wolfc now says E0410 with a `var` fix-it): the interpreter half of the divergence is open | wolf-interp | [filed: wolf-interp#8](https://github.com/wolffe-lang/wolf-interp/issues/8) |
+| F-0018 | 2026-08-12 | (sc03 Targets 1–4) **The boundary primitive is missing**: no recoverable slice (`str.get`), no byte accessor, no `chars()`/`char` type — so no scan can advance past a code point of unknown length, and 28 of sc03's 64 functions are unwritable rather than merely unimplemented; plus `^n` resolving nowhere, `str` methods `unsupported` in wolfc, `str + str` diverging | wolf-lang s37 (core types) owners | [filed: wolf-lang#17](https://github.com/wolffe-lang/wolf-lang/issues/17) |
+| F-0019 | 2026-08-12 | (sc03 Target 4) **Decision request — the unicode tables budget**: where category/case/normalization/segmentation data lives (std recommends penumbra or `std/x`, never core), with the evidence that lupin's `lower`/`upper` ALREADY do simple Unicode case mapping and `trim`/`words` already use Unicode `White_Space` — so std had to carry a 25-entry table to agree with the builtin | wolf-lang spec/std owners | [filed: wolf-lang#18](https://github.com/wolffe-lang/wolf-lang/issues/18) |
+| F-0020 | 2026-08-12 | `assert(cond, msg)` traps `assert` even when `cond` HOLDS (wolfc 12ae8c2) — the two-argument intrinsic wolf-lang#9 just landed ignores its condition; the one-argument form is correct; contradicts `[conf.trap.assert]`'s "silent and effect-free when the condition holds" | wolf-lang (the #9 implementation) | [filed: wolf-lang#19](https://github.com/wolffe-lang/wolf-lang/issues/19) |
+| F-0021 | 2026-08-12 | lupin: a method call on a SLICE EXPRESSION over a binding (`d[0..1].upper()`) is `unsupported` at resolve ("does not denote a place at run time") while the same shape over a literal runs — every std.str body binds the slice first | wolf-interp | [filed: wolf-interp#10](https://github.com/wolffe-lang/wolf-interp/issues/10) |
+| F-0022 | 2026-08-12 | lupin: `n as f64` does not convert — the value stays an int, compares equal to ints and unequal to floats, and no diagnostic appears (wolfc correctly refuses the mixed comparison E0401); `std.str.parse_float` ships a ten-branch digit→f64 table to avoid it | wolf-interp | [filed: wolf-interp#11](https://github.com/wolffe-lang/wolf-interp/issues/11) |
+| F-0023 | 2026-08-12 | lupin, the interpreter half of wolf-lang#3 and #4 (both closed compiler-side): postfix rows in param/`let` positions are E0201, lowercase bare tags do not resolve at raise sites — **and tag resolution is LAZY**, so a `return none` on an untaken branch certifies falsely, which is how sc02's F-0003 update came to be wrong | wolf-interp | [filed: wolf-interp#12](https://github.com/wolffe-lang/wolf-interp/issues/12) |
+| F-0024 | 2026-08-12 | `cargo test --workspace` is deterministically RED at trunk `12ae8c2` (wolf_parse `blast_radius`: 4 added diagnostics, max 3, on `corpus/comptime/norm_witness.lu`) while that sha's trunk CI run reports success — so "the last green trunk run" is not by itself a sufficient pin criterion | wolf-lang CI/parser owners | [filed: wolf-lang#20](https://github.com/wolffe-lang/wolf-lang/issues/20) |
+| F-0025 | 2026-08-12 | Integer literals ignore their context in lupin: `INT_MIN` has NO spelling (`-9223372036854775808`, `-MAX - 1`, `0 - MAX - 1` all trap `overflow` at `i32` whatever the annotation says), `var k = 0` infers `i32`, and a cross-module `-> int` call does not type its own operator (`math.int_max() - 1` traps) — the only working shape puts a typed binding on the left | wolf-interp | [filed: wolf-interp#14](https://github.com/wolffe-lang/wolf-interp/issues/14) |
+| F-0026 | 2026-08-12 | Capability map of the compiler's two rungs, with std's cost per refusal: the checked tier refuses every f64 literal, every `const` USE and `&`/`^`/`>>`/`\|`; the native rung refuses `const` DECLARATIONS, `List`, generics, `print` and `str` — and refuses two modules that declare a function with the same name (a real mangling bug: `std.list.len` and `std.str.len` already collide) | wolf-lang backend/checked-tier owners | [filed: wolf-lang#26](https://github.com/wolffe-lang/wolf-lang/issues/26) |
+| F-0027 | 2026-08-12 | **Silent wrong answer**: the native rung lowers `!=` on `f64` to an ORDERED comparison, so `nan != nan` is FALSE natively and true in the interpreter (`==`, `<`, `<=`, `>`, `>=` are all correct). `x != x` is the portable NaN test and was `std.cmp.total_cmp`'s; every float inequality in std now spells `!(x == y)` | wolf-lang s28 codegen | [filed: wolf-lang#22](https://github.com/wolffe-lang/wolf-lang/issues/22) |
+| F-0028 | 2026-08-12 | (sc04 Target 2) The pure-wolf transcendentals and the intrinsics request: 29 functions, measured ≤ 1 ulp except `cbrt` (2) and `powf` (3), bit-identical on BOTH executing lanes over 200 pinned values — plus the two asks, that the wolf source stay the semantic reference and that `sqrt` be re-derived from the hardware instruction rather than the other way round | wolf-lang s37 intrinsics / s41 llvm | [filed: wolf-lang#25](https://github.com/wolffe-lang/wolf-lang/issues/25) |
+| F-0029 | 2026-08-12 | Cross-module enum consumption: an enum's VALUES cross a module boundary but nothing that inspects them does — variant patterns do not resolve against an imported enum (lupin), methods do not dispatch, and an enum-returning call is `unsupported` in the checked tier and has "no recorded type" natively. Blocks `sort_by`, `is_sorted_by`, `binary_search_by` — and the sorting STABILITY WITNESS, which is only observable through a comparator that ignores part of the value | wolf-lang #12's family + wolf-interp | [filed: wolf-lang#23](https://github.com/wolffe-lang/wolf-lang/issues/23) |
+| F-0030 | 2026-08-12 | (sc04 Target 5) A range value has no bounds accessor under any spelling (`start`/`end`/`len`/`lo`/`hi`/`first`/`last` all "no member") and `range` does not resolve as a TYPE in wolfc (E0301, both rungs) — so `contains`, `len` and `clamp_to` are unwritable (only by iterating, which hangs on `0..2^63`) and `std.range` ships one function | wolf-lang s37 core types | [filed: wolf-lang#24](https://github.com/wolffe-lang/wolf-lang/issues/24) |
+| F-0031 | 2026-08-13 | (sc05 Target 1) **The format spec means two different things**: `{x:>8}` pads under lupin and is IGNORED by wolfc, which parses the spec and prints the unpadded value — a stdout divergence with no diagnostic on either side; lupin additionally implements only `[[fill]align][width]`, refusing sign/zero-pad/precision/type as `unsupported`, and silently reads `{n:08}` as width 8 with a space fill | wolf-lang s38 (f-string lowering) + spec §7.4 owners | [filed: wolf-lang#10](https://github.com/wolffe-lang/wolf-lang/issues/10) |
+| F-0032 | 2026-08-13 | lupin's `as` accepts an UNKNOWN target type silently: `s as int` and `s as nonsense` both pass the value through unchanged with no diagnostic, while `n as f64` converts correctly — a typo in a cast is invisible, and so is a cast the machine has no rule for | wolf-interp | [filed: wolf-interp#17](https://github.com/wolffe-lang/wolf-interp/issues/17) |
+| F-0033 | 2026-08-13 | (sc05 Target 1) **spec §7.4 does not exist**: `FORMAT_SPEC` is in the grammar with its semantics an explicit IOU, so every question a formatter must answer is unanswered — what each spec means per builtin type, what a malformed or type-mismatched spec does, and how a USER type formats. Candidate section text filed with a running reference implementation (`std.fmt`, whose functions are the spec's worked examples) plus the **`Show` proposal** (`fmt(self, spec) -> str`) and the s38 dispatch hook it needs | wolf-lang spec owners + s38 | [filed: wolf-lang#28](https://github.com/wolffe-lang/wolf-lang/issues/28) |
+| F-0034 | 2026-08-13 | The module namespace is FLAT at the last path segment: `std.fmt.float` cannot import `std.math.float` (lupin: "this import completes a cycle: `float` → `float`", E0303) and cannot be imported beside it (wolfc: E0306 — while lupin silently binds one of the two and drops the other). Two facades may never grow a same-named leaf, so §10's "the float family lives in its own module" pattern is unrepeatable; sc05's module is `std.fmt.decimal` because of it | wolf-lang resolve owners + wolf-interp | [filed: wolf-lang#29](https://github.com/wolffe-lang/wolf-lang/issues/29) |
+| F-0035 | 2026-08-13 | (sc05 Targets 3-4) **The encoders have no byte type**: `std.bytes` is still 0/9 (F-0018 re-tested, unchanged), so `std.hex` and `std.base64` ship over `List[int]` with a documented 0..255 element contract — and `hex.encode(str)`, the commonest use of a hex encoder anywhere, cannot exist because nothing reads a `str`'s bytes. The same root blocks `json.parse`, `json.unescape`, `fmt.truncate_to`, and forces `json.escape`'s one refusal | wolf-lang s37 core types | [filed: wolf-lang#17](https://github.com/wolffe-lang/wolf-lang/issues/17) (sc05 evidence on F-0018's issue) |
+| F-0036 | 2026-08-13 | **Silent wrong answer**: a row tag that shares a name with anything in the value namespace at the raise site resolves to that THING instead of raising — `-> int ! {tagmod}` inside module `tagmod` hands the caller the module value, `else` never fires and no diagnostic appears. Found three ways in one sprint (`std.hex` raising `hex`, `std.json`'s `kind` function versus its `kind` tag, and `std.fmt.decimal` nearly raising `range` beside `std.range`) | wolf-lang resolve + wolf-interp | [filed: wolf-lang#30](https://github.com/wolffe-lang/wolf-lang/issues/30) |
+| F-0037 | 2026-08-13 | **Silent wrong answer**: a function whose return type is an ENUM and whose signature carries an error row takes the MISS path on every call — `fn id(v: Value) -> Value ! {none} { v }` raises instead of returning `v`, in one line, with no diagnostic. Blocks `json.get` and `json.at`, which were written, tested and withdrawn to reviewed contracts; until it closes, no std accessor may return an enum through a row | wolf-interp (row/enum value representation) | [filed: wolf-interp#16](https://github.com/wolffe-lang/wolf-interp/issues/16) |
+| F-0038 | 2026-08-13 | **Absence has no literal**: a row VALUE cannot be written as an expression — `none` resolves at a raise site and nowhere else, so `f(none)` is `unsupported` — which means no doc example can call a row-taking function and `std.option`'s six ship with prose examples instead of fenced ones | wolf-lang s15/resolve owners + wolf-interp | [filed: wolf-lang#38](https://github.com/wolffe-lang/wolf-lang/issues/38) |
+| F-0039 | 2026-08-13 | **Nested rows diverge**: `T ! {none} ! {none}` parses and EXECUTES in lupin and is `fail(E0201)` at parse in wolfc, in both return and parameter position — the grammar's `type` production admits one `!`. `std.option.flatten` is the only helper whose type needs two, so it ships from the nursery to keep the module's other four out of a rejection | wolf-lang s03 grammar + s37 | [filed: wolf-lang#34](https://github.com/wolffe-lang/wolf-lang/issues/34) |
+| F-0040 | 2026-08-13 | **No bottom type**: a diverging `else` handler cannot typecheck generically — wolfc types an `else \|_\| { … }` block by its last expression, `assert(false)` is `()`, and the block must produce `T` (E0401). A monomorphic helper writes an unreachable dummy; a generic one has no `T` to conjure, so `std.option.expect` ships from the nursery. lupin accepts and runs it | wolf-lang s14 typecheck + spec (D30's no-unwinding makes divergence ordinary) | [filed: wolf-lang#35](https://github.com/wolffe-lang/wolf-lang/issues/35) |
+| F-0041 | 2026-08-13 | (sc06 Target 2) **The error-set alias surface** — s15's parked amendment, filed with the measured cost: 49 `pub` signatures carry a row across 16 modules, 11 distinct shapes, 45 of them one tag and 4 of them two, and NOTHING exceeds two. Core does not need aliases yet and the filing says so; what it argues is the semantics (`error Set Name = {…}` as a transparent name, never nominal — from D30) and the io taxonomy that makes it urgent in stdc02, plus the `try`⇄Result bridge's standing dependency on s16 | wolf-lang s03 grammar + s37 (std error taxonomy owners) | [filed: wolf-lang#36](https://github.com/wolffe-lang/wolf-lang/issues/36) |
+| F-0042 | 2026-08-13 | (sc06 Target 6) **`wolf test` must subsume this rig without rewrites** — the s39 alignment requirements, with the rig as the working reference: directive-header compatibility (`check:`/`phase:`/`conforms:` verbatim), one trap expectation per entry file as the catch mechanism, subtest naming (Go 12166), a `--json` record stream (Go 2981), the three-lane ledger as a first-class concept, and the D36 bench-format reservation so `std.bench` can land in stdc02+ without a format war | wolf-lang s39 (+ D36 owners) | [filed: wolf-lang#34](https://github.com/wolffe-lang/wolf-lang/issues/34) |
+| F-0043 | 2026-08-14 | (sc07 Targets 1-3) **A multi-tag error row cannot be branched on at all**, which is the io tier's whole vocabulary: a bare identifier in an `else` handler BINDS instead of matching (`else \|eof\|` fires for `io` too — measured on a `-> str ! {eof, io}` raising each tag), and a payload pattern is now refused by wolfc as refutable (`E0806: this pattern can fail to match, but a binding cannot`) even for a ONE-tag row, while lupin executes it. So API-CONVENTIONS §13's own row-expectation convention (`else \|Tag(p)\|`) is a compiler rejection, `std.io.input_all` cannot tell end-of-input from a read error, and the `NotFound{path}` payload retrofit the sprint contract predicted would not help until this closes | wolf-lang s14/s15 (else-handler patterns) + wolf-interp | [filed: wolf-lang#43](https://github.com/wolffe-lang/wolf-lang/issues/43) — half superseded by F-0052 at the sc08 pin (the `E0201` is gone, the silent wrong answer replaced it); the `E0806` half is unmoved |
+| F-0044 | 2026-08-14 | (sc07 Target 1) **The fs builtin set is nine calls wide and five std functions cannot be written honestly over it**: no `read_dir` (so no directory listing at all), no byte-level read or write (so `copy_file`/`move_file` are TEXT operations that refuse a non-UTF-8 file, and a fixed-size `read` can split a code point and raise `utf8`), no atomic `rename`, no `create_dir`/`remove_dir`, no metadata (`size`, `modified`, `is_file`). Also: `denied` and `utf8` have no portable litmus, so std ships two documented tags it cannot test | wolf-lang s38 owners (the fs builtin tier) | [filed: wolf-lang#51](https://github.com/wolffe-lang/wolf-lang/issues/51) (filed late, at sc08 — re-verified unmoved) |
+| F-0045 | 2026-08-14 | (sc07 Target 1) **`fs_open` has no mode**: it opens read-only and `fs_create` truncates, so there is no append-mode open and no read-write handle. `std.fs.append_text` is therefore read-concat-write — linear in the FILE's size rather than the text's, non-atomic, and carrying a `utf8` row for the existing contents it must decode. The ask is an open-mode argument (or `fs_open_append`), and a positioned write | wolf-lang s38 owners | [filed: wolf-lang#52](https://github.com/wolffe-lang/wolf-lang/issues/52) (filed late, at sc08 — re-verified unmoved) |
+| F-0046 | 2026-08-14 | (sc07 Target 2) **The io tier's three gaps, from writing the facade**: `conform-run` cannot inject stdin (the checked machine's `run_checked_with_input` exists but no flag reaches it), so std can witness only `eof` and `read_all`/`prompt`'s hit paths are untestable in this rig; there is no `read_all` builtin, and a line read strips the terminator, so the whole-input operation cannot be composed from `read_line` even with a working handler; and writes are infallible with no flush, so `prompt` cannot guarantee its prompt appears before the read | wolf-lang s38 + s39 (`wolf test` stdin) | its deny-warnings half is [filed: wolf-lang#49](https://github.com/wolffe-lang/wolf-lang/issues/49) with F-0053; the stdin and `read_all`/flush asks are re-verified unmoved at sc08 and still unfiled on their own |
+| F-0047 | 2026-08-14 | (sc07 Target 2) **Silent wrong answer, and a name std cannot have**: a module item whose name matches an AMBIENT PRELUDE name resolves differently in the two implementations. `pub fn read_line() { read_line()? }` in `std.io` — the obvious facade — delegates to the builtin under wolfc and recurses forever under lupin (`unsupported — call depth exceeded 512 frames`), with no diagnostic on either side; the reverse case (`assert`) shadows the intrinsic module-wide in both. std renamed its reader `input_line` rather than depend on a resolution order. The ask: retire the ambient host names now that the real std surface exists (the prelude's own comment promises exactly that), and rule the shadowing question for the names that stay | wolf-lang resolve owners + wolf-interp | [filed: wolf-lang#44](https://github.com/wolffe-lang/wolf-lang/issues/44) |
+| F-0048 | 2026-08-14 | **The checked lane's verdict is not deterministic**: the same program, same binary, same inputs answers `exit(0)` or `unsupported — place projection outside the modelled surface` at random — measured 5 of 12 runs one way and 7 the other on `tests/str/byte_length_honesty.lu`, and reproduced on `tests/str/interpolation_interplay.lu` (2 of 136 tests, both `str`-heavy). Verdict stability is a conformance property, not a nicety: spec/06's differential protocol compares records across implementations, and this rig's ledger gate cannot express "sometimes" without the `unstable(…)` vocabulary this sprint had to add | wolf-lang s23/s31 (checked execution) | [filed: wolf-lang#42](https://github.com/wolffe-lang/wolf-lang/issues/42) — **CLOSED and RETIRED at the sc08 pin** (14-for-14 deterministic on both files) |
+| F-0049 | 2026-08-15 | (sc08 Target 2) **The net builtin tier is seven calls wide, and the `timeout` tag it declares is unreachable**: `wolf_rt`'s net table implements a per-socket deadline and unit-tests it, no builtin exposes it, and the executing lane's sockets are plain blocking `std::net` sockets that never consult it — so no wolf program can arm a deadline and `accept`/`read`/`connect` block forever by construction. Also absent: `shutdown` (an orderly half-close), any address accessor beyond the LOCAL port as an `int`, byte-level read/write, UDP, and any reactor/`select` composition (X6's posture is s35's and does not reach std yet). `std.net` ships the vocabulary with the tag documented as unobservable rather than a helper that cannot work | wolf-lang s39 + s35 owners | [filed: wolf-lang#45](https://github.com/wolffe-lang/wolf-lang/issues/45) |
+| F-0050 | 2026-08-15 | (sc08 Target 3) **A line protocol over a socket needs a byte-level read, not a buffer**: the buffered half WORKS — a `str` field mutated through a `mut` parameter across a module boundary runs on both executing lanes (measured) — but filling the buffer is a byte-count `net_read`, and a chunk that ends inside a code point raises `utf8` with the bytes already consumed. So a `read_line`-over-socket is broken the moment a stream carries a non-ASCII character, and `std.net` ships the contract instead (§9's refusal-over-approximation). The ask: a read that returns bytes, or one that leaves an undecodable tail in the socket | wolf-lang s39/s37 owners | [filed: wolf-lang#46](https://github.com/wolffe-lang/wolf-lang/issues/46) |
+| F-0051 | 2026-08-15 | **A `comptime fn` cannot call across a module boundary**, so a capability module's D33 refusal cannot be witnessed through its own facade: `comptime fn probe() { net.connect(…) }` is `unsupported` at resolve rather than `E0701`, and so is a comptime call to a PURE std helper where no capability is involved — the engine has no cross-module call at this pin, and the checked record carries no reason string to say so. std's witness therefore names the builtin one level down (`tests/net/comptime_refuses.lu`) | wolf-lang s16 (CTFE engine) owners | [filed: wolf-lang#47](https://github.com/wolffe-lang/wolf-lang/issues/47) |
+| F-0052 | 2026-08-15 | **Silent wrong answer, and a three-lane divergence: a `match` inside an `else` handler matches its FIRST ARM for every tag** on wolfc's checked lane. `miss_io() else \|e\| match e { eof => "said-eof", io => "said-io", _ => … }` answers `said-eof`; swap the arms and it answers `said-io` — measured both ways, no diagnostic. lupin 0.1.5 and the native rung both discriminate CORRECTLY, so one program has two meanings across three lanes. It is F-0043's successor rather than its fix: sc07's `E0201` on the shape is gone and what replaced it is worse, because a rejection cannot ship and this can (the `E0806` on payload patterns is unmoved). It costs `std.net.read_all` and keeps `std.io.input_all` a contract: a loop that cannot tell `closed`/`eof` from `io` truncates data silently | wolf-lang s14/s15 + s23 (checked execution) | [filed: wolf-lang#48](https://github.com/wolffe-lang/wolf-lang/issues/48) |
+| F-0053 | 2026-08-15 | **The warning signal covers the ENTRY file only**, so the `--deny-warnings` gate F-0046 asked for would not see std at all: over 144 staged programs the record's `warnings` array reports only the entry's own spans, while `std/math/float/float.lu` carries 40-plus `0.0 - x` sites that W0402 diagnoses and no importing test surfaces one. `conform-run` still rejects `--deny-warnings` (re-verified at this pin; the flag exists on `wolf build`/`wolf test`). The warning system's first real catch is recorded with it: W0402 found 29 sites in two std TEST files, one of which claimed to assert the two signed zeros and asserted `+0.0` against `+0.0` | wolf-lang s67/s69 (warnings) + s39 (`wolf test` surface) | [filed: wolf-lang#49](https://github.com/wolffe-lang/wolf-lang/issues/49) |
+| F-0054 | 2026-08-15 | **The pin's own ritual gates are load-flaky**: `cargo test --workspace` and `cargo run -p xtask -- ci` each failed once at trunk `13b811f` in a clean scratch clone and each passed on re-run, both times in `wolf_rt::task::proc`'s scheduler-seam tests (`seam_observes_proc_events` missed a `ProcExit` event; `killed_proc_skips_defers_and_frees_regions` counted 0 where it wanted 1). Run alone the crate is 14-for-14 green, so the failures are timing under full-workspace parallelism — which makes a green pin a probabilistic claim and F-0024's two-gate ritual a coin flip rather than a check | wolf-lang s32/s34 (task runtime) + CI owners | [filed: wolf-lang#50](https://github.com/wolffe-lang/wolf-lang/issues/50) |
 
 ## F-0001 — the std search path
 
@@ -1414,3 +1420,295 @@ Why this is more than a flake:
 The ask: make the refusal deterministic (an iteration order over a
 `HashMap` is the usual culprit for this exact shape), and give the
 `unsupported` record's span a file so the construct can be named.
+
+## Retirements and movements at the sc08 pins
+
+The pin bump is wolf `f0da6e6` → trunk **`13b811f`** ("merge the #40 sprint:
+native str, List, and fs — the three-consumer gate opens (wave-four lane
+four, wave closed)") and lupin **0.1.4 → 0.1.5** (tag `v0.1.5`, which names
+`f0da6e6` as its own conformance pin — the lawful two-upstream drift). Both
+ritual gates were run in a clean scratch clone at the sha and both are green
+— each on its SECOND attempt, which is F-0054.
+
+This is the largest ledger movement this repo has recorded and it is almost
+all in one column: **44 rows moved, 41 of them native.**
+
+- **The native column: 23 → 64 of 136 rows** (`unsupported` → `run`, every
+  one of them). By module: `str` 8/8 of the previously dark rows, `strbuf`
+  4/4, `fs` 6/7 (the seventh is the E1001 rejection witness, already `run`),
+  `io` 2/2, `base64` 3, `fmt` 6, `hex` 3, `iter` 2, `x/deque_int` 4,
+  `errors` 1, `list` 1, `unicode` 1. #40 landed native `str`, `List` and the
+  fs/io builtin tier at once, so every refusal this repo mapped in F-0026 as
+  "the native rung refuses `str`/`List`/`print`" is gone with it, and the two
+  os modules gained a second executing lane. What still refuses natively:
+  generics and rows-over-generics (`option`, `list`'s generic family),
+  `trait`/`enum`/`impl` modules (`cmp`, `sort`, `json`), `Map`, module-level
+  `const`s, and the whole `net` tier by name.
+- **The lupin column: 114 → 116.** `fs/path_helpers.lu` runs because lupin
+  0.1.5 has the full 18-method builtin `str` set, and `io/writers_and_streams.lu`
+  runs because 0.1.5 has `eprint`/`eprint_raw`. lupin still has no `fs_*`, no
+  `read_line` and no `net_*` — by design, and it says so in the refusal.
+- **The wolfc column: 100 → 101, and the `unstable` vocabulary is retired.**
+  `str/to_strbuf_round_trip.lu` advanced, and the two `unstable(run|unsupported)`
+  rows narrowed to plain `run`: 14 consecutive runs of each file plus the rig's
+  own run, all `exit(0)`, against sc07's measured 5-of-12. **F-0048 is
+  RETIRED** (wolf-lang#42, closed upstream) and nothing in the tree carries
+  the vocabulary now — as intended, it was a truthful record of one pin and
+  not a lane.
+
+Retirements and re-verifications, each re-measured rather than assumed:
+
+- **F-0018's INTERPRETER half is RETIRED.** lupin 0.1.5 answers `find`,
+  `rfind`, `split`, `get`, `ends_with`, `strip_prefix`, `strip_suffix`,
+  `replace`, `trim_start`, `trim_end`, `count` and `bytes` — the whole s37
+  set the compiler got at the sc07 pin. Nothing in sc08 spends it, and it is
+  the biggest prize in the Phase-A census: the 30 census-blocked functions
+  that were "writable for one lane" at sc07 are now writable for BOTH, which
+  retires the question `phase-b-census.md` §5 left for the next `std.str`
+  sprint (it no longer has to choose between a narrow and a wide reading of
+  the doc-truth rule).
+- **F-0043 is HALF superseded and half unmoved — see F-0052.** The `E0201`
+  on a `match` inside an `else` handler is gone, and what replaced it is a
+  silent wrong answer on the executing lane. The `E0806` on a payload pattern
+  is exactly where sc07 left it: `tests/errors/coarsen_and_chain.lu` is still
+  `fail(E0806)` at typecheck on both compiler lanes (re-measured), so §13's
+  own row-expectation convention is still a compiler rejection and the row is
+  still held as one.
+- **F-0046 is UNMOVED on all three asks.** `conform-run` still rejects
+  `--deny-warnings` and still has no stdin flag (`--stdin=` is an unknown
+  flag), and there is still no `read_all` builtin or flush. The deny-warnings
+  signal is therefore reported the same way sc07 reported it, from the
+  record's `warnings` array — with a new caveat that is now its own finding
+  (F-0053): the array covers the entry file only.
+- **The warning system's first catch, and it was a real bug.** Over the 144
+  staged programs at this pin the `warnings` array was non-empty for two
+  files, 29 occurrences, all `W0402` ("`0.0 - x` is not negation" — the s67/s69
+  wave implementing sc04's own lesson). `tests/testing/near_and_ulps.lu`
+  claimed in its header to assert "the two signed zeros" and asserted `+0.0`
+  against `+0.0`, because `0.0 - 0.0` is `+0.0` under round-to-nearest; it now
+  writes `-0.0` and means it. `tests/fmt/decimal/parse_float_shapes.lu`'s 26
+  sites were a sentinel `-1.0` spelled the old way. After the fixes all 144
+  programs report an empty array.
+- **`wolf test` EXISTS at this pin** (s39's third target), which moves F-0042
+  from "requirements filed against an unbuilt tool" to "requirements to check
+  against a built one". Nothing in this rig switches to it: the coupling
+  doctrine is `conform-run` plus the record protocol, and a rig migration is a
+  sprint of its own.
+- **Three sc07 findings were never FILED and are now** (the house rule is that
+  a finding leaves the building): F-0044 → wolf-lang#51, F-0045 →
+  wolf-lang#52, both re-verified unmoved at this pin, and F-0046's
+  deny-warnings half rides F-0053's issue. F-0046's stdin and
+  `read_all`/flush asks are still unfiled on their own and are the next
+  sprint's to place.
+- **Retested and still open**: F-0004 (no trait dispatch anywhere), F-0011,
+  F-0012 (the checked tier's `trait`/`enum`/`impl` module ceiling — five
+  `std.cmp` rows unmoved), F-0014, F-0016 (`wolf fmt` still splits a dotted
+  call under a `//` comment — fourth sprint running), F-0025's last third,
+  F-0026 (narrowed hard by the native flip, not closed), F-0027, F-0029,
+  F-0030, F-0034, F-0035, F-0036's interpreter half, F-0037, F-0038, F-0039,
+  F-0040, F-0044, F-0045, F-0047.
+
+## F-0049 — the net builtin tier, and the deadline that exists but cannot be armed
+
+Seven builtins (`net_listen`, `net_port`, `net_accept`, `net_connect`,
+`net_read`, `net_write`, `net_close`) carry the whole of `std.net`, over the
+row vocabulary `{refused, timeout, closed, utf8, io}`. They are enough for a
+TCP echo — the module's eight tests and ten doc examples prove it on the
+checked lane — and the shape of what is missing is one theme: **nothing can
+wait with a bound, and nothing can say less than "closed" or more than "the
+local port".**
+
+- **`timeout` is declared and unreachable.** `wolf_rt`'s net table implements
+  a per-socket deadline (`set_deadline`, with its own unit tests, including
+  one named `timeout_row_reachable`), and no builtin exposes it. The
+  executing lane does not even go through that table: the checked machine
+  opens plain blocking `std::net` sockets directly, so a deadline armed by
+  some future builtin would have to be plumbed there too. Consequence for a
+  program: `accept` with no peer coming, `connect` to a black hole and `read`
+  from a silent peer all block forever, and there is no `select` at this tier
+  to race them against a timer (X6's composition story is s35's). Every
+  `std.net` signature already carries the tag, so the fix is additive — but
+  every std TEST has to be written so that the peer is the program itself,
+  which is a discipline the rig cannot enforce.
+- **No `shutdown`.** Closing the socket is the only way to tell a peer "I am
+  done sending", so a request/response protocol where the client signals
+  end-of-request by half-closing cannot be written, and `read`-to-close on
+  the other end is the only termination signal there is.
+- **No address surface beyond the local port.** `net_port` answers an `int`
+  for the local end; there is no peer address, no local address string, no
+  family. A server cannot log who connected.
+- **No byte-level read or write**, which is why `read` carries a `utf8` row
+  at all (a chunk boundary inside a code point is a miss and the bytes are
+  gone) and why the line-protocol helper is F-0050.
+- **No UDP, no name resolution as an operation.** `net_connect` hands its
+  string to the host, so a hostname WOULD resolve through the host resolver —
+  which std neither uses nor tests, because the no-external-network law is
+  absolute here.
+- **Two tags std documents and cannot test**: `timeout` (above) and `utf8`
+  (it needs a peer that writes bytes that are not UTF-8, and nothing in wolf
+  can write them — the compiler's own s39 test spawns a Rust thread to do it).
+  Both are documented per function and no test claims to have observed them.
+
+## F-0050 — a line protocol needs a byte read, not a buffer
+
+The obvious blocker for `read_line`-over-a-socket is state, and state turns
+out to be free: a public struct with a `str` field, mutated through a `mut`
+parameter across a module boundary, WORKS on both executing lanes
+(measured — `stash(mut r, text)` then two `take_line(mut r)` calls returning
+`one`/`two` and then missing, identically under lupin 0.1.5 and the checked
+tier). So a buffered reader is writable in principle.
+
+What is not writable is FILLING the buffer. Every read is a byte count over
+a `str`, and a chunk that ends inside a code point raises `utf8` with the
+bytes already consumed — so a line reader is correct only while the stream
+is ASCII, and silently loses data the moment it is not. §9's rule decides
+it: a function that is right on ASCII and corrupts on text is not a partial
+function, it is a broken one. `std.net` ships the contract in its header.
+
+The ask, in the order std would spend it: (1) a read that returns bytes
+(`net_read_bytes(fd, max) -> List[int]`, or the `Bytes` type of F-0035);
+(2) failing that, a read that leaves an undecodable tail IN the socket rather
+than consuming it, which makes a re-read with a larger `max` a correct
+recovery; (3) a `net_read_line` builtin, which is the least general and would
+still be worth having.
+
+## F-0051 — a `comptime fn` cannot call across a module boundary
+
+A capability module's D33 refusal is supposed to be witnessable: §14 requires
+every os-facing function to say that comptime refuses it, and a claim in a doc
+that nothing tests is a claim. It cannot be witnessed through the facade at
+this pin.
+
+```
+comptime fn probe() -> int ! {refused, timeout, io} {
+    net.connect("127.0.0.1:1")?      // unsupported at resolve, NOT E0701
+}
+```
+
+The same shape one level down is exactly right — a `comptime fn` calling
+`net_connect` directly is `fail(E0701)` at typecheck on both compiler rungs,
+with the catalog's "reaches the network, which comptime code can never touch"
+— so the sandbox table is doing its job and the CALL is what fails first.
+Measured with no capability involved at all: a `comptime fn` returning
+`net.endpoint("127.0.0.1", 0)`, a pure string function, is also `unsupported`
+at resolve. So this is the engine's cross-module call, not the sandbox.
+
+Two asks: make the comptime engine resolve and evaluate a std module's
+functions (pure ones at least — a comptime `fs.join` or `net.endpoint` is
+ordinary metaprogramming), and give the checked record's `unsupported`
+verdict a reason string, because at this pin the record says nothing about
+WHY and the human-readable output says nothing either.
+
+`tests/net/comptime_refuses.lu` therefore witnesses the builtin, and its
+header says so rather than implying the facade was tested.
+
+## F-0052 — a `match` in a handler matches its first arm, on the lane that executes
+
+**This is F-0043's successor, and it is worse than its predecessor, because a
+rejection cannot ship and this can.** sc07 recorded two rejections: a `match`
+inside an `else` handler was `E0201`, and a payload pattern was `E0806`. The
+first is gone at this pin and what replaced it is a silent wrong answer; the
+second is unmoved (re-measured on `tests/errors/coarsen_and_chain.lu`).
+
+```
+fn miss_io()  -> str ! {eof, io} { return io }
+fn miss_eof() -> str ! {eof, io} { return eof }
+
+miss_io()  else |e| match e { eof => "said-eof", io => "said-io", _ => "?" }
+miss_eof() else |e| match e { io => "said-io", eof => "said-eof", _ => "?" }
+```
+
+The checked lane prints `said-eof` for the first and `said-io` for the second:
+**the first arm matches whatever the tag is.** Swap the arms and the answers
+swap with them, which is the measurement that rules out any reading other than
+"a bare-identifier arm binds". No diagnostic, on either line.
+
+lupin 0.1.5 and the native rung both answer correctly (`said-io`,
+`said-eof`). So this is also a three-lane DIVERGENCE on a program every lane
+runs — the shape spec/06's differential protocol exists to catch, and the
+shape this rig's own divergence gate would fail on if the program were a test.
+It is not one: a test that passed by agreeing with the wrong answer would
+fossilize the bug, so `tests/net/closed_row.lu` deliberately contains no
+discriminating handler and says why in its header.
+
+What it costs, concretely:
+
+- **`std.net.read_all` is NOT WRITTEN.** It was written, tested and withdrawn
+  inside this sprint: the loop must stop on `closed` and re-raise
+  `timeout`/`utf8`/`io` unchanged, and on the executing lane it would take the
+  `closed` arm for every one of them — a silent truncation of a caller's
+  stream, which §14 forbids in the same words it used for `std.io.input_all`.
+- **`std.io.input_all` stays a contract** for the same reason, one sprint
+  after being blocked on the opposite problem.
+- **A tag's identity is still witnessable only by propagating it out of
+  `main`**, where the process outcome prints `error: <tag>`. Six of this
+  repo's row litmuses are written that way and none of them can be written
+  any other way.
+- **API-CONVENTIONS §13's row-expectation convention is still a rejection.**
+  `else |Tag(p)|` is still `E0806` ("this pattern can fail to match, but a
+  binding cannot") on both compiler lanes, so the convention sc06 wrote and
+  sc07 could not use is unusable for a third sprint — and this finding says
+  that even if it compiled, the arm-matching semantics beneath it would need
+  re-measuring before std leaned on them.
+
+The ask, in order: (1) resolve a bare identifier in a handler's `match` arm
+against the operand row's TAGS before treating it as a binding, which is the
+same rule wolfc already applies at a RAISE site (wolf-lang#30, closed); (2)
+failing that, diagnose the shadowing, because a pattern that silently catches
+everything is the one failure mode a reader cannot see; (3) and either way,
+make the three lanes agree — one program, one meaning.
+
+## F-0053 — the warning signal covers the entry file only
+
+The deny-warnings gate F-0046 asked for is still not available on the lane
+this repo runs (`conform-run: unknown flag --deny-warnings`, re-verified;
+the flag exists on `wolf build` and now on `wolf test`), so the signal is
+still read from the record's `warnings` array. At this pin that array turns
+out to be narrower than the claim it was used to support.
+
+Measured over all 144 staged programs (each staged exactly as the rig stages
+it: entry file plus the whole `std/` tree, `--std-root` at the staged root):
+the array reports diagnostics from the ENTRY file only. `std/math/float/float.lu`
+carries more than forty `0.0 - x` sites — deliberately, per sc04's own
+reasoning, and one of them is the literal `0.0 - 1.0` that W0402 flags 26
+times when it appears in a test — and not one importing test surfaces a
+single warning. So "the std tree is warning-clean" is not a claim this signal
+can make; "no staged ENTRY file warns" is.
+
+Recorded with it, because it is the same wave: **W0402 earned its keep on its
+first run.** `tests/testing/near_and_ulps.lu` said in its header that it
+asserted "the two signed zeros (one step apart, not zero — they are distinct
+bit patterns)" and asserted `0.0 - 0.0` against `0.0`, which is `+0.0` against
+`+0.0` — the exact wrong result sc04 wrote a guide entry about and this repo
+then committed anyway. The lint found it; the test now writes `-0.0`.
+
+Two asks: `--deny-warnings` on `conform-run` (F-0046's item, restated because
+it is now the only thing standing between this repo and a warning GATE), and
+warnings collected for every module in the staged package, not only the entry
+— a library's own source is exactly where a lint like W0402 pays.
+
+## F-0054 — the pin's ritual gates are load-flaky
+
+F-0024 gave this repo a two-gate pin ritual: `cargo test --workspace` AND
+`cargo run -p xtask -- ci`, both in a clean scratch clone at the sha. At
+`13b811f` each gate failed once and passed on re-run, and both failures were
+in the same place:
+
+- `wolf_rt::task::proc::tests::seam_observes_proc_events` — the observed
+  scheduler-event set was missing `ProcExit { kind: 2 }` (release profile, full
+  workspace run), with a `Box<dyn Any>` panic logged from `task/pool.rs:150`
+  alongside it.
+- `wolf_rt::task::proc::tests::killed_proc_skips_defers_and_frees_regions` —
+  `assert_eq!(left: 0, right: 1)` (debug profile, `xtask ci`'s test step).
+
+Run alone the crate is green 14 times out of 14 (8 single-test runs plus 6
+whole-crate runs), and the whole workspace is green on its second attempt, so
+the failures are timing under the parallelism of a full `cargo test`. That
+makes a "green trunk" claim probabilistic exactly where F-0024's lesson tried
+to make it deterministic: a pin verified by two runs that each fail ~half the
+time on a busy machine is not verified.
+
+The ask: make the proc seam tests wait on the event they assert rather than on
+elapsed time (or serialize them), so that a red gate means a red pin. This
+repo's own posture in the meantime is to state the re-run in the pin's
+`vendor/tools.toml` note rather than quietly re-running until green.
