@@ -1,0 +1,25 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.range
+//!
+//! The one function `std.range` can ship. Emptiness is decidable from
+//! iteration alone, which is why it survives where `contains`, `len` and
+//! `clamp_to` do not: those need the bounds as VALUES, and a range
+//! exposes no accessor at these pins (F-0030).
+//!
+//! Interpreter lane only — the compiler does not resolve the type
+//! `range` at all (E0301), on either rung.
+
+use std.range
+
+fn main() -> !int {
+    if range.is_empty(5..5) {} else { return 1 }
+    if range.is_empty(2..7) { return 2 }
+    if range.is_empty(7..3) {} else { return 3 }
+    if range.is_empty(0..1) { return 4 }
+    if range.is_empty(0..0) {} else { return 5 }
+    let lo = 3
+    let hi = 3
+    if range.is_empty(lo..hi) {} else { return 6 }
+    0
+}

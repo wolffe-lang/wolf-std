@@ -1,0 +1,34 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.math
+//!
+//! The miss half: every operand pair whose result leaves `int`, consumed
+//! by `else`. These are the SAME operands that make the trapping
+//! operators fault — `checked_add(int_max(), 1)` raises where
+//! `int_max() + 1` traps, which `add_overflow_trap.lu` pins as the
+//! complement.
+//!
+//! wolfc's checked tier answers `unsupported` here and runs the hit half:
+//! the row RAISE path inside an imported module is refused while the
+//! value path executes (F-0015). The native rung runs both.
+
+use std.math
+
+fn main() -> !int {
+    let miss: int = 0 - 1
+    if (math.checked_add(math.int_max(), 1) else miss) == miss {} else { return 1 }
+    if (math.checked_add(math.int_min(), 0 - 1) else miss) == miss {} else { return 2 }
+    if (math.checked_sub(math.int_min(), 1) else miss) == miss {} else { return 3 }
+    if (math.checked_sub(math.int_max(), 0 - 1) else miss) == miss {} else { return 4 }
+    if (math.checked_sub(0, math.int_min()) else miss) == miss {} else { return 5 }
+    if (math.checked_mul(math.int_max(), 2) else miss) == miss {} else { return 6 }
+    if (math.checked_mul(2, math.int_max()) else miss) == miss {} else { return 7 }
+    if (math.checked_mul(math.int_min(), 0 - 1) else miss) == miss {} else { return 8 }
+    if (math.checked_mul(0 - 1, math.int_min()) else miss) == miss {} else { return 9 }
+    if (math.checked_mul(math.int_min(), 2) else miss) == miss {} else { return 10 }
+    let big: int = 4000000000
+    if (math.checked_mul(0 - big, big) else miss) == miss {} else { return 11 }
+    if (math.checked_div(1, 0) else miss) == miss {} else { return 12 }
+    if (math.checked_div(0, 0) else miss) == miss {} else { return 13 }
+    0
+}

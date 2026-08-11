@@ -1,0 +1,60 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.math
+//!
+//! The classification and sign family, including the two values `<` and
+//! `==` cannot see: NaN (unequal to everything, itself included) and
+//! `-0.0` (equal to `+0.0` and distinguishable only through the sign of
+//! its reciprocal). Note every inequality below is spelled `!(a == b)`:
+//! the native backend lowers `!=` on `f64` to an ORDERED comparison, so
+//! `nan != nan` is false there and true elsewhere (F-0027) — a
+//! divergence this suite refuses to depend on.
+//!
+//! wolfc's checked tier refuses float literals outright ("this literal
+//! shape in checked execution"), so every float test in this tree is a
+//! lupin + native pair.
+
+use std.math.float
+
+fn main() -> !int {
+    if float.is_nan(float.nan()) {} else { return 1 }
+    if float.is_nan(0.0 / 0.0) {} else { return 2 }
+    if float.is_nan(1.0) { return 3 }
+    if float.is_nan(float.inf()) { return 4 }
+    if float.is_inf(float.inf()) {} else { return 5 }
+    if float.is_inf(float.neg_inf()) {} else { return 6 }
+    if float.is_inf(1.0e308) { return 7 }
+    if float.is_inf(float.nan()) { return 8 }
+    if float.is_finite(1.0) {} else { return 9 }
+    if float.is_finite(0.0) {} else { return 10 }
+    if float.is_finite(float.f_max()) {} else { return 11 }
+    if float.is_finite(float.inf()) { return 12 }
+    if float.is_finite(float.nan()) { return 13 }
+    if float.is_sign_negative(-1.0) {} else { return 14 }
+    if float.is_sign_negative(-0.0) {} else { return 15 }
+    if float.is_sign_negative(0.0) { return 16 }
+    if float.is_sign_negative(float.neg_inf()) {} else { return 17 }
+    if float.abs(-2.5) == 2.5 {} else { return 18 }
+    if float.abs(2.5) == 2.5 {} else { return 19 }
+    if float.is_sign_negative(float.abs(-0.0)) { return 20 }
+    if float.is_nan(float.abs(float.nan())) {} else { return 21 }
+    if float.signum(3.0) == 1.0 {} else { return 22 }
+    if float.signum(-3.0) == -1.0 {} else { return 23 }
+    if float.signum(0.0) == 0.0 {} else { return 24 }
+    if float.is_sign_negative(float.signum(-0.0)) {} else { return 25 }
+    if float.is_nan(float.signum(float.nan())) {} else { return 26 }
+    if float.copysign(3.0, -1.0) == -3.0 {} else { return 27 }
+    if float.copysign(-3.0, 1.0) == 3.0 {} else { return 28 }
+    // The zero's sign counts, which is why `copysign` cannot be written
+    // with `0.0 - x` (that answers +0.0 for both zeroes).
+    if float.copysign(3.0, -0.0) == -3.0 {} else { return 29 }
+    if float.is_sign_negative(float.copysign(0.0, -1.0)) {} else { return 30 }
+    if float.pi() == 3.141592653589793 {} else { return 31 }
+    if float.tau() == 6.283185307179586 {} else { return 32 }
+    if float.e() == 2.718281828459045 {} else { return 33 }
+    if float.epsilon() == 2.220446049250313e-16 {} else { return 34 }
+    if float.f_max() == 1.7976931348623157e308 {} else { return 35 }
+    if float.f_min() == -1.7976931348623157e308 {} else { return 36 }
+    if 1.0 + float.epsilon() > 1.0 {} else { return 37 }
+    0
+}

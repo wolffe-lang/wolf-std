@@ -1,0 +1,29 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.sort
+//!
+//! `is_sorted` on its own boundaries: empty and single lists are sorted
+//! by definition, ties are allowed (ascending is not STRICTLY
+//! ascending), and one inversion anywhere is enough to answer false.
+
+use std.sort
+
+fn main() -> !int {
+    var e = List[int]()
+    if sort.is_sorted(e) {} else { return 1 }
+    (mut e).push(1)
+    if sort.is_sorted(e) {} else { return 2 }
+    (mut e).push(1)
+    if sort.is_sorted(e) {} else { return 3 }
+    (mut e).push(2)
+    if sort.is_sorted(e) {} else { return 4 }
+    (mut e).push(0)
+    if sort.is_sorted(e) { return 5 }
+    var tail = List[int]()
+    (mut tail).push(1)
+    (mut tail).push(2)
+    (mut tail).push(3)
+    (mut tail).push(2)
+    if sort.is_sorted(tail) { return 6 }
+    0
+}

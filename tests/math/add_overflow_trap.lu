@@ -1,0 +1,13 @@
+//! check: run(exit=trap(overflow))
+//! phase: run
+//! conforms: std.math
+//!
+//! The trapping operator on the operands `checked_add` raises for: the paired half of `checked_misses.lu` line 1, proving the two forms answer the same question two ways.
+
+use std.math
+
+fn main() -> !int {
+    let hi = math.int_max()
+    let _ = hi + 1
+    0
+}

@@ -1,0 +1,50 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.math
+//!
+//! `trunc`, `floor`, `ceil`, `round` and `fract` on the cases that
+//! separate them: the negative fractions where truncation and flooring
+//! disagree, the exact halves where the documented half-away-from-zero
+//! rule differs from IEEE's own round-half-to-even, the zero signs each
+//! must preserve, and the values at and above 2^52 where every float is
+//! already an integer.
+
+use std.math.float
+
+fn main() -> !int {
+    if float.trunc(2.7) == 2.0 {} else { return 1 }
+    if float.trunc(-2.7) == -2.0 {} else { return 2 }
+    if float.trunc(2.0) == 2.0 {} else { return 3 }
+    if float.trunc(0.5) == 0.0 {} else { return 4 }
+    if float.is_sign_negative(float.trunc(-0.5)) {} else { return 5 }
+    if float.trunc(4503599627370496.0) == 4503599627370496.0 {} else { return 6 }
+    if float.trunc(1.0e300) == 1.0e300 {} else { return 7 }
+    if float.floor(2.7) == 2.0 {} else { return 8 }
+    if float.floor(-2.7) == -3.0 {} else { return 9 }
+    if float.floor(-2.0) == -2.0 {} else { return 10 }
+    if float.floor(-0.5) == -1.0 {} else { return 11 }
+    if float.ceil(2.1) == 3.0 {} else { return 12 }
+    if float.ceil(-2.1) == -2.0 {} else { return 13 }
+    if float.ceil(2.0) == 2.0 {} else { return 14 }
+    if float.ceil(0.5) == 1.0 {} else { return 15 }
+    if float.is_sign_negative(float.ceil(-0.5)) {} else { return 16 }
+    // Half away from zero — 0.5 to 1.0 and 2.5 to 3.0, where banker's
+    // rounding would answer 0.0 and 2.0.
+    if float.round(0.5) == 1.0 {} else { return 17 }
+    if float.round(-0.5) == -1.0 {} else { return 18 }
+    if float.round(2.5) == 3.0 {} else { return 19 }
+    if float.round(3.5) == 4.0 {} else { return 20 }
+    if float.round(2.4) == 2.0 {} else { return 21 }
+    if float.round(-2.6) == -3.0 {} else { return 22 }
+    if float.is_sign_negative(float.round(-0.4)) {} else { return 23 }
+    if float.fract(2.75) == 0.75 {} else { return 24 }
+    if float.fract(-2.75) == -0.75 {} else { return 25 }
+    if float.fract(3.0) == 0.0 {} else { return 26 }
+    if float.is_nan(float.fract(float.inf())) {} else { return 27 }
+    // Infinities and NaN survive every rounding untouched.
+    if float.trunc(float.inf()) == float.inf() {} else { return 28 }
+    if float.floor(float.neg_inf()) == float.neg_inf() {} else { return 29 }
+    if float.is_nan(float.ceil(float.nan())) {} else { return 30 }
+    if float.is_nan(float.round(float.nan())) {} else { return 31 }
+    0
+}

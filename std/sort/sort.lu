@@ -1,0 +1,421 @@
+//! member: true
+//!
+//! std.sort — ordering a `List` in place. Stability tier: core.
+//!
+//! **One algorithm: bottom-up stable merge sort**, O(n log n) comparisons
+//! and O(n) scratch, stable by construction (a tie takes from the left
+//! run). It is not a hybrid and does not degrade to insertion sort on
+//! short runs — the constant-factor work belongs to s44's bench tracks,
+//! and a second algorithm would need a second stability proof.
+//!
+//! The scratch is a fresh `List` per pass rather than in-place swapping:
+//! index assignment (`xs[i] = v`) executes on one implementation only,
+//! and `std.list.swap` rebuilds the whole list per call (O(n) a swap), so
+//! the merge that allocates is the FASTER of the two available shapes as
+//! well as the more portable one. Region-scratch placement (`.in(r)`) is
+//! s37's plumbing, named here, not shipped.
+//!
+//! **Monomorphic and generic, and why each is which.** `sort_ints`,
+//! `sort_floats` and `sort_strs` are the contract's monomorphic
+//! conveniences and they RUN. `sort` and `sort_by` are the generic
+//! targets: `sort[T: Ord]` needs `Ord.cmp` dispatch, which executes in
+//! neither implementation, and `sort_by`'s `Ordering` result cannot be
+//! examined outside the module that declares the enum (F-0029) — so both
+//! ship as bodies that pass the static ladder and are `unsupported` at
+//! the run rung, with their tests ledgered honestly. `is_sorted` and
+//! `is_sorted_by` go the other way and ship monomorphic over `int`: a
+//! predicate with no running witness proves nothing, and these two are
+//! the witnesses `sort_ints`'s tests use.
+//!
+//! Reversal composes rather than multiplying the API: sort ascending and
+//! call `std.list.reverse`, or pass a comparator that swaps its
+//! arguments (`sort_by(mut xs, reverse_cmp)`); there is no `sort_desc`.
+//!
+//! **Bench kernels (D5/D36, report-only).** The three registered
+//! candidates for s44's T1 perf suite are `sort_ints` over 1e5 random
+//! ints, `sort_ints` over a sorted run of the same length (the
+//! adversarial case a merge sort should win), and
+//! `std.search.binary_search` over 1e6 elements. They are NAMED here
+//! rather than registered: the s44 registry does not exist yet and this
+//! repository cannot write into it, so the closeout carries the handoff.
+//!
+//! BLOCKED(c05), named and bodiless: `sort_by_key`, `sort_unstable`,
+//! `sort_dedup`. The first waits on closures (a key extractor is a
+//! closure in every real use); the second waits on a second algorithm
+//! earning its place; the third belongs to whichever sprint gives
+//! `std.list.dedup` an `Eq` bound that dispatches.
+
+use std.cmp
+
+/// Sorts `xs` ascending in place, stably. Total: no error row, no traps
+/// (element comparison is `Ord.cmp`, which is total by its own law).
+///
+/// Does not execute at these pins — `Ord.cmp` dispatch is
+/// `unsupported` in both implementations (F-0002) — and the running
+/// witnesses are `sort_ints`, `sort_floats` and `sort_strs`, which share
+/// this merge's shape line for line. Example is prose for the same
+/// reason: a fenced block must run.
+pub fn sort[T: cmp.Ord](mut xs: List[T]) {
+    let n = xs.len
+    if n < 2 {
+        return
+    }
+    var src = xs
+    var width = 1
+    while width < n {
+        var out = List[T]()
+        var i = 0
+        while i < n {
+            var mid = i + width
+            if mid > n {
+                mid = n
+            }
+            var end = mid + width
+            if end > n {
+                end = n
+            }
+            var a = i
+            var b = mid
+            while a < mid {
+                var take_right = false
+                if b < end {
+                    take_right = cmp.Ord.cmp(src[b], src[a]).is_lt()
+                }
+                if take_right {
+                    (mut out).push(src[b])
+                    b = b + 1
+                } else {
+                    (mut out).push(src[a])
+                    a = a + 1
+                }
+            }
+            while b < end {
+                (mut out).push(src[b])
+                b = b + 1
+            }
+            i = end
+        }
+        src = out
+        width = width + width
+    }
+    xs = src
+}
+
+/// Sorts `xs` ascending in place, stably, ordering by `by` rather than
+/// by `Ord`. `by` must be a total order or the result is merely a
+/// permutation — std cannot check that and does not pretend to.
+///
+/// The comparator is a NAMED function today (`sort_by(mut xs, by_age)`);
+/// closures arrive with c05 and change no signature here. Does not
+/// execute at these pins: an `Ordering` produced by an imported module
+/// cannot be examined by this one (F-0029). Prose, not a fenced example,
+/// for that reason.
+pub fn sort_by[T](mut xs: List[T], by: fn(T, T) -> cmp.Ordering) {
+    let n = xs.len
+    if n < 2 {
+        return
+    }
+    var src = xs
+    var width = 1
+    while width < n {
+        var out = List[T]()
+        var i = 0
+        while i < n {
+            var mid = i + width
+            if mid > n {
+                mid = n
+            }
+            var end = mid + width
+            if end > n {
+                end = n
+            }
+            var a = i
+            var b = mid
+            while a < mid {
+                var take_right = false
+                if b < end {
+                    take_right = by(src[b], src[a]).is_lt()
+                }
+                if take_right {
+                    (mut out).push(src[b])
+                    b = b + 1
+                } else {
+                    (mut out).push(src[a])
+                    a = a + 1
+                }
+            }
+            while b < end {
+                (mut out).push(src[b])
+                b = b + 1
+            }
+            i = end
+        }
+        src = out
+        width = width + width
+    }
+    xs = src
+}
+
+/// Sorts a list of `int` ascending, in place, stably. O(n log n)
+/// comparisons, O(n) scratch. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(3)
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// sort.sort_ints(mut xs)
+/// xs[0] == 1
+/// xs[1] == 2
+/// xs[2] == 3
+/// ```
+pub fn sort_ints(mut xs: List[int]) {
+    let n = xs.len
+    if n < 2 {
+        return
+    }
+    var src = xs
+    var width = 1
+    while width < n {
+        var out = List[int]()
+        var i = 0
+        while i < n {
+            var mid = i + width
+            if mid > n {
+                mid = n
+            }
+            var end = mid + width
+            if end > n {
+                end = n
+            }
+            var a = i
+            var b = mid
+            while a < mid {
+                var take_right = false
+                if b < end {
+                    // Strictly-less is what makes the merge stable: an
+                    // equal pair keeps the left run's element first.
+                    take_right = src[b] < src[a]
+                }
+                if take_right {
+                    (mut out).push(src[b])
+                    b = b + 1
+                } else {
+                    (mut out).push(src[a])
+                    a = a + 1
+                }
+            }
+            while b < end {
+                (mut out).push(src[b])
+                b = b + 1
+            }
+            i = end
+        }
+        src = out
+        width = width + width
+    }
+    xs = src
+}
+
+/// True when `a` precedes `b` under IEEE totalOrder — the order
+/// `std.cmp.total_cmp` defines and `std.cmp`'s `Ord for f64` adopts:
+/// -inf < negative reals < -0.0 < +0.0 < positive reals < +inf < NaN.
+///
+/// It is spelled here rather than delegated because an `Ordering`
+/// crossing a module boundary cannot be examined at these pins (F-0029);
+/// `tests/sort/float_total_order.lu` pins the resulting sequence so a
+/// divergence from `std.cmp` fails CI instead of drifting.
+fn total_lt(a: f64, b: f64) -> bool {
+    let a_nan = !(a == a)
+    let b_nan = !(b == b)
+    if a_nan {
+        return false
+    }
+    if b_nan {
+        return true
+    }
+    if a < b {
+        return true
+    }
+    if b < a {
+        return false
+    }
+    // Numerically equal: only the zeroes can still differ, and their
+    // sign is observable through division.
+    if a == 0.0 {
+        if 1.0 / a < 0.0 {
+            return 0.0 < 1.0 / b
+        }
+    }
+    false
+}
+
+/// Sorts a list of `f64` ascending, in place, stably, under IEEE
+/// totalOrder (see `total_lt`): every NaN lands at the end and `-0.0`
+/// sorts strictly below `+0.0`. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[f64]()
+/// (mut xs).push(2.5)
+/// (mut xs).push(-1.0)
+/// (mut xs).push(0.0)
+/// sort.sort_floats(mut xs)
+/// xs[0] == -1.0
+/// xs[1] == 0.0
+/// xs[2] == 2.5
+/// ```
+pub fn sort_floats(mut xs: List[f64]) {
+    let n = xs.len
+    if n < 2 {
+        return
+    }
+    var src = xs
+    var width = 1
+    while width < n {
+        var out = List[f64]()
+        var i = 0
+        while i < n {
+            var mid = i + width
+            if mid > n {
+                mid = n
+            }
+            var end = mid + width
+            if end > n {
+                end = n
+            }
+            var a = i
+            var b = mid
+            while a < mid {
+                var take_right = false
+                if b < end {
+                    take_right = total_lt(src[b], src[a])
+                }
+                if take_right {
+                    (mut out).push(src[b])
+                    b = b + 1
+                } else {
+                    (mut out).push(src[a])
+                    a = a + 1
+                }
+            }
+            while b < end {
+                (mut out).push(src[b])
+                b = b + 1
+            }
+            i = end
+        }
+        src = out
+        width = width + width
+    }
+    xs = src
+}
+
+/// Sorts a list of `str` ascending, in place, stably, in the language's
+/// byte-lexicographic order (`[mem.str.order]`): unsigned byte compare,
+/// shorter first on a shared prefix, so every multi-byte code point
+/// sorts above every ASCII one. That is NOT alphabetical order in any
+/// human language and this module does not pretend it is — collation is
+/// a table question (F-0019) and belongs where the tables land.
+///
+/// Total: no error row, no traps. Runs on the interpreter only at these
+/// pins: `<` on `str` is `unsupported` in wolfc's checked tier and in
+/// the native rung's string lowering (F-0018's family).
+///
+/// ```wolf-doc-example
+/// var xs = List[str]()
+/// (mut xs).push("pear")
+/// (mut xs).push("apple")
+/// sort.sort_strs(mut xs)
+/// xs[0] == "apple"
+/// xs[1] == "pear"
+/// ```
+pub fn sort_strs(mut xs: List[str]) {
+    let n = xs.len
+    if n < 2 {
+        return
+    }
+    var src = xs
+    var width = 1
+    while width < n {
+        var out = List[str]()
+        var i = 0
+        while i < n {
+            var mid = i + width
+            if mid > n {
+                mid = n
+            }
+            var end = mid + width
+            if end > n {
+                end = n
+            }
+            var a = i
+            var b = mid
+            while a < mid {
+                var take_right = false
+                if b < end {
+                    take_right = src[b] < src[a]
+                }
+                if take_right {
+                    (mut out).push(src[b])
+                    b = b + 1
+                } else {
+                    (mut out).push(src[a])
+                    a = a + 1
+                }
+            }
+            while b < end {
+                (mut out).push(src[b])
+                b = b + 1
+            }
+            i = end
+        }
+        src = out
+        width = width + width
+    }
+    xs = src
+}
+
+/// True when `xs` is in ascending order (ties allowed). The empty list
+/// and every one-element list are sorted. Total: no error row, no traps.
+///
+/// Monomorphic over `int` at these pins — see the module header for why
+/// the predicates go one way and the sorts the other.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(1)
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// sort.is_sorted(xs) == true
+/// ```
+pub fn is_sorted(xs: List[int]) -> bool {
+    let n = xs.len
+    var i = 1
+    while i < n {
+        if xs[i] < xs[i - 1] {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+/// True when `xs` is in ascending order under `by` (ties allowed).
+/// Total: no error row, no traps.
+///
+/// The comparator answers `std.cmp.Ordering`, so this function's own
+/// examination of that answer is a cross-module `Ordering` read and does
+/// not execute at these pins (F-0029); the static ladder is clean and
+/// the test is ledgered `unsupported` on both lanes. Prose, not a fenced
+/// example, for that reason.
+pub fn is_sorted_by(xs: List[int], by: fn(int, int) -> cmp.Ordering) -> bool {
+    let n = xs.len
+    var i = 1
+    while i < n {
+        if by(xs[i], xs[i - 1]).is_lt() {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}

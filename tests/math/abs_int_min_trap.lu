@@ -1,0 +1,13 @@
+//! check: run(exit=trap(overflow))
+//! phase: run
+//! conforms: std.math
+//!
+//! `abs(int_min())` has no `int` answer, so it traps `overflow` — the X3 fault, not a row. The complement of `checked_mul(int_min(), -1)`'s miss.
+
+use std.math
+
+fn main() -> !int {
+    let n = math.int_min()
+    let _ = math.abs(n)
+    0
+}

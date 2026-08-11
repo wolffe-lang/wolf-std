@@ -1,0 +1,12 @@
+//! check: run(exit=trap(overflow))
+//! phase: run
+//! conforms: std.math
+//!
+//! `lcm` is documented as checked: a multiple that leaves `int` traps.
+
+use std.math
+
+fn main() -> !int {
+    let _ = math.lcm(4611686018427387904, 3)
+    0
+}

@@ -1,0 +1,63 @@
+//! member: true
+//!
+//! std.range — operations over the language's `a..b`. Stability tier:
+//! core.
+//!
+//! **Three of the contract's four functions are BLOCKED, and the reason
+//! is one missing thing: a range value has no bounds accessor.** At
+//! these pins a `range[int]` can be constructed (`2..7`), passed to a
+//! function, and iterated by `for` — and nothing else. `r.start`,
+//! `r.end`, `r.len`, `r.lo`, `r.hi`, `r.first`, `r.last` all answer
+//! "a range has no member" in the interpreter, and the type `range` does
+//! not resolve at all in the compiler (E0301). Filed as F-0030.
+//!
+//! What that costs, precisely:
+//!
+//! - `contains(r, x) -> bool` — writable only by iterating, which is
+//!   O(len) where the operation is O(1), and a *hang* rather than an
+//!   answer on `0..9223372036854775807`. std does not ship a function
+//!   that is right on small inputs and fatal on legal ones (sc03's
+//!   refusal-over-approximation rule, §9).
+//! - `len(r) -> int` — same, and worse: counting to 2^63 is not an
+//!   implementation of `len`.
+//! - `clamp_to(r, x) -> int` — needs both bounds as values; there is no
+//!   spelling at all.
+//!
+//! `is_empty(r)` survives because emptiness is decidable in O(1) from
+//! iteration alone: a range is empty exactly when its iterator yields
+//! nothing, and `for` plus an early `return` asks that question without
+//! consuming the range. It is the only function here, and it is the
+//! demonstration that the other three are blocked by an accessor rather
+//! than by iteration.
+//!
+//! The reviewed signatures, for the sprint that lands them:
+//! `contains(r: range[int], x: int) -> bool`,
+//! `len(r: range[int]) -> int`,
+//! `clamp_to(r: range[int], x: int) -> int`. `rev()` and `step_by()`
+//! remain BLOCKED on the iterator combinator surface (F-0008's
+//! successor); note that the combinator that truncates a sequence is
+//! named `limit(n)`, never `take(n)` — `take` is the ownership mode that
+//! CONSUMES its operand, and a combinator that does not consume would be
+//! a false friend at the centre of the ownership story (wolf-lang#16,
+//! recorded in API-CONVENTIONS §10).
+//!
+//! Runs on the interpreter only: the compiler does not resolve the type
+//! `range` at either rung, so every test here is a lupin lane and the
+//! ledger says so. The single function's example is prose rather than a
+//! fenced block for exactly that reason — a fenced example must reach
+//! `exit(0)` or an honest `unsupported`, and a static rejection is a doc
+//! bug by §4.
+
+/// True when `r` yields no values — `5..5` and `7..3` are empty, `2..7`
+/// is not. O(1): the loop body runs at most once. Total: no error row,
+/// no traps.
+///
+/// Example (prose; see the module header for why it is not a fenced
+/// block): `range.is_empty(5..5)` is true and `range.is_empty(2..7)` is
+/// false.
+pub fn is_empty(r: range[int]) -> bool {
+    for _ in r {
+        return false
+    }
+    true
+}

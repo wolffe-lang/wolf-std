@@ -1,0 +1,38 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.search
+//!
+//! Binary search's hit half, on the boundaries that off-by-one errors
+//! live at: the first element, the last element, a single-element list,
+//! and a run of duplicates (where the index is unspecified but the VALUE
+//! at it is not — which is exactly what the contract promises and what
+//! this test asserts).
+
+use std.search
+
+fn main() -> !int {
+    var xs = List[int]()
+    (mut xs).push(10)
+    (mut xs).push(20)
+    (mut xs).push(30)
+    (mut xs).push(40)
+    (mut xs).push(50)
+    if (search.binary_search(xs, 10) else 0 - 1) == 0 {} else { return 1 }
+    if (search.binary_search(xs, 50) else 0 - 1) == 4 {} else { return 2 }
+    if (search.binary_search(xs, 30) else 0 - 1) == 2 {} else { return 3 }
+    if (search.binary_search(xs, 20) else 0 - 1) == 1 {} else { return 4 }
+    if (search.binary_search(xs, 40) else 0 - 1) == 3 {} else { return 5 }
+    var one = List[int]()
+    (mut one).push(7)
+    if (search.binary_search(one, 7) else 0 - 1) == 0 {} else { return 6 }
+    // Duplicates: the index is unspecified, the value at it is not.
+    var dups = List[int]()
+    (mut dups).push(1)
+    (mut dups).push(2)
+    (mut dups).push(2)
+    (mut dups).push(2)
+    (mut dups).push(3)
+    let at = search.binary_search(dups, 2) else 0 - 1
+    if dups[at] == 2 {} else { return 7 }
+    0
+}

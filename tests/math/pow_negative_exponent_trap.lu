@@ -1,0 +1,12 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.math
+//!
+//! A negative exponent has no integer power, so `pow` traps `assert`: the caller's contract is broken, not the value's (API-CONVENTIONS §2's trap rule).
+
+use std.math
+
+fn main() -> !int {
+    let _ = math.pow(2, 0 - 1)
+    0
+}

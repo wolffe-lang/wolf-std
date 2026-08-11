@@ -1,0 +1,35 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.sort
+//!
+//! `sort_strs` in the language's byte-lexicographic order
+//! (`[mem.str.order]`): shorter first on a shared prefix, and every
+//! multi-byte code point above every ASCII one — which is emphatically
+//! not alphabetical order, as "Zebra" before "apple" shows. Collation
+//! needs the tables F-0019 asks about; this is the order the language
+//! defines and the only one std promises.
+//!
+//! Interpreter lane only: `<` on `str` is `unsupported` in wolfc's
+//! checked tier ("ordering outside integers") and in the native rung's
+//! string lowering.
+
+use std.sort
+
+fn main() -> !int {
+    var xs = List[str]()
+    (mut xs).push("wolves")
+    (mut xs).push("apple")
+    (mut xs).push("Zebra")
+    (mut xs).push("wolf")
+    (mut xs).push("é")
+    (mut xs).push("")
+    sort.sort_strs(mut xs)
+    if xs[0] == "" {} else { return 1 }
+    if xs[1] == "Zebra" {} else { return 2 }
+    if xs[2] == "apple" {} else { return 3 }
+    if xs[3] == "wolf" {} else { return 4 }
+    if xs[4] == "wolves" {} else { return 5 }
+    if xs[5] == "é" {} else { return 6 }
+    if xs.len == 6 {} else { return 7 }
+    0
+}

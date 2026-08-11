@@ -1,0 +1,92 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.sort
+//!
+//! The shapes that break naive sorts: already sorted, exactly reversed,
+//! all-equal, dup-heavy, single, empty, and two elements each way. Every
+//! case is checked against `is_sorted` AND against its expected content,
+//! because a "sort" that returns the empty list passes the first check
+//! alone.
+
+use std.sort
+
+fn build(n: int) -> List[int] {
+    var xs = List[int]()
+    var i = 0
+    while i < n {
+        (mut xs).push(i)
+        i = i + 1
+    }
+    xs
+}
+
+fn main() -> !int {
+    // Empty and single are the boundary the merge's `n < 2` guard names.
+    var e = List[int]()
+    sort.sort_ints(mut e)
+    if e.len == 0 {} else { return 1 }
+    if sort.is_sorted(e) {} else { return 2 }
+    var one = List[int]()
+    (mut one).push(7)
+    sort.sort_ints(mut one)
+    if one.len == 1 {} else { return 3 }
+    if one[0] == 7 {} else { return 4 }
+    // Already ascending: a merge sort must not disturb it.
+    var asc = build(8)
+    sort.sort_ints(mut asc)
+    if sort.is_sorted(asc) {} else { return 5 }
+    if asc[0] == 0 {} else { return 6 }
+    if asc[7] == 7 {} else { return 7 }
+    // Exactly reversed.
+    var desc = List[int]()
+    var i = 8
+    while i > 0 {
+        (mut desc).push(i)
+        i = i - 1
+    }
+    sort.sort_ints(mut desc)
+    if sort.is_sorted(desc) {} else { return 8 }
+    if desc[0] == 1 {} else { return 9 }
+    if desc[7] == 8 {} else { return 10 }
+    // All equal, and dup-heavy with a spread of three values.
+    var same = List[int]()
+    var j = 0
+    while j < 6 {
+        (mut same).push(4)
+        j = j + 1
+    }
+    sort.sort_ints(mut same)
+    if sort.is_sorted(same) {} else { return 11 }
+    if same.len == 6 {} else { return 12 }
+    if same[5] == 4 {} else { return 13 }
+    var dups = List[int]()
+    var k = 0
+    while k < 9 {
+        (mut dups).push(k % 3)
+        k = k + 1
+    }
+    sort.sort_ints(mut dups)
+    if sort.is_sorted(dups) {} else { return 14 }
+    if dups[0] == 0 {} else { return 15 }
+    if dups[2] == 0 {} else { return 16 }
+    if dups[3] == 1 {} else { return 17 }
+    if dups[8] == 2 {} else { return 18 }
+    // An odd length that exercises a short tail run in every pass, with
+    // negative values so the comparison is not accidentally unsigned.
+    var mixed = List[int]()
+    (mut mixed).push(5)
+    (mut mixed).push(0 - 3)
+    (mut mixed).push(9)
+    (mut mixed).push(0)
+    (mut mixed).push(0 - 3)
+    (mut mixed).push(2)
+    (mut mixed).push(1)
+    sort.sort_ints(mut mixed)
+    if sort.is_sorted(mixed) {} else { return 19 }
+    if mixed[0] == 0 - 3 {} else { return 20 }
+    if mixed[1] == 0 - 3 {} else { return 21 }
+    if mixed[2] == 0 {} else { return 22 }
+    if mixed[6] == 9 {} else { return 23 }
+    if mixed.len == 7 {} else { return 24 }
+    0
+}

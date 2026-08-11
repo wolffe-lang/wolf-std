@@ -1,0 +1,58 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.math
+//!
+//! sin/cos/tan and the inverse family, pinned exactly. The interesting
+//! cases are the reduction's: `sin(1000.0)` needs three pieces of pi/2
+//! to stay accurate (a one-piece split is 300 ulp out here), and
+//! `tan(pi/2)` answers the enormous correctly-rounded value for the
+//! argument actually given rather than an infinity, because the pi/2
+//! that reaches the function is not pi/2.
+
+use std.math.float
+
+fn main() -> !int {
+    if float.sin(0.0) == 0.0 {} else { return 1 }
+    if float.sin(1.0) == 0.8414709848078965 {} else { return 2 }
+    if float.sin(-1.0) == -0.8414709848078965 {} else { return 3 }
+    if float.sin(1000.0) == 0.8268795405320026 {} else { return 4 }
+    if float.is_nan(float.sin(float.inf())) {} else { return 5 }
+    if float.is_nan(float.sin(float.nan())) {} else { return 6 }
+    if float.abs(float.sin(float.pi())) < 1.0e-15 {} else { return 7 }
+    if float.cos(0.0) == 1.0 {} else { return 8 }
+    if float.cos(1.0) == 0.5403023058681398 {} else { return 9 }
+    if float.cos(-1.0) == float.cos(1.0) {} else { return 10 }
+    if float.cos(1000.0) == 0.5623790762907029 {} else { return 11 }
+    if float.is_nan(float.cos(float.inf())) {} else { return 12 }
+    if float.tan(0.0) == 0.0 {} else { return 13 }
+    if float.tan(1.0) == 1.557407724654902 {} else { return 14 }
+    if float.is_nan(float.tan(float.nan())) {} else { return 15 }
+    if float.atan(0.0) == 0.0 {} else { return 16 }
+    if float.atan(1.0) == 0.7853981633974483 {} else { return 17 }
+    if float.atan(-1.0) == -0.7853981633974483 {} else { return 18 }
+    if float.atan(float.inf()) == 1.5707963267948966 {} else { return 19 }
+    if float.atan(float.neg_inf()) == -1.5707963267948966 {} else { return 20 }
+    if float.asin(0.0) == 0.0 {} else { return 21 }
+    if float.asin(1.0) == 1.5707963267948966 {} else { return 22 }
+    if float.asin(-1.0) == -1.5707963267948966 {} else { return 23 }
+    if float.asin(0.5) == 0.5235987755982988 {} else { return 24 }
+    if float.is_nan(float.asin(2.0)) {} else { return 25 }
+    if float.acos(1.0) == 0.0 {} else { return 26 }
+    if float.acos(0.0) == 1.5707963267948966 {} else { return 27 }
+    if float.acos(-1.0) == 3.141592653589793 {} else { return 28 }
+    if float.is_nan(float.acos(-2.0)) {} else { return 29 }
+    // atan2's quadrants and the IEEE special cases, sign of zero
+    // included.
+    if float.atan2(0.0, 1.0) == 0.0 {} else { return 30 }
+    if float.atan2(1.0, 1.0) == 0.7853981633974483 {} else { return 31 }
+    if float.atan2(1.0, -1.0) == 2.356194490192345 {} else { return 32 }
+    if float.atan2(-1.0, -1.0) == -2.356194490192345 {} else { return 33 }
+    if float.atan2(1.0, 0.0) == 1.5707963267948966 {} else { return 34 }
+    if float.atan2(-1.0, 0.0) == -1.5707963267948966 {} else { return 35 }
+    if float.atan2(0.0, -1.0) == 3.141592653589793 {} else { return 36 }
+    if float.atan2(-0.0, -1.0) == -3.141592653589793 {} else { return 37 }
+    if float.atan2(float.inf(), float.inf()) == 0.7853981633974483 {} else { return 38 }
+    if float.atan2(float.inf(), float.neg_inf()) == 2.356194490192345 {} else { return 39 }
+    if float.is_nan(float.atan2(float.nan(), 1.0)) {} else { return 40 }
+    0
+}

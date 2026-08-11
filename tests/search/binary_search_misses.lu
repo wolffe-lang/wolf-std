@@ -1,0 +1,31 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.search
+//!
+//! The miss half: absent values below, above and between the elements,
+//! plus the empty list. `None` is consumed by `else` — no function here
+//! returns -1 to mean "absent" (§8).
+//!
+//! wolfc's checked tier answers `unsupported`: a row RAISE inside an
+//! imported module is refused there while the value path runs (F-0015).
+
+use std.search
+
+fn main() -> !int {
+    let miss: int = 0 - 1
+    var xs = List[int]()
+    (mut xs).push(10)
+    (mut xs).push(20)
+    (mut xs).push(30)
+    if (search.binary_search(xs, 5) else miss) == miss {} else { return 1 }
+    if (search.binary_search(xs, 15) else miss) == miss {} else { return 2 }
+    if (search.binary_search(xs, 25) else miss) == miss {} else { return 3 }
+    if (search.binary_search(xs, 35) else miss) == miss {} else { return 4 }
+    var e = List[int]()
+    if (search.binary_search(e, 1) else miss) == miss {} else { return 5 }
+    if (search.min_of(e) else miss) == miss {} else { return 6 }
+    if (search.max_of(e) else miss) == miss {} else { return 7 }
+    if (search.min_index(e) else miss) == miss {} else { return 8 }
+    if (search.max_index(e) else miss) == miss {} else { return 9 }
+    0
+}

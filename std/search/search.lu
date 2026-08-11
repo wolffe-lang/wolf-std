@@ -1,0 +1,328 @@
+//! member: true
+//!
+//! std.search — finding things in a sorted `List`, and the reductions
+//! that scan an unsorted one. Stability tier: core.
+//!
+//! **Sortedness is the caller's contract, not a checked precondition.**
+//! `binary_search`, `lower_bound`, `upper_bound` and `equal_range` all
+//! assume `xs` is ascending; on an unsorted list they answer *something*
+//! rather than trapping, because verifying the precondition costs more
+//! than the search does. `std.sort.is_sorted` is the check, and the docs
+//! say to call it in a debug path if you cannot prove it.
+//!
+//! **Absence is a row, never a sentinel** (§2, §8): a miss raises `None`
+//! and no function here returns -1. `lower_bound` and `upper_bound` are
+//! the total complements — an insertion POSITION always exists, so they
+//! return a plain `int`.
+//!
+//! **Monomorphic over `int` at these pins.** The reviewed generic
+//! signatures, which land the day `Ord.cmp` dispatches (F-0002):
+//!
+//! - `binary_search[T: Ord](xs: List[T], x: T) -> int ! {none}`
+//! - `binary_search_by[T](xs: List[T], by: fn(T) -> Ordering) -> int ! {none}`
+//! - `lower_bound[T: Ord](xs: List[T], x: T) -> int`
+//! - `upper_bound[T: Ord](xs: List[T], x: T) -> int`
+//! - `equal_range[T: Ord](xs: List[T], x: T) -> (int, int)`
+//! - `min_of[T: Ord](xs: List[T]) -> T ! {none}`, `max_of` likewise
+//! - `min_index[T: Ord](xs: List[T]) -> int ! {none}`, `max_index` likewise
+//!
+//! The monomorphic bodies below are those signatures with `T = int`, and
+//! they RUN — which is the whole point of shipping them this way rather
+//! than shipping generic bodies that only typecheck. `sum` and `product`
+//! are `int`-only by nature (they are checked integer arithmetic).
+//!
+//! Linear `contains` and `index_of` are NOT here: they are `std.list`'s
+//! (sc02, in `std/x/list_eq` while the `Eq` bound cannot dispatch), and
+//! one concept keeps one name across std (§1).
+//!
+//! BLOCKED(c05), named and bodiless: `min_by`, `max_by`, `sum_by`,
+//! `partition_point` — each takes a closure in every real use.
+
+use std.cmp
+
+/// The index of some element equal to `x`, or `None` when `xs` holds
+/// none. `xs` must be ascending (see the module header). On a run of
+/// equal elements the index returned is unspecified — `lower_bound` and
+/// `equal_range` are the functions that promise a position.
+///
+/// O(log n) comparisons. No traps: every index it forms is in range.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(10)
+/// (mut xs).push(20)
+/// (mut xs).push(30)
+/// (search.binary_search(xs, 20) else -1) == 1
+/// (search.binary_search(xs, 10) else -1) == 0
+/// (search.binary_search(xs, 25) else -1) == -1
+/// ```
+pub fn binary_search(xs: List[int], x: int) -> int ! {None} {
+    var lo = 0
+    var hi = xs.len
+    while lo < hi {
+        // `lo + (hi - lo) / 2` rather than `(lo + hi) / 2`: the sum of
+        // two indices can leave `int` and this cannot.
+        let mid = lo + (hi - lo) / 2
+        let v = xs[mid]
+        if v == x {
+            return mid
+        }
+        if v < x {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    None
+}
+
+/// The index of the one element for which `by` answers `Equal`, or
+/// `None`. `by` is a *probe*: it receives an element and reports how
+/// that element compares to the sought value, so the value itself never
+/// crosses the boundary.
+///
+/// Does not execute at these pins: examining an `Ordering` produced
+/// outside the module that declares it is `unsupported` in both
+/// implementations (F-0029). The static ladder is clean and the body is
+/// the one that lands. Prose, not a fenced example, for that reason.
+pub fn binary_search_by(xs: List[int], by: fn(int) -> cmp.Ordering) -> int ! {None} {
+    var lo = 0
+    var hi = xs.len
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2
+        let o = by(xs[mid])
+        if o.is_eq() {
+            return mid
+        }
+        if o.is_lt() {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    None
+}
+
+/// The first index at which `x` could be inserted keeping `xs`
+/// ascending — the index of the first element at or above `x`, and
+/// `len(xs)` when every element is below it. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// (mut xs).push(2)
+/// (mut xs).push(5)
+/// search.lower_bound(xs, 2) == 1
+/// search.lower_bound(xs, 0) == 0
+/// search.lower_bound(xs, 9) == 4
+/// ```
+pub fn lower_bound(xs: List[int], x: int) -> int {
+    var lo = 0
+    var hi = xs.len
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2
+        if xs[mid] < x {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    lo
+}
+
+/// The last index at which `x` could be inserted keeping `xs`
+/// ascending — the index of the first element strictly above `x`.
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// (mut xs).push(2)
+/// (mut xs).push(5)
+/// search.upper_bound(xs, 2) == 3
+/// search.upper_bound(xs, 0) == 0
+/// search.upper_bound(xs, 5) == 4
+/// ```
+pub fn upper_bound(xs: List[int], x: int) -> int {
+    var lo = 0
+    var hi = xs.len
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2
+        if xs[mid] > x {
+            hi = mid
+        } else {
+            lo = mid + 1
+        }
+    }
+    lo
+}
+
+/// The half-open index range `(first, last)` of the elements equal to
+/// `x` — `(lower_bound(xs, x), upper_bound(xs, x))`. An empty range
+/// (`first == last`) means `x` is absent, and its value is the insertion
+/// point. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// (mut xs).push(2)
+/// (mut xs).push(5)
+/// search.equal_range(xs, 2).0 == 1
+/// search.equal_range(xs, 2).1 == 3
+/// search.equal_range(xs, 4).0 == search.equal_range(xs, 4).1
+/// ```
+pub fn equal_range(xs: List[int], x: int) -> (int, int) {
+    (lower_bound(xs, x), upper_bound(xs, x))
+}
+
+/// The least element of `xs`, or `None` when `xs` is empty. Linear;
+/// `xs` need not be sorted. On a tie the FIRST least element's value is
+/// returned, which is the same value either way — `min_index` is the
+/// function whose tie rule is observable. No traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(3)
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// (search.min_of(xs) else 0) == 1
+/// ```
+pub fn min_of(xs: List[int]) -> int ! {None} {
+    var seen = false
+    var best = 0
+    for v in xs {
+        if !seen {
+            best = v
+            seen = true
+        } else if v < best {
+            best = v
+        }
+    }
+    if !seen {
+        return None
+    }
+    best
+}
+
+/// The greatest element of `xs`, or `None` when `xs` is empty. Linear;
+/// `xs` need not be sorted. No traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(3)
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// (search.max_of(xs) else 0) == 3
+/// ```
+pub fn max_of(xs: List[int]) -> int ! {None} {
+    var seen = false
+    var best = 0
+    for v in xs {
+        if !seen {
+            best = v
+            seen = true
+        } else if v > best {
+            best = v
+        }
+    }
+    if !seen {
+        return None
+    }
+    best
+}
+
+/// The index of the least element, or `None` when `xs` is empty. Ties go
+/// to the FIRST — the same stability promise `std.cmp.min` makes. No
+/// traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(3)
+/// (mut xs).push(1)
+/// (mut xs).push(1)
+/// (search.min_index(xs) else -1) == 1
+/// ```
+pub fn min_index(xs: List[int]) -> int ! {None} {
+    let n = xs.len
+    if n == 0 {
+        return None
+    }
+    var best = 0
+    var i = 1
+    while i < n {
+        if xs[i] < xs[best] {
+            best = i
+        }
+        i = i + 1
+    }
+    best
+}
+
+/// The index of the greatest element, or `None` when `xs` is empty.
+/// Ties go to the FIRST. No traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(3)
+/// (mut xs).push(3)
+/// (mut xs).push(1)
+/// (search.max_index(xs) else -1) == 0
+/// ```
+pub fn max_index(xs: List[int]) -> int ! {None} {
+    let n = xs.len
+    if n == 0 {
+        return None
+    }
+    var best = 0
+    var i = 1
+    while i < n {
+        if xs[i] > xs[best] {
+            best = i
+        }
+        i = i + 1
+    }
+    best
+}
+
+/// The sum of `xs`; 0 for an empty list. Traps `overflow` the moment a
+/// partial sum leaves `int` — checked arithmetic, X3, and deliberately
+/// NOT a row: a sum that overflows is a bug in the caller's data model,
+/// and `std.math.checked_add` is right there for the case where it is
+/// not.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// (mut xs).push(3)
+/// search.sum(xs) == 6
+/// ```
+pub fn sum(xs: List[int]) -> int {
+    var total: int = 0
+    for v in xs {
+        total = total + v
+    }
+    total
+}
+
+/// The product of `xs`; 1 for an empty list. Traps `overflow` on the
+/// same terms as `sum`.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(2)
+/// (mut xs).push(3)
+/// (mut xs).push(4)
+/// search.product(xs) == 24
+/// ```
+pub fn product(xs: List[int]) -> int {
+    var total: int = 1
+    for v in xs {
+        total = total * v
+    }
+    total
+}

@@ -1,0 +1,15 @@
+//! check: run(exit=trap(div-zero))
+//! phase: run
+//! conforms: std.math
+//!
+//! `div_floor` inherits the language's checked division, so a zero
+//! divisor traps `div-zero` — and `checked_div` is the recoverable
+//! complement on the same operands (`checked_misses.lu`, line 12).
+
+use std.math
+
+fn main() -> !int {
+    let z: int = 0
+    let _ = math.div_floor(7, z)
+    0
+}

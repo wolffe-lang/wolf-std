@@ -1,0 +1,40 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.math
+//!
+//! `powf`'s special cases, which are almost the whole function: the
+//! exponent-zero and base-one identities that hold even for NaN, the
+//! zero and infinity bases whose answers follow the exponent's parity,
+//! the negative base that is NaN unless the exponent is integral, and
+//! the integral-exponent path that makes `powf(10.0, 3.0)` exactly 1000.
+
+use std.math.float
+
+fn main() -> !int {
+    if float.powf(2.0, 10.0) == 1024.0 {} else { return 1 }
+    if float.powf(10.0, 3.0) == 1000.0 {} else { return 2 }
+    if float.powf(2.0, 100.0) == 1267650600228229401496703205376.0 {} else { return 3 }
+    if float.powf(4.0, 0.5) == 2.0 {} else { return 4 }
+    if float.powf(2.0, -3.0) == 0.125 {} else { return 5 }
+    if float.powf(-2.0, 3.0) == -8.0 {} else { return 6 }
+    if float.powf(-2.0, 2.0) == 4.0 {} else { return 7 }
+    if float.is_nan(float.powf(-2.0, 0.5)) {} else { return 8 }
+    // x^0 is 1 for every x, NaN included; 1^y is 1 for every y.
+    if float.powf(2.0, 0.0) == 1.0 {} else { return 9 }
+    if float.powf(float.nan(), 0.0) == 1.0 {} else { return 10 }
+    if float.powf(1.0, float.nan()) == 1.0 {} else { return 11 }
+    if float.powf(1.0, float.inf()) == 1.0 {} else { return 12 }
+    if float.powf(0.0, 2.0) == 0.0 {} else { return 13 }
+    if float.powf(0.0, -2.0) == float.inf() {} else { return 14 }
+    if float.powf(float.inf(), 2.0) == float.inf() {} else { return 15 }
+    if float.powf(float.inf(), -2.0) == 0.0 {} else { return 16 }
+    if float.powf(float.neg_inf(), 3.0) == float.neg_inf() {} else { return 17 }
+    if float.powf(float.neg_inf(), 2.0) == float.inf() {} else { return 18 }
+    if float.powf(2.0, float.inf()) == float.inf() {} else { return 19 }
+    if float.powf(2.0, float.neg_inf()) == 0.0 {} else { return 20 }
+    if float.powf(0.5, float.inf()) == 0.0 {} else { return 21 }
+    if float.powf(0.5, float.neg_inf()) == float.inf() {} else { return 22 }
+    if float.is_nan(float.powf(float.nan(), 2.0)) {} else { return 23 }
+    if float.is_nan(float.powf(2.0, float.nan())) {} else { return 24 }
+    0
+}

@@ -1,0 +1,47 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.math
+//!
+//! `to_bits`/`from_bits` — the exactness currency. The encodings are
+//! read as SIGNED `int`s, so a negative float has a negative encoding
+//! and `-0.0` (whose bits are the sign bit alone) is `int_min()`. The
+//! round trip is checked across every class the format has: zeroes,
+//! subnormals, the smallest and largest normals, the infinities, and a
+//! NaN, which canonicalizes.
+
+use std.math.float
+
+fn main() -> !int {
+    // Every negative encoding goes through a typed zero: an integer
+    // literal does not take its type from context, so a bare
+    // `-4611686018427387904` is an `i32` negation that traps (F-0025).
+    let zero: int = 0
+    if float.to_bits(0.0) == 0 {} else { return 1 }
+    if float.to_bits(1.0) == 4607182418800017408 {} else { return 2 }
+    if float.to_bits(2.0) == 4611686018427387904 {} else { return 3 }
+    if float.to_bits(-2.0) == zero - 4611686018427387904 {} else { return 4 }
+    if float.to_bits(0.5) == 4602678819172646912 {} else { return 5 }
+    if float.to_bits(-0.0) < 0 {} else { return 6 }
+    if float.to_bits(float.inf()) == 9218868437227405312 {} else { return 7 }
+    if float.to_bits(float.f_max()) == 9218868437227405311 {} else { return 8 }
+    if float.to_bits(5.0e-324) == 1 {} else { return 9 }
+    if float.to_bits(float.nan()) == 9221120237041090560 {} else { return 10 }
+    if float.from_bits(0) == 0.0 {} else { return 11 }
+    if float.from_bits(4607182418800017408) == 1.0 {} else { return 12 }
+    if float.from_bits(zero - 4611686018427387904) == -2.0 {} else { return 13 }
+    if float.from_bits(9218868437227405312) == float.inf() {} else { return 14 }
+    if float.from_bits(1) == 5.0e-324 {} else { return 15 }
+    if float.is_nan(float.from_bits(9221120237041090560)) {} else { return 16 }
+    // Round trips, one per class.
+    if float.from_bits(float.to_bits(0.125)) == 0.125 {} else { return 17 }
+    if float.from_bits(float.to_bits(-3.75)) == -3.75 {} else { return 18 }
+    if float.from_bits(float.to_bits(float.pi())) == float.pi() {} else { return 19 }
+    if float.from_bits(float.to_bits(1.0e300)) == 1.0e300 {} else { return 20 }
+    if float.from_bits(float.to_bits(1.0e-300)) == 1.0e-300 {} else { return 21 }
+    if float.from_bits(float.to_bits(5.0e-324)) == 5.0e-324 {} else { return 22 }
+    if float.from_bits(float.to_bits(float.f_max())) == float.f_max() {} else { return 23 }
+    if float.from_bits(float.to_bits(float.f_min())) == float.f_min() {} else { return 24 }
+    if float.is_sign_negative(float.from_bits(float.to_bits(-0.0))) {} else { return 25 }
+    if float.from_bits(float.to_bits(float.neg_inf())) == float.neg_inf() {} else { return 26 }
+    0
+}

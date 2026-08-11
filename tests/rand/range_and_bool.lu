@@ -1,0 +1,46 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.rand
+//!
+//! `below` and `next_bool`: the range invariant on every draw, the
+//! degenerate `below(1)` that can only answer 0, and the pinned
+//! sequences that make the rejection loop's behaviour observable. The
+//! coin is checked for both faces over a short window rather than for a
+//! distribution — a statistical test belongs to a bench, not to CI.
+
+use std.rand
+
+fn main() -> !int {
+    var r = rand.new(7)
+    var i = 0
+    while i < 32 {
+        let v = rand.below(mut r, 10)
+        if v < 0 { return 1 }
+        if v > 9 { return 2 }
+        i = i + 1
+    }
+    var one = rand.new(1)
+    var j = 0
+    while j < 4 {
+        if rand.below(mut one, 1) == 0 {} else { return 3 }
+        j = j + 1
+    }
+    // Pinned: the first four draws below 10 from seed 7.
+    var p = rand.new(7)
+    if rand.below(mut p, 10) == 7 {} else { return 4 }
+    if rand.below(mut p, 10) == 2 {} else { return 5 }
+    if rand.below(mut p, 10) == 2 {} else { return 6 }
+    if rand.below(mut p, 10) == 2 {} else { return 7 }
+    var c = rand.new(5)
+    var heads = 0
+    var k = 0
+    while k < 16 {
+        if rand.next_bool(mut c) {
+            heads = heads + 1
+        }
+        k = k + 1
+    }
+    if heads > 0 {} else { return 8 }
+    if heads < 16 {} else { return 9 }
+    0
+}

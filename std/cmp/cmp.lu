@@ -264,8 +264,12 @@ pub fn clamp[T: Ord](v: T, lo: T, hi: T) -> T {
 /// cmp.total_cmp(-0.0, 0.0) == cmp.total_cmp(1.0, 2.0)
 /// ```
 pub fn total_cmp(a: f64, b: f64) -> Ordering {
-    let a_nan = a != a
-    let b_nan = b != b
+    // `!(x == x)`, not the textbook `x != x`: the native backend lowers
+    // `!=` on `f64` to an ORDERED comparison, so `nan != nan` is false
+    // there and true in the interpreter (F-0027 / wolf-lang#22). The
+    // spelling below agrees on every lane and reverts when that closes.
+    let a_nan = !(a == a)
+    let b_nan = !(b == b)
     if a_nan && b_nan { return Ordering.Equal }
     if a_nan { return Ordering.Greater }
     if b_nan { return Ordering.Less }

@@ -1,0 +1,18 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.rand
+//!
+//! `choose` on an empty list raises `None` rather than trapping: there
+//! is nothing to choose, and that is an ordinary outcome the caller
+//! handles — unlike `below(0)`, where the CALLER named an empty range
+//! and broke the contract (`below_zero_trap.lu`).
+
+use std.rand
+
+fn main() -> !int {
+    var r = rand.new(1)
+    var e = List[int]()
+    let miss: int = 0 - 1
+    if (rand.choose(mut r, e) else miss) == miss {} else { return 1 }
+    0
+}

@@ -1,0 +1,41 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.search
+//!
+//! `lower_bound`, `upper_bound` and `equal_range` — the total functions
+//! that answer a POSITION rather than a hit, so an absent value gets an
+//! insertion point instead of a row. The duplicate run is the case that
+//! separates the two bounds; the absent value is the case where they
+//! coincide and `equal_range` is empty.
+
+use std.search
+
+fn main() -> !int {
+    var xs = List[int]()
+    (mut xs).push(1)
+    (mut xs).push(2)
+    (mut xs).push(2)
+    (mut xs).push(2)
+    (mut xs).push(5)
+    if search.lower_bound(xs, 2) == 1 {} else { return 1 }
+    if search.upper_bound(xs, 2) == 4 {} else { return 2 }
+    if search.lower_bound(xs, 0) == 0 {} else { return 3 }
+    if search.upper_bound(xs, 0) == 0 {} else { return 4 }
+    if search.lower_bound(xs, 9) == 5 {} else { return 5 }
+    if search.upper_bound(xs, 9) == 5 {} else { return 6 }
+    if search.lower_bound(xs, 1) == 0 {} else { return 7 }
+    if search.upper_bound(xs, 1) == 1 {} else { return 8 }
+    if search.lower_bound(xs, 5) == 4 {} else { return 9 }
+    if search.upper_bound(xs, 5) == 5 {} else { return 10 }
+    // Between two present values: both bounds land on the gap.
+    if search.lower_bound(xs, 3) == 4 {} else { return 11 }
+    if search.upper_bound(xs, 3) == 4 {} else { return 12 }
+    if search.equal_range(xs, 2).0 == 1 {} else { return 13 }
+    if search.equal_range(xs, 2).1 == 4 {} else { return 14 }
+    if search.equal_range(xs, 3).0 == search.equal_range(xs, 3).1 {} else { return 15 }
+    if search.equal_range(xs, 1).1 - search.equal_range(xs, 1).0 == 1 {} else { return 16 }
+    var e = List[int]()
+    if search.lower_bound(e, 1) == 0 {} else { return 17 }
+    if search.upper_bound(e, 1) == 0 {} else { return 18 }
+    0
+}

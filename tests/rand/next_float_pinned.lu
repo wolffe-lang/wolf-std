@@ -1,0 +1,25 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.rand
+//!
+//! `next_float` builds its result out of a mantissa rather than
+//! dividing, because there is no int-to-float conversion that works at
+//! these pins (F-0022) — so the values are exact and pinnable. The
+//! half-open interval is the contract: 0.0 is reachable, 1.0 is not.
+
+use std.rand
+
+fn main() -> !int {
+    var r = rand.new(7)
+    if rand.next_float(mut r) == 0.47090909785457935 {} else { return 1 }
+    if rand.next_float(mut r) == 0.9731243966707073 {} else { return 2 }
+    var s = rand.new(11)
+    var i = 0
+    while i < 24 {
+        let v = rand.next_float(mut s)
+        if v < 0.0 { return 3 }
+        if v >= 1.0 { return 4 }
+        i = i + 1
+    }
+    0
+}

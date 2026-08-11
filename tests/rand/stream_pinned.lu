@@ -1,0 +1,44 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.rand
+//!
+//! **The stream is the contract.** These eight values are PCG32's output
+//! for seed 42 under the module's fixed increment, and they are pinned
+//! here so that a change to the algorithm, the seeding dance or the
+//! output permutation fails CI instead of silently reshuffling every
+//! downstream program. They were cross-checked against an independent
+//! PCG32 implementation before being written down.
+//!
+//! Same seed, same stream, on every implementation: that is what makes a
+//! seeded generator replayable, and the two lanes that execute this file
+//! are the proof.
+
+use std.rand
+
+fn main() -> !int {
+    var r = rand.new(42)
+    if rand.next_int(mut r) == 3270867926 {} else { return 1 }
+    if rand.next_int(mut r) == 1795671209 {} else { return 2 }
+    if rand.next_int(mut r) == 1924641435 {} else { return 3 }
+    if rand.next_int(mut r) == 1143034755 {} else { return 4 }
+    if rand.next_int(mut r) == 4121910957 {} else { return 5 }
+    if rand.next_int(mut r) == 1757328946 {} else { return 6 }
+    if rand.next_int(mut r) == 3418829100 {} else { return 7 }
+    if rand.next_int(mut r) == 3589261271 {} else { return 8 }
+    // A different seed is a different position in the stream.
+    var s = rand.new(7)
+    if rand.next_int(mut s) == 1273465047 {} else { return 9 }
+    if rand.next_int(mut s) == 4201302492 {} else { return 10 }
+    // Seed 0 is not a degenerate state — that is what the seeding dance
+    // in `new` is for.
+    var z = rand.new(0)
+    if rand.next_int(mut z) == 3894649422 {} else { return 11 }
+    if rand.next_int(mut z) == 2055130073 {} else { return 12 }
+    // Two generators from one seed agree forever; copying a generator
+    // copies its position (value semantics).
+    var a = rand.new(99)
+    var b = rand.new(99)
+    if rand.next_int(mut a) == rand.next_int(mut b) {} else { return 13 }
+    if rand.next_int(mut a) == rand.next_int(mut b) {} else { return 14 }
+    0
+}

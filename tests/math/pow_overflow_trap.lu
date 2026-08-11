@@ -1,0 +1,12 @@
+//! check: run(exit=trap(overflow))
+//! phase: run
+//! conforms: std.math
+//!
+//! `pow` multiplies with the checked operator, so an out-of-range power traps `overflow` rather than wrapping or saturating.
+
+use std.math
+
+fn main() -> !int {
+    let _ = math.pow(2, 63)
+    0
+}

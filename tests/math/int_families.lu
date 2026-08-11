@@ -1,0 +1,66 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.math
+//!
+//! The classical integer family, table-driven: `abs`, `signum`, `pow`,
+//! `isqrt`, `gcd`, `lcm`, the three divisions and `midpoint`, each on the
+//! cases where the definitions disagree with one another — negative
+//! dividends (where `/` truncates and `div_floor` does not), the two
+//! zeroes of `gcd`, and the same-sign extremes `midpoint` exists for.
+//! Every value here runs on all three lanes: this module's bodies are
+//! `int` arithmetic and nothing else.
+
+use std.math
+
+fn main() -> !int {
+    if math.abs(5) == 5 {} else { return 1 }
+    if math.abs(0 - 5) == 5 {} else { return 2 }
+    if math.abs(0) == 0 {} else { return 3 }
+    if math.signum(7) == 1 {} else { return 4 }
+    if math.signum(0 - 7) == 0 - 1 {} else { return 5 }
+    if math.signum(0) == 0 {} else { return 6 }
+    if math.pow(2, 10) == 1024 {} else { return 7 }
+    if math.pow(2, 62) == 4611686018427387904 {} else { return 8 }
+    if math.pow(0 - 3, 3) == 0 - 27 {} else { return 9 }
+    if math.pow(0, 0) == 1 {} else { return 10 }
+    if math.pow(0, 5) == 0 {} else { return 11 }
+    if math.isqrt(0) == 0 {} else { return 12 }
+    if math.isqrt(1) == 1 {} else { return 13 }
+    if math.isqrt(15) == 3 {} else { return 14 }
+    if math.isqrt(16) == 4 {} else { return 15 }
+    if math.isqrt(math.int_max()) == 3037000499 {} else { return 16 }
+    if math.gcd(12, 18) == 6 {} else { return 17 }
+    if math.gcd(0 - 12, 18) == 6 {} else { return 18 }
+    if math.gcd(0, 5) == 5 {} else { return 19 }
+    if math.gcd(0, 0) == 0 {} else { return 20 }
+    if math.lcm(4, 6) == 12 {} else { return 21 }
+    if math.lcm(0, 5) == 0 {} else { return 22 }
+    if math.lcm(0 - 4, 6) == 12 {} else { return 23 }
+    // Truncation versus flooring versus ceiling, all four sign pairs.
+    if math.div_floor(7, 2) == 3 {} else { return 24 }
+    if math.div_floor(0 - 7, 2) == 0 - 4 {} else { return 25 }
+    if math.div_floor(7, 0 - 2) == 0 - 4 {} else { return 26 }
+    if math.div_floor(0 - 7, 0 - 2) == 3 {} else { return 27 }
+    if math.div_ceil(7, 2) == 4 {} else { return 28 }
+    if math.div_ceil(0 - 7, 2) == 0 - 3 {} else { return 29 }
+    if math.div_ceil(7, 0 - 2) == 0 - 3 {} else { return 30 }
+    if math.div_ceil(0 - 7, 0 - 2) == 4 {} else { return 31 }
+    if math.div_floor(6, 3) == 2 {} else { return 32 }
+    if math.div_ceil(6, 3) == 2 {} else { return 33 }
+    if math.rem_euclid(7, 3) == 1 {} else { return 34 }
+    if math.rem_euclid(0 - 7, 3) == 2 {} else { return 35 }
+    if math.rem_euclid(7, 0 - 3) == 1 {} else { return 36 }
+    if math.rem_euclid(0 - 7, 0 - 3) == 2 {} else { return 37 }
+    // The midpoint's whole reason for existing: no intermediate leaves
+    // `int`, and it rounds toward negative infinity.
+    if math.midpoint(1, 3) == 2 {} else { return 38 }
+    if math.midpoint(1, 2) == 1 {} else { return 39 }
+    if math.midpoint(0 - 1, 0 - 2) == 0 - 2 {} else { return 40 }
+    if math.midpoint(math.int_max(), math.int_max()) == math.int_max() {} else { return 41 }
+    if math.midpoint(math.int_min(), math.int_min()) == math.int_min() {} else { return 42 }
+    if math.midpoint(math.int_min(), math.int_max()) == 0 - 1 {} else { return 43 }
+    if math.int_max() == 9223372036854775807 {} else { return 44 }
+    let zero: int = 0
+    if math.int_min() == zero - 9223372036854775807 - 1 {} else { return 45 }
+    0
+}

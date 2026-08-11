@@ -1,0 +1,60 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.math
+//!
+//! The algebraic family pinned bit-for-bit. Every literal on the right
+//! is the value std.math.float produces, and the point of writing them
+//! as exact `==` comparisons rather than tolerances is that a
+//! disagreement of ONE bit between the interpreter and the native
+//! compiler fails here — which is the pure-wolf determinism claim, under
+//! test. How far these values sit from the correctly rounded answer is
+//! the other question, and `cargo xtask ulp` (tests/ulp/reference.txt)
+//! is where it is asked.
+
+use std.math.float
+
+fn main() -> !int {
+    if float.sqrt(4.0) == 2.0 {} else { return 1 }
+    if float.sqrt(2.0) == 1.414213562373095 {} else { return 2 }
+    if float.sqrt(1.0e100) == 1.0e50 {} else { return 3 }
+    if float.sqrt(0.0) == 0.0 {} else { return 4 }
+    if float.is_sign_negative(float.sqrt(-0.0)) {} else { return 5 }
+    if float.is_nan(float.sqrt(-1.0)) {} else { return 6 }
+    if float.sqrt(float.inf()) == float.inf() {} else { return 7 }
+    if float.cbrt(8.0) == 2.0 {} else { return 8 }
+    if float.cbrt(-8.0) == -2.0 {} else { return 9 }
+    if float.cbrt(27.0) == 3.0 {} else { return 10 }
+    if float.cbrt(0.0) == 0.0 {} else { return 11 }
+    if float.cbrt(float.neg_inf()) == float.neg_inf() {} else { return 12 }
+    if float.hypot(3.0, 4.0) == 5.0 {} else { return 13 }
+    if float.hypot(-3.0, -4.0) == 5.0 {} else { return 14 }
+    if float.hypot(0.0, 0.0) == 0.0 {} else { return 15 }
+    // No intermediate overflow: the literal formula would answer inf.
+    if float.hypot(1.0e200, 1.0e200) == 1.4142135623730949e200 {} else { return 16 }
+    if float.hypot(float.inf(), float.nan()) == float.inf() {} else { return 17 }
+    if float.exp(0.0) == 1.0 {} else { return 18 }
+    if float.exp(1.0) == 2.7182818284590455 {} else { return 19 }
+    if float.exp(float.neg_inf()) == 0.0 {} else { return 20 }
+    if float.exp(float.inf()) == float.inf() {} else { return 21 }
+    if float.exp(1000.0) == float.inf() {} else { return 22 }
+    if float.exp(-1000.0) == 0.0 {} else { return 23 }
+    if float.exp2(0.0) == 1.0 {} else { return 24 }
+    if float.exp2(10.0) == 1024.0 {} else { return 25 }
+    if float.exp2(-1.0) == 0.5 {} else { return 26 }
+    if float.exp2(64.0) == 18446744073709551616.0 {} else { return 27 }
+    if float.ln(1.0) == 0.0 {} else { return 28 }
+    if float.ln(0.0) == float.neg_inf() {} else { return 29 }
+    if float.is_nan(float.ln(-1.0)) {} else { return 30 }
+    if float.ln(float.inf()) == float.inf() {} else { return 31 }
+    // The exponent is a separate term, so powers of two are exact.
+    if float.log2(1.0) == 0.0 {} else { return 32 }
+    if float.log2(8.0) == 3.0 {} else { return 33 }
+    if float.log2(0.5) == -1.0 {} else { return 34 }
+    if float.log2(1024.0) == 10.0 {} else { return 35 }
+    if float.log2(0.0) == float.neg_inf() {} else { return 36 }
+    if float.log10(1.0) == 0.0 {} else { return 37 }
+    if float.log10(10.0) == 1.0 {} else { return 38 }
+    if float.log10(100.0) == 2.0 {} else { return 39 }
+    if float.log10(1000.0) == 3.0 {} else { return 40 }
+    0
+}

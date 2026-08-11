@@ -1,0 +1,224 @@
+//! member: true
+//!
+//! std.rand — a deterministic, explicitly seeded pseudo-random
+//! generator. Stability tier: core.
+//!
+//! **There is no entropy in Phase A** (D15: the runtime stays thin, and
+//! comptime refuses ambient randomness by design). Every generator here
+//! is constructed from a seed the caller supplies, and the same seed
+//! gives the same stream on every implementation and every OS — the
+//! stream is part of the observable contract and `tests/rand/` pins it
+//! value by value. Seeding from the operating system arrives with
+//! stdc02's os tier and will be a separate constructor, never a hidden
+//! default.
+//!
+//! **The generator is PCG32** (O'Neill's XSH-RR variant over a 64-bit
+//! LCG): 64 bits of state, a 63-bit odd stream increment, a 32-bit
+//! output. It is chosen over a bare xorshift for its output permutation
+//! — the raw LCG's high bits are good and its low bits are not, and
+//! PCG's xorshift-then-rotate mixes them — and over anything larger
+//! because 64 bits of state is what `wrapping[u64]` gives us with no
+//! bit-twiddling the checked tier cannot lower. It is NOT
+//! cryptographically secure and this header says so once, loudly: a
+//! caller who needs unpredictability needs stdc02's csprng, not this.
+//!
+//! **`Rng` is a struct with free functions, not methods.** The contract
+//! writes `Rng.new(seed)`; an `impl` block's methods cannot be called
+//! across a module boundary at these pins (F-0029), so the module ships
+//! `rand.new(seed)` and `rand.next_int(mut r)` — the container-first,
+//! mode-honest shape §8 already mandates for every other std container.
+//! The methods land when cross-module dispatch does.
+
+use std.list
+use std.math.float
+
+/// A seeded PCG32 generator. Copy it and you copy the position in the
+/// stream — the value semantics are the whole point of a replayable
+/// generator.
+pub struct Rng {
+    state: wrapping[u64],
+    inc: wrapping[u64],
+}
+
+/// A generator seeded with `seed`. Two generators built from the same
+/// seed produce identical streams, forever, on every implementation.
+/// Total: no error row, no traps — every `int` is a legal seed,
+/// including 0 and negative values.
+///
+/// The stream increment is fixed (PCG's default), so `seed` selects a
+/// position in one stream rather than a stream of its own; a
+/// `new_stream(seed, stream)` constructor is the nursery candidate that
+/// would change that.
+///
+/// ```wolf-doc-example
+/// var a = rand.new(42)
+/// var b = rand.new(42)
+/// rand.next_int(mut a) == rand.next_int(mut b)
+/// ```
+pub fn new(seed: int) -> Rng {
+    // Each big literal goes through a typed binding: an integer literal
+    // does not take its type from a struct field or an annotation at
+    // these pins, and an `i32`-typed 1442695040888963407 traps (F-0025).
+    let zero: wrapping[u64] = 0
+    let increment: wrapping[u64] = 1442695040888963407
+    var r = Rng {
+        state: zero,
+        inc: increment,
+    }
+    // The canonical PCG seeding dance: step, add the seed, step again,
+    // so that a zero seed is not a degenerate state.
+    step(mut r)
+    r.state = r.state + seed_word(seed)
+    step(mut r)
+    r
+}
+
+/// The seed as a `wrapping[u64]`, sign extension included — the cast is
+/// legal in this direction (it is the float-to-int one that does not
+/// convert, F-0022).
+fn seed_word(seed: int) -> wrapping[u64] {
+    seed as wrapping[u64]
+}
+
+/// Advances the LCG one step. The multiplier and increment are PCG32's.
+fn step(mut r: Rng) {
+    let mult: wrapping[u64] = 6364136223846793005
+    r.state = r.state * mult + r.inc
+}
+
+/// The next 32 bits of the stream, as an `int` in `[0, 4294967296)`.
+/// Never negative and never above 2^32 - 1: the generator's output word
+/// is 32 bits wide, and widening it to `int` here (rather than
+/// producing a full-range `int`) keeps `below` unbiased with one draw in
+/// the common case. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var r = rand.new(42)
+/// rand.next_int(mut r) >= 0
+/// rand.next_int(mut r) < 4294967296
+/// ```
+pub fn next_int(mut r: Rng) -> int {
+    let old = r.state
+    step(mut r)
+    // XSH-RR: xorshift the state down, then rotate by its top 5 bits.
+    let mask: wrapping[u64] = 4294967295
+    let xorshifted = (old >> 18 ^ old) >> 27 & mask
+    let rot = old >> 59 & 31
+    let rotated = (xorshifted >> rot | xorshifted << (32 - rot & 31)) & mask
+    rotated as int
+}
+
+/// A uniform draw from `[0, n)`, without modulo bias — the high draws
+/// that would skew the residue are rejected and redrawn, so the number
+/// of draws is data-dependent but the distribution is exact. Traps
+/// `assert` when `n <= 0` (an empty range has nothing to draw from — a
+/// caller contract violation, §2's trap rule) and when `n` exceeds
+/// 2^32, which this generator's output word cannot cover.
+///
+/// ```wolf-doc-example
+/// var r = rand.new(7)
+/// rand.below(mut r, 10) < 10
+/// rand.below(mut r, 10) >= 0
+/// rand.below(mut r, 1) == 0
+/// ```
+pub fn below(mut r: Rng, n: int) -> int {
+    if n <= 0 {
+        assert(false)
+    }
+    let span: int = 4294967296
+    if n > span {
+        assert(false)
+    }
+    // Everything below the threshold would make one residue more likely
+    // than the others.
+    let threshold = span % n
+    var v = next_int(mut r)
+    while v < threshold {
+        v = next_int(mut r)
+    }
+    v % n
+}
+
+/// A uniform draw from `[0.0, 1.0)` with 52 bits of resolution: the
+/// draw fills a mantissa, so every representable multiple of 2^-52 in
+/// the interval is equally likely and 1.0 is never returned. Total: no
+/// error row, no traps.
+///
+/// ```wolf-doc-example
+/// var r = rand.new(7)
+/// rand.next_float(mut r) < 1.0
+/// rand.next_float(mut r) >= 0.0
+/// ```
+pub fn next_float(mut r: Rng) -> f64 {
+    let word: int = 4294967296
+    let hi = next_int(mut r) % 1048576
+    let lo = next_int(mut r)
+    // Build the encoding of a value in [1, 2) and subtract the one:
+    // there is no int-to-float conversion to divide with (F-0022), and
+    // this construction is exact.
+    let one_bits: int = 4607182418800017408
+    let mantissa = hi * word + lo
+    float.from_bits(one_bits + mantissa) - 1.0
+}
+
+/// A fair coin, taken from the output word's top bit (the LCG's best
+/// bit after the output permutation). Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// var r = rand.new(7)
+/// var seen = 0
+/// for _ in 0..8 { if rand.next_bool(mut r) { seen = seen + 1 } }
+/// seen > 0
+/// seen < 8
+/// ```
+pub fn next_bool(mut r: Rng) -> bool {
+    let half: int = 2147483648
+    next_int(mut r) >= half
+}
+
+/// Shuffles `xs` into a uniformly random permutation (Fisher–Yates,
+/// drawing from the front). Total: no error row, no traps; an empty or
+/// one-element list is left alone.
+///
+/// Cost note, honestly stated: this is O(n^2) at these pins, not O(n),
+/// because `std.list.swap` rebuilds the list (index assignment executes
+/// on one implementation only — F-0011's surface question). The
+/// algorithm is the right one and the constant is the language's to fix.
+///
+/// ```wolf-doc-example
+/// var r = rand.new(3)
+/// var xs = List[int]()
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// (mut xs).push(3)
+/// rand.shuffle(mut r, mut xs)
+/// xs.len == 3
+/// xs[0] + xs[1] + xs[2] == 6
+/// ```
+pub fn shuffle(mut r: Rng, mut xs: List[int]) {
+    let n = list.len(xs)
+    var i = 0
+    while i + 1 < n {
+        let j = i + below(mut r, n - i)
+        list.swap(mut xs, i, j)
+        i = i + 1
+    }
+}
+
+/// A uniformly chosen element of `xs`, or `None` when `xs` is empty.
+/// No traps.
+///
+/// ```wolf-doc-example
+/// var r = rand.new(3)
+/// var xs = List[int]()
+/// (mut xs).push(9)
+/// (rand.choose(mut r, xs) else 0) == 9
+/// ```
+pub fn choose(mut r: Rng, xs: List[int]) -> int ! {None} {
+    let n = list.len(xs)
+    if n == 0 {
+        return None
+    }
+    let i = below(mut r, n)
+    xs[i]
+}

@@ -1,0 +1,42 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.math
+//!
+//! The recoverable arithmetic family on operands that DO fit — the hit
+//! half of every row, plus the saturating pair, which has no row at all.
+//! The miss half lives in `checked_misses.lu` because a row raise inside
+//! an imported module is `unsupported` in wolfc's checked tier (F-0015)
+//! and the two halves would otherwise share one ledger row.
+
+use std.math
+
+fn main() -> !int {
+    // Big negative literals go through a typed zero (F-0025).
+    let zero: int = 0
+    if (math.checked_add(2, 3) else 0) == 5 {} else { return 1 }
+    if (math.checked_add(math.int_max(), 0 - 1) else 0) == 9223372036854775806 {} else { return 2 }
+    if (math.checked_add(math.int_min(), 1) else 0) == math.int_min() + 1 {} else { return 3 }
+    if (math.checked_sub(5, 3) else 0) == 2 {} else { return 4 }
+    if (math.checked_sub(0 - 5, 0 - 3) else 0) == 0 - 2 {} else { return 5 }
+    if (math.checked_mul(6, 7) else 0) == 42 {} else { return 6 }
+    if (math.checked_mul(0 - 6, 7) else 0) == 0 - 42 {} else { return 7 }
+    if (math.checked_mul(6, 0 - 7) else 0) == 0 - 42 {} else { return 8 }
+    if (math.checked_mul(0 - 6, 0 - 7) else 0) == 42 {} else { return 9 }
+    if (math.checked_mul(0, math.int_min()) else 0 - 1) == 0 {} else { return 10 }
+    if (math.checked_mul(0 - 1, math.int_max()) else 0) == zero - 9223372036854775807 {} else {
+        return 11
+    }
+    if (math.checked_div(7, 2) else 0) == 3 {} else { return 12 }
+    if (math.checked_div(0 - 7, 2) else 0) == 0 - 3 {} else { return 13 }
+    // Saturation clamps instead of raising, so it has no miss half.
+    if math.saturating_add(2, 3) == 5 {} else { return 14 }
+    if math.saturating_add(math.int_max(), 1) == math.int_max() {} else { return 15 }
+    if math.saturating_add(math.int_max(), math.int_max()) == math.int_max() {} else { return 16 }
+    if math.saturating_add(math.int_min(), 0 - 1) == math.int_min() {} else { return 17 }
+    if math.saturating_add(math.int_max(), math.int_min()) == 0 - 1 {} else { return 18 }
+    if math.saturating_sub(5, 3) == 2 {} else { return 19 }
+    if math.saturating_sub(math.int_min(), 1) == math.int_min() {} else { return 20 }
+    if math.saturating_sub(math.int_max(), 0 - 1) == math.int_max() {} else { return 21 }
+    if math.saturating_sub(0, math.int_min()) == math.int_max() {} else { return 22 }
+    0
+}

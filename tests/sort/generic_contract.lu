@@ -1,0 +1,33 @@
+//! check: pass
+//! phase: mem
+//! conforms: std.sort
+//!
+//! Freight, deliberately: `sort[T: Ord]`, `sort_by` and `is_sorted_by`
+//! are the shapes sc04 ships as reviewed contracts, and this file proves
+//! they TYPECHECK — the static ladder runs clean through mem on both
+//! implementations — while nothing here executes.
+//!
+//! Two independent blockers, both filed: `Ord.cmp` dispatch executes in
+//! neither implementation (F-0002), and an `Ordering` produced by
+//! `std.cmp` cannot be examined by any other module (F-0029), which is
+//! what a comparator's result is. The day either falls, this file's
+//! directive becomes `run(exit=0)` in the same commit as the pin bump.
+
+use std.cmp
+use std.sort
+
+/// A named comparator — the fn-value form the contract asks for while
+/// closures wait on c05.
+fn by_last_digit(a: int, b: int) -> cmp.Ordering {
+    cmp.Ord.cmp(a % 10, b % 10)
+}
+
+fn main() -> !int {
+    var xs = List[int]()
+    (mut xs).push(31)
+    (mut xs).push(12)
+    sort.sort(mut xs)
+    sort.sort_by(mut xs, by_last_digit)
+    if sort.is_sorted_by(xs, by_last_digit) {} else { return 1 }
+    0
+}

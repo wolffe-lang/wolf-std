@@ -25,20 +25,24 @@ lupin = "run"
 # already executes the staged exemplar under `--checked` (miri-lite run
 # rung, s23) — the truthful ledger records what IS.
 wolfc = "run"
+native = "unsupported"
 
 # ---- std.option: the six idioms the blocked helpers name (F-0002) ----
 
 [tests."option/or_else_default.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."option/expect_trap.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."option/flatten_propagate.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."option/to_list_roundtrip.lu"]
 lupin = "run"
@@ -47,62 +51,82 @@ lupin = "run"
 # raise alone (F-0015). Depth 1 -> 0 in the rig's ranking; an advance in
 # truth, since nothing is refused any more.
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."option/exists_marking.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."option/is_none_marking.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 # ---- std.cmp ----
 
 [tests."cmp/static_floor.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."cmp/total_cmp_relational.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
+# sc04 pin bump, lupin 0.1.2: `run` -> `unsupported`, and the CAUSE is a
+# fix. wolf-interp#5 landed, so a bare-ident pattern is a variant pattern
+# now instead of a binding that always matched the first arm — and a
+# variant pattern over an IMPORTED enum resolves in neither
+# implementation (F-0029). The match this file exists for is refused
+# honestly rather than answered wrongly, which is the better verdict.
 [tests."cmp/ordering_exhaustive.lu"]
-lupin = "run"
+lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."cmp/ordering_methods_static.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."cmp/clamp_bad_range.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 # ---- std.testing ----
 
 [tests."testing/assert_builtin_trap.lu"]
 lupin = "run"
 wolfc = "run"
+native = "run"
 
 [tests."testing/fail_trap.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."testing/unreachable_trap.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."testing/todo_trap.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."testing/assert_eq_trap.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."testing/assert_ne_trap.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 # ---- std.iter: the F1 prototypes ----
 
@@ -113,11 +137,13 @@ lupin = "run"
 # (F-0005). The sc03 pin closes that (wolf-lang#6, copy-reads), so the
 # ladder is clean and only the row raise keeps the run rung shut (F-0015).
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."iter/list_cursor_drive.lu"]
 lupin = "run"
 # Was fail(E0804) — the same F-0005 closure. See range_drive above.
 wolfc = "unsupported"
+native = "unsupported"
 
 # ---- sc02: std.list (the run-rung floor — push/len/index/for reach
 # wolfc's checked run rung; the row-raising family is where the two
@@ -126,6 +152,7 @@ wolfc = "unsupported"
 [tests."list/push_len_empty.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."list/get_hit_miss.lu"]
 lupin = "run"
@@ -133,50 +160,62 @@ lupin = "run"
 # answers `unsupported — module items in checked execution` (F-0015). The
 # same code inlined into an entry file runs.
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."list/first_last_hit_miss.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."list/pop_drains.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."list/set_and_swap.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."list/insert_remove.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."list/clear_truncate_fill.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."list/reverse_extend_concat_repeat.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."list/index_bounds_trap.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."list/remove_bounds_trap.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."list/set_bounds_trap.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."list/mutate_while_iterating.lu"]
 lupin = "run"
 wolfc = "fail(E1001)"
+native = "fail(E1001)"
 
 [tests."list/freeze_then_read.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 # ---- sc02: std.map (lupin executes the builtin; wolfc does not type
 # `Map` at all — F-0011) ----
@@ -184,26 +223,32 @@ wolfc = "run"
 [tests."map/set_len_empty.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."map/keys_values_pairs.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."map/clear_and_extend.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."map/get_hit_miss.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."map/has_and_get_or.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."map/remove_and_tally.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 # ---- sc02: std.pool (X5 — the two-phase protocol and the stale-handle
 # trap execute in both) ----
@@ -211,14 +256,17 @@ wolfc = "unsupported"
 [tests."pool/alloc_and_deref.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."pool/free_then_deref_traps.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."pool/alloc_after_free.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 # ---- sc02: the nursery (std.x) ----
 
@@ -226,26 +274,32 @@ wolfc = "run"
 lupin = "run"
 # Same F-0015 module-row ceiling as std.list's row family.
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."x/deque_int/both_ends.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."x/deque_int/pop_back_and_clear.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."x/deque_int/to_list_order.lu"]
 lupin = "run"
 wolfc = "run"
+native = "unsupported"
 
 [tests."x/list_eq/contains_and_index_of.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."x/list_eq/dedup_and_affixes.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+native = "unsupported"
 
 # ---- sc03: std.str. The whole module is a LUPIN lane, and the reason is
 # structural rather than incidental: wolfc answers `unsupported` at RESOLVE
@@ -258,6 +312,7 @@ wolfc = "unsupported"
 [tests."str/byte_length_honesty.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."str/slice_oob_traps.lu"]
 lupin = "run"
@@ -265,38 +320,47 @@ lupin = "run"
 # slicing — and wolfc still stops at resolve: `s[a..b]` on `str` is not
 # plumbed, so the trap it should raise cannot be observed on that lane.
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."str/slice_split_codepoint_traps.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."str/trim_whitespace_set.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."str/affix_and_case.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."str/lines_words_join.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."str/parse_int_bases.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."str/parse_float_shapes.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."str/interpolation_interplay.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."str/to_strbuf_round_trip.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 # ---- sc03: std.strbuf (a concrete struct plus free functions — the shape
 # sc02's deque_int proved runs on both lanes; what keeps wolfc dark here is
@@ -305,18 +369,22 @@ wolfc = "unsupported"
 [tests."strbuf/build_and_read.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."strbuf/insert_remove_truncate.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."strbuf/truncate_split_codepoint_traps.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 [tests."strbuf/region_build_and_freeze.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
 
 # ---- sc03: std.unicode. The one sc03 module with no `str` in its bodies —
 # pure integer predicates — and therefore the one with a wolfc `run` row:
@@ -326,7 +394,205 @@ wolfc = "unsupported"
 [tests."unicode/ascii_predicates.lu"]
 lupin = "run"
 wolfc = "run"
+native = "run"
 
 [tests."unicode/scalar_values_and_utf8_len.lu"]
 lupin = "run"
 wolfc = "unsupported"
+native = "unsupported"
+
+# ---- sc04: std.math (integers). The one family in this sprint that runs
+# on ALL THREE lanes — `int` arithmetic, module-qualified calls, no
+# containers, no globals, no floats — which is why the trap complements
+# live here and are pinned by kind on every rung. The one exception is
+# the row-raising half (`checked_misses`), `unsupported` under wolfc's
+# checked tier for F-0015's reason alone and executing natively. ----
+
+[tests."math/int_families.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."math/checked_hits.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."math/checked_misses.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."math/abs_int_min_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."math/add_overflow_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."math/pow_overflow_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."math/lcm_overflow_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."math/pow_negative_exponent_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."math/isqrt_negative_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."math/div_zero_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# ---- sc04: std.math.float. wolfc's checked tier refuses a float literal
+# outright ("this literal shape in checked execution"), so the compiler's
+# evidence for all thirty float functions is the NATIVE rung — which is
+# the reason this sprint taught the rig a third column at all. ----
+
+[tests."math/float/predicates.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."math/float/rounding.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."math/float/algebra_pins.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."math/float/trig_pins.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."math/float/powf_cases.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."math/float/bits_roundtrip.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+# ---- sc04: std.sort. `List` construction is `unsupported` on the native
+# rung (runtime shapes, c06), so every sorting test is a lupin + checked
+# pair; the float and str sorts lose the checked lane too (float literals
+# and `str` ordering respectively). ----
+
+[tests."sort/ints_adversarial.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+[tests."sort/is_sorted_edges.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+[tests."sort/floats_total_order.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."sort/strs_bytewise.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+# Freight: the generic contracts typecheck (`check: pass`, phase mem) and
+# execute nowhere — `Ord.cmp` dispatch (F-0002) and cross-module
+# `Ordering` examination (F-0029) are two independent blockers.
+[tests."sort/generic_contract.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# ---- sc04: std.search ----
+
+[tests."search/binary_search_hits.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+[tests."search/binary_search_misses.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."search/bounds_and_equal_range.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+[tests."search/reductions.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+[tests."search/sum_overflow_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+# ---- sc04: std.rand. The output permutation uses `>>`, `^` and `&`,
+# which are `unsupported` in wolfc's checked tier ("this operator in
+# checked execution"), and `List` keeps the native rung out — so the
+# pinned stream is an interpreter-lane fact at this pin. ----
+
+[tests."rand/stream_pinned.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."rand/range_and_bool.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."rand/next_float_pinned.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."rand/shuffle_and_choose.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."rand/choose_empty_miss.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."rand/below_zero_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+# ---- sc04: std.range. The compiler resolves no type named `range`, so
+# both of its rungs REJECT — the only fail(E…) rows in the ledger, and
+# they die with the accessor F-0030 asks for. ----
+
+[tests."range/is_empty.lu"]
+lupin = "run"
+wolfc = "fail(E0301)"
+native = "fail(E0301)"

@@ -1,0 +1,16 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.rand
+//!
+//! `below(0)` traps `assert`: an empty range has nothing to draw from,
+//! and a caller who asked for one violated the contract rather than
+//! meeting an ordinary absence (API-CONVENTIONS §2's trap rule; contrast
+//! `choose_empty_miss.lu`).
+
+use std.rand
+
+fn main() -> !int {
+    var r = rand.new(1)
+    let _ = rand.below(mut r, 0)
+    0
+}

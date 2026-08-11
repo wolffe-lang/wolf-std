@@ -1,0 +1,48 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.rand
+//!
+//! `shuffle` must be a PERMUTATION — the property a wrong Fisher–Yates
+//! loses first — so the test checks the multiset, not just the length:
+//! the sum and the product of 1..5 are preserved, every element is still
+//! present, and the pinned order for one seed makes a change to the draw
+//! sequence visible. `choose` returns an element that is actually in the
+//! list.
+
+use std.rand
+use std.search
+use std.sort
+
+fn main() -> !int {
+    var r = rand.new(3)
+    var xs = List[int]()
+    var i = 1
+    while i <= 5 {
+        (mut xs).push(i)
+        i = i + 1
+    }
+    rand.shuffle(mut r, mut xs)
+    if xs.len == 5 {} else { return 1 }
+    if search.sum(xs) == 15 {} else { return 2 }
+    if search.product(xs) == 120 {} else { return 3 }
+    sort.sort_ints(mut xs)
+    if xs[0] == 1 {} else { return 4 }
+    if xs[4] == 5 {} else { return 5 }
+    // An empty or single list survives untouched.
+    var e = List[int]()
+    rand.shuffle(mut r, mut e)
+    if e.len == 0 {} else { return 6 }
+    var one = List[int]()
+    (mut one).push(9)
+    rand.shuffle(mut r, mut one)
+    if one[0] == 9 {} else { return 7 }
+    // `choose` picks from the list, every time.
+    var c = rand.new(21)
+    var k = 0
+    while k < 16 {
+        let v = rand.choose(mut c, one) else 0
+        if v == 9 {} else { return 8 }
+        k = k + 1
+    }
+    0
+}

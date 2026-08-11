@@ -1,0 +1,43 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.search
+//!
+//! The scans: `min_of`/`max_of` for values, `min_index`/`max_index` for
+//! positions (ties go to the FIRST, the same promise `std.cmp.min`
+//! makes), and the two checked folds. The empty-list rows live in
+//! `binary_search_misses.lu` with the other misses.
+
+use std.search
+
+fn main() -> !int {
+    var xs = List[int]()
+    (mut xs).push(3)
+    (mut xs).push(1)
+    (mut xs).push(4)
+    (mut xs).push(1)
+    (mut xs).push(5)
+    if (search.min_of(xs) else 0) == 1 {} else { return 1 }
+    if (search.max_of(xs) else 0) == 5 {} else { return 2 }
+    if (search.min_index(xs) else 0 - 1) == 1 {} else { return 3 }
+    if (search.max_index(xs) else 0 - 1) == 4 {} else { return 4 }
+    if search.sum(xs) == 14 {} else { return 5 }
+    if search.product(xs) == 60 {} else { return 6 }
+    // Ties go to the first occurrence, on both ends.
+    var ties = List[int]()
+    (mut ties).push(2)
+    (mut ties).push(2)
+    (mut ties).push(2)
+    if (search.min_index(ties) else 0 - 1) == 0 {} else { return 7 }
+    if (search.max_index(ties) else 0 - 1) == 0 {} else { return 8 }
+    // Negatives, and the empty folds' identities.
+    var neg = List[int]()
+    (mut neg).push(0 - 7)
+    (mut neg).push(2)
+    if (search.min_of(neg) else 0) == 0 - 7 {} else { return 9 }
+    if search.sum(neg) == 0 - 5 {} else { return 10 }
+    if search.product(neg) == 0 - 14 {} else { return 11 }
+    var e = List[int]()
+    if search.sum(e) == 0 {} else { return 12 }
+    if search.product(e) == 1 {} else { return 13 }
+    0
+}

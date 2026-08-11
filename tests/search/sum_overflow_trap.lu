@@ -1,0 +1,19 @@
+//! check: run(exit=trap(overflow))
+//! phase: run
+//! conforms: std.search
+//!
+//! `sum` is checked arithmetic, so a partial sum that leaves `int` traps
+//! rather than wrapping — and deliberately does not raise: a sum that
+//! overflows is a bug in the caller's data model, and
+//! `std.math.checked_add` is the recoverable form.
+
+use std.math
+use std.search
+
+fn main() -> !int {
+    var xs = List[int]()
+    (mut xs).push(math.int_max())
+    (mut xs).push(1)
+    let _ = search.sum(xs)
+    0
+}

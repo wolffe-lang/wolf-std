@@ -1,0 +1,37 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.sort
+//!
+//! `sort_floats` under IEEE totalOrder, which is the order
+//! `std.cmp.total_cmp` defines and API-CONVENTIONS §6 adopts for `f64`:
+//! -inf below the negatives, `-0.0` strictly below `+0.0`, and every NaN
+//! above `+inf`. The sequence below is the agreement `std.sort` must
+//! keep with `std.cmp` — the two cannot be cross-checked mechanically at
+//! these pins (an `Ordering` cannot cross a module boundary, F-0029), so
+//! this test is the pin.
+
+use std.math.float
+use std.sort
+
+fn main() -> !int {
+    var xs = List[f64]()
+    (mut xs).push(float.nan())
+    (mut xs).push(2.5)
+    (mut xs).push(float.neg_inf())
+    (mut xs).push(0.0)
+    (mut xs).push(float.inf())
+    (mut xs).push(-0.0)
+    (mut xs).push(-1.0)
+    sort.sort_floats(mut xs)
+    if xs[0] == float.neg_inf() {} else { return 1 }
+    if xs[1] == -1.0 {} else { return 2 }
+    if xs[2] == 0.0 {} else { return 3 }
+    if float.is_sign_negative(xs[2]) {} else { return 4 }
+    if xs[3] == 0.0 {} else { return 5 }
+    if float.is_sign_negative(xs[3]) { return 6 }
+    if xs[4] == 2.5 {} else { return 7 }
+    if xs[5] == float.inf() {} else { return 8 }
+    if float.is_nan(xs[6]) {} else { return 9 }
+    if xs.len == 7 {} else { return 10 }
+    0
+}

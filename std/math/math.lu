@@ -1,0 +1,478 @@
+//! member: true
+//!
+//! std.math — integer numerics: the recoverable complements to the
+//! language's trapping operators, plus the classical integer functions.
+//! Stability tier: core.
+//!
+//! **The trapping operators stay the default (X3).** `a + b` is checked
+//! in every profile and a overflow is a bug that faults deterministically;
+//! `wrapping[T]` is how intended wraparound is spelled at the type. The
+//! `checked_*` family here is for the other case — where the OPERANDS are
+//! data and an out-of-range result is an ordinary outcome the caller
+//! handles (parsing, accumulating user input, bounds arithmetic). Reach
+//! for `+` first; reach for `checked_add` when a miss is not a bug.
+//!
+//! The row tags are `overflow` and `div_zero` (API-CONVENTIONS §2, the
+//! sc04 amendment); they are payload-free marks, so they are lowercase by
+//! that section's rule and CapCase here by the same interim every other
+//! std module rides (F-0003 / F-0023).
+//!
+//! **The two bounds are functions, not constants** (`int_max`,
+//! `int_min`). The contract asks for `INT_MIN`/`INT_MAX` constants and
+//! std wants them; a `const` cannot carry them at these pins and a
+//! `const` of any kind costs two of the three execution lanes:
+//! - lupin types the literal in `-9223372036854775808` (and in
+//!   `0 - 9223372036854775807`) at `i32` regardless of the declared type,
+//!   so the initializer traps `overflow` — INT_MIN has no const spelling;
+//! - USING a module-level `const` is `unsupported` in wolfc's checked
+//!   tier, and DECLARING one is `unsupported` on the native rung
+//!   ("item-initializer lowering (globals, c06)").
+//! Two total zero-argument functions cost one pair of parentheses and
+//! keep all three lanes. Filed as F-0025; the constants land with it.
+//!
+//! Non-targets recorded for the nursery clock (report 07): no generic
+//! numeric tower, no operator traits, no bigint/decimal/complex, no
+//! statistics. Unsigned integers have their own op-set question and this
+//! module is signed-`int` only.
+
+/// The greatest value of type `int` (2^63 - 1). Total: no error row, no
+/// traps. See the module header for why this is a function.
+///
+/// ```wolf-doc-example
+/// math.int_max() == 9223372036854775807
+/// math.int_max() > 0
+/// ```
+pub fn int_max() -> int {
+    9223372036854775807
+}
+
+/// The least value of type `int` (-2^63). Total: no error row, no traps.
+/// See the module header for why this is a function — and note the
+/// initializer's shape: the typed zero is what keeps the literal at
+/// `int` (F-0025).
+///
+/// ```wolf-doc-example
+/// let zero: int = 0
+/// math.int_min() == zero - 9223372036854775807 - 1
+/// math.int_min() < 0
+/// ```
+pub fn int_min() -> int {
+    let zero: int = 0
+    zero - 9223372036854775807 - 1
+}
+
+/// Absolute value. Traps `overflow` on `int_min()`, whose magnitude is
+/// not an `int` — a checked-arithmetic fault (X3), the same one `0 - n`
+/// raises, and the reason `abs` has no error row: the caller who could
+/// not have known has one value to check.
+///
+/// ```wolf-doc-example
+/// math.abs(5) == 5
+/// math.abs(-5) == 5
+/// math.abs(0) == 0
+/// ```
+pub fn abs(n: int) -> int {
+    if n < 0 {
+        return 0 - n
+    }
+    n
+}
+
+/// The sign of `n`: `-1`, `0` or `1`. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// math.signum(7) == 1
+/// math.signum(-7) == -1
+/// math.signum(0) == 0
+/// ```
+pub fn signum(n: int) -> int {
+    if n < 0 {
+        return 0 - 1
+    }
+    if n > 0 {
+        return 1
+    }
+    0
+}
+
+/// `b` raised to the `e`th power by binary exponentiation. Traps
+/// `overflow` when the result (or an intermediate square) leaves `int` —
+/// the ordinary checked-arithmetic fault, since `pow` multiplies with
+/// `*`. Traps `assert` on a negative exponent: an integer power of a
+/// negative exponent is not an integer, so the caller's contract is
+/// broken rather than the value's (§2's trap rule).
+///
+/// `pow(b, 0)` is 1 for every `b`, `0` included.
+///
+/// ```wolf-doc-example
+/// math.pow(2, 10) == 1024
+/// math.pow(2, 0) == 1
+/// math.pow(-3, 3) == -27
+/// math.pow(0, 0) == 1
+/// ```
+pub fn pow(b: int, e: int) -> int {
+    if e < 0 {
+        assert(false)
+    }
+    var result: int = 1
+    var base = b
+    var k = e
+    while k > 0 {
+        if k % 2 == 1 {
+            result = result * base
+        }
+        k = k / 2
+        if k > 0 {
+            base = base * base
+        }
+    }
+    result
+}
+
+/// The integer square root: the greatest `r` with `r * r <= n`. Traps
+/// `assert` on a negative `n` (no real root — a caller contract
+/// violation). Total on every non-negative `int`, `int_max()` included:
+/// the Newton iteration only ever divides, so no intermediate overflows.
+///
+/// ```wolf-doc-example
+/// math.isqrt(0) == 0
+/// math.isqrt(1) == 1
+/// math.isqrt(15) == 3
+/// math.isqrt(16) == 4
+/// math.isqrt(9223372036854775807) == 3037000499
+/// ```
+pub fn isqrt(n: int) -> int {
+    if n < 0 {
+        assert(false)
+    }
+    if n < 2 {
+        return n
+    }
+    // `n / 2 + 1` is an over-estimate of the root for every n >= 2 and
+    // cannot overflow the way the textbook's `(n + 1) / 2` can.
+    var x = n / 2 + 1
+    var y = (x + n / x) / 2
+    while y < x {
+        x = y
+        y = (x + n / x) / 2
+    }
+    x
+}
+
+/// The greatest common divisor of `|a|` and `|b|`, by Euclid. `gcd(0, 0)`
+/// is 0 and `gcd(0, b)` is `|b|`. Traps `overflow` when either argument
+/// is `int_min()` (it takes absolute values — see `abs`).
+///
+/// ```wolf-doc-example
+/// math.gcd(12, 18) == 6
+/// math.gcd(-12, 18) == 6
+/// math.gcd(0, 5) == 5
+/// math.gcd(0, 0) == 0
+/// math.gcd(17, 5) == 1
+/// ```
+pub fn gcd(a: int, b: int) -> int {
+    var x = abs(a)
+    var y = abs(b)
+    while y > 0 {
+        let t = x % y
+        x = y
+        y = t
+    }
+    x
+}
+
+/// The least common multiple of `|a|` and `|b|`; 0 when either is 0.
+/// Traps `overflow` when the multiple leaves `int` (checked `*`), and
+/// when either argument is `int_min()` (see `abs`).
+///
+/// ```wolf-doc-example
+/// math.lcm(4, 6) == 12
+/// math.lcm(0, 5) == 0
+/// math.lcm(-4, 6) == 12
+/// math.lcm(7, 7) == 7
+/// ```
+pub fn lcm(a: int, b: int) -> int {
+    if a == 0 {
+        return 0
+    }
+    if b == 0 {
+        return 0
+    }
+    let g = gcd(a, b)
+    abs(a / g * b)
+}
+
+/// Division rounding toward negative infinity — the mathematician's
+/// quotient, unlike `/`, which truncates toward zero. Traps `div-zero`
+/// when `b` is 0 and `overflow` on `div_floor(int_min(), -1)`, both
+/// inherited from the language's checked `/` (X3).
+///
+/// ```wolf-doc-example
+/// math.div_floor(7, 2) == 3
+/// math.div_floor(-7, 2) == -4
+/// math.div_floor(7, -2) == -4
+/// math.div_floor(-7, -2) == 3
+/// math.div_floor(6, 3) == 2
+/// ```
+pub fn div_floor(a: int, b: int) -> int {
+    let q = a / b
+    let r = a % b
+    if r < 0 {
+        if b > 0 {
+            return q - 1
+        }
+    }
+    if r > 0 {
+        if b < 0 {
+            return q - 1
+        }
+    }
+    q
+}
+
+/// Division rounding toward positive infinity. Traps `div-zero` when `b`
+/// is 0 and `overflow` on `div_ceil(int_min(), -1)`.
+///
+/// ```wolf-doc-example
+/// math.div_ceil(7, 2) == 4
+/// math.div_ceil(-7, 2) == -3
+/// math.div_ceil(7, -2) == -3
+/// math.div_ceil(-7, -2) == 4
+/// math.div_ceil(6, 3) == 2
+/// ```
+pub fn div_ceil(a: int, b: int) -> int {
+    let q = a / b
+    let r = a % b
+    if r > 0 {
+        if b > 0 {
+            return q + 1
+        }
+    }
+    if r < 0 {
+        if b < 0 {
+            return q + 1
+        }
+    }
+    q
+}
+
+/// The Euclidean remainder: always in `[0, |b|)`, unlike `%`, whose sign
+/// follows the dividend. Traps `div-zero` when `b` is 0.
+///
+/// ```wolf-doc-example
+/// math.rem_euclid(7, 3) == 1
+/// math.rem_euclid(-7, 3) == 2
+/// math.rem_euclid(7, -3) == 1
+/// math.rem_euclid(-7, -3) == 2
+/// ```
+pub fn rem_euclid(a: int, b: int) -> int {
+    let r = a % b
+    if r < 0 {
+        if b < 0 {
+            return r - b
+        }
+        return r + b
+    }
+    r
+}
+
+/// `a + b`, or the `Overflow` mark when the sum leaves `int`. The
+/// recoverable complement of `+`: same operands, no trap. Total — it
+/// never performs the operation it is asked to check.
+///
+/// ```wolf-doc-example
+/// (math.checked_add(2, 3) else 0) == 5
+/// (math.checked_add(math.int_max(), 1) else -1) == -1
+/// (math.checked_add(math.int_min(), -1) else -1) == -1
+/// (math.checked_add(math.int_max(), -1) else 0) == 9223372036854775806
+/// ```
+pub fn checked_add(a: int, b: int) -> int ! {Overflow} {
+    if b > 0 {
+        if a > int_max() - b {
+            return Overflow
+        }
+    }
+    if b < 0 {
+        if a < int_min() - b {
+            return Overflow
+        }
+    }
+    a + b
+}
+
+/// `a - b`, or the `Overflow` mark when the difference leaves `int`.
+///
+/// ```wolf-doc-example
+/// (math.checked_sub(5, 3) else 0) == 2
+/// (math.checked_sub(math.int_min(), 1) else 0) == 0
+/// (math.checked_sub(math.int_max(), -1) else 0) == 0
+/// (math.checked_sub(0, math.int_min()) else 0) == 0
+/// ```
+pub fn checked_sub(a: int, b: int) -> int ! {Overflow} {
+    if b < 0 {
+        if a > int_max() + b {
+            return Overflow
+        }
+    }
+    if b > 0 {
+        if a < int_min() + b {
+            return Overflow
+        }
+    }
+    a - b
+}
+
+/// `a * b`, or the `Overflow` mark when the product leaves `int`. The
+/// four sign cases are checked by division, so nothing here can trap.
+///
+/// ```wolf-doc-example
+/// (math.checked_mul(6, 7) else 0) == 42
+/// (math.checked_mul(-6, 7) else 0) == -42
+/// (math.checked_mul(math.int_max(), 2) else 0) == 0
+/// (math.checked_mul(math.int_min(), -1) else 0) == 0
+/// (math.checked_mul(0, math.int_min()) else -1) == 0
+/// ```
+pub fn checked_mul(a: int, b: int) -> int ! {Overflow} {
+    if a == 0 {
+        return 0
+    }
+    if b == 0 {
+        return 0
+    }
+    let lo = int_min()
+    let hi = int_max()
+    // -1 is the one multiplier for which the division tests below would
+    // themselves overflow (`lo / -1`), so it answers first.
+    if a == 0 - 1 {
+        if b == lo {
+            return Overflow
+        }
+        return 0 - b
+    }
+    if b == 0 - 1 {
+        if a == lo {
+            return Overflow
+        }
+        return 0 - a
+    }
+    if a > 0 {
+        if b > 0 {
+            if a > hi / b {
+                return Overflow
+            }
+        }
+        if b < 0 {
+            if b < lo / a {
+                return Overflow
+            }
+        }
+    }
+    if a < 0 {
+        if b > 0 {
+            if a < lo / b {
+                return Overflow
+            }
+        }
+        if b < 0 {
+            if a < hi / b {
+                return Overflow
+            }
+        }
+    }
+    a * b
+}
+
+/// `a / b` truncating toward zero, or the `DivZero` mark when `b` is 0.
+/// The one fault it does NOT recover is `checked_div(int_min(), -1)`,
+/// whose quotient leaves `int`: that traps `overflow`, because the row
+/// this signature carries is about the divisor, not the range (the
+/// contract's choice, and the caller who divides by a possibly-`-1`
+/// divisor can ask `checked_mul` first).
+///
+/// ```wolf-doc-example
+/// (math.checked_div(7, 2) else 0) == 3
+/// (math.checked_div(-7, 2) else 0) == -3
+/// (math.checked_div(1, 0) else -99) == -99
+/// (math.checked_div(0, 5) else -1) == 0
+/// ```
+pub fn checked_div(a: int, b: int) -> int ! {DivZero} {
+    if b == 0 {
+        return DivZero
+    }
+    a / b
+}
+
+/// `a + b`, clamped to `[int_min(), int_max()]` instead of trapping.
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// math.saturating_add(2, 3) == 5
+/// math.saturating_add(math.int_max(), 1) == math.int_max()
+/// math.saturating_add(math.int_min(), -1) == math.int_min()
+/// math.saturating_add(math.int_max(), math.int_min()) == -1
+/// ```
+pub fn saturating_add(a: int, b: int) -> int {
+    if b > 0 {
+        if a > int_max() - b {
+            return int_max()
+        }
+    }
+    if b < 0 {
+        if a < int_min() - b {
+            return int_min()
+        }
+    }
+    a + b
+}
+
+/// `a - b`, clamped to `[int_min(), int_max()]` instead of trapping.
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// math.saturating_sub(5, 3) == 2
+/// math.saturating_sub(math.int_min(), 1) == math.int_min()
+/// math.saturating_sub(math.int_max(), -1) == math.int_max()
+/// math.saturating_sub(0, math.int_min()) == math.int_max()
+/// ```
+pub fn saturating_sub(a: int, b: int) -> int {
+    if b < 0 {
+        if a > int_max() + b {
+            return int_max()
+        }
+    }
+    if b > 0 {
+        if a < int_min() + b {
+            return int_min()
+        }
+    }
+    a - b
+}
+
+/// The midpoint of `a` and `b`, rounded toward negative infinity, with
+/// no intermediate that can leave `int` — `(a + b) / 2` overflows for
+/// large same-sign pairs and this does not. Total: no error row, no
+/// traps.
+///
+/// The halves-and-remainders shape (rather than the bit-twiddling
+/// `(a & b) + ((a ^ b) >> 1)`) is deliberate: `&`, `^` and `>>` are
+/// `unsupported` in wolfc's checked tier at this pin, and the arithmetic
+/// spelling costs nothing and runs on every lane (F-0026).
+///
+/// ```wolf-doc-example
+/// math.midpoint(1, 3) == 2
+/// math.midpoint(1, 2) == 1
+/// math.midpoint(-1, -2) == -2
+/// math.midpoint(math.int_max(), math.int_max()) == math.int_max()
+/// math.midpoint(math.int_min(), math.int_max()) == -1
+/// ```
+pub fn midpoint(a: int, b: int) -> int {
+    let m = a / 2 + b / 2
+    let r = a % 2 + b % 2
+    if r >= 2 {
+        return m + 1
+    }
+    if r <= 0 - 1 {
+        return m - 1
+    }
+    m
+}

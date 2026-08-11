@@ -1,0 +1,1502 @@
+//! member: true
+//!
+//! std.math.float — floating-point numerics over `f64`: predicates,
+//! decomposition, rounding, and the transcendentals. Stability tier: core.
+//!
+//! **The pure-wolf decision (sc04's Target 2, D31 applied).** Every
+//! function here is implemented in ordinary wolf — range reduction plus
+//! polynomial evaluation — and NOT delegated to a platform libm. The
+//! reason is differential testability: a libm binding would make
+//! `sin(1.0)` mean whatever the host's C library means, which no
+//! interpreter can reproduce bit-for-bit and no two operating systems
+//! need agree on. Pure wolf makes the answer a property of the SOURCE:
+//! every implementation that evaluates IEEE-754 binary64 arithmetic
+//! correctly gets the same bits, and the tests pin those bits as exact
+//! literals. The accuracy contract below is the price, and it is stated
+//! per function rather than assumed.
+//!
+//! **The accuracy contract.** Every algebraic and transcendental
+//! function documents a bound in ulp (units in the last place of the
+//! correctly rounded result), measured over the pinned reference set in
+//! `tests/ulp/reference.toml` and enforced by `cargo xtask ulp`. The
+//! bound is a measurement, not an aspiration: where a function does not
+//! reach 2 ulp on some input class, the function says so. Faithful
+//! rounding (≤ 1 ulp) is NOT claimed anywhere, and correctly-rounded
+//! (≤ 0.5 ulp) is not a v1 promise for any transcendental — the s37
+//! intrinsics layer is where a hardware `sqrt` and friends would earn
+//! those, and this source stays the semantic reference either way
+//! (F-0028).
+//!
+//! **Why the constants are functions.** `pi()`, `nan()`, `f_max()` and
+//! the rest would be `const` items; a module-level `const` is
+//! `unsupported` when USED under wolfc's checked tier and when DECLARED
+//! on the native rung, and the native rung is the only compiler-side
+//! lane that executes float code at all (the checked tier refuses float
+//! literals outright). Constants-as-functions keep the whole module
+//! executing on two implementations. Filed as F-0025.
+//!
+//! **Never write `x != y` on floats in this module.** The native backend
+//! lowers `!=` on `f64` to an ORDERED comparison, so `nan != nan` is
+//! false there and true everywhere else (F-0027). Every inequality here
+//! is spelled `!(x == y)`, which agrees on all three lanes.
+//!
+//! Not here, by contract: float parsing and printing (sc05 owns the
+//! decimal boundary; this module ships only the binary `to_bits`
+//! currency), statistics, complex, decimal, and any SIMD or intrinsic
+//! fast path.
+
+/// π, the ratio of a circle's circumference to its diameter, rounded to
+/// the nearest `f64`. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.pi() == 3.141592653589793
+/// float.pi() > 3.14
+/// ```
+pub fn pi() -> f64 {
+    3.141592653589793
+}
+
+/// τ = 2π. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.tau() == 6.283185307179586
+/// float.tau() == float.pi() * 2.0
+/// ```
+pub fn tau() -> f64 {
+    6.283185307179586
+}
+
+/// Euler's number, the base of the natural logarithm. Total: no error
+/// row, no traps.
+///
+/// ```wolf-doc-example
+/// float.e() == 2.718281828459045
+/// float.e() > 2.7
+/// ```
+pub fn e() -> f64 {
+    2.718281828459045
+}
+
+/// Positive infinity. Total: no error row, no traps — float division by
+/// zero is IEEE, not the checked-arithmetic fault X3 gives integers.
+///
+/// ```wolf-doc-example
+/// float.inf() > 1.0e308
+/// float.inf() == 1.0 / 0.0
+/// ```
+pub fn inf() -> f64 {
+    1.0 / 0.0
+}
+
+/// Negative infinity. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.neg_inf() < -1.0e308
+/// float.neg_inf() == 0.0 - float.inf()
+/// ```
+pub fn neg_inf() -> f64 {
+    0.0 - inf()
+}
+
+/// A quiet NaN. Total: no error row, no traps. NaN is the one `f64`
+/// unequal to itself — probe it with `is_nan`, never with `==`.
+///
+/// ```wolf-doc-example
+/// float.is_nan(float.nan()) == true
+/// float.is_nan(0.0) == false
+/// ```
+pub fn nan() -> f64 {
+    0.0 / 0.0
+}
+
+/// The difference between 1.0 and the next representable `f64` (2^-52).
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.epsilon() == 2.220446049250313e-16
+/// 1.0 + float.epsilon() > 1.0
+/// ```
+pub fn epsilon() -> f64 {
+    2.220446049250313e-16
+}
+
+/// The least finite `f64` — the most negative one, not the smallest
+/// positive one (that is `f_min_positive`, a nursery candidate this
+/// module names and does not ship). Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.f_min() == 0.0 - float.f_max()
+/// float.f_min() < -1.0e308
+/// ```
+pub fn f_min() -> f64 {
+    0.0 - f_max()
+}
+
+/// The greatest finite `f64`. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.f_max() == 1.7976931348623157e308
+/// float.f_max() < float.inf()
+/// ```
+pub fn f_max() -> f64 {
+    1.7976931348623157e308
+}
+
+/// True exactly for NaN. Total: no error row, no traps.
+///
+/// The body is `!(x == x)` rather than the textbook `x != x`: see the
+/// module header (F-0027).
+///
+/// ```wolf-doc-example
+/// float.is_nan(0.0 / 0.0) == true
+/// float.is_nan(1.0) == false
+/// float.is_nan(float.inf()) == false
+/// ```
+pub fn is_nan(x: f64) -> bool {
+    !(x == x)
+}
+
+/// True for either infinity. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.is_inf(float.inf()) == true
+/// float.is_inf(float.neg_inf()) == true
+/// float.is_inf(1.0e308) == false
+/// float.is_inf(float.nan()) == false
+/// ```
+pub fn is_inf(x: f64) -> bool {
+    if x == inf() {
+        return true
+    }
+    x == neg_inf()
+}
+
+/// True for everything that is neither NaN nor an infinity. Total: no
+/// error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.is_finite(1.0) == true
+/// float.is_finite(0.0) == true
+/// float.is_finite(float.inf()) == false
+/// float.is_finite(float.nan()) == false
+/// ```
+pub fn is_finite(x: f64) -> bool {
+    if is_nan(x) {
+        return false
+    }
+    !is_inf(x)
+}
+
+/// True when `x` carries a negative sign bit — which includes `-0.0`,
+/// the value `x < 0.0` cannot see. NaN's sign is not observable at these
+/// pins and answers false. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.is_sign_negative(-1.0) == true
+/// float.is_sign_negative(-0.0) == true
+/// float.is_sign_negative(0.0) == false
+/// float.is_sign_negative(1.0) == false
+/// ```
+pub fn is_sign_negative(x: f64) -> bool {
+    if is_nan(x) {
+        return false
+    }
+    if x < 0.0 {
+        return true
+    }
+    if x == 0.0 {
+        // The sign of a zero is observable through division: 1/-0.0 is
+        // -inf and 1/+0.0 is +inf.
+        return 1.0 / x < 0.0
+    }
+    false
+}
+
+/// Magnitude. `abs(-0.0)` is `+0.0` and `abs(NaN)` is NaN. Total: no
+/// error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.abs(-2.5) == 2.5
+/// float.abs(2.5) == 2.5
+/// float.abs(-0.0) == 0.0
+/// float.is_sign_negative(float.abs(-0.0)) == false
+/// ```
+pub fn abs(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x == 0.0 {
+        // Normalizes -0.0 to +0.0 (adding zeroes of unlike sign gives
+        // +0.0 under round-to-nearest).
+        return 0.0
+    }
+    if x < 0.0 {
+        return 0.0 - x
+    }
+    x
+}
+
+/// The sign of `x` as a float: `1.0`, `-1.0`, the zero itself for `±0.0`
+/// (sign preserved), and NaN for NaN. Total: no error row, no traps.
+///
+/// The zero and NaN answers are the documented choice: `signum` is
+/// sign EXTRACTION, and a zero's sign is a zero's, not a one's.
+///
+/// ```wolf-doc-example
+/// float.signum(3.0) == 1.0
+/// float.signum(-3.0) == -1.0
+/// float.signum(0.0) == 0.0
+/// float.is_nan(float.signum(float.nan())) == true
+/// ```
+pub fn signum(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x > 0.0 {
+        return 1.0
+    }
+    if x < 0.0 {
+        return 0.0 - 1.0
+    }
+    x
+}
+
+/// `x` with the sign of `y`. `copysign(3.0, -0.0)` is `-3.0`: the sign
+/// of a zero counts. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.copysign(3.0, -1.0) == -3.0
+/// float.copysign(-3.0, 1.0) == 3.0
+/// float.copysign(3.0, -0.0) == -3.0
+/// float.copysign(-0.0, 1.0) == 0.0
+/// ```
+pub fn copysign(x: f64, y: f64) -> f64 {
+    let m = abs(x)
+    if is_sign_negative(y) {
+        return neg(m)
+    }
+    m
+}
+
+/// Truncation toward zero: the integral part, with the sign of `x`
+/// (`trunc(-0.5)` is `-0.0`). Infinities and NaN pass through. Total: no
+/// error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.trunc(2.7) == 2.0
+/// float.trunc(-2.7) == -2.0
+/// float.trunc(2.0) == 2.0
+/// float.trunc(0.5) == 0.0
+/// ```
+pub fn trunc(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    let a = abs(x)
+    // Every |x| at or above 2^52 is already an integer, infinities
+    // included — and the rounding trick below needs |x| < 2^52 to be
+    // exact, so this branch is the contract, not an optimization.
+    if a >= 4503599627370496.0 {
+        return x
+    }
+    if x == 0.0 {
+        return x
+    }
+    // (a + 2^52) - 2^52 rounds a to an integer (nearest, ties to even);
+    // truncation is one step down whenever that rounded up.
+    let r = a + 4503599627370496.0 - 4503599627370496.0
+    var t = r
+    if r > a {
+        t = r - 1.0
+    }
+    if x < 0.0 {
+        return neg(t)
+    }
+    t
+}
+
+/// The greatest integer at or below `x`. Infinities and NaN pass
+/// through. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.floor(2.7) == 2.0
+/// float.floor(-2.7) == -3.0
+/// float.floor(2.0) == 2.0
+/// float.floor(-0.5) == -1.0
+/// ```
+pub fn floor(x: f64) -> f64 {
+    let t = trunc(x)
+    if x < 0.0 {
+        if !(t == x) {
+            return t - 1.0
+        }
+    }
+    t
+}
+
+/// The least integer at or above `x`. `ceil(-0.5)` is `-0.0`.
+/// Infinities and NaN pass through. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.ceil(2.1) == 3.0
+/// float.ceil(-2.1) == -2.0
+/// float.ceil(2.0) == 2.0
+/// float.ceil(0.5) == 1.0
+/// ```
+pub fn ceil(x: f64) -> f64 {
+    let t = trunc(x)
+    if x > 0.0 {
+        if !(t == x) {
+            return t + 1.0
+        }
+    }
+    t
+}
+
+/// Rounds to the nearest integer, **halves away from zero** — the
+/// schoolbook rule, not the banker's rounding IEEE arithmetic itself
+/// uses. `round(0.5)` is `1.0` and `round(-0.5)` is `-1.0`, where
+/// round-half-to-even would answer `0.0` and `-0.0`. Infinities and NaN
+/// pass through. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.round(0.5) == 1.0
+/// float.round(-0.5) == -1.0
+/// float.round(2.5) == 3.0
+/// float.round(2.4) == 2.0
+/// float.round(-2.6) == -3.0
+/// ```
+pub fn round(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    let a = abs(x)
+    if a >= 4503599627370496.0 {
+        return x
+    }
+    let t = trunc(a)
+    var r = t
+    if a - t >= 0.5 {
+        r = t + 1.0
+    }
+    if is_sign_negative(x) {
+        return neg(r)
+    }
+    r
+}
+
+/// The fractional part: `x - trunc(x)`, carrying the sign of `x`.
+/// `fract` of an infinity is NaN (infinity has no fractional part to
+/// name), and NaN passes through. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.fract(2.75) == 0.75
+/// float.fract(-2.75) == -0.75
+/// float.fract(3.0) == 0.0
+/// float.is_nan(float.fract(float.inf())) == true
+/// ```
+pub fn fract(x: f64) -> f64 {
+    x - trunc(x)
+}
+
+/// `2.0` raised to an integral `f64` power — the scaling primitive the
+/// reductions below share. `k` outside `[-1100, 1100]` saturates to
+/// `0.0` or `inf` exactly as repeated multiplication does. Total: no
+/// error row, no traps.
+fn two_pow(k: f64) -> f64 {
+    var r = 1.0
+    var n = k
+    while n >= 1.0 {
+        r = r * 2.0
+        n = n - 1.0
+    }
+    while n <= 0.0 - 1.0 {
+        r = r * 0.5
+        n = n + 1.0
+    }
+    r
+}
+
+/// Sign flip that preserves the sign of a zero: `0.0 - x` gives `+0.0`
+/// for both zeroes under round-to-nearest, and multiplying by -1.0 does
+/// not. Every sign flip in this module that can see a zero goes through
+/// here.
+fn neg(x: f64) -> f64 {
+    x * (0.0 - 1.0)
+}
+
+/// The positive square root. `sqrt` of a negative number is NaN, of
+/// `±0.0` is that zero, of `+inf` is `+inf`, of NaN is NaN.
+///
+/// Accuracy: **≤ 1 ulp** over the reference set — five Newton steps from
+/// a linear seed on the reduced argument, with the power-of-four scaling
+/// exact. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.sqrt(4.0) == 2.0
+/// float.sqrt(0.0) == 0.0
+/// float.sqrt(1.0) == 1.0
+/// float.is_nan(float.sqrt(-1.0)) == true
+/// float.sqrt(float.inf()) == float.inf()
+/// ```
+pub fn sqrt(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x < 0.0 {
+        return nan()
+    }
+    if x == 0.0 {
+        return x
+    }
+    if x == inf() {
+        return x
+    }
+    // Scale by powers of four (exact) into [1, 4), where a linear seed
+    // is good to about 17% and Newton doubles the digits each step.
+    var m = x
+    var k = 0.0
+    while m >= 4.0 {
+        m = m * 0.25
+        k = k + 1.0
+    }
+    while m < 1.0 {
+        m = m * 4.0
+        k = k - 1.0
+    }
+    var y = 0.5 * m + 0.5
+    y = 0.5 * (y + m / y)
+    y = 0.5 * (y + m / y)
+    y = 0.5 * (y + m / y)
+    y = 0.5 * (y + m / y)
+    y = 0.5 * (y + m / y)
+    y * two_pow(k)
+}
+
+/// The real cube root, defined for negative arguments too (unlike
+/// `powf(x, 1.0 / 3.0)`). `cbrt(±0.0)` is that zero, `cbrt(±inf)` is
+/// that infinity, `cbrt(NaN)` is NaN.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// float.cbrt(8.0) == 2.0
+/// float.cbrt(-8.0) == -2.0
+/// float.cbrt(0.0) == 0.0
+/// float.cbrt(1.0) == 1.0
+/// ```
+pub fn cbrt(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x == 0.0 {
+        return x
+    }
+    if is_inf(x) {
+        return x
+    }
+    let negative = x < 0.0
+    var m = abs(x)
+    var k = 0.0
+    // Powers of eight are exact, so the reduction costs no accuracy.
+    while m >= 8.0 {
+        m = m * 0.125
+        k = k + 1.0
+    }
+    while m < 1.0 {
+        m = m * 8.0
+        k = k - 1.0
+    }
+    var y = 1.0 + (m - 1.0) * 0.16666666666666666
+    y = (2.0 * y + m / (y * y)) * 0.3333333333333333
+    y = (2.0 * y + m / (y * y)) * 0.3333333333333333
+    y = (2.0 * y + m / (y * y)) * 0.3333333333333333
+    y = (2.0 * y + m / (y * y)) * 0.3333333333333333
+    y = (2.0 * y + m / (y * y)) * 0.3333333333333333
+    y = (2.0 * y + m / (y * y)) * 0.3333333333333333
+    // x = m * 8^k, so the root is cbrt(m) * 2^k.
+    let r = y * two_pow(k)
+    if negative {
+        return neg(r)
+    }
+    r
+}
+
+/// `sqrt(a*a + b*b)` computed without the intermediate overflow the
+/// literal formula suffers. `hypot` of an infinity is `+inf` even when
+/// the other argument is NaN (IEEE's rule: the magnitude is already
+/// known).
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// float.hypot(3.0, 4.0) == 5.0
+/// float.hypot(0.0, 0.0) == 0.0
+/// float.hypot(-3.0, -4.0) == 5.0
+/// float.hypot(float.inf(), float.nan()) == float.inf()
+/// ```
+pub fn hypot(a: f64, b: f64) -> f64 {
+    let x = abs(a)
+    let y = abs(b)
+    if is_inf(x) {
+        return inf()
+    }
+    if is_inf(y) {
+        return inf()
+    }
+    if is_nan(x) {
+        return nan()
+    }
+    if is_nan(y) {
+        return nan()
+    }
+    var big = x
+    var small = y
+    if y > x {
+        big = y
+        small = x
+    }
+    if big == 0.0 {
+        return 0.0
+    }
+    let r = small / big
+    big * sqrt(1.0 + r * r)
+}
+
+/// e raised to the power `x`. `exp(-inf)` is `0.0`, `exp(+inf)` is
+/// `+inf`, `exp(NaN)` is NaN; arguments above about 709.78 overflow to
+/// `+inf` and below about -745.13 underflow to `0.0`, exactly as the
+/// range demands.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set, subnormal results
+/// included — the final scaling is staged so that a subnormal answer
+/// rounds once rather than once per halving (`scale2`). Total: no error
+/// row, no traps.
+///
+/// ```wolf-doc-example
+/// float.exp(0.0) == 1.0
+/// float.exp(1.0) == 2.7182818284590455
+/// float.exp(float.neg_inf()) == 0.0
+/// float.exp(float.inf()) == float.inf()
+/// ```
+pub fn exp(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x == inf() {
+        return x
+    }
+    if x == neg_inf() {
+        return 0.0
+    }
+    if x > 709.7827128933841 {
+        return inf()
+    }
+    if x < 0.0 - 745.1332191019411 {
+        return 0.0
+    }
+    // x = k*ln2 + r with |r| <= ln2/2. The high piece of ln2 carries only
+    // 33 significant bits, so `k * LN2_HI` is EXACT for every k this
+    // function can produce and the first subtraction loses nothing — the
+    // ordinary two-piece split leaves 200+ ulp on the table at x = 700.
+    let k = round(x * 1.4426950408889634)
+    let r = x - k * 0.6931471803691238 - k * 1.9082149292705877e-10
+    scale2(exp_small(r), k)
+}
+
+/// `v * 2^k`, staged so that a subnormal result rounds once instead of
+/// once per halving.
+fn scale2(v: f64, k: f64) -> f64 {
+    if k < 0.0 - 1022.0 {
+        return v * two_pow(k + 200.0) * two_pow(0.0 - 200.0)
+    }
+    v * two_pow(k)
+}
+
+/// e^r for |r| at or below about 0.35 — the Taylor series, Horner form,
+/// through r^14, whose truncation term is below 2^-60 on that interval.
+fn exp_small(r: f64) -> f64 {
+    let t = 1.0 + r * 0.07142857142857142
+    let t2 = 1.0 + r * t * 0.07692307692307693
+    let t3 = 1.0 + r * t2 * 0.08333333333333333
+    let t4 = 1.0 + r * t3 * 0.09090909090909091
+    let t5 = 1.0 + r * t4 * 0.1
+    let t6 = 1.0 + r * t5 * 0.1111111111111111
+    let t7 = 1.0 + r * t6 * 0.125
+    let t8 = 1.0 + r * t7 * 0.14285714285714285
+    let t9 = 1.0 + r * t8 * 0.16666666666666666
+    let t10 = 1.0 + r * t9 * 0.2
+    let t11 = 1.0 + r * t10 * 0.25
+    let t12 = 1.0 + r * t11 * 0.3333333333333333
+    let t13 = 1.0 + r * t12 * 0.5
+    1.0 + r * t13
+}
+
+/// `2.0` raised to the power `x`, exact at every integral `x` in range.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// float.exp2(0.0) == 1.0
+/// float.exp2(10.0) == 1024.0
+/// float.exp2(-1.0) == 0.5
+/// float.exp2(0.5) == 1.414213562373095
+/// ```
+pub fn exp2(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x == inf() {
+        return x
+    }
+    if x == neg_inf() {
+        return 0.0
+    }
+    if x > 1024.0 {
+        return inf()
+    }
+    if x < 0.0 - 1075.0 {
+        return 0.0
+    }
+    let k = round(x)
+    let f = x - k
+    if f == 0.0 {
+        return scale2(1.0, k)
+    }
+    scale2(exp_small(f * 0.6931471805599453 + f * 2.3190468138462996e-17), k)
+}
+
+/// The natural logarithm. `ln(0.0)` is `-inf`, `ln` of a negative number
+/// is NaN, `ln(+inf)` is `+inf`, `ln(1.0)` is exactly `0.0`.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// float.ln(1.0) == 0.0
+/// float.ln(float.e()) == 1.0
+/// float.ln(0.0) == float.neg_inf()
+/// float.is_nan(float.ln(-1.0)) == true
+/// ```
+pub fn ln(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x < 0.0 {
+        return nan()
+    }
+    if x == 0.0 {
+        return neg_inf()
+    }
+    if x == inf() {
+        return x
+    }
+    let k = ln_exponent(x)
+    let m = x * two_pow(0.0 - k)
+    // ln2 in two pieces keeps k*ln2 honest for |k| up to 1100.
+    ln_mantissa(m) +
+        k * 0.6931471805599453 +
+        k * 2.3190468138462996e-17
+}
+
+/// The scaling exponent `k` with `x * 2^-k` in `[sqrt(2)/2, sqrt(2))`.
+fn ln_exponent(x: f64) -> f64 {
+    var m = x
+    var k = 0.0
+    while m >= 1.4142135623730951 {
+        m = m * 0.5
+        k = k + 1.0
+    }
+    while m < 0.7071067811865476 {
+        m = m * 2.0
+        k = k - 1.0
+    }
+    k
+}
+
+/// ln(m) for m in [sqrt(2)/2, sqrt(2)) via the atanh series in
+/// s = (m-1)/(m+1), |s| <= 0.1716 — twelve odd terms, truncating below
+/// 2^-60.
+fn ln_mantissa(m: f64) -> f64 {
+    let s = (m - 1.0) / (m + 1.0)
+    let q = s * s
+    let t = 0.043478260869565216 + q * 0.04
+    let t2 = 0.047619047619047616 + q * t
+    let t3 = 0.05263157894736842 + q * t2
+    let t4 = 0.058823529411764705 + q * t3
+    let t5 = 0.06666666666666667 + q * t4
+    let t6 = 0.07692307692307693 + q * t5
+    let t7 = 0.09090909090909091 + q * t6
+    let t8 = 0.1111111111111111 + q * t7
+    let t9 = 0.14285714285714285 + q * t8
+    let t10 = 0.2 + q * t9
+    let t11 = 0.3333333333333333 + q * t10
+    let t12 = 1.0 + q * t11
+    2.0 * s * t12
+}
+
+/// The base-2 logarithm, exact at every power of two. `log2(0.0)` is
+/// `-inf` and `log2` of a negative number is NaN.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// float.log2(1.0) == 0.0
+/// float.log2(8.0) == 3.0
+/// float.log2(0.5) == -1.0
+/// float.log2(0.0) == float.neg_inf()
+/// ```
+pub fn log2(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x < 0.0 {
+        return nan()
+    }
+    if x == 0.0 {
+        return neg_inf()
+    }
+    if x == inf() {
+        return x
+    }
+    let k = ln_exponent(x)
+    let m = x * two_pow(0.0 - k)
+    // Splitting this way — the exponent as an exact term, the mantissa
+    // through the series — is what makes log2 of a power of two exact.
+    k +
+        ln_mantissa(m) * 1.4426950408889634
+}
+
+/// The base-10 logarithm. `log10(0.0)` is `-inf` and `log10` of a
+/// negative number is NaN.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Exactness at powers of
+/// ten is NOT promised — `log10(1000.0)` is the correctly rounded
+/// neighbour of 3, not 3 — because the base-ten exponent is not a term
+/// this reduction can separate. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.log10(1.0) == 0.0
+/// float.log10(10.0) == 1.0
+/// float.log10(0.0) == float.neg_inf()
+/// float.log10(100.0) == 2.0
+/// ```
+pub fn log10(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x < 0.0 {
+        return nan()
+    }
+    if x == 0.0 {
+        return neg_inf()
+    }
+    if x == inf() {
+        return x
+    }
+    let k = ln_exponent(x)
+    let m = x * two_pow(0.0 - k)
+    k * 0.3010299956639812 + ln_mantissa(m) * 0.4342944819032518
+}
+
+/// The quadrant-and-remainder reduction sin/cos/tan share: returns the
+/// remainder r with |r| <= pi/4 for the quadrant `q`, computed with pi/2
+/// in three pieces (Cody–Waite).
+fn reduce_quadrant(x: f64) -> f64 {
+    let n = round(x * 0.6366197723675814)
+    // pi/2 in three pieces whose two leading parts carry 33 significant
+    // bits each: `n * PIO2_1` and `n * PIO2_2` are then exact for every
+    // |n| below 2^20, and the first subtraction cancels exactly. The
+    // single-piece split costs 300 ulp at x = 1000.
+    x -
+        n * 1.5707963267341256 -
+        n * 6.077100506303966e-11 -
+        n * 2.0222662487959506e-21
+}
+
+/// The quadrant index 0..3 of `x` as an `f64`.
+fn quadrant(x: f64) -> f64 {
+    let n = round(x * 0.6366197723675814)
+    n - 4.0 * floor(n * 0.25)
+}
+
+/// sin(r) for |r| <= pi/4, Taylor through r^17.
+fn sin_small(r: f64) -> f64 {
+    let q = r * r
+    let t = 0.16666666666666666 - q * poly_sin(q)
+    r - r * q * t
+}
+
+/// The inner alternating sum of sin's Taylor series, from 1/5040 up.
+fn poly_sin(q: f64) -> f64 {
+    let a = 2.8114572543455206e-15 - q * 8.22063524662433e-18
+    let b = 7.647163731819816e-13 - q * a
+    let c = 1.6059043836821613e-10 - q * b
+    let d = 2.505210838544172e-8 - q * c
+    let f = 2.7557319223985893e-6 - q * d
+    let g = 1.984126984126984e-4 - q * f
+    let h = 0.008333333333333333 - q * g
+    h
+}
+
+/// cos(r) for |r| <= pi/4, Taylor through r^18.
+fn cos_small(r: f64) -> f64 {
+    let q = r * r
+    let a = 4.779477332387385e-14 - q * 1.5619206968586225e-16
+    let b = 1.1470745597729725e-11 - q * a
+    let c = 2.08767569878681e-9 - q * b
+    let d = 2.755731922398589e-7 - q * c
+    let f = 2.48015873015873e-5 - q * d
+    let g = 0.001388888888888889 - q * f
+    let h = 0.041666666666666664 - q * g
+    let i = 0.5 - q * h
+    1.0 - q * i
+}
+
+/// The sine of `x` in radians. NaN in, NaN out; an infinite argument has
+/// no meaningful sine and answers NaN.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set for |x| ≤ 2^20. Beyond
+/// that the three-piece argument reduction runs out of bits and the
+/// error grows with |x| — the documented limit, not a hidden one.
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.sin(0.0) == 0.0
+/// float.sin(1.0) == 0.8414709848078965
+/// float.is_nan(float.sin(float.inf())) == true
+/// float.abs(float.sin(float.pi())) < 1.0e-15
+/// ```
+pub fn sin(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if is_inf(x) {
+        return nan()
+    }
+    if x == 0.0 {
+        return x
+    }
+    let r = reduce_quadrant(x)
+    let q = quadrant(x)
+    if q == 0.0 {
+        return sin_small(r)
+    }
+    if q == 1.0 {
+        return cos_small(r)
+    }
+    if q == 2.0 {
+        return 0.0 - sin_small(r)
+    }
+    0.0 - cos_small(r)
+}
+
+/// The cosine of `x` in radians. NaN in, NaN out; an infinite argument
+/// answers NaN.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set for |x| ≤ 2^20, with the
+/// same reduction limit `sin` documents. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.cos(0.0) == 1.0
+/// float.cos(1.0) == 0.5403023058681398
+/// float.is_nan(float.cos(float.inf())) == true
+/// float.cos(-1.0) == float.cos(1.0)
+/// ```
+pub fn cos(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if is_inf(x) {
+        return nan()
+    }
+    let r = reduce_quadrant(x)
+    let q = quadrant(x)
+    if q == 0.0 {
+        return cos_small(r)
+    }
+    if q == 1.0 {
+        return 0.0 - sin_small(r)
+    }
+    if q == 2.0 {
+        return 0.0 - cos_small(r)
+    }
+    sin_small(r)
+}
+
+/// The tangent of `x` in radians, as `sin(x) / cos(x)` over one shared
+/// reduction. NaN in, NaN out; an infinite argument answers NaN.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. The quotient inherits
+/// both polynomials' error, and near a pole the cancellation in `cos` is
+/// genuine — the reference set includes `tan(pi/2)`, whose enormous
+/// answer is the correctly rounded one for the argument actually given.
+/// Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.tan(0.0) == 0.0
+/// float.tan(1.0) == 1.557407724654902
+/// float.is_nan(float.tan(float.inf())) == true
+/// float.abs(float.tan(float.pi() * 0.25) - 1.0) < 1.0e-15
+/// ```
+pub fn tan(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if is_inf(x) {
+        return nan()
+    }
+    if x == 0.0 {
+        return x
+    }
+    let r = reduce_quadrant(x)
+    let q = quadrant(x)
+    let s = sin_small(r)
+    let c = cos_small(r)
+    if q == 0.0 {
+        return s / c
+    }
+    if q == 1.0 {
+        return 0.0 - c / s
+    }
+    if q == 2.0 {
+        return s / c
+    }
+    0.0 - c / s
+}
+
+/// atan(t) for |t| <= tan(pi/12), the 18-term odd series.
+fn atan_small(t: f64) -> f64 {
+    let q = t * t
+    let a = 0.030303030303030304 - q * 0.02857142857142857
+    let b = 0.03225806451612903 - q * a
+    let c = 0.034482758620689655 - q * b
+    let d = 0.037037037037037035 - q * c
+    let f = 0.04 - q * d
+    let g = 0.043478260869565216 - q * f
+    let h = 0.047619047619047616 - q * g
+    let i = 0.05263157894736842 - q * h
+    let j = 0.058823529411764705 - q * i
+    let k = 0.06666666666666667 - q * j
+    let l = 0.07692307692307693 - q * k
+    let m = 0.09090909090909091 - q * l
+    let n = 0.1111111111111111 - q * m
+    let o = 0.14285714285714285 - q * n
+    let p = 0.2 - q * o
+    let u = 0.3333333333333333 - q * p
+    let v = 1.0 - q * u
+    t * v
+}
+
+/// atan of a non-negative finite `a`, reducing into [0, tan(pi/12)].
+fn atan_positive(a: f64) -> f64 {
+    if a > 1.0 {
+        return 1.5707963267948966 - atan_positive(1.0 / a)
+    }
+    if a > 0.2679491924311227 {
+        // atan(a) = pi/6 + atan((a*sqrt3 - 1) / (sqrt3 + a))
+        let u = (a * 1.7320508075688772 - 1.0) / (1.7320508075688772 + a)
+        return 0.5235987755982988 + atan_small(u)
+    }
+    atan_small(a)
+}
+
+/// The arctangent, in `[-pi/2, pi/2]`. `atan(±inf)` is `±pi/2`, NaN in
+/// NaN out.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// float.atan(0.0) == 0.0
+/// float.atan(1.0) == 0.7853981633974483
+/// float.atan(-1.0) == -0.7853981633974483
+/// float.atan(float.inf()) == 1.5707963267948966
+/// ```
+pub fn atan(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    if x == inf() {
+        return 1.5707963267948966
+    }
+    if x == neg_inf() {
+        return 0.0 - 1.5707963267948966
+    }
+    if x == 0.0 {
+        return x
+    }
+    let r = atan_positive(abs(x))
+    if x < 0.0 {
+        return 0.0 - r
+    }
+    r
+}
+
+/// The arcsine, in `[-pi/2, pi/2]`. An argument outside `[-1, 1]` is
+/// NaN — the value has no real arcsine, and a row would make every
+/// caller of a total function handle a case the domain already states.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// float.asin(0.0) == 0.0
+/// float.asin(1.0) == 1.5707963267948966
+/// float.asin(-1.0) == -1.5707963267948966
+/// float.is_nan(float.asin(2.0)) == true
+/// ```
+pub fn asin(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    let a = abs(x)
+    if a > 1.0 {
+        return nan()
+    }
+    if x == 0.0 {
+        return x
+    }
+    let r = asin_positive(a)
+    if x < 0.0 {
+        return 0.0 - r
+    }
+    r
+}
+
+/// asin of a non-negative `a` in [0, 1].
+fn asin_positive(a: f64) -> f64 {
+    if a == 1.0 {
+        return 1.5707963267948966
+    }
+    if a > 0.7071067811865476 {
+        // The half-angle identity keeps the argument away from the
+        // vertical tangent, where `a / sqrt(1 - a*a)` loses digits.
+        let h = sqrt((1.0 - a) * 0.5)
+        return 1.5707963267948966 - 2.0 * atan_positive(h / sqrt(1.0 - h * h))
+    }
+    atan_positive(a / sqrt(1.0 - a * a))
+}
+
+/// The arccosine, in `[0, pi]`. An argument outside `[-1, 1]` is NaN.
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// float.acos(1.0) == 0.0
+/// float.acos(0.0) == 1.5707963267948966
+/// float.acos(-1.0) == 3.141592653589793
+/// float.is_nan(float.acos(-2.0)) == true
+/// ```
+pub fn acos(x: f64) -> f64 {
+    if is_nan(x) {
+        return x
+    }
+    let a = abs(x)
+    if a > 1.0 {
+        return nan()
+    }
+    if x >= 0.5 {
+        let h = sqrt((1.0 - x) * 0.5)
+        return 2.0 * asin_positive(h)
+    }
+    if x <= 0.0 - 0.5 {
+        let h = sqrt((1.0 + x) * 0.5)
+        return 3.141592653589793 - 2.0 * asin_positive(h)
+    }
+    1.5707963267948966 - asin(x)
+}
+
+/// The angle of the point `(x, y)` from the positive x-axis, in
+/// `(-pi, pi]`, with the quadrant taken from both signs. The IEEE
+/// special cases are all here and all documented by the tests: NaN in
+/// either argument gives NaN; `atan2(±0.0, +x)` is `±0.0`;
+/// `atan2(±0.0, -x)` is `±pi`; both infinite gives the diagonal
+/// (`±pi/4`, `±3pi/4`).
+///
+/// Accuracy: **≤ 2 ulp** over the reference set. Total: no error row, no
+/// traps.
+///
+/// ```wolf-doc-example
+/// float.atan2(0.0, 1.0) == 0.0
+/// float.atan2(1.0, 1.0) == 0.7853981633974483
+/// float.atan2(1.0, 0.0) == 1.5707963267948966
+/// float.atan2(0.0, -1.0) == 3.141592653589793
+/// float.atan2(-1.0, -1.0) == -2.356194490192345
+/// ```
+pub fn atan2(y: f64, x: f64) -> f64 {
+    if is_nan(y) {
+        return nan()
+    }
+    if is_nan(x) {
+        return nan()
+    }
+    if is_inf(y) {
+        if is_inf(x) {
+            var base = 0.7853981633974483
+            if x < 0.0 {
+                base = 2.356194490192345
+            }
+            if y < 0.0 {
+                return 0.0 - base
+            }
+            return base
+        }
+        if y < 0.0 {
+            return 0.0 - 1.5707963267948966
+        }
+        return 1.5707963267948966
+    }
+    if is_inf(x) {
+        var base = 0.0
+        if x < 0.0 {
+            base = 3.141592653589793
+        }
+        if is_sign_negative(y) {
+            return 0.0 - base
+        }
+        return base
+    }
+    if y == 0.0 {
+        var base = 0.0
+        if is_sign_negative(x) {
+            base = 3.141592653589793
+        }
+        if is_sign_negative(y) {
+            return 0.0 - base
+        }
+        return base
+    }
+    if x == 0.0 {
+        if y < 0.0 {
+            return 0.0 - 1.5707963267948966
+        }
+        return 1.5707963267948966
+    }
+    let a = atan_positive(abs(y) / abs(x))
+    var r = a
+    if x < 0.0 {
+        r = 3.141592653589793 - a
+    }
+    if y < 0.0 {
+        return 0.0 - r
+    }
+    r
+}
+
+/// `b` raised to the real power `e`, as `exp(e * ln b)` with the sign
+/// and the special cases handled first. A negative base is legal only
+/// for an integral exponent (the real power is undefined otherwise) and
+/// answers NaN if the exponent is not integral.
+///
+/// The IEEE special cases this follows: `powf(x, 0.0)` is `1.0` for
+/// every `x`, NaN included; `powf(1.0, y)` is `1.0` for every `y`;
+/// `powf(0.0, y)` is `0.0` for positive `y` and `+inf` for negative `y`.
+///
+/// Accuracy: **≤ 4 ulp** over the reference set. An integral exponent of
+/// magnitude at most 4096 takes the binary-exponentiation path and is
+/// exact wherever the answer is (`powf(10.0, 3.0)` is 1000.0,
+/// `powf(2.0, 100.0)` is the exact power); every other exponent goes
+/// through `exp(e * ln b)`, whose error is `ln b`'s multiplied by `e` —
+/// so the bound degrades with |e·ln b| and the docs say so rather than
+/// pretending otherwise. Total: no error row, no traps.
+///
+/// ```wolf-doc-example
+/// float.powf(2.0, 10.0) == 1024.0
+/// float.powf(4.0, 0.5) == 2.0
+/// float.powf(2.0, 0.0) == 1.0
+/// float.powf(-2.0, 3.0) == -8.0
+/// float.is_nan(float.powf(-2.0, 0.5)) == true
+/// ```
+pub fn powf(b: f64, e: f64) -> f64 {
+    if e == 0.0 {
+        return 1.0
+    }
+    if b == 1.0 {
+        return 1.0
+    }
+    if is_nan(b) {
+        return b
+    }
+    if is_nan(e) {
+        return e
+    }
+    if b == 0.0 {
+        if e < 0.0 {
+            return inf()
+        }
+        return 0.0
+    }
+    if is_inf(b) {
+        if b > 0.0 {
+            if e > 0.0 {
+                return inf()
+            }
+            return 0.0
+        }
+        // A negative infinity's powers follow the exponent's parity.
+        let odd = is_odd_integer(e)
+        if e > 0.0 {
+            if odd {
+                return neg_inf()
+            }
+            return inf()
+        }
+        if odd {
+            return neg(0.0)
+        }
+        return 0.0
+    }
+    if is_inf(e) {
+        let m = abs(b)
+        if m > 1.0 {
+            if e > 0.0 {
+                return inf()
+            }
+            return 0.0
+        }
+        if e > 0.0 {
+            return 0.0
+        }
+        return inf()
+    }
+    if b < 0.0 {
+        if !(trunc(e) == e) {
+            return nan()
+        }
+        let m = pow_positive(0.0 - b, e)
+        if is_odd_integer(e) {
+            return neg(m)
+        }
+        return m
+    }
+    pow_positive(b, e)
+}
+
+/// `b^e` for a finite positive `b`. An integral exponent of modest size
+/// goes through binary exponentiation, which is exact where the answer
+/// is exact (`powf(10.0, 3.0)` is 1000.0) and costs about one ulp per
+/// squaring; everything else is `exp(e * ln b)`, whose error is `ln b`'s
+/// multiplied by `e`.
+fn pow_positive(b: f64, e: f64) -> f64 {
+    if trunc(e) == e {
+        if abs(e) <= 4096.0 {
+            let m = pow_int(b, abs(e))
+            if e < 0.0 {
+                return 1.0 / m
+            }
+            return m
+        }
+    }
+    exp(e * ln(b))
+}
+
+/// `b^n` for an integral `n >= 0` held in an `f64`, by squaring.
+fn pow_int(b: f64, n: f64) -> f64 {
+    var result = 1.0
+    var base = b
+    var k = n
+    while k > 0.0 {
+        let half = floor(k * 0.5)
+        if k - half - half > 0.0 {
+            result = result * base
+        }
+        k = half
+        if k > 0.0 {
+            base = base * base
+        }
+    }
+    result
+}
+
+/// True when `x` is an integer with an odd value — the parity test
+/// `powf` needs for negative bases. Values at or above 2^53 are all
+/// even in the sense that matters (no odd integer is representable
+/// beyond that with a unit ulp), so they answer false.
+fn is_odd_integer(x: f64) -> bool {
+    if !(trunc(x) == x) {
+        return false
+    }
+    let a = abs(x)
+    if a >= 9007199254740992.0 {
+        return false
+    }
+    let h = a * 0.5
+    !(trunc(h) == h)
+}
+
+/// The IEEE-754 binary64 encoding of `x`, read as a signed `int`: the
+/// sign bit lands in the sign of the result, so a negative float has a
+/// negative encoding and `from_bits` inverts it exactly. This is the
+/// exactness currency — two floats are the same value exactly when
+/// their bits agree, which `==` cannot say for NaN and says wrongly for
+/// `-0.0`.
+///
+/// Every NaN answers one canonical encoding (`0x7FF8000000000000` read
+/// as an `int`): NaN payloads and sign are not observable at these pins,
+/// the same approximation `std.cmp.total_cmp` documents. Total: no error
+/// row, no traps.
+///
+/// ```wolf-doc-example
+/// let zero: int = 0
+/// float.to_bits(0.0) == 0
+/// float.to_bits(1.0) == 4607182418800017408
+/// float.to_bits(2.0) == 4611686018427387904
+/// float.to_bits(-2.0) == zero - 4611686018427387904
+/// float.to_bits(-0.0) < 0
+/// ```
+pub fn to_bits(x: f64) -> int {
+    if is_nan(x) {
+        return 9221120237041090560
+    }
+    let negative = is_sign_negative(x)
+    let a = abs(x)
+    var mag: int = 0
+    if a == inf() {
+        mag = 9218868437227405312
+    }
+    if a > 0.0 {
+        if is_finite(a) {
+            var m = a
+            var k: int = 0
+            while m >= 2.0 {
+                m = m * 0.5
+                k = k + 1
+            }
+            while m < 1.0 {
+                m = m * 2.0
+                k = k - 1
+            }
+            if k < 0 - 1022 {
+                // Subnormal: the exponent field is zero and the stored
+                // fraction is the value scaled by 2^1022, mantissa and
+                // all.
+                var f = m
+                var j: int = k + 1022
+                while j < 0 {
+                    f = f * 0.5
+                    j = j + 1
+                }
+                mag = mantissa_bits(f)
+            } else {
+                mag = (k + 1023) * 4503599627370496 + mantissa_bits(m - 1.0)
+            }
+        }
+    }
+    if negative {
+        return mag + sign_bit()
+    }
+    mag
+}
+
+/// The sign bit's value in the signed reading of an encoding: -2^63.
+/// Spelled through a typed zero because a literal `-9223372036854775808`
+/// does not carry its type at these pins (F-0025).
+fn sign_bit() -> int {
+    let zero: int = 0
+    zero - 9223372036854775807 - 1
+}
+
+/// The 52 stored fraction bits of a value in [0, 1), MSB first. Exact:
+/// doubling and subtracting one are both exact operations.
+fn mantissa_bits(f: f64) -> int {
+    var v = f
+    var bits: int = 0
+    var i: int = 0
+    while i < 52 {
+        v = v * 2.0
+        bits = bits * 2
+        if v >= 1.0 {
+            bits = bits + 1
+            v = v - 1.0
+        }
+        i = i + 1
+    }
+    bits
+}
+
+/// The `f64` whose IEEE-754 binary64 encoding, read as a signed `int`,
+/// is `b` — the inverse of `to_bits` on every finite value and on the
+/// infinities. Every NaN encoding answers `nan()`, matching `to_bits`'s
+/// one canonical NaN.
+///
+/// Total: no error row, no traps — every `int` is some float's encoding.
+///
+/// ```wolf-doc-example
+/// let zero: int = 0
+/// float.from_bits(0) == 0.0
+/// float.from_bits(4607182418800017408) == 1.0
+/// float.from_bits(zero - 4611686018427387904) == -2.0
+/// float.from_bits(float.to_bits(0.125)) == 0.125
+/// float.from_bits(9218868437227405312) == float.inf()
+/// ```
+pub fn from_bits(b: int) -> f64 {
+    var mag = b
+    var negative = false
+    if b < 0 {
+        negative = true
+        mag = b - sign_bit()
+    }
+    let biased = mag / 4503599627370496
+    let frac = mag % 4503599627370496
+    var out = 0.0
+    if biased == 2047 {
+        if frac == 0 {
+            out = inf()
+        } else {
+            return nan()
+        }
+    }
+    if biased == 0 {
+        out = bits_mantissa(frac) * two_pow(0.0 - 1022.0)
+    }
+    if biased > 0 {
+        if biased < 2047 {
+            out = (1.0 + bits_mantissa(frac)) * two_pow(exp_as_float(biased - 1023))
+        }
+    }
+    if negative {
+        return neg(out)
+    }
+    out
+}
+
+/// The stored fraction `frac` (0 <= frac < 2^52) as the `f64` in [0, 1)
+/// it encodes. Bit by bit from the top, so no int-to-float conversion is
+/// needed — there is none that works at these pins (F-0022).
+fn bits_mantissa(frac: int) -> f64 {
+    var rest = frac
+    var scale = 0.5
+    var divisor: int = 2251799813685248
+    var out = 0.0
+    while divisor >= 1 {
+        if rest >= divisor {
+            out = out + scale
+            rest = rest - divisor
+        }
+        scale = scale * 0.5
+        divisor = divisor / 2
+    }
+    out
+}
+
+/// A small `int` exponent as an `f64`, by counting — the same missing
+/// conversion, in the other direction.
+fn exp_as_float(k: int) -> f64 {
+    var n = k
+    var out = 0.0
+    while n > 0 {
+        out = out + 1.0
+        n = n - 1
+    }
+    while n < 0 {
+        out = out - 1.0
+        n = n + 1
+    }
+    out
+}

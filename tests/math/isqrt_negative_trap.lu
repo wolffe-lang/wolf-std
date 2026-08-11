@@ -1,0 +1,12 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.math
+//!
+//! A negative radicand has no real root, so `isqrt` traps `assert` for the same reason `pow` does.
+
+use std.math
+
+fn main() -> !int {
+    let _ = math.isqrt(0 - 1)
+    0
+}
