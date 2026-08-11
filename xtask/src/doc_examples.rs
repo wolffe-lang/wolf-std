@@ -14,9 +14,11 @@
 //!
 //! The doc-truth gate: lupin must reach `exit(0)` — a documented
 //! example the reference machine cannot execute truthfully is a doc
-//! bug, and an unrunnable example belongs in prose (§4). wolfc must
-//! reach `exit(0)` or refuse honestly (`unsupported`); a static
-//! rejection (`fail(E…)`) is a doc bug too.
+//! bug, and an unrunnable example belongs in prose (§4). The compiler's
+//! two rungs (checked and, from sc04, native) must reach `exit(0)` or
+//! refuse honestly (`unsupported`); a static rejection (`fail(E…)`) is a
+//! doc bug too — which is why `std.range`, whose one function names a
+//! type the compiler does not resolve, carries prose instead of a fence.
 //!
 //! sc01 left "fold examples into tests/ledger.toml" to sc02; sc02's
 //! answer, for the closeout to confirm: NO. The ledger's value is
@@ -64,8 +66,13 @@ pub fn doc_examples() -> Result<(), String> {
         println!("doc-examples: no wolf-doc-example blocks in std/");
         return Ok(());
     }
+    let native_rt = bins::native_rt(&repo);
     let mut lanes = Vec::new();
-    for imp in [Impl::Lupin, Impl::Wolf] {
+    for imp in bins::LANES {
+        if imp == Impl::Native && native_rt.is_none() {
+            println!("SKIP: no libwolf_rt.a — doc-example native lane dark");
+            continue;
+        }
         match bins::resolve(imp, &repo) {
             Some(r) => lanes.push((imp, r.path)),
             None => println!(
@@ -91,13 +98,15 @@ pub fn doc_examples() -> Result<(), String> {
         let staged = stage::stage_test(&entry_path, &repo.join("std"), &staged_root)?;
         for (imp, bin) in &lanes {
             let verdict = run_lane(*imp, bin, &staged, ceiling)?;
-            let waived = matches!((&verdict, imp), (Verdict::Fail(code), Impl::Wolf)
-                if WOLFC_WAIVERS.iter().any(|(m, c, _)| *m == b.module && c == code));
+            let compiler_lane = matches!(imp, Impl::Wolf | Impl::Native);
+            let waived = matches!(&verdict, Verdict::Fail(code)
+                if compiler_lane
+                    && WOLFC_WAIVERS
+                        .iter()
+                        .any(|(m, c, _)| *m == b.module && c == code));
             let ok = waived
-                || matches!(
-                    (&verdict, imp),
-                    (Verdict::Exit(0), _) | (Verdict::Unsupported, Impl::Wolf)
-                );
+                || matches!(&verdict, Verdict::Exit(0))
+                || (compiler_lane && matches!(&verdict, Verdict::Unsupported));
             let tag = if waived {
                 let (_, _, finding) = WOLFC_WAIVERS
                     .iter()
@@ -145,8 +154,11 @@ fn run_lane(
     cmd.arg("conform-run");
     if imp == Impl::Wolf {
         cmd.arg("--checked");
-        cmd.arg("--std-root").arg(staged.std_root.as_os_str());
     }
+    if imp == Impl::Native {
+        cmd.arg("--native");
+    }
+    cmd.arg("--std-root").arg(staged.std_root.as_os_str());
     cmd.arg(staged.entry.as_os_str());
     cmd.arg("--json");
     let got = exec::run(cmd, ceiling)?;

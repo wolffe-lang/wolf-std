@@ -10,15 +10,16 @@
 //! the F-0001 interim is retired compiler-side (wolf-lang#1 closed by
 //! s26's `--std-root`/`WOLF_STD` loader).
 //!
-//! RESIDUAL INTERIM (finding F-0010, filed to wolf-interp): lupin has no
-//! std-root notion. It binds a `use std.cmp` to the path's LAST segment
-//! and looks for a package directory of that name, so the same scratch
-//! root additionally carries a flat MIRROR of every module directory
-//! (`std/cmp/` also appears as `cmp/`). Both lanes therefore run the
-//! same source text — real `use std.…` imports everywhere — and the
-//! mirror dies with the pin bump that teaches lupin a std root.
+//! THE MIRROR IS RETIRED (sc04, lupin 0.1.2 / wolf-interp#6 closed).
+//! Until this pin the scratch root also carried a flat copy of every
+//! module directory (`std/cmp/` as `cmp/`) because lupin bound a
+//! `use std.cmp` to the path's LAST segment and looked for a package
+//! directory of that name. lupin now takes `--std-root` (with `LUPIN_STD`
+//! as the flagless spelling) exactly as the compiler does, so all three
+//! lanes are pointed at the same staged tree and nothing is duplicated.
+//! F-0010 is closed; the last-segment collision rule it forced on module
+//! naming is gone with it.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -47,57 +48,10 @@ pub fn stage_test(entry: &Path, std_root: &Path, scratch: &Path) -> Result<Stage
 
     let staged_std = scratch.join("std");
     copy_tree(std_root, &staged_std)?;
-
-    // The lupin mirror: every module directory (a directory that directly
-    // holds `.lu` files) reappears under its LAST path segment. Two
-    // modules sharing a last segment would collide in the mirror — that
-    // is a staging error, loud, not a silent overwrite.
-    let mut mirrored: BTreeMap<String, PathBuf> = BTreeMap::new();
-    for module_dir in module_dirs(std_root)? {
-        let name = module_dir
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| format!("stage: unnameable module dir {}", show(&module_dir)))?
-            .to_string();
-        if let Some(first) = mirrored.get(&name) {
-            return Err(format!(
-                "stage: modules {} and {} share the last segment `{name}` — the \
-                 lupin mirror (F-0010) cannot represent both; rename one until \
-                 lupin grows a std root",
-                show(first),
-                show(&module_dir)
-            ));
-        }
-        copy_tree(&module_dir, &scratch.join(&name))?;
-        mirrored.insert(name, module_dir);
-    }
     Ok(Staged {
         entry: scratch.join(file_name),
         std_root: staged_std,
     })
-}
-
-/// Every directory at or under `root` that directly contains `.lu`
-/// files, sorted, shallowest first.
-fn module_dirs(root: &Path) -> Result<Vec<PathBuf>, String> {
-    let mut out = Vec::new();
-    let mut stack = vec![root.to_path_buf()];
-    while let Some(dir) = stack.pop() {
-        let mut has_lu = false;
-        for path in sorted_entries(&dir)? {
-            deny_symlink(&path)?;
-            if path.is_dir() {
-                stack.push(path);
-            } else if path.extension().and_then(|e| e.to_str()) == Some("lu") {
-                has_lu = true;
-            }
-        }
-        if has_lu && dir != root {
-            out.push(dir);
-        }
-    }
-    out.sort();
-    Ok(out)
 }
 
 fn sorted_entries(dir: &Path) -> Result<Vec<PathBuf>, String> {
@@ -163,7 +117,7 @@ mod tests {
     }
 
     #[test]
-    fn stages_entry_beside_tree_and_mirror() {
+    fn stages_entry_beside_tree() {
         let root = scratch("round-trip");
         let std_root = root.join("std");
         fs::create_dir_all(std_root.join("prelude")).unwrap();
@@ -181,17 +135,18 @@ mod tests {
         let member = root.join("stage/std/prelude/prelude.lu");
         assert_eq!(fs::read(member).unwrap(), b"//! member: true\n");
         assert!(root.join("stage/std/x/deque_int/d.lu").is_file());
-        // …and mirrored flat under the last segment for lupin (F-0010);
-        // a directory with no `.lu` of its own (`x/`) is not a module.
-        assert!(root.join("stage/prelude/prelude.lu").is_file());
-        assert!(root.join("stage/deque_int/d.lu").is_file());
-        assert!(!root.join("stage/x").exists());
+        // Nothing is mirrored any more (sc04): every lane takes
+        // `--std-root`, so the staged root holds the entry and `std/`.
+        assert!(!root.join("stage/prelude").exists());
+        assert!(!root.join("stage/deque_int").exists());
         // Staging is repeatable (the scratch root is cleared first).
         stage_test(&root.join("entry.lu"), &std_root, &root.join("stage")).unwrap();
     }
 
     #[test]
-    fn last_segment_collisions_are_loud() {
+    fn same_last_segment_modules_coexist() {
+        // What the retired mirror could not represent: two modules whose
+        // last path segment is the same. Both stage now.
         let root = scratch("collide");
         let std_root = root.join("std");
         fs::create_dir_all(std_root.join("a/dup")).unwrap();
@@ -199,8 +154,9 @@ mod tests {
         fs::write(std_root.join("a/dup/x.lu"), "//! member: true\n").unwrap();
         fs::write(std_root.join("b/dup/x.lu"), "//! member: true\n").unwrap();
         fs::write(root.join("entry.lu"), "//! check: pass\n//! phase: run\n").unwrap();
-        let err = stage_test(&root.join("entry.lu"), &std_root, &root.join("stage")).unwrap_err();
-        assert!(err.contains("last segment `dup`"), "{err}");
+        stage_test(&root.join("entry.lu"), &std_root, &root.join("stage")).unwrap();
+        assert!(root.join("stage/std/a/dup/x.lu").is_file());
+        assert!(root.join("stage/std/b/dup/x.lu").is_file());
     }
 
     #[cfg(unix)]

@@ -11,33 +11,59 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+/// The three observation lanes. `Wolf` and `Native` are the SAME binary
+/// at two rungs — `conform-run --checked` (the miri-lite interpreter,
+/// s23) and `conform-run --native` (compile, link, execute, s28) — and
+/// they refuse different things, which is exactly why sc04 records both:
+/// the checked tier refuses float literals outright while the native
+/// rung executes them, and the native rung refuses `List` and globals
+/// while the checked tier runs them.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Impl {
     Lupin,
     Wolf,
+    Native,
 }
+
+pub const LANES: [Impl; 3] = [Impl::Lupin, Impl::Wolf, Impl::Native];
 
 impl Impl {
     pub fn name(self) -> &'static str {
         match self {
             Impl::Lupin => "lupin",
             Impl::Wolf => "wolf",
+            Impl::Native => "wolf",
         }
     }
     pub fn env_var(self) -> &'static str {
         match self {
             Impl::Lupin => "LUPIN_BIN",
             Impl::Wolf => "WOLF_BIN",
+            Impl::Native => "WOLF_BIN",
         }
     }
-    /// Ledger column name (the compiler's column is `wolfc`, the record's
-    /// `impl` string).
+    /// Ledger column name (the compiler's checked column is `wolfc`, its
+    /// native column is `native`, the record's `impl` string otherwise).
     pub fn ledger_name(self) -> &'static str {
         match self {
             Impl::Lupin => "lupin",
             Impl::Wolf => "wolfc",
+            Impl::Native => "native",
         }
     }
+}
+
+/// The native rung links against `libwolf_rt.a`, which the driver looks
+/// for next to the `wolf` binary or at `$WOLF_RT_LIB`. Absent, the lane
+/// is dark — and says so, like every other absence here.
+pub fn native_rt(repo: &Path) -> Option<PathBuf> {
+    if let Ok(v) = std::env::var("WOLF_RT_LIB") {
+        let p = PathBuf::from(v);
+        return p.is_file().then_some(p);
+    }
+    let wolf = resolve(Impl::Wolf, repo)?;
+    let beside = wolf.path.parent()?.join("libwolf_rt.a");
+    beside.is_file().then_some(beside)
 }
 
 #[derive(Debug)]
@@ -58,6 +84,7 @@ pub fn resolve(imp: Impl, repo: &Path) -> Option<Resolved> {
             source: match imp {
                 Impl::Lupin => "$LUPIN_BIN",
                 Impl::Wolf => "$WOLF_BIN",
+                Impl::Native => "$WOLF_BIN",
             },
         });
     }

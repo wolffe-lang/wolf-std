@@ -268,6 +268,91 @@ sibling module are restructured or written as prose.
   agreement member by member, so a builtin change fails CI instead of
   drifting silently.
 
+## 10. Numerics, and the iterator combinator's name (sc04)
+
+- **Checked is the default, recoverable is the complement, and the docs
+  say when each is right.** `a + b` traps on overflow in every profile
+  (X3) and that is what ordinary code writes; `math.checked_add ->
+  int ! {overflow}` exists for the case where the OPERANDS are data and
+  an out-of-range result is an ordinary outcome (parsing, accumulating
+  user input, bounds arithmetic). `saturating_*` is the third form and
+  has no row at all. A function may ship one, two or three of these; it
+  may not ship a wrapping form without the `wrapping[T]` type, because
+  intended overflow is spelled at the type (X3), not at the call.
+- **§2's inventory gains two error tags**: `overflow` (a result outside
+  the type) and `div_zero` (a zero divisor). Both are payload-free marks,
+  so both are lowercase by §2's rule and both ride the `None`-spelling
+  interim — std writes `Overflow` and `DivZero` at these pins (F-0003 /
+  F-0023). They are *error* tags rather than absence tags and do not join
+  the `none`/`gone`/`eof`/`parse` family: `else` handles them the same
+  way, but a caller distinguishes "this arithmetic does not fit" from
+  "there is nothing here".
+- **Trap where the CALLER broke the contract, raise where the DATA did.**
+  `pow(b, -1)` and `isqrt(-1)` trap `assert` (a negative exponent has no
+  integer power; a negative radicand has no real root — the caller could
+  have checked). `abs(int_min())` and `sum` overflow trap, because a
+  magnitude that does not fit is a bug in the data model. `checked_add`
+  raises. `rand.below(0)` traps and `rand.choose(empty)` raises, and the
+  difference is exactly this rule: the first names an empty range, the
+  second finds one.
+- **Accuracy is a documented, measured, per-function contract.** Every
+  transcendental states a bound in ulp; the bound is what the pinned
+  reference table measures, not an aspiration; and the harness refuses a
+  table row whose budget exceeds what the doc promises. Nothing in std
+  claims faithful (≤1 ulp) or correct (≤0.5 ulp) rounding without a test
+  that shows it. Where a function cannot reach the family's bound —
+  `powf`, whose error is `ln`'s multiplied by the exponent — it says so
+  in its own doc rather than letting the module header speak for it.
+- **Pure wolf over a platform library, for anything whose value is
+  observable.** `std.math.float` implements its transcendentals in wolf
+  source so that every implementation agrees bit for bit and the tests
+  can pin exact literals; a libm binding would make `sin(1.0)` mean
+  whatever the host means. When intrinsics land, the wolf source stays
+  the semantic reference (F-0028).
+- **Constants are constants — unless the toolchain charges two execution
+  lanes for one.** At these pins a module-level `const` is `unsupported`
+  when used (checked tier) and when declared (native rung), and `INT_MIN`
+  has no literal spelling at all, so `std.math` and `std.math.float` ship
+  their constants as total zero-argument functions (`int_max()`, `pi()`)
+  with the reason on the module. This is a recorded interim (F-0025 /
+  F-0026), not a house style: the constants land the day either half is
+  fixed, under the contract's own names.
+- **The float family lives in its own module.** wolf has no overloading,
+  so `abs`, `signum` and `round` cannot mean two things in one module;
+  `std.math` is the integer family and `std.math.float` the `f64` one.
+  The split is also what keeps each module importable into a native
+  program, since two modules that declare a same-named function cannot be
+  linked together yet (F-0026).
+- **A sorted-input precondition is documented, not checked.**
+  `binary_search` and the bound family assume ascending order and answer
+  *something* on unsorted input rather than trapping — verifying costs
+  more than the search. `is_sorted` is the check, and the docs name it.
+
+**§10 amendment (sc04) — the iterator combinator is `limit(n)`, never
+`take(n)`** (wolf-lang#16, ruled and closed). In wolf, `take` is a
+parameter MODE that consumes its operand (X1); a combinator spelled
+`xs.take(2)` that left `xs` usable would be a false friend at the exact
+centre of the ownership story, and one that did consume it would be a
+combinator nobody wants. The name is free to rule now because no
+combinator has shipped. Every truncating combinator in std is `limit`,
+and the family that follows it (`skip`, `step_by`, `rev`, `chunks`)
+inherits the same test: a combinator name may not collide with an
+ownership verb. `std.range`'s header records the ruling where the
+blocked `rev`/`step_by` contracts are written down.
+
+**§10 note (sc04) — unicode tables are std-carried source.** wolf-lang#18
+is ruled and closed: the category/case tables land as **committed
+generated wolf source** under `std.unicode.tables`, behind the facade,
+with a pinned Unicode version, a checked-in generator and a manual
+regeneration step guarded by a drift check (the grammar-sync pattern) —
+because both implementations then execute the same wolf code and agree by
+construction, where an intrinsic path makes Unicode a per-implementation
+liability. Anything in std that classifies a code point cites that module
+rather than growing a table of its own; §9's rule that a std function
+matching a builtin's set carries a test pinning the agreement member by
+member stands, and `tests/str/trim_whitespace_set.lu` remains the
+worked example until the tables land.
+
 ## Review record
 
 - 2026-08-10 — drafted (sc00). Human review: **pending**; record the
@@ -282,3 +367,10 @@ sibling module are restructured or written as prose.
 - 2026-08-12 — sc03 amendments: §2 gains the `parse` tag (and reserves
   `utf8`) with the interim's ownership flipped to lupin, and §9 Strings.
   Review rides the same pending sc00 gate.
+- 2026-08-12 — sc04 amendments: §10 Numerics (checked/recoverable/
+  saturating, the `overflow` and `div_zero` error tags, the trap-versus-
+  raise rule, the measured accuracy contract, the pure-wolf decision,
+  constants-as-functions as a recorded interim, the float module split,
+  and the documented sorted-input precondition), plus the two closed
+  rulings: the iterator combinator is `limit(n)` and unicode tables are
+  std-carried committed source. Review rides the same pending sc00 gate.

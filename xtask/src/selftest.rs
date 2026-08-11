@@ -69,9 +69,12 @@ fn std_tree_files_are_members() {
 }
 
 /// The staging round-trip the rig exists to prove: the exemplar entry
-/// FAILS to resolve its module in place (the package root is the entry
-/// file's directory — tests/ holds no modules), and runs green once
-/// staged beside the std tree. Needs lupin; SKIPs loudly without it.
+/// FAILS to resolve its module in place (no std root, and the package
+/// root — the entry file's directory — holds no modules), and runs green
+/// once staged and rooted. Since sc04 the interpreter takes
+/// `--std-root` like the compiler (wolf-interp#6, F-0010 closed), so the
+/// staged tree is pointed at rather than mirrored. Needs lupin; SKIPs
+/// loudly without it.
 #[test]
 fn staging_round_trip_under_lupin() {
     let repo = repo_root();
@@ -81,8 +84,8 @@ fn staging_round_trip_under_lupin() {
     };
     let entry = repo.join("tests/prelude/prelude_smoke.lu");
 
-    // Unstaged, in place: must NOT satisfy its directive.
-    let unstaged = conform(&lupin.path, &entry);
+    // Unstaged and unrooted: must NOT satisfy its directive.
+    let unstaged = conform(&lupin.path, &entry, None);
     assert_eq!(
         unstaged.verdict,
         Verdict::Unsupported,
@@ -93,10 +96,13 @@ fn staging_round_trip_under_lupin() {
     // Staged: green, stdout hash checked.
     let scratch = repo.join("target/stage-selftest");
     let staged = stage::stage_test(&entry, &repo.join("std"), &scratch).unwrap();
-    // The lupin half of staging is the flat mirror (F-0010): the tree
-    // also lands as `std/`, which is what the wolf lane is rooted at.
+    // One staged tree, one root, all three lanes.
     assert!(staged.std_root.join("prelude/prelude.lu").is_file());
-    let rec = conform(&lupin.path, &staged.entry);
+    assert!(
+        !scratch.join("prelude").exists(),
+        "the flat mirror is retired: nothing is duplicated beside std/"
+    );
+    let rec = conform(&lupin.path, &staged.entry, Some(&staged.std_root));
     assert_eq!(rec.verdict, Verdict::Exit(0), "staged exemplar runs green");
     let src = std::fs::read_to_string(&entry).unwrap();
     let d = directive::parse(&src, "prelude_smoke.lu").unwrap();
@@ -111,9 +117,13 @@ fn staging_round_trip_under_lupin() {
     }
 }
 
-fn conform(bin: &PathBuf, entry: &PathBuf) -> record::Record {
+fn conform(bin: &PathBuf, entry: &PathBuf, std_root: Option<&std::path::Path>) -> record::Record {
     let mut cmd = Command::new(bin);
-    cmd.arg("conform-run").arg(entry).arg("--json");
+    cmd.arg("conform-run");
+    if let Some(root) = std_root {
+        cmd.arg("--std-root").arg(root.as_os_str());
+    }
+    cmd.arg(entry).arg("--json");
     let got = exec::run(cmd, Duration::from_secs(exec::timeout_secs())).unwrap();
     assert_eq!(got.status, Some(0), "tool error: {}", got.stderr);
     record::parse(&got.stdout, "lupin").unwrap()

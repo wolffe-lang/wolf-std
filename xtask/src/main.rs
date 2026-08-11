@@ -2,7 +2,7 @@
 //! ever (D33); no source dependency on any `wolf_*` crate or on
 //! wolf-interp (binaries and pinned data are the only couplings).
 //!
-//! Subcommands: `std-test`, `doc-examples`, `doctor`, `sync-pin`,
+//! Subcommands: `std-test`, `doc-examples`, `ulp`, `doctor`, `sync-pin`,
 //! `ledger-check`, `ci`.
 
 mod anchors;
@@ -19,6 +19,7 @@ mod selftest;
 mod stage;
 mod sync_pin;
 mod tomlite;
+mod ulp;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -37,13 +38,15 @@ fn main() {
     let result = match args.first().map(String::as_str) {
         Some("std-test") => runner::std_test(),
         Some("doc-examples") => doc_examples::doc_examples(),
+        Some("ulp") => ulp::ulp(),
         Some("ledger-check") => runner::ledger_check(),
         Some("doctor") => doctor::doctor(),
         Some("sync-pin") => sync_pin::sync_pin(),
         Some("ci") => ci(),
         other => {
             eprintln!(
-                "usage: cargo xtask <std-test|doc-examples|ledger-check|doctor|sync-pin|ci>{}",
+                "usage: cargo xtask \
+                 <std-test|doc-examples|ulp|ledger-check|doctor|sync-pin|ci>{}",
                 other.map(|o| format!(" (got `{o}`)")).unwrap_or_default()
             );
             std::process::exit(2);
@@ -103,6 +106,8 @@ fn ci() -> Result<(), String> {
     runner::std_test()?;
     banner("doc-examples");
     doc_examples::doc_examples()?;
+    banner("ulp");
+    ulp::ulp()?;
     println!("\nci: GREEN");
     Ok(())
 }

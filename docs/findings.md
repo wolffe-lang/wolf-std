@@ -31,6 +31,12 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0022 | 2026-08-12 | lupin: `n as f64` does not convert — the value stays an int, compares equal to ints and unequal to floats, and no diagnostic appears (wolfc correctly refuses the mixed comparison E0401); `std.str.parse_float` ships a ten-branch digit→f64 table to avoid it | wolf-interp | [filed: wolf-interp#11](https://github.com/tenseleyFlow/wolf-interp/issues/11) |
 | F-0023 | 2026-08-12 | lupin, the interpreter half of wolf-lang#3 and #4 (both closed compiler-side): postfix rows in param/`let` positions are E0201, lowercase bare tags do not resolve at raise sites — **and tag resolution is LAZY**, so a `return none` on an untaken branch certifies falsely, which is how sc02's F-0003 update came to be wrong | wolf-interp | [filed: wolf-interp#12](https://github.com/tenseleyFlow/wolf-interp/issues/12) |
 | F-0024 | 2026-08-12 | `cargo test --workspace` is deterministically RED at trunk `12ae8c2` (wolf_parse `blast_radius`: 4 added diagnostics, max 3, on `corpus/comptime/norm_witness.lu`) while that sha's trunk CI run reports success — so "the last green trunk run" is not by itself a sufficient pin criterion | wolf-lang CI/parser owners | [filed: wolf-lang#20](https://github.com/tenseleyFlow/wolf-lang/issues/20) |
+| F-0025 | 2026-08-12 | Integer literals ignore their context in lupin: `INT_MIN` has NO spelling (`-9223372036854775808`, `-MAX - 1`, `0 - MAX - 1` all trap `overflow` at `i32` whatever the annotation says), `var k = 0` infers `i32`, and a cross-module `-> int` call does not type its own operator (`math.int_max() - 1` traps) — the only working shape puts a typed binding on the left | wolf-interp | [filed: wolf-interp#14](https://github.com/tenseleyFlow/wolf-interp/issues/14) |
+| F-0026 | 2026-08-12 | Capability map of the compiler's two rungs, with std's cost per refusal: the checked tier refuses every f64 literal, every `const` USE and `&`/`^`/`>>`/`\|`; the native rung refuses `const` DECLARATIONS, `List`, generics, `print` and `str` — and refuses two modules that declare a function with the same name (a real mangling bug: `std.list.len` and `std.str.len` already collide) | wolf-lang backend/checked-tier owners | [filed: wolf-lang#26](https://github.com/tenseleyFlow/wolf-lang/issues/26) |
+| F-0027 | 2026-08-12 | **Silent wrong answer**: the native rung lowers `!=` on `f64` to an ORDERED comparison, so `nan != nan` is FALSE natively and true in the interpreter (`==`, `<`, `<=`, `>`, `>=` are all correct). `x != x` is the portable NaN test and was `std.cmp.total_cmp`'s; every float inequality in std now spells `!(x == y)` | wolf-lang s28 codegen | [filed: wolf-lang#22](https://github.com/tenseleyFlow/wolf-lang/issues/22) |
+| F-0028 | 2026-08-12 | (sc04 Target 2) The pure-wolf transcendentals and the intrinsics request: 29 functions, measured ≤ 1 ulp except `cbrt` (2) and `powf` (3), bit-identical on BOTH executing lanes over 200 pinned values — plus the two asks, that the wolf source stay the semantic reference and that `sqrt` be re-derived from the hardware instruction rather than the other way round | wolf-lang s37 intrinsics / s41 llvm | [filed: wolf-lang#25](https://github.com/tenseleyFlow/wolf-lang/issues/25) |
+| F-0029 | 2026-08-12 | Cross-module enum consumption: an enum's VALUES cross a module boundary but nothing that inspects them does — variant patterns do not resolve against an imported enum (lupin), methods do not dispatch, and an enum-returning call is `unsupported` in the checked tier and has "no recorded type" natively. Blocks `sort_by`, `is_sorted_by`, `binary_search_by` — and the sorting STABILITY WITNESS, which is only observable through a comparator that ignores part of the value | wolf-lang #12's family + wolf-interp | [filed: wolf-lang#23](https://github.com/tenseleyFlow/wolf-lang/issues/23) |
+| F-0030 | 2026-08-12 | (sc04 Target 5) A range value has no bounds accessor under any spelling (`start`/`end`/`len`/`lo`/`hi`/`first`/`last` all "no member") and `range` does not resolve as a TYPE in wolfc (E0301, both rungs) — so `contains`, `len` and `clamp_to` are unwritable (only by iterating, which hangs on `0..2^63`) and `std.range` ships one function | wolf-lang s37 core types | [filed: wolf-lang#24](https://github.com/tenseleyFlow/wolf-lang/issues/24) |
 
 ## F-0001 — the std search path
 
@@ -533,3 +539,200 @@ sc03 pinned the sha anyway (the driver builds and behaves correctly across
 downstream lesson: "the last green trunk run" is not by itself a
 sufficient pin criterion, and this repo's pin ritual should grow a second
 gate.
+
+## F-0025 — integer literals ignore their context (lupin)
+
+`wolf-interp#14`. Three shapes, one cause, and one of them makes a value
+that exists in the type unwritable.
+
+**`INT_MIN` has no spelling.** Every form of -2^63 traps `overflow`
+"outside `i32`", whatever the declared type says: `const A: int =
+-9223372036854775808`, `-9223372036854775807 - 1`, `0 - 9223372036854775807
+- 1`, `let d: int = -9223372036854775807`, `let e: i64 = …`. The one shape
+that works puts a TYPED BINDING on the left of the operator, so the
+operation is typed by the binding and not by the literal's `i32` default:
+`let zero: int = 0` then `zero - 9223372036854775807 - 1`. That line, with
+that comment, is `std.math.int_min`'s body.
+
+**An unannotated `var` is `i32`.** `var k = 0` then `k * 4503599627370496`
+traps. Every accumulator in `to_bits`/`from_bits`/`mantissa_bits` carries
+an explicit `: int`.
+
+**A cross-module `-> int` call does not type its own operator.**
+`math.int_max() - 1` traps; the same expression over a same-file function
+does not. This is why `std.math`'s doc examples say
+`math.int_max() > 0` rather than `math.int_max() - 1 < math.int_max()`.
+
+Consequence for the sprint: the contract's `INT_MIN`/`INT_MAX` constants
+ship as the zero-argument functions `int_min()`/`int_max()`, and every
+big literal anywhere in std or its tests goes through a typed binding.
+wolfc is correct on all three shapes at trunk `d147a54`.
+
+## F-0026 — the two rungs' capability map
+
+`wolf-lang#26`. Not a defect report: a map of what each of the compiler's
+execution rungs refuses, with std's cost. It is the direct cause of this
+sprint's rig change (a third ledger column), because the two rungs refuse
+DIFFERENT things and neither alone can carry a library's evidence.
+
+Checked tier refuses: every `f64` literal ("this literal shape in checked
+execution" — so all thirty float functions get zero evidence there);
+every USE of a module-level `const`; `&`, `^`, `>>`, `|` on integers
+("this operator in checked execution"); `str` ordering.
+
+Native rung refuses: every DECLARATION of a module-level `const`
+("item-initializer lowering (globals, c06)"); `List`/`Pool`
+construction; generic functions (monomorphization); `print`; `str`; and
+**two modules that declare a function with the same name** — a real
+mangling bug, since `std.list.len` and `std.str.len` already collide.
+
+Two of these shaped the API directly. Constants became functions
+(F-0025's other half): a `const` costs the checked lane when used and the
+native lane when declared, so `pi()` costs one pair of parentheses and
+keeps both. `midpoint` is written with halves and remainders rather than
+`(a & b) + ((a ^ b) >> 1)` because the bit-twiddling form loses the
+checked lane for nothing.
+
+What the native rung gives BACK is worth as much: it executes f64
+arithmetic, rows and their raise paths (wolf-lang#13's refusal does not
+apply there), structs, `wrapping[u64]`, recursion and traps by kind. It
+is the only compiler-side evidence `std.math.float` has.
+
+## F-0027 — `!=` on f64 is ordered in the native backend
+
+`wolf-lang#22`. The sprint's most severe filing, because it is a silent
+wrong answer rather than a refusal. `nan != nan` is FALSE under
+`conform-run --native` and true everywhere else; `==`, `<`, `<=`, `>` and
+`>=` are all correct, which is the signature of an ordered `fcmp ne`
+where the unordered one was meant.
+
+`x != x` is *the* portable NaN test and it is what sc01's
+`std.cmp.total_cmp` was written with, so this sprint rewrote those two
+probes as `!(x == x)` in the same commit as the finding — along with
+every inequality in `std.math.float`, whose header now carries the rule
+so the next author does not reintroduce it. All of it is revertible when
+the issue closes. `tests/math/float/predicates.lu` is the pin.
+
+## F-0028 — the pure-wolf transcendentals, and the intrinsics request
+
+`wolf-lang#25`. sc04's acceptance requires this filing. The claim it
+carries is the one the sprint set out to make good on: **29 functions in
+pure wolf, and both executing lanes agree bit for bit.**
+
+`cargo xtask ulp` reads `tests/ulp/reference.txt` (200 rows: the call,
+the value std produces, the correctly rounded value, the ulp budget the
+doc comment promises), checks each distance against its budget, refuses a
+row whose budget exceeds what the function documents, and then generates
+a program asserting all 200 values EXACTLY and runs it on every lit lane.
+The interpreter and the native backend each reproduce all 200, which is
+the pure-wolf determinism decision demonstrated rather than asserted.
+
+Measured worst case over that set: ≤ 1 ulp for `sqrt`, `exp`, `exp2`,
+`ln`, `log2`, `log10`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`,
+`atan2` and `hypot`; 2 for `cbrt`; 3 for `powf` (documented 4). Three
+constants earned their places the hard way and are worth recording: the
+two-piece `ln2` split in `exp` needs a HIGH piece with 33 significant
+bits or `exp(700.0)` is 220 ulp out; the three-piece `pi/2` split in the
+trig reduction needs the same or `cos(1000.0)` is 304 ulp out; and
+`log10`'s multiplier was one ulp wrong (`0.30102999566398114` for
+`0.3010299956639812`), which cost 2 ulp on every input until the harness
+caught it.
+
+The asks: the wolf source stays the semantic reference when intrinsics
+land, and `sqrt` is the exception to take first — IEEE requires it
+correctly rounded and the hardware gives that for free, so it is the one
+function whose intrinsic will be MORE accurate than this source and where
+the source should be re-derived from the instruction rather than the
+other way round.
+
+## F-0029 — an enum's values cross a module boundary; inspecting them does not
+
+`wolf-lang#23`. `oo.is_lt(oo.cmp_int(1, 2))` RUNS in lupin — an enum
+value is produced by one module and consumed by another — but every way
+of looking at that value from outside the declaring module fails: a
+`match` with variant patterns is `unsupported: no match arm applied`
+(lupin), a method call is "has no method … in this machine's std subset",
+and the whole shape is `unsupported — module items in checked execution`
+in the checked tier and "a member access without a recorded type"
+natively.
+
+The lupin half is NEW information produced by a FIX: wolf-interp#5 landed,
+so a bare-ident pattern is a variant pattern now instead of a binding that
+always matched the first arm — and the honest refusal replaced a wrong
+answer. `tests/cmp/ordering_exhaustive.lu` moved `run` → `unsupported` in
+the ledger for exactly that reason and the comment there says so.
+
+Blocked: `std.sort.sort_by`, `std.sort.is_sorted_by`,
+`std.search.binary_search_by` — all three ship as bodies that pass the
+static ladder (`tests/sort/generic_contract.lu`, `check: pass`, phase
+mem) and execute nowhere. And, less obviously, **the sorting stability
+witness**: stability is only observable through a comparator that ignores
+part of the value, so the three executing sorts — which order by the
+whole value — cannot demonstrate it. sc04 ships a stable merge sort whose
+stability has no executable test at these pins, and says so on the
+function rather than claiming a property no test covers.
+
+## F-0030 — a range has no bounds accessor
+
+`wolf-lang#24`. `2..7` can be built, passed as `range[int]` and iterated,
+and that is the entire surface: `start`, `end`, `len`, `lo`, `hi`,
+`first`, `last` all answer "a range has no member", and wolfc does not
+resolve the TYPE `range` at all (E0301, both rungs), which makes a range
+an interpreter-only parameter type.
+
+`contains` and `len` are expressible only by iterating — O(len) for an
+O(1) question, and a hang rather than an answer on
+`0..9223372036854775807`. sc03's refusal-over-approximation rule (§9)
+says a function that is right on small inputs and fatal on legal ones
+does not ship, so it did not. `clamp_to` has no spelling at all.
+`is_empty` survives because emptiness is decidable from iteration in O(1)
+(`for _ in r { return false }`) and ships as `std.range`'s single
+function — the demonstration that the blocker is the accessor and not the
+iteration.
+
+## Retirements at the sc04 pins
+
+Four findings this repo filed died with lupin 0.1.2, and one with wolfc
+`d147a54`. Each was retested before being written off.
+
+- **F-0007 (wolf-interp#5) RETIRED** — bare-ident match patterns
+  dispatch. The first-arm-always bug is gone; a variant pattern over a
+  SAME-FILE enum now selects correctly (`tests/cmp/ordering_exhaustive.lu`
+  proves the other half, F-0029).
+- **F-0010 (wolf-interp#6) RETIRED** — lupin has `--std-root`/`LUPIN_STD`.
+  This repo's half of the retirement: the flat mirror is deleted from
+  `xtask/src/stage.rs`, all three lanes are pointed at one staged tree,
+  the last-segment collision rule is gone with it (a self-test now proves
+  two modules may share a last segment), and `std/testing/testing.lu`'s
+  `use cmp` — a pre-std-root leftover the mirror had been hiding — became
+  the real `use std.cmp`. That last one is the mirror's parting gift: an
+  interim that works is an interim you cannot see.
+- **F-0013 (wolf-interp#7) RETIRED** — both false `ub(mem.ub)` shapes
+  are gone with the `drop_frame` key repair. The workarounds in
+  `std.map`'s tests are no longer load-bearing; nothing in this sprint
+  needed either shape.
+- **F-0017 (wolf-interp#8) RETIRED** — `let` reassignment is E0410 at
+  resolve in lupin, byte-identical to wolfc.
+- **F-0020 (wolf-lang#19) RETIRED** — `assert(cond, msg)` no longer traps
+  when the condition holds (trunk `425a3dc`: ubcheck stopped treating the
+  message as a second condition). `std.testing`'s
+  `if !cond { testing.fail(msg) }` interim can be retired by whichever
+  sprint owns that module next; sc04 did not touch it, since changing a
+  test primitive is not a numerics sprint's business.
+- **F-0024's lesson APPLIED** — "the last green trunk CI run" is not a
+  sufficient pin criterion, so the pin ritual grew a second gate:
+  `cargo test --workspace` in a clean scratch clone at the sha. It is
+  green at `d147a54` (96 test binaries) where it was red at `12ae8c2`,
+  so the gate earned its keep on first use. Recorded in
+  `vendor/tools.toml`.
+
+Retested and still open: **F-0022** (`n as f64` does not convert) —
+wolf-interp#11 is marked closed and the behaviour is unchanged at 0.1.2;
+reopened with fresh evidence. It is why `std.math.float.from_bits`,
+`to_bits` and `std.rand.next_float` accumulate mantissas bit by bit
+instead of dividing. **F-0012** is narrowed rather than closed: an
+imported module containing an `enum` no longer makes every importer
+`unsupported` — only calls that PRODUCE the enum are refused (F-0029).
+**F-0015** (the row raise inside a module) is unchanged in the checked
+tier and does not apply to the native rung, which is why every miss test
+in this sprint has a `run` in its native column.

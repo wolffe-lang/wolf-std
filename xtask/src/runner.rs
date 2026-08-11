@@ -1,10 +1,11 @@
 //! `cargo xtask std-test` — the dual-implementation loop. Every entry
 //! test is staged, then observed under both `lupin conform-run` and
 //! `wolf conform-run --checked` (`[proto.invoke]`); records are compared
-//! against the directive, the ledger, and — where both implementations
+//! against the directive, the ledger, and — pairwise, wherever two lanes
 //! reach run — against each other (`[proto.cmp]`-style). A divergence on
 //! std code is a finding for the upstream divergence log, and the reason
-//! this track runs two machines.
+//! this track runs two machines at three rungs (sc04 adds the native
+//! one).
 
 use crate::bins::{self, Impl};
 use crate::directive::{self, Check, ExitExpect};
@@ -100,8 +101,23 @@ pub fn std_test() -> Result<(), String> {
     let registry = anchors::Registry::load(&repo)?;
     let (lupin_pin, wolf_pin) = bins::load_tool_pins(&repo)?;
 
+    let native_rt = bins::native_rt(&repo);
     let mut lanes = Vec::new();
-    for (imp, pin) in [(Impl::Lupin, &lupin_pin), (Impl::Wolf, &wolf_pin)] {
+    for (imp, pin) in [
+        (Impl::Lupin, &lupin_pin),
+        (Impl::Wolf, &wolf_pin),
+        (Impl::Native, &wolf_pin),
+    ] {
+        if imp == Impl::Native && native_rt.is_none() {
+            println!(
+                "SKIP: no libwolf_rt.a beside the wolf binary (nor $WOLF_RT_LIB) \
+                 — the native lane is dark; build it with \
+                 `cargo build -p wolf_rt` in a checkout at pin {}",
+                &wolf_pin.pin[..7.min(wolf_pin.pin.len())]
+            );
+            lanes.push((imp, None));
+            continue;
+        }
         match bins::resolve(imp, &repo) {
             Some(r) => {
                 println!(
@@ -184,6 +200,7 @@ pub fn std_test() -> Result<(), String> {
             let want = match imp {
                 Impl::Lupin => &expect.lupin,
                 Impl::Wolf => &expect.wolfc,
+                Impl::Native => &expect.native,
             };
             let got = achieved.as_expect();
             if got != *want {
@@ -219,9 +236,13 @@ pub fn std_test() -> Result<(), String> {
         // ([proto.cmp]): verdict; trap kind by name; stdout hash. `ub` on
         // one side where the other ran defined is the highest-severity
         // class ([proto.record.ub]).
-        if let [(_, a), (_, b)] = &runtime_records[..] {
-            let class = diff_class(a, b);
-            if let Some(class) = class {
+        for i in 0..runtime_records.len() {
+            for j in i + 1..runtime_records.len() {
+                let (_, a) = &runtime_records[i];
+                let (_, b) = &runtime_records[j];
+                let Some(class) = diff_class(a, b) else {
+                    continue;
+                };
                 divergences.push(serde_json::json!({
                     "file": format!("tests/{test}"),
                     "class": class,
@@ -283,15 +304,22 @@ fn invoke(
     let mut cmd = Command::new(bin);
     cmd.arg("conform-run");
     if imp == Impl::Wolf {
-        // The compiler's run rung is `--checked`-gated until s31
-        // (miri-lite execution, budget-bounded; a blown budget reports an
-        // honest `unsupported`, never a hang).
+        // The compiler's interpreted run rung is `--checked`-gated until
+        // s31 (miri-lite execution, budget-bounded; a blown budget
+        // reports an honest `unsupported`, never a hang).
         cmd.arg("--checked");
-        // s26's real std resolution (wolf-lang#1): `use std.X` reads
-        // `<std-root>/X/`. lupin has no counterpart yet and resolves the
-        // staged flat mirror instead (F-0010).
-        cmd.arg("--std-root").arg(staged.std_root.as_os_str());
     }
+    if imp == Impl::Native {
+        // s28's rung: compile to a native executable, link `wolf_rt`,
+        // run it, and read the trap kind off the runtime's stderr
+        // contract. Refusals stay honest `unsupported` records.
+        cmd.arg("--native");
+    }
+    // Real std resolution on every lane: s26 gave the compiler
+    // `--std-root`/`WOLF_STD` (wolf-lang#1) and lupin 0.1.2 gave the
+    // interpreter the same flag (wolf-interp#6) — which is what retired
+    // this rig's flat-mirror interim, F-0010.
+    cmd.arg("--std-root").arg(staged.std_root.as_os_str());
     // Absolute entry path: the package root is the entry file's
     // directory, and a bare relative name resolves to an empty root.
     cmd.arg(staged.entry.as_os_str());
