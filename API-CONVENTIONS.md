@@ -147,6 +147,15 @@ all. Its cost is one explicit spelling: a predicate is asserted as
 `list.is_empty(xs) == true`, never as a bare call, because a bare call
 is a statement.
 
+**§4 amendment (sc07) — a propagating statement.** A fenced example
+line may end in `?`, and it is emitted verbatim as a statement. The
+extractor's generated `main` is `-> !int`, so `?` widens into its sealed
+row and the line documents exactly what a caller writes at that call site:
+`fs.write_text("out.tmp", "x")?`. Without it an os-facing operation could
+appear in an example only under an `else`, which would document handling
+the caller did not ask for — and a statement that CANNOT fail is still
+spelled without a `?`, so the presence of one is information.
+
 **§4 note (sc02) — one module per example.** The extractor imports
 exactly the documented module (`use std.<path>`), so an example may only
 name that module plus the language itself. Examples that would need a
@@ -523,6 +532,60 @@ and a lint that guessed at them would train authors to work around it.
 - **Every test names its anchors** with `conforms:` (§4), and the doc
   examples are tests too: fenced means executable, always.
 
+## 14. The os tier (sc07) — capabilities, rows, paths, handles
+
+Phase B's first two modules (`std.fs`, `std.io`) are the worked home of
+this section, as `std.option` is §2's and `std.errors` is §12's. Every
+rule here is a rule for the modules that follow them (net, time, process).
+
+- **Every os-facing `pub` item names its CAPABILITY, in its own doc, by
+  the I13 name** (`fs`, `io`, `net`, `env`, `exec`, `ffi`, `unsafe`,
+  `comptime`), and says that comptime refuses it (D33). The module header
+  states the capability once for the module; the per-function note stays
+  anyway, because a reader arrives at a function and a manifest audit
+  reads functions. A function in an os module that reaches NOTHING (the
+  path helpers) says so explicitly — "pure, comptime-safe" — because the
+  exception is the surprising case.
+- **Io errors are rows, and the row vocabulary is the toolchain's, not
+  std's.** `{not_found, denied, io, utf8, eof}` are adopted verbatim from
+  the builtin tier: std adds no translation layer, no error type of its
+  own, and no coarsening a caller did not ask for (§12). A std function's
+  row is exactly the union of what its delegates can raise, minus what it
+  handles itself, and the doc lists every tag with the condition that
+  produces it. Nothing in the os tier traps: a host failure is never a
+  contract violation, because the caller could not have checked
+  (§2's rule, in the place it matters most).
+- **A path is a `str`, and the separator in a wolf literal is `/`.**
+  Until a `Path` type exists, std does not invent one. Every path-taking
+  function documents that forward slashes travel on every tier-1 host, and
+  every path-producing helper cuts at `/` only — a backslash inside a wolf
+  string literal is an ESCAPE, so a windows path written literally does
+  not lex. Tests and doc examples use RELATIVE paths and the rig gives
+  each program its own working directory; a std test never names an
+  absolute path or a host temp directory.
+- **An os handle is consumed by its closer.** `close(take f)` is the
+  pattern: the mode system, not a generation counter or a liveness flag,
+  is what makes use-after-close impossible, and the rejection is held as a
+  test (`tests/fs/use_after_close.lu`, expected `fail(E1001)`). A handle
+  that a caller could forge from data answers with a row (`io`) rather
+  than trapping, for the same reason a missing file does. An operation
+  that advances a handle's POSITION takes `mut` even when no field of the
+  value changes — the stream's state is what the value names.
+- **A capability module's lanes are honestly unequal, and the rig says so
+  once.** An implementation may lack a capability entirely (lupin has no
+  filesystem by design); its ledger column is `unsupported` at resolve and
+  that is a posture recorded in `CONTRIBUTING.md`, not a defect noted in
+  every test header. For doc examples the doc-truth rule becomes: at least
+  ONE lane must reach `exit(0)`, and an honest refusal on the others is
+  acceptable — a stronger requirement than "the reference machine runs it"
+  for exactly the modules where the reference machine cannot.
+- **What a capability module may not do to get a green lane**: emulate the
+  capability, degrade silently, or ship an operation whose failure mode it
+  cannot distinguish. `std.io.input_all` is the worked refusal — a loop
+  over the line read cannot tell `eof` from `io` at this pin (F-0043), so
+  the function is a reviewed contract in the module header instead of a
+  silent truncation.
+
 ## Review record
 
 - 2026-08-10 — drafted (sc00). Human review: **pending**; record the
@@ -561,3 +624,9 @@ and a lint that guessed at them would train authors to work around it.
   pairing, the `List[int]` byte interim, the `base`/`deep`/`boundary` tags,
   the tag-name-collision and enum-through-a-row house rules, and the
   re-home rule for conversions). Review rides the same pending sc00 gate.
+- 2026-08-14 — sc07 amendments (Phase B opens): §14 The os tier
+  (capability notes per I13, the toolchain's row vocabulary adopted
+  verbatim, paths as forward-slashed `str`, `take`-consumed handles with
+  the rejection held as a test, and the capability-lane posture with its
+  stronger doc-truth rule), plus §4's propagating-statement amendment.
+  Review rides the same pending sc00 gate.

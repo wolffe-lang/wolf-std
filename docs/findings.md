@@ -49,6 +49,12 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0040 | 2026-08-13 | **No bottom type**: a diverging `else` handler cannot typecheck generically — wolfc types an `else \|_\| { … }` block by its last expression, `assert(false)` is `()`, and the block must produce `T` (E0401). A monomorphic helper writes an unreachable dummy; a generic one has no `T` to conjure, so `std.option.expect` ships from the nursery. lupin accepts and runs it | wolf-lang s14 typecheck + spec (D30's no-unwinding makes divergence ordinary) | [filed: wolf-lang#35](https://github.com/tenseleyFlow/wolf-lang/issues/35) |
 | F-0041 | 2026-08-13 | (sc06 Target 2) **The error-set alias surface** — s15's parked amendment, filed with the measured cost: 49 `pub` signatures carry a row across 16 modules, 11 distinct shapes, 45 of them one tag and 4 of them two, and NOTHING exceeds two. Core does not need aliases yet and the filing says so; what it argues is the semantics (`error Set Name = {…}` as a transparent name, never nominal — from D30) and the io taxonomy that makes it urgent in stdc02, plus the `try`⇄Result bridge's standing dependency on s16 | wolf-lang s03 grammar + s37 (std error taxonomy owners) | [filed: wolf-lang#36](https://github.com/tenseleyFlow/wolf-lang/issues/36) |
 | F-0042 | 2026-08-13 | (sc06 Target 6) **`wolf test` must subsume this rig without rewrites** — the s39 alignment requirements, with the rig as the working reference: directive-header compatibility (`check:`/`phase:`/`conforms:` verbatim), one trap expectation per entry file as the catch mechanism, subtest naming (Go 12166), a `--json` record stream (Go 2981), the three-lane ledger as a first-class concept, and the D36 bench-format reservation so `std.bench` can land in stdc02+ without a format war | wolf-lang s39 (+ D36 owners) | [filed: wolf-lang#34](https://github.com/tenseleyFlow/wolf-lang/issues/34) |
+| F-0043 | 2026-08-14 | (sc07 Targets 1-3) **A multi-tag error row cannot be branched on at all**, which is the io tier's whole vocabulary: a bare identifier in an `else` handler BINDS instead of matching (`else \|eof\|` fires for `io` too — measured on a `-> str ! {eof, io}` raising each tag), and a payload pattern is now refused by wolfc as refutable (`E0806: this pattern can fail to match, but a binding cannot`) even for a ONE-tag row, while lupin executes it. So API-CONVENTIONS §13's own row-expectation convention (`else \|Tag(p)\|`) is a compiler rejection, `std.io.input_all` cannot tell end-of-input from a read error, and the `NotFound{path}` payload retrofit the sprint contract predicted would not help until this closes | wolf-lang s14/s15 (else-handler patterns) + wolf-interp | filing pending (evidence: `tests/errors/coarsen_and_chain.lu` held at `fail(E0806)`, `tests/fs/not_found_row.lu`) |
+| F-0044 | 2026-08-14 | (sc07 Target 1) **The fs builtin set is nine calls wide and five std functions cannot be written honestly over it**: no `read_dir` (so no directory listing at all), no byte-level read or write (so `copy_file`/`move_file` are TEXT operations that refuse a non-UTF-8 file, and a fixed-size `read` can split a code point and raise `utf8`), no atomic `rename`, no `create_dir`/`remove_dir`, no metadata (`size`, `modified`, `is_file`). Also: `denied` and `utf8` have no portable litmus, so std ships two documented tags it cannot test | wolf-lang s38 owners (the fs builtin tier) | filing pending (evidence: `std/fs/fs.lu`'s absent-inventory header) |
+| F-0045 | 2026-08-14 | (sc07 Target 1) **`fs_open` has no mode**: it opens read-only and `fs_create` truncates, so there is no append-mode open and no read-write handle. `std.fs.append_text` is therefore read-concat-write — linear in the FILE's size rather than the text's, non-atomic, and carrying a `utf8` row for the existing contents it must decode. The ask is an open-mode argument (or `fs_open_append`), and a positioned write | wolf-lang s38 owners | filing pending (evidence: `std.fs.append_text`'s doc) |
+| F-0046 | 2026-08-14 | (sc07 Target 2) **The io tier's three gaps, from writing the facade**: `conform-run` cannot inject stdin (the checked machine's `run_checked_with_input` exists but no flag reaches it), so std can witness only `eof` and `read_all`/`prompt`'s hit paths are untestable in this rig; there is no `read_all` builtin, and a line read strips the terminator, so the whole-input operation cannot be composed from `read_line` even with a working handler; and writes are infallible with no flush, so `prompt` cannot guarantee its prompt appears before the read | wolf-lang s38 + s39 (`wolf test` stdin) | filing pending (evidence: `tests/io/input_line_eof.lu`, `std/io/io.lu`'s contract for `input_all`) |
+| F-0047 | 2026-08-14 | (sc07 Target 2) **Silent wrong answer, and a name std cannot have**: a module item whose name matches an AMBIENT PRELUDE name resolves differently in the two implementations. `pub fn read_line() { read_line()? }` in `std.io` — the obvious facade — delegates to the builtin under wolfc and recurses forever under lupin (`unsupported — call depth exceeded 512 frames`), with no diagnostic on either side; the reverse case (`assert`) shadows the intrinsic module-wide in both. std renamed its reader `input_line` rather than depend on a resolution order. The ask: retire the ambient host names now that the real std surface exists (the prelude's own comment promises exactly that), and rule the shadowing question for the names that stay | wolf-lang resolve owners + wolf-interp | filing pending (evidence: `std/io/io.lu`'s naming note) |
+| F-0048 | 2026-08-14 | **The checked lane's verdict is not deterministic**: the same program, same binary, same inputs answers `exit(0)` or `unsupported — place projection outside the modelled surface` at random — measured 5 of 12 runs one way and 7 the other on `tests/str/byte_length_honesty.lu`, and reproduced on `tests/str/interpolation_interplay.lu` (2 of 136 tests, both `str`-heavy). Verdict stability is a conformance property, not a nicety: spec/06's differential protocol compares records across implementations, and this rig's ledger gate cannot express "sometimes" without the `unstable(…)` vocabulary this sprint had to add | wolf-lang s23/s31 (checked execution) | filing pending (evidence: two `unstable(run\|unsupported)` ledger rows) |
 
 ## F-0001 — the std search path
 
@@ -1130,3 +1136,281 @@ below was re-measured at the new pins.
   F-0015 (the checked tier's module-boundary ceilings), F-0018 (the
   boundary primitive, whose resolve-level half is what put
   `assert_starts_with` in the nursery), F-0026, F-0029, F-0036, F-0037.
+
+## F-0043 — a multi-tag row cannot be branched on (sc07 Targets 1-3)
+
+The io tier's vocabulary is `{not_found, denied, io, utf8}` and
+`{eof, io, utf8}`, and at these pins a caller cannot ask WHICH of them
+fired. Two independent halves, both measured:
+
+**A bare identifier in a handler binds, it does not match.** Given
+`fn miss_io() -> str ! {eof, io} { return io }` and
+`fn miss_eof() -> str ! {eof, io} { return eof }`, both of
+`… else |eof| { "handler-fired" }` fire. The handler binding is a
+binding — the same rule that makes `let` patterns irrefutable — so
+`|eof|` catches `io` as well, silently, exactly as bare-ident MATCH
+patterns bind in lupin (F-0007). There is no diagnostic; the program
+reads as if it discriminated and does not.
+
+**A payload pattern is refused outright by wolfc.** `else |Parse(p)| { … }`
+— API-CONVENTIONS §13's own row-expectation convention, written in sc06
+against this pin's predecessor — is now
+`error[E0806]: this pattern can fail to match, but a binding cannot`,
+with the note "test and destructure with `match` instead", in a position
+where `match` is E0201. It fires for a ONE-tag row too
+(`-> int ! {Parse(P)}`), so it is not a refutability computation this
+sprint can satisfy by narrowing the row. lupin runs the same source and
+destructures correctly (`v=-1 seen=3`), so this is also a divergence.
+
+What it costs this sprint, concretely:
+
+- `std.io.read_all`/`input_all` is NOT WRITTEN. A loop over `input_line`
+  must treat `io` as the end of input, which is a silent truncation of
+  someone's data. §9's "refusal over approximation" decides it: the
+  function ships as a reviewed contract in the module header.
+- Every row litmus in `tests/fs` and `tests/io` witnesses the tag by
+  PROPAGATING it out of `main`, where the process outcome prints
+  `error: <tag>` and exits 1. That is the only place in this rig where a
+  tag appears as itself, and it is why `not_found_row.lu` and
+  `forged_handle_io_row.lu` are written the way they are.
+- `tests/errors/coarsen_and_chain.lu` is held at `fail(E0806)` on both
+  compiler lanes rather than rewritten: the convention it demonstrates is
+  correct and the rejection is the finding.
+- The `NotFound{path}` payload retrofit the sprint contract offered as
+  the fix for bare tags would not help until this closes — a payload you
+  cannot destructure at the handler is worse than a mark.
+
+The ask, in the order std would spend it: (1) `else |Tag(p)|` matches the
+tag and propagates the rest — the natural D30 reading, since a handler
+that covers part of a row leaves a narrower row behind; (2) failing that,
+a `match` over the miss (which needs a row VALUE, F-0038's territory);
+(3) at minimum, a DIAGNOSTIC when a bare-identifier handler shadows a tag
+name in the operand's row, because that shape is silently wrong today in
+both implementations.
+
+## F-0044 — the fs builtin set, and the five functions above it
+
+Nine builtins (`fs_read_text`, `fs_write_text`, `fs_open`, `fs_create`,
+`fs_read`, `fs_write`, `fs_close`, `fs_remove`, `fs_exists`) carried the
+whole of `std.fs`, and the shape of what is missing is one theme: bytes,
+directories, and atomicity.
+
+- **No `read_dir`.** Nothing enumerates a directory, so `std.fs` ships no
+  listing at all — and the guided project the book plans (P1 counts words
+  in the files of a directory) cannot be written yet.
+- **No byte-level read or write.** `copy_file` and `move_file` are
+  therefore TEXT operations composed from `read_text` + `write_text`:
+  they carry a `utf8` row, they refuse a binary file, and they read the
+  whole file into memory. The signatures are the ones the byte versions
+  will keep; the bodies are what the filing is about. `fs_read`'s
+  fixed-size chunk has the same root: a `max` that lands inside a code
+  point raises `utf8`, so a chunked reader is safe only over ASCII.
+- **No atomic `rename`.** `move_file` is copy-then-remove and says so;
+  `rename` is a contract in the module header. A crash between the two
+  leaves both files, which is a durability property a library cannot
+  emulate.
+- **No `create_dir`/`remove_dir`, no metadata** (`size`, `modified`,
+  `is_file`) — so `exists` cannot say WHAT exists, and a writer cannot
+  create the directory it is about to write into.
+- **Two tags std documents and cannot test**: `denied` needs a
+  permission change (a unixism, and the rig is platform-agnostic by
+  rule) and `utf8` needs a file containing bytes that are not UTF-8,
+  which nothing in the language can write. They are documented per
+  function and no test claims to have observed them.
+
+## F-0045 — `fs_open` has no mode, so `append_text` is a rewrite
+
+`fs_open` opens read-only; `fs_create` truncates. There is no
+append-mode open, no read-write handle, and no positioned write. So
+`std.fs.append_text` reads the file, concatenates in memory and writes
+the whole thing back: linear in the FILE's size rather than the appended
+text's, non-atomic (two appenders lose a write), and carrying a `utf8`
+row for contents it must decode in order to keep. The one honest
+alternative — leaving the function out — is worse, because appending to a
+log is the commonest file operation there is.
+
+The ask: an open mode (`fs_open(path, mode)` or `fs_open_append`), and a
+positioned or appending write. With either, `append_text` becomes three
+calls that touch no existing bytes and its `utf8` row disappears from the
+signature.
+
+## F-0046 — the io tier's three gaps, from writing the facade
+
+1. **No stdin injection through the front door.** The checked machine
+   takes a stdin buffer (`run_checked_with_input`) and `conform-run`
+   exposes no flag for it, so this rig can witness `read_line`'s `eof`
+   and nothing else: `prompt`'s hit path and every reader loop are
+   untestable here, and `tests/io/input_line_eof.lu` says so in its
+   header rather than pretending. The ask is a `--stdin=<file>` (or
+   `--stdin-text=`) on `conform-run`, and the same on `wolf test` when
+   s39 lands — F-0042's requirement list gains an eighth item.
+2. **No `read_all` builtin, and the line read drops the terminator.**
+   Even with a working tag-selective handler (F-0043), a whole-input
+   operation composed from `read_line` cannot know whether the input
+   ended with a newline, because that byte is consumed and dropped. A
+   `read_all` builtin returning the bytes as they are is the fix; the
+   std contract is written and waiting.
+3. **Writes are infallible and unflushable.** `print`/`eprint` return
+   nothing and raise nothing, so a closed stdout is unreportable, and
+   there is no flush — which means `prompt` cannot guarantee its prompt
+   reaches the terminal before the blocking read. Both are recorded
+   rather than emulated: a row that always misses would be a lie, and a
+   flush std cannot perform is not a function.
+
+Recorded with it, because it is the same interface: **`conform-run`
+rejects `--deny-warnings`** (`unknown flag`), so the warning gate that
+`wolf build` implements cannot be exercised on the lane this repo runs.
+The record's `warnings` array is the workaround, and it is enough for a
+report — over all 136 staged programs at this pin the array is EMPTY
+every time, so the std tree is warning-clean going into s69 — but a gate
+needs the flag.
+
+## F-0047 — a module item that shares an ambient prelude name
+
+**Silent wrong answer, and the implementations disagree about which way.**
+`std.io` wanted to be written the obvious way:
+
+```
+pub fn read_line() -> str ! {eof, io, utf8} {
+    read_line()?
+}
+```
+
+Under wolfc the inner call resolves to the PRELUDE builtin and the
+facade works (measured: a module `read_line` returning a plain `str`
+still typechecked its body's `?`, which only the builtin's row can
+license, and a qualified `io.read_line()` from an importer reached the
+module item). Under lupin the inner call resolves to the module's own
+item: unbounded recursion, reported as
+`unsupported — call depth exceeded 512 frames`. One source, a facade in
+one machine and a stack overflow in the other, no diagnostic on either
+side.
+
+The reverse case is already known and is the other half of the same
+question: a module item named `assert` shadows the intrinsic MODULE-WIDE
+in both implementations (F-0009 / sc01), severing the module from the
+trap it needs. So the resolution order between "ambient prelude name" and
+"module's own item" is unspecified, implemented two ways, and
+consequential in both directions.
+
+std's answer for now is to give the reader a name of its own —
+`std.io.input_line` — rather than depend on an order neither spec nor
+implementation has ruled on. The asks: retire the ambient host stubs
+(`read_text`, `read_line`, `net_fetch`, `env_var`, `clock_ms`,
+`random_seed`) now that the real std surface exists, which the prelude
+table's own comment already promises ("retire the moment the real std
+surface (s05) replaces them"); and until then, rule the order and
+diagnose the collision, because a name that means two things in two
+machines is not a name.
+
+## Retirements and movements at the sc07 pins
+
+The pin bump is wolf `29a9d9c` → trunk **`f0da6e6`** (both ritual gates
+green in a clean scratch clone: `cargo test --workspace` and
+`cargo run -p xtask -- ci`, "all steps green" — F-0024's lesson applied
+for the fourth time) and lupin stays at **0.1.4** (0.1.5 is in flight and
+deliberately not chased). Five fan-out lanes merged upstream between the
+two shas — s32/s33 (tasks, channels), s37 (the `str` core types), s38
+(fmt, io, fs), s67 (the warning system) — and three of them reach this
+repo. Every claim below was re-measured at the new pins.
+
+- **F-0015 RETIRED.** A row RAISE inside an imported module's function
+  executes on the checked lane now (`ca41dc3`, "row raises execute in the
+  miri-lite cross-module"). This is the single biggest ledger movement
+  this repo has recorded: 51 rows advance from `unsupported` to `run` in
+  the wolfc column, and every "the miss path is lupin-only" note this
+  ledger carried since sc02 is gone. `std.fs` exists because of it — a
+  facade over a builtin tier is nothing BUT propagation.
+- **F-0018's compiler half RETIRED, and it is the biggest prize in the
+  Phase-A census.** The boundary primitive landed as
+  `s.get(a..b) -> str ! {none}` (`1833c4a`, anchor `mem.str.get`) inside
+  an 18-method builtin `str` set that also includes `find`, `rfind`,
+  `split`, `count`, `ends_with`, `strip_prefix`/`strip_suffix`,
+  `replace`, `trim_start`/`trim_end` and `bytes`. The RESOLVE-level half
+  is gone with it: a `str` method inside an imported module no longer
+  costs its importers the wolfc lane (measured — `std.fs`'s path helpers
+  use `rfind` and `get`, and every importer runs), which is what advanced
+  13 `str`/`strbuf` tests and both `x/testing_text` rows. What remains
+  open is the INTERPRETER half: lupin 0.1.4's `str` subset still has no
+  `get`, `find`, `rfind`, `split` or `ends_with` (measured:
+  "`str` has no method `ends_with` in this machine's std subset"), so
+  the 30 blocked functions of the census are writable for one lane. They
+  are a `std.str` sprint's prize, not this sprint's, and the census's
+  Phase-B section records the size of it.
+- **F-0031 RETIRED.** The format spec is no longer ignored by wolfc:
+  `tests/fmt/pad_and_align.lu`, `sign_and_group.lu` and
+  `decimal/fixed_and_exp.lu` all run on the checked lane and the rig's
+  pairwise record comparison finds no stdout divergence against lupin —
+  which is exactly the divergence F-0031 filed. (`1071388`: one comptime
+  spec parser, `E0412`/`E0413` with spans inside the literal;
+  `1833c4a`: native `print` refuses a spec it cannot honour instead of
+  silently dropping it.)
+- **F-0036's compiler half RETIRED; the interpreter half is now WORSE
+  than filed.** A raise-position bare identifier resolves against the
+  declared row first under wolfc (`1833c4a`, "closes #30"): a module with
+  both a `parse` function and a `parse` tag raises the tag and `else`
+  fires. lupin 0.1.4 still hands the caller the FUNCTION — measured as
+  `miss=tagmod::parse` on stdout, a module-qualified function value
+  printed where an `int` was declared, with no diagnostic. The house rule
+  (grep every new tag against the module's items) stays until the
+  interpreter half closes.
+- **Retested and still open**: F-0004 (no trait dispatch anywhere),
+  F-0011 (generic data types), F-0012 (narrowed, unmoved: the five
+  `std.cmp` tests are still `unsupported` at the module boundary),
+  F-0014, F-0016 (`wolf fmt` still splits a dotted call under a `//`
+  comment — it bit `tests/fs/copy_and_move.lu` during this sprint and the
+  note moved into the file header, as the guide says), F-0025's last
+  third (`var k = 0` is `i32`), F-0026, F-0027, F-0029, F-0037,
+  F-0038, F-0039, F-0040.
+- **A test-side movement worth recording, because it is not a
+  workaround.** `tests/hex/round_trip.lu` and
+  `tests/base64/round_trip.lu` became `fail(E1001)` at this pin: an
+  `else` FALLBACK that names a container binding MOVES it, so a
+  `let empty = List[int]()` reused as the fallback of two different
+  `decode` calls is a use-after-move. The fix is the language's own
+  operator, which both implementations run — `else copy empty` — and both
+  tests now run on the checked lane too. The reads-as-moves lens is
+  right; the tests were written before `copy` existed.
+- **A drift note for the anchor registry.** The s67 lane registered ten
+  `diag.*` anchors in `spec/anchors.json` without amending
+  `[conf.anchor.ns]`'s namespace list in spec/05, so a `conforms: diag.…`
+  tag would be a CI failure in this rig ("a tag outside all registered
+  and reserved namespaces"). Nothing in std wants one yet; the rig's
+  `REGISTERED_NS` stays a copy of the spec clause, and this is recorded
+  so the next sprint that reaches for a diagnostics anchor knows why it
+  cannot have one.
+
+## F-0048 — the checked lane answers at random
+
+The same file, the same binary, the same `--std-root`, twelve runs:
+five `exit(0)`, seven
+`unsupported — place projection outside the modelled surface @3272..3279`.
+No seed, no concurrency, no filesystem state involved
+(`tests/str/byte_length_honesty.lu` asserts byte lengths of literals).
+`tests/str/interpolation_interplay.lu` does the same at a lower rate; the
+other 134 tests were stable over repeated runs, and the two that are not
+are the two most `str`-literal-heavy files in the tree — which points at
+whatever the refusal's span is being computed from (the span does not
+correspond to any place expression in the staged sources; offsets 3272..3279
+land inside a COMMENT in `std/str/str.lu`, so the record's span and its
+source have parted company somewhere too).
+
+Why this is more than a flake:
+
+- **Verdict stability is a conformance property.** spec/06's differential
+  protocol exists to compare one implementation's record against
+  another's; a machine that answers two ways cannot be differenced, and
+  the corpus gate upstream is exposed to exactly the same coin flip.
+- **A refusal is supposed to be a capability statement.** "This construct
+  is outside the modelled surface" is a fact about the construct, so it
+  cannot depend on the run.
+- **It forced a rig change.** `tests/ledger.toml` grew an
+  `unstable(run|unsupported)` value (documented in `xtask/src/ledger.rs`
+  and `CONTRIBUTING.md`): the honest record of a nondeterministic pin,
+  loud in every `std-test` summary, and narrowing back to one value the
+  day this closes. Nothing else in this repo has ever needed it, and
+  nothing else should.
+
+The ask: make the refusal deterministic (an iteration order over a
+`HashMap` is the usual culprit for this exact shape), and give the
+`unsupported` record's span a file so the construct can be named.

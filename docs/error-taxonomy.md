@@ -1,8 +1,12 @@
-# The error taxonomy — the sc06 audit
+# The error taxonomy — the sc06 audit, extended at sc07
 
 Every error row shipped in sc01–sc05, audited against the rules
 API-CONVENTIONS §12 now states, with the verdict per tag and the changes
-this sprint made. The measurements are mechanical (a script over
+sc06 made; the table and the last section carry sc07's io tier (`std.fs`,
+`std.io`) as well, which is the first sprint to spend the `eof`/`utf8`
+reservations and the first to add tags std cannot test.
+
+The measurements are mechanical (a script over
 `pub fn` signatures in `std/`, re-runnable) so the numbers in the alias
 filing (F-0041) can be checked rather than believed.
 
@@ -45,10 +49,14 @@ recorded question for a later sprint.
 | `done` | 2 (`iter.range_next`, `iter.list_next`) | none | conforming; **renamed** from `Done`. Exhaustion is its own noun, deliberately not `none` |
 | `deep` | 2 (`json.stringify/stringify_pretty`) | none | conforming |
 | `div_zero` | 1 (`math.checked_div`) | none | conforming; **renamed** from `DivZero` |
+| `io` | 13 (`fs.read_text/write_text/append_text/remove/copy_file/move_file/open/create/read/write/close`, `io.input_line/prompt`) | none — and it is already a COARSENING: every host failure that is not `not_found` or `denied` arrives as `io` (§12 rule 3, and the builtin tier decides it, not std) | conforming; **watch** — the day a caller can act on "disk full" versus "broken pipe" it needs a payload, and F-0043 must close first or the caller cannot read one |
+| `not_found` | 7 (`fs.read_text/write_text/append_text/remove/copy_file/move_file/open`) | none today; `NotFound{path}` is the landing shape the sprint contract named | conforming; **watch** — the payload is what a caller wants (WHICH path was missing, in a chain of them) and it is blocked on F-0043, not on this taxonomy |
+| `utf8` | 7 (`fs.read_text/append_text/copy_file/move_file/read`, `io.input_line/prompt`) | none | conforming — no longer merely reserved: "these bytes are not text" is one actionable mode, and std cannot test it at this pin (F-0044) |
+| `denied` | 8 (the same fs family plus `fs.create`, whose row is `{denied, io}` — a directory it cannot write is `io` there, not `not_found`) | none | conforming, and **untestable at this pin**: making a file unreadable needs a permission call the language does not have (F-0044). Documented per function, observed nowhere |
+| `eof` | 3 (`fs.read`, `io.input_line`, `io.prompt`) | none | conforming — an END is an outcome, not a failure, which is why it is its own noun rather than `none` (the same ruling as `done`) |
 | `gone` | 0 in std (the language's own `weak.upgrade`, `[mem.shared.rc.3]`) | none | conforming, reserved |
-| `eof`, `utf8` | 0 — reserved for the io tier and `bytes.to_str` | none | reserved |
 
-## What this sprint changed
+## What sc06 changed
 
 **The rename, executed tree-wide.** `None` → `none`, `Done` → `done`,
 `Overflow` → `overflow`, `DivZero` → `div_zero` — 148 occurrences across
@@ -98,3 +106,34 @@ They are stated normatively in API-CONVENTIONS §12; the short form:
    std function owns a resource that needs it, so the convention is
    recorded and unused rather than invented — the first `errdefer` in std
    will be in the io tier, releasing a handle it opened.
+
+## The io tier's five tags (sc07, Phase B opens)
+
+`std.fs` and `std.io` add five marks and adopt them VERBATIM from the s38
+builtin tier — `not_found`, `denied`, `io`, `utf8`, `eof` — which is a
+decision worth recording as one: std could have defined its own error type
+over the builtins and did not. Three reasons. The tags are already the
+right granularity (one per response a caller can choose); a translation
+layer would have to invent a mapping and then defend it; and a row that
+matches the builtin's exactly means `?` propagates from the builtin to the
+caller through std without widening, so `std.fs.read_text` costs nothing
+that `fs_read_text` does not.
+
+What the tier reveals about §12's rules:
+
+- **Rule 3 (one tag per actionable mode) is doing real work here.** `io`
+  covers every host failure that is not "missing" or "refused", and no
+  caller can act on the difference between a full disk and a broken pipe
+  in wolf today — there is no retry policy, no free-space query, nothing.
+  The day one can, the tag gains a payload; it does not gain siblings.
+- **Rule 2 (a payload is DATA) has a blocked landing.** `NotFound{path}`
+  is the obvious next step and the sprint contract named it in advance.
+  It cannot land while a payload pattern in an `else` handler is a wolfc
+  rejection (F-0043): a payload nobody can destructure is worse than a
+  mark, because it looks like progress.
+- **Two tags ship documented and unobserved.** `denied` needs a
+  permission change and `utf8` needs a file of invalid bytes; neither is
+  writable from wolf at this pin (F-0044). §10's "accuracy is a measured
+  contract" has an error-tier counterpart, and this is it: a tag std
+  cannot witness says so on the function and in the test header, and no
+  test claims otherwise.

@@ -259,6 +259,7 @@ pub fn std_test() -> Result<(), String> {
     let mut reds: Vec<String> = Vec::new();
     let mut forward_tags = 0usize;
     let mut conservatism: Vec<String> = Vec::new();
+    let mut unstable: Vec<String> = Vec::new();
     let mut divergences: Vec<serde_json::Value> = Vec::new();
     let mut ran = 0usize;
 
@@ -313,7 +314,19 @@ pub fn std_test() -> Result<(), String> {
                 Impl::Native => &expect.native,
             };
             let got = achieved.as_expect();
-            if got != *want {
+            if let Expect::Unstable(set) = want {
+                // A row the pin answers nondeterministically (sc07, F-0048):
+                // accepted, and LOUD — every run names it.
+                unstable.push(format!(
+                    "unstable({}): {test} — observed `{got}` of {{{}}} (F-0048)",
+                    imp.ledger_name(),
+                    set.iter()
+                        .map(|e| e.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+            if !ledger::satisfies(want, &got) {
                 let direction = match ledger::depth(&got).cmp(&ledger::depth(want)) {
                     std::cmp::Ordering::Greater => {
                         "deeper than the ledger claims — advancement is deliberate: \
@@ -338,6 +351,9 @@ pub fn std_test() -> Result<(), String> {
                         conservatism.push(format!("rejects({}, {c}): {test}", imp.ledger_name()))
                     }
                     Expect::Run => {}
+                    // An OBSERVATION is never unstable — only a ledger row
+                    // is (the observation is one run's outcome).
+                    Expect::Unstable(_) => unreachable!("an observation is a single outcome"),
                 }
             }
         }
@@ -388,10 +404,14 @@ pub fn std_test() -> Result<(), String> {
     }
     println!(
         "std-test: {ran} test(s); forward tags: {forward_tags}; \
-         conservatism ledger: {} entr{}",
+         conservatism ledger: {} entr{}; unstable rows: {}",
         conservatism.len(),
-        if conservatism.len() == 1 { "y" } else { "ies" }
+        if conservatism.len() == 1 { "y" } else { "ies" },
+        unstable.len()
     );
+    for line in &unstable {
+        println!("  {line}");
+    }
     for line in &conservatism {
         println!("  {line}");
     }
@@ -412,6 +432,10 @@ fn invoke(
     ceiling: Duration,
 ) -> Result<Record, String> {
     let mut cmd = Command::new(bin);
+    // Every lane runs IN the staged package root (sc07): the filesystem
+    // tier writes real files, so each test gets its own working directory,
+    // wiped by staging, outside the source tree. See `stage::Staged::root`.
+    cmd.current_dir(&staged.root);
     cmd.arg("conform-run");
     if imp == Impl::Wolf {
         // The compiler's interpreted run rung is `--checked`-gated until

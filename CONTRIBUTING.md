@@ -41,10 +41,41 @@ and pinned data only** (the ls00 honesty):
 
 `tests/ledger.toml` records what each implementation achieves on each
 test *today* — `lupin = run | unsupported`, `wolfc = run | unsupported |
-fail(E…)`. The rig fails CI when reality is deeper OR shallower than the
-ledger. Advancing an entry (an upstream pin bump taught a tool a new
+fail(E…)`, and, where a pin answers the SAME program two ways,
+`unstable(run|unsupported)` (sc07, F-0048 — accepted, printed loudly in
+every `std-test` summary, and narrowed back to one value the day the
+finding closes; two rows carry it and nothing else should). The rig fails
+CI when reality is deeper OR shallower than the ledger. Advancing an entry (an upstream pin bump taught a tool a new
 trick) is deliberate: its own commit, saying which upstream change
 earned it.
+
+## The os tier: working directories and honest lanes (sc07)
+
+Two postures the rig carries so that no test has to restate them.
+
+**Every lane runs in the staged package root.** `stage::Staged::root` is
+the per-test scratch directory the runner and the doc-example extractor
+`current_dir` into. A filesystem test therefore writes RELATIVE,
+forward-slashed paths (`"round-trip.tmp"`) and gets: isolation from other
+tests, a directory staging wipes before every run, nothing written into
+the source tree, and no wolf literal carrying a host temp path — where a
+backslash would be a string escape and `C:\Users` would not lex. That
+last point is the s38 lesson, paid for upstream seven times in one file
+and now structural here.
+
+**A capability module's lanes are unequal, and that is the ledger's
+truth.** `std.fs` and `std.io` reach the host, and an implementation may
+honestly not go there: at these pins lupin has no `fs_*` builtins, no
+`read_line` and no `eprint`/`eprint_raw`, so its column for the fs tier is
+`unsupported` at RESOLVE, and the native rung refuses the tier by name
+("io/fs builtins in native lowering (checked lane only at s38)"). The
+compiler's checked tier is the executing lane — it performs REAL host
+operations; the comptime sandbox is the one place they are refused (D33).
+This posture is recorded here and once in `tests/ledger.toml`'s sc07
+section, never per file. For doc examples the same honesty is a
+`CAPABILITY_MODULES` list in the extractor: an `unsupported` verdict is
+acceptable on any lane for those modules, and in exchange at least one
+lane must reach `exit(0)` — an example nobody ran is not documentation.
 
 ## The pin ritual
 

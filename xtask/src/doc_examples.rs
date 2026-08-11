@@ -49,6 +49,19 @@ use std::time::Duration;
 /// permanent allowance.
 const WOLFC_WAIVERS: &[(&str, &str, &str)] = &[];
 
+/// Modules whose functions need an OS CAPABILITY (I13) that an
+/// implementation may honestly not have (sc07). For these, an
+/// `unsupported` verdict is acceptable on EVERY lane — including lupin,
+/// which has no fs/io builtins by design — while the doc-truth rule is
+/// kept by a stronger requirement instead: at least one lane must reach
+/// `exit(0)`, so a documented example is still a program that ran
+/// somewhere.
+///
+/// The list is deliberately tiny and deliberately named by module rather
+/// than by capability: a module lands here when its whole surface reaches
+/// the host, never to excuse one function.
+const CAPABILITY_MODULES: &[&str] = &["fs", "io"];
+
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
     /// `x.deque_int`, …). The bound name is its last segment.
@@ -96,6 +109,8 @@ pub fn doc_examples() -> Result<(), String> {
         std::fs::write(&entry_path, &entry_src).map_err(|e| format!("doc-examples: write: {e}"))?;
         let staged_root = scratch.join("pkg");
         let staged = stage::stage_test(&entry_path, &repo.join("std"), &staged_root)?;
+        let capability = CAPABILITY_MODULES.contains(&b.module.as_str());
+        let mut any_ran = false;
         for (imp, bin) in &lanes {
             let verdict = run_lane(*imp, bin, &staged, ceiling)?;
             let compiler_lane = matches!(imp, Impl::Wolf | Impl::Native);
@@ -104,9 +119,12 @@ pub fn doc_examples() -> Result<(), String> {
                     && WOLFC_WAIVERS
                         .iter()
                         .any(|(m, c, _)| *m == b.module && c == code));
+            if matches!(&verdict, Verdict::Exit(0)) {
+                any_ran = true;
+            }
             let ok = waived
                 || matches!(&verdict, Verdict::Exit(0))
-                || (compiler_lane && matches!(&verdict, Verdict::Unsupported));
+                || ((compiler_lane || capability) && matches!(&verdict, Verdict::Unsupported));
             let tag = if waived {
                 let (_, _, finding) = WOLFC_WAIVERS
                     .iter()
@@ -135,6 +153,16 @@ pub fn doc_examples() -> Result<(), String> {
                 ));
             }
         }
+        // The doc-truth rule for a capability module: no lane is REQUIRED
+        // to have the capability, but the example must have run somewhere,
+        // or it is documentation nothing checks.
+        if capability && !any_ran && !lanes.is_empty() {
+            reds.push(format!(
+                "{}: no lane reached exit(0) — a capability module's example still has to \
+                 run somewhere (§4)",
+                b.origin
+            ));
+        }
     }
     if reds.is_empty() {
         println!("doc-examples: {} block(s), GREEN", blocks.len());
@@ -151,6 +179,9 @@ fn run_lane(
     ceiling: Duration,
 ) -> Result<Verdict, String> {
     let mut cmd = Command::new(bin);
+    // The staged package root is the working directory (sc07), so an
+    // os-facing example writes its scratch files there and nowhere else.
+    cmd.current_dir(&staged.root);
     cmd.arg("conform-run");
     if imp == Impl::Wolf {
         cmd.arg("--checked");
@@ -265,6 +296,13 @@ fn validate_line(line: &str, origin: &str) -> Result<(), String> {
         // relation, which `is_assertion` has already ruled out
         || l.contains(" = ")
         || l.ends_with(')')
+        // a propagating call (`fs.write_text(p, t)?`) — the whole shape of
+        // an os-facing statement (sc07): the operation returns a row, the
+        // example's generated `main` is `-> !int`, and `?` is how a
+        // statement that can fail is written honestly. Without this a
+        // fallible statement could only be spelled with an `else`, which
+        // would document handling the caller never wrote.
+        || l.ends_with('?')
         || l.ends_with('}');
     if statement {
         Ok(())
@@ -396,6 +434,24 @@ mod tests {
         assert!(validate_line("list.is_empty xs", "t").is_err(), "typo");
         assert!(validate_line("list.is_empty(xs) == true", "t").is_ok());
         assert!(validate_line("m[\"a\"] = 1", "t").is_ok(), "assignment");
+    }
+
+    #[test]
+    fn a_propagating_statement_is_a_statement() {
+        // sc07: the os-facing statement shape. `?` ends the line, the
+        // generated `main` is `-> !int`, and the example documents the
+        // propagation the caller actually writes.
+        assert!(validate_line("fs.write_text(\"a.tmp\", \"x\")?", "t").is_ok());
+        assert!(!is_assertion("fs.write_text(\"a.tmp\", \"x\")?"));
+        // Still a typo, still rejected.
+        assert!(validate_line("fs write_text", "t").is_err());
+    }
+
+    #[test]
+    fn capability_modules_are_the_two_os_facades() {
+        // The list is a review surface: it must stay tiny, and a module
+        // joins it only when its whole surface reaches the host.
+        assert_eq!(CAPABILITY_MODULES, &["fs", "io"]);
     }
 
     #[test]

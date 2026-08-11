@@ -31,6 +31,15 @@ pub struct Staged {
     pub entry: PathBuf,
     /// The staged std tree's root (absolute) — `--std-root`'s argument.
     pub std_root: PathBuf,
+    /// The staged package root (absolute), and the WORKING DIRECTORY every
+    /// lane is invoked in (sc07). It is the per-test scratch directory the
+    /// filesystem tier needs: a relative path in a wolf literal
+    /// (`"probe.tmp"`) lands here, one test cannot see another's files, the
+    /// staging step wipes it before every run, and nothing is ever written
+    /// into the source tree. Relative-and-forward-slashed is also the only
+    /// spelling that survives a windows temp path inside a wolf string
+    /// literal, where a backslash is an escape (the s38 lesson).
+    pub root: PathBuf,
 }
 
 /// Stage one test into `scratch`: the entry file, the `std/` tree, and
@@ -51,6 +60,7 @@ pub fn stage_test(entry: &Path, std_root: &Path, scratch: &Path) -> Result<Stage
     Ok(Staged {
         entry: scratch.join(file_name),
         std_root: staged_std,
+        root: scratch.to_path_buf(),
     })
 }
 

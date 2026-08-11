@@ -197,3 +197,26 @@ each has a named graduation trigger.
 
 If a resident is still here at the stdc02 closeout, D31 says delete it —
 and the reviewed contract in its header is what survives.
+
+## Postscript — what the sc07 pin bump did to this census
+
+Written at the sc06 pins and left as the historical record; one pin bump
+later (wolf trunk `f0da6e6`, sc07) three of its blockers moved, and
+`phase-b-census.md` carries the numbers:
+
+- **F-0015 retired** — a row raise executes across a module boundary, so
+  §4's "the shape of a library written against one executing
+  implementation" is no longer the whole story: the wolfc column went from
+  40 `run` rows to 100.
+- **F-0018's compiler half retired** — the boundary primitive landed as
+  `s.get(a..b) -> str ! {none}` inside an 18-method builtin `str` set, so
+  §3's 30-function prize is claimable on ONE lane (lupin's `str` subset has
+  not caught up). It is the next `std.str` sprint's to spend, and the
+  Phase-B census records the decision that comes with it.
+- **F-0031 and F-0036's compiler half retired** (the format spec, and a
+  colliding row tag riding out as a value). F-0036's interpreter half is
+  now reproduced with a printed function value.
+
+Nothing else in §3's blocked inventory moved: closures (23 functions),
+generic data types (28), trait dispatch (8 + 16 non-executing) and the
+range accessors (5) stand as written.
