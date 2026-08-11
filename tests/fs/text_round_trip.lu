@@ -1,0 +1,38 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fs, err.row, err.else
+//!
+//! The whole-text tier of `std.fs`, round-tripped: a file that does not
+//! exist, a write that creates it, a read that gives back exactly the
+//! bytes written, a second write that replaces them, an append that
+//! extends them, an append that creates the file it appends to, and a
+//! remove that leaves nothing behind.
+//!
+//! **Temp-dir discipline** (the rig's, recorded once in CONTRIBUTING):
+//! every path here is RELATIVE and forward-slashed, and the rig runs each
+//! test in its own staged package directory — so these files land in a
+//! per-test scratch directory that staging wipes, never in the source
+//! tree, and no wolf literal ever has to carry a windows path (where a
+//! backslash would be an escape).
+
+use std.fs
+
+fn main() -> !int {
+    let p = "round-trip.tmp"
+    if fs.exists(p) { return 1 }
+    fs.write_text(p, "three wolves\n")?
+    if !fs.exists(p) { return 2 }
+    if (fs.read_text(p) else "?") != "three wolves\n" { return 3 }
+    fs.write_text(p, "one wolf\n")?
+    if (fs.read_text(p) else "?") != "one wolf\n" { return 4 }
+    fs.append_text(p, "two wolves\n")?
+    if (fs.read_text(p) else "?") != "one wolf\ntwo wolves\n" { return 5 }
+    let fresh = "round-trip-fresh.tmp"
+    fs.append_text(fresh, "made by append\n")?
+    if (fs.read_text(fresh) else "?") != "made by append\n" { return 6 }
+    fs.remove(p)?
+    fs.remove(fresh)?
+    if fs.exists(p) { return 7 }
+    if fs.exists(fresh) { return 8 }
+    0
+}

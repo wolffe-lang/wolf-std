@@ -1,0 +1,36 @@
+//! check: run(exit=0, stdout="raw-onebeta\nline-two\n{brace} 42")
+//! phase: run
+//! conforms: std.io, gram.fmt.continuation
+//!
+//! The four writers, and what the record can and cannot see. Standard
+//! output is hashed by the rig, so `write` (no terminator) and
+//! `write_line` (exactly one `"\n"`, on every platform) are pinned
+//! byte-for-byte here — including that two `write`s concatenate and that
+//! the last line of a program need not end in a newline.
+//!
+//! Standard ERROR is not part of the record protocol
+//! ([proto.record] has one stdout hash and no stderr), so
+//! `write_err`/`write_err_line` are witnessed only by the program
+//! finishing cleanly. That is stated rather than hidden: this test proves
+//! they are callable and route somewhere that is not stdout — which is
+//! itself the property that matters, since a stderr write leaking into
+//! stdout would change the hash.
+//!
+//! The last line also pins the pass-through promise: the format spec and
+//! the escapes are the CALLER's, applied at the caller's literal, and
+//! `std.io` adds no second interpolation pass — `{{` arrives as one brace
+//! and `{n}` as the value, exactly as `print` would render them.
+
+use std.io
+
+fn main() -> !int {
+    io.write("raw-one")
+    io.write_err("to-stderr-no-newline")
+    io.write("beta")
+    io.write_line("")
+    io.write_err_line("to-stderr-with-newline")
+    io.write_line("line-two")
+    let n: int = 42
+    io.write("{{brace}} {n}")
+    0
+}

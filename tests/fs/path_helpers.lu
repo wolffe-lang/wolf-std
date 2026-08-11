@@ -1,0 +1,38 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fs, mem.str.get, err.row, err.else
+//!
+//! The pure half of `std.fs`: `join`, `parent`, `file_name`. No file is
+//! touched — these are `str` arithmetic over the one separator wolf
+//! literals can carry safely (`/`), and their misses are absence rows
+//! rather than empty strings.
+//!
+//! The interesting cases are the boundaries: a base that already ends in
+//! a separator, an empty base, a path with no separator at all, a path
+//! whose only separator is the leading one, and a path that ends in a
+//! separator (a directory spelling, which names no file). `parent` and
+//! `file_name` are written over `rfind` + the recoverable slice
+//! (`mem.str.get`), so a multi-byte path is cut at an ASCII `/` and never
+//! inside a code point — which the last two cases pin.
+
+use std.fs
+
+fn main() -> !int {
+    if fs.join("logs", "today.txt") != "logs/today.txt" { return 1 }
+    if fs.join("logs/", "today.txt") != "logs/today.txt" { return 2 }
+    if fs.join("", "today.txt") != "today.txt" { return 3 }
+    if fs.join("logs", "") != "logs/" { return 4 }
+    if (fs.parent("logs/2026/today.txt") else "?") != "logs/2026" { return 5 }
+    if (fs.parent("today.txt") else "?") != "?" { return 6 }
+    if (fs.parent("/etc/hosts") else "?") != "/etc" { return 7 }
+    if (fs.parent("/hosts") else "?") != "/" { return 8 }
+    if (fs.file_name("logs/2026/today.txt") else "?") != "today.txt" { return 9 }
+    if (fs.file_name("today.txt") else "?") != "today.txt" { return 10 }
+    if (fs.file_name("logs/") else "?") != "?" { return 11 }
+    if (fs.file_name("") else "?") != "?" { return 12 }
+    // Multi-byte segments: the cut is at the ASCII separator, so nothing
+    // lands inside a code point and the segments come back whole.
+    if (fs.file_name("caché/données.txt") else "?") != "données.txt" { return 13 }
+    if (fs.parent("caché/données.txt") else "?") != "caché" { return 14 }
+    0
+}

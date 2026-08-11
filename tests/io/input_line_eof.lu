@@ -1,0 +1,35 @@
+//! check: run(exit=1, stdout="line: no input\nprompt: anonymous\nerror: eof")
+//! phase: run
+//! conforms: std.io, err.row, err.propagate, err.else
+//!
+//! The input side, at the only depth the rig can reach: `conform-run` has
+//! no stdin injection at this pin, so standard input is EMPTY and every
+//! read misses with `eof` (the hit path is proven upstream, in the
+//! compiler's own io/fs tests; the flag std would need to prove it here is
+//! filed as F-0046).
+//!
+//! What that still pins, and it is not nothing: `eof` is a ROW rather than
+//! an empty string or a trap, so a caller distinguishes "the input ended"
+//! from "the user typed nothing" — the distinction a sentinel would
+//! destroy. `prompt` misses the same way after writing its prompt, and the
+//! propagation out of `main` names the tag on stdout, which is this rig's
+//! only witness of a tag's identity (F-0043).
+//!
+//! Note the prompt itself does NOT appear in stdout before the miss:
+//! `prompt` writes with `write` (no newline) and the empty-stdin read
+//! misses immediately, so the two writes are the two lines below and the
+//! prompt text rides on the first of them. It is written into the
+//! expectation deliberately — a reader who expected otherwise has learned
+//! something true about prompts.
+
+use std.io
+
+fn main() -> !int {
+    let line = io.input_line() else "no input"
+    io.write_line("line: {line}")
+    let name = io.prompt("") else "anonymous"
+    io.write_line("prompt: {name}")
+    let strict = io.input_line()?
+    io.write_line("unreachable: {strict}")
+    0
+}

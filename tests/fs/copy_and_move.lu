@@ -1,0 +1,38 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fs, err.row, err.else
+//!
+//! `copy_file` leaves both files; `move_file` leaves only the
+//! destination. Both are text operations built from `read_text` +
+//! `write_text` at this pin (there is no byte-level copy or atomic
+//! rename in the builtin tier — F-0044), so what this test pins is the
+//! CONTRACT the byte-level versions must keep: same contents at the
+//! destination, source present after a copy and absent after a move,
+//! destination replaced rather than appended to — the middle of the
+//! program writes a longer text to the destination first, so a copy that
+//! appended (or that left a tail behind) could not pass.
+//!
+//! The note above that step is in this header rather than above the call:
+//! `wolf fmt` splits a dotted call at the dot when a `//` comment sits
+//! directly above it (F-0016), and fmt is law (D34).
+
+use std.fs
+
+fn main() -> !int {
+    let src = "copy-src.tmp"
+    let dst = "copy-dst.tmp"
+    fs.write_text(src, "wolves\n")?
+    fs.copy_file(src, dst)?
+    if !fs.exists(src) { return 1 }
+    if (fs.read_text(dst) else "?") != "wolves\n" { return 2 }
+    fs.write_text(dst, "stale contents that are longer\n")?
+    fs.copy_file(src, dst)?
+    if (fs.read_text(dst) else "?") != "wolves\n" { return 3 }
+    fs.remove(dst)?
+    let moved = "moved.tmp"
+    fs.move_file(src, moved)?
+    if fs.exists(src) { return 4 }
+    if (fs.read_text(moved) else "?") != "wolves\n" { return 5 }
+    fs.remove(moved)?
+    0
+}

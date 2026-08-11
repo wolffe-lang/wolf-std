@@ -7,6 +7,13 @@
 //! `to_str`, and `clear` leaves it usable. Non-ASCII content is part of the
 //! contract, not an afterthought — a builder that only handles ASCII would
 //! be a `str` with extra steps.
+//!
+//! Three notes that used to sit above their calls and now live here:
+//! `len` is BYTES, not code points (`é` is 2 and `🐺` is 4); appending
+//! the empty string changes nothing; and `clear` leaves the buffer
+//! usable rather than consumed. `wolf fmt` splits a dotted call at the
+//! dot when a `//` comment sits directly above it (F-0016) and fmt is
+//! law (D34), so the notes moved up here instead.
 
 use std.strbuf
 
@@ -19,16 +26,13 @@ fn main() -> !int {
     strbuf.push_str(mut b, "wolf")
     if strbuf.len(b) == 8 {} else { return 3 }
     if strbuf.to_str(b) == "the wolf" {} else { return 4 }
-    // Bytes, not code points: é is 2 and 🐺 is 4.
     var u = strbuf.new()
     strbuf.push_str(mut u, "é")
     strbuf.push_str(mut u, "🐺")
     if strbuf.len(u) == 6 {} else { return 5 }
     if strbuf.to_str(u) == "é🐺" {} else { return 6 }
-    // Appending nothing changes nothing.
     strbuf.push_str(mut u, "")
     if strbuf.len(u) == 6 {} else { return 7 }
-    // clear leaves the buffer usable.
     strbuf.clear(mut u)
     if strbuf.len(u) == 0 {} else { return 8 }
     strbuf.push_str(mut u, "again")

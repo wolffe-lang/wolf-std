@@ -1,0 +1,45 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fs, err.row, err.else
+//!
+//! The fd tier: `create` a file, `write` to it in pieces, `close` it,
+//! `open` it, `read` it back in chunks, and see `eof` at the end.
+//!
+//! Two properties worth naming. The pieces a writer sends arrive
+//! concatenated — `write` advances the file's position, which is why it
+//! takes `mut f` even though the `File`'s field does not change. And the
+//! end of the file is a ROW (`eof`), not a length test: a reader loops
+//! until the miss, which is what makes the shape work for a stream whose
+//! length nobody knows.
+//!
+//! Chunk sizes here are ASCII-safe on purpose. A fixed-size read of
+//! non-ASCII text can split a code point and raise `utf8` — a real limit
+//! of a byte-count read over a `str`, documented on `fs.read` and filed
+//! (F-0044) rather than papered over.
+
+use std.fs
+
+fn main() -> !int {
+    let p = "fd-stream.tmp"
+    var w = fs.create(p)?
+    fs.write(mut w, "wolf")?
+    fs.write(mut w, "pack")?
+    fs.close(take w)?
+    if (fs.read_text(p) else "?") != "wolfpack" { return 1 }
+    var r = fs.open(p)?
+    if (fs.read(mut r, 4) else "?") != "wolf" { return 2 }
+    if (fs.read(mut r, 4) else "?") != "pack" { return 3 }
+    // At the end of the file the next read misses with `eof`.
+    if (fs.read(mut r, 4) else "at-end") != "at-end" { return 4 }
+    fs.close(take r)?
+    // `create` truncates: the same path opened again is empty, so its
+    // first read is already the end.
+    var t = fs.create(p)?
+    fs.close(take t)?
+    if (fs.read_text(p) else "?") != "" { return 5 }
+    var empty = fs.open(p)?
+    if (fs.read(mut empty, 8) else "at-end") != "at-end" { return 6 }
+    fs.close(take empty)?
+    fs.remove(p)?
+    0
+}

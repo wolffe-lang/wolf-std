@@ -1,0 +1,26 @@
+//! check: fail(E1001)
+//! phase: typecheck
+//! conforms: std.fs, mem.tier0.move.1, mem.tier0.move.2
+//!
+//! **The staleness discipline, held as a rejection.** `fs.close` takes
+//! its `File` by `take` (X1), so reading a closed file is a use-after-move
+//! — caught statically, with no generation counter, no liveness bit and no
+//! run-time cost. This file is the witness: it is expected to be REJECTED,
+//! and if a future pin ever accepts it the rig goes red, which is exactly
+//! what a discipline that lives in the type system should do.
+//!
+//! It is also the argument for `take` over a `mut`-and-flag design: a
+//! `File` with an `is_open` field would move this error from compile time
+//! to run time and add a row to every operation for a condition the
+//! compiler can see.
+
+use std.fs
+
+fn main() -> !int {
+    let p = "use-after-close.tmp"
+    var f = fs.create(p)?
+    fs.close(take f)?
+    let after = fs.read(mut f, 4) else "?"
+    print("unreachable: {after}")
+    0
+}

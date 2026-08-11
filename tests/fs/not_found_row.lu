@@ -1,0 +1,40 @@
+//! check: run(exit=1, stdout="handled: fallback\nremoved-absent: handled\nerror: not_found")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate, err.else
+//!
+//! The `not_found` litmus, in both directions a caller can take it: an
+//! `else` handler that turns the miss into a value and lets the program
+//! continue, and a `?` that propagates it out of `main` — where the
+//! process outcome NAMES the tag on stdout and exits 1. That last line is
+//! how this rig witnesses a tag's identity: an `else` handler cannot say
+//! WHICH tag fired (a bare-identifier handler binds every one of them and
+//! a payload pattern is a wolfc rejection, F-0043), so the propagation
+//! record is the only place the tag appears.
+//!
+//! Deterministic on any host: the path names a directory that does not
+//! exist inside a scratch directory staging has just cleared. Removing an
+//! absent file is a miss for the same reason — `remove` does not pretend
+//! that "there was nothing to do" is success.
+//!
+//! `denied` and `utf8` have no portable litmus at this pin: making a file
+//! unreadable needs a permission call and making one un-decodable needs
+//! byte-level writing, neither of which exists in the builtin tier
+//! (F-0044). Their meanings are documented on the functions; nothing here
+//! claims to have observed them.
+
+use std.fs
+
+fn main() -> !int {
+    let absent = "no-such-dir/absent.txt"
+    let text = fs.read_text(absent) else |_| "fallback"
+    print("handled: {text}")
+    let gone = "never-existed.tmp"
+    var removed = "not-handled"
+    fs.remove(gone) else |_| {
+        removed = "handled"
+    }
+    print("removed-absent: {removed}")
+    let strict = fs.read_text(absent)?
+    print("unreachable: {strict}")
+    0
+}

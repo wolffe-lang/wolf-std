@@ -1,0 +1,36 @@
+//! check: run(exit=1, stdout="read: handled\nwrite: handled\nerror: io")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate
+//!
+//! A `File` nobody opened is a MISS, not a trap. `std.fs.File` is a
+//! struct a caller can build (structs cross module boundaries whole), so
+//! a forged descriptor is reachable from ordinary code — and API-
+//! CONVENTIONS §2's rule decides what happens: the caller could not have
+//! checked whether a number names an open file, so this is a checkable
+//! condition the library reports (`io`), never a contract violation it
+//! traps on.
+//!
+//! The same row answers a double close and a read of a closed handle;
+//! neither is reachable through the honest API, because `close` consumes
+//! its `File` and the compiler rejects the second use (see
+//! `use_after_close.lu`). This test exists for the shape that survives
+//! that discipline: a handle built from data.
+
+use std.fs
+
+fn main() -> !int {
+    let forged = fs.File { fd: 4242 }
+    var f = forged
+    let got = fs.read(mut f, 4) else "handled"
+    print("read: {got}")
+    var g = fs.File { fd: 4243 }
+    var wrote = "not-handled"
+    fs.write(mut g, "nowhere") else |_| {
+        wrote = "handled"
+    }
+    print("write: {wrote}")
+    var h = fs.File { fd: 4244 }
+    fs.close(take h)?
+    print("unreachable")
+    0
+}

@@ -1,0 +1,207 @@
+//! member: true
+//!
+//! std.io — standard output, standard error, and standard input as
+//! functions: the facade over the language's `print` family and the s38
+//! line-read builtin. Stability tier: core.
+//!
+//! **Why a facade at all, when `print` is ambient.** `print` is a
+//! prelude intrinsic and stays the spelling ordinary code writes — this
+//! module does not replace it and could not (§1: one concept, one name).
+//! What it adds is the four operations as VALUES of the library rather
+//! than magic: a stream chosen by the function you call rather than by a
+//! name's prefix, the raw-versus-line difference spelled in the name, and
+//! one home for the input side, whose row is the interesting part and
+//! whose ambient spelling std may not reuse (see below). A program that
+//! computes what to write, or writes to stderr from a helper, reads
+//! better through these.
+//!
+//! **The format spec is the CALLER's, and it passes through untouched.**
+//! Every function here takes an already-rendered `str`, so
+//! `io.write_line("{n:>8}")` is the caller's f-string with the caller's
+//! spec (spec §7.4, the s38 lowering) and this module adds nothing to it
+//! — no second interpolation pass, no reformatting, nothing that could
+//! disagree with what the literal says. The operations that BUILD a
+//! rendered string out of data live in `std.fmt` (§11's split), and this
+//! module is where the result goes.
+//!
+//! **Capability: `io` (I13).** The four writers and the line read reach the
+//! host's standard streams, are tagged `io` in the toolchain's sandbox
+//! table, and are categorically refused at comptime (D33): a `comptime
+//! fn` cannot read a line, and — because a comptime program's output
+//! would be neither reproducible nor visible — cannot write one either.
+//!
+//! **Writing cannot fail here, and that is the builtin's contract, not a
+//! simplification.** `print`/`eprint` return nothing and raise nothing:
+//! a closed stdout is not reportable at this pin. When the builtin tier
+//! grows a fallible write, these signatures gain a row and the change is
+//! a breaking one, which is why it is recorded here rather than
+//! pre-empted with a row that would always miss (F-0046).
+//!
+//! **The input side is one function and one row.** `input_line` raises
+//! `eof` at the end of input — an outcome, not a failure — plus `io` for
+//! a host failure and `utf8` for bytes that are not text. A caller that
+//! wants a loop writes it around `input_line`; a caller that wants the
+//! whole input at once wants `input_all`, which is a reviewed contract at
+//! this pin and NOT written, for a reason worth reading:
+//!
+//! - `input_all() -> str ! {io, utf8}` — every remaining line, joined
+//!   with `"\n"`. Blocked twice. (1) An `else` handler cannot
+//!   distinguish `eof` from `io`: a bare identifier in the handler BINDS
+//!   rather than matching the tag (so it catches everything) and a
+//!   payload pattern is refused outright by wolfc (E0806) — so a loop
+//!   over `input_line` must treat a genuine read error as the end of
+//!   input, which is a silent wrong answer and this module will not ship
+//!   one (F-0043). (2) the line read strips the terminator, so even with
+//!   a working handler the result cannot say whether the input ended with
+//!   a newline — the operation wants a `read_all` builtin that returns
+//!   the bytes as they are (F-0046). Both are filed; the function lands
+//!   the day either one closes.
+//!
+//! **Why the reader is `input_line` and not `read_line`.** `read_line` is
+//! the name this module wanted, and it is a name std cannot have: it is an
+//! AMBIENT PRELUDE name, and a module item that shares one is resolved
+//! differently by the two implementations. Measured at these pins, from a
+//! `pub fn read_line` whose body called `read_line()`: wolfc resolved the
+//! inner call to the BUILTIN (the delegation worked), and lupin resolved
+//! it to the module's own item — unbounded recursion, reported as
+//! `unsupported — call depth exceeded 512 frames`. One source, a facade in
+//! one machine and a stack overflow in the other, with no diagnostic on
+//! either side (F-0047). So the reader takes a name of its own, the
+//! writers keep theirs (nothing ambient is called `write`), and the filing
+//! asks for what would let the good name come back: retire the ambient
+//! host names — the prelude's own comment already promises to, "the moment
+//! the real std surface replaces them" — and rule the shadowing question
+//! explicitly for the names that stay.
+//!
+//! **Lanes.** The compiler's checked tier executes everything here. Its
+//! stdin is EMPTY — `conform-run` has no stdin injection at this pin — so
+//! the `eof` path is the one the rig witnesses and the hit path is proven
+//! upstream (F-0046 asks for the flag). The writers' stdout is compared
+//! by hash; stderr is not in the record protocol, so `write_err` and
+//! `write_err_line` are witnessed by their exit status alone, which is
+//! stated rather than hidden. lupin has neither the `read_line` builtin
+//! nor `eprint`/`eprint_raw`, so its column is `run` for the two stdout
+//! writers and an honest `unsupported` for the other three — the
+//! capability posture the rig records once in its docs rather than per
+//! test (F-0043). The native rung refuses the tier.
+
+/// Write `text` to standard output exactly as given — no newline, no
+/// reformatting.
+///
+/// Total: no rows, no traps (see the module header on the builtin's
+/// infallible-write contract). Capability `io`; refused at comptime
+/// (D33). Delegates to `print_raw`.
+///
+/// This is the function to build a line out of pieces with, and the one
+/// to use when the bytes must be exact: a progress indicator, a prompt,
+/// a value that must not gain a terminator it did not ask for.
+///
+/// ```wolf-doc-example
+/// io.write("no newline here")
+/// io.write("")
+/// ```
+pub fn write(text: str) {
+    print_raw(text)
+}
+
+/// Write `text` to standard output followed by a newline.
+///
+/// Total: no rows, no traps. Capability `io`; refused at comptime (D33).
+/// Delegates to `print`, whose terminator is exactly one `"\n"` on every
+/// platform — no `"\r\n"` translation anywhere, which is what keeps a
+/// stdout hash comparable across the tier-1 hosts.
+///
+/// ```wolf-doc-example
+/// io.write_line("one line")
+/// io.write_line("{2 + 2}")
+/// ```
+pub fn write_line(text: str) {
+    print(text)
+}
+
+/// Write `text` to standard error exactly as given — no newline.
+///
+/// Total: no rows, no traps. Capability `io`; refused at comptime (D33).
+/// Delegates to `eprint_raw`.
+///
+/// Standard error is the stream for what a program says ABOUT its work
+/// rather than what its work produced: diagnostics, progress, warnings.
+/// Keeping them off stdout is what lets a caller pipe the output of a
+/// wolf program into another one — and it is why the rig can hash stdout
+/// at all.
+///
+/// ```wolf-doc-example
+/// io.write_err("partial diagnostic ")
+/// io.write_err("continued\n")
+/// ```
+pub fn write_err(text: str) {
+    eprint_raw(text)
+}
+
+/// Write `text` to standard error followed by a newline.
+///
+/// Total: no rows, no traps. Capability `io`; refused at comptime (D33).
+/// Delegates to `eprint`.
+///
+/// ```wolf-doc-example
+/// io.write_err_line("a diagnostic line")
+/// ```
+pub fn write_err_line(text: str) {
+    eprint(text)
+}
+
+/// The next line of standard input, without its terminator.
+///
+/// Rows: `eof` when there is no more input — the END of the stream is an
+/// outcome, so a read loop is `while` over this function's misses rather
+/// than a length test; `io` for a host failure; `utf8` when the bytes are
+/// not well-formed UTF-8 (nothing is returned in that case — this is not
+/// a lossy decode). Never traps.
+///
+/// The terminator is consumed and dropped, and a `"\r\n"` ending yields
+/// the line without either byte — so a file written on windows reads the
+/// same as one written on linux, and a caller cannot tell whether the
+/// last line of the input ended with a newline. That last point is a real
+/// limitation of the line-oriented shape, not a bug: a caller who needs
+/// the bytes as they are wants `read_all`, which is a contract at this
+/// pin (F-0046).
+///
+/// Capability `io`; refused at comptime (D33). Delegates to the prelude's
+/// `read_line`, whose name this function deliberately does not share —
+/// see the module header.
+///
+/// A doc example cannot demonstrate the hit path: an extracted example
+/// runs with no stdin, so the honest example is the miss, which is also
+/// the one every reader gets wrong first.
+///
+/// ```wolf-doc-example
+/// (io.input_line() else "no input") == "no input"
+/// ```
+pub fn input_line() -> str ! {eof, io, utf8} {
+    read_line()?
+}
+
+/// Write `text` to standard output with no newline, then read one line
+/// of standard input.
+///
+/// Rows: `input_line`'s exactly — `eof` when the input ends (the user
+/// pressed the terminal's end-of-input, or the pipe closed), `io` for a
+/// host failure, `utf8` for bytes that are not text. Never traps.
+///
+/// The prompt is written with `write` rather than `write_line`, because a
+/// prompt belongs on the same line as the answer, and it is not flushed
+/// separately: standard output is line-buffered on a terminal, so a
+/// prompt with no newline may appear only when the line is read. That is
+/// the host's behaviour and this function does not paper over it; a
+/// program that needs a guaranteed flush before a blocking read wants
+/// the flush operation, which no builtin offers yet (F-0046).
+///
+/// Capability `io`; refused at comptime (D33).
+///
+/// ```wolf-doc-example
+/// (io.prompt("name? ") else "anonymous") == "anonymous"
+/// ```
+pub fn prompt(text: str) -> str ! {eof, io, utf8} {
+    print_raw(text)
+    read_line()?
+}
