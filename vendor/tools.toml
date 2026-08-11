@@ -11,77 +11,66 @@
 # nightly lane watches the drift, report-never-gate.
 
 [lupin]
-# 0.1.5 (sc08 bump, tag v0.1.5). lupin names `f0da6e6` — the sc07 DATA pin —
+# 0.1.6 (sc09 bump, tag v0.1.6). lupin names `13b811f` — the sc08 data pin —
 # as its own conformance pin, while the `wolf` binary below sits at trunk
-# `13b811f`: the lawful two-upstream drift this file's header describes, with
-# the nightly lane watching it.
+# `8321aba`: the lawful two-upstream drift this file's header describes, with
+# the nightly lane watching it. The drift narrowed by one wave this bump.
 # What the bump changes for this repo, all re-measured:
-# - **the whole 18-method builtin `str` set arrives** (`find`, `rfind`,
-#   `split`, `get`, `ends_with`, `strip_prefix`/`strip_suffix`, `replace`,
-#   `trim_start`/`trim_end`, `count`, `bytes`), which retires the INTERPRETER
-#   half of F-0018 and moves `fs/path_helpers.lu` to `run`. The 30
-#   census-blocked `std.str`/`std.bytes` functions are now writable on BOTH
-#   implementations — a `std.str` sprint's prize, not this one's.
-# - **`eprint`/`eprint_raw` exist**, which moves `io/writers_and_streams.lu`
-#   to `run`: all four `std.io` writers work under lupin now and only the line
-#   READ is refused (no injectable stdin, by design).
-# - **a `match` inside an `else` handler discriminates CORRECTLY here** — and
-#   does not on wolfc's checked lane, which is F-0052, the sprint's sharpest
-#   finding and a three-lane divergence.
+# - **this machine runs WARNING analyses now** (wolf-interp#19): eleven
+#   shared-analysis lints (W0304–W0309, W0401, W0602, W1101, W1102, W1302)
+#   with the counterparty's spans, and the record's `warnings` array is
+#   populated per `[proto.record.warn]`. The compiler-only four (W0402,
+#   W0601, W0801, W1001) stay honest-absent — so the lupin lane is a
+#   SECOND warning signal for this rig, still entry-file-only (F-0053).
+# - **reads through frozen containers are legal** (wolf-interp#20, spec
+#   `[mem.region.freeze.4]`): a method receiver that does not change is not
+#   written back, so `frozen[0].body.words()` reads where 0.1.5 trapped
+#   `region-fault`. Nothing in this repo's ledger moved on it (no std test
+#   reads through a frozen container), recorded because sc02's freeze entry
+#   in the guide claimed less than the machine now does.
+# - **E1101/E1102/E1103 and E0004 reject at this machine's resolve rung**
+#   with wolfc's codes and spans — the #41 capture law is enforced on both
+#   implementations at last, which retires the guide's "silent wrong answer
+#   on one lane" warning about task captures.
 # What it does NOT change: no `fs_*` builtins, no `read_line`, no `net_*` (all
 # three declined by design, with a sentence in the refusal), `var k = 0` is
-# still `i32`, and the capture law is still unenforced — a task writing a
-# captured `var` runs with the write silently dropped where wolfc rejects it
-# E1101.
-version = "0.1.5"
-pin = "f0da6e67158292e962c93268973d9e927fe703a0"
+# still `i32`, and `count("")`/`split("")`/`replace("", …)` are still
+# refused as `unsupported` rather than defined (F-0055 — std guards them).
+version = "0.1.6"
+pin = "13b811ffc03092c78873bed1cc9b400d166f04fd"
 
 [wolf]
 version = "0.0.1"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver -p wolf_rt.
-# sc08 bump: trunk 13b811f — "merge the #40 sprint: native str, List, and fs —
-# the three-consumer gate opens (wave-four lane four, wave closed)". One lane
-# reaches this repo and it reaches it hard:
-# - **#40, native `str`/`List`/fs**: the native rung's refusal list loses
-#   `str`, `List`, `print` and the whole fs/io builtin tier, which flips 41
-#   ledger rows in one bump (native: 23 of 136 -> 64) and gives `std.fs` and
-#   `std.io` a SECOND executing lane. F-0026's capability map is narrowed to
-#   generics, `trait`/`enum`/`impl` modules, `Map`, `const` declarations and
-#   the `net` tier.
-# - **s39's net builtin tier** (`net_listen`, `net_port`, `net_accept`,
-#   `net_connect`, `net_read`, `net_write`, `net_close`) over D30 rows
-#   `{refused, timeout, closed, utf8, io}`, executing on the CHECKED lane and
-#   refused by name in native lowering. `std.net` is written over exactly this
-#   surface. The `timeout` tag cannot be reached: the runtime has a per-socket
-#   deadline and no builtin arms it (F-0049).
-# - **#42 closed**: the checked lane's verdict nondeterminism is gone,
-#   re-measured 14-for-14 on both affected files, so the `unstable(...)` ledger
-#   vocabulary sc07 had to invent is retired and unused.
-# - **the format spec has CONVERGED**: `{x:.2}`, `{s:.4}` and `{n:08}` render
-#   identically on all three lanes now, including precision on a `str` —
-#   F-0031's divergence retired, and the one clause F-0033 said nothing
-#   implemented.
-# - **`wolf test` exists** (s39's third target), which turns F-0042 from
-#   requirements-against-nothing into requirements to check. This rig does not
-#   switch to it: the coupling doctrine is `conform-run` plus the record.
-# - **W0402 arrived and immediately paid for itself** ("`0.0 - x` is not
-#   negation"): 29 sites in two std TEST files, one of them a signed-zero
-#   assertion that asserted `+0.0` against `+0.0`. Fixed; all 144 staged
-#   programs now report an empty `warnings` array. `conform-run` still rejects
-#   `--deny-warnings` and the array still covers the entry file only (F-0053).
+# sc09 bump: trunk 8321aba — the s36 deterministic-scheduler merge plus its
+# two off-linux follow-ups ("gate the w1- token validator behind the task
+# layer's linux posture"). NOTHING in the wave reaches this repo's surface:
+# s36 is the scheduler (seeded picks, virtual timers, replay from seed or
+# `w1-` token, zero scheduler symbols in release builds) and std ships no
+# concurrent code at all. Re-measured anyway, because a pin is a pin:
+# - the builtin `str` set is unchanged from 13b811f (the s37 21-method set,
+#   `get` included), which is what sc09 spends;
+# - `count("")`, `split("")` and `replace(s, "", …)` are still REFUSED on
+#   the checked lane ("count of an empty needle") while native DEFINES them
+#   (0, one whole piece, identity) — the three-lane split F-0055 files and
+#   `std.str` now guards ahead of every delegate;
+# - `repeat(s, n)` with `n < 0` still traps `bounds` on the checked lane and
+#   answers `""` natively and under lupin (F-0056; `std.str.repeat` guards);
+# - `--deny-warnings` is STILL rejected by `conform-run` (F-0046/F-0053,
+#   re-verified at this sha: `unknown flag`), so the warning gate is still
+#   the record's `warnings` array, now read on two lanes (lupin 0.1.6).
 #
-# THE SECOND GATE (F-0024's lesson, applied for the fifth time): the pin is
+# THE SECOND GATE (F-0024's lesson, applied for the sixth time): the pin is
 # verified by `cargo test --workspace` AND `cargo run -p xtask -- ci` in a
-# clean scratch clone at the sha. Both are green at 13b811f — **each on its
-# second attempt.** Each gate failed once in `wolf_rt::task::proc`'s
-# scheduler-seam tests (`seam_observes_proc_events`,
-# `killed_proc_skips_defers_and_frees_regions`) and the crate is 14-for-14
-# green run alone, so the failures are timing under full-workspace
-# parallelism. Recorded rather than quietly re-run: F-0054.
+# clean scratch clone at the sha. Both are green at 8321aba **on their first
+# attempt** — F-0054's proc-seam flakiness (each gate failed once at
+# 13b811f) did not reproduce here, on 1-for-1 evidence. The finding stays
+# open: one clean pair is not proof the timing dependence is gone, and the
+# lawful posture remains "state the attempt count in this note".
 #
 # The native rung needs `libwolf_rt.a` beside the binary
 # (`cargo build -p wolf_rt` at the same sha, or `$WOLF_RT_LIB`); doctor
 # reports its absence and the lane goes dark rather than silent. It executes
 # the fs/io tier now and refuses the net tier by name.
-pin = "13b811ffc03092c78873bed1cc9b400d166f04fd"
+pin = "8321aba4e77d16f598a77e7934c146700cbcfa46"
