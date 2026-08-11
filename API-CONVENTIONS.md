@@ -586,6 +586,46 @@ rule here is a rule for the modules that follow them (net, time, process).
   the function is a reviewed contract in the module header instead of a
   silent truncation.
 
+**§14 amendment (sc08) — the net tier, and the refusal rule restated.**
+`std.net` is the third module of this section and the first whose whole
+vocabulary is a network's. Everything above applies unchanged; four additions,
+each earned by writing the module.
+
+- **The row vocabulary is the toolchain's, again and verbatim**:
+  `{refused, timeout, closed, utf8, io}`. `closed` is the socket's `eof` — the
+  peer finished, an OUTCOME a reader stops on rather than reports — and it
+  joins §2's absence family for that reason, not the error family. `refused`
+  and `timeout` are error marks. std adds no tag, no translation and no
+  coarsening a caller did not ask for.
+- **A tag a program cannot reach is documented as unreachable, not omitted.**
+  `timeout` is declared by three builtins and no builtin can arm a deadline at
+  this pin (F-0049), so every `std.net` signature carries the tag, every doc
+  says it is unobservable here, and the day a deadline lands nothing about the
+  surface changes. Removing it would be the lie: the row is the toolchain's.
+- **One verb, one type — so the second closer wears a longer name.** wolf has
+  no overloading, so a module with two handle types cannot spell `close` twice.
+  The vocabulary word goes to the value programs handle most (`net.close`
+  takes the `Socket`) and the other is qualified (`net.close_listener`). Both
+  are `take`-consuming per §14's handle rule; both hold their staleness
+  discipline as a `fail(E1001)` test.
+- **The pure member of a capability module is stated twice: on the function
+  and in the module header.** `net.endpoint`/`net.loopback` touch nothing and
+  are comptime-safe, exactly as `std.fs`'s path helpers are — and in an os
+  module the pure function is the surprising one, so the exception is spelled
+  out rather than inferred from the absence of a capability note.
+
+**§14's last rule, restated because sc08 paid it twice.** "What a capability
+module may not do to get a green lane" now has two worked refusals, blocked by
+the same finding from opposite directions: `std.io.input_all` (sc07) and
+`std.net.read_all` (sc08, written and withdrawn inside the sprint). A loop over
+a rowed read must stop on one tag and re-raise the others, and no handler can
+tell them apart — at the sc08 pin the shape that should discriminate
+(`else |e| match e { … }`) compiles, runs, and matches its FIRST ARM for every
+tag on the executing lane, while the other two lanes get it right (F-0052).
+The rule that decides both: a capability module ships no operation whose
+failure mode it cannot distinguish, and the version that "works on the happy
+path" is the version that loses someone's data.
+
 ## Review record
 
 - 2026-08-10 — drafted (sc00). Human review: **pending**; record the
@@ -624,6 +664,13 @@ rule here is a rule for the modules that follow them (net, time, process).
   pairing, the `List[int]` byte interim, the `base`/`deep`/`boundary` tags,
   the tag-name-collision and enum-through-a-row house rules, and the
   re-home rule for conversions). Review rides the same pending sc00 gate.
+- 2026-08-15 — sc08 amendments: §14 gains the net tier (the
+  `{refused, timeout, closed, utf8, io}` vocabulary adopted verbatim, an
+  unreachable tag documented rather than omitted, the one-verb-one-type rule
+  for a module with two handle types, and the pure-member exception stated
+  twice), plus §14's refusal rule restated with its second worked refusal
+  (`std.net.read_all`, withdrawn inside the sprint — F-0052). Review rides the
+  same pending sc00 gate.
 - 2026-08-14 — sc07 amendments (Phase B opens): §14 The os tier
   (capability notes per I13, the toolchain's row vocabulary adopted
   verbatim, paths as forward-slashed `str`, `take`-consumed handles with

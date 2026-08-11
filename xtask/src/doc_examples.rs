@@ -60,7 +60,7 @@ const WOLFC_WAIVERS: &[(&str, &str, &str)] = &[];
 /// The list is deliberately tiny and deliberately named by module rather
 /// than by capability: a module lands here when its whole surface reaches
 /// the host, never to excuse one function.
-const CAPABILITY_MODULES: &[&str] = &["fs", "io"];
+const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net"];
 
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
@@ -448,10 +448,13 @@ mod tests {
     }
 
     #[test]
-    fn capability_modules_are_the_two_os_facades() {
+    fn capability_modules_are_the_os_facades() {
         // The list is a review surface: it must stay tiny, and a module
-        // joins it only when its whole surface reaches the host.
-        assert_eq!(CAPABILITY_MODULES, &["fs", "io"]);
+        // joins it only when its surface reaches the host. `net` joined in
+        // sc08: its two address helpers are pure, but a module belongs here
+        // as soon as a lane can honestly refuse ANY of its examples, and the
+        // seven socket functions can.
+        assert_eq!(CAPABILITY_MODULES, &["fs", "io", "net"]);
     }
 
     #[test]

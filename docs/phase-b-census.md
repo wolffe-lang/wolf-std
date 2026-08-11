@@ -133,3 +133,84 @@ honestly". Whether `std.str` may do the same is the question the next
 sprint inherits — with the sc07 precedent (a capability the machine
 genuinely lacks) as the narrow reading, and "lupin is simply behind" as
 the wide one this file recommends against.
+
+## 6. sc08 — `std.net`, and the native column's flip
+
+Re-measured at the sc08 pins (wolf trunk `13b811f`, lupin 0.1.5).
+
+| measure | sc07 | sc08 |
+|---|---|---|
+| modules in `std/` | 27 | **28** (`std.net`) |
+| free `pub fn` in `std/` | 274 | **284** (+10) |
+| public types | — | +2 (`net.Listener`, `net.Socket`) |
+| entry tests | 136 | **144** (+8) |
+| fenced doc examples, extracted and RUN | 232 | **242** (+10) |
+| named-and-unbuilt in the os tier (reviewed contracts) | 10 | **17** (+7 in `std.net`) |
+| findings filed | 6 (F-0043…F-0048) | **6** (F-0049…F-0054, issues #45–#50) |
+| findings retired | 4 | **3 whole** (F-0018's interpreter half, F-0031, F-0048) |
+
+### What `std.net` delivers
+
+Ten functions and two types: `listen`, `port`, `accept`, `connect`, `read`,
+`write`, `close`, `close_listener` over `Listener`/`Socket`, plus the pure
+address helpers `endpoint` and `loopback`. Row vocabulary
+`{refused, timeout, closed, utf8, io}`, adopted verbatim from the s39 builtin
+tier. Eight tests: an echo round trip that accepts twice on one listener,
+a stream-in-pieces read, three row litmuses (`refused`, `closed`, `io`), the
+`take`-consumed-close rejection (`fail(E1001)`), the comptime refusal
+(`fail(E0701)`), and the pure helpers.
+
+Two names differ from what the sprint contract listed, both measured rather
+than chosen:
+
+- **`read_all` is NOT shipped.** Written, tested, withdrawn: the loop must
+  stop on `closed` and re-raise the other three tags, and a handler's `match`
+  matches its first arm for every tag on the executing lane (F-0052). §14's
+  refusal rule applies in the same words it used for `std.io.input_all`.
+- **`write_all` is not shipped either, and that one is good news**: the
+  builtin write is complete, so a short-write loop would document a hazard
+  this surface does not have. The name is reserved.
+
+### The lane table at these pins
+
+144 tests × 3 lanes:
+
+| lane | run | unsupported | fail(E…) |
+|---|---|---|---|
+| lupin | **117** | 27 | 0 |
+| wolfc `--checked` | **109** | 30 | 5 |
+| native | **66** | 73 | 5 |
+
+The native column is the story: 23 → 64 on the sc07 test set (+41 rows), plus
+the two net rejection witnesses. #40 landed native `str`, `List` and the fs/io
+builtin tier together, so `std.fs` and `std.io` have two executing lanes now
+and F-0026's capability map is down to generics, `trait`/`enum`/`impl`
+modules, `Map`, `const` declarations and the `net` tier. No row anywhere is
+`unstable(...)` any more (F-0048 closed).
+
+### The os-tier blocked inventory, by blocker (updated)
+
+- **F-0049 — the net builtin tier · 5 contracts**: deadline helpers
+  (`set_deadline`/`read_timeout` — the `timeout` tag is declared and
+  unreachable), `shutdown`, `peer_address`/`local_address`, UDP, and name
+  resolution as an operation.
+- **F-0052 — no tag discrimination · 2 contracts, both loops**:
+  `std.net.read_all` and `std.io.input_all`. The blocker changed shape between
+  sprints (rejection → silent wrong answer) and blocks the same two functions.
+- **F-0050 — no byte-level socket read · 1 contract**: `read_line` over a
+  socket and any line protocol above it. The buffered-reader half of the
+  problem is solved (a mutable `str` field through a `mut` parameter works on
+  both executing lanes); the fill is not.
+- **F-0044 (6), F-0046 (1), F-0004 (2)** — unchanged from sc07's table.
+
+### What Phase B no longer inherits
+
+§5 above left the next `std.str` sprint a decision: those 30 census-blocked
+functions would run on the compiler's checked lane and be `unsupported` under
+lupin, so was "at least one lane, honestly" allowed outside a genuine
+capability gap? **The question is moot.** lupin 0.1.5 has the whole builtin
+`str` set, so those functions run on every lane that has `str` at all — which
+is now all three. Phase A's rule ("the reference machine runs it") stands
+unrelaxed, and the narrow reading of §14's capability posture — an
+implementation that genuinely lacks a capability — remains the only reading
+this repo has ever needed.

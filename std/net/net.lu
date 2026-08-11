@@ -1,0 +1,431 @@
+//! member: true
+//!
+//! std.net — blocking TCP over rows: bind a listener, accept or dial a
+//! connection, read and write text on it, and close it exactly once.
+//! Stability tier: core.
+//!
+//! **Errors are rows, never traps** (D30, API-CONVENTIONS §2's trap rule
+//! and §14's restatement of it for the os tier): a refused connection, a
+//! peer that finished, a deadline, bytes that are not text and every other
+//! host failure are ORDINARY outcomes a caller handles with `else` or
+//! propagates with `?`. Nothing here traps, and nothing returns a
+//! sentinel. The vocabulary is the s39 builtin tier's, adopted verbatim so
+//! that std adds no translation layer:
+//!
+//! - `refused` — nobody is listening at that address
+//! - `timeout` — the operation's deadline expired (see the deadline note
+//!   below: DECLARED so the vocabulary is stable, and not reachable from
+//!   wolf source at this pin)
+//! - `closed` — the peer finished: the socket's `eof`, an outcome rather
+//!   than a failure, and the value that ends a read loop
+//! - `utf8` — the bytes read are not well-formed UTF-8; a wolf `str` is
+//!   UTF-8 by definition, so a read that cannot decode is a miss
+//! - `io` — every other host failure, including a forged, closed or
+//!   wrong-kind handle, coarsened to one tag because no caller can act
+//!   differently on them yet (§12's rule 3)
+//!
+//! **Capability: `net` (I13).** Every function here except the two address
+//! helpers reaches the host's network stack, is tagged `net` in the
+//! toolchain's sandbox table, and is categorically refused at comptime
+//! (D33) — sockets are the loudest case of that rule: `wolf add` must
+//! never mean arbitrary code talks to the network with the builder's
+//! credentials. The refusal is `E0701`, and
+//! `tests/net/comptime_refuses.lu` holds it — one level down, at the builtin,
+//! because a `comptime fn` cannot call across a module boundary at this pin
+//! and so cannot reach this facade at all (F-0051).
+//!
+//! **Loopback and port 0, always — no external network, EVER.** Every
+//! test and every doc example in this module binds `127.0.0.1:0`: the
+//! host assigns an ephemeral port and the program learns it through
+//! `port`. Nothing here names a fixed port, a foreign host or a name to
+//! resolve. `connect` hands its address string to the host, which means a
+//! hostname WOULD be resolved by the host resolver — std does not do it,
+//! does not test it, and `dns`/`resolve` is not a function this module has
+//! (see below).
+//!
+//! **The three-way split** (§8/§9's rule, applied to sockets). The
+//! IMPLEMENTATION owns the builtins this module delegates to
+//! (`net_listen`, `net_port`, `net_accept`, `net_connect`, `net_read`,
+//! `net_write`, `net_close`) — their semantics are therefore part of this
+//! module's contract and are documented per function. std owns everything
+//! else: the `Listener` and `Socket` values, the consuming closers, and
+//! the pure address helpers. The LANGUAGE owns nothing here; there is no
+//! socket syntax.
+//!
+//! **Blocking, and what that means for a program.** Every operation blocks
+//! the whole process: `accept` waits for a connection, `read` waits for
+//! bytes. There is no reactor, no task parking and no `select` at this tier
+//! — X6's completion-io posture is the s35 reactor's story and reaches std
+//! when the builtin tier does. Two consequences a caller must design
+//! around: a server written over these functions serves one connection at
+//! a time, and an `accept` with no peer coming never returns (which is why
+//! every test in this module connects BEFORE it accepts).
+//!
+//! **What is deliberately absent.** Each of these is a reviewed contract
+//! with a filing behind it rather than an approximation:
+//!
+//! - `set_deadline(mut s, millis)` / `read_timeout` — **the `timeout` tag
+//!   is declared and unreachable.** The runtime has a per-socket deadline
+//!   (`wolf_rt`'s net table implements one and unit-tests it), and NO
+//!   builtin exposes it, so no wolf program can arm one; the executing
+//!   lane's sockets are plain blocking sockets that never consult it
+//!   (F-0049). std ships no deadline helper rather than one that cannot
+//!   work, and every signature already carries the tag so that arming a
+//!   deadline is a pure addition when the builtin lands.
+//! - `read_all(mut s)` — every byte to the peer's close, as one `str`.
+//!   **The loop is unwritable at this pin and the reason is a silent wrong
+//!   answer, not a rejection.** It must stop on `closed` and re-raise
+//!   `timeout`/`utf8`/`io` unchanged, so it needs a handler that can say
+//!   WHICH tag fired; `else |e| match e { … }` parses and runs on the
+//!   executing lane now (sc07's `E0201` is gone), and its FIRST ARM MATCHES
+//!   EVERY TAG — measured, with no diagnostic (F-0052). A loop written over
+//!   it would treat a read error as the end of the stream, which is a
+//!   truncation of someone's data, and §14 forbids shipping an operation
+//!   whose failure mode the module cannot distinguish. `std.io.input_all`
+//!   is the same refusal for the same reason. Read with `read` and your own
+//!   limit until the finding closes.
+//! - `read_line(mut s)` and any line protocol over it — blocked on
+//!   byte-level reads (and on `read_all` above). A buffered reader is
+//!   writable in principle — a `str` field mutated through a `mut`
+//!   parameter works on both lanes, measured — but FILLING the buffer is a
+//!   byte-count read, and a chunk that ends inside a code point is a `utf8`
+//!   miss whose bytes are gone (F-0050). A line reader that corrupts the
+//!   moment a stream carries a non-ASCII character is not a partial
+//!   function, it is a broken one; §9's "refusal over approximation"
+//!   decides it.
+//! - `write_all` — **not shipped because `write` already is one.** The
+//!   builtin writes the whole `str` or raises; a short write is not
+//!   observable, so a `write_all` loop here would be ceremony documenting
+//!   a hazard that does not exist at this pin. The name is reserved for the
+//!   day a partial-write surface appears, and `write`'s doc states the
+//!   completeness it relies on.
+//! - `shutdown(mut s, half)` — an orderly half-close. No builtin, so a
+//!   writer cannot say "I am done sending" without closing the whole
+//!   socket (F-0049).
+//! - `peer_address` / `local_address` — `port` is the only address
+//!   information the builtin tier reports, and it reports it as an `int`
+//!   for the LOCAL end (F-0049).
+//! - UDP (`send_to`/`recv_from`), name resolution, and any HTTP: no
+//!   builtin surface at this pin, and the sprint's non-targets besides.
+//!   TLS is never this tier's business.
+//! - Byte-level `read_bytes`/`write_bytes` — the same missing byte type
+//!   and byte io that make `std.fs.copy_file` a text operation
+//!   (F-0035/F-0044). It is why `read` carries a `utf8` row at all.
+//!
+//! **Lanes.** The compiler's checked tier is the executing lane: it opens
+//! REAL sockets (the comptime sandbox is the one place they are refused,
+//! D33). lupin has no `net_*` builtins by design — a program that reaches
+//! them is an honest `unsupported` at resolve, the conservatism posture the
+//! rig records once rather than per test — but lupin resolves module bodies
+//! LAZILY, so the two pure address helpers RUN there, which is a property of
+//! that lane rather than a leak in this module. The native rung refuses the
+//! tier by name ("net
+//! builtins in native lowering (checked lane only at s39)"), and refuses
+//! the whole module including the pure helpers, because lowering budgets a
+//! module by more than the body it needs.
+
+/// A bound TCP listener: the host socket this process accepts connections
+/// on.
+///
+/// The field is an `int` because that is what the builtin tier hands out —
+/// a small non-negative index into the machine's socket table, never a
+/// pointer. Reading it is legal; passing a hand-built `Listener` to
+/// `accept` is not a trap but a miss (`io`), because a forged descriptor is
+/// a checkable condition rather than a contract violation, and a public
+/// struct's field cannot be private at this pin.
+///
+/// **Staleness is prevented by the mode system**, exactly as it is for
+/// `std.fs.File`: `close_listener` takes its `Listener` by `take` (X1), so
+/// using one after closing it is a static use-after-move rather than a
+/// row on every operation for a condition the compiler can see.
+pub struct Listener {
+    fd: int,
+}
+
+/// A connected TCP socket: one end of an established stream, whichever
+/// side opened it.
+///
+/// `accept` and `connect` both answer one of these, and nothing about the
+/// value records which — the operations are identical once the connection
+/// exists, which is the whole point of the type. The field is an `int` for
+/// the reasons `Listener`'s is, and `close` consumes the value for the same
+/// reason `close_listener` does.
+pub struct Socket {
+    fd: int,
+}
+
+/// Bind a listening socket to `addr` and return it.
+///
+/// `addr` is `"host:port"` as the host understands it — write
+/// `"127.0.0.1:0"` and let the host choose the port, which is what `port`
+/// below is for. Rows: `io` when the address cannot be bound at all
+/// (already in use, not a local address, malformed), coarsened to one tag
+/// because the builtin tier reports one. Never traps.
+///
+/// The listener starts accepting immediately: a peer may connect before
+/// `accept` is ever called and waits in the host's backlog, which is what
+/// makes a single-process test deterministic.
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_listen`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen(net.loopback(0))?
+/// (net.port(srv) else 0) > 0
+/// net.close_listener(take srv)?
+/// ```
+pub fn listen(addr: str) -> Listener ! {io} {
+    Listener { fd: net_listen(addr)? }
+}
+
+/// The port `l` is bound to.
+///
+/// This is how a program learns the port the host chose for it after
+/// `listen(":0")` — the port-0 discipline every test in this module
+/// follows. Rows: `io` when the handle is closed, forged or the host
+/// cannot report the address. Never traps.
+///
+/// Read mode: asking a listener its port does not change it. The answer is
+/// the LOCAL port only; there is no peer or full-address accessor at this
+/// pin (see the module header).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_port`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv) else 0
+/// p > 0
+/// net.close_listener(take srv)?
+/// ```
+pub fn port(l: Listener) -> int ! {io} {
+    net_port(l.fd)?
+}
+
+/// Take the next connection from `l`'s backlog, waiting until one arrives.
+///
+/// Rows: `timeout` when a deadline expires — declared for the vocabulary's
+/// sake and not reachable at this pin, because nothing in wolf can arm one
+/// (F-0049) — and `io` when the handle is closed, forged or the host
+/// failed. Never traps.
+///
+/// **This blocks until a peer connects.** There is no non-blocking accept
+/// and no way to poll, so a program that accepts before anyone dials waits
+/// forever; a test connects first and lets the backlog hold the connection
+/// (which is exactly what the doc example below does).
+///
+/// `mut l` because accepting ADVANCES the listener: the connection this
+/// call takes is one the next call will not see, which is state the value
+/// names even though its `fd` field does not change — the same rule
+/// `std.fs.read` follows for a file's position (§14).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_accept`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// var conn = net.accept(mut srv)?
+/// net.write(mut cli, "hi")?
+/// (net.read(mut conn, 8) else "?") == "hi"
+/// net.close(take cli)?
+/// net.close(take conn)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn accept(mut l: Listener) -> Socket ! {timeout, io} {
+    Socket { fd: net_accept(l.fd)? }
+}
+
+/// Dial `addr` and return the connected socket.
+///
+/// Rows: `refused` when nobody is listening there — the commonest network
+/// outcome there is, and a row rather than a trap because the caller could
+/// not have checked; `timeout` when a deadline expires (declared, not
+/// reachable at this pin — F-0049); `io` for every other host failure,
+/// including an address that does not parse. Never traps.
+///
+/// **This blocks until the connection completes or fails**, and the host
+/// decides how long that takes. `addr` is handed to the host as written,
+/// so a NAME would be resolved by the host resolver — std neither resolves
+/// nor tests names, and every example here is loopback (see the module
+/// header on the no-external-network law).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_connect`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect(net.loopback(p))?
+/// net.close(take cli)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn connect(addr: str) -> Socket ! {refused, timeout, io} {
+    Socket { fd: net_connect(addr)? }
+}
+
+/// Read up to `max` bytes from `s`, decoded as UTF-8, waiting for at least
+/// one byte.
+///
+/// Rows: `closed` when the peer finished — the socket's `eof`, an OUTCOME
+/// that ends a read loop rather than a failure, and the tag a reader stops
+/// on rather than reports; `timeout` when a deadline expires (declared, not reachable
+/// — F-0049); `utf8` when the bytes read are not well-formed UTF-8, WHICH
+/// INCLUDES a chunk boundary that lands inside a code point, and the bytes
+/// are consumed either way; `io` when the handle is closed, forged or the
+/// host failed. Never traps.
+///
+/// **A byte-count read of text is not safe in general**, exactly as
+/// `std.fs.read` is not: TCP delivers whatever has arrived, so a stream
+/// carrying non-ASCII text can split a code point across two reads and the
+/// second byte-sequence is a `utf8` miss. ASCII is safe at any size, and
+/// the honest fix is byte-level io (F-0035/F-0044), filed rather than
+/// hidden. `max` at or below zero reads nothing and answers the empty
+/// string without touching the socket.
+///
+/// `mut s` because reading CONSUMES from the stream: the bytes this call
+/// takes are bytes the next call will not see (§14).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_read`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// net.write(mut cli, "wolfpack")?
+/// var conn = net.accept(mut srv)?
+/// (net.read(mut conn, 4) else "?") == "wolf"
+/// (net.read(mut conn, 4) else "?") == "pack"
+/// net.close(take cli)?
+/// net.close(take conn)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn read(mut s: Socket, max: int) -> str ! {closed, timeout, utf8, io} {
+    net_read(s.fd, max)?
+}
+
+/// Write all of `text` to `s`.
+///
+/// Rows: `closed` when the peer has gone away (a write to a finished
+/// connection is the row, never a trap), `io` when the handle is closed,
+/// forged or the host failed. Never traps, and there is no `utf8` row: a
+/// `str` is already well-formed UTF-8.
+///
+/// **The whole string is written or the call raises** — the builtin loops
+/// internally, so a partial write is not an outcome this surface has, and
+/// that is why there is no `write_all` beside this function (see the
+/// module header). What it does NOT promise is delivery: bytes handed to
+/// the host may still be in flight, and only the peer's own read proves
+/// otherwise.
+///
+/// Writes are unbuffered: every call reaches the host, so a program
+/// writing a message in small pieces pays for each one.
+///
+/// `mut s` because writing advances the stream, the same rule `read`
+/// follows (§14).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_write`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// net.write(mut cli, "one ")?
+/// net.write(mut cli, "two")?
+/// net.close(take cli)?
+/// var conn = net.accept(mut srv)?
+/// (net.read(mut conn, 7) else "?") == "one two"
+/// net.close(take conn)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn write(mut s: Socket, text: str) -> () ! {closed, io} {
+    net_write(s.fd, text)?
+}
+
+/// Close `s`, consuming it.
+///
+/// Rows: `io` when the handle was already closed or is foreign. Never
+/// traps.
+///
+/// `take` is the mode of the operation's meaning (§3, and §14's handle
+/// rule): closing ends the socket's life, so the caller spells
+/// `net.close(take s)` and the compiler rejects every later use as a
+/// use-after-move. That is the whole staleness story for sockets, it costs
+/// nothing at run time, and `tests/net/use_after_close.lu` holds it as a
+/// rejection so it cannot rot.
+///
+/// Closing is also what tells the PEER the stream is finished: it is the
+/// only half-close this tier has, so it is what makes the other end's next
+/// read answer `closed`. A writer that wants to say "done sending" and keep
+/// reading wants `shutdown`, which is a contract at this pin (F-0049).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_close`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// net.close(take cli)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn close(take s: Socket) -> () ! {io} {
+    net_close(s.fd)?
+}
+
+/// Close the listener `l`, consuming it.
+///
+/// Rows: `io` when it was already closed or is foreign. Never traps.
+///
+/// **Why the name is not `close`.** wolf has no overloading, so one module
+/// cannot spell one verb for two types (§1: one concept, one name — and
+/// the vocabulary word `close` goes to the value a program handles most,
+/// the connected socket). Closing a listener stops new connections; the
+/// ones already accepted are separate sockets and are unaffected.
+///
+/// `take` for `close`'s reason: the handle is gone afterwards, and using
+/// it is a static use-after-move.
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_close`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// net.close_listener(take srv)?
+/// ```
+pub fn close_listener(take l: Listener) -> () ! {io} {
+    net_close(l.fd)?
+}
+
+/// `host` and `port_number` joined as the address string `listen` and
+/// `connect` take.
+///
+/// Total: no rows, no traps — and pure, so unlike everything above it is
+/// comptime-safe and reaches no host, which is why it is the one function
+/// here a `comptime fn` may call. An IPv6 host (one containing a `:`) is
+/// bracketed, because that is what makes `"::1"` and a port
+/// unambiguous; anything else is joined with a single `:`. Nothing is
+/// validated: an address the host cannot parse comes back as an `io` row
+/// from `listen` or `connect`, where the host is the authority.
+///
+/// ```wolf-doc-example
+/// net.endpoint("127.0.0.1", 8080) == "127.0.0.1:8080"
+/// net.endpoint("::1", 8080) == "[::1]:8080"
+/// net.endpoint("localhost", 0) == "localhost:0"
+/// ```
+pub fn endpoint(host: str, port_number: int) -> str {
+    if host.contains(":") { return "[{host}]:{port_number}" }
+    "{host}:{port_number}"
+}
+
+/// The loopback address with `port_number` — `endpoint("127.0.0.1", n)`.
+///
+/// Total, pure, comptime-safe. It exists to make the discipline this
+/// module tests itself under writable in one call: `loopback(0)` asks the
+/// host for an ephemeral port on the interface that cannot leave the
+/// machine, which is the only address a std test or doc example is ever
+/// allowed to name.
+///
+/// ```wolf-doc-example
+/// net.loopback(0) == "127.0.0.1:0"
+/// net.loopback(8080) == "127.0.0.1:8080"
+/// ```
+pub fn loopback(port_number: int) -> str {
+    endpoint("127.0.0.1", port_number)
+}
