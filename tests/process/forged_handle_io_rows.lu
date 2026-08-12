@@ -1,0 +1,31 @@
+//! check: run(exit=1, stdout="forged wait: io\nforged kill: io\nerror: io")
+//! phase: run
+//! conforms: std.process, err.row, err.propagate, err.else
+//!
+//! A bad handle is a ROW, never a trap — the `std.fs.File` and
+//! `std.net.Socket` precedent, for the third handle type in the os tier.
+//! A `Child` has no private field at this pin, so
+//! `process.Child { slot: 4242 }` is ordinary code and a library cannot
+//! claim the caller violated a contract it had no way to state (§14).
+//!
+//! Both operations on a forged handle answer `io`, and the two halves of
+//! this file are the house shape for a row test: an `else` that proves the
+//! miss path is taken and produces a value, then a final call with no
+//! handler at all so the tag rides out of `main` and the RECORD names it.
+//!
+//! Note that `wait` consumes its handle, so each witness needs its own
+//! forged value — which is the static staleness discipline showing through
+//! in the test that exists because of what it cannot see.
+
+use std.process
+
+fn main() -> !int {
+    var forged = process.Child { slot: 4242 }
+    process.wait(take forged) else |_| { print("forged wait: io"); 0 - 1 }
+    var twin = process.Child { slot: 4242 }
+    process.kill(mut twin) else |_| print("forged kill: io")
+    var third = process.Child { slot: 4242 }
+    process.wait(take third)?
+    print("unreachable")
+    0
+}

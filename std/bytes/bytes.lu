@@ -61,7 +61,13 @@
 //!     approximation). `is_utf8` below is its PREDICATE half, written and
 //!     tested, so a program can at least ask the border's question; the
 //!     day a bytes-to-str primitive lands, this function is four lines
-//!     over that predicate. Filed as F-0057.
+//!     over that predicate. Filed as F-0057 and upstream as
+//!     wolf-lang#58, still OPEN — and re-measured at the sc11 pin with
+//!     four probes rather than assumed: `str.from_utf8(b)` is "does not
+//!     resolve", `(mut b).push_byte(104)` is "`StrBuf` has no method
+//!     `push_byte` in this machine's std subset", a `'h'` character
+//!     literal is `E0101` at the LEXER ("`'` begins no token"), and
+//!     there is no `bytes_to_str` builtin. Three sprints, one answer.
 //! ```
 
 /// The number of bytes in `b`. O(1). Total: no error row, no traps.

@@ -1,0 +1,53 @@
+//! check: run(exit=0, stdout="whole: [one line\nand another]\nlines: 2 [one line] [and another]\nempty: 0")
+//! phase: run
+//! conforms: std.net, err.row, err.else
+//!
+//! The two operations sc08 refused to write, and the sending half that pairs
+//! with them: `read_all` reads to the peer's close, `write_line` adds exactly
+//! one terminator, `read_lines` splits what arrived. The loop they need can
+//! stop on `closed` and re-raise `timeout`/`utf8`/`io` unchanged now that a
+//! handler discriminates on every lane (F-0052 closed at s70, F-0043's
+//! payload half at s71).
+//!
+//! **Dial first, then accept** — the module's law (F-0049: nothing here has a
+//! deadline, so an accept with no peer coming hangs until the rig's ceiling
+//! kills it). Every socket here is loopback on port 0, learned through
+//! `net.port`, and the CLIENT closes before the server reads, which is what
+//! makes `read_all` return at all.
+//!
+//! The empty case is the third witness and the easy one to forget: a peer
+//! that connects and closes without writing gives `""` and no lines, not a
+//! `closed` row — the tag ends the read, it is not the answer.
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli = net.connect(net.loopback(p))?
+    net.write_line(mut cli, "one line")?
+    net.write(mut cli, "and another")?
+    net.close(take cli)?
+    var conn = net.accept(mut srv)?
+    let whole = net.read_all(mut conn) else "?"
+    print("whole: [{whole}]")
+    net.close(take conn)?
+
+    var second = net.connect(net.loopback(p))?
+    net.write_line(mut second, "one line")?
+    net.write_line(mut second, "and another")?
+    net.close(take second)?
+    var conn2 = net.accept(mut srv)?
+    let got = net.read_lines(mut conn2) else List[str]()
+    print("lines: {got.len} [{got[0]}] [{got[1]}]")
+    net.close(take conn2)?
+
+    var third = net.connect(net.loopback(p))?
+    net.close(take third)?
+    var conn3 = net.accept(mut srv)?
+    let none_of_it = net.read_lines(mut conn3) else List[str]()
+    print("empty: {none_of_it.len}")
+    net.close(take conn3)?
+    net.close_listener(take srv)?
+    0
+}

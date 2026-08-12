@@ -1,0 +1,22 @@
+//! check: run(exit=3)
+//! phase: run
+//! conforms: std.process
+//!
+//! `process.exit` ends THIS process with the status the caller names, and
+//! the record's verdict is the witness: `exit(3)`, not a trap and not a
+//! propagated row. Nothing after the call runs, which is why the line that
+//! would print sits after it.
+//!
+//! The low-byte rule (`exit(300)` is seen as 44) is documented on the
+//! function and deliberately NOT tested here: a second entry file per
+//! platform-visible arithmetic would be witnessing the host's `waitpid`
+//! encoding rather than std's behaviour, and this rig observes the verdict
+//! through the same encoding.
+
+use std.process
+
+fn main() -> !int {
+    process.exit(3)
+    print("unreachable")
+    0
+}

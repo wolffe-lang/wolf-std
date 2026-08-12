@@ -10,8 +10,18 @@
 //! explicit named call, and renders the result with the cause preserved.
 //!
 //! The row expectation is asserted through the handler's pattern, tag and
-//! payload both, which is the convention this sprint writes down for
-//! every row test in std.
+//! payload both, which is the convention API-CONVENTIONS §13 writes down
+//! for every row test in std.
+//!
+//! **This file was a HELD REJECTION for four sprints and runs on every lane
+//! at the sc11 pin.** From sc07 to sc10 both compiler rungs answered
+//! `fail(E0806)` — "this pattern can fail to match, but a binding cannot" —
+//! so the one shape §13 requires of a row test was the one shape the
+//! compiler refused, and the ledger recorded the contradiction rather than
+//! hiding it. s71 ruled the pattern (wolf-lang#43/#59): a handler pattern
+//! must COVER the row (`E0809` when it does not), and a covering pattern
+//! binds its payload — on all three lanes, measured. F-0043's surviving half
+//! is closed, and the convention and the toolchain agree at last.
 
 use std.errors
 

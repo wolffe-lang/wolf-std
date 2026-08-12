@@ -37,30 +37,35 @@
 //! a breaking one, which is why it is recorded here rather than
 //! pre-empted with a row that would always miss (F-0046).
 //!
-//! **The input side is one function and one row.** `input_line` raises
-//! `eof` at the end of input — an outcome, not a failure — plus `io` for
-//! a host failure and `utf8` for bytes that are not text. A caller that
-//! wants a loop writes it around `input_line`; a caller that wants the
-//! whole input at once wants `input_all`, which is a reviewed contract at
-//! this pin and NOT written, for a reason worth reading:
+//! **The input side is two functions and one row between them.**
+//! `input_line` raises `eof` at the end of input — an outcome, not a
+//! failure — plus `io` for a host failure and `utf8` for bytes that are not
+//! text. `input_all` reads to the end and joins the lines with `"\n"`, so
+//! `eof` is not in ITS row at all: the end of input is what makes it
+//! return.
 //!
-//! - `input_all() -> str ! {io, utf8}` — every remaining line, joined
-//!   with `"\n"`. Blocked twice, and the first blocker got SHARPER at the
-//!   sc08 pin rather than closing. (1) A handler cannot distinguish `eof`
-//!   from `io`. A bare identifier in the handler BINDS rather than matching
-//!   (so it catches everything, F-0043), and the shape that should have
-//!   fixed it — `else |e| match e { eof => …, io => … }` — now parses and
-//!   RUNS on the checked lane, where it matches its FIRST ARM for every tag
-//!   with no diagnostic, while lupin and the native rung discriminate
-//!   correctly (F-0052). A loop written over it would report the wrong
-//!   thing on the lane that executes, so this module still ships no loop:
-//!   treating a read error as the end of input is a silent truncation of
-//!   someone's data. (2) the line read strips the terminator, so even with
-//!   a working handler the result cannot say whether the input ended with
-//!   a newline — the operation wants a `read_all` builtin that returns
-//!   the bytes as they are (F-0046, unmoved). Both are filed; the function
-//!   lands the day either one closes. `std.net` refuses its own `read_all`
-//!   for exactly the same reason, which is how a convention becomes a rule.
+//! `input_all` was a reviewed contract for four sprints and it is worth
+//! recording why, because the reason was never "nobody wrote it". The loop
+//! must stop on ONE tag and re-raise the others, and no handler could tell
+//! tags apart: a bare identifier in a handler BINDS rather than matching, so
+//! it catches everything (F-0043), and the shape that should have fixed it —
+//! `else |e| match e { eof => …, io => … }` — matched its FIRST ARM for
+//! every tag on the lane that executed, with no diagnostic (F-0052). A loop
+//! written over that would have treated a read error as the end of input,
+//! which is a silent truncation of someone's data, and §14 forbids shipping
+//! an operation whose failure mode a module cannot distinguish. s70's match
+//! tier and s71's payload-pattern ruling closed both, and the function is
+//! four lines and one handler.
+//!
+//! What is still a reviewed contract is the byte-exact read:
+//!
+//! - `read_bytes(max: int) -> List[int] ! {io}` — standard input as it is.
+//!   `input_all` joins LINES, and the line read strips terminators, so
+//!   `"a\nb"` and `"a\nb\n"` are indistinguishable through this module —
+//!   which is fine for text processing and wrong for anything byte-exact.
+//!   No builtin returns bytes from standard input (F-0046, unmoved), so
+//!   std ships nothing rather than a `read_bytes` that could only lie about
+//!   the last byte.
 //!
 //! **Why the reader is `input_line` and not `read_line`.** `read_line` is
 //! the name this module wanted, and it is a name std cannot have: it is an
@@ -78,7 +83,7 @@
 //! the real std surface replaces them" — and rule the shadowing question
 //! explicitly for the names that stay.
 //!
-//! **Lanes (re-measured at the sc08 pin).** Both compiler rungs execute
+//! **Lanes (re-measured at the sc11 pin).** Both compiler rungs execute
 //! everything here — the native rung lowers the io tier as of #40, so both
 //! of this module's tests run natively where both were `unsupported` in
 //! sc07. Standard input is still EMPTY on the checked lane (`conform-run`
@@ -89,9 +94,10 @@
 //! exit status alone, which is stated rather than hidden. lupin gained
 //! `eprint`/`eprint_raw` at 0.1.5, which is what moved
 //! `tests/io/writers_and_streams.lu` to a lupin `run` row: all four
-//! writers work there now and only the line READ is refused (this machine
-//! has no injectable stdin by design). The capability posture is the rig's
-//! to record once rather than each test's to restate.
+//! writers work there now and only the READS are refused (this machine has
+//! no `read_line` and no injectable stdin, by design and with a sentence in
+//! the refusal — unchanged at 0.1.8). The capability posture is the rig's to
+//! record once rather than each test's to restate.
 
 /// Write `text` to standard output exactly as given — no newline, no
 /// reformatting.
@@ -212,4 +218,67 @@ pub fn input_line() -> str ! {eof, io, utf8} {
 pub fn prompt(text: str) -> str ! {eof, io, utf8} {
     print_raw(text)
     read_line()?
+}
+
+/// Every remaining line of standard input, joined with `"\n"`.
+///
+/// Rows: `io` for a host failure and `utf8` for bytes that are not text —
+/// both RE-RAISED unchanged from the line read they came from. `eof` is not
+/// in the row: the end of input is what makes this function RETURN, which
+/// is the whole difference between reading everything and failing to read
+/// something. Never traps.
+///
+/// **What it can and cannot tell you.** The result is the input's lines
+/// with exactly one `"\n"` between them and NONE at the end, whatever the
+/// input's own last byte was: the line read strips the terminator and
+/// nothing gives it back, so `"a\nb"` and `"a\nb\n"` both arrive here as
+/// `"a\nb"` (F-0046 asks for the byte-exact `read_all` that would fix it).
+/// A caller who must know wants that builtin; a caller who wants lines is
+/// not affected, and `std.str.lines` on this result gives them back.
+/// Empty input is `""`, which is also what a single empty line looks like,
+/// for the same reason.
+///
+/// **Why this function exists only now.** It was a reviewed contract for
+/// four sprints because the loop it needs must stop on ONE tag and re-raise
+/// the others, and no handler could tell tags apart: a bare binding catches
+/// everything (F-0043) and a `match` inside a handler matched its first arm
+/// for every tag on the lane that executed (F-0052). Both are closed at
+/// this pin — the match tier at s70, the payload pattern at s71 — so the
+/// handler below discriminates on all three lanes, and the alternative std
+/// refused to ship is visible in what it would have done: treated a read
+/// error as the end of input and truncated someone's data (§14).
+///
+/// Capability `io`; refused at comptime (D33). Delegates to the prelude's
+/// `read_line`, once per line.
+///
+/// ```wolf-doc-example
+/// (io.input_all() else "?") == ""
+/// ```
+pub fn input_all() -> str ! {io, utf8} {
+    var out = ""
+    var lines = 0
+    var more = true
+    while more {
+        let line = read_line() else |e| match e {
+            eof => {
+                more = false
+                ""
+            },
+            io => {
+                return io
+            },
+            utf8 => {
+                return utf8
+            },
+        }
+        if more {
+            if lines == 0 {
+                out = line
+            } else {
+                out = "{out}\n{line}"
+            }
+            lines = lines + 1
+        }
+    }
+    out
 }

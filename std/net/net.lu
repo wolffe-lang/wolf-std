@@ -43,6 +43,17 @@
 //! does not test it, and `dns`/`resolve` is not a function this module has
 //! (see below).
 //!
+//! **Two operations sc08 withdrew are HERE now** (sc11): `read_all` and
+//! `read_lines`, with `write_line` as the sending half that pairs with
+//! them. All three need a loop that stops on `closed` and re-raises
+//! `timeout`/`utf8`/`io` unchanged, which needs a handler that can say WHICH
+//! tag fired — the shape that matched its first arm for every tag on the
+//! executing lane through all of sc08 and sc09 (F-0052, closed at s70;
+//! F-0043's payload half at s71). The version this module refused to ship
+//! for two sprints would have treated a read error as the end of the stream
+//! and handed back a truncated message with no indication, which is what
+//! §14's rule about an indistinguishable failure mode exists to prevent.
+//!
 //! **The three-way split** (§8/§9's rule, applied to sockets). The
 //! IMPLEMENTATION owns the builtins this module delegates to
 //! (`net_listen`, `net_port`, `net_accept`, `net_connect`, `net_read`,
@@ -72,27 +83,17 @@
 //!   (F-0049). std ships no deadline helper rather than one that cannot
 //!   work, and every signature already carries the tag so that arming a
 //!   deadline is a pure addition when the builtin lands.
-//! - `read_all(mut s)` — every byte to the peer's close, as one `str`.
-//!   **The loop is unwritable at this pin and the reason is a silent wrong
-//!   answer, not a rejection.** It must stop on `closed` and re-raise
-//!   `timeout`/`utf8`/`io` unchanged, so it needs a handler that can say
-//!   WHICH tag fired; `else |e| match e { … }` parses and runs on the
-//!   executing lane now (sc07's `E0201` is gone), and its FIRST ARM MATCHES
-//!   EVERY TAG — measured, with no diagnostic (F-0052). A loop written over
-//!   it would treat a read error as the end of the stream, which is a
-//!   truncation of someone's data, and §14 forbids shipping an operation
-//!   whose failure mode the module cannot distinguish. `std.io.input_all`
-//!   is the same refusal for the same reason. Read with `read` and your own
-//!   limit until the finding closes.
-//! - `read_line(mut s)` and any line protocol over it — blocked on
-//!   byte-level reads (and on `read_all` above). A buffered reader is
-//!   writable in principle — a `str` field mutated through a `mut`
-//!   parameter works on both lanes, measured — but FILLING the buffer is a
-//!   byte-count read, and a chunk that ends inside a code point is a `utf8`
-//!   miss whose bytes are gone (F-0050). A line reader that corrupts the
-//!   moment a stream carries a non-ASCII character is not a partial
-//!   function, it is a broken one; §9's "refusal over approximation"
-//!   decides it.
+//! - `read_line(mut s) -> str ! {closed, timeout, utf8, io}` — ONE line,
+//!   as it arrives. Still blocked, and this is now the module's only
+//!   blocked read: a buffered reader is writable in principle (a `str`
+//!   field mutated through a `mut` parameter works on both executing lanes,
+//!   measured in sc08) but FILLING the buffer is a byte-count read, and a
+//!   chunk that ends inside a code point is a `utf8` miss whose bytes are
+//!   already gone (F-0050). A line reader that corrupts the moment a stream
+//!   carries a non-ASCII character is not a partial function, it is a broken
+//!   one; §9's "refusal over approximation" decides it. `read_lines` below
+//!   is NOT a substitute — it returns nothing until the peer closes — and
+//!   the difference is stated on both.
 //! - `write_all` — **not shipped because `write` already is one.** The
 //!   builtin writes the whole `str` or raises; a short write is not
 //!   observable, so a `write_all` loop here would be ceremony documenting
@@ -112,8 +113,8 @@
 //!   and byte io that make `std.fs.copy_file` a text operation
 //!   (F-0035/F-0044). It is why `read` carries a `utf8` row at all.
 //!
-//! **Lanes.** The compiler's checked tier is the executing lane: it opens
-//! REAL sockets (the comptime sandbox is the one place they are refused,
+//! **Lanes (re-measured at the sc11 pin).** The compiler's checked tier is
+//! the executing lane: it opens REAL sockets (the comptime sandbox is the one place they are refused,
 //! D33). lupin has no `net_*` builtins by design — a program that reaches
 //! them is an honest `unsupported` at resolve, the conservatism posture the
 //! rig records once rather than per test — but lupin resolves module bodies
@@ -391,6 +392,161 @@ pub fn close(take s: Socket) -> () ! {io} {
 /// ```
 pub fn close_listener(take l: Listener) -> () ! {io} {
     net_close(l.fd)?
+}
+
+/// Every byte the peer sends until it closes, decoded as UTF-8, as one
+/// `str`.
+///
+/// Rows: `timeout` when a deadline expires (declared, not reachable at this
+/// pin — F-0049); `utf8` when what arrived is not well-formed UTF-8, WHICH
+/// INCLUDES a chunk boundary that lands inside a code point (see below);
+/// `io` for a host failure or a bad handle. All three are RE-RAISED
+/// unchanged from the read they came from. `closed` is not in the row: the
+/// peer finishing is what makes this function RETURN, which is the whole
+/// difference between reading everything and failing to read something.
+/// Never traps.
+///
+/// **This blocks until the peer CLOSES**, not until it stops sending. A
+/// peer that writes a request and waits for a reply is a peer this function
+/// never returns from — so it is the right operation for a stream whose end
+/// is the message boundary (a one-shot response, a file transfer) and the
+/// wrong one for a conversation. `read` with a limit is the operation for a
+/// conversation.
+///
+/// **The `utf8` hazard is inherited and is real**: the socket is read in
+/// 4096-byte chunks and a chunk boundary can split a code point, so a
+/// stream carrying non-ASCII text can raise `utf8` even though every byte
+/// it sent was valid (F-0050 — the byte-level read that would fix it does
+/// not exist). ASCII is safe at any size. The bytes read before the miss
+/// are gone either way, which is why this function reports the tag rather
+/// than returning a partial answer beside it.
+///
+/// **Why this function exists only now.** It was written and withdrawn
+/// inside sc08: the loop must stop on `closed` and re-raise the other three
+/// unchanged, and no handler could tell tags apart — a bare binding catches
+/// everything (F-0043) and a `match` inside a handler matched its FIRST ARM
+/// for every tag on the executing lane (F-0052). Both are closed at this
+/// pin (s70's match tier, s71's payload pattern), so the handler below
+/// discriminates on every lane. The version std refused to ship is visible
+/// in what it would have done: treated a read error as the end of the
+/// stream and handed the caller a truncated message with no indication
+/// (§14's rule about a failure mode a module cannot distinguish).
+///
+/// `mut s` because reading consumes from the stream (§14).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_read`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// net.write(mut cli, "the whole message")?
+/// net.close(take cli)?
+/// var conn = net.accept(mut srv)?
+/// (net.read_all(mut conn) else "?") == "the whole message"
+/// net.close(take conn)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn read_all(mut s: Socket) -> str ! {timeout, utf8, io} {
+    var out = ""
+    var more = true
+    while more {
+        let chunk = net_read(s.fd, 4096) else |e| match e {
+            closed => {
+                more = false
+                ""
+            },
+            timeout => {
+                return timeout
+            },
+            utf8 => {
+                return utf8
+            },
+            io => {
+                return io
+            },
+        }
+        if more {
+            out = "{out}{chunk}"
+        }
+    }
+    out
+}
+
+/// Write `text` to `s` followed by exactly one `"\n"`.
+///
+/// Rows: `write`'s exactly — `closed` when the peer has gone away, `io` for
+/// a host failure or a bad handle. Never traps, and there is no `utf8` row:
+/// a `str` is already well-formed UTF-8.
+///
+/// This is the SENDING half of a line protocol, and it is one call rather
+/// than two so that a message and its terminator cannot be separated by an
+/// early return between them. The terminator is one `"\n"` on every
+/// platform — no `"\r\n"` translation anywhere, matching `std.io`'s
+/// writers, because a protocol that wants the other terminator can write it
+/// with `write` and a program should never have to guess which one it got.
+///
+/// `mut s` because writing advances the stream (§14).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_write`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// net.write_line(mut cli, "GET /")?
+/// net.close(take cli)?
+/// var conn = net.accept(mut srv)?
+/// (net.read_all(mut conn) else "?") == "GET /\n"
+/// net.close(take conn)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn write_line(mut s: Socket, text: str) -> () ! {closed, io} {
+    net_write(s.fd, "{text}\n")?
+}
+
+/// Every line the peer sends until it closes, terminators stripped.
+///
+/// Rows: `read_all`'s exactly — `timeout` (declared, unreachable at this
+/// pin), `utf8` (including a chunk boundary inside a code point), `io` —
+/// and `closed` is again the OUTCOME that ends the read rather than a tag.
+/// Never traps. Allocates the list.
+///
+/// This is the RECEIVING half of a line protocol, and its shape is the
+/// honest one available at this pin: read the whole stream, then split it.
+/// The alternative — a `read_line` that returns ONE line as it arrives —
+/// needs a buffer filled by a byte-count read, and a chunk that ends inside
+/// a code point loses those bytes with no way to report which line they
+/// belonged to (F-0050). That function is a reviewed contract in the module
+/// header, and this one is not a substitute for it: a caller who must react
+/// to each line as it arrives cannot use this, because nothing is returned
+/// until the peer closes.
+///
+/// A trailing terminator produces no final empty line (`"a\nb\n"` is two
+/// lines, not three), the empty stream is an empty list, and the split is
+/// `std.str.lines`'s — Unicode line boundaries, which is the builtin's
+/// definition and therefore part of this contract.
+///
+/// `mut s` because reading consumes from the stream (§14).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_read`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// net.write_line(mut cli, "one")?
+/// net.write_line(mut cli, "two")?
+/// net.close(take cli)?
+/// var conn = net.accept(mut srv)?
+/// let got = net.read_lines(mut conn) else List[str]()
+/// got.len == 2
+/// net.close(take conn)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn read_lines(mut s: Socket) -> List[str] ! {timeout, utf8, io} {
+    let whole = read_all(mut s)?
+    whole.lines()
 }
 
 /// `host` and `port_number` joined as the address string `listen` and

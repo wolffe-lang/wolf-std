@@ -7,6 +7,39 @@
 # deeper than its ledger claims fails CI — advancement is deliberate, in
 # its own commit.
 #
+# THE sc11 PIN BUMP (wolf trunk e94b879 -> 0b4e79c, five waves — s71, s72,
+# s51, s41, s73 — plus the r01 identity release; lupin 0.1.6 -> 0.1.8) MOVED
+# SEVEN ROWS and rewrote three test files. Every movement is an advance, and
+# they come from three upstream changes:
+# - **lupin gained the s40 `time_*`/`env_*` tiers** (its pin jumped two waves,
+#   to 26fa98e): `time/monotonic.lu` and `env/variable_round_trip.lu` are
+#   `run` on the interpreter lane. The sc10 note called that absence a DRIFT
+#   rather than a design refusal and predicted it would close on a release;
+#   it did. `env/args_and_vars.lu` did NOT move, and the reason is ONE
+#   builtin: `env_vars` "does not resolve" at 0.1.8 while `env_args`,
+#   `env_get`, `env_set`, `os_cwd` and `os_exit` all run (F-0070, measured one
+#   call at a time). Four fifths of a family is not the family. And
+#   `x/json/*` did not move either, but for a new reason: lupin now DECLINES
+#   the json surface by design ("rather than risk a second, guessed RFC 8259
+#   reading"), so those three dark columns are a posture, not a wave.
+# - **s71 ruled the handler pattern** (`else |Tag(p)|` must cover the row,
+#   E0809, and binds the payload): `errors/coarsen_and_chain.lu` was
+#   `fail(E0806)` on both compiler rungs for four sprints and is `run` on all
+#   three lanes now. F-0043's surviving half is closed.
+# - **s72's D40 gave iteration exclusivity teeth** (E1013 via the loop-extent
+#   read claim; `for` no longer moves its iterable):
+#   `list/mutate_while_iterating.lu` is now `mutate_while_iterating_trap.lu`,
+#   `trap(exclusivity)` under lupin — which used to run it silently — and
+#   `fail(E1013)` where it used to be `fail(E1001)`. F-0014 is closed, and the
+#   row is a rewrite rather than a movement.
+# Two more file rewrites carry no row movement at all, because the answers
+# they assert changed while the depth did not: s71 DEFINED the empty needle
+# (`[mem.str.empty]`) so `split_empty_separator_trap.lu` and
+# `replace_empty_pattern_trap.lu` lost their traps, their guards and their
+# `_trap` names, and it ruled a negative `repeat` to be `assert` rather than
+# `bounds` (`[mem.str.repeat]`), which turned `repeat_negative_trap.lu` red
+# inside a minute of the bump.
+#
 # THE sc08 PIN BUMP (wolf trunk f0da6e6 -> 13b811f, the #40 merge; lupin
 # 0.1.4 -> 0.1.5) MOVED 44 ROWS, all `unsupported` -> `run`, and 41 of them
 # are in ONE column: the native rung went from 23 of 136 rows to 64. #40
@@ -110,8 +143,11 @@ native = "run"  # sc08 pin bump (13b811f)
 
 [tests."errors/coarsen_and_chain.lu"]
 lupin = "run"
-wolfc = "fail(E0806)"
-native = "fail(E0806)"
+# sc11 pin bump: s71 ruled the handler pattern (wolf-lang#43/#59), so the one
+# shape §13 requires of a row test is no longer the one shape the compiler
+# refused. Four sprints as a held rejection, now three executing lanes.
+wolfc = "run"
+native = "run"
 
 # ---- std.cmp ----
 
@@ -310,10 +346,13 @@ lupin = "run"
 wolfc = "run"
 native = "unsupported"
 
-[tests."list/mutate_while_iterating.lu"]
+# Renamed to `…_trap.lu` at the sc11 bump: s72's D40 made this `exclusivity`
+# under lupin (it used to run silently) and `E1013` on the compiler rungs (it
+# used to be the `E1001` reads-as-moves accident). F-0014 closed.
+[tests."list/mutate_while_iterating_trap.lu"]
 lupin = "run"
-wolfc = "fail(E1001)"
-native = "fail(E1001)"
+wolfc = "fail(E1013)"
+native = "fail(E1013)"
 
 [tests."list/freeze_then_read.lu"]
 lupin = "run"
@@ -966,11 +1005,12 @@ wolfc = "run"
 native = "unsupported"
 
 # The three row litmuses. A tag's IDENTITY rides out of `main` — the process
-# outcome names it on stdout and exits 1 — and that is still the ONLY witness
-# of one: the shape that was supposed to replace it (`else |e| match e { … }`)
-# parses and runs at this pin and matches its first arm for every tag, with no
-# diagnostic and against two lanes that get it right (F-0052). None of these
-# files contains a discriminating handler, on purpose.
+# outcome names it on stdout and exits 1 — and that is still the STRONGEST
+# witness of one, because it is the toolchain naming the tag rather than this
+# repository asserting its own reading. It is no longer the only one: the
+# discriminating handler (`else |e| match e { … }`) works on every lane as of
+# s70 and the payload pattern as of s71, which is what `read_all` below is
+# written over.
 [tests."net/refused_row.lu"]
 lupin = "unsupported"
 wolfc = "run"
@@ -1058,12 +1098,12 @@ native = "run"
 
 # The two empty-argument guards (F-0055). std traps `assert` where the
 # builtin's answer is three different things on three lanes.
-[tests."str/split_empty_separator_trap.lu"]
+[tests."str/split_empty_separator.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."str/replace_empty_pattern_trap.lu"]
+[tests."str/replace_empty_pattern.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"
@@ -1151,7 +1191,7 @@ wolfc = "run"
 native = "run"
 
 [tests."time/monotonic.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc11 pin bump: lupin 0.1.8 has the s40 `time_*` tier
 wolfc = "run"
 native = "run"
 
@@ -1166,7 +1206,7 @@ wolfc = "run"
 native = "run"
 
 [tests."env/variable_round_trip.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc11 pin bump: lupin 0.1.8 has the s40 `env_*` tier
 wolfc = "run"
 native = "run"
 
@@ -1223,3 +1263,81 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# ---- sc11: std.process, and the backlog the closed findings unblocked ----
+#
+# **std.process has ONE executing lane, and both dark columns are postures
+# rather than gaps.** The checked tier spawns real children. lupin declines
+# the process trio by design and says so — "this machine runs no child
+# processes by design, so the tier is declined rather than mocked" — and the
+# native rung refuses it by name ("process builtins in native lowering
+# (checked lane only at s40)"), refusing the whole module with it, pure
+# builder included, because lowering budgets a module by more than the body it
+# needs. Two files escape that shape and both for reasons this ledger has
+# recorded before: `builder.lu` calls only pure members and lupin resolves
+# module bodies lazily, and the two rejection witnesses never reach lowering.
+#
+# **No test here starts a real program**, and that is portability rather than
+# timidity: no program exists on every tier-1 host, a wolf program cannot
+# learn its own path (`env_args` drops argv[0]), and the directive schema has
+# no per-platform gate (F-0066). Every witness is deterministic on all of
+# them — a name no host has, an empty argv, a forged handle.
+
+[tests."process/builder.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+[tests."process/not_found_row.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+[tests."process/forged_handle_io_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+# The staleness discipline, held as a REJECTION: `wait` consumes its `Child`
+# (X1 `take`) because waiting REAPS, so a second wait is E1001. `run` means
+# "satisfies the directive", and the directive is `fail(E1001)`.
+[tests."process/use_after_wait.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# D33 held as a rejection (E0701), witnessed at the builtin one level down
+# (F-0051) — and at `os_kill` rather than `os_spawn`, because building the
+# `List[str]` argv is outside the comptime engine's subset and would make the
+# file pass for the wrong reason. The three `exec` builtins refuse identically.
+[tests."process/comptime_refuses.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `process.exit` on the two lanes that have `os_exit` — lupin included, since
+# its pin now carries the s40 os family. The native rung refuses the module
+# for its process trio, not for this function.
+[tests."process/exit_code.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+# The two functions sc07 and sc08 refused to write, landed here because
+# F-0043's payload half (s71) and F-0052 (s70) are both closed: a loop over a
+# rowed read can stop on ONE tag and re-raise the others now.
+#
+# `io/input_all_empty.lu` witnesses the empty-input path only — `conform-run`
+# still has no stdin injection (F-0046), so the multi-line join is proven
+# upstream and stated on the function.
+[tests."io/input_all_empty.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `net/read_all_and_lines.lu` is the whole line-protocol pair plus the empty
+# stream, on the checked lane alone with the module's other seven.
+[tests."net/read_all_and_lines.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"

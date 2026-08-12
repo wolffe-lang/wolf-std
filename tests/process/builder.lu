@@ -1,0 +1,40 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.process
+//!
+//! The PURE half of a capability module, in its own file (§14's sc10 rule):
+//! building an argv, extending it, reading it back and judging an exit code
+//! touch no host at all. lupin resolves module bodies lazily, so this is
+//! the one `std.process` test that runs on the interpreter lane even though
+//! the machine declines the process tier by design; the native rung refuses
+//! the whole module by name, pure members included.
+
+use std.process
+
+fn main() -> !int {
+    let ls = process.command("ls")
+    let one = process.argv(ls)
+    assert(one.len == 1, "command() builds a one-element argv")
+    assert(one[0] == "ls", "element 0 is the program")
+
+    var c = process.command("grep")
+    process.push_arg(mut c, "-n")
+    process.push_arg(mut c, "the wolf; rm -rf /")
+    let three = process.argv(c)
+    assert(three.len == 3, "two pushes make three elements")
+    assert(three[2] == "the wolf; rm -rf /", "an argument is bytes, never words")
+
+    var raw = List[str]()
+    (mut raw).push("wc")
+    (mut raw).push("-l")
+    let from = process.from_argv(raw)
+    assert(process.argv(from).len == 2, "from_argv keeps the whole vector")
+
+    let empty = process.from_argv(List[str]())
+    assert(process.argv(empty).len == 0, "an empty argv is buildable data")
+
+    assert(process.is_success(0), "zero is success")
+    assert(!process.is_success(1), "one is not")
+    assert(!process.is_success(0 - 1), "nor is a negative code")
+    0
+}

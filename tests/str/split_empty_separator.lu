@@ -1,21 +1,50 @@
-//! check: run(exit=trap(assert))
+//! check: run(exit=0)
 //! phase: run
-//! conforms: conf.trap.map, std.str
+//! conforms: mem.str.empty, std.str
 //!
-//! An empty separator has no piece boundary, so `split` traps `assert`: a
-//! caller contract violation it could have checked, per §2's trap rule and
-//! the reviewed contract's kind.
+//! **The empty needle, RULED and held here** (`[mem.str.empty]`,
+//! wolf-lang#56). An empty separator has no boundary anywhere, so `split`
+//! answers ONE piece — the whole string — and `count` answers 0. Both are
+//! the language's answers now, on all three lanes, where for three sprints
+//! two lanes refused the call as `unsupported` and the third answered
+//! (F-0055).
 //!
-//! The guard is std's own and it exists because the LANES DISAGREE about
-//! the builtin (F-0055): `"abc".split("")` is refused as `unsupported` by
-//! lupin and by the checked tier, and answers one whole piece natively. A
-//! std function that delegated would have three behaviours; this one has
-//! one, and this file is what holds it to that.
+//! This file was `split_empty_separator_trap.lu` and expected
+//! `trap(assert)`: std guarded the empty argument so that its three lanes
+//! could not disagree, which was the right call while the toolchain had
+//! stated nothing and is the wrong one now that it has. The guards are gone,
+//! the delegation is the contract, and the test that held the guard becomes
+//! the test that holds the ruling.
+//!
+//! `splitn` and `rsplit` are here too because they do NOT delegate — they
+//! walk `find`, which answers 0 for an empty needle forever — so their
+//! agreement with the ruling is std's own obligation and needs its own
+//! witness.
 
 use std.str
 
 fn main() -> !int {
-    let pieces = str.split("a,b", "")
-    if pieces.len == 0 {} else { return 1 }
+    let whole = str.split("a,b", "")
+    assert(whole.len == 1, "an empty separator splits to one piece")
+    assert(whole[0] == "a,b", "and that piece is the whole string")
+
+    let of_empty = str.split("", "")
+    assert(of_empty.len == 1, "the empty string is one piece too")
+
+    assert(str.count("a,b", "") == 0, "a count of nothing is nothing")
+
+    let capped = str.splitn("a,b", "", 3)
+    assert(capped.len == 1, "splitn agrees: one whole piece")
+    assert(capped[0] == "a,b", "and it is unsplit")
+
+    let none_at_all = str.splitn("a,b", "", 0)
+    assert(none_at_all.len == 0, "at most zero pieces is zero pieces")
+
+    let backwards = str.rsplit("a,b", "")
+    assert(backwards.len == 1, "one piece cannot be reordered")
+    assert(backwards[0] == "a,b", "and it is still the whole string")
+
+    let offsets = str.find_all("a,b", "")
+    assert(offsets.len == 0, "find_all yields nothing, as count says")
     0
 }

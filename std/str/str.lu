@@ -68,18 +68,21 @@
 //!     about this pin's `str` brings it closer.
 //! ```
 //!
-//! **THE EMPTY NEEDLE IS STD'S PROBLEM, AND STD SOLVES IT ONCE** (F-0055).
-//! Three builtins are undefined on an empty argument and the three lanes
-//! disagree about what that means: `count("")`, `split("")` and
-//! `replace(s, "", …)` are refused as `unsupported` by lupin and by the
-//! checked tier, and DEFINED by the native runtime (0, one whole piece,
-//! identity). std never lets that reach a caller: `count` answers 0 before
-//! delegating, `split`/`replace`/`replacen`/`splitn`/`rsplit` trap `assert`
-//! on an empty separator (the reviewed contract's kind — a caller
-//! contract violation, §2), and every lane therefore agrees about every
-//! call this module makes. The functions defined in terms of `find`
-//! (`split_once`, `rsplit_once`, `find_all`) inherit `find`'s answer for
-//! the empty needle instead, and say so on themselves.
+//! **THE EMPTY NEEDLE IS RULED, AND STD'S GUARDS ARE GONE** (`[mem.str.empty]`,
+//! wolf-lang#56, F-0055 CLOSED at the sc11 pin). For three sprints
+//! `count("")`, `split("")` and `replace(s, "", …)` were undefined and the
+//! three lanes disagreed — two refused the call as `unsupported`, the native
+//! runtime answered — so six functions here guarded the empty argument and
+//! two of them TRAPPED, which was std stating a contract the toolchain had
+//! not stated. s71 states it: an empty needle counts 0, splits to one whole
+//! piece, and replaces nothing (identity). Measured on all three lanes at
+//! this pin, so `count`, `split` and `replace` simply delegate now, and the
+//! functions std writes itself agree with the ruling by construction:
+//! `splitn` answers the one whole piece, `rsplit` inherits `split`'s,
+//! `replacen` is the identity. Nothing in this module traps on an empty
+//! argument any more. The `find`-defined family (`split_once`,
+//! `rsplit_once`, `find_all`) inherits `find`'s answer instead, and says so
+//! on itself.
 //!
 //! **PADDING LIVES IN `std.fmt`** (§11: the format spec is a spelling and
 //! std owns the operations). `pad_left`, `pad_right`, `center`, their
@@ -235,10 +238,12 @@ pub fn rfind(s: str, needle: str) -> int ! {none} {
 /// to right — the find-all family's one member, and the plural of `find`
 /// rather than a new vocabulary. `count(s, needle)` is its length.
 ///
-/// The empty needle yields no offsets, for `count`'s reason: a list of
-/// every position in the string is not an answer any caller wants, and
-/// nothing is a stronger answer than something wrong. Allocates the list.
-/// Total: no error row, no traps beyond allocation.
+/// The empty needle yields no offsets, for `count`'s reason — `count` is
+/// this function's length and the ruled count of nothing is 0
+/// (`[mem.str.empty]`). The guard is also what makes the loop terminate:
+/// `find("")` is 0 at every step, so a body that advanced by the needle's
+/// length would not advance at all. Allocates the list. Total: no error
+/// row, no traps beyond allocation.
 ///
 /// ```wolf-doc-example
 /// var n = 0
@@ -270,9 +275,10 @@ pub fn find_all(s: str, needle: str) -> List[int] {
 
 /// The number of NON-OVERLAPPING occurrences of `needle` in `s`, scanning
 /// left to right — `"aaa"` contains one `"aa"`, not two. The empty needle
-/// counts 0, not `len + 1`: a count of nothing is nothing (the reviewed
-/// contract, and the reason this function guards before delegating —
-/// F-0055). Total: no error row, no traps.
+/// counts 0, not `len + 1`: a count of nothing is nothing, which was this
+/// module's reviewed contract and is now the language's ruling
+/// (`[mem.str.empty]`), so the guard std carried for three sprints is gone
+/// and the delegation says the same thing. Total: no error row, no traps.
 ///
 /// ```wolf-doc-example
 /// str.count("a,b,c", ",") == 2
@@ -281,9 +287,6 @@ pub fn find_all(s: str, needle: str) -> List[int] {
 /// str.count("wolf", "") == 0
 /// ```
 pub fn count(s: str, needle: str) -> int {
-    if needle.is_empty() {
-        return 0
-    }
     s.count(needle)
 }
 
@@ -396,21 +399,23 @@ pub fn strip_suffix(s: str, suffix: str) -> str ! {none} {
 /// empty pieces: `split("a,,b", ",")` is three pieces and `split("", ",")`
 /// is one empty piece. The pieces are slices of `s`; the list allocates.
 ///
-/// An empty `sep` traps `assert` — no piece boundary exists, so the caller
-/// has violated a contract it could have checked (§2's trap rule, and the
-/// reviewed contract's kind). The guard is std's own, because the three
-/// lanes do not agree about the builtin's answer (F-0055).
+/// An empty `sep` yields ONE piece — the whole of `s` — which is the
+/// language's ruling (`[mem.str.empty]`) and not this module's choice:
+/// there is no boundary anywhere, so there is nothing to cut. std guarded
+/// this with a trap while the three lanes disagreed about it (F-0055,
+/// closed at the sc11 pin); the guard is gone and the delegation is the
+/// contract. No traps.
 ///
 /// ```wolf-doc-example
 /// var n = 0
 /// for p in str.split("a,,b", ",") { n = n + 1 }
 /// n = n + 0
 /// n == 3
+/// let whole = str.split("a,b", "")
+/// whole.len == 1
+/// whole[0] == "a,b"
 /// ```
 pub fn split(s: str, sep: str) -> List[str] {
-    if sep.is_empty() {
-        assert(false, "str.split: the separator cannot be empty")
-    }
     s.split(sep)
 }
 
@@ -419,20 +424,29 @@ pub fn split(s: str, sep: str) -> List[str] {
 /// produces no pieces at all — the honest reading of "at most n" — and
 /// `n == 1` is the whole string as one piece.
 ///
-/// An empty `sep` traps `assert`, as `split`. Allocates the list; the
-/// pieces are slices of `s`. No other traps.
+/// An empty `sep` yields the whole of `s` as one piece for any `n >= 1`,
+/// which is `split`'s ruled answer truncated to at most `n`
+/// (`[mem.str.empty]`) — the guard below states it explicitly because this
+/// body walks `find` rather than delegating, and `find("")` is 0 forever.
+/// Allocates the list; the pieces are slices of `s`. No traps.
 ///
 /// ```wolf-doc-example
 /// var n = 0
 /// for p in str.splitn("a,b,c", ",", 2) { n = n + 1 }
 /// n = n + 0
 /// n == 2
+/// let whole = str.splitn("a,b", "", 3)
+/// whole.len == 1
+/// whole[0] == "a,b"
 /// ```
 pub fn splitn(s: str, sep: str, n: int) -> List[str] {
-    if sep.is_empty() {
-        assert(false, "str.splitn: the separator cannot be empty")
-    }
     var out = List[str]()
+    if sep.is_empty() {
+        if n > 0 {
+            (mut out).push(s)
+        }
+        return out
+    }
     if n <= 0 {
         return out
     }
@@ -457,7 +471,8 @@ pub fn splitn(s: str, sep: str, n: int) -> List[str] {
 /// differs, so `rsplit(s, sep)` and `split(s, sep)` always have the same
 /// length and the same members.
 ///
-/// An empty `sep` traps `assert`, as `split`. Allocates the list.
+/// An empty `sep` yields `split`'s one whole piece, in a list of one, where
+/// order cannot matter (`[mem.str.empty]`). Allocates the list. No traps.
 ///
 /// ```wolf-doc-example
 /// var first = "?"
@@ -527,35 +542,40 @@ pub fn rsplit_once(s: str, sep: str) -> (str, str) ! {none} {
 /// resumes AFTER each replacement, so `replace("aaa", "aa", "b")` is
 /// `"ba"` and a `new` that contains `old` does not feed itself.
 ///
-/// An empty `old` traps `assert`, as `split` — and for the same three-lane
-/// reason (F-0055). No other traps.
+/// An empty `old` replaces NOTHING — the result is `s` — which is the
+/// language's ruling (`[mem.str.empty]`): an empty pattern occurs
+/// everywhere and at no width, so inserting `new` at every position would
+/// be a different operation with a different name. std trapped here while
+/// the lanes disagreed (F-0055, closed at the sc11 pin) and delegates now.
+/// No traps.
 ///
 /// ```wolf-doc-example
 /// str.replace("a,b,c", ",", ";") == "a;b;c"
 /// str.replace("aaa", "aa", "b") == "ba"
 /// str.replace("wolf", "z", "y") == "wolf"
 /// str.replace("héllo", "l", "L") == "héLLo"
+/// str.replace("a,b", "", "-") == "a,b"
 /// ```
 pub fn replace(s: str, old: str, new: str) -> str {
-    if old.is_empty() {
-        assert(false, "str.replace: the pattern cannot be empty")
-    }
     s.replace(old, new)
 }
 
 /// `replace` stopping after `n` replacements; the rest of `s` is copied
 /// unchanged. `n <= 0` replaces nothing and returns `s`.
 ///
-/// An empty `old` traps `assert`, as `replace`. No other traps.
+/// An empty `old` is the identity for any `n`, which is `replace`'s ruled
+/// answer (`[mem.str.empty]`) — stated as a guard because this body walks
+/// `find`, and `find("")` is 0 forever. No traps.
 ///
 /// ```wolf-doc-example
 /// str.replacen("a,b,c", ",", ";", 1) == "a;b,c"
 /// str.replacen("a,b,c", ",", ";", 9) == "a;b;c"
 /// str.replacen("a,b,c", ",", ";", 0) == "a,b,c"
+/// str.replacen("a,b", "", "-", 2) == "a,b"
 /// ```
 pub fn replacen(s: str, old: str, new: str, n: int) -> str {
     if old.is_empty() {
-        assert(false, "str.replacen: the pattern cannot be empty")
+        return s
     }
     var out = ""
     var rest = s
@@ -628,14 +648,18 @@ pub fn eq_ignore_case(a: str, b: str) -> bool {
 }
 
 /// `s` repeated `n` times, freshly allocated. `n == 0` gives the empty
-/// string. A NEGATIVE `n` traps `bounds` — the language's own fault, from
-/// the builtin, on all three lanes at this pin: "a repeat count cannot be
-/// negative" (`[mem.ub.defined]`). std does not guard it, because the trap
-/// is the right answer for a contract violation the caller could have
-/// checked (§2) and because a guard would hide the one place the
-/// implementations agree. Recorded as a change: sc03 measured this as `""`
-/// under the interpreter and this module's doc claimed it until sc09
-/// re-measured (F-0056).
+/// string. A NEGATIVE `n` traps `assert` — the language's own fault, from
+/// the builtin, on all three lanes: a repeat count cannot be negative, and
+/// s71 RULED the KIND (`[mem.str.repeat]`, wolf-lang#57) to be the caller
+/// contract violation it is rather than the `bounds` the runtime used to
+/// report. std does not guard it, because a trap is the right answer for a
+/// violation the caller could have checked (§2) and because a guard would
+/// hide the one place the implementations agree. Twice re-measured, twice
+/// changed: sc03 read `""` from the interpreter, sc09 measured
+/// `trap(bounds)` on every lane, sc11 measures `trap(assert)` on every lane
+/// — which is exactly why the claim lives in
+/// `tests/str/repeat_negative_trap.lu` and not only in this sentence
+/// (F-0056, closed).
 ///
 /// ```wolf-doc-example
 /// str.repeat("ab", 3) == "ababab"

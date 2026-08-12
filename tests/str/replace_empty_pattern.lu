@@ -1,16 +1,24 @@
-//! check: run(exit=trap(assert))
+//! check: run(exit=0)
 //! phase: run
-//! conforms: conf.trap.map, std.str
+//! conforms: mem.str.empty, std.str
 //!
-//! `replace` with an empty pattern traps `assert`, for `split`'s reason and
-//! with `split`'s guard (F-0055): there is no occurrence of nothing to
-//! replace, the three lanes disagree about what the builtin does with it,
-//! and std answers the same way everywhere by refusing before it delegates.
+//! **An empty pattern replaces nothing** (`[mem.str.empty]`, wolf-lang#56):
+//! it occurs everywhere and at no width, so inserting the replacement at
+//! every position would be a different operation with a different name. The
+//! language rules the identity, all three lanes answer it, and std delegates
+//! where it used to trap (F-0055, closed).
+//!
+//! This file was `replace_empty_pattern_trap.lu`. `replacen` keeps a guard
+//! because it walks `find` rather than delegating, so the identity is std's
+//! own obligation there — which is why it is witnessed here beside the
+//! delegating one.
 
 use std.str
 
 fn main() -> !int {
-    let out = str.replace("a,b", "", "-")
-    if out == "a,b" {} else { return 1 }
+    assert(str.replace("a,b", "", "-") == "a,b", "an empty pattern is the identity")
+    assert(str.replace("", "", "-") == "", "including over the empty string")
+    assert(str.replacen("a,b", "", "-", 2) == "a,b", "replacen agrees")
+    assert(str.replacen("a,b", "", "-", 0) == "a,b", "at any count")
     0
 }

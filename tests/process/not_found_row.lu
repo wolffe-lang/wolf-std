@@ -1,0 +1,36 @@
+//! check: run(exit=1, stdout="empty argv: -1\nno such program: -1\nerror: not_found")
+//! phase: run
+//! conforms: std.process, err.row, err.propagate, err.else
+//!
+//! **`not_found` twice, from the two conditions that reach it**: an argv
+//! that names no program at all, and a program name no host has. Both are
+//! rows and neither is a trap — the caller could not have checked whether a
+//! program exists, and a race says it could not have checked reliably even
+//! then (§2, §14).
+//!
+//! **Why this test is deterministic on every tier-1 host.** No program is
+//! ever started: an empty vector cannot name one, and
+//! `wolf-sc11-no-such-program-here` is a name no packaging system ships.
+//! The happy path needs a program that exists everywhere, and there is none
+//! (F-0066) — `/bin/sh` is not on windows and `cmd.exe` is not on linux — so
+//! the exit-code path is proven in the toolchain's own unix-gated suite and
+//! this file proves the rows.
+//!
+//! The last call has no `else`: the tag rides out of `main`, the process
+//! prints `error: not_found` and exits 1, and that is the toolchain naming
+//! the tag rather than this repository asserting its own reading of it.
+
+use std.process
+
+fn main() -> !int {
+    let empty = process.from_argv(List[str]())
+    let a = process.run(empty) else 0 - 1
+    print("empty argv: {a}")
+    var missing = process.command("wolf-sc11-no-such-program-here")
+    let b = process.start(missing) else |_| { process.Child { slot: 0 - 1 } }
+    print("no such program: {b.slot}")
+    let c = process.command("wolf-sc11-no-such-program-here")
+    process.run(c)?
+    print("unreachable")
+    0
+}

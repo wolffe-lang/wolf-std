@@ -1,21 +1,24 @@
-//! check: run(exit=0)
+//! check: run(exit=trap(exclusivity))
 //! phase: run
-//! conforms: std.list
+//! conforms: conf.trap.map, mem.iter.excl, std.list
 //!
-//! THE cross-implementation triage case the sprint contract names, and
-//! it does NOT agree at these pins (finding F-0014):
+//! **The cross-implementation triage case, and it AGREES now** (F-0014,
+//! closed at the sc11 pin). Pushing to a list while iterating it is
+//! `exclusivity` — the trap `[conf.trap.map]` predicted all along — under
+//! the interpreter, and a static rejection (`E1013`) on both compiler rungs.
 //!
-//! - wolfc REJECTS it statically — `fail(E1001)`, because `for x in xs`
-//!   moves `xs` and `xs.push` then reads a moved place. A rejection is a
-//!   fine answer; it is not the `exclusivity` trap `[conf.trap.map]`
-//!   would predict, and it arrives through the reads-as-moves lens
-//!   (F-0005) rather than a container-exclusivity rule.
-//! - lupin RUNS it to completion, silently, with no trap at all — the
-//!   under-enforcement half of the divergence.
+//! What it was for nine sprints: wolfc rejected it as `E1001` because
+//! `for x in xs` MOVED `xs` and the push then read a moved place, which was
+//! a fine answer arriving through the wrong lens (the reads-as-moves rule,
+//! F-0005); lupin ran the program to completion, silently, with no trap at
+//! all. One machine over-explained it and the other under-enforced it.
 //!
-//! The directive therefore records the LUPIN behavior (run, exit 0) and
-//! the ledger records wolfc's `fail(E1001)`: the file exists so the
-//! divergence has a home in CI until one of the two moves.
+//! s72's D40 settles it: iteration takes a read claim over the loop's whole
+//! extent (`[mem.iter.excl]`), so `for` no longer moves its iterable and a
+//! write during the loop is an exclusivity violation on its own terms. The
+//! E1001 accident is structurally dead, and this file — which existed so the
+//! divergence had a home in CI — becomes the witness that the divergence is
+//! gone. It is a trap file now, and named like one (§13).
 
 fn main() -> !int {
     var xs = List[int]()

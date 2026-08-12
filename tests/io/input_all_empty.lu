@@ -1,0 +1,30 @@
+//! check: run(exit=0, stdout="all: [] len 0\nagain: []")
+//! phase: run
+//! conforms: std.io, err.row, err.else
+//!
+//! `input_all` on EMPTY standard input: the loop's first read is `eof`, the
+//! loop ends, and the answer is `""` — the end of input is what makes the
+//! function return, so `eof` is not in its row at all.
+//!
+//! Empty input is the only path this rig can witness: `conform-run` has no
+//! stdin injection (F-0046, unmoved for four sprints) and the runner wires
+//! the null device, so the hit path — several lines joined with `"\n"` — is
+//! proven in the toolchain's own tests and stated on the function rather
+//! than asserted here. What this file DOES hold is the property that made
+//! the function unwritable until this pin: the loop stops on one tag and
+//! re-raises the others, so an empty stream is an empty answer and never a
+//! miss.
+//!
+//! The second call proves the obvious thing worth proving anyway — the
+//! function is not stateful and a second call at end-of-input is still `""`,
+//! not a row.
+
+use std.io
+
+fn main() -> !int {
+    let all = io.input_all() else "?"
+    print("all: [{all}] len {all.len}")
+    let again = io.input_all() else "?"
+    print("again: [{again}]")
+    0
+}

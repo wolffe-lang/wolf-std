@@ -1,0 +1,28 @@
+//! check: fail(E1001)
+//! phase: typecheck
+//! conforms: std.process, mem.tier0.move.1, mem.tier0.move.2
+//!
+//! **The staleness discipline, held as a rejection** — `std.fs.close` and
+//! `std.net.close` for a child process. `process.wait` takes its `Child` by
+//! `take` (X1) because waiting REAPS: the handle names nothing afterwards,
+//! so a second wait is a use-after-move caught statically, with no
+//! generation counter, no liveness bit and no run-time cost.
+//!
+//! This file is expected to be REJECTED, and if a future pin ever accepts it
+//! the rig goes red — which is what a discipline living in the type system
+//! should do. The alternative design is visible in the diagnostic's absence:
+//! a `Child` with an `is_reaped` field would move this error to run time and
+//! add a row to every operation for a condition the compiler can see. What
+//! remains for the handles the compiler CANNOT see is the forged-handle row
+//! (`forged_handle_io_rows.lu`).
+
+use std.process
+
+fn main() -> !int {
+    var c = process.command("wolf-sc11-no-such-program-here")
+    var ch = process.start(c)?
+    let first = process.wait(take ch)?
+    let second = process.wait(take ch)?
+    print("codes: {first} {second}")
+    0
+}

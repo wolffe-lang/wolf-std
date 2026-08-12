@@ -169,9 +169,14 @@ pub fn unix_ms() -> int {
 /// earlier, so a program that must not overshoot measures with `elapsed`
 /// rather than trusting the argument.
 ///
-/// Total: no rows, no traps. This blocks the whole thread — there is no
-/// task-aware sleep at this tier, and the s35 reactor's parking story
-/// reaches std when its builtin tier does.
+/// Total: no rows, no traps. **This blocks the whole thread**, and as of the
+/// sc11 pin that sentence has teeth on every lane: s73 lowers tasks, channels
+/// and procs natively, so a wolf program can now have several tasks on all
+/// three rungs — and `time_sleep_ms` still parks the OS thread rather than the
+/// task, so sleeping inside one task stops the others that share its thread.
+/// There is no task-aware sleep at this tier. The s35 reactor has the parking
+/// story and reaches std when its builtin tier does; until then, a program
+/// that must not stall its peers waits on a channel instead of sleeping.
 ///
 /// Capability `Clock`; refused at comptime (D33). Delegates to
 /// `time_sleep_ms`.

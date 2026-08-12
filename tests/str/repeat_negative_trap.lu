@@ -1,17 +1,19 @@
-//! check: run(exit=trap(bounds))
+//! check: run(exit=trap(assert))
 //! phase: run
-//! conforms: conf.trap.set, std.str
+//! conforms: conf.trap.set, mem.str.repeat, std.str
 //!
-//! A negative repeat count traps `bounds` — the builtin's own fault ("a
-//! repeat count cannot be negative", `[mem.ub.defined]`), on all three
-//! lanes, and std does not guard it.
+//! A negative repeat count traps `assert` — the builtin's own fault, on all
+//! three lanes, and std does not guard it. s71 RULED the kind
+//! (`[mem.str.repeat]`, wolf-lang#57): a negative count is a caller contract
+//! violation, which is `assert`, where the runtime used to report `bounds`.
 //!
-//! This file is a CORRECTION held as a test. sc03 measured `"ab".repeat(-1)`
-//! as `""` under the interpreter and `std.str.repeat`'s doc claimed that
-//! answer for five sprints; at the sc09 pin every lane traps, so the doc
-//! was wrong for at least one bump before anyone looked (F-0056). A claim
-//! about an implementation's answer that no test holds is a claim that
-//! rots — this is the test.
+//! This file is a CORRECTION held as a test, and it has now corrected the
+//! same sentence twice. sc03 measured `"ab".repeat(-1)` as `""` under the
+//! interpreter and `std.str.repeat`'s doc claimed that answer for five
+//! sprints; sc09 measured `trap(bounds)` on every lane and wrote this file;
+//! sc11's pin bump changed the KIND and this file went red inside a minute,
+//! which is the whole argument for holding a claim about an implementation
+//! in a test rather than in prose (F-0056, closed).
 
 use std.str
 

@@ -1,0 +1,58 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.exec
+//!
+//! **D33, held as a rejection: no child processes at compile time.** The
+//! capability `std.process` carries (`Exec`, per I13) is refused
+//! categorically in the comptime sandbox, and the sandbox table's own reason
+//! is the sharpest in the eight: compiling a package must never RUN or
+//! TERMINATE programs on the machine that compiles it. `wolf add` may not
+//! mean arbitrary code executes with the builder's credentials.
+//!
+//! **Why the refused call is the BUILTIN and not the facade** (the
+//! `std.net` witness's reason, unchanged): a `comptime fn` cannot call
+//! across a module boundary at this pin, so a witness written over
+//! `process.start` would be an honest `unsupported` at resolve rather than
+//! the capability refusal (F-0051). The refusal is witnessed one level down,
+//! at a builtin of the same `exec` category, and the module's pure builder
+//! is called at RUN time — which is also what keeps the import used (an
+//! unused import is E0305).
+//!
+//! **Why the builtin is `os_kill` and not `os_spawn`.** The trio's spawn
+//! takes a `List[str]`, and building a list is outside the comptime engine's
+//! subset at this pin: a witness written over `os_spawn` answers
+//! `unsupported` for the ARGUMENT rather than `fail(E0701)` for the
+//! capability, on every lane, which would be a test that passes for the
+//! wrong reason. `os_kill` takes an `int`, so nothing but the capability can
+//! decide the verdict — and the three `exec` builtins refuse identically
+//! (the pinned corpus's `comptime/sandbox_exec.lu` says so in the same
+//! words).
+//!
+//! What the file proves: the capability is refused at comptime, and the
+//! builder half is the only part of this module a comptime program could
+//! ever use — the day the engine can call across a module boundary.
+//!
+//! **The handler on the refused call is load-bearing twice over.** A bare
+//! `os_kill(slot)` discards a `() ! {io}` result, which is `W0601` ("a failure
+//! here vanishes silently") on both compiler rungs — and this rig denies
+//! warnings, so the file was red for the warning while being right about the
+//! error. The obvious fix is `os_kill(slot)?`, and that one is WORSE: `?`
+//! inside a `comptime fn` is outside the comptime engine's subset at this pin,
+//! so the whole file answers `unsupported` at resolve and the capability
+//! refusal never happens — a test that would have passed its ledger row while
+//! proving nothing (F-0069). Handling the row locally reaches E0701 and warns
+//! about nothing.
+
+use std.process
+
+comptime fn probe(slot: int) -> int {
+    os_kill(slot) else |_| {}
+    slot
+}
+
+fn main() -> !int {
+    const KILLED = probe(4242)
+    let c = process.command("ls")
+    print("argv: {process.argv(c).len} killed: {KILLED}")
+    0
+}

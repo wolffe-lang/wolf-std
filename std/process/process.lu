@@ -1,0 +1,434 @@
+//! member: true
+//!
+//! std.process — build a command as an argument VECTOR, start it, wait for
+//! its exit code, kill it, and end this process. Stability tier: core.
+//!
+//! **There is no shell here, and there never will be.** The builtin tier
+//! takes an argv ARRAY and nothing else (`os_spawn(List[str])`), so a
+//! command is a program name plus its arguments as separate values, all
+//! the way down to the host's `execve`. No string is ever parsed into
+//! words, no `sh -c` exists to parse one, and a file name containing a
+//! space, a quote or a `;` is therefore just an argument. Injection is off
+//! the table by construction rather than by escaping, which is the whole
+//! reason this module's builder shape is the ONLY way to spawn: a
+//! convenience that took `"grep -n {pattern} {path}"` would have to invent
+//! quoting rules, and every quoting rule anyone has ever written has had a
+//! hole in it.
+//!
+//! **Capability: `Exec` (I13).** `start`, `run`, `wait`, `kill` and `exit`
+//! reach the host's process table, are tagged `exec` in the toolchain's
+//! sandbox table, and are categorically refused at comptime (D33) — with
+//! the sandbox table's own reason, which is worth quoting because it is
+//! sharper than "determinism": *compiling a package must never run or
+//! terminate programs on the machine that compiles it*. `wolf add` may not
+//! mean arbitrary code executes with the builder's credentials. The
+//! refusal is `E0701` and `tests/process/comptime_refuses.lu` holds it one
+//! level down, at `os_kill`, because a `comptime fn` cannot call across a
+//! module boundary at this pin (F-0051) and because `os_spawn`'s `List[str]`
+//! argument is outside the comptime engine's subset — the witness has to be
+//! the builtin whose only argument is an `int`, with its row HANDLED rather
+//! than propagated, since `?` inside a `comptime fn` is `unsupported` and
+//! masks the refusal entirely (F-0069). The builder half of this module
+//! (`command`, `from_argv`, `push_arg`, `argv`, `is_success`) reaches
+//! NOTHING and is comptime-safe — in an os module the pure function is the
+//! surprising one, so it is spelled out here and on each of them (§14).
+//! "Comptime-safe" is a statement about the sandbox and not a promise that
+//! you can call it: F-0051 means no `comptime fn` can call across a module
+//! boundary at this pin, so the builder is comptime-safe and
+//! comptime-unreachable at the same time — exactly where `std.net`'s address
+//! helpers and `std.fs`'s path helpers stand.
+//!
+//! **Errors are rows, never traps** (D30, §14): a program that is not
+//! there, a directory that will not execute, a child that died on a
+//! signal, a handle that was already reaped — every one of them is an
+//! ORDINARY outcome a caller handles with `else` or propagates with `?`.
+//! Nothing here traps. The vocabulary is the s40 builtin tier's, adopted
+//! verbatim so std adds no translation layer:
+//!
+//! - `not_found` — no such program (and the same tag for an EMPTY argv,
+//!   which names no program at all)
+//! - `denied` — the host refused to execute it (permissions, a directory,
+//!   a file with no execute bit)
+//! - `signal` — the child died WITHOUT an exit code: killed, or crashed.
+//!   Its own outcome and never a fake code, because every fake would
+//!   collide with a code a program can really return (§12: one tag per
+//!   failure mode a caller can act on)
+//! - `io` — every other host failure, including a forged, foreign or
+//!   already-reaped handle, coarsened to one tag because the builtin tier
+//!   reports one and no caller can act on the difference (§12's rule 3)
+//!
+//! **An exit code is an `int`, and a handle is a TYPE.** The builtin tier
+//! hands out two bare integers whose meanings are unrelated — a child
+//! handle from `os_spawn`, an exit code from `os_wait` — and passing one
+//! where the other belongs is the mistake this module exists to make
+//! impossible: `Child` is a struct, so a code can never be waited on and a
+//! handle can never be compared with 0. The code itself stays an `int`,
+//! because that is what it is: the number the child returned, in
+//! `0..255` on every tier-1 host, with `0` meaning success (`is_success`
+//! says so once so that no caller writes the convention out).
+//!
+//! **The stdio of a child is CLOSED at this pin** — `os_spawn` wires all
+//! three streams to the host's null device, so a child cannot read the
+//! parent's input and neither its output nor its diagnostics reach the
+//! parent's streams. That is a real limitation and not a simplification:
+//! it means this module can start a program and learn only how it EXITED.
+//! Pipes need a builtin surface that does not exist (F-0065), and every
+//! plausible workaround — a temporary file, a shell redirect — is either
+//! the shell this module refuses or a different program's business
+//! (`std.fs`).
+//!
+//! **Waiting is what reaps, and the handle is consumed by it** (§14's
+//! handle rule, in its second home). `wait(take ch)` ends the `Child`'s
+//! life exactly as `fs.close(take f)` ends a `File`'s: a second wait is a
+//! static use-after-move rather than a row on every operation for a
+//! condition the compiler can see, and `tests/process/use_after_wait.lu`
+//! holds the rejection as `fail(E1001)`. `kill` does NOT reap — it takes
+//! `mut ch` and leaves the handle alive for the `wait` that must follow,
+//! because a killed child that nobody waits for is a zombie on every unix.
+//! A `Child` a caller FORGES from data (`process.Child { slot: 4242 }`)
+//! answers `io`, never a trap, for the same reason a missing file does: no
+//! field is private at this pin, so a forged handle is a checkable
+//! condition rather than a contract violation.
+//!
+//! **What is deliberately absent.** Each is a reviewed contract with a
+//! filing behind it rather than an approximation:
+//!
+//! ```text
+//! output(c: Command) -> str ! {not_found, denied, signal, io}
+//! stdin_text(mut c: Command, text: str)
+//!     A child's captured stdout, and text written to its stdin. No
+//!     builtin wires a pipe (F-0065): v0 stdio is null-wired, so there
+//!     is nothing to read and nowhere to write. This is the single
+//!     biggest hole in the module and the one the book's pargrep chapter
+//!     will feel first.
+//! env_for(mut c: Command, name: str, value: str)
+//! current_dir(mut c: Command, path: str)
+//!     A child's environment and working directory. `os_spawn` inherits
+//!     both from the parent and takes no third argument (F-0065). A
+//!     caller that must change them today changes its OWN with
+//!     `std.env.set` before spawning, which is a different thing and is
+//!     not documented as if it were the same.
+//! try_wait(mut ch: Child) -> int ! {none, signal, io}
+//!     Has it finished? `os_wait` blocks and there is no non-blocking
+//!     form (F-0065), so the honest answer is unavailable — and a poll
+//!     loop written over a blocking wait is a lie about its own cost.
+//! wait_timeout(mut ch: Child, d: Duration)
+//!     Same gap as the net tier's deadline (F-0049): no builtin arms one.
+//! pid(ch: Child) -> int
+//!     The `Child`'s field is the MACHINE's table index, not the host's
+//!     process id, so an accessor named `pid` would name something this
+//!     tier does not have. Nothing reports a real pid (F-0065).
+//! signal_of(…) -> int
+//!     Which signal killed it. The `signal` row carries no payload
+//!     because the builtin reports none; the day it does, the tag gains
+//!     a payload rather than a sibling (§12).
+//! ```
+//!
+//! **Lanes, and one of them is dark by design.** The compiler's checked
+//! tier is the only lane that STARTS a process: it spawns real children.
+//! The native rung refuses the tier by name ("process builtins in native
+//! lowering (checked lane only at s40)") and refuses the whole module with
+//! it, including the pure builder, because lowering budgets a module by
+//! more than the body it needs. lupin declines the surface by design and
+//! says so — *this machine runs no child processes by design, so the tier
+//! is declined rather than mocked* — but it resolves module bodies LAZILY,
+//! so a program that only BUILDS commands runs there, which is why
+//! `tests/process/builder.lu` has two lanes where everything else has one.
+//!
+//! **No test and no doc example in this module starts a real program**, and
+//! that is a portability statement rather than a shortcut: there is no
+//! program every tier-1 host has (`/bin/sh` is not on windows, `cmd.exe`
+//! is not on linux), a wolf program cannot learn its own path
+//! (`env_args` drops argv[0]), and the directive schema has no per-platform
+//! gate — so a spawn test that ran anywhere real would be red on some
+//! supported host. What every witness here uses instead is deterministic on
+//! ALL of them: a program name no host has (`not_found`), an empty argv
+//! (`not_found` again), and a forged handle (`io`). The happy path — a live
+//! child, its exit code, its `signal` row after a kill — is proven upstream
+//! in the toolchain's own unix-gated tests, and this module's inability to
+//! witness it here is filed as F-0066 rather than papered over.
+
+/// A program and its arguments, as the argument VECTOR the host receives.
+///
+/// Element 0 is the program; the rest are its arguments, one value each,
+/// with no quoting and no splitting anywhere (see the module header on why
+/// there is no shell). Build one with `command` or `from_argv`, extend it
+/// with `push_arg`, read it back with `argv`.
+///
+/// The field is a `List[str]` because that is exactly what `os_spawn`
+/// takes. A `Command` reaches nothing until it is started: constructing,
+/// extending and reading one is pure, and the sandbox has no objection to
+/// any of it — though nothing in this module is REACHABLE from a `comptime
+/// fn` at this pin, because none of them can call across a module boundary
+/// (F-0051). Pure here means "no capability", not "callable at compile
+/// time".
+pub struct Command {
+    argv: List[str],
+}
+
+/// A started child process: this machine's handle on it.
+///
+/// The field is an `int` because that is what the builtin tier hands out —
+/// a small non-negative index into the machine's child table, never a
+/// host process id (see the module header's absent-list). Reading it is
+/// legal and passing a hand-built `Child` to `wait` or `kill` is not a
+/// trap but a miss (`io`), because a forged handle is a checkable
+/// condition and a public struct's field cannot be private at this pin.
+///
+/// **Staleness is prevented by the mode system**, exactly as it is for
+/// `std.fs.File` and `std.net.Socket`: `wait` takes its `Child` by `take`
+/// (X1), so using one after it has been reaped is a static use-after-move
+/// rather than a row on every operation.
+pub struct Child {
+    slot: int,
+}
+
+/// A `Command` that runs `program` with no arguments.
+///
+/// Total: no rows, no traps. Pure and comptime-safe — building a command
+/// starts nothing. `program` is a path or a bare name; a bare name is
+/// resolved by the HOST's search rules (`PATH` on every tier-1 platform),
+/// which is the host's business and not this module's, and a name it
+/// cannot resolve is `start`'s `not_found` row rather than an error here.
+///
+/// ```wolf-doc-example
+/// let ls = process.command("ls")
+/// let vec = process.argv(ls)
+/// vec.len == 1
+/// vec[0] == "ls"
+/// ```
+pub fn command(program: str) -> Command {
+    var argv = List[str]()
+    (mut argv).push(program)
+    Command { argv: argv }
+}
+
+/// A `Command` from a whole argument vector: element 0 is the program, the
+/// rest are its arguments.
+///
+/// Total: no rows, no traps. Pure and comptime-safe. This is the
+/// constructor for an argv a program already HAS — `std.env.args()`
+/// forwarded to a child, a vector read from a configuration — and it is
+/// why `push_arg` is not the only way to build one.
+///
+/// An EMPTY vector is accepted here and misses at `start` with
+/// `not_found`: a vector that names no program is data a program can hold
+/// perfectly well, so refusing it at construction would move a run-time
+/// outcome into a place that has no row (§2).
+///
+/// ```wolf-doc-example
+/// var argv = List[str]()
+/// (mut argv).push("grep")
+/// (mut argv).push("-n")
+/// let c = process.from_argv(argv)
+/// let vec = process.argv(c)
+/// vec.len == 2
+/// vec[0] == "grep"
+/// ```
+pub fn from_argv(argv: List[str]) -> Command {
+    Command { argv: argv }
+}
+
+/// Append one argument to `c`.
+///
+/// Total: no rows, no traps. Pure and comptime-safe. `value` is passed to
+/// the child as ONE argument whatever it contains — spaces, quotes,
+/// newlines and semicolons are ordinary bytes, because nothing between
+/// here and the host's `execve` parses words (the module header's whole
+/// subject).
+///
+/// `mut c` because appending is the operation's point (§3), and the call
+/// site spells it. The verb is `push_arg` rather than `arg` for two
+/// reasons: `push` is std's vocabulary word for appending to a sequence
+/// (§8), and `std.env.arg(i)` already means "the argument at i" — a
+/// program that forwards its own argv to a child imports both modules, and
+/// two functions called `arg` doing opposite things in one file is a
+/// collision std declines to create (§1: one concept, one name).
+///
+/// ```wolf-doc-example
+/// var c = process.command("grep")
+/// process.push_arg(mut c, "-n")
+/// process.push_arg(mut c, "the wolf; rm -rf /")
+/// let vec = process.argv(c)
+/// vec.len == 3
+/// vec[2] == "the wolf; rm -rf /"
+/// ```
+pub fn push_arg(mut c: Command, value: str) {
+    (mut c.argv).push(value)
+}
+
+/// `c`'s argument vector: the program first, then its arguments.
+///
+/// Total: no rows, no traps. Pure and comptime-safe. The list is a copy of
+/// what the child would receive, so pushing to it does not extend the
+/// command — `push_arg` is how a command grows.
+///
+/// ```wolf-doc-example
+/// var c = process.command("wc")
+/// process.push_arg(mut c, "-l")
+/// let vec = process.argv(c)
+/// vec.len == 2
+/// vec[0] == "wc"
+/// ```
+pub fn argv(c: Command) -> List[str] {
+    c.argv
+}
+
+/// Start `c` and return the handle of the child, WITHOUT waiting for it.
+///
+/// Rows: `not_found` when no such program exists — and for an EMPTY argv,
+/// which names no program at all; `denied` when the host refuses to
+/// execute it; `io` for every other host failure. Never traps.
+///
+/// The child inherits this process's environment and working directory,
+/// and its three standard streams are wired to the host's null device
+/// (F-0065): nothing it writes is visible to this program, and it cannot
+/// read this program's input. A started child MUST be waited for —
+/// `wait(take ch)` is what reaps it — or it stays a zombie on every unix
+/// until this process exits.
+///
+/// **Why the name is not `spawn`.** `spawn` is one of the language's 50
+/// reserved keywords — it opens a task (`s.spawn(fn() { … })`) and a
+/// supervised proc (`spawn proc`) — so `pub fn spawn` is `E0008` with no
+/// raw-identifier escape, exactly as `std.fs.copy_file` is not `copy`.
+/// The collision is worth more than the name: a child process and a task
+/// are different things with different failure models, and a std function
+/// that borrowed the keyword's word for the other one would have invited
+/// the confusion the type system then has to unpick.
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to `os_spawn`.
+///
+/// ```wolf-doc-example
+/// var missing = process.command("wolf-sc11-no-such-program-here")
+/// var child = process.start(missing) else |_| { process.Child { slot: -1 } }
+/// (process.wait(take child) else -1) == -1
+/// ```
+pub fn start(c: Command) -> Child ! {not_found, denied, io} {
+    Child { slot: os_spawn(c.argv)? }
+}
+
+/// Wait for `ch` to finish and answer its exit code, consuming the handle.
+///
+/// Rows: `signal` when the child died without an exit code — killed by
+/// this program or by anything else, or crashed — which is an OUTCOME with
+/// no number rather than a failure to report a number; `io` when the
+/// handle is forged, foreign or already reaped. Never traps.
+///
+/// **This blocks until the child finishes.** There is no non-blocking form
+/// and no deadline at this pin (F-0065), so a caller who cannot afford to
+/// wait forever has to kill the child from somewhere else — which, with
+/// no way to poll, means another task.
+///
+/// `take ch` because waiting REAPS: the child is gone from the machine's
+/// table afterwards, so a second wait is a use-after-move the compiler
+/// rejects rather than an `io` row at run time (§14's handle rule).
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to `os_wait`.
+///
+/// ```wolf-doc-example
+/// var forged = process.Child { slot: 4242 }
+/// (process.wait(take forged) else -1) == -1
+/// ```
+pub fn wait(take ch: Child) -> int ! {signal, io} {
+    os_wait(ch.slot)?
+}
+
+/// Kill `ch` — end the child immediately, without reaping it.
+///
+/// Rows: `io` when the handle is forged, foreign, already reaped, or names
+/// a child that has already exited (a child that is finished is not yours
+/// to kill any more). Never traps.
+///
+/// **A killed child still has to be waited for.** This call does not
+/// consume the handle, and the `wait` that follows answers the `signal`
+/// row rather than a code — that pair is the whole "stop it" idiom, and
+/// skipping the wait leaves a zombie on every unix. The kill is immediate
+/// and uncatchable by the child: nothing here asks a program to shut down
+/// politely, because no builtin sends a gentler signal (F-0065).
+///
+/// `mut ch` because killing changes what the child IS, exactly as
+/// `std.fs.read` takes `mut` for advancing a position: the handle's fields
+/// do not move, the thing it names does (§14).
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to `os_kill`.
+///
+/// ```wolf-doc-example
+/// var forged = process.Child { slot: 4242 }
+/// process.kill(mut forged) else |_| { }
+/// (process.wait(take forged) else -1) == -1
+/// ```
+pub fn kill(mut ch: Child) -> () ! {io} {
+    os_kill(ch.slot)?
+}
+
+/// Start `c`, wait for it, and answer its exit code.
+///
+/// Rows: the union of `start`'s and `wait`'s — `not_found`, `denied`,
+/// `signal`, `io`, each meaning exactly what it means there. Never traps.
+///
+/// This is the whole operation for the commonest case, where a program
+/// runs another program and cares only how it ended. It blocks for as long
+/// as the child runs, it reaps the child (so nothing is left behind), and
+/// it cannot be interrupted at this pin. What it cannot do is give you the
+/// child's output — nothing can, yet (F-0065).
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to `os_spawn`
+/// and `os_wait`.
+///
+/// ```wolf-doc-example
+/// let missing = process.command("wolf-sc11-no-such-program-here")
+/// (process.run(missing) else -1) == -1
+/// ```
+pub fn run(c: Command) -> int ! {not_found, denied, signal, io} {
+    var ch = start(c)?
+    wait(take ch)?
+}
+
+/// Whether `exit_code` means the program succeeded.
+///
+/// Total: no rows, no traps. Pure and comptime-safe. Zero is success and
+/// everything else is failure, on every tier-1 host; this function exists
+/// so that the convention is written down once, in std, instead of as a
+/// `== 0` in every caller that would then have to be re-read when someone
+/// wonders whether this platform is the exception. It is not.
+///
+/// The `signal` row is NOT a code and never reaches here: a child that
+/// died without exiting did not succeed and did not fail with a number,
+/// which is exactly why it is a separate outcome (§12).
+///
+/// ```wolf-doc-example
+/// process.is_success(0) == true
+/// process.is_success(1) == false
+/// process.is_success(-1) == false
+/// ```
+pub fn is_success(exit_code: int) -> bool {
+    exit_code == 0
+}
+
+/// End THIS process immediately with `code`.
+///
+/// Never returns — no `defer` runs, no buffer is flushed by std, and no
+/// row can be raised by a call that does not come back. Not a trap: the
+/// process ends with the status the caller asked for, which is the one
+/// thing a trap cannot do.
+///
+/// Only the low byte of `code` survives on a unix host: the exit status a
+/// parent can observe is `code` modulo 256, so `exit(300)` is seen as 44
+/// and `exit(-1)` as 255. std does not renumber or clamp — a caller that
+/// wants a portable status writes one in `0..255`, and this sentence is
+/// where that is documented rather than discovered.
+///
+/// Capability `Exec`; refused at comptime (D33) — a comptime program that
+/// could end the compiler is the sharpest case of that rule. Delegates to
+/// `os_exit`, which is the one member of the s40 `exec` family every rung
+/// executes: this function therefore runs under the interpreter too, and the
+/// only reason it is dark on the native rung is that lowering refuses the
+/// whole MODULE for the process trio beside it.
+///
+/// ```wolf-doc-example
+/// process.is_success(0) == true
+/// process.exit(0)
+/// ```
+pub fn exit(code: int) {
+    os_exit(code)
+}
