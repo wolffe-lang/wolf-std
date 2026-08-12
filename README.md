@@ -57,4 +57,4 @@ and 98 named-and-unbuilt functions whose blockers are filed upstream and
 counted by blocker in `docs/phase-a-census.md`.
 
 Sprint plan: the `std` track (`scNN`) in the wolf metarepo.
-Dual-licensed MIT or Apache-2.0.
+Licensed under [MIT](LICENSE).
