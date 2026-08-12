@@ -50,7 +50,7 @@ The rig fails CI when reality is deeper OR shallower than the ledger. Advancing 
 trick) is deliberate: its own commit, saying which upstream change
 earned it.
 
-## The os tier: working directories and honest lanes (sc07, re-measured sc08)
+## The os tier: working directories and honest lanes (sc07, re-measured sc11)
 
 Two postures the rig carries so that no test has to restate them.
 
@@ -71,14 +71,14 @@ once per tier in `tests/ledger.toml`, never per file — and it is re-measured
 at every pin, because a capability lane is exactly the kind of claim that
 rots:
 
-- **fs and io, at the sc08 pin: two executing lanes.** The checked tier
+- **fs and io, at the sc11 pin: two executing lanes.** The checked tier
   performs REAL host operations and the native rung lowers both tiers as of
   #40 (six of seven `fs` tests and both `io` tests run natively, where every
   one of them was `unsupported` in sc07). lupin has no `fs_*` builtins and no
   injectable stdin by design, so it refuses those at RESOLVE — but it resolves
   module bodies LAZILY, so `fs/path_helpers.lu` runs there, and lupin 0.1.5's
   `eprint`/`eprint_raw` moved `io/writers_and_streams.lu` to `run` too.
-- **net, at the sc08 pin: one executing lane.** The checked tier opens real
+- **net, at the sc11 pin: one executing lane.** The checked tier opens real
   sockets; lupin has no `net_*` builtins by design; the native rung refuses
   the tier by name ("net builtins in native lowering (checked lane only at
   s39)"). The pure address helpers run on lupin for the lazy-resolution reason
@@ -91,10 +91,27 @@ rots:
   `net.port`, and dials before it accepts. No fixed ports, no foreign hosts,
   no name resolution, no external network EVER — and no timeout to rescue a
   blocked accept at this pin (F-0049).
+- **time and env, at the sc11 pin: three executing lanes.** lupin 0.1.8's
+  conformance pin carries the s40 `time_*` and `env_*` families, so what sc10
+  recorded as a two-wave DRIFT is closed — by a release, exactly as that note
+  predicted. `x/json` is still one lane and its dark columns changed KIND: the
+  native rung refuses the tier by name and lupin now DECLINES the surface by
+  design ("rather than risk a second, guessed RFC 8259 reading"), which is a
+  posture like `fs` and `net` rather than a wave to wait out.
+- **process, at the sc11 pin: one executing lane, and no test starts a
+  program.** The checked tier spawns real children; lupin declines the trio by
+  design ("this machine runs no child processes by design, so the tier is
+  declined rather than mocked") and the native rung refuses it by name. No
+  `.lu` test here starts a real program, and that is portability rather than
+  timidity: no program exists on every tier-1 host, a wolf program cannot
+  learn its own path, and the directive schema has no per-platform gate
+  (F-0066). Every witness is deterministic on all of them — a name no host
+  has, an empty argv, a forged handle — and the exit-code path rests on the
+  toolchain's own unix-gated tests, which the module header says out loud.
 
 For doc examples the same honesty is a `CAPABILITY_MODULES` list in the
-extractor (`fs`, `io`, `net`): an `unsupported` verdict is acceptable on any
-lane for those modules, and in exchange at least one lane must reach
+extractor (`fs`, `io`, `net`, `time`, `env`, `process`, `x.json`): an
+`unsupported` verdict is acceptable on any lane for those modules, and in exchange at least one lane must reach
 `exit(0)` — an example nobody ran is not documentation.
 
 ## The pin ritual

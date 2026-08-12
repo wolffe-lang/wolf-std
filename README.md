@@ -14,8 +14,10 @@ wiring, intrinsics, `wolf build` integration) lives in wolf-lang.
 
 Phase A covers the pure-computational core: collections, strings,
 math, sorting, formatting, encodings, error and testing conventions.
-OS-facing modules (io, fs, net, time, process) are scoped but wait on
-the compiled runtime.
+Phase B is the os tier and it is landing: `std.fs`, `std.io` (sc07),
+`std.net` (sc08), `std.time`, `std.env` (sc10) and `std.process` (sc11)
+are written, each with the capability it reaches named per function per
+I13 and each honest about which of the three rungs executes it.
 
 ## The rig (sc00)
 

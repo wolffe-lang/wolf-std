@@ -137,3 +137,44 @@ What the tier reveals about §12's rules:
   contract" has an error-tier counterpart, and this is it: a tag std
   cannot witness says so on the function and in the test header, and no
   test claims otherwise.
+
+## The os tier's later tags (sc08, sc10, sc11)
+
+Each module after `std.fs`/`std.io` adopted its builtin tier's vocabulary
+verbatim, for the three reasons above, and the inventory is now:
+
+| tag | added | meaning | family |
+|---|---|---|---|
+| `not_found` | sc07 | no such path — and, from sc11, no such PROGRAM (an empty argv names none either) | error |
+| `denied` | sc07 | the host refused | error |
+| `io` | sc07 | every other host failure, one tag by rule 3 | error |
+| `utf8` | sc07 | bytes that are not text | error |
+| `eof` | sc07 | the input ended | absence |
+| `refused` | sc08 | nobody is listening | error |
+| `timeout` | sc08 | a deadline expired — declared, unreachable (F-0049) | error |
+| `closed` | sc08 | the peer finished: the socket's `eof` | absence |
+| `missing` | sc10 | no such environment variable | absence |
+| `invalid` | sc10 | a variable name the platform cannot hold | error |
+| `signal` | sc11 | the child died with no exit code | error |
+
+Three observations the later modules added, each earned by writing one:
+
+- **An absence tag is what ENDS a loop, and an error tag is what a loop
+  re-raises.** `eof` and `closed` are the same shape in two vocabularies, and
+  sc11 is where it paid: `io.input_all` and `net.read_all` are one loop each
+  that stops on the absence tag and re-raises everything else UNCHANGED, so
+  neither tag appears in either function's row. The rows are the caller's
+  business and the absence is the function's — which is only writable at all
+  because a handler can finally tell them apart (F-0043/F-0052, both closed).
+- **`signal` is the taxonomy's first "no value at all" ERROR.** Every other
+  error mark here means an operation did not happen; `signal` means it
+  happened and produced no number. It is not an absence (nothing is missing —
+  a child ran), and it must not be a code (every invented code collides with
+  a real one). Rule 4 covers its future: the day the builtin says WHICH
+  signal, the tag gains a payload, not a sibling.
+- **A tag with no witness is still documented, and sc11 has two of them**:
+  `denied` for a program the host will not execute, and `signal` itself,
+  because no `.lu` test in this repository can start a real child to kill
+  (F-0066). §10's "accuracy is a measured contract" has its error-tier
+  counterpart here — a tag std cannot witness says so on the function, in the
+  test header and in the census, and no test claims otherwise.

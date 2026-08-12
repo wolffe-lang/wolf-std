@@ -424,3 +424,136 @@ unwritten pending a sprint that owns them; their module headers still say
 "blocked" until one does, which is a debt this census names so it cannot sit
 quietly. **F-0058 adds 1** (`x.json.keys`, blocked on a query tier with no key
 enumeration) and **F-0061 adds 1** (`x.json.float_at`).
+
+## 9. sc11 — std.process, and the backlog four closed findings unblocked
+
+Pins: wolf trunk `0b4e79c` (five waves: s71, s72, s51, s41, s73, plus the r01
+identity release — and one commit BEHIND trunk's tip, which fails the ritual's
+first gate, F-0063), lupin 0.1.8 at conformance pin `26fa98e`.
+
+| measure | sc10 | sc11 |
+|---|---|---|
+| modules under `std/` | 33 | **34** (`std.process`) |
+| `pub fn` in `std/`, nursery excluded | 328 | **342** (+10 process, +3 net, +1 io) |
+| `pub fn` including `std/x/` | 359 | **373** |
+| public types in the os tier | 3 (`File`, `Listener`, `Socket`) | **5** (`Command`, `Child`) |
+| entry tests | 175 | **183** |
+| findings filed | F-0056…F-0061 | **F-0062 … F-0069** (eight) |
+| findings CLOSED | 1 (F-0052) | **4** (F-0014, F-0043, F-0055, F-0056) |
+
+(The count method is `grep -c "^pub fn"` over the tracked `.lu` files, stated
+because earlier census rows in this file used a different one and a total that
+cannot be reproduced is not a measure. The DELTA is what matters and it is
++14.)
+
+### What `std.process` delivers
+
+Ten functions and two types: `command`, `from_argv`, `push_arg`, `argv` (the
+pure builder) · `start`, `wait`, `kill`, `run` (the trio, plus the
+spawn-and-wait pair) · `is_success`, `exit`. Rows are the builtin tier's
+verbatim: `{not_found, denied, io}` starting, `{signal, io}` waiting, `{io}`
+killing — `signal` being new to §12's inventory.
+
+Two names differ from the obvious ones, both for reasons the contract could
+not have known: **`start`, not `spawn`** (`spawn` is one of the 50 keywords —
+it opens a task and a `spawn proc` — so `pub fn spawn` is `E0008`, F-0062), and
+**`push_arg`, not `arg`** (`std.env.arg(i)` already means "the argument at i",
+and a program forwarding its own argv to a child imports both modules).
+
+### The backlog, verified then written
+
+- **`io.input_all`** (sc07's worked refusal) and **`net.read_all`** (sc08's,
+  written and withdrawn inside that sprint) — both shipped, both four lines
+  and one handler. Neither became writable because std lowered its standard:
+  both needed a loop that stops on ONE tag and re-raises the others, and both
+  waited for s70's match tier (F-0052) and s71's payload-pattern ruling
+  (F-0043). §14's refusal rule now has its first two retractions and a third
+  clause: ship the function in the sprint after the finding closes.
+- **`net.write_line` and `net.read_lines`** — the line protocol's two halves,
+  in the shape available at this pin: send one line, or read the whole stream
+  and split it. A single-line incremental read is still blocked (F-0050: the
+  buffer fill is a byte-count read and a chunk can split a code point), and
+  `read_lines` says on itself that it is not a substitute.
+- **`bytes.to_str`** — still a contract, re-documented after four PROBES
+  rather than an assumption: `str.from_utf8` does not resolve,
+  `strbuf.push_byte` is not a method, `'h'` is `E0101` at the lexer, there is
+  no `bytes_to_str`. wolf-lang#58 is open; F-0057 is unmoved for a third
+  sprint.
+
+### The ripple, every flip listed
+
+Seven rows moved and three files were rewritten. Every movement is an advance:
+
+| test | lane | was | is | why |
+|---|---|---|---|---|
+| `time/monotonic.lu` | lupin | unsupported | run | lupin 0.1.8 has `time_*` |
+| `env/variable_round_trip.lu` | lupin | unsupported | run | lupin 0.1.8 has `env_*` |
+| `errors/coarsen_and_chain.lu` | wolfc | fail(E0806) | run | s71 ruled `else \|Tag(p)\|` |
+| `errors/coarsen_and_chain.lu` | native | fail(E0806) | run | same |
+| `list/mutate_while_iterating_trap.lu` | lupin | run (exit 0) | run (trap) | s72's D40 |
+| `list/mutate_while_iterating_trap.lu` | wolfc | fail(E1001) | fail(E1013) | same |
+| `list/mutate_while_iterating_trap.lu` | native | fail(E1001) | fail(E1013) | same |
+
+The three rewrites carry no row movement because the ANSWER changed while the
+depth did not: `split_empty_separator_trap.lu` and
+`replace_empty_pattern_trap.lu` lost their traps, their guards and their
+`_trap` names (s71 defined the empty needle, `[mem.str.empty]`), and
+`repeat_negative_trap.lu` changed kind from `bounds` to `assert`
+(`[mem.str.repeat]`) — which turned red inside a minute of the bump, because
+sc09 wrote the file instead of the sentence.
+
+**s73 moved no row at all, and that is the honest report.** Native
+concurrency is the wave this sprint was told to ripple, and std wraps no
+concurrency surface at this pin — no task facade, no channel helpers, nothing
+that names `spawn` (which is a keyword, F-0062). So the ripple is entirely
+DOCUMENTARY and it is real: every sentence in this repository that budgeted a
+concurrent program to the interpreter lane is now false, `std.time.sleep`'s doc
+had to say that a thread-blocking sleep now stalls sibling TASKS on three
+rungs rather than one, and `std.process`'s "kill it from another task" advice
+became writable advice instead of a one-machine trick. Zero rows, three
+paragraphs, and the alternative — leaving the claims standing — is how a
+document starts lying.
+
+Two rows did NOT move and both are worth naming. `env/args_and_vars.lu` stays
+lupin-dark because ONE builtin of the five is missing — `env_vars` "does not
+resolve" at 0.1.8 while `env_args`, `env_get`, `env_set`, `os_cwd` and
+`os_exit` all run (F-0070, measured one call at a time rather than inferred
+from the family, which is how a wrong sentence nearly reached this file).
+The three `x/json/*` rows stay dark for a NEW reason: lupin 0.1.8 declines
+the json surface by DESIGN ("rather than risk a second, guessed RFC 8259
+reading"), so what sc10 recorded as drift is now a posture. A drift closes on
+a release; a posture closes on a decision.
+
+### The lane table at these pins
+
+183 tests × 3 lanes:
+
+| lane | run | unsupported | fail(E…) | (sc10) |
+|---|---|---|---|---|
+| lupin | **144** | 39 | 0 | 140 / 35 / 0 |
+| wolfc `--checked` | **149** | 30 | 4 | 140 / 30 / 5 |
+| native | **97** | 82 | 4 | 93 / 77 / 5 |
+
+The `fail` column shrank by one on both compiler rungs because
+`errors/coarsen_and_chain.lu` stopped being a held rejection — the only time
+this ledger has recorded a rejection turning into a run.
+
+Eight new rows, and the split is the sprint's lane story: **two are two-lane
+on the interpreter side** (`process/builder.lu` and `process/exit_code.lu` —
+the pure builder and `os_exit`, which lupin has), **one is two-lane on the
+compiler side** (`io/input_all_empty.lu`: both rungs, lupin has no stdin),
+**two are one-lane** (`process/not_found_row.lu`,
+`process/forged_handle_io_rows.lu` and `net/read_all_and_lines.lu` — checked
+only), and **two are rejection witnesses that run on both compiler rungs**
+(`process/use_after_wait.lu`, `process/comptime_refuses.lu`), because a
+rejection never reaches lowering.
+
+### The blocked inventory
+
+F-0049 (5), F-0050 (1 — now `net.read_line` alone), F-0044 (6), F-0046 (1,
+re-shaped: `io.read_bytes` rather than `input_all`), F-0004 (2), F-0057 (1),
+F-0058 (1), F-0061 (1), and **F-0065 adds 6** (`process.output`,
+`stdin_text`, `env_for`, `current_dir`, `try_wait`, `wait_timeout`, `pid`
+being the seventh named in the header). F-0066 adds no contract and one debt:
+the module's central claim — a child's exit code comes back — has no portable
+witness in this repository at all.

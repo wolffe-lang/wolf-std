@@ -297,14 +297,30 @@ while the boundary primitive was missing.
   own bug into a wrong answer, which is the failure mode §9's
   refusal-over-approximation rule exists to prevent.
 - **Where the lanes disagree about a primitive, the std function decides —
-  before it delegates.** `count("")`, `split("")` and `replace(s, "", …)`
-  are `unsupported` on two lanes and defined on the third (F-0055), so six
-  `std.str` functions guard the empty argument themselves: `count` answers
-  0, the rest trap `assert`. The guard is not a workaround for a bug in one
-  implementation (which §0's house rule would file rather than paper over) —
-  it is std stating a contract the toolchain has not stated, in the one
-  place a caller can rely on it, with the filing attached. A std function may
-  never have three behaviours because it has three lanes.
+  before it delegates — AND THE DECISION IS TEMPORARY.** `count("")`,
+  `split("")` and `replace(s, "", …)` were `unsupported` on two lanes and
+  defined on the third (F-0055), so six `std.str` functions guarded the empty
+  argument themselves: `count` answered 0, the rest trapped `assert`. That
+  was std stating a contract the toolchain had not stated, in the one place a
+  caller can rely on it, with the filing attached — never a workaround for a
+  bug in one implementation, which §0's house rule would file rather than
+  paper over. A std function may never have three behaviours because it has
+  three lanes.
+
+  **sc11 completes the rule with its other half.** s71 RULED the empty needle
+  (`[mem.str.empty]`: count 0, one whole piece, identity) and every lane
+  answers it, so the guards are deleted and the delegation is the contract
+  again — including where the ruling DISAGREED with std's reviewed contract,
+  which it did twice: `split("")` and `replace(s, "", …)` trapped `assert` in
+  std and are defined answers in the language. std adopts the ruling without
+  argument, because a std function that second-guesses a spec clause is a
+  worse thing than the ambiguity the guard was covering. Two of the six
+  guards survive in a different role and say so on themselves: `splitn` and
+  `replacen` walk `find` rather than delegating, and `find("")` is 0 forever,
+  so they state the ruled answer explicitly to reach it at all. **The full
+  rule, then: guard where the lanes disagree, file it, and delete the guard
+  the day the toolchain rules — the filing is what makes the second half
+  happen.**
 - **A code point is an `int` until `char` exists, and the interim is
   `std.unicode`'s.** `str.code_points`, `char_offsets` and `char_count` ship
   in the same currency `std.unicode` chose for its classifiers, so the two
@@ -495,7 +511,9 @@ home, as `std.option` is §2's.
 
 - **Marks are lowercase, payload-carrying tags are CapCase.** A mark is a
   payload-free tag naming a failure mode: `none`, `gone`, `eof`, `done`,
-  `parse`, `base`, `utf8`, `overflow`, `div_zero`, `deep`, `boundary`. A
+  `parse`, `base`, `utf8`, `overflow`, `div_zero`, `deep`, `boundary`, and —
+  from the os tier — `not_found`, `denied`, `io`, `missing`, `invalid`,
+  `refused`, `timeout`, `closed`, `signal`. A
   payload-carrying tag is CapCase and names its payload TYPE:
   `Parse(ParseErr)`. The case is the reader's signal about whether there
   is anything to destructure.
@@ -761,8 +779,86 @@ worked home, as `std.option` is §2's and `std.errors` is §12's.
   `std.json` are both `json`. Until that is ruled, a resident that shadows a
   facade name divides the work with it strictly and says so in both headers.
 
+**§14 amendment (sc11) — the process tier, and the three rules writing it
+settled.** `std.process` is the sixth module of this section and the first
+whose capability can end another program. Everything above applies unchanged;
+four additions.
+
+- **The row vocabulary is the toolchain's, for the fourth time, and it gains
+  one mark**: `{not_found, denied, io}` for starting a child (the fs tier's
+  three, exactly), `{signal, io}` for waiting on one, `{io}` for killing one.
+  **`signal`** is new to §12's inventory: the child died WITHOUT an exit code.
+  It is a payload-free mark by §12's casing rule and it is deliberately not a
+  number — every fake code a library could invent collides with a code some
+  program really returns, and "it did not exit" is a different sentence from
+  "it exited with 137". The day the builtin reports WHICH signal, the tag
+  gains a payload rather than a sibling (§12's rule 4).
+- **When the language owns the verb, std takes the next word — and says
+  why.** `spawn` is one of the 50 keywords, so `std.process.start` is the
+  spelling (F-0062), exactly as `copy` made `std.fs.copy_file`. The rule this
+  sets: a name collision with a keyword is not a workaround to hide in a
+  doc-free rename, it is a paragraph on the function, because the reader
+  arriving from another language will type the keyword first. The same
+  paragraph is what keeps a std verb from competing with a language concept —
+  a child process and a task are different failure models and should not share
+  a word.
+- **A builder is PURE, and in a capability module that is worth stating three
+  times**: on the module, on each builder function, and in the ledger's shape.
+  `command`/`from_argv`/`push_arg`/`argv`/`is_success` reach nothing, so they
+  are comptime-safe and they are what gives the module its second lane under
+  an implementation that declines the capability entirely (lupin resolves
+  module bodies lazily). §14's sc08 rule said the pure MEMBER of a capability
+  module is stated twice; the process tier adds that a pure builder is a
+  DESIGN choice with a lane consequence — a facade whose construction touched
+  the host would have had one lane and no fenceable example for its own
+  constructor.
+- **A capability whose happy path cannot be witnessed portably says so, on
+  the module and in a filing.** No program exists on every tier-1 host, a wolf
+  program cannot learn its own path, and the directive schema has no
+  per-platform gate, so no `.lu` test in this repository can start a real
+  program (F-0066). What `tests/process/` witnesses instead is every ROW —
+  an empty argv, a name no host has, a forged handle — and the module header
+  states plainly that the exit-code path rests on the toolchain's own
+  unix-gated tests. This is a weaker standard than §13's "a claim about what
+  an implementation answers is a test or it is a rumour", and the honest
+  response is to name the gap in three places rather than to let a green rig
+  imply coverage it does not have.
+
+**§14 amendment (sc11) — the refusal rule, and its first two RETRACTIONS.**
+§14's "what a capability module may not do to get a green lane" had two worked
+refusals, `std.io.input_all` (sc07) and `std.net.read_all` (sc08, written and
+withdrawn inside the sprint). Both are shipped in sc11, and the rule is
+unchanged by that — which is the point worth recording.
+
+Neither function became writable because std lowered its standard. Both needed
+a loop that stops on ONE tag and re-raises the others, both were blocked by
+handlers that could not discriminate (F-0043's binding catches everything;
+F-0052's `match` took its first arm on the executing lane), and both waited
+for the toolchain: s70's match tier and s71's payload-pattern ruling. **The
+refusal was the mechanism that got them written.** A version shipped in sc07
+would have treated a read error as the end of the stream, would have passed
+its tests, and would still be quietly truncating data at this pin — and
+nothing would have been filed, so nothing would have been fixed.
+
+The rule the pair now states, in full: **a capability module ships no
+operation whose failure mode it cannot distinguish; it writes the contract
+into the module header with the finding that would unblock it; and it ships
+the function in the sprint after the finding closes.** The third clause is
+new and it is a debt, not a courtesy — sc10's census had to name both
+functions as "no longer blocked, still unwritten" to keep them from sitting
+quietly, which is one sprint of grace and no more.
+
 ## Review record
 
+- 2026-08-18 — sc11 amendments: §14 gains the process tier (the row
+  vocabulary's fourth verbatim adoption with the new `signal` mark, the
+  keyword-collision naming rule, the pure-builder rule and its lane
+  consequence, and the unwitnessable-happy-path posture), §14's refusal rule
+  gains its first two retractions with the three-clause rule they settle, §12's
+  mark inventory gains the os tier's nine, and §9's sc09 amendment gains its
+  other half — a guard written where the lanes disagree is DELETED the day the
+  toolchain rules, even when the ruling contradicts std's reviewed contract.
+  Review rides the same pending sc00 gate.
 - 2026-08-17 — sc10 amendments: §14 gains the time/env tier (the sandbox
   table's capability names with their own reasons quoted, the
   facade-over-a-scalar-ABI rule that makes unit confusion a compile error, the

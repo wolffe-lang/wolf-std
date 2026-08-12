@@ -20,7 +20,7 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0011 | 2026-08-11 | (contract Target-1) **What is builtin and what is std**: recommendation + four gaps — `List`/`Pool` language-blessed core types with std owning their API mass; `Map`/`Set`/`Deque` std-defined once s16 lands generic data types (`struct X[T]` is E0201 in BOTH implementations today); the `Hash`/`Eq` key protocol is unspecified; `Pool` exposes no `len`/`capacity`/liveness probe/iteration; `Map` cannot erase a key; the wordcount `tally[w] += 1` idiom runs nowhere (lupin: index is not a place; absent key reads `()`, not a zero) | wolf-lang s16/s21/s37 owners | [filed: wolf-lang#11](https://github.com/wolffe-lang/wolf-lang/issues/11) |
 | F-0012 | 2026-08-11 | wolfc checked tier: an imported module whose items include a `trait`/`enum`/`impl` makes every importer `unsupported — module items in checked execution` — so `use std.cmp` costs a module every wolfc run row, which is why std.list's `Eq` family sits in `std/x/list_eq` | wolf-lang s23/s31 (checked execution) | [filed: wolf-lang#12](https://github.com/wolffe-lang/wolf-lang/issues/12) |
 | F-0013 | 2026-08-11 | lupin false `ub(mem.ub)` on std-shaped code, two shapes: (a) a `mut` argument inside an f-string interpolation leaves a stale borrow tag — a later read is "read through tag … which is Disabled"; (b) a `mut`-mode call followed by a read-mode call whose body ALLOCATES is "foreign write … while tag … is PROTECTED". Both are false positives in the provenance model; both are avoidable only by writing around them | wolf-interp (Tier-3 provenance) | [filed: wolf-interp#7](https://github.com/wolffe-lang/wolf-interp/issues/7) |
-| F-0014 | 2026-08-11 | Mutate-while-iterating does not agree: wolfc rejects statically as `fail(E1001)` (reads-as-moves, F-0005's lens — not an exclusivity rule), lupin RUNS it silently with no trap at all, where `[conf.trap.map]` predicts `exclusivity`. The sprint contract's designated triage case, recorded in `tests/list/mutate_while_iterating.lu` | wolf-lang s22 + wolf-interp | [filed: wolf-lang#15](https://github.com/wolffe-lang/wolf-lang/issues/15) + [wolf-interp#9](https://github.com/wolffe-lang/wolf-interp/issues/9) |
+| F-0014 | 2026-08-11 | Mutate-while-iterating does not agree: wolfc rejects statically as `fail(E1001)` (reads-as-moves, F-0005's lens — not an exclusivity rule), lupin RUNS it silently with no trap at all, where `[conf.trap.map]` predicts `exclusivity`. The sprint contract's designated triage case, recorded in `tests/list/mutate_while_iterating_trap.lu` | wolf-lang s22 + wolf-interp | [filed: wolf-lang#15](https://github.com/wolffe-lang/wolf-lang/issues/15) + [wolf-interp#9](https://github.com/wolffe-lang/wolf-interp/issues/9) — **CLOSED at sc11** by s72's D40 (`[mem.iter.excl]`): `E1013` on both rungs, `trap(exclusivity)` under lupin, the two machines agreeing at last |
 | F-0015 | 2026-08-11 | wolfc checked tier: the row RAISE path inside an imported module's function is `unsupported — module items in checked execution` — the same call runs when it yields a value, and the same body inlined into the entry file runs both ways. Every `! {None}` miss test in std.list/x.deque_int is `unsupported` for this reason alone | wolf-lang s23/s31 | [filed: wolf-lang#13](https://github.com/wolffe-lang/wolf-lang/issues/13) |
 | F-0016 | 2026-08-11 | `wolf fmt` splits a dotted call at the dot when a `//` comment line precedes it (`xs.push(1)` becomes `xs.` + newline + `push(1)`), idempotently — fmt is law (D34), so its output is the style, and this one is a defect | wolf-lang fmt owner | [filed: wolf-lang#14](https://github.com/wolffe-lang/wolf-lang/issues/14) |
 | F-0017 | 2026-08-11 | lupin still accepts `let` reassignment after wolf-lang#2 closed compiler-side (wolfc now says E0410 with a `var` fix-it): the interpreter half of the divergence is open | wolf-interp | [filed: wolf-interp#8](https://github.com/wolffe-lang/wolf-interp/issues/8) |
@@ -49,10 +49,10 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0040 | 2026-08-13 | **No bottom type**: a diverging `else` handler cannot typecheck generically — wolfc types an `else \|_\| { … }` block by its last expression, `assert(false)` is `()`, and the block must produce `T` (E0401). A monomorphic helper writes an unreachable dummy; a generic one has no `T` to conjure, so `std.option.expect` ships from the nursery. lupin accepts and runs it | wolf-lang s14 typecheck + spec (D30's no-unwinding makes divergence ordinary) | [filed: wolf-lang#35](https://github.com/wolffe-lang/wolf-lang/issues/35) |
 | F-0041 | 2026-08-13 | (sc06 Target 2) **The error-set alias surface** — s15's parked amendment, filed with the measured cost: 49 `pub` signatures carry a row across 16 modules, 11 distinct shapes, 45 of them one tag and 4 of them two, and NOTHING exceeds two. Core does not need aliases yet and the filing says so; what it argues is the semantics (`error Set Name = {…}` as a transparent name, never nominal — from D30) and the io taxonomy that makes it urgent in stdc02, plus the `try`⇄Result bridge's standing dependency on s16 | wolf-lang s03 grammar + s37 (std error taxonomy owners) | [filed: wolf-lang#36](https://github.com/wolffe-lang/wolf-lang/issues/36) |
 | F-0042 | 2026-08-13 | (sc06 Target 6) **`wolf test` must subsume this rig without rewrites** — the s39 alignment requirements, with the rig as the working reference: directive-header compatibility (`check:`/`phase:`/`conforms:` verbatim), one trap expectation per entry file as the catch mechanism, subtest naming (Go 12166), a `--json` record stream (Go 2981), the three-lane ledger as a first-class concept, and the D36 bench-format reservation so `std.bench` can land in stdc02+ without a format war | wolf-lang s39 (+ D36 owners) | [filed: wolf-lang#34](https://github.com/wolffe-lang/wolf-lang/issues/34) |
-| F-0043 | 2026-08-14 | (sc07 Targets 1-3) **A multi-tag error row cannot be branched on at all**, which is the io tier's whole vocabulary: a bare identifier in an `else` handler BINDS instead of matching (`else \|eof\|` fires for `io` too — measured on a `-> str ! {eof, io}` raising each tag), and a payload pattern is now refused by wolfc as refutable (`E0806: this pattern can fail to match, but a binding cannot`) even for a ONE-tag row, while lupin executes it. So API-CONVENTIONS §13's own row-expectation convention (`else \|Tag(p)\|`) is a compiler rejection, `std.io.input_all` cannot tell end-of-input from a read error, and the `NotFound{path}` payload retrofit the sprint contract predicted would not help until this closes | wolf-lang s14/s15 (else-handler patterns) + wolf-interp | [filed: wolf-lang#43](https://github.com/wolffe-lang/wolf-lang/issues/43) — half superseded by F-0052 at the sc08 pin (the `E0201` is gone, the silent wrong answer replaced it); the `E0806` half is unmoved |
+| F-0043 | 2026-08-14 | (sc07 Targets 1-3) **A multi-tag error row cannot be branched on at all**, which is the io tier's whole vocabulary: a bare identifier in an `else` handler BINDS instead of matching (`else \|eof\|` fires for `io` too — measured on a `-> str ! {eof, io}` raising each tag), and a payload pattern is now refused by wolfc as refutable (`E0806: this pattern can fail to match, but a binding cannot`) even for a ONE-tag row, while lupin executes it. So API-CONVENTIONS §13's own row-expectation convention (`else \|Tag(p)\|`) is a compiler rejection, `std.io.input_all` cannot tell end-of-input from a read error, and the `NotFound{path}` payload retrofit the sprint contract predicted would not help until this closes | wolf-lang s14/s15 (else-handler patterns) + wolf-interp | [filed: wolf-lang#43](https://github.com/wolffe-lang/wolf-lang/issues/43) — **CLOSED at sc11**: s71 ruled the handler pattern (#43/#59), so a covering pattern binds its payload on all three lanes (`E0809` names the tags left out) and the `E0806` half is gone. With F-0052 closed at s70, both blockers of `io.input_all`/`net.read_all` are retired and both functions ship in sc11 |
 | F-0044 | 2026-08-14 | (sc07 Target 1) **The fs builtin set is nine calls wide and five std functions cannot be written honestly over it**: no `read_dir` (so no directory listing at all), no byte-level read or write (so `copy_file`/`move_file` are TEXT operations that refuse a non-UTF-8 file, and a fixed-size `read` can split a code point and raise `utf8`), no atomic `rename`, no `create_dir`/`remove_dir`, no metadata (`size`, `modified`, `is_file`). Also: `denied` and `utf8` have no portable litmus, so std ships two documented tags it cannot test | wolf-lang s38 owners (the fs builtin tier) | [filed: wolf-lang#51](https://github.com/wolffe-lang/wolf-lang/issues/51) (filed late, at sc08 — re-verified unmoved) |
 | F-0045 | 2026-08-14 | (sc07 Target 1) **`fs_open` has no mode**: it opens read-only and `fs_create` truncates, so there is no append-mode open and no read-write handle. `std.fs.append_text` is therefore read-concat-write — linear in the FILE's size rather than the text's, non-atomic, and carrying a `utf8` row for the existing contents it must decode. The ask is an open-mode argument (or `fs_open_append`), and a positioned write | wolf-lang s38 owners | [filed: wolf-lang#52](https://github.com/wolffe-lang/wolf-lang/issues/52) (filed late, at sc08 — re-verified unmoved) |
-| F-0046 | 2026-08-14 | (sc07 Target 2) **The io tier's three gaps, from writing the facade**: `conform-run` cannot inject stdin (the checked machine's `run_checked_with_input` exists but no flag reaches it), so std can witness only `eof` and `read_all`/`prompt`'s hit paths are untestable in this rig; there is no `read_all` builtin, and a line read strips the terminator, so the whole-input operation cannot be composed from `read_line` even with a working handler; and writes are infallible with no flush, so `prompt` cannot guarantee its prompt appears before the read | wolf-lang s38 + s39 (`wolf test` stdin) | its deny-warnings half is [filed: wolf-lang#49](https://github.com/wolffe-lang/wolf-lang/issues/49) with F-0053; the stdin and `read_all`/flush asks are re-verified unmoved at sc08 and still unfiled on their own |
+| F-0046 | 2026-08-14 | (sc07 Target 2) **The io tier's three gaps, from writing the facade**: `conform-run` cannot inject stdin (the checked machine's `run_checked_with_input` exists but no flag reaches it), so std can witness only `eof` and `read_all`/`prompt`'s hit paths are untestable in this rig; there is no `read_all` builtin, and a line read strips the terminator, so the whole-input operation cannot be composed from `read_line` even with a working handler; and writes are infallible with no flush, so `prompt` cannot guarantee its prompt appears before the read | wolf-lang s38 + s39 (`wolf test` stdin) | its deny-warnings half is [filed: wolf-lang#49](https://github.com/wolffe-lang/wolf-lang/issues/49) with F-0053; the stdin and flush asks are re-verified unmoved at sc11 (`--deny-warnings` is still `unknown flag`) and still unfiled on their own. **RE-SHAPED at sc11**: `std.io.input_all` SHIPS — the blocker was never this finding but the handler that could not discriminate (F-0043/F-0052, both closed) — so the surviving read ask is byte-exactness, not composition: a line read strips terminators, so `"a\nb"` and `"a\nb\n"` are indistinguishable through std and `io.read_bytes` is the contract that replaces the old `read_all` one |
 | F-0047 | 2026-08-14 | (sc07 Target 2) **Silent wrong answer, and a name std cannot have**: a module item whose name matches an AMBIENT PRELUDE name resolves differently in the two implementations. `pub fn read_line() { read_line()? }` in `std.io` — the obvious facade — delegates to the builtin under wolfc and recurses forever under lupin (`unsupported — call depth exceeded 512 frames`), with no diagnostic on either side; the reverse case (`assert`) shadows the intrinsic module-wide in both. std renamed its reader `input_line` rather than depend on a resolution order. The ask: retire the ambient host names now that the real std surface exists (the prelude's own comment promises exactly that), and rule the shadowing question for the names that stay | wolf-lang resolve owners + wolf-interp | [filed: wolf-lang#44](https://github.com/wolffe-lang/wolf-lang/issues/44) |
 | F-0048 | 2026-08-14 | **The checked lane's verdict is not deterministic**: the same program, same binary, same inputs answers `exit(0)` or `unsupported — place projection outside the modelled surface` at random — measured 5 of 12 runs one way and 7 the other on `tests/str/byte_length_honesty.lu`, and reproduced on `tests/str/interpolation_interplay.lu` (2 of 136 tests, both `str`-heavy). Verdict stability is a conformance property, not a nicety: spec/06's differential protocol compares records across implementations, and this rig's ledger gate cannot express "sometimes" without the `unstable(…)` vocabulary this sprint had to add | wolf-lang s23/s31 (checked execution) | [filed: wolf-lang#42](https://github.com/wolffe-lang/wolf-lang/issues/42) — **CLOSED and RETIRED at the sc08 pin** (14-for-14 deterministic on both files) |
 | F-0049 | 2026-08-15 | (sc08 Target 2) **The net builtin tier is seven calls wide, and the `timeout` tag it declares is unreachable**: `wolf_rt`'s net table implements a per-socket deadline and unit-tests it, no builtin exposes it, and the executing lane's sockets are plain blocking `std::net` sockets that never consult it — so no wolf program can arm a deadline and `accept`/`read`/`connect` block forever by construction. Also absent: `shutdown` (an orderly half-close), any address accessor beyond the LOCAL port as an `int`, byte-level read/write, UDP, and any reactor/`select` composition (X6's posture is s35's and does not reach std yet). `std.net` ships the vocabulary with the tag documented as unobservable rather than a helper that cannot work | wolf-lang s39 + s35 owners | [filed: wolf-lang#45](https://github.com/wolffe-lang/wolf-lang/issues/45) |
@@ -61,13 +61,22 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0052 | 2026-08-15 | **Silent wrong answer, and a three-lane divergence: a `match` inside an `else` handler matches its FIRST ARM for every tag** on wolfc's checked lane. `miss_io() else \|e\| match e { eof => "said-eof", io => "said-io", _ => … }` answers `said-eof`; swap the arms and it answers `said-io` — measured both ways, no diagnostic. lupin 0.1.5 and the native rung both discriminate CORRECTLY, so one program has two meanings across three lanes. It is F-0043's successor rather than its fix: sc07's `E0201` on the shape is gone and what replaced it is worse, because a rejection cannot ship and this can (the `E0806` on payload patterns is unmoved). It costs `std.net.read_all` and keeps `std.io.input_all` a contract: a loop that cannot tell `closed`/`eof` from `io` truncates data silently | wolf-lang s14/s15 + s23 (checked execution) | [filed: wolf-lang#48](https://github.com/wolffe-lang/wolf-lang/issues/48) |
 | F-0053 | 2026-08-15 | **The warning signal covers the ENTRY file only**, so the `--deny-warnings` gate F-0046 asked for would not see std at all: over 144 staged programs the record's `warnings` array reports only the entry's own spans, while `std/math/float/float.lu` carries 40-plus `0.0 - x` sites that W0402 diagnoses and no importing test surfaces one. `conform-run` still rejects `--deny-warnings` (re-verified at this pin; the flag exists on `wolf build`/`wolf test`). The warning system's first real catch is recorded with it: W0402 found 29 sites in two std TEST files, one of which claimed to assert the two signed zeros and asserted `+0.0` against `+0.0` | wolf-lang s67/s69 (warnings) + s39 (`wolf test` surface) | [filed: wolf-lang#49](https://github.com/wolffe-lang/wolf-lang/issues/49) |
 | F-0054 | 2026-08-15 | **The pin's own ritual gates are load-flaky**: `cargo test --workspace` and `cargo run -p xtask -- ci` each failed once at trunk `13b811f` in a clean scratch clone and each passed on re-run, both times in `wolf_rt::task::proc`'s scheduler-seam tests (`seam_observes_proc_events` missed a `ProcExit` event; `killed_proc_skips_defers_and_frees_regions` counted 0 where it wanted 1). Run alone the crate is 14-for-14 green, so the failures are timing under full-workspace parallelism — which makes a green pin a probabilistic claim and F-0024's two-gate ritual a coin flip rather than a check | wolf-lang s32/s34 (task runtime) + CI owners | [filed: wolf-lang#50](https://github.com/wolffe-lang/wolf-lang/issues/50) |
-| F-0055 | 2026-08-16 | **The empty needle is three different things**: `count("")`, `split("")` and `replace(s, "", …)` are refused as `unsupported` by lupin 0.1.6 AND the checked tier, and DEFINED by the native runtime (0, one whole piece, identity) — a three-lane split on a shape every caller-supplied separator can reach. `wolf_rt` calls its answers "the documented deterministic placeholder" and `wolf_mem` refuses the same three, so both sides know; neither is ruled. `std.str` guards all six affected functions before delegating (`count` answers 0, the rest trap `assert`) so no caller sees it | wolf-lang s37 (core types) + spec owners | [filed: wolf-lang#56](https://github.com/wolffe-lang/wolf-lang/issues/56) |
-| F-0056 | 2026-08-16 | **`repeat(-1)` traps `bounds` on every lane and no clause says so** — and it silently CHANGED: sc03 measured `""` under the interpreter and `std.str.repeat`'s doc claimed that answer for five sprints with no test holding it. `bounds` is also arguably the wrong kind for a caller contract violation (`[conf.trap.map]` spells that `assert`), and `wolf_rt`'s own `__wolf_rt_str_repeat` clamps with `count.max(0)` — so the three lanes agree by construction, not by rule | wolf-lang spec (`[conf.trap.map]` / `[mem.str.*]`) | [filed: wolf-lang#57](https://github.com/wolffe-lang/wolf-lang/issues/57) |
+| F-0055 | 2026-08-16 | **CLOSED at sc11 (ruled, `[mem.str.empty]`).** The empty needle is three different things: `count("")`, `split("")` and `replace(s, "", …)` are refused as `unsupported` by lupin 0.1.6 AND the checked tier, and DEFINED by the native runtime (0, one whole piece, identity) — a three-lane split on a shape every caller-supplied separator can reach. `wolf_rt` calls its answers "the documented deterministic placeholder" and `wolf_mem` refuses the same three, so both sides know; neither is ruled. `std.str` guards all six affected functions before delegating (`count` answers 0, the rest trap `assert`) so no caller sees it | wolf-lang s37 (core types) + spec owners | [filed: wolf-lang#56](https://github.com/wolffe-lang/wolf-lang/issues/56) |
+| F-0056 | 2026-08-16 | **CLOSED at sc11 (ruled `assert`, `[mem.str.repeat]`).** `repeat(-1)` traps `bounds` on every lane and no clause says so — and it silently CHANGED: sc03 measured `""` under the interpreter and `std.str.repeat`'s doc claimed that answer for five sprints with no test holding it. `bounds` is also arguably the wrong kind for a caller contract violation (`[conf.trap.map]` spells that `assert`), and `wolf_rt`'s own `__wolf_rt_str_repeat` clamps with `count.max(0)` — so the three lanes agree by construction, not by rule | wolf-lang spec (`[conf.trap.map]` / `[mem.str.*]`) | [filed: wolf-lang#57](https://github.com/wolffe-lang/wolf-lang/issues/57) |
 | F-0057 | 2026-08-16 | **s37 gave the language a byte VIEW and no byte SOURCE**: `s.bytes()` exists on every lane and nothing turns bytes back into a `str`, so `std.bytes.to_str -> str ! {utf8}` — the D24 border post, the last unwritten member of the census's byte block — has no spelling. Needs one of `str.from_utf8`, a `char` type with scalar-to-`str` (F-0018's half), or `strbuf.push_byte`. std ships the predicate half instead (`bytes.is_utf8`, full validation in wolf source, 31 rows on three lanes) so the gap is visible rather than silent | wolf-lang s37 core types | [filed: wolf-lang#58](https://github.com/wolffe-lang/wolf-lang/issues/58) |
 | F-0058 | 2026-08-17 | **The nursery's first tenant cannot be imported beside its facade**: module identity is the last path segment (F-0034), so `std.x.json` and `std.json` are both `json` to an importer — `use std.json` beside `use std.x.json` is `fail(E0306)` on BOTH compiler rungs and `unsupported` under lupin, measured at these pins. D31's whole promise is that graduation is a MOVE (`std.x.foo` becomes `std.foo`, and the path is the release note), and this makes the two paths mutually exclusive for the campaign in which a resident and its successor coexist. Also filed with it: the query tier has no key ENUMERATION (`json_len` counts an object's members and nothing names them), so an object can be counted and not walked | wolf-lang resolve owners (the F-0034 issue) + s40 owners (the json tier) | [filed: wolf-lang#29](https://github.com/wolffe-lang/wolf-lang/issues/29) (module identity) + the json half re-verified against s40 |
 | F-0059 | 2026-08-17 | **The clock ABI is milliseconds and the deadline hole is now everywhere**: `time_now_ms`/`time_unix_ms`/`time_sleep_ms` are the whole time tier, so `std.time` can offer no sub-millisecond resolution (a `_ns` face over a `_ms` source would report a thousand-fold lie) and no `Deadline` type at all — nothing in the toolchain arms a deadline anywhere (F-0049 for sockets, the same hole for everything else), and there is no `select` to race a timer against work. Also: no monotonic-clock IDENTITY, so two `Instant`s from different processes are silently incomparable with no way to detect it; and the s36 clock-hook seam does not yet reach clock READS, so `--schedules`/`--replay` cannot virtualize time and a timing test has no deterministic mode | wolf-lang s40 + s35/s36 owners | filed with sc10's evidence on the s40 tier |
 | F-0060 | 2026-08-17 | **A pure builtin family is refused at comptime with no diagnostic**: `json_valid`/`json_get`/`json_type`/`json_len` carry no I13 capability and no sandbox category by design (the metadata for a package using only them stays capability-free — correct), and the comptime engine still refuses them, as `unsupported` at resolve with no code and no reason string. Every capability family answers `E0701` naming what it reaches and why (`reaches the clock, which comptime code can never touch`); the pure family answers nothing, so a package cannot learn WHY its `comptime fn` will not evaluate, and this repo cannot hold the refusal as a test the way `tests/{net,time,env}/comptime_refuses.lu` hold theirs. The ask is a diagnostic for "no evaluator at v0", distinct from the capability refusal | wolf-lang s16 (CTFE engine) + s40 owners | filed with sc10's evidence |
 | F-0061 | 2026-08-17 | **`std.fmt.decimal.parse_float` is `unsupported` on BOTH compiler rungs** ("arithmetic outside integers" at the mem tier, one body deep — F-0026's f64 ceiling, still open at sc05's row), and that now costs a function rather than a lane: `std.x.json.float_at` was written and WITHDRAWN inside sc10 because the checked tier is `std.x.json`'s only executing lane, so the function would have had zero lanes, no runnable test and no fenceable doc example. A std function nobody can run is a claim, not code | wolf-lang s23/s31 (checked execution) + s28 (native) | re-verified unmoved at this pin on [wolf-lang#26](https://github.com/wolffe-lang/wolf-lang/issues/26) |
+| F-0062 | 2026-08-18 | **Two keywords ate two std names, and one of them reported it badly**: `spawn` (a task AND `spawn proc`) and `handle` (the pool tier) are reserved, so `std.process` is `start` over a `Child { slot: int }`. `pub fn spawn` is a clean `E0008` with a fix-it; a keyword as a FIELD name is not — lupin says `E0008: \`handle\` is a reserved keyword` and wolfc says `E0201: expected a field initializer` pointing at the field, which reads as a typo in the struct literal below and is where this sprint looked first. The ask: one code, one sentence, both positions | wolf-lang parser owners + wolf-interp (already correct) | sc11 evidence; unfiled at report time, routed with the closeout |
+| F-0063 | 2026-08-18 | **Trunk's tip failed the pin ritual's first gate**: `17ea078` banks an unfixed fmt fuzz class as `tests/regressions/unfixed/idem_class_six.lu.pending`, and `wolf_fmt`'s `fuzz_regressions` sweep `read_dir`s that corpus and `fs::read`s every entry — so the new SUBDIRECTORY panics `IsADirectory` and `cargo test --workspace` exits 101, with every banked regression unchecked and the "corpus never shrinks" assertion unreachable. The ask: filter to files (or to `.lu`) before reading. sc11 pins `0b4e79c`, its parent, green on both gates first try | wolf-lang s63 (fmt) owners | sc11 evidence; unfiled at report time, routed with the closeout |
+| F-0064 | 2026-08-18 | **A pairing line is not a pin**: `wolf 0.1.0` answers `--version` on two lines and the second names lupin's sha in the wolf-interp repo ("paired with lupin 0.1.8 …, pin 7886559"). This rig's doctor read the whole output as one line, compared two repositories' histories and failed the bump. Not an upstream bug — the pairing is the right thing to report — but the first time a tool's `--version` grew a line, so any other consumer has the same latent bug. Fixed here (identity from line one; the pairing is printed, never gated) with the two-line shape held as a unit test | wolf-std rig (fixed in `xtask/src/bins.rs`); recorded for other consumers | fixed in this repo at sc11 |
+| F-0065 | 2026-08-18 | **The process trio is four operations short of a Command facade**: no piped stdio (v0 wires all three of the child's streams to the null device, so `output`/`stdin_text` have nothing to read and nowhere to write), no child environment or working directory (`os_spawn(argv)` takes one argument), no non-blocking wait and no deadline (so `try_wait`/`wait_timeout` have no honest implementation), and no real pid (the `int` is the machine's child-table index). Six reviewed contracts in `std.process`'s header. What the trio gets RIGHT and std would have fought otherwise: argv-array only, no shell-string spawn anywhere, so injection is structurally impossible | wolf-lang s40 + s35 (reactor) owners | sc11 evidence; unfiled at report time, routed with the closeout |
+| F-0066 | 2026-08-18 | **The happy path of a spawn is unwitnessable from a portable test**: no program exists on every tier-1 host (`/bin/sh` is not on windows, `cmd.exe` is not on linux), a wolf program cannot learn its own path (`env_args` drops argv[0], no `os_exe`), and the directive schema has no per-platform gate — so no `.lu` test in this repository can start a real child, and `std.process`'s central claim (an exit code comes back; a killed child answers `signal`) rests on the toolchain's own unix-gated tests. Every ROW is witnessed portably (empty argv, a name no host has, a forged handle). Cheapest fix by far: an `os_exe` builtin, which lets a test spawn ITSELF | wolf-lang s40 + conformance-directive owners | sc11 evidence; unfiled at report time, routed with the closeout |
+| F-0067 | 2026-08-18 | **`os_cwd` has no home in std, because `chdir` does not exist**: the s40 os family is split between `std.env` (the env four) and `std.process` (the trio plus `os_exit` as `exit`), and `os_cwd` is left over — `env`-tagged so not `std.process`'s by capability, a query about this program like `args`/`vars` so `std.env`'s by shape, but there is no `os_chdir`, so std would ship a directory READ with no WRITE beside it and no way to give a child a different one either (F-0065's item 2). The ask: `os_chdir`, or a stated decision that a process-wide chdir is deliberately absent — either way `cwd` lands with a reason rather than by accident | wolf-lang s40 owners | sc11 evidence; unfiled at report time, routed with the closeout |
+| F-0068 | 2026-08-18 | **`conform-run <bare-name.lu>` says the wrong thing**: a path with no directory component has an empty parent, so the package root is searched in nowhere and the message is "the package root has no wolf source files" about a directory holding exactly one `.lu` file. `./main.lu` works. No cost to this rig (it passes absolute paths) and every cost to a person at a prompt. The ask: normalize `Path::parent` of a bare name to `.`, and name the root that was searched | wolf-lang driver owners | sc11 evidence; unfiled at report time, routed with the closeout |
+| F-0069 | 2026-08-18 | **`?` inside a `comptime fn` is `unsupported`, and it MASKS the capability refusal**: a row RETURN, a raise and an `else` all evaluate at comptime; `let v = inner(x)?` answers `unsupported` at resolve with an empty `diagnostics` array. The interaction is the finding — `tests/process/comptime_refuses.lu` written the obvious way (`os_kill(slot)?`) answers `unsupported` instead of `fail(E0701)`, so a D33 rejection test proves NOTHING while looking healthy, and the bare-call form trips `W0601` (a discarded `() ! {io}`) which this rig denies. Two asks: support `?` or refuse it by name (F-0060's shape again), and make the permanent check (the sandbox) win over the temporary one (the subset) | wolf-lang s16 (CTFE engine) owners | sc11 evidence; unfiled at report time, routed with the closeout |
+| F-0070 | 2026-08-18 | **lupin 0.1.8 has four fifths of the os/env builtin family**: `env_args`, `env_get`, `env_set`, `os_cwd`, `os_exit` and every `time_*` call run at its own conformance pin; `env_vars` "does not resolve" — the generic unknown-name refusal, not the reasoned decline this machine gives `fs_*`/`net_*`/`json_*`/the process trio, so it reads as an oversight. Costs one ledger row (`tests/env/args_and_vars.lu`) and nearly cost three documents a wrong sentence: **a builtin FAMILY is not a unit of evidence; a builtin is** | wolf-interp | sc11 evidence; unfiled at report time, routed with the closeout |
 
 ## F-0001 — the std search path
 
@@ -382,7 +391,18 @@ test suite with the workaround documented in each test header:
 Highest-severity verdict class (`[proto.record.ub]`), so it matters that
 it be right before triage is built on it.
 
-## F-0014 — mutate-while-iterating (the contract's triage case)
+## F-0014 — mutate-while-iterating (the contract's triage case) — **CLOSED at the sc11 pin**
+
+**Closed by s72's D40** (`[mem.iter.excl]`, wolf-lang#15). Iteration now takes
+a read claim over the loop's whole extent, so `for` no longer MOVES its
+iterable and a write during the loop is an exclusivity violation on its own
+terms: `E1013` on both compiler rungs, `trap(exclusivity)` under lupin — which
+is exactly what `[conf.trap.map]` predicted for nine sprints while one machine
+over-explained it (`E1001`, through the reads-as-moves lens) and the other ran
+it silently. The file that held the divergence is
+`tests/list/mutate_while_iterating_trap.lu` now, and it holds the agreement.
+The record below is the original.
+
 
 wolfc rejects statically, `fail(E1001)`, naming `for x in xs` as the
 move and suggesting a `copy` operator outside the pinned grammar —
@@ -1150,7 +1170,18 @@ below was re-measured at the new pins.
   boundary primitive, whose resolve-level half is what put
   `assert_starts_with` in the nursery), F-0026, F-0029, F-0036, F-0037.
 
-## F-0043 — a multi-tag row cannot be branched on (sc07 Targets 1-3)
+## F-0043 — a multi-tag row cannot be branched on (sc07 Targets 1-3) — **CLOSED at the sc11 pin**
+
+**The surviving half closed at s71** (wolf-lang#43, #59): a handler pattern
+must COVER the row — `E0809` when it does not — and a covering pattern BINDS
+its payload, on all three lanes, measured. `else |Parse(p)| { p.offset }` runs
+where it was `E0806` ("this pattern can fail to match, but a binding cannot")
+from sc07 to sc10, so §13's own row-expectation convention is legal at last
+and `tests/errors/coarsen_and_chain.lu` stops being a held rejection. With
+F-0052 (the discriminating `match`) closed at s70, the two findings that made
+`std.io.input_all` and `std.net.read_all` unwritable are both gone and both
+functions ship in sc11. The record below is the original.
+
 
 The io tier's vocabulary is `{not_found, denied, io, utf8}` and
 `{eof, io, utf8}`, and at these pins a caller cannot ask WHICH of them
@@ -1720,7 +1751,20 @@ elapsed time (or serialize them), so that a red gate means a red pin. This
 repo's own posture in the meantime is to state the re-run in the pin's
 `vendor/tools.toml` note rather than quietly re-running until green.
 
-## F-0055 — the empty needle is three different things
+## F-0055 — the empty needle is three different things — **CLOSED at the sc11 pin**
+
+**Ruled by s71** (`[mem.str.empty]`, wolf-lang#56): an empty needle counts 0,
+splits to one whole piece, and replaces nothing. Measured on all three lanes
+at the sc11 pin, where two of them used to refuse the call as `unsupported`
+and the third answered. The six guards `std.str` carried are deleted —
+`count`, `split` and `replace` delegate, and the three functions std writes
+itself (`splitn`, `rsplit`, `replacen`) state the ruled answer explicitly
+because they walk `find`, which answers 0 for an empty needle forever. Nothing
+in `std.str` traps on an empty argument any more, and the two `…_trap.lu`
+files that held the guards are `split_empty_separator.lu` and
+`replace_empty_pattern.lu`, holding the ruling instead. The record below is
+the original.
+
 
 The sprint that spends F-0018's prize found the prize has one hole in it,
 and it is the hole every caller-supplied separator falls through.
@@ -1768,7 +1812,17 @@ ruling) and make the other two lanes obey; failing that, make it a `trap`
 everywhere rather than an `unsupported` on two lanes; either way, do not
 leave a shape where two rungs refuse and one answers.
 
-## F-0056 — `repeat(-1)` traps, and the doc that said otherwise rotted
+## F-0056 — `repeat(-1)` traps, and the doc that said otherwise rotted — **CLOSED at the sc11 pin**
+
+**Ruled by s71** (`[mem.str.repeat]`, wolf-lang#57): a negative repeat count
+is a caller contract violation, so the kind is `assert` and not `bounds`.
+Measured on all three lanes. The claim has now changed twice — `""` under the
+sc03 interpreter, `trap(bounds)` everywhere at sc09, `trap(assert)` everywhere
+at sc11 — and the second change was caught by the rig within a minute of the
+pin bump because sc09 wrote `tests/str/repeat_negative_trap.lu` instead of a
+sentence. That is the whole argument for §13's rule, paid back with interest.
+The record below is the original.
+
 
 At this pin `"ab".repeat(0 - 1)` is `trap(bounds)` with clause
 `[mem.ub.defined]` on all three lanes ("a repeat count cannot be
@@ -2074,3 +2128,298 @@ one lane is a ledger row, and a refusal that costs a module's ONLY lane is a
 withdrawn function. The nursery is full of modules with one lane by
 construction, so every dependency a resident takes should be checked against
 that lane before it is written, not after.
+
+## F-0062 — two keywords ate two std names, and one of them reported it badly
+
+wolf has 50 reserved keywords, no raw identifiers, and two of them are words
+the process tier wants: **`spawn`** (it opens a task, `s.spawn(fn() { … })`,
+and a supervised proc, `spawn proc`) and **`handle`** (the pool tier's
+two-phase reserve/init value).
+
+Both refusals are correct and neither is the finding. `pub fn spawn` is a
+clean `E0008` with a fix-it — "`spawn_` is the usual dodge, or a more
+specific word" — exactly as `copy`/`copy_file` was in sc07, and
+`std.process.start` is the better name anyway: a child process and a task are
+different things with different failure models, and borrowing the keyword's
+word for the other one would have invited the confusion the type system then
+has to unpick. Recorded so the next author checks the list first.
+
+**The finding is the OTHER diagnostic.** A keyword used as a STRUCT FIELD
+name splits the implementations, and the compiler's half is much the worse:
+
+```
+pub struct Child { handle: int }
+// lupin 0.1.8:  E0008 — `handle` is a reserved keyword           (at parse)
+// wolfc 0.1.0:  E0201 — expected a field initializer             (at parse)
+```
+
+`E0201: expected a field initializer` points at `handle` and says nothing
+about keywords, so the reader's first hypothesis is a typo in the struct
+literal three lines below — which is where the second error appears. lupin
+names the cause in five words; wolfc names a symptom. The same asymmetry
+appears at the USE site: `var forged = process.Child { handle: 4242 }` is
+lupin's keyword error and wolfc's "expected a field initializer".
+
+The ask: the keyword check that produces `E0008` for an item name should
+produce it for a field name too — one code, one sentence, both positions.
+The generalization for wolf-std: check every new field name against the
+keyword list, not just every new function name.
+
+## F-0063 — trunk's tip failed the pin ritual's first gate, and the fix is a `read_dir`
+
+`17ea078` (wolf-lang trunk HEAD at the sc11 bump) fails
+`cargo test --workspace` with exit 101:
+
+```
+---- fuzz_regressions stdout ----
+panicked at crates/wolf_fmt/tests/properties.rs:187:
+read regression: Os { code: 21, kind: IsADirectory, message: "Is a directory" }
+```
+
+The commit adds one file — `tests/regressions/unfixed/idem_class_six.lu.pending`,
+an unfixed fmt fuzz class banked deliberately — and its message says "the
+.pending suffix keeps it out of the regression sweep". The suffix does; the
+enclosing DIRECTORY does not. `fuzz_regressions` walks the corpus with
+`read_dir` and calls `fs::read` on every entry, so the new subdirectory is
+read as a file and the sweep panics before it checks anything.
+
+Consequences worth naming: the sweep's own assertion ("the regression corpus
+never shrinks") cannot fail because the loop cannot finish, and every
+regression in the corpus goes unchecked on that run.
+
+The ask: filter to files, or to the `.lu` extension, before reading — and
+consider asserting on the count of files SKIPPED, since the corpus now has a
+deliberate skip category.
+
+This repository's response is the pin ritual working as designed: the sha is
+held one commit back at `0b4e79c`, which is green on both gates on the first
+attempt and contains every wave sc11 needed. Recorded here because a pin that
+was chosen for a reason should say what the reason was, and because "trunk
+HEAD is green" is exactly the kind of assumption F-0024 taught this repo to
+stop making.
+
+## F-0064 — a pairing line is not a pin, and it broke doctor
+
+`wolf 0.1.0` (the r01 identity release) answers `--version` on two lines:
+
+```
+wolf 0.1.0 (wolfgang)
+paired with lupin 0.1.8 (reference interpreter), pin 7886559
+```
+
+This repository's `cargo xtask doctor` verifies a binary's self-reported pin
+against `vendor/tools.toml`, and its parser read the whole output as one
+line: name `wolf`, version `0.1.0`, and — from the second line — pin
+`7886559`. That sha is lupin's own commit in the **wolf-interp** repository,
+so doctor compared two repositories' histories and failed the bump with
+"`--version` names pin 7886559, recorded pin is 0b4e79c".
+
+Not an upstream bug: the pairing is exactly the right thing for a release
+binary to report, and the rig was reading it wrong. Fixed here — identity
+comes from the first line, the remainder is captured as `pairing` and PRINTED
+by doctor without gating — with the two-line shape held as a unit test so the
+next release cannot break it silently.
+
+Recorded as a finding anyway, for two reasons. It is the first time a
+tool's `--version` has grown a line, so any other consumer of that output has
+the same latent bug; and the pairing is genuinely useful information this
+repo now surfaces (`doctor: pairing: paired with lupin 0.1.8 …`), which is
+the answer to "are these two binaries meant to be used together" that
+`vendor/tools.toml`'s drift note has been answering in prose for ten sprints.
+
+## F-0065 — the process trio is four operations short of a Command facade
+
+`os_spawn`/`os_wait`/`os_kill` (s40, checked lane only) are enough to write
+`std.process` and its five verbs, and this finding is the list of what a
+caller then cannot do. Every item is a reviewed contract in the module
+header; none is a workaround std can write.
+
+1. **No stdio.** `os_spawn` wires all three of the child's streams to the
+   host's null device, so `output(c) -> str` — the single most-reached-for
+   operation in any process API — has nothing to read, and `stdin_text` has
+   nowhere to write. The book's pargrep chapter will feel this first. The ask
+   is a piped-stdio spawn plus a read on the pipe; the s38 io traits are the
+   natural shape, and `wolf_rt` already has the reactor (s35) that would
+   serve it.
+2. **No child environment or working directory.** `os_spawn(argv)` takes one
+   argument and the child inherits both from the parent. A caller who must
+   change them can only change its OWN with `env_set` first, which is a
+   different operation with a different meaning (it is not scoped to the
+   child, and it races every task in this process).
+3. **No non-blocking wait and no deadline.** `os_wait` blocks, so
+   `try_wait` — "has it finished?" — has no honest implementation, and
+   `wait_timeout` is the same missing deadline as the net tier's (F-0049).
+   With no way to poll, the only way to stop a runaway child is a kill from
+   another task.
+4. **No real process id.** The `int` `os_spawn` hands back is the machine's
+   own child-table index, so a `pid` accessor would name something this tier
+   does not have. A program that must be reported to an operator, or written
+   into a pid file, cannot be.
+
+One thing the trio gets exactly right, recorded so it is not lost in a list
+of gaps: **argv-array only, with no shell-string spawn anywhere.** That is a
+design decision std would have had to fight if it had gone the other way,
+and it makes command injection structurally impossible rather than a
+quoting-discipline problem. `std.process` has no `shell` function and its
+header says it never will.
+
+## F-0066 — the happy path of a spawn is unwitnessable from a portable test
+
+`std.process` ships six functions and this repository cannot write a single
+test that starts a real program, because three things are missing at once:
+
+- **No program exists on every tier-1 host.** `/bin/sh` is not on windows,
+  `cmd.exe` is not on linux or macOS. The toolchain's own process tests are
+  `#[cfg(unix)]`-gated and use `/bin/sh`, which is the right answer for a
+  Rust test suite and unavailable to a `.lu` file.
+- **A wolf program cannot learn its own path.** `env_args` drops argv[0] by
+  design ("the program name is not the program's input"), and there is no
+  `os_exe`/`current_exe`. So the one program guaranteed to exist and be
+  executable — the test itself — cannot be named.
+- **The directive schema has no per-platform gate.** A test is `run` or it is
+  not; there is no `platform: unix` to make a unix-only witness legal, and
+  the ledger's three columns are implementations rather than hosts.
+
+The rows are all witnessable and they are what `tests/process/` holds: an
+empty argv and a name no host has are both `not_found`, a forged handle is
+`io`, and none of them starts anything. What cannot be held here is the
+central claim of the module — that a child's exit code comes back, and that
+a killed child answers `signal` — so those two sentences rest on the
+toolchain's unix-gated tests, which is a weaker place for them than this
+repo's usual standard (§13: a claim about what an implementation answers is a
+test or it is a rumour).
+
+The ask, cheapest first: (1) an `os_exe`-style builtin, which would let a
+test spawn ITSELF with an argument that makes it exit with a chosen code —
+this single addition closes the whole finding, portably, with no fixture;
+(2) failing that, a `platform:` directive key so a unix-gated witness can
+live in the corpus honestly; (3) failing both, a documented fixture program
+the toolchain guarantees on every tier-1 host.
+
+## F-0067 — `os_cwd` has no home in std, because `chdir` does not exist
+
+The s40 os family is now split across two std modules: the `env_*` four are
+`std.env`'s and the process trio plus `os_exit` are `std.process`'s (as
+`exit`). One builtin is left over — `os_cwd` — and sc11 declines to place it
+rather than placing it badly.
+
+Why it is awkward. It carries the `env` capability, not `exec`, so it is not
+`std.process`'s by the capability table. It is a query about this program's
+own situation exactly as `args` and `vars` are, so `std.env.cwd()` is the
+obvious home. But the operation a caller reaches for next does not exist:
+there is no `os_chdir` at the builtin tier, so std would ship a directory
+READ with no directory WRITE beside it — and a program that wants to resolve
+a relative path against the working directory can do it, while a program that
+wants to run in another directory cannot, and neither can it ask a child to
+(F-0065's item 2).
+
+The ask: `os_chdir(path) -> () ! {not_found, denied, io}`, at which point
+`std.env.cwd`/`chdir` land together as a pair and this finding closes. If the
+answer is that a process-wide chdir is deliberately absent — a defensible
+position, since it races every task in the process and is the reason
+per-child working directories exist — then say so, and `cwd` lands alone with
+that reason quoted, which is a decision rather than an oversight.
+
+## F-0068 — `conform-run <file>` with no directory component says the wrong thing
+
+```
+$ wolf conform-run --checked main.lu
+wolf conform-run: the package root has no wolf source files
+$ wolf conform-run --checked ./main.lu
+{"verdict":"exit(0)", …}
+```
+
+The file exists, is in the working directory, and is the only `.lu` file
+there. The package root is evidently derived from the argument's parent
+directory, and a bare file name's parent is the empty string rather than
+`.`, so the loader looks in nowhere and reports the one thing that is
+certainly not true.
+
+No cost to this rig — it passes absolute paths (`stage::Staged::entry`) and
+always has — and no cost to `wolf test`, which takes a directory. The cost is
+to a person at a prompt, which is where every first impression of a
+toolchain is formed, and the message is actively misleading: it describes a
+package problem for what is a path-normalization bug.
+
+The ask: normalize the argument (`Path::parent` of a bare name is `Some("")`
+— treat it as `.`), and consider naming the root that was searched in the
+message, since a diagnostic that says where it looked cannot be this wrong.
+
+## F-0069 — `?` inside a `comptime fn` is `unsupported`, and it MASKS the capability refusal
+
+Measured at the sc11 pin, three programs that differ only in how one row is
+handled:
+
+```
+comptime fn probe(x: int) -> int ! {io} { if x < 0 { return io }  x }
+// checked: exit(0) — a row RETURN and a raise are fine at comptime
+
+comptime fn probe(x: int) -> int { let v = inner(x) else 0 - 1  v }
+// checked: exit(0) — a same-module call whose row is HANDLED is fine
+
+comptime fn probe(x: int) -> int ! {io} { let v = inner(x)?  v }
+// checked: unsupported (phase_reached=resolve), diagnostics: []
+```
+
+So `?` — the language's ordinary propagation, and the first thing anyone
+writes — is outside the comptime engine's subset, while the raise and the
+`else` are inside it. That alone would be an ordinary NotYet. What makes it a
+finding is the interaction with D33.
+
+`tests/process/comptime_refuses.lu` holds the `Exec` refusal, and the natural
+spelling of its witness is `os_kill(slot)?` inside a `comptime fn`. Written
+that way the file answers **`unsupported`, not `fail(E0701)`** — the engine
+refuses the propagation at resolve, so the capability check never runs, and a
+rejection test that was supposed to prove "compiling a package can never kill
+a process" proves nothing at all while looking healthy in a ledger. The
+bare-call version (`os_kill(slot)` with the row discarded) reaches E0701 and
+then trips `W0601`, which this rig denies. Only the third spelling —
+`os_kill(slot) else |_| { }` — both reaches the refusal and warns about
+nothing.
+
+Two asks, in order:
+
+1. **Support `?` in the comptime engine**, or refuse it with a diagnostic that
+   names it (`E`-coded, "`?` has no comptime evaluator yet"). A bare
+   `unsupported` with an empty `diagnostics` array is the shape F-0060 already
+   asked about for the json family: the author cannot tell "not implemented"
+   from "you wrote something wrong".
+2. **Decide the ORDER between the sandbox check and the subset check.** A
+   capability refusal is permanent and a subset gap is temporary, so the
+   permanent one should win: `os_kill` in a `comptime fn` should be `E0701`
+   whatever surrounds it. Today the temporary answer hides the permanent one,
+   which is the wrong way round for anything a security posture rests on.
+
+The general lesson for this repository, recorded in the guide: when a
+rejection test's verdict changes because you changed something UNRELATED to
+the rejection, the test has stopped witnessing what its header says.
+
+## F-0070 — lupin 0.1.8 has four fifths of the os/env builtin family
+
+At its own conformance pin (`26fa98e`, two waves past the 0.1.6 this repo held
+at sc10) the interpreter runs `env_args`, `env_get`, `env_set`, `os_cwd` and
+`os_exit`, and every `time_*` call. One builtin of the s40 os/env family is
+absent:
+
+```
+$ lupin conform-run env_vars.lu
+unsupported: `env_vars` does not resolve
+```
+
+It is not a declined surface — the other four env calls run, and the refusals
+this machine DOES make by design (`fs_*`, `net_*`, `json_*`, the process trio)
+all carry a sentence explaining themselves. `env_vars` just is not there, with
+the generic "does not resolve" that any unknown name gets, so it reads as an
+oversight rather than a posture.
+
+The cost here is one ledger row: `tests/env/args_and_vars.lu` asserts the
+`K=V` listing round trip and stays `unsupported` on the interpreter lane while
+its four siblings advanced at this bump. Small, and worth filing for the
+sentence it produced: this sprint nearly wrote "lupin has the env family now"
+into three documents on the strength of `env_get` working, and the correct
+record needed five separate one-call probes. **A builtin FAMILY is not a unit
+of evidence; a builtin is.**
+
+The ask: implement `env_vars` (sorted `K=V` lines, non-UTF-8 entries skipped —
+the semantics `wolf_mem`'s `os_builtin` already pins and `std.env.vars`
+documents), or decline it with a reason the way the other refusals do.
