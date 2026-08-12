@@ -309,3 +309,118 @@ stand as sc08 recorded them. **F-0057 joins them with 1**
 (`std.bytes.to_str`), and it is the one to watch: `fs_read_bytes` (F-0044)
 and `to_str` unblock each other's usefulness, so the sprint that lands
 either should land both.
+
+## 8. sc10 — the nursery opens, and three builtin tiers arrive at once
+
+Re-measured at the sc10 pins (wolf trunk `e94b879` — the s40 + s70 + s69
+wave — and lupin **held** at 0.1.6). This is the first sprint whose surface
+comes almost entirely from ONE upstream merge: s40 landed fourteen builtins
+in three families and sc10 wraps three of them.
+
+| measure | sc09 | sc10 |
+|---|---|---|
+| modules in `std/` with code | 28 | **31** (`std.time`, `std.env`, `std.x.json`) |
+| free `pub fn` in `std/` | 314 | **359** (+45) |
+| entry tests | 160 | **175** (+15) |
+| fenced doc examples, extracted and RUN | 272 | **317** (+45) |
+| findings filed | 3 (F-0055…F-0057) | **4** (F-0058…F-0061) |
+| findings retired | 1 | **1** (F-0052, closed upstream by s70) |
+| nursery residents | 5 | **6** (`x.json`, D31's named first tenant) |
+
+### What landed
+
+- **`std.time`, 24 functions.** Six reach the clock (`now`, `unix_ms`,
+  `sleep`, `elapsed`, `now_iso8601`, `unix_iso8601`, capability `Clock`);
+  eighteen are pure — the `Instant`/`Duration` algebra and `to_iso8601`, an
+  exact RFC 3339 renderer written over Hinnant's `civil_from_days` with the
+  floor-division correction spelled out rather than assumed.
+- **`std.env`, 8 functions.** `args`, `arg`, `get`, `has`, `vars`, `set`
+  (capability `env`) plus the two pure `K=V` cutters. This is the module
+  bs10 asked for: a project can stop holding its input as data.
+- **`std.x.json`, 11 functions.** `is_valid`, `get`, `type_name`, `len`,
+  `has`, the typed reads `str_at`/`bool_at`/`is_null_at`/`int_at`, and the
+  two pure path builders. Capability-free.
+- **Two of the four census rows sc09 re-owned**: `std.fmt.truncate_to` and
+  `std.hex.encode_str`, both three-lane, both one small body over a
+  primitive that landed at s37. `std.fmt` now has no blocked contract at
+  all.
+
+### What did NOT land, and why — the other two census rows
+
+sc09 re-owned four rows on the strength of F-0018 retiring, and predicted
+all four were writable. Two were. The other two are `std.json`'s, and the
+sprint that took them found a DIFFERENT finding standing behind the one
+that retired:
+
+- **`json.parse` is blocked by F-0037, not by F-0018.** Its signature is
+  `-> Value ! {syntax, deep}` — an enum returned through an error row, which
+  takes the miss path on every call, re-measured unmoved at this pin. The
+  scanner is writable; the SIGNATURE is not, and neither is `json.get`/`at`,
+  withdrawn at sc05 for the same reason.
+- **`json.unescape` is blocked by F-0057**, not by F-0018 either. The walk
+  is writable and its OUTPUT is not: decoding `\u00e9` means building `"é"`
+  from the number 233, and nothing in the language turns a scalar into a
+  `str` — no `from_utf8`, no `char`, no `strbuf.push_byte`. An ASCII-only
+  `unescape` would be a border post that refuses text, which §9 forbids.
+  Its tag also changes in the contract, from the interim `boundary` to
+  `parse`: the boundary condition is genuinely gone, and what is left is
+  ordinary bad data.
+- **`json.escape`'s one refusal is the only one of the four that is simply
+  unwritten**, and deliberately: making `escape` total changes
+  `stringify`'s row from `{boundary, deep}` to `{deep}`, which ripples
+  through every test and doc example in `std.json`. That is a signature
+  change worth making once, beside the function that turns this module into
+  a reader.
+
+The census correction worth recording, and it is the most transferable
+thing in this sprint: **"the blocker retired" is not "writable"** until
+every finding on the SIGNATURE has been re-measured, not just the one that
+was in the way last time. sc09 predicted four writable functions from one
+retirement and got two — and the two it missed are blocked by findings that
+were open, filed and visible the whole time (F-0037 since sc05, F-0057 since
+sc09 itself). The re-measurement is cheap; the prediction was the expensive
+part.
+
+### One function written and withdrawn
+
+`std.x.json.float_at` (F-0061). `std.fmt.decimal.parse_float` is
+`unsupported` on both compiler rungs and the checked tier is
+`std.x.json`'s only executing lane, so the function would have had zero
+lanes, no runnable test and no fenceable doc example. It is a contract in
+the module header with a four-line body waiting for either rung. The rule it
+sets is in API-CONVENTIONS §14 and in the nursery register: check a
+resident's dependencies against its own lanes BEFORE writing the function.
+
+### The lane table at these pins
+
+175 tests × 3 lanes:
+
+| lane | run | unsupported | fail(E…) |
+|---|---|---|---|
+| lupin | **140** | 35 | 0 |
+| wolfc `--checked` | **140** | 30 | 5 |
+| native | **93** | 77 | 5 |
+
+Fifteen new rows, and no existing row moved — the first three-wave pin bump
+that advanced nothing already recorded, which is exactly what the wave was:
+new builtin families std had never wrapped (s40), a fixed shape std had
+refused to write (s70), and lints std already obeyed (s69).
+
+The new rows split three ways, and the split is the sprint's whole lane
+story: **five are three-lane** (both pure test files, both census rows, and
+the F-0052 witness), **six are two-lane** (every capability test — lupin has
+no `time_*`/`env_*`, and that is a pin DRIFT rather than a design refusal),
+**one is two-lane the other way** (`x/json/path_helpers.lu`: lupin and
+checked, native dark), and **three are one-lane** (the json queries, checked
+only). A pure member always buys a lane, and separating it into its own test
+file is now house habit.
+
+### The blocked inventory
+
+Unchanged from sc09 except for the movement above: F-0049 (5), F-0050 (1),
+F-0044 (6), F-0046 (1), F-0004 (2), F-0057 (1). **F-0052's two (`io.input_all`,
+`net.read_all`) are no longer blocked** — the finding closed — and are
+unwritten pending a sprint that owns them; their module headers still say
+"blocked" until one does, which is a debt this census names so it cannot sit
+quietly. **F-0058 adds 1** (`x.json.keys`, blocked on a query tier with no key
+enumeration) and **F-0061 adds 1** (`x.json.float_at`).

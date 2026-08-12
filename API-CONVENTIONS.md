@@ -688,7 +688,91 @@ The rule that decides both: a capability module ships no operation whose
 failure mode it cannot distinguish, and the version that "works on the happy
 path" is the version that loses someone's data.
 
+**§14 amendment (sc10) — time, env, and the tier that is not a capability.**
+`std.time` and `std.env` are the fourth and fifth modules of this section and
+the first whose builtin tiers BOTH compiler rungs execute. Everything above
+applies unchanged; four additions.
+
+- **The capability name is the sandbox table's, and `Clock` is one of the
+  eight.** I13's list as the toolchain spells it is `Io`, `Fs`, `Net`, `Env`,
+  `Clock`, `Random`, `Ffi`, `Exec` — §14 named five of them and the two new
+  modules use two more. A per-function capability note quotes the table's own
+  reason as well as its name, because the reason is what a reader needs:
+  `Clock` is refused at comptime for determinism alone (*two identical builds
+  must not observe different times*) where `Env` is refused for determinism
+  AND confinement (*contents differ per machine and may hold secrets*). One
+  category, one sentence, and std does not paraphrase it.
+- **A facade over a scalar ABI exists to make unit confusion a compile
+  error.** The time builtins speak in bare milliseconds; `std.time` ships
+  `Instant` and `Duration` as one-field structs, and that IS the module —
+  `sleep(millis(2))` and `sleep(seconds(2))` cannot be mistyped for each
+  other, an `Instant` can never be rendered as a date, and an elapsed span can
+  never be added to a count of bytes. The rule this sets for the modules that
+  follow: when a builtin tier hands std a bare `int` whose UNIT is the whole
+  contract, std names the unit in a type rather than in a parameter name. It
+  costs nothing at run time (structs cross module boundaries completely) and
+  it buys no privacy at this pin (a caller can forge one and read its field),
+  so a forged value must produce arithmetic and never a trap.
+- **Rendering is a documented posture, not an apology per function.** A
+  formatter in an os module states once, in the header, exactly which profile
+  it writes and what it deliberately has not got. `std.time`'s is: RFC 3339
+  in UTC with three fractional digits, and NO parsing, NO timezones, NO
+  calendar arithmetic and NO leap seconds — each with its reason (a zone is a
+  database and §10's unicode-tables ruling applies verbatim; "one month later"
+  is a policy, not a function). The one deviation, years outside `0..9999`, is
+  stated and then held as a TEST, because a sentence about what an
+  implementation answers is a test or it is a rumour (§13, sc09's rule).
+- **A pure builtin family is not a capability, and it still does not get a
+  free lane.** The `json_*` four carry no I13 tag and no sandbox category by
+  design, so a package using only them declares nothing — and they still
+  execute on ONE rung at s40. The doc-truth accommodation §14 wrote for
+  capability modules ("at least one lane must reach `exit(0)`, and an honest
+  refusal on the others is acceptable") is therefore about UNEQUAL LANES and
+  not about capabilities, and the rig's list is named that way now. The
+  distinction that survives: a capability lane may be dark forever by design
+  (lupin has no sockets); a tier lane is dark until someone writes the mirror.
+
+**§14 amendment (sc10) — D31's nursery, its banner and its clock, stated
+normatively.** `std/x/README.md` is the register and `std.x.json` is the
+worked home, as `std.option` is §2's and `std.errors` is §12's.
+
+- **Every resident's module header carries the banner**: that `std.x.*` is
+  not `std.*`, that its path, names, rows and behaviour may change or vanish
+  in one sprint, that no other std module may depend on it (a resident MAY
+  depend on the facade), and that the register is where its reason and its
+  trigger are written down. One paragraph, in every resident, at the top.
+- **The graduation clock ticks at campaign closeouts** and has exactly three
+  outcomes, recorded in the closeout: GRADUATE (the module moves under
+  `std.`, and because the path is the API the move is the release note),
+  DELETE (the reviewed contract in its header is what survives), or EXTEND by
+  one campaign with a written reason. Nothing sits in `x` unexamined, and
+  "still useful" is not a reason — a named trigger is.
+- **A resident is not an experiment.** Every one so far is a complete, tested
+  body kept out of the facade because one refused or rejected body costs
+  every importer of its module a lane. The reason is measured and named in the
+  register, never "we are not sure about the API yet".
+- **Check a resident's dependencies against its own lanes before writing a
+  function.** A resident often has ONE executing lane; a delegate that is
+  refused on exactly that lane leaves a function with no test and no fenceable
+  example, which is a claim rather than code. `std.x.json.float_at` was
+  written and withdrawn inside sc10 for precisely that (F-0061).
+- **A resident and its facade successor cannot be imported by one program**
+  (F-0058): module identity is the last path segment, so `std.x.json` and
+  `std.json` are both `json`. Until that is ruled, a resident that shadows a
+  facade name divides the work with it strictly and says so in both headers.
+
 ## Review record
+
+- 2026-08-17 — sc10 amendments: §14 gains the time/env tier (the sandbox
+  table's capability names with their own reasons quoted, the
+  facade-over-a-scalar-ABI rule that makes unit confusion a compile error, the
+  render-only posture stated once and held as a test, and the ruling that the
+  unequal-lanes accommodation is about lanes rather than capabilities), and
+  §14 gains D31's nursery normatively — the banner every resident carries, the
+  three-outcome graduation clock, the measured-reason rule, the
+  check-your-lane rule that cost `float_at`, and F-0058's
+  resident-versus-facade import collision. Review rides the same pending sc00
+  gate.
 
 - 2026-08-16 — sc09 amendments: §9 gains the four rules writing the landed
   `str`/`bytes` surface settled (`get` versus `s[a..b]` by whose offset it

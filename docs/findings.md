@@ -64,6 +64,10 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0055 | 2026-08-16 | **The empty needle is three different things**: `count("")`, `split("")` and `replace(s, "", …)` are refused as `unsupported` by lupin 0.1.6 AND the checked tier, and DEFINED by the native runtime (0, one whole piece, identity) — a three-lane split on a shape every caller-supplied separator can reach. `wolf_rt` calls its answers "the documented deterministic placeholder" and `wolf_mem` refuses the same three, so both sides know; neither is ruled. `std.str` guards all six affected functions before delegating (`count` answers 0, the rest trap `assert`) so no caller sees it | wolf-lang s37 (core types) + spec owners | [filed: wolf-lang#56](https://github.com/wolffe-lang/wolf-lang/issues/56) |
 | F-0056 | 2026-08-16 | **`repeat(-1)` traps `bounds` on every lane and no clause says so** — and it silently CHANGED: sc03 measured `""` under the interpreter and `std.str.repeat`'s doc claimed that answer for five sprints with no test holding it. `bounds` is also arguably the wrong kind for a caller contract violation (`[conf.trap.map]` spells that `assert`), and `wolf_rt`'s own `__wolf_rt_str_repeat` clamps with `count.max(0)` — so the three lanes agree by construction, not by rule | wolf-lang spec (`[conf.trap.map]` / `[mem.str.*]`) | [filed: wolf-lang#57](https://github.com/wolffe-lang/wolf-lang/issues/57) |
 | F-0057 | 2026-08-16 | **s37 gave the language a byte VIEW and no byte SOURCE**: `s.bytes()` exists on every lane and nothing turns bytes back into a `str`, so `std.bytes.to_str -> str ! {utf8}` — the D24 border post, the last unwritten member of the census's byte block — has no spelling. Needs one of `str.from_utf8`, a `char` type with scalar-to-`str` (F-0018's half), or `strbuf.push_byte`. std ships the predicate half instead (`bytes.is_utf8`, full validation in wolf source, 31 rows on three lanes) so the gap is visible rather than silent | wolf-lang s37 core types | [filed: wolf-lang#58](https://github.com/wolffe-lang/wolf-lang/issues/58) |
+| F-0058 | 2026-08-17 | **The nursery's first tenant cannot be imported beside its facade**: module identity is the last path segment (F-0034), so `std.x.json` and `std.json` are both `json` to an importer — `use std.json` beside `use std.x.json` is `fail(E0306)` on BOTH compiler rungs and `unsupported` under lupin, measured at these pins. D31's whole promise is that graduation is a MOVE (`std.x.foo` becomes `std.foo`, and the path is the release note), and this makes the two paths mutually exclusive for the campaign in which a resident and its successor coexist. Also filed with it: the query tier has no key ENUMERATION (`json_len` counts an object's members and nothing names them), so an object can be counted and not walked | wolf-lang resolve owners (the F-0034 issue) + s40 owners (the json tier) | [filed: wolf-lang#29](https://github.com/wolffe-lang/wolf-lang/issues/29) (module identity) + the json half re-verified against s40 |
+| F-0059 | 2026-08-17 | **The clock ABI is milliseconds and the deadline hole is now everywhere**: `time_now_ms`/`time_unix_ms`/`time_sleep_ms` are the whole time tier, so `std.time` can offer no sub-millisecond resolution (a `_ns` face over a `_ms` source would report a thousand-fold lie) and no `Deadline` type at all — nothing in the toolchain arms a deadline anywhere (F-0049 for sockets, the same hole for everything else), and there is no `select` to race a timer against work. Also: no monotonic-clock IDENTITY, so two `Instant`s from different processes are silently incomparable with no way to detect it; and the s36 clock-hook seam does not yet reach clock READS, so `--schedules`/`--replay` cannot virtualize time and a timing test has no deterministic mode | wolf-lang s40 + s35/s36 owners | filed with sc10's evidence on the s40 tier |
+| F-0060 | 2026-08-17 | **A pure builtin family is refused at comptime with no diagnostic**: `json_valid`/`json_get`/`json_type`/`json_len` carry no I13 capability and no sandbox category by design (the metadata for a package using only them stays capability-free — correct), and the comptime engine still refuses them, as `unsupported` at resolve with no code and no reason string. Every capability family answers `E0701` naming what it reaches and why (`reaches the clock, which comptime code can never touch`); the pure family answers nothing, so a package cannot learn WHY its `comptime fn` will not evaluate, and this repo cannot hold the refusal as a test the way `tests/{net,time,env}/comptime_refuses.lu` hold theirs. The ask is a diagnostic for "no evaluator at v0", distinct from the capability refusal | wolf-lang s16 (CTFE engine) + s40 owners | filed with sc10's evidence |
+| F-0061 | 2026-08-17 | **`std.fmt.decimal.parse_float` is `unsupported` on BOTH compiler rungs** ("arithmetic outside integers" at the mem tier, one body deep — F-0026's f64 ceiling, still open at sc05's row), and that now costs a function rather than a lane: `std.x.json.float_at` was written and WITHDRAWN inside sc10 because the checked tier is `std.x.json`'s only executing lane, so the function would have had zero lanes, no runnable test and no fenceable doc example. A std function nobody can run is a claim, not code | wolf-lang s23/s31 (checked execution) + s28 (native) | re-verified unmoved at this pin on [wolf-lang#26](https://github.com/wolffe-lang/wolf-lang/issues/26) |
 
 ## F-0001 — the std search path
 
@@ -1828,3 +1832,245 @@ and `>>` on a plain `int` are still `unsupported` on the checked lane
 more argument for the builtin. And the io tier will want this the moment
 `fs_read_bytes` lands (F-0044): a byte read with no way back to text is a
 byte read nobody can use.
+
+**sc10 addendum — this finding blocks a second function, and nobody
+expected it to.** sc09 re-owned `std.json.unescape` to a json sprint on the
+grounds that F-0018 had retired and a scanner over arbitrary text was
+writable. It is; the scanner is not the problem. `unescape` has to DECODE
+`\uXXXX`, which means building `"é"` from the number 233 — the same
+materialization half F-0057 is about, arrived at from text rather than from
+bytes. An ASCII-only `unescape` would be a border post that refuses text
+(§9 forbids it), so the contract stays, and its tag moves from the interim
+`boundary` to `parse` because the boundary condition really is gone and
+what is left is ordinary bad data.
+
+Two consequences worth carrying. First, the ask list above gains a
+motivation: `str.from_utf8` or a scalar-to-`str` constructor unblocks JSON
+unescaping, not just byte IO. Second, the general lesson, which is now in
+the guide: a finding that blocks "bytes to text" blocks every ESCAPE
+FORMAT too — json, url-encoding, `\x` escapes, HTML entities — because
+every one of them decodes a number into a character. That is a family, not
+a function, and it is worth knowing before the next census predicts one of
+them writable.
+
+## Retirements and movements at the sc10 pins
+
+The pin bump is wolf `8321aba` → trunk **`e94b879`** ("merge s69: the idiom
+arbiter — c16-warnings closes"), three merged waves in one step (s40, s70,
+s69), with lupin **HELD at 0.1.6**. Both ritual gates were run in a clean
+scratch clone at the sha and both are green on their FIRST attempt — the
+second clean pair in a row, which is why F-0054 stays open rather than
+retiring: two clean pairs are not proof a timing dependence is gone, and the
+posture this repo keeps is to state the attempt count.
+
+v0.1.7 of lupin exists and was deliberately not chased. The consequence is
+the widest two-upstream drift this repo has recorded — the interpreter's
+conformance pin (`13b811f`) is three waves behind the compiler's — and it is
+the whole explanation for sc10's lupin column: lupin has no `time_*`, no
+`env_*` and no `json_*` builtins because they did not exist at its pin. That
+is a DRIFT, not a design refusal like `fs`/`net`, and it closes on a release
+rather than on a decision. The ledger says so where it would otherwise read
+like a capability posture.
+
+### F-0052 is CLOSED, and it is the biggest thing in this bump
+
+For two sprints the guide called `v else |e| match e { … }` the most
+dangerous shape in the language: it compiled, it ran, and on wolfc's checked
+lane it matched its FIRST ARM whatever the tag was, silently, against two
+lanes that got it right. s70's match tier fixed it upstream (wolf-lang#48 —
+"handler matches resolve bare idents against the scrutinee's tags before
+binding"), and it is re-measured here on all three lanes with the arms
+written in BOTH orders, which is the experiment that found the bug in sc08
+run in reverse.
+
+It is held as `tests/errors/handler_discriminates.lu` rather than only
+believed, per sc09's rule that a claim about what an implementation answers
+is a test or it is a rumour. Three lanes, `run`.
+
+**What it unblocks and what sc10 deliberately did not do with it.** Two
+functions were written and withdrawn on this finding — `std.io.input_all`
+(sc07) and `std.net.read_all` (sc08) — and both are now writable: a loop
+over a rowed read can stop on `eof`/`closed` and re-raise the others, which
+is the only thing that ever blocked them. Neither is in this sprint's
+contract and neither is written; both module headers still say "blocked",
+and the sprint that reconsiders them owns the change. `std.x.json` uses the
+shape nowhere either: its one place for it (`float_at`'s two-tag delegate)
+turned out to have a simpler answer, because the kernel's guarantee makes
+one of the two tags unreachable and a wildcard says exactly that without
+claiming to tell tags apart.
+
+### Re-verified UNMOVED, each re-measured rather than assumed
+
+- **F-0037** — an enum returned through an error row still takes the miss
+  path on every call (`fn id(v: V) -> V ! {none} { v }`, one line, no
+  diagnostic). This is now the sole blocker on `std.json.parse`: sc09
+  retired its F-0018 half and re-owned the census row to a json sprint, and
+  the sprint that took the row found the OTHER finding still standing. That
+  is why the DOM half of json is still write-only and why the query half
+  lives in the nursery over a different tier entirely.
+- **F-0046 / F-0053** — `conform-run` still rejects `--deny-warnings`
+  (`unknown flag`, re-measured at this sha), and the record's `warnings`
+  array still covers the entry file only. The rig denies warnings itself, on
+  every lane that reports one, and it stayed green across 175 tests and 317
+  doc-example blocks at this pin. s69 landed eleven NEW lints
+  (W0310–W0316, W0602–W0604, W1002, W1003), several policing exactly what
+  API-CONVENTIONS §1 already requires — no `get_` prefix, `is_` answers
+  `bool`, `as_` borrows rather than consumes, bare `get` carries a row, a
+  `pub` item is documented. Nothing in `std/` trips one that this rig can
+  see, and F-0053 is the reason that is not the same sentence as "nothing in
+  `std/` trips one".
+- **F-0034** — module identity is still the last path segment, and it now
+  costs a module PAIR rather than a name: see F-0058.
+- **F-0026** — the checked tier's f64 ceiling is unmoved in the one body
+  that matters here, and it cost a function this sprint: see F-0061.
+- **F-0016** — `wolf fmt` still splits a dotted call under a `//` comment.
+  Fifth sprint running; it bit three of sc10's test files within a minute of
+  their existing, and all three now carry the note in the file header, which
+  is the documented dodge and is getting old.
+- **F-0043's `E0806` half**, F-0004, F-0011, F-0012, F-0014, F-0025's last
+  third, F-0027, F-0029, F-0030, F-0035 (the byte-type half), F-0038,
+  F-0039, F-0040, F-0044, F-0045, F-0047, F-0049, F-0050, F-0051, F-0054,
+  F-0055, F-0056, F-0057: all retested, all open.
+
+### The ledger movement
+
+Fifteen new rows and no existing row moved — the first pin bump in this
+repo's history where a three-wave jump advanced nothing already recorded.
+That is not a disappointment, it is what the wave was: s40 added builtin
+families std had never wrapped, s70 fixed a shape std had refused to write,
+and s69 added lints std already obeyed. Nothing in the existing 160 tests
+touches any of the three.
+
+## F-0058 — the nursery's first tenant cannot be imported beside its facade
+
+D31's graduation mechanism is a MOVE: `std.x.foo` becomes `std.foo`, and
+because the path is the API, the move is the whole release note. F-0034 says
+module identity is the LAST path segment. Put those together and a resident
+and its facade successor are the same name:
+
+```
+use std.json
+use std.x.json          // fail(E0306) on both compiler rungs
+                        // unsupported under lupin (silently binds one)
+```
+
+Measured at these pins with two one-function probe modules, so the result is
+about the paths and not about either module's contents. Importing EITHER on
+its own resolves and runs, which is what lets `std.x.json` keep the name
+upstream's prelude comment gives it.
+
+**Why it matters beyond a naming annoyance.** The nursery exists so that a
+module can be USED while it is still moving (D31: the residents are not
+experiments, they are complete bodies kept out of the facade for a measured
+reason). A program that wants both halves of json today — the DOM to build a
+document, the query kernel to read one — cannot have them, and neither
+module can grow toward the other by depending on it. `std.json` and
+`std.x.json` therefore divide the work strictly by direction, each says so
+in its header, and every test and doc example in the repository imports
+exactly one.
+
+**The second half of this filing is the query tier's own hole**, and it is
+the one that makes `std.x.json` a query surface rather than a reader: there
+is no key ENUMERATION. `json_len` counts an object's members and nothing
+names them, so an object can be counted and not walked. `keys(doc, path)` is
+a reviewed contract in the module header, blocked rather than unwritten, and
+until it lands a program can only ask about keys it already knew. (An array
+CAN be walked — `json_len` plus `child_index` plus `get` — and `items` is
+left out for a different reason, stated in the header: it would re-parse the
+document once per element.)
+
+Asks, in order: rule how a resident and its facade successor coexist during
+a graduation campaign (a `use … as` rename would do it, and so would module
+identity being the full path); and grow the query tier a key enumerator.
+
+## F-0059 — the clock ABI is milliseconds, and the deadline hole is everywhere
+
+`time_now_ms`, `time_unix_ms` and `time_sleep_ms` are the whole time tier.
+They are enough for `std.time`'s twenty-four functions and the shape of what
+is missing is three themes.
+
+- **Milliseconds are the floor of the resolution.** A `_ns` face over a
+  `_ms` source would report a thousand-fold lie, so `std.time` ships no
+  nanosecond anything. Benchmarking, latency histograms and anything that
+  wants to see a fast function are out of reach — and D36's bench format is
+  a stdc02+ item that will want exactly this.
+- **Nothing arms a deadline, anywhere in the toolchain.** F-0049 filed this
+  for sockets, where `wolf_rt` has a per-socket deadline no builtin
+  exposes; s40 makes it general. `std.time` cannot ship a `Deadline` type or
+  a `with_timeout` combinator, because there is nothing to arm and no
+  `select` to race a timer against work (X6's composition story is s35's and
+  has not reached std). Every operation in std that could block — `accept`,
+  `read`, `connect`, `sleep` — blocks unboundedly.
+- **A monotonic reading has no identity.** `time_now_ms` counts from an
+  arbitrary process-local anchor, which is correct; nothing marks WHICH
+  anchor, so two `Instant`s from different processes subtract to a number
+  that means nothing and no code can detect it. `std.time` documents the
+  hazard, which is all a library can do — the fix is a clock id in the ABI,
+  or a `SystemTime`/`Instant` distinction the tier itself understands.
+
+One more, and it is the one that makes timing tests unprincipled here: the
+s36 clock-hook seam does not reach clock READS yet, so `--schedules` and
+`--replay` cannot virtualize time. A test over a sleep is therefore a
+predicate over a real host clock (`elapsed >= 3`) with no deterministic
+mode, which is why `tests/time/monotonic.lu` asserts only inequalities and
+why every exact assertion in the module is against the PURE renderer
+instead.
+
+## F-0060 — a pure builtin family is refused at comptime with no diagnostic
+
+The json four are the toolchain's one pure builtin family: no I13
+capability, no sandbox category, nothing reached, so a package that uses
+only them declares no capability at all. That is the right design and this
+finding does not argue with it.
+
+What it argues with is the refusal. The comptime engine still refuses them —
+correctly, there is no json evaluator in the D33 allowlist at v0 — and the
+refusal is `unsupported` at resolve, with no code, no reason string and
+nothing in the record's `diagnostics` array:
+
+```
+comptime fn probe(doc: str) -> bool { json_valid(doc) }
+// checked: unsupported (phase_reached=resolve), diagnostics: []
+```
+
+Every capability family answers `E0701` with a sentence naming what the call
+reaches and why comptime cannot: "`time_now_ms` reaches the clock, which
+comptime code can never touch", "`env_get` reaches environment variables …".
+A package author who hits the json refusal learns nothing at all, and cannot
+tell "no evaluator yet" from "you wrote something wrong".
+
+The cost here is concrete and small: this repository holds the D33 refusal
+as a test for `net`, `time` and `env` (`fail(E0701)`, one file each, the
+kind named in the directive), and it cannot hold one for json, because
+`unsupported` is a ledger row rather than a directive.
+
+The ask: a diagnostic for "this builtin has no comptime evaluator at v0",
+distinct from the capability refusal — because the two are different
+sentences and one of them is temporary.
+
+## F-0061 — `parse_float` is unsupported on both compiler rungs, and it cost a function
+
+`std.fmt.decimal.parse_float` answers `unsupported — arithmetic outside
+integers` at the mem tier on the checked lane and on the native rung
+(F-0026's f64 ceiling, one body deep; sc05 recorded the ledger row and it is
+unmoved at this pin). For five sprints that was one `unsupported` row among
+several and nothing depended on it.
+
+sc10 is where it stopped being free. `std.x.json.float_at` — the number
+reader every JSON caller reaches for second — was written, tested and
+withdrawn inside the sprint, and the arithmetic is simple: the checked tier
+is `std.x.json`'s ONLY executing lane (the native rung refuses the json
+builtins by name, lupin is behind the pin), and `parse_float` is refused on
+exactly that lane. So the function would have had zero lanes: no test could
+run it, no doc example could be fenced, and §14's doc-truth floor — at least
+one lane reaches `exit(0)` — would have been missed on every example it had.
+
+It is a reviewed contract in the module header with this filing beside it,
+and its body is four lines waiting for either compiler rung to execute
+`parse_float`. Nothing about the signature changes when it lands.
+
+The general shape, worth stating because it will recur: a refusal that costs
+one lane is a ledger row, and a refusal that costs a module's ONLY lane is a
+withdrawn function. The nursery is full of modules with one lane by
+construction, so every dependency a resident takes should be checked against
+that lane before it is written, not after.

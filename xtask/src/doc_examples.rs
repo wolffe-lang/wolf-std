@@ -49,18 +49,30 @@ use std::time::Duration;
 /// permanent allowance.
 const WOLFC_WAIVERS: &[(&str, &str, &str)] = &[];
 
-/// Modules whose functions need an OS CAPABILITY (I13) that an
-/// implementation may honestly not have (sc07). For these, an
-/// `unsupported` verdict is acceptable on EVERY lane — including lupin,
-/// which has no fs/io builtins by design — while the doc-truth rule is
-/// kept by a stronger requirement instead: at least one lane must reach
-/// `exit(0)`, so a documented example is still a program that ran
-/// somewhere.
+/// Modules whose lanes are honestly unequal, so an `unsupported` verdict
+/// is acceptable on EVERY lane while the doc-truth rule is kept by a
+/// stronger requirement instead: at least one lane must reach `exit(0)`,
+/// so a documented example is still a program that ran somewhere.
 ///
 /// The list is deliberately tiny and deliberately named by module rather
-/// than by capability: a module lands here when its whole surface reaches
-/// the host, never to excuse one function.
-const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net"];
+/// than by capability: a module lands here when its whole surface is
+/// something an implementation may not have, never to excuse one
+/// function.
+///
+/// Two reasons put a module here, and sc10 added the second.
+///
+/// 1. **An OS CAPABILITY (I13) an implementation may honestly not have**
+///    (sc07): `fs`, `io`, `net`, and now `time` (`Clock`) and `env`
+///    (`env`) — lupin has none of those builtin tiers, by design, with a
+///    sentence in its refusal.
+/// 2. **A builtin tier only one rung has landed** (sc10): `x.json`
+///    reaches no capability at all — the `json_*` family is the one PURE
+///    builtin family, no I13 tag, no sandbox category — and its kernels
+///    execute on the checked tier alone at s40, because the native mirror
+///    and the interpreter's own are unwritten. The honesty this list
+///    encodes is the same either way: the example ran somewhere, and the
+///    lanes that refused said so.
+const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "x.json"];
 
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
@@ -463,13 +475,19 @@ mod tests {
     }
 
     #[test]
-    fn capability_modules_are_the_os_facades() {
+    fn capability_modules_are_the_unequal_lane_facades() {
         // The list is a review surface: it must stay tiny, and a module
-        // joins it only when its surface reaches the host. `net` joined in
-        // sc08: its two address helpers are pure, but a module belongs here
-        // as soon as a lane can honestly refuse ANY of its examples, and the
-        // seven socket functions can.
-        assert_eq!(CAPABILITY_MODULES, &["fs", "io", "net"]);
+        // joins it only when a lane can honestly refuse ANY of its
+        // examples. `net` joined in sc08 (its two address helpers are pure,
+        // but the seven socket functions can be refused); `time` and `env`
+        // joined in sc10 for the same reason at the `Clock` and `env`
+        // tiers; `x.json` joined in sc10 for a DIFFERENT reason, which is
+        // why the constant's doc names two — it reaches no capability at
+        // all and its builtin tier has one rung.
+        assert_eq!(
+            CAPABILITY_MODULES,
+            &["fs", "io", "net", "time", "env", "x.json"]
+        );
     }
 
     #[test]
