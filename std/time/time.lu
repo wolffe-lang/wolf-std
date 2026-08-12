@@ -1,0 +1,574 @@
+//! member: true
+//!
+//! std.time — monotonic instants, signed durations, and one wall-clock
+//! rendering. Stability tier: core.
+//!
+//! **Capability: `Clock` (I13).** Every function that reads a clock or
+//! sleeps is tagged `Clock` in the toolchain's sandbox table and is
+//! categorically refused at comptime (D33), for the reason X12 gives:
+//! *determinism — two identical builds must not observe different times*.
+//! The refusal is `E0701` and `tests/time/comptime_refuses.lu` holds it,
+//! one level down at the builtin, because a `comptime fn` cannot call
+//! across a module boundary at this pin (F-0051).
+//!
+//! Six of this module's functions reach the clock (`now`, `unix_ms`,
+//! `sleep`, `elapsed`, `now_iso8601`, `unix_iso8601`); the other eighteen
+//! are PURE and comptime-safe — arithmetic over two one-field structs and
+//! one calendar rendering. §14 says to state the exception explicitly,
+//! because in a capability module the pure function is the surprising
+//! one, so every doc below says which it is.
+//!
+//! **The two clocks are different clocks and the types say so.** `now()`
+//! reads a MONOTONIC counter from an arbitrary process-local anchor: its
+//! values compare and subtract, and they are never dates. `unix_ms()`
+//! reads the WALL clock — milliseconds since 1970-01-01T00:00:00Z — which
+//! can jump backwards when the host adjusts it, and is the only reading
+//! with a calendar meaning. So `to_iso8601` takes an `int` of wall
+//! milliseconds and there is deliberately no way to render an `Instant`:
+//! rendering a monotonic counter as a date is the mistake this split
+//! exists to make unspellable.
+//!
+//! **`Instant` and `Duration` are the facade over an `int` ABI.** The
+//! builtin tier is three calls that speak in bare milliseconds
+//! (`time_now_ms`, `time_unix_ms`, `time_sleep_ms`); wrapping them in two
+//! one-field structs is the whole point of the module, because it is what
+//! turns unit confusion into a compile error — `sleep(millis(2))` and
+//! `sleep(seconds(2))` cannot be mistyped for each other, and
+//! `elapsed(t)` cannot be added to a count of bytes.
+//!
+//! A `Duration` is a SIGNED millisecond count. `between(a, b)` where `b`
+//! precedes `a` is negative rather than clamped or trapped: the reversal
+//! is the caller's information, not this module's to discard.
+//!
+//! **Neither struct has a private field, because this pin has none**
+//! (sc07's `fs.File` lesson): a caller can write `time.Instant { ms: 0 }`
+//! and read `t.ms` directly. Nothing here traps on a forged value — a
+//! nonsense `Instant` produces a nonsense `Duration`, which is arithmetic
+//! and not a fault. Read the millisecond count through `as_millis`
+//! anyway; the field is the representation and the function is the API.
+//!
+//! **Formatting is render-only, UTC-only, and that is the v0 posture —
+//! stated once here rather than apologised for per function.**
+//! `to_iso8601` writes exactly `YYYY-MM-DDTHH:MM:SS.sssZ`: the RFC 3339
+//! profile of ISO 8601, always three fractional digits, always the `Z`
+//! zone. What this module does NOT have, deliberately:
+//!
+//! - **no parsing.** Text to time is the inverse direction and it needs
+//!   an error taxonomy (which field was wrong, at which offset) that the
+//!   payload conventions of §12 can express and no caller can yet branch
+//!   on. `parse_iso8601` is a reviewed contract below.
+//! - **no timezones.** A zone is a database (IANA tzdata), a package
+//!   decision (§10's unicode-tables ruling applies verbatim: committed
+//!   generated wolf source behind a facade, or nothing) and a versioning
+//!   liability. `Z` is the one offset a library can promise without one.
+//! - **no calendar arithmetic.** "One month later" is a policy, not a
+//!   function; days, hours, minutes and seconds are exact and are all
+//!   this module adds.
+//! - **no leap seconds.** Unix milliseconds do not count them and neither
+//!   does this rendering; a UTC minute here is always 60 seconds long.
+//!
+//! Years outside `0..9999` are a documented deviation rather than a
+//! refusal: they render with their own digit count and a leading `-` when
+//! negative, which is not ISO 8601's expanded-year form (that form needs
+//! an agreed digit width between writer and reader, and there is nobody
+//! to agree with here). Inside `0..9999` — every timestamp a program is
+//! likely to hold — the output is exactly RFC 3339.
+//!
+//! **The lanes are unequal and the reason is the builtin tier.** The
+//! checked tier and the native rung both execute `time_*`; lupin 0.1.6
+//! has no time builtins at all, so it refuses them at resolve. It
+//! resolves module bodies LAZILY, so a program that touches only the pure
+//! members runs there too — which is why `tests/time/duration_algebra.lu`
+//! and `tests/time/iso8601_render.lu` have three lanes and
+//! `tests/time/monotonic.lu` has two.
+//!
+//! Reviewed contracts, blocked or unscheduled, landing verbatim when they
+//! are not:
+//!
+//! ```text
+//! parse_iso8601(s: str) -> int ! {parse}
+//!     The inverse of `to_iso8601`: wall milliseconds from an RFC 3339
+//!     text with a `Z` zone. Writable at these pins over `str.get` and
+//!     `fmt.parse_int` — unwritten rather than unwritable, and waiting
+//!     on the payload question: a caller wants to know WHICH field was
+//!     malformed and at which offset, which is a `Parse(ParseErr)`
+//!     payload (§12) that no `else` handler can destructure while
+//!     `E0806` stands (F-0043's unmoved half).
+//! deadline(d: Duration) -> Deadline / with_timeout(...)
+//!     A bound on how long an operation may take. Blocked at the tier
+//!     below: no builtin arms a deadline anywhere in the toolchain
+//!     (F-0049 for sockets; the same hole for everything else), and
+//!     there is no `select` to race a timer against work. std ships no
+//!     deadline type rather than one that cannot expire.
+//! monotonic_ns() / unix_ns()
+//!     Nanosecond resolution. The builtin ABI is milliseconds and a
+//!     library cannot invent precision it was not given; a `_ns` face
+//!     over a `_ms` source would report a thousand-fold lie.
+//! ```
+
+/// A reading of the MONOTONIC clock, in milliseconds from an arbitrary
+/// process-local anchor.
+///
+/// Two `Instant`s compare and subtract; a single one means nothing on its
+/// own and is never a date. The anchor is not the epoch, is not shared
+/// between processes, and may differ between two runs of the same
+/// program — that is what makes the clock monotonic, and it is why
+/// `to_iso8601` takes wall milliseconds instead of one of these.
+pub struct Instant {
+    ms: int,
+}
+
+/// A signed span of time, in milliseconds.
+///
+/// Negative is legal and meaningful: `between(a, b)` with `b` before `a`
+/// is negative rather than clamped, because the reversal is information
+/// the caller asked for.
+pub struct Duration {
+    ms: int,
+}
+
+/// The current reading of the monotonic clock.
+///
+/// Total: no rows, no traps. Successive calls are non-decreasing within
+/// one process; the value has no meaning outside comparison and
+/// subtraction (see the module header's two-clocks note).
+///
+/// Capability `Clock`; refused at comptime (D33). Delegates to
+/// `time_now_ms`.
+///
+/// ```wolf-doc-example
+/// let a = time.now()
+/// let b = time.now()
+/// time.as_millis(time.between(a, b)) >= 0
+/// ```
+pub fn now() -> Instant {
+    Instant { ms: time_now_ms() }
+}
+
+/// The current wall clock, in milliseconds since 1970-01-01T00:00:00Z.
+///
+/// Total: no rows, no traps. Unlike `now`, this reading has a calendar
+/// meaning and can move BACKWARDS when the host adjusts its clock, so it
+/// is the wrong thing to measure an elapsed interval with. Use `now` and
+/// `elapsed` for durations and this for timestamps.
+///
+/// Capability `Clock`; refused at comptime (D33). Delegates to
+/// `time_unix_ms`.
+///
+/// ```wolf-doc-example
+/// time.unix_ms() > 1577836800000
+/// ```
+pub fn unix_ms() -> int {
+    time_unix_ms()
+}
+
+/// Block the calling thread for `d`.
+///
+/// A non-positive `d` returns immediately. The sleep is a FLOOR, not a
+/// promise: the host may wake the thread later than asked and never
+/// earlier, so a program that must not overshoot measures with `elapsed`
+/// rather than trusting the argument.
+///
+/// Total: no rows, no traps. This blocks the whole thread — there is no
+/// task-aware sleep at this tier, and the s35 reactor's parking story
+/// reaches std when its builtin tier does.
+///
+/// Capability `Clock`; refused at comptime (D33). Delegates to
+/// `time_sleep_ms`.
+///
+/// ```wolf-doc-example
+/// let before = time.now()
+/// time.sleep(time.millis(2))
+/// time.as_millis(time.elapsed(before)) >= 2
+/// ```
+pub fn sleep(d: Duration) {
+    if d.ms <= 0 {
+        return
+    }
+    time_sleep_ms(d.ms)
+}
+
+/// How long ago `since` was read, on the monotonic clock.
+///
+/// `elapsed(t)` is `between(t, now())`. Never negative in practice,
+/// because the clock it reads is monotonic — but it is not clamped, so a
+/// forged `Instant` from the future answers a negative `Duration` rather
+/// than a lie.
+///
+/// Total: no rows, no traps.
+///
+/// Capability `Clock`; refused at comptime (D33). Delegates to
+/// `time_now_ms`.
+///
+/// ```wolf-doc-example
+/// let start = time.now()
+/// time.as_millis(time.elapsed(start)) >= 0
+/// ```
+pub fn elapsed(since: Instant) -> Duration {
+    Duration { ms: time_now_ms() - since.ms }
+}
+
+/// The wall clock, rendered — `to_iso8601(unix_ms())`.
+///
+/// Total: no rows, no traps. The one function here that turns a clock
+/// reading straight into text, and the only correct way to timestamp a
+/// log line: `to_iso8601(as_millis(elapsed(t)))` would render a duration
+/// as a date, which the types cannot stop because both are `int` at the
+/// boundary and this doc is where that is said.
+///
+/// Capability `Clock`; refused at comptime (D33). Delegates to
+/// `time_unix_ms`.
+///
+/// ```wolf-doc-example
+/// time.now_iso8601().len == 24
+/// time.now_iso8601().ends_with("Z") == true
+/// ```
+pub fn now_iso8601() -> str {
+    to_iso8601(time_unix_ms())
+}
+
+/// A `Duration` of `n` milliseconds. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// time.as_millis(time.millis(250)) == 250
+/// time.as_millis(time.millis(-1)) == -1
+/// ```
+pub fn millis(n: int) -> Duration {
+    Duration { ms: n }
+}
+
+/// A `Duration` of `n` seconds. Pure and comptime-safe.
+///
+/// Traps `overflow` (X3, checked arithmetic in every profile) when
+/// `n * 1000` leaves `int` — a span that long is a bug in the caller's
+/// data model, not an outcome to hand back as a row (§10's trap-versus-
+/// raise rule).
+///
+/// ```wolf-doc-example
+/// time.as_millis(time.seconds(3)) == 3000
+/// ```
+pub fn seconds(n: int) -> Duration {
+    Duration { ms: n * 1000 }
+}
+
+/// A `Duration` of `n` minutes. Pure and comptime-safe; the overflow
+/// posture is `seconds`'.
+///
+/// ```wolf-doc-example
+/// time.as_millis(time.minutes(2)) == 120000
+/// ```
+pub fn minutes(n: int) -> Duration {
+    Duration { ms: n * 60000 }
+}
+
+/// A `Duration` of `n` hours. Pure and comptime-safe; the overflow
+/// posture is `seconds`'.
+///
+/// ```wolf-doc-example
+/// time.as_millis(time.hours(1)) == 3600000
+/// ```
+pub fn hours(n: int) -> Duration {
+    Duration { ms: n * 3600000 }
+}
+
+/// The millisecond count `d` names. Pure and comptime-safe.
+///
+/// The exact representation, signed, with nothing rounded — the `as_`
+/// form because it borrows and allocates nothing (§1).
+///
+/// ```wolf-doc-example
+/// time.as_millis(time.seconds(2)) == 2000
+/// ```
+pub fn as_millis(d: Duration) -> int {
+    d.ms
+}
+
+/// `d` in whole seconds, truncated TOWARD ZERO. Pure and comptime-safe.
+///
+/// Truncation rather than rounding, and toward zero rather than down, so
+/// that `as_seconds(d)` and `as_seconds(negate(d))` are mirror images:
+/// 1999ms is 1 second and -1999ms is -1.
+///
+/// ```wolf-doc-example
+/// time.as_seconds(time.millis(1999)) == 1
+/// time.as_seconds(time.millis(-1999)) == -1
+/// time.as_seconds(time.hours(1)) == 3600
+/// ```
+pub fn as_seconds(d: Duration) -> int {
+    quotient_toward_zero(d.ms, 1000)
+}
+
+/// `d` in whole minutes, truncated toward zero. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// time.as_minutes(time.seconds(119)) == 1
+/// ```
+pub fn as_minutes(d: Duration) -> int {
+    quotient_toward_zero(d.ms, 60000)
+}
+
+/// `d` in whole hours, truncated toward zero. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// time.as_hours(time.minutes(59)) == 0
+/// time.as_hours(time.minutes(60)) == 1
+/// ```
+pub fn as_hours(d: Duration) -> int {
+    quotient_toward_zero(d.ms, 3600000)
+}
+
+/// The span from `earlier` to `later`, signed. Pure and comptime-safe.
+///
+/// Negative when the arguments are the other way round, per the module
+/// header. Traps `overflow` (X3) when the two instants are further apart
+/// than `int` can express, which cannot happen to two readings of one
+/// process's clock.
+///
+/// ```wolf-doc-example
+/// let a = time.Instant { ms: 10 }
+/// let b = time.Instant { ms: 25 }
+/// time.as_millis(time.between(a, b)) == 15
+/// time.as_millis(time.between(b, a)) == -15
+/// ```
+pub fn between(earlier: Instant, later: Instant) -> Duration {
+    Duration { ms: later.ms - earlier.ms }
+}
+
+/// `t` advanced by `d` (which may be negative). Pure and comptime-safe.
+///
+/// Traps `overflow` (X3) when the result leaves `int`.
+///
+/// ```wolf-doc-example
+/// let t = time.Instant { ms: 100 }
+/// let u = time.add(t, time.millis(50))
+/// time.as_millis(time.between(t, u)) == 50
+/// ```
+pub fn add(t: Instant, d: Duration) -> Instant {
+    Instant { ms: t.ms + d.ms }
+}
+
+/// Whether `a` is strictly before `b` on the monotonic clock. Pure and
+/// comptime-safe.
+///
+/// ```wolf-doc-example
+/// let a = time.Instant { ms: 1 }
+/// let b = time.Instant { ms: 2 }
+/// time.is_before(a, b) == true
+/// time.is_before(b, a) == false
+/// time.is_before(a, a) == false
+/// ```
+pub fn is_before(a: Instant, b: Instant) -> bool {
+    a.ms < b.ms
+}
+
+/// Whether `a` is strictly after `b`. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// let a = time.Instant { ms: 3 }
+/// let b = time.Instant { ms: 2 }
+/// time.is_after(a, b) == true
+/// time.is_after(b, b) == false
+/// ```
+pub fn is_after(a: Instant, b: Instant) -> bool {
+    a.ms > b.ms
+}
+
+/// `a + b`. Pure and comptime-safe; traps `overflow` (X3) on a sum
+/// outside `int`.
+///
+/// ```wolf-doc-example
+/// time.as_millis(time.plus(time.seconds(1), time.millis(500))) == 1500
+/// ```
+pub fn plus(a: Duration, b: Duration) -> Duration {
+    Duration { ms: a.ms + b.ms }
+}
+
+/// `a - b`. Pure and comptime-safe; traps `overflow` (X3) on a
+/// difference outside `int`.
+///
+/// ```wolf-doc-example
+/// time.as_millis(time.minus(time.seconds(1), time.millis(250))) == 750
+/// ```
+pub fn minus(a: Duration, b: Duration) -> Duration {
+    Duration { ms: a.ms - b.ms }
+}
+
+/// `d` with its sign flipped. Pure and comptime-safe.
+///
+/// Traps `overflow` (X3) on the one input that has no negation: the most
+/// negative `int`.
+///
+/// ```wolf-doc-example
+/// time.as_millis(time.negate(time.millis(5))) == -5
+/// time.as_millis(time.negate(time.millis(-5))) == 5
+/// ```
+pub fn negate(d: Duration) -> Duration {
+    Duration { ms: 0 - d.ms }
+}
+
+/// Whether `d` is the zero span. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// time.is_zero(time.millis(0)) == true
+/// time.is_zero(time.millis(1)) == false
+/// ```
+pub fn is_zero(d: Duration) -> bool {
+    d.ms == 0
+}
+
+/// Whether `d` runs backwards. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// time.is_negative(time.millis(-1)) == true
+/// time.is_negative(time.millis(0)) == false
+/// ```
+pub fn is_negative(d: Duration) -> bool {
+    d.ms < 0
+}
+
+/// `unix_millis` rendered as `YYYY-MM-DDTHH:MM:SS.sssZ` — the RFC 3339
+/// profile of ISO 8601, in UTC, with exactly three fractional digits.
+///
+/// **Pure and comptime-safe**: it reads no clock, so the same argument
+/// always gives the same text on every host, and this is the function a
+/// test pins. The argument is WALL milliseconds — `unix_ms()`, or a
+/// timestamp a program received as data — never an `Instant` (the module
+/// header explains why there is no way to render one).
+///
+/// Total: no rows, no traps, defined for every `int`. Negative arguments
+/// are pre-1970 dates and render correctly (`-1` is
+/// `1969-12-31T23:59:59.999Z`); the proleptic Gregorian calendar runs
+/// backwards without a switchover, which is what every other
+/// implementation of this format does. Years outside `0..9999` render
+/// with their own digit count and a leading `-` when negative — a
+/// documented deviation from ISO 8601's expanded-year form, per the
+/// module header.
+///
+/// No leap seconds: a minute here is always 60 seconds, as Unix time
+/// itself defines it.
+///
+/// ```wolf-doc-example
+/// time.to_iso8601(0) == "1970-01-01T00:00:00.000Z"
+/// time.to_iso8601(1000) == "1970-01-01T00:00:01.000Z"
+/// time.to_iso8601(86399999) == "1970-01-01T23:59:59.999Z"
+/// time.to_iso8601(-1) == "1969-12-31T23:59:59.999Z"
+/// time.to_iso8601(1577836800000) == "2020-01-01T00:00:00.000Z"
+/// time.to_iso8601(951782400000) == "2000-02-29T00:00:00.000Z"
+/// ```
+pub fn to_iso8601(unix_millis: int) -> str {
+    let day_ms: int = 86400000
+    var days = quotient_toward_zero(unix_millis, day_ms)
+    var rest = unix_millis - days * day_ms
+    if rest < 0 {
+        rest = rest + day_ms
+        days = days - 1
+    }
+    let date = civil_date(days)
+    let ms = rest - quotient_toward_zero(rest, 1000) * 1000
+    let all_seconds = quotient_toward_zero(rest, 1000)
+    let second = all_seconds - quotient_toward_zero(all_seconds, 60) * 60
+    let all_minutes = quotient_toward_zero(all_seconds, 60)
+    let minute = all_minutes - quotient_toward_zero(all_minutes, 60) * 60
+    let hour = quotient_toward_zero(all_minutes, 60)
+    let clock = "{pad_two(hour)}:{pad_two(minute)}:{pad_two(second)}"
+    "{date}T{clock}.{pad_three(ms)}Z"
+}
+
+/// `unix_ms()` rendered — see `to_iso8601`, which does the work.
+///
+/// Capability `Clock`; refused at comptime (D33). Delegates to
+/// `time_unix_ms`. Kept beside `now_iso8601` because the two read
+/// different clocks in every other language and the same one here: this
+/// is the honest name, and `now_iso8601` is the one a caller reaches for.
+///
+/// ```wolf-doc-example
+/// time.unix_iso8601().starts_with("2") == true
+/// ```
+pub fn unix_iso8601() -> str {
+    to_iso8601(time_unix_ms())
+}
+
+/// The `YYYY-MM-DD` of a day count from 1970-01-01. Private.
+///
+/// Howard Hinnant's `civil_from_days`, which is exact for the whole
+/// proleptic Gregorian range and has no table and no loop. The era
+/// arithmetic below needs FLOORED division and wolf's `/` truncates
+/// toward zero, so every quotient is either taken over non-negative
+/// operands or corrected explicitly by `quotient_floor`.
+fn civil_date(days: int) -> str {
+    let shifted = days + 719468
+    let era = quotient_floor(shifted, 146097)
+    let day_of_era = shifted - era * 146097
+    let year_of_era = (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146096) /
+        365
+    let year_base = year_of_era + era * 400
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100)
+    let month_shifted = (5 * day_of_year + 2) / 153
+    let day = day_of_year - (153 * month_shifted + 2) / 5 + 1
+    var month = month_shifted + 3
+    if month_shifted >= 10 {
+        month = month_shifted - 9
+    }
+    var year = year_base
+    if month <= 2 {
+        year = year_base + 1
+    }
+    "{pad_year(year)}-{pad_two(month)}-{pad_two(day)}"
+}
+
+/// `a / b` truncated toward zero — wolf's own `/`, named so that the
+/// rounding direction is written down where the calendar code relies on
+/// it. Private.
+fn quotient_toward_zero(a: int, b: int) -> int {
+    a / b
+}
+
+/// `a / b` rounded DOWN (toward negative infinity), for a positive `b`.
+/// Private: the era arithmetic needs floor and `/` gives truncation, so
+/// the correction is one comparison rather than an assumption about the
+/// operator.
+fn quotient_floor(a: int, b: int) -> int {
+    let q = a / b
+    if a - q * b < 0 {
+        return q - 1
+    }
+    q
+}
+
+/// `n` as two digits, zero-padded. Private; `n` is 0..99 by construction
+/// at every call site.
+fn pad_two(n: int) -> str {
+    if n < 10 {
+        return "0{n}"
+    }
+    "{n}"
+}
+
+/// `n` as three digits, zero-padded. Private; `n` is 0..999.
+fn pad_three(n: int) -> str {
+    if n < 10 {
+        return "00{n}"
+    }
+    if n < 100 {
+        return "0{n}"
+    }
+    "{n}"
+}
+
+/// A year as four digits when it fits in `0..9999`, and as its own
+/// digits otherwise — the documented deviation of `to_iso8601`. Private.
+fn pad_year(n: int) -> str {
+    if n < 0 {
+        return "{n}"
+    }
+    if n < 10 {
+        return "000{n}"
+    }
+    if n < 100 {
+        return "00{n}"
+    }
+    if n < 1000 {
+        return "0{n}"
+    }
+    "{n}"
+}

@@ -1,0 +1,37 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.time, comptime.sandbox, comptime.sandbox.clock
+//!
+//! **D33, held as a rejection: no clock at compile time.** The capability
+//! `std.time` carries (`Clock`, per I13) is refused categorically in the
+//! comptime sandbox, and the sandbox table's reason is X12's: *two
+//! identical builds must not observe different times*. Of the eight
+//! categories this is the one whose refusal is purely about determinism —
+//! nothing is confined, nothing leaks; a build that could read the clock
+//! would simply stop being reproducible.
+//!
+//! The refused call is the BUILTIN and not the facade, for the reason
+//! `tests/net/comptime_refuses.lu` records: the comptime engine has no
+//! cross-module call at this pin, so a `comptime fn` naming any std
+//! function is an honest `unsupported` at resolve before the sandbox ever
+//! sees it (F-0051). The diagnostic is
+//! `E0701: `time_now_ms` reaches the clock, which comptime code can never
+//! touch`.
+//!
+//! `time.to_iso8601` below is called at RUN time and is pure — it is what
+//! a comptime program COULD use the day the engine can call across a
+//! module boundary, and it also keeps the import used (an unused import
+//! is E0305).
+
+use std.time
+
+comptime fn probe() -> int {
+    time_now_ms()
+}
+
+fn main() -> !int {
+    const AT = probe()
+    let stamp = time.to_iso8601(0)
+    print("stamp: {stamp} at: {AT}")
+    0
+}

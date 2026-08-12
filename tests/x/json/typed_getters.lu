@@ -1,0 +1,76 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.json, err.row, err.else
+//!
+//! The typed reads — `str_at`, `bool_at`, `is_null_at`, `int_at` — and
+//! the two properties that decide whether a JSON reader can be trusted.
+//!
+//! **No coercion, ever.** `str_at` of a number is a miss and not `"42"`;
+//! `bool_at` of `0` is a miss and not `false`. A reader that guesses
+//! across JSON's types is a reader that quietly loses the document's own
+//! information, and every one of those misses is asserted below.
+//!
+//! **`int_at` is exact and it does not trap.** A 64-bit id survives
+//! (`9007199254740993` is beyond `f64`'s integers and comes back whole),
+//! both ends of `int` parse, and one past either end is the `overflow`
+//! ROW rather than the trap `std.fmt.parse_int` would raise on the same
+//! digits — because here the digits came out of a document, and §10 says
+//! data raises where a caller's mistake traps. That difference is the
+//! reason `std.x.json` does its own range check instead of delegating,
+//! and it is why the last four assertions exist.
+//!
+//! One lane, for the reason `query_kernel.lu`'s header gives.
+
+use std.x.json
+
+fn main() -> !int {
+    let zero: int = 0
+    let int_min = zero - 9223372036854775807 - 1
+
+    if (json.str_at("{{\"a\": \"wolf\"}}", "a") else "?") != "wolf" { return 1 }
+    if (json.str_at("{{\"a\": \"\"}}", "a") else "?") != "" { return 2 }
+    // Escapes are decoded by the tier: the model holds text, not source.
+    if (json.str_at("{{\"a\": \"line\\nbreak\"}}", "a") else "?") != "line\nbreak" { return 3 }
+    if (json.str_at("{{\"a\": \"caf\\u00e9\"}}", "a") else "?") != "café" { return 4 }
+    // No coercion in either direction.
+    if (json.str_at("{{\"a\": 1}}", "a") else "?") != "?" { return 5 }
+    if (json.str_at("{{\"a\": null}}", "a") else "?") != "?" { return 6 }
+    if (json.str_at("{{\"a\": 1}}", "b") else "?") != "?" { return 7 }
+
+    if (json.bool_at("{{\"a\": true}}", "a") else false) != true { return 8 }
+    if (json.bool_at("{{\"a\": false}}", "a") else true) != false { return 9 }
+    if (json.bool_at("{{\"a\": 0}}", "a") else false) != false { return 10 }
+    if (json.bool_at("{{\"a\": \"true\"}}", "a") else false) != false { return 11 }
+
+    if (json.is_null_at("{{\"a\": null}}", "a") else false) != true { return 12 }
+    if (json.is_null_at("{{\"a\": 0}}", "a") else true) != false { return 13 }
+    if (json.is_null_at("{{\"a\": \"\"}}", "a") else true) != false { return 14 }
+    // An ABSENT node is a different question from a null one, and it is
+    // the `missing` row rather than `true`.
+    if (json.is_null_at("{{\"a\": null}}", "b") else true) != true { return 15 }
+
+    if (json.int_at("{{\"a\": 42}}", "a") else -1) != 42 { return 16 }
+    if (json.int_at("{{\"a\": -7}}", "a") else 0) != -7 { return 17 }
+    if (json.int_at("{{\"a\": 0}}", "a") else -1) != 0 { return 18 }
+    // Exactness past 2^53: the whole reason `int_at` exists.
+    if (json.int_at("{{\"a\": 9007199254740993}}", "a") else 0) != 9007199254740993 { return 19 }
+    if (json.int_at("{{\"a\": 9223372036854775807}}", "a") else 0) != 9223372036854775807 {
+        return 20
+    }
+    if (json.int_at("{{\"a\": -9223372036854775808}}", "a") else 0) != int_min { return 21 }
+
+    // A number that is not an integer spelling is `kind` — the document
+    // wrote a fraction and this function will not round one.
+    if (json.int_at("{{\"a\": 1.5}}", "a") else -1) != -1 { return 22 }
+    if (json.int_at("{{\"a\": 1.0}}", "a") else -1) != -1 { return 23 }
+    if (json.int_at("{{\"a\": 1e3}}", "a") else -1) != -1 { return 24 }
+    if (json.int_at("{{\"a\": \"7\"}}", "a") else -1) != -1 { return 25 }
+
+    // One past each end of `int`: the `overflow` ROW, and NOT a trap.
+    // The whole file reaching this line is the assertion.
+    if (json.int_at("{{\"a\": 9223372036854775808}}", "a") else -1) != -1 { return 26 }
+    if (json.int_at("{{\"a\": -9223372036854775809}}", "a") else -1) != -1 { return 27 }
+    if (json.int_at("{{\"a\": 99999999999999999999}}", "a") else -1) != -1 { return 28 }
+    if (json.int_at("{{\"a\": -99999999999999999999}}", "a") else -1) != -1 { return 29 }
+    0
+}

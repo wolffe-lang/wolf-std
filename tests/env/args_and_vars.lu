@@ -1,0 +1,52 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.env, err.row, err.else
+//!
+//! argv and the variable listing — the reason this module exists (bs10:
+//! a project stops holding its input as data the moment `args()` works).
+//!
+//! **`args()` is empty on every lane under this rig, by design.**
+//! `conform-run` supplies no arguments: the checked machine's argv
+//! defaults empty (mirroring the stdin posture) and the native rung runs
+//! the binary bare. So this file asserts the SHAPE — that argv exists, is
+//! a `List[str]`, and that `arg` misses off both ends — and never a
+//! particular argument, because an argument assertion here would be
+//! asserting the rig rather than the language. `wolf run file.lu a b c`
+//! is where real arguments arrive, and that path is outside this
+//! repository's coupling doctrine.
+//!
+//! Two lanes: lupin has no `env_*` builtins by design.
+//!
+//! `vars()` is asserted as a predicate over its own round trip — a
+//! variable this program set must appear in the listing, in `K=V` form,
+//! and be findable by cutting the line with the pure helpers. Nothing
+//! asserts WHICH variables the host has, and nothing asserts the count.
+
+use std.env
+
+fn main() -> !int {
+    let all = env.args()
+    if all.len != 0 { return 1 }
+
+    // `none` off both ends: an index into argv is data the program
+    // received, so it is an absence row and never a `bounds` trap.
+    if (env.arg(0) else "<none>") != "<none>" { return 2 }
+    if (env.arg(-1) else "<none>") != "<none>" { return 3 }
+    if (env.arg(99) else "<none>") != "<none>" { return 4 }
+
+    env.set("WOLF_STD_LISTED", "here")?
+    let lines = env.vars()
+    if lines.len <= 0 { return 5 }
+
+    var found = false
+    var value = ""
+    for line in lines {
+        if env.entry_key(line) == "WOLF_STD_LISTED" {
+            found = true
+            value = env.entry_value(line)
+        }
+    }
+    if !found { return 6 }
+    if value != "here" { return 7 }
+    0
+}

@@ -1,0 +1,75 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.json, err.row, err.else
+//!
+//! The four query kernels — `is_valid`, `get`, `type_name`, `len` — over
+//! one document that has every JSON shape in it.
+//!
+//! **One lane, and it is not a capability.** The `json_*` builtins are
+//! the one PURE builtin family (no I13 tag, nothing reached), and they
+//! still run on the checked tier alone at s40: the native rung refuses
+//! them by name and lupin 0.1.6 has never had them. That is the first of
+//! the two reasons this module is a nursery resident rather than a facade
+//! member, and it is what the ledger row below records.
+//!
+//! Every object literal writes `{{` and `}}`: a brace inside a wolf
+//! string opens an interpolation, so a JSON document in a wolf literal is
+//! escaped throughout. That is a property of f-strings, not of json.
+//!
+//! What the file pins that is easy to get wrong: `get` on a CONTAINER
+//! hands back valid JSON text — a sub-document you can query again — and
+//! `get` on a string hands back the DECODED text, not its source
+//! spelling. The two together are what make a nested read composable
+//! without a DOM.
+
+use std.x.json
+
+fn main() -> !int {
+    let doc = "{{\"pack\": [{{\"name\": \"lupin\"}}, {{\"name\": \"ainu\"}}], \"n\": 42, \"ok\": true, \"nil\": null}}"
+
+    if !json.is_valid(doc) { return 1 }
+    if !json.is_valid("[]") { return 2 }
+    if !json.is_valid("  null  ") { return 3 }
+    // Strict RFC 8259: no trailing commas, no comments, no bare words,
+    // one value per text.
+    if json.is_valid("[1,]") { return 4 }
+    if json.is_valid("{{") { return 5 }
+    if json.is_valid("") { return 6 }
+    if json.is_valid("1 2") { return 7 }
+    if json.is_valid("'x'") { return 8 }
+
+    // A digit segment indexes, anything else keys, "" is the root.
+    if (json.get(doc, "n") else "?") != "42" { return 9 }
+    if (json.get(doc, "pack.0.name") else "?") != "lupin" { return 10 }
+    if (json.get(doc, "pack.1.name") else "?") != "ainu" { return 11 }
+    if (json.get(doc, "ok") else "?") != "true" { return 12 }
+    if (json.get(doc, "nil") else "?") != "null" { return 13 }
+
+    // A container renders as JSON text — a document in its own right,
+    // which is the composition this tier has instead of a cursor.
+    let subtree = json.get(doc, "pack.0") else "?"
+    if !json.is_valid(subtree) { return 14 }
+    if (json.get(subtree, "name") else "?") != "lupin" { return 15 }
+
+    if (json.type_name(doc, "") else "?") != "object" { return 16 }
+    if (json.type_name(doc, "pack") else "?") != "array" { return 17 }
+    if (json.type_name(doc, "pack.0") else "?") != "object" { return 18 }
+    if (json.type_name(doc, "pack.0.name") else "?") != "str" { return 19 }
+    if (json.type_name(doc, "n") else "?") != "num" { return 20 }
+    if (json.type_name(doc, "ok") else "?") != "bool" { return 21 }
+    if (json.type_name(doc, "nil") else "?") != "null" { return 22 }
+
+    if (json.len(doc, "") else -1) != 4 { return 23 }
+    if (json.len(doc, "pack") else -1) != 2 { return 24 }
+    if (json.len(doc, "pack.0") else -1) != 1 { return 25 }
+    if (json.len("[]", "") else -1) != 0 { return 26 }
+
+    if (json.has(doc, "n") else false) != true { return 27 }
+    if (json.has(doc, "nope") else true) != false { return 28 }
+    // A null MEMBER is present: absence of a value and a null value are
+    // different answers, and this tier keeps them apart.
+    if (json.has(doc, "nil") else false) != true { return 29 }
+    if (json.has(doc, "pack.1") else false) != true { return 30 }
+    if (json.has(doc, "pack.9") else true) != false { return 31 }
+    0
+}

@@ -1,0 +1,61 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time
+//!
+//! `to_iso8601` is a PURE function of an `int`, which is what makes the
+//! one formatting surface in a clock module testable at all: no host, no
+//! reading, no seed — the same argument gives the same text on every lane
+//! and every machine, so the vectors below are exact literals rather than
+//! predicates.
+//!
+//! This file is one of the two three-lane rows in `tests/time`. lupin has
+//! no `time_*` builtins and refuses them at resolve, but it resolves
+//! module bodies LAZILY, so a program that touches only the calendar
+//! arithmetic runs there — the same asymmetry `tests/net/address_helpers`
+//! records for `std.net`'s pure members.
+//!
+//! The vectors are the boundaries a date renderer gets wrong: the epoch,
+//! the last millisecond of a day, the millisecond BEFORE the epoch (which
+//! is where a truncating division and a flooring one part company), a
+//! leap day in a century year that IS a leap year (2000), the first
+//! instant of a century year that is NOT (2100), and both ends of the
+//! four-digit year range.
+
+use std.time
+
+fn main() -> !int {
+    if time.to_iso8601(0) != "1970-01-01T00:00:00.000Z" { return 1 }
+    if time.to_iso8601(1) != "1970-01-01T00:00:00.001Z" { return 2 }
+    if time.to_iso8601(1000) != "1970-01-01T00:00:01.000Z" { return 3 }
+    if time.to_iso8601(86399999) != "1970-01-01T23:59:59.999Z" { return 4 }
+    if time.to_iso8601(86400000) != "1970-01-02T00:00:00.000Z" { return 5 }
+    // The millisecond before the epoch: the negative half of the day
+    // split, which a truncating `/` gets wrong without the correction
+    // `std.time.to_iso8601` spells out.
+    if time.to_iso8601(-1) != "1969-12-31T23:59:59.999Z" { return 6 }
+    if time.to_iso8601(-86400000) != "1969-12-31T00:00:00.000Z" { return 7 }
+    // 2000 is a leap year (divisible by 400); 2100 is not (divisible by
+    // 100 and not 400). Both rules live in the same three divisions.
+    if time.to_iso8601(951782400000) != "2000-02-29T00:00:00.000Z" { return 8 }
+    if time.to_iso8601(4102444800000) != "2100-01-01T00:00:00.000Z" { return 9 }
+    if time.to_iso8601(1234567890000) != "2009-02-13T23:31:30.000Z" { return 10 }
+    if time.to_iso8601(1577836800000) != "2020-01-01T00:00:00.000Z" { return 11 }
+    // Both ends of the four-digit year window the RFC 3339 profile
+    // covers, and one pre-1900 date to prove the proleptic calendar runs
+    // backwards without a switchover.
+    if time.to_iso8601(253402300799999) != "9999-12-31T23:59:59.999Z" { return 12 }
+    if time.to_iso8601(-2208988800000) != "1900-01-01T00:00:00.000Z" { return 13 }
+    if time.to_iso8601(-62135596800000) != "0001-01-01T00:00:00.000Z" { return 14 }
+    // Year zero exists in the proleptic Gregorian calendar and it is a
+    // leap year, which is why the day before it is 31 December of year
+    // -1 rather than of year 1 BC.
+    if time.to_iso8601(-62167219200000) != "0000-01-01T00:00:00.000Z" { return 15 }
+    // A year outside 0..9999 is the documented deviation: the digits it
+    // has, and a leading `-` when negative — NOT ISO 8601's expanded
+    // form. Recorded as a test so the sentence in the doc cannot rot
+    // (sc09's rule: a claim about what an implementation answers is a
+    // test, or it is a rumour).
+    if time.to_iso8601(-62167219200001) != "-1-12-31T23:59:59.999Z" { return 16 }
+    if time.to_iso8601(253402300800000) != "10000-01-01T00:00:00.000Z" { return 17 }
+    0
+}

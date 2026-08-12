@@ -1,0 +1,48 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.json
+//!
+//! The two pure members — `child` and `child_index` — which touch no
+//! builtin and are the only part of this module a comptime program could
+//! ever use.
+//!
+//! Two lanes rather than one, and the reason is the same lazy body
+//! resolution that gives `std.net` and `std.fs` a second column: lupin
+//! never reaches the `json_*` names it does not have, so a program that
+//! builds paths and queries nothing runs there. The native rung refuses
+//! the module as a whole. That asymmetry inside one module is why the
+//! ledger records lanes per TEST.
+//!
+//! The last two assertions are the dotted-path language's ceiling, held
+//! as a test rather than only as a sentence: a key containing `.` is
+//! unreachable, and `child` does not pretend otherwise — there is no
+//! escape to hide behind, and the path it builds addresses something
+//! else. That is the second reason this module is in the nursery.
+
+use std.x.json
+
+fn main() -> !int {
+    // "" is the root, so the first segment is the whole path.
+    if json.child("", "users") != "users" { return 1 }
+    if json.child("users", "0") != "users.0" { return 2 }
+    if json.child("a.b", "c") != "a.b.c" { return 3 }
+    if json.child("a", "") != "a." { return 4 }
+
+    if json.child_index("", 0) != "0" { return 5 }
+    if json.child_index("users", 2) != "users.2" { return 6 }
+    if json.child_index("a.0", 1) != "a.0.1" { return 7 }
+    // A negative index is not rejected here: it builds a path that
+    // addresses nothing, which is the `missing` row at the query. One
+    // refusal in the right place beats two in the wrong one.
+    if json.child_index("a", -1) != "a.-1" { return 8 }
+
+    // Composing the two is how a program walks a document.
+    let path = json.child(json.child_index(json.child("", "pack"), 1), "name")
+    if path != "pack.1.name" { return 9 }
+
+    // The ceiling: a key with a dot in it produces a path that means
+    // something else, and nothing in the dotted language can say so.
+    if json.child("", "a.b") != "a.b" { return 10 }
+    if json.child("x", "a.b") != "x.a.b" { return 11 }
+    0
+}

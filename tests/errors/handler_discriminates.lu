@@ -1,0 +1,88 @@
+//! check: run(exit=0, stdout="io closed\nio closed timeout")
+//! phase: run
+//! conforms: err.row, err.else, err.match
+//!
+//! **F-0052 is closed and this file is what keeps it closed.**
+//!
+//! For two sprints the most dangerous shape in the language was
+//! `v else |e| match e { … }`: it parsed, it ran, and on wolfc's checked
+//! lane it matched its FIRST ARM whatever the tag was, with no
+//! diagnostic, while lupin and the native rung discriminated correctly.
+//! `std.io.input_all` and `std.net.read_all` were both refused for it —
+//! a loop over a rowed read must stop on one tag and re-raise the
+//! others, and a handler that cannot tell them apart truncates someone's
+//! data on the happy path.
+//!
+//! s70's match tier fixed it ("handler matches resolve bare idents
+//! against the scrutinee's tags before binding", wolf-lang#48), and all
+//! three lanes agree here now. This file is the guard on that: it is a
+//! statement about what the IMPLEMENTATIONS answer, so per sc09's rule it
+//! is a test or it is a rumour.
+//!
+//! The measurement that makes it a real test rather than a coincidence is
+//! the arm ORDER. Each tag is raised twice — once with its arm first and
+//! once with its arm last — so a first-arm-always implementation would
+//! print `io io` and `closed closed` instead of the answers below. That
+//! is exactly the experiment that FOUND the bug in sc08, run in reverse.
+//!
+//! Three lanes. Nothing in `std` depends on this shape yet; the two
+//! withdrawn functions above are the next sprint's to reconsider, and
+//! their module headers still say "blocked" until one does.
+
+fn miss_closed() -> str ! {closed, timeout, io} {
+    closed
+}
+
+fn miss_io() -> str ! {closed, timeout, io} {
+    io
+}
+
+fn miss_timeout() -> str ! {closed, timeout, io} {
+    timeout
+}
+
+/// Arms in declaration order.
+fn name_forward(which: int) -> str {
+    if which == 0 {
+        return miss_io() else |e| match e {
+            closed => "closed",
+            timeout => "timeout",
+            io => "io",
+        }
+    }
+    miss_closed() else |e| match e {
+        closed => "closed",
+        timeout => "timeout",
+        io => "io",
+    }
+}
+
+/// The same two tags, arms in the opposite order. A first-arm-always
+/// handler cannot answer both this and `name_forward` correctly.
+fn name_reversed(which: int) -> str {
+    if which == 0 {
+        return miss_io() else |e| match e {
+            io => "io",
+            timeout => "timeout",
+            closed => "closed",
+        }
+    }
+    miss_closed() else |e| match e {
+        io => "io",
+        timeout => "timeout",
+        closed => "closed",
+    }
+}
+
+fn main() -> !int {
+    print("{name_forward(0)} {name_forward(1)}")
+    let a = name_reversed(0)
+    let b = name_reversed(1)
+    let c = miss_timeout() else |e| match e {
+        closed => "closed",
+        timeout => "timeout",
+        io => "io",
+    }
+    print("{a} {b} {c}")
+    0
+}

@@ -1,0 +1,66 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time
+//!
+//! The `Instant`/`Duration` facade with no clock in sight. Both structs
+//! are constructed by literal here — a public struct can be forged by any
+//! importer at this pin (sc06's cross-module property, sc07's `fs.File`
+//! lesson), and that is exactly what makes the arithmetic testable
+//! without a reading: `Instant { ms: 10 }` is ordinary code and nothing
+//! in `std.time` traps on it.
+//!
+//! The second three-lane row in `tests/time`, for the same lazy-body
+//! reason as `iso8601_render.lu`.
+//!
+//! What the file pins beyond the obvious: that a `Duration` is SIGNED
+//! (`between` in the wrong order is negative, not clamped and not a
+//! trap), and that every `as_*` truncates TOWARD ZERO so the positive and
+//! negative answers are mirror images.
+
+use std.time
+
+fn main() -> !int {
+    let a = time.Instant { ms: 10 }
+    let b = time.Instant { ms: 25 }
+
+    if time.as_millis(time.between(a, b)) != 15 { return 1 }
+    if time.as_millis(time.between(b, a)) != -15 { return 2 }
+    if time.as_millis(time.between(a, a)) != 0 { return 3 }
+
+    if !time.is_before(a, b) { return 4 }
+    if time.is_before(b, a) { return 5 }
+    if time.is_before(a, a) { return 6 }
+    if !time.is_after(b, a) { return 7 }
+    if time.is_after(a, a) { return 8 }
+
+    let later = time.add(a, time.millis(50))
+    if time.as_millis(time.between(a, later)) != 50 { return 9 }
+    let earlier = time.add(a, time.millis(-4))
+    if time.as_millis(time.between(earlier, a)) != 4 { return 10 }
+
+    if time.as_millis(time.millis(250)) != 250 { return 11 }
+    if time.as_millis(time.seconds(3)) != 3000 { return 12 }
+    if time.as_millis(time.minutes(2)) != 120000 { return 13 }
+    if time.as_millis(time.hours(1)) != 3600000 { return 14 }
+
+    // Truncation toward zero, both signs, at the boundary that shows it.
+    if time.as_seconds(time.millis(1999)) != 1 { return 15 }
+    if time.as_seconds(time.millis(-1999)) != -1 { return 16 }
+    if time.as_seconds(time.millis(2000)) != 2 { return 17 }
+    if time.as_minutes(time.seconds(119)) != 1 { return 18 }
+    if time.as_minutes(time.seconds(-119)) != -1 { return 19 }
+    if time.as_hours(time.minutes(59)) != 0 { return 20 }
+    if time.as_hours(time.minutes(60)) != 1 { return 21 }
+
+    if time.as_millis(time.plus(time.seconds(1), time.millis(500))) != 1500 { return 22 }
+    if time.as_millis(time.minus(time.seconds(1), time.millis(250))) != 750 { return 23 }
+    if time.as_millis(time.minus(time.millis(1), time.millis(3))) != -2 { return 24 }
+    if time.as_millis(time.negate(time.millis(5))) != -5 { return 25 }
+    if time.as_millis(time.negate(time.millis(-5))) != 5 { return 26 }
+
+    if !time.is_zero(time.millis(0)) { return 27 }
+    if time.is_zero(time.millis(1)) { return 28 }
+    if !time.is_negative(time.millis(-1)) { return 29 }
+    if time.is_negative(time.millis(0)) { return 30 }
+    0
+}

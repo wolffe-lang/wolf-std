@@ -1,0 +1,511 @@
+//! member: true
+//!
+//! std.x.json — JSON as a QUERY, over the s40 kernel builtins: is this
+//! text valid, what is at this path, what kind is it, how many children
+//! does it have, and give it to me as the wolf type I expect.
+//! Stability tier: **x (nursery, D31)**.
+//!
+//! ## The nursery banner (D31) — read this before you depend on it
+//!
+//! **`std.x.*` is not `std.*`.** A module under `x` is a RESIDENT rather
+//! than a facade member — its path, its names, its rows and its behaviour
+//! may change or disappear in a single sprint, and no other std module may
+//! depend on one. `std/x/README.md` is the register: every resident is
+//! listed there with the measured reason it is not in the facade and the
+//! named trigger that graduates it.
+//!
+//! **The graduation clock.** At every campaign closeout each resident is
+//! reviewed and one of three things happens, recorded in that closeout:
+//! it GRADUATES (it moves under `std.`, and because the path *is* the
+//! API, the move is the release note), it is DELETED (the reviewed
+//! contract in its header is what survives), or it is EXTENDED by one
+//! campaign with a written reason. Nothing sits in `x` unexamined.
+//!
+//! **This module's clock** starts at the stdc02 closeout, which is this
+//! campaign's. Its named triggers are below.
+//!
+//! ## Why the first tenant is json
+//!
+//! D31 said the nursery's first tenant would be a json module, and s40
+//! built the kernel for it — but the reason it is a resident rather than
+//! a member is measured, not decreed, and it is two reasons:
+//!
+//! 1. **One executing lane.** `json_valid`/`json_get`/`json_type`/
+//!    `json_len` are the checked tier's alone at s40: the native rung
+//!    refuses them by name ("json builtins in native lowering (checked
+//!    lane only at s40)") and lupin 0.1.6 has never heard of them. A core
+//!    module with one lane out of three cannot make the promises the
+//!    facade makes. The graduation trigger is the native mirror of
+//!    `wolf_mem::json` plus the interpreter's own — the same two-consumer
+//!    shape every other builtin tier went through.
+//! 2. **This is a query surface, not the API json will end up with.** A
+//!    dotted path is a small language and it cannot express what the
+//!    document can hold: a key containing `.` is unreachable at this tier
+//!    (documented upstream and here), there is no way to enumerate an
+//!    object's keys, and every read re-parses the whole text. The API a
+//!    program eventually wants is `std.json`'s DOM — one parse, a value
+//!    you navigate — and that module already exists with everything
+//!    except the parser (see the sibling note below). When it can parse,
+//!    this module either graduates as the *streaming query* face beside
+//!    it, or it is deleted and its callers move. That is a decision for a
+//!    closeout, and this is where it is written down.
+//!
+//! ## `std.x.json` and `std.json` are two modules and one program may not
+//! ## import both
+//!
+//! Module identity is the LAST path segment (F-0034), so `std.x.json` and
+//! `std.json` are both `json` to an importer: `use std.json` beside
+//! `use std.x.json` is `E0306` on both compiler rungs and `unsupported`
+//! under lupin, measured at these pins (F-0058). Importing EITHER on its
+//! own is fine, which is why this module can keep the name upstream gave
+//! it. Every test and every doc example here imports exactly one.
+//!
+//! They divide the work the way their lanes do. `std.json` owns the DOM —
+//! a `Value` enum you build, navigate and serialize — and cannot parse,
+//! because a function returning an enum through an error row takes the
+//! miss path on every call (F-0037, re-measured unmoved at these pins).
+//! This module owns the read direction — text in, wolf values out — and
+//! cannot build anything, because the kernel is queries only. Between
+//! them a program can read JSON and write JSON today; neither half can do
+//! both alone, and both say so.
+//!
+//! ## The tier this delegates to
+//!
+//! **Capability-free.** The `json_*` builtins are the one pure builtin
+//! family: no I13 capability, no sandbox category, nothing reached. A
+//! package that uses only this module and the language declares no
+//! capability at all. The comptime engine still refuses them — there is
+//! no json evaluator in the D33 allowlist at v0, which is a design
+//! decision and not a capability question.
+//!
+//! **And that refusal is the one thing in this repository that cannot be
+//! held as a test.** `tests/{net,time,env}/comptime_refuses.lu` each pin
+//! their tier's D33 rejection as `fail(E0701)` with the sandbox table's
+//! own sentence ("reaches the clock, which comptime code can never
+//! touch"). A `comptime fn` calling `json_valid` answers a bare
+//! `unsupported` at resolve — no code, no reason string, nothing in the
+//! record's `diagnostics` — so there is no directive to write it against
+//! and a package author learns nothing about why. Filed as F-0060; there
+//! is deliberately no `comptime_refuses.lu` here rather than a file
+//! asserting something weaker than the truth.
+//!
+//! **Paths are dotted segments.** `""` is the root; a segment of digits
+//! indexes an array; anything else keys an object. `"users.0.name"` is
+//! the second element's `name`. Build one with `child`/`child_index`
+//! rather than by hand. **A key containing `.` is unreachable** — the
+//! tier says so and so does this module; it is not a bug to work around
+//! here, it is the ceiling of a dotted path, and it is one of the reasons
+//! the DOM is where json is going.
+//!
+//! **The rows are the toolchain's, verbatim** (§14's rule, and this
+//! module adds no translation layer): `parse` for any RFC 8259 violation
+//! in the DOCUMENT, `missing` for a path that addresses nothing, `kind`
+//! for a node of the wrong kind for the operation. Two tags are this
+//! module's own and they are marked as such below: `kind` is reused for
+//! "the node is a number and you asked for an integer", and `overflow`
+//! (§10's mark) for a number outside the wolf type you asked for.
+//! Nothing here traps — a document is data, and every failure a document
+//! can cause is a row.
+//!
+//! **Numbers keep their source spelling in the kernel** and this module
+//! is where they become wolf values: `int_at` reads an integer exactly,
+//! so a 64-bit id survives — `std.json`'s number posture, arrived at
+//! from the other direction. The `f64` half is a contract below and the
+//! reason is measured, not principled.
+//!
+//! **Every read re-parses the document.** `get` on a ten-megabyte text is
+//! a ten-megabyte parse, and ten reads are ten parses. That is the
+//! kernel's shape, not a defect this module can hide, and it is the
+//! second-loudest argument for the DOM. Read a subtree once with `get`
+//! (which hands back a valid JSON text) and query THAT, if the shape of
+//! your data allows it.
+//!
+//! Reviewed contracts, blocked at the tier below:
+//!
+//! ```text
+//! float_at(doc: str, path: str) -> f64 ! {parse, missing, kind, overflow}
+//!     The number at `path` as `f64`, widening an integer node, with
+//!     `std.fmt.decimal.parse_float`'s correct rounding. WRITTEN, and
+//!     withdrawn before it shipped, for a reason that is arithmetic
+//!     rather than design: `parse_float` is `unsupported` on BOTH
+//!     compiler rungs ("arithmetic outside integers" at the mem tier —
+//!     F-0026's f64 ceiling, one body deep), and the checked tier is
+//!     this module's ONLY executing lane. So the function would have
+//!     had zero lanes and zero evidence: no test could run it, no doc
+//!     example could be fenced, and §14's doc-truth floor ("at least
+//!     one lane reaches exit(0)") would have been missed on every one.
+//!     A std function nobody can run is a claim, not code. It lands the
+//!     day either compiler rung executes `parse_float`, with this
+//!     signature and a four-line body; `get` plus the caller's own
+//!     conversion is the spelling until then.
+//! keys(doc: str, path: str) -> List[str] ! {parse, missing, kind}
+//!     An object's member names. No builtin enumerates them — `json_len`
+//!     counts members and nothing names them — so an object can be
+//!     counted and not walked, which is the sharpest hole in the query
+//!     tier (F-0058). Blocked, not unwritten.
+//! items(doc: str, path: str) -> List[str] ! {parse, missing, kind}
+//!     An array's elements as sub-documents. Writable TODAY over
+//!     `json_len` plus `child_index` plus `get` in a loop, and left out
+//!     deliberately: it would parse the document once per element, which
+//!     is quadratic in a shape programs reach for constantly. It lands
+//!     when the tier grows a cursor, or in the DOM.
+//! parse(doc: str) -> Value   ·   stringify(v: Value) -> str
+//!     The DOM directions. `stringify` is `std.json`'s and shipped;
+//!     `parse` is `std.json`'s and blocked by F-0037.
+//! ```
+
+use std.fmt
+
+/// Whether `doc` is one well-formed RFC 8259 text.
+///
+/// Total: no rows, no traps — the one function here that answers for
+/// every input, which is what makes it the guard the others are written
+/// behind. Strict: no comments, no trailing commas, no bare identifiers,
+/// exactly one value with only insignificant whitespace around it, and
+/// container nesting limited (the kernel's limit is 128, and exceeding it
+/// is invalidity rather than a stack fault).
+///
+/// Capability-free; refused at comptime (D33 — no json evaluator, not a
+/// capability). Delegates to `json_valid`.
+///
+/// ```wolf-doc-example
+/// json.is_valid("[1, 2, 3]") == true
+/// json.is_valid("{{\"a\": 1}}") == true
+/// json.is_valid("[1,]") == false
+/// json.is_valid("{{") == false
+/// json.is_valid("") == false
+/// ```
+pub fn is_valid(doc: str) -> bool {
+    json_valid(doc)
+}
+
+/// The node at `path`, rendered as text.
+///
+/// A string node comes back DECODED (escapes resolved, so `"a\nb"` is two
+/// lines and not four characters); a number keeps its source spelling
+/// exactly, so nothing is rounded on the way out; `true`, `false` and
+/// `null` spell themselves; an object or array comes back as JSON text —
+/// **a valid document in its own right**, which is what makes
+/// `get(get(doc, "a"), "b")` work and is the cheapest way to query a
+/// subtree twice.
+///
+/// Rows: `parse` when `doc` is not valid JSON, `missing` when nothing is
+/// at `path`. Never traps.
+///
+/// Bare `get` is the checked-access spelling and this one can miss (§1).
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_get`.
+///
+/// ```wolf-doc-example
+/// (json.get("{{\"a\": 1}}", "a") else "?") == "1"
+/// (json.get("[10, 20]", "1") else "?") == "20"
+/// (json.get("{{\"s\": \"hi\"}}", "s") else "?") == "hi"
+/// (json.get("{{\"a\": {{\"b\": 2}}}}", "a.b") else "?") == "2"
+/// (json.get("{{\"a\": 1}}", "b") else "?") == "?"
+/// (json.get("{{", "a") else "?") == "?"
+/// ```
+pub fn get(doc: str, path: str) -> str ! {parse, missing} {
+    json_get(doc, path)?
+}
+
+/// The kind of the node at `path` — one of `"object"`, `"array"`,
+/// `"str"`, `"num"`, `"bool"`, `"null"`.
+///
+/// Rows: `parse`, `missing`. Never traps.
+///
+/// Spelled `type_name` and not `kind` for the reason `std.json` learned
+/// the hard way: a function and a row tag with the same name in one
+/// module make the tag resolve to the FUNCTION at the raise site,
+/// silently (F-0036). The names here are the kernel's own vocabulary
+/// (`"str"` and `"num"`, not RFC 8259's "string" and "number"), adopted
+/// verbatim per §14 rather than prettified into a second dialect.
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_type`.
+///
+/// ```wolf-doc-example
+/// (json.type_name("{{\"a\": [1]}}", "a") else "?") == "array"
+/// (json.type_name("{{\"a\": [1]}}", "a.0") else "?") == "num"
+/// (json.type_name("{{\"a\": \"x\"}}", "a") else "?") == "str"
+/// (json.type_name("{{\"a\": null}}", "a") else "?") == "null"
+/// (json.type_name("{{\"a\": true}}", "a") else "?") == "bool"
+/// (json.type_name("{{\"a\": {{}}}}", "a") else "?") == "object"
+/// ```
+pub fn type_name(doc: str, path: str) -> str ! {parse, missing} {
+    json_type(doc, path)?
+}
+
+/// How many elements an array has, or members an object has, at `path`.
+///
+/// Rows: `parse`, `missing`, and `kind` for a scalar — a number has no
+/// length, and answering 1 or 0 would be a guess about which question was
+/// asked. Never traps.
+///
+/// Not a string length: `len` of a `"str"` node is `kind`, and the length
+/// of the text it holds is `std.str.len` of what `get` returns (§1: one
+/// concept, one home).
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_len`.
+///
+/// ```wolf-doc-example
+/// (json.len("[1, 2, 3]", "") else -1) == 3
+/// (json.len("{{\"a\": 1, \"b\": 2}}", "") else -1) == 2
+/// (json.len("[[1, 2]]", "0") else -1) == 2
+/// (json.len("[]", "") else -1) == 0
+/// (json.len("[1]", "0") else -1) == -1
+/// ```
+pub fn len(doc: str, path: str) -> int ! {parse, missing, kind} {
+    json_len(doc, path)?
+}
+
+/// Whether `doc` has a node at `path`.
+///
+/// Rows: `parse` when the document is not valid JSON — a question about a
+/// path has no honest answer when the text is not a document, and `false`
+/// would say "no such field" about a file that is not JSON at all.
+/// Never traps.
+///
+/// `has` rather than `contains` for a keyed lookup (§8's vocabulary).
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_valid`
+/// and `json_get`.
+///
+/// ```wolf-doc-example
+/// (json.has("{{\"a\": 1}}", "a") else false) == true
+/// (json.has("{{\"a\": 1}}", "b") else false) == false
+/// (json.has("{{\"a\": null}}", "a") else false) == true
+/// (json.has("[1, 2]", "1") else false) == true
+/// (json.has("[1, 2]", "9") else false) == false
+/// (json.has("nope", "a") else true) == true
+/// ```
+pub fn has(doc: str, path: str) -> bool ! {parse} {
+    if !json_valid(doc) {
+        return parse
+    }
+    let probe = json_get(doc, path) else |_| { return false }
+    probe.len >= 0
+}
+
+/// The text of the string node at `path`, decoded.
+///
+/// Rows: `parse`, `missing`, and `kind` when the node is not a string.
+/// No coercion: `str_at` of a number is a miss and not `"42"`, because a
+/// reader that guesses across JSON's types is a reader that loses the
+/// document's own information. `get` is the function that renders any
+/// node as text.
+///
+/// Capability-free; refused at comptime (D33).
+///
+/// ```wolf-doc-example
+/// (json.str_at("{{\"a\": \"wolf\"}}", "a") else "?") == "wolf"
+/// (json.str_at("{{\"a\": \"line\\nbreak\"}}", "a") else "?") == "line\nbreak"
+/// (json.str_at("{{\"a\": 1}}", "a") else "?") == "?"
+/// ```
+pub fn str_at(doc: str, path: str) -> str ! {parse, missing, kind} {
+    let node = json_type(doc, path)?
+    if node != "str" {
+        return kind
+    }
+    json_get(doc, path)?
+}
+
+/// The boolean at `path`.
+///
+/// Rows: `parse`, `missing`, `kind` for every non-boolean node. No
+/// coercion: `0`, `""` and `null` are all `kind`.
+///
+/// Capability-free; refused at comptime (D33).
+///
+/// ```wolf-doc-example
+/// (json.bool_at("{{\"a\": true}}", "a") else false) == true
+/// (json.bool_at("{{\"a\": false}}", "a") else true) == false
+/// (json.bool_at("{{\"a\": 0}}", "a") else false) == false
+/// ```
+pub fn bool_at(doc: str, path: str) -> bool ! {parse, missing, kind} {
+    let node = json_type(doc, path)?
+    if node != "bool" {
+        return kind
+    }
+    let text = json_get(doc, path)?
+    text == "true"
+}
+
+/// Whether the node at `path` is JSON `null`.
+///
+/// Rows: `parse`, `missing`. A predicate rather than a coercion, because
+/// "is this null" has a yes-or-no answer for every node that EXISTS —
+/// while an absent node is a different question, and it is `missing`.
+///
+/// Capability-free; refused at comptime (D33).
+///
+/// ```wolf-doc-example
+/// (json.is_null_at("{{\"a\": null}}", "a") else false) == true
+/// (json.is_null_at("{{\"a\": 0}}", "a") else true) == false
+/// (json.is_null_at("{{\"a\": null}}", "b") else true) == true
+/// ```
+pub fn is_null_at(doc: str, path: str) -> bool ! {parse, missing} {
+    let node = json_type(doc, path)?
+    node == "null"
+}
+
+/// The integer at `path`, exactly.
+///
+/// Rows: `parse`, `missing`; `kind` when the node is not a number OR is a
+/// number that is not an integer (`1.5`, `1e3` and `1.0` are all `kind` —
+/// the document wrote a non-integer and this function will not round
+/// one); `overflow` (§10's mark) when the integer is outside `int`.
+///
+/// **`overflow` is a row and not a trap, and that is the whole reason
+/// this function does its own range check** rather than delegating
+/// straight to `std.fmt.parse_int`, which traps on an out-of-range value
+/// (correctly: to `fmt` the text is a caller's argument). Here the digits
+/// came out of a DOCUMENT — data, which §10 says raises where a caller's
+/// mistake traps — so a 20-digit id in someone's JSON is an outcome this
+/// function reports, never a process this function ends.
+///
+/// Exactness is the point: an id beyond 2^53 survives `int_at` and would
+/// not survive `float_at`. That is the same number posture `std.json`
+/// takes from the writing side.
+///
+/// Capability-free; refused at comptime (D33).
+///
+/// ```wolf-doc-example
+/// (json.int_at("{{\"a\": 42}}", "a") else -1) == 42
+/// (json.int_at("{{\"a\": -7}}", "a") else 0) == -7
+/// (json.int_at("{{\"a\": 9007199254740993}}", "a") else 0) == 9007199254740993
+/// (json.int_at("{{\"a\": 1.5}}", "a") else -1) == -1
+/// (json.int_at("{{\"a\": \"7\"}}", "a") else -1) == -1
+/// (json.int_at("{{\"a\": 99999999999999999999}}", "a") else -1) == -1
+/// ```
+pub fn int_at(doc: str, path: str) -> int ! {parse, missing, kind, overflow} {
+    let node = json_type(doc, path)?
+    if node != "num" {
+        return kind
+    }
+    let text = json_get(doc, path)?
+    integer_of(text)?
+}
+
+/// `path` extended by one object key.
+///
+/// Total: no rows, no traps, and PURE — the only member of this module
+/// that reaches no builtin, so it is the only one a comptime program
+/// could use. An empty `path` is the root, so `child("", "a")` is `"a"`.
+///
+/// A `segment` containing `.` produces a path that addresses something
+/// else, and this function does not pretend otherwise: there is no
+/// escape in the dotted-path language to hide behind (the module header's
+/// ceiling). Keys with dots need the DOM.
+///
+/// ```wolf-doc-example
+/// json.child("", "users") == "users"
+/// json.child("users", "0") == "users.0"
+/// json.child("a.b", "c") == "a.b.c"
+/// ```
+pub fn child(path: str, segment: str) -> str {
+    if path == "" {
+        return segment
+    }
+    "{path}.{segment}"
+}
+
+/// `path` extended by one array index.
+///
+/// Total: no rows, no traps, and PURE — comptime-safe. A negative index
+/// is not rejected here: it produces a path that addresses nothing, which
+/// is the `missing` row at the query, and one refusal in the right place
+/// beats two in the wrong one.
+///
+/// ```wolf-doc-example
+/// json.child_index("", 0) == "0"
+/// json.child_index("users", 2) == "users.2"
+/// json.child_index("a.0", 1) == "a.0.1"
+/// ```
+pub fn child_index(path: str, i: int) -> str {
+    child(path, "{i}")
+}
+
+/// The integer a JSON number's source text denotes. Private.
+///
+/// `kind` when the text is not an integer spelling at all (a fraction, an
+/// exponent, an empty digit run); `overflow` when it is one and does not
+/// fit `int`.
+///
+/// The range check is arithmetic rather than a comparison against a
+/// literal, because the one value that cannot be built positively is the
+/// one this has to admit: `int_min` is `-(922337203685477580 * 10) - 8`,
+/// so the negative branch never forms the positive magnitude at all.
+fn integer_of(text: str) -> int ! {kind, overflow} {
+    var body = text
+    var negative = false
+    if body.starts_with("-") {
+        negative = true
+        body = body[1..]
+    }
+    if !is_digit_run(body) {
+        return kind
+    }
+    let width = body.len
+    if width > 19 {
+        return overflow
+    }
+    if width < 19 {
+        let small = fmt.parse_int(body) else |_| { return kind }
+        if negative {
+            return -small
+        }
+        return small
+    }
+    let head_text = body[0..18]
+    let tail_text = body[18..19]
+    let head = fmt.parse_int(head_text) else |_| { return kind }
+    let tail = fmt.parse_int(tail_text) else |_| { return kind }
+    let head_limit: int = 922337203685477580
+    var tail_limit: int = 7
+    if negative {
+        tail_limit = 8
+    }
+    if head > head_limit {
+        return overflow
+    }
+    if head == head_limit {
+        if tail > tail_limit {
+            return overflow
+        }
+    }
+    if negative {
+        return -head * 10 - tail
+    }
+    head * 10 + tail
+}
+
+/// Whether `s` is one or more ASCII digits and nothing else. Private.
+///
+/// Written with the recoverable slice rather than the language's, even
+/// though the kernel has already promised this text is ASCII: a
+/// non-boundary here would be the kernel breaking its promise, and a
+/// `bounds` trap is not how a library should report that (§9's rule about
+/// whose offset it is, taken the conservative way at a tier boundary).
+fn is_digit_run(s: str) -> bool {
+    let n = s.len
+    if n == 0 {
+        return false
+    }
+    var i: int = 0
+    while i < n {
+        let c = s.get(i..i + 1) else ""
+        if !is_digit(c) {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+/// Whether `c` is one ASCII digit. Private.
+fn is_digit(c: str) -> bool {
+    if c == "" {
+        return false
+    }
+    let alphabet = "0123456789"
+    alphabet.contains(c)
+}

@@ -1,0 +1,50 @@
+//! check: run(exit=1, stdout="parse taken\nmissing taken\nkind taken\nerror: parse")
+//! phase: run
+//! conforms: std.x.json, err.row, err.else, err.propagate
+//!
+//! The three kernel rows, each through its own miss path, and then one of
+//! them RIDDEN OUT of `main` so the record names it.
+//!
+//! That two-part shape is sc07's and it is still the only way this rig
+//! witnesses a tag's identity: an `else` proves the miss path was taken
+//! and produces a value, and a final `?` lets the tag reach the process
+//! outcome, where `error: <tag>` on stdout and exit 1 record which one it
+//! was. A handler CAN discriminate at these pins (F-0052 closed at s70,
+//! and `tests/errors/handler_discriminates.lu` holds that) — but a
+//! handler that says "it was `parse`" is this repository asserting its
+//! own reading, while the record's `error: parse` is the toolchain
+//! saying it.
+//!
+//! The three tags, and what each one means here:
+//!
+//! - `parse` — the DOCUMENT is not RFC 8259. Nothing about the path.
+//! - `missing` — the document is fine and the path addresses nothing.
+//! - `kind` — both are fine and the node is the wrong shape for the
+//!   operation: `len` of a scalar has no answer, and answering 0 or 1
+//!   would be a guess about which question was asked.
+//!
+//! One lane, for the reason `query_kernel.lu`'s header gives.
+
+use std.x.json
+
+fn main() -> !int {
+    let bad = json.get("{{", "a") else |_| { print("parse taken"); "" }
+    if bad != "" { return 2 }
+
+    let gone = json.get("[1]", "9") else |_| { print("missing taken"); "" }
+    if gone != "" { return 3 }
+
+    let scalar = json.len("[1]", "0") else |_| { print("kind taken"); -1 }
+    if scalar != -1 { return 4 }
+
+    // `has` refuses an invalid document rather than answering "no such
+    // field" about a file that is not JSON at all.
+    if (json.has("nope", "a") else true) != true { return 5 }
+
+    // A path into a scalar addresses nothing, which is `missing` and not
+    // `kind`: there is no node there to have a kind.
+    if (json.type_name("[1]", "0.x") else "?") != "?" { return 6 }
+
+    json.get("{{", "a")?
+    0
+}

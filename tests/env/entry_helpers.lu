@@ -1,0 +1,52 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.env
+//!
+//! The two pure members of a capability module: `entry_key` and
+//! `entry_value` cut a `K=V` line and reach nothing, so they are
+//! comptime-safe and they run on all three lanes — including lupin,
+//! which has no `env_*` builtins at all and resolves module bodies
+//! LAZILY, so a program that never calls one never learns they are
+//! missing. §14 says to state the pure exception explicitly; this file
+//! is where it is proved.
+//!
+//! The cut is at the FIRST `=` and the degenerate shapes are the point:
+//! a name may not contain `=` (that is `set`'s `invalid` row) and a value
+//! may, so everything after the first separator is value, and a line with
+//! no separator at all is all name.
+
+use std.env
+
+fn main() -> !int {
+    if env.entry_key("HOME=/home/wolf") != "HOME" { return 1 }
+    if env.entry_value("HOME=/home/wolf") != "/home/wolf" { return 2 }
+
+    // An empty value is a value, which is the whole reason `get` returns
+    // a row instead of a string.
+    if env.entry_key("EMPTY=") != "EMPTY" { return 3 }
+    if env.entry_value("EMPTY=") != "" { return 4 }
+
+    // No separator: all name, no value.
+    if env.entry_key("BARE") != "BARE" { return 5 }
+    if env.entry_value("BARE") != "" { return 6 }
+
+    // Only the first `=` separates.
+    if env.entry_key("A=b=c") != "A" { return 7 }
+    if env.entry_value("A=b=c") != "b=c" { return 8 }
+
+    // A leading separator is a line with an empty name — not a shape any
+    // host produces, and answered rather than refused.
+    if env.entry_key("=v") != "" { return 9 }
+    if env.entry_value("=v") != "v" { return 10 }
+
+    if env.entry_key("") != "" { return 11 }
+    if env.entry_value("") != "" { return 12 }
+
+    // Non-ASCII on both sides of the cut: `find` returns a byte offset
+    // that is a code-point boundary by construction, so the slice is
+    // safe and the text survives whole (§9's rule about whose offset it
+    // is).
+    if env.entry_key("CAFÉ=café") != "CAFÉ" { return 13 }
+    if env.entry_value("CAFÉ=café") != "café" { return 14 }
+    0
+}

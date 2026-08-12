@@ -1,0 +1,53 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time
+//!
+//! The clock half of `std.time`, asserted the only way a clock can be:
+//! as PREDICATES. No timestamp reaches stdout and no exact value is
+//! compared, because both would make the test a function of the host —
+//! the discipline `corpus/time/monotonic.lu` sets upstream, kept here.
+//!
+//! Two lanes: the checked tier and the native rung both execute the
+//! `time_*` builtins; lupin 0.1.6 has none of them and refuses at
+//! resolve, which is the whole reason `iso8601_render.lu` and
+//! `duration_algebra.lu` are separate files.
+//!
+//! Two notes that would sit above their call sites if `wolf fmt` allowed
+//! it — a `//` comment directly above a dotted call still splits the call
+//! at the dot (F-0016, fifth sprint running), so they live here: a
+//! non-positive sleep returns immediately and is not an error, and the
+//! wall-clock assertion is the one `corpus/time/monotonic.lu` makes.
+//!
+//! What is actually pinned: that `now` is non-decreasing, that a sleep
+//! really blocks (so `elapsed` crosses the requested span — a FLOOR, per
+//! the doc, hence `>=` and never `==`), that `unix_ms` is a wall clock in
+//! this century rather than the monotonic one, and that `now_iso8601`
+//! produces the fixed-width text `to_iso8601` promises.
+
+use std.time
+
+fn main() -> !int {
+    let first = time.now()
+    let second = time.now()
+    if time.as_millis(time.between(first, second)) < 0 { return 1 }
+    if time.is_after(first, second) { return 2 }
+
+    let start = time.now()
+    time.sleep(time.millis(3))
+    let waited = time.elapsed(start)
+    if time.as_millis(waited) < 3 { return 3 }
+
+    // The wall clock is a different clock: it has a calendar meaning and
+    // this assertion is the one `corpus/time/monotonic.lu` makes.
+    if time.unix_ms() <= 1577836800000 { return 4 }
+
+    time.sleep(time.millis(0))
+    time.sleep(time.millis(-5))
+
+    let stamp = time.now_iso8601()
+    if stamp.len != 24 { return 5 }
+    if !stamp.ends_with("Z") { return 6 }
+    if !stamp.starts_with("2") { return 7 }
+    if time.unix_iso8601().len != 24 { return 8 }
+    0
+}

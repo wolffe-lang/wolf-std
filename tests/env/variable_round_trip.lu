@@ -1,0 +1,64 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.env, err.row, err.else, err.propagate
+//!
+//! `set` then `get` is the honest test of an environment facade: it needs
+//! no ambient variable, so it does not depend on the machine that runs
+//! it, and it works identically on both executing lanes even though they
+//! write to different places (the checked machine keeps a machine-local
+//! overlay, the native rung the real process environment).
+//!
+//! Two lanes: lupin has no `env_*` builtins by design and refuses at
+//! resolve.
+//!
+//! The names all start `WOLF_STD_` because setting is process-global and
+//! is not undone at any scope exit — a test that sets a variable is
+//! writing to the program it runs in.
+//!
+//! Three notes that belong above their call sites and cannot go there —
+//! a `//` comment directly above a dotted call splits the call at the dot
+//! (F-0016, fifth sprint running). (1) Overwriting is a plain `set`;
+//! there is no "already present" outcome. (2) An empty value is a VALUE,
+//! so `get` answers `""` and `has` is true — the distinction a
+//! sentinel-returning `get` would destroy. (3) A value may contain `=`
+//! even though a name may not, and the entry helpers cut it the right
+//! way.
+//!
+//! Three rows are exercised through their MISS paths: `missing` for an
+//! absent variable, `invalid` for a name the platform cannot hold, and —
+//! deliberately not asserted by tag identity — nothing claims to know
+//! WHICH tag fired, because `has` is written to answer one question and
+//! `get` is where a caller that needs the difference goes.
+
+use std.env
+
+fn main() -> !int {
+    env.set("WOLF_STD_RT_VALUE", "tarn")?
+    if (env.get("WOLF_STD_RT_VALUE") else "?") != "tarn" { return 1 }
+    if !env.has("WOLF_STD_RT_VALUE") { return 2 }
+
+    env.set("WOLF_STD_RT_VALUE", "second")?
+    if (env.get("WOLF_STD_RT_VALUE") else "?") != "second" { return 3 }
+
+    env.set("WOLF_STD_RT_EMPTY", "")?
+    if (env.get("WOLF_STD_RT_EMPTY") else "?") != "" { return 4 }
+    if !env.has("WOLF_STD_RT_EMPTY") { return 5 }
+
+    // The `missing` row, through its miss path.
+    if (env.get("WOLF_STD_RT_NEVER_SET") else "<absent>") != "<absent>" { return 6 }
+    if env.has("WOLF_STD_RT_NEVER_SET") { return 7 }
+
+    // The `invalid` row: a name the platform cannot hold. Empty, and one
+    // containing the separator — both are the CALLER's argument and both
+    // are a row rather than a trap, because which names a host accepts
+    // differs between hosts (§2's trap rule).
+    var refusals: int = 0
+    env.set("", "x") else |_| { refusals = refusals + 1 }
+    env.set("WOLF=STD", "x") else |_| { refusals = refusals + 1 }
+    if refusals != 2 { return 8 }
+
+    env.set("WOLF_STD_RT_PAIR", "a=b")?
+    let got = env.get("WOLF_STD_RT_PAIR") else "?"
+    if got != "a=b" { return 9 }
+    0
+}

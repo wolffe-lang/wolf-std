@@ -1,0 +1,54 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fmt, mem.str.get
+//!
+//! `truncate_to` — the last of `std.fmt`'s reviewed contracts, and one of
+//! the four census rows sc09 re-owned to the modules that own them.
+//!
+//! The interesting inputs are all on one side: a `width` that lands
+//! INSIDE a multi-byte character. The function backs off to the boundary
+//! below, so the answer can be up to three bytes shorter than asked and
+//! is never longer and never a trap. `"é"` is two bytes and `"€"` is
+//! three and the emoji is four, which covers every backoff distance
+//! UTF-8 can produce.
+//!
+//! Three lanes: `str.get` executes on all of them (s37/#40), which is the
+//! whole reason this function stopped being a contract.
+
+use std.fmt
+
+fn main() -> !int {
+    // Already fits, or exactly fits.
+    if fmt.truncate_to("wolf", 10) != "wolf" { return 1 }
+    if fmt.truncate_to("wolf", 4) != "wolf" { return 2 }
+    if fmt.truncate_to("", 3) != "" { return 3 }
+
+    // Plain ASCII cuts.
+    if fmt.truncate_to("wolf", 2) != "wo" { return 4 }
+    if fmt.truncate_to("wolf", 1) != "w" { return 5 }
+
+    // Non-positive widths.
+    if fmt.truncate_to("wolf", 0) != "" { return 6 }
+    if fmt.truncate_to("wolf", -1) != "" { return 7 }
+
+    // Two-byte: one byte of backoff.
+    if fmt.truncate_to("café", 5) != "café" { return 8 }
+    if fmt.truncate_to("café", 4) != "caf" { return 9 }
+    if fmt.truncate_to("café", 3) != "caf" { return 10 }
+    if fmt.truncate_to("é", 1) != "" { return 11 }
+    if fmt.truncate_to("é", 2) != "é" { return 12 }
+
+    // Three-byte: two bytes of backoff.
+    if fmt.truncate_to("€uro", 3) != "€" { return 13 }
+    if fmt.truncate_to("€uro", 2) != "" { return 14 }
+    if fmt.truncate_to("€uro", 1) != "" { return 15 }
+
+    // Four-byte: three bytes of backoff, the widest UTF-8 goes.
+    if fmt.truncate_to("🐺x", 4) != "🐺" { return 16 }
+    if fmt.truncate_to("🐺x", 3) != "" { return 17 }
+    if fmt.truncate_to("🐺x", 5) != "🐺x" { return 18 }
+
+    // Width is BYTES, everywhere in this module and in `len` itself.
+    if fmt.truncate_to("é", 2).len != 2 { return 19 }
+    0
+}

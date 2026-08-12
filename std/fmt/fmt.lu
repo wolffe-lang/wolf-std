@@ -55,26 +55,16 @@
 //!   is `int_min()` instead of an overflow trap. Positive `int_min()` has
 //!   no value to be, and still traps.
 //!
-//! **One function here is a contract and not code, and its blocker is
-//! gone.** `truncate_to` could not be written for the reason fifteen
-//! `std.str` functions could not: cutting a string at a byte offset
-//! requires knowing the offset is a code-point boundary, the only way to
-//! ask was to slice there, and slicing at a non-boundary traps uncatchably
-//! (D30, F-0018). s37's `str.get` answers that question with a row, and
-//! `std.str` spends it in full as of sc09 — so `truncate_to` is now three
-//! lines over `str.get` (walk down from `width` until the range is
-//! accepted) and is UNWRITTEN rather than unwritable. It waits for a
-//! `std.fmt` sprint; the contract below is unchanged.
-//!
-//! ```text
-//! truncate_to(s: str, width: int) -> str
-//!     The longest prefix of `s` that is at most `width` BYTES long and
-//!     ends on a code-point boundary; `s` itself when it already fits.
-//!     Total: never traps, never splits a code point, and never appends
-//!     an ellipsis (that is the caller's to add, and its width is the
-//!     caller's to subtract). Writable at these pins over `str.get`
-//!     (sc09); scheduled, not blocked.
-//! ```
+//! **This module's one blocked contract is code as of sc10, and nothing
+//! here is a contract now.** `truncate_to` could not be written for the
+//! reason fifteen `std.str` functions could not: cutting a string at a
+//! byte offset requires knowing the offset is a code-point boundary, the
+//! only way to ask was to slice there, and slicing at a non-boundary
+//! traps uncatchably (D30, F-0018). s37's `str.get` asks instead of
+//! faulting, `std.str` spent that primitive in sc09, and sc10 spends it
+//! here: the function is a walk down from `width` until the range is
+//! accepted — three iterations at worst, because no UTF-8 scalar is wider
+//! than four bytes — and it is at the bottom of this file.
 //!
 //! Float printing and parsing live in `std.fmt.float`: wolf has no
 //! overloading, so one module cannot spell both `to_str(n: int)` and
@@ -520,4 +510,60 @@ pub fn parse_bool(s: str) -> bool ! {parse} {
         return false
     }
     return parse
+}
+
+/// The longest prefix of `s` that is at most `width` BYTES long and ends
+/// on a code-point boundary; `s` itself when it already fits.
+///
+/// Total: never traps, never splits a code point, and never appends an
+/// ellipsis — that is the caller's to add, and its width is the caller's
+/// to subtract. A `width` of zero or less answers `""`.
+///
+/// Width is bytes, like every other width in this module (§11) and like
+/// `len` itself (§9). A prefix that would end inside a multi-byte
+/// character is backed off to the boundary below it, so the answer can be
+/// up to three bytes shorter than `width` and is never longer.
+///
+/// **The census row this closes, and how.** For five sprints this was a
+/// reviewed contract: cutting at a byte offset needs to know the offset
+/// is a boundary, the only way to ask was to slice there, and slicing
+/// wrong traps uncatchably (F-0018). s37's `str.get` asks instead of
+/// faulting, so the body is a walk down from `width` until the range is
+/// accepted — three iterations at worst, because no UTF-8 scalar is
+/// wider than four bytes.
+///
+/// The recoverable slice is right here and the language's is not: `width`
+/// is the CALLER's offset (§9's sc09 rule), so a bad one must be refused
+/// rather than faulted on.
+///
+/// ```wolf-doc-example
+/// fmt.truncate_to("wolf", 10) == "wolf"
+/// fmt.truncate_to("wolf", 4) == "wolf"
+/// fmt.truncate_to("wolf", 2) == "wo"
+/// fmt.truncate_to("wolf", 0) == ""
+/// fmt.truncate_to("wolf", -1) == ""
+/// fmt.truncate_to("café", 5) == "café"
+/// fmt.truncate_to("café", 4) == "caf"
+/// fmt.truncate_to("café", 3) == "caf"
+/// fmt.truncate_to("é", 1) == ""
+/// ```
+pub fn truncate_to(s: str, width: int) -> str {
+    if width <= 0 {
+        return ""
+    }
+    if s.len <= width {
+        return s
+    }
+    var w = width
+    while w > 0 {
+        // `w` is positive, so a HIT is never the empty string and the
+        // fallback is unambiguous: `""` here always means "that offset is
+        // inside a code point, back off one byte".
+        let piece = s.get(0..w) else ""
+        if piece != "" {
+            return piece
+        }
+        w = w - 1
+    }
+    ""
 }

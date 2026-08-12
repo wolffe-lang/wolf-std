@@ -1,0 +1,50 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.hex
+//!
+//! `encode_str` — hex over a `str`'s UTF-8 bytes, and the second of the
+//! four census rows sc09 re-owned. It was blocked for four sprints on
+//! nothing more than a byte accessor (F-0035); `s.bytes()` is that
+//! accessor and the body is one delegation.
+//!
+//! Total by construction: every wolf `str` is well-formed UTF-8, so there
+//! is no input to refuse. The non-ASCII cases are the ones worth pinning
+//! — they are where a byte-per-character implementation would be wrong —
+//! and the agreement with `encode(bytes.from_str(s))` is asserted rather
+//! than assumed, because two functions that must agree get a test that
+//! says so (§9).
+
+use std.hex
+
+fn main() -> !int {
+    if hex.encode_str("") != "" { return 1 }
+    if hex.encode_str("wolf") != "776f6c66" { return 2 }
+    if hex.encode_str("0") != "30" { return 3 }
+    if hex.encode_str("\n") != "0a" { return 4 }
+    if hex.encode_str("\x00") != "00" { return 5 }
+
+    // Two, three and four byte scalars: the answer is the UTF-8, not one
+    // byte per character.
+    if hex.encode_str("é") != "c3a9" { return 6 }
+    if hex.encode_str("€") != "e282ac" { return 7 }
+    if hex.encode_str("🐺") != "f09f90ba" { return 8 }
+    if hex.encode_str("é").len != 4 { return 9 }
+
+    // The forward round trip: what `encode_str` produces decodes back to
+    // the same bytes. The other direction needs `bytes.to_str`, which is
+    // still a contract (F-0057), and this module says so rather than
+    // shipping an ASCII-only inverse.
+    let back = hex.decode(hex.encode_str("wolf")) else List[int]()
+    if back.len != 4 { return 10 }
+    if back[0] != 119 { return 11 }
+    if back[3] != 102 { return 12 }
+
+    let wide = hex.decode(hex.encode_str("é")) else List[int]()
+    if wide.len != 2 { return 13 }
+    if wide[0] != 195 { return 14 }
+    if wide[1] != 169 { return 15 }
+
+    // Uppercase is the caller's `.upper()`, not a second function.
+    if hex.encode_str("wolf").upper() != "776F6C66" { return 16 }
+    0
+}

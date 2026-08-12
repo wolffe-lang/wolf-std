@@ -11,15 +11,34 @@
 //! That was F-0018, and a `parse` written by guessing would have died on
 //! `{"name": "café"}` — legal input.
 //!
-//! **That blocker is gone.** s37's `s.get(a..b) -> str ! {none}` answers
-//! the boundary question instead of faulting on it, and `std.str` spends
-//! it in full as of sc09 (`find`, `split_once`, `code_points`, the lot).
-//! So `parse`, `unescape` and `escape`'s one refusal are all WRITABLE at
-//! these pins; they are simply not written, because the sprint that spent
-//! the primitive owned `std.str` and `std.bytes`, not this module. They
-//! stay reviewed contracts below — with a scheduling note now, not a
-//! language gap — and the day a `std.json` sprint lands them, nothing in
-//! the value model or the serializer moves.
+//! **That blocker is gone, and sc09 concluded from it that all three were
+//! writable. sc10 took the census row, re-measured, and found TWO OTHER
+//! FINDINGS standing behind the famous one.** The lesson is worth more
+//! than the functions: "the blocker retired" is not "writable" until every
+//! finding on the SIGNATURE has been re-measured, not just the one that
+//! was in the way last time.
+//!
+//! - `parse` is blocked by **F-0037**, not F-0018. Its return type is an
+//!   enum and its signature carries an error row, and that combination
+//!   takes the miss path on every call — one line, no diagnostic,
+//!   re-measured unmoved at the sc10 pins. The SCANNER is writable now;
+//!   the signature is not, and neither is `get`/`at`, withdrawn at sc05
+//!   for the same reason.
+//! - `unescape` is blocked by **F-0057**, not F-0018. Walking the text is
+//!   fine; the walk has to PRODUCE a code point from `\uXXXX`, and nothing
+//!   in the language builds a `str` from a number — no `from_utf8`, no
+//!   `char`, no `strbuf.push_byte`. An ASCII-only `unescape` would be a
+//!   border post that refuses text, which §9 forbids std from shipping.
+//! - `escape`'s one refusal IS writable at these pins, over
+//!   `str.code_points`/`char_offsets`, and is the one of the three that is
+//!   genuinely just unwritten. It is left for the sprint that lands
+//!   `parse`, because making `escape` total changes `stringify`'s row from
+//!   `{boundary, deep}` to `{deep}` and that ripples through every test
+//!   and doc example here — a signature change worth making once, beside
+//!   the function that makes this module a reader.
+//!
+//! The three reviewed contracts below are unchanged, and the day they land
+//! nothing in the value model or the serializer moves.
 //!
 //! What that leaves is still most of a JSON library: the value model, the
 //! accessors, and a serializer that turns wolf data into text. A program
@@ -57,9 +76,8 @@
 //! `lupin = run, wolfc = unsupported, native = unsupported`, exactly as
 //! the sprint contract's non-target predicted.
 //!
-//! Reviewed contracts, WRITABLE at these pins over `str.get` and the rest
-//! of the s37 set (the blocker retired at sc09) and landing verbatim in a
-//! `std.json` sprint:
+//! The reviewed contracts themselves, with the blocker each one actually
+//! has (re-measured at the sc10 pins, not inherited):
 //!
 //! ```text
 //! parse(s: str) -> Value ! {syntax, deep}
@@ -89,12 +107,18 @@
 //!     into a document is data, and a caller cannot have checked what the
 //!     document contains. Blocked by F-0037 with `get`; `as_arr` plus the
 //!     language's own indexing is today's spelling.
-//! unescape(s: str) -> str ! {boundary}
+//! unescape(s: str) -> str ! {parse}
 //!     The inverse of `escape`: `\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`,
 //!     `\t` and `\uXXXX` (surrogate pairs joined into one code point),
-//!     with any other backslash sequence and any lone surrogate a
-//!     `boundary` miss. Blocked for the same reason as `parse`: the scan
-//!     cannot pass a code point of unknown length.
+//!     with any other backslash sequence and any lone surrogate a miss.
+//!     The tag is `parse` and not `boundary` now: `boundary` was the
+//!     interim mark for "this pin cannot find the code-point boundary"
+//!     (§11) and that condition is gone, so what is left is ordinary bad
+//!     data. **Blocked by F-0057, not by F-0018**: the walk is writable
+//!     and its OUTPUT is not — decoding `\u00e9` means building `"é"` out
+//!     of the number 233, and nothing in the language turns a scalar into
+//!     a `str`. An ASCII-only version would refuse text, which §9
+//!     forbids.
 //! ```
 
 use std.fmt

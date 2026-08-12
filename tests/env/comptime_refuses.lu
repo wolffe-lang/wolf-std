@@ -1,0 +1,34 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.env, comptime.sandbox, comptime.sandbox.env
+//!
+//! **D33, held as a rejection: no environment at compile time.** The
+//! capability `std.env` carries (`env`, per I13) is refused categorically
+//! in the comptime sandbox, and the table's reason names both halves:
+//! *determinism and confinement — environment contents differ per machine
+//! and may hold secrets*. It is the one category where BOTH reasons
+//! apply, which is why a build that reads `$PATH` is two different bugs
+//! at once.
+//!
+//! The refused call is the BUILTIN, one level below the facade, because
+//! the comptime engine has no cross-module call at this pin (F-0051) —
+//! the same witness shape `tests/net/comptime_refuses.lu` and
+//! `tests/time/comptime_refuses.lu` use. The diagnostic is
+//! `E0701: `env_get` reaches environment variables, which comptime code
+//! can never touch`.
+//!
+//! The pure `env.entry_key` below runs at RUN time and keeps the import
+//! used (an unused import is E0305).
+
+use std.env
+
+comptime fn probe(name: str) -> str ! {missing, utf8} {
+    env_get(name)
+}
+
+fn main() -> !int {
+    const HOME = probe("HOME") else |_| ""
+    let key = env.entry_key("PATH=/usr/bin")
+    print("key: {key} home: {HOME}")
+    0
+}

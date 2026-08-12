@@ -1104,3 +1104,122 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+
+# ---- sc10: std.time, std.env, and the nursery's first tenant ----
+# THE sc10 PIN BUMP is wolf trunk `8321aba` -> `e94b879` (the s40 + s70 + s69
+# wave: os/time/json builtins, the match tier, the idiom arbiter) with lupin
+# held at 0.1.6. lupin 0.1.6 names `13b811f` as its conformance pin, which is
+# TWO waves behind the compiler now — the lawful two-upstream drift this repo
+# has always recorded, at its widest so far, and the whole reason the three
+# new modules' lupin columns read the way they do: the interpreter has no
+# `time_*`, no `env_*` and no `json_*` builtins because they did not exist at
+# its pin. That is not a refusal by design like `fs`/`net`; it is a drift, and
+# it closes on the next lupin release rather than on a design decision.
+#
+# THE SHAPE OF THE THREE NEW MODULES' ROWS, stated once here instead of in
+# fourteen file headers:
+#
+# - `std.time` and `std.env` are capability modules (I13 `Clock`, `env`) whose
+#   builtin tier BOTH compiler rungs execute — so a clock/env test is
+#   `run` on wolfc and native and `unsupported` on lupin. Their PURE members
+#   (`to_iso8601` and the Duration algebra; `entry_key`/`entry_value`) run on
+#   all three, because lupin resolves module bodies lazily and never reaches a
+#   builtin it does not have. That per-test asymmetry inside one module is
+#   sc07's `std.io` lesson and sc08's `std.net` lesson, now twice more.
+# - `std.x.json` is the opposite shape and it is NOT a capability module: the
+#   `json_*` family is pure (no I13 tag, no sandbox category), and it runs on
+#   the CHECKED TIER ALONE — the native rung refuses it by name ("json
+#   builtins in native lowering (checked lane only at s40)") and lupin is
+#   behind the pin. One lane out of three is the measured reason D31's
+#   nursery is where it lives; `x/json/path_helpers.lu` is its one two-lane
+#   row, on the lazy-resolution rule again.
+# - The comptime refusals are `fail(E0701)` on both compiler rungs and
+#   `unsupported` under lupin, exactly as `net/comptime_refuses.lu` records —
+#   and there is deliberately no such file for `x.json`, because a pure
+#   builtin family has no capability to refuse: the comptime engine answers
+#   `unsupported` with no diagnostic at all (F-0060).
+
+[tests."time/iso8601_render.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."time/duration_algebra.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."time/monotonic.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."time/comptime_refuses.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."env/entry_helpers.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."env/variable_round_trip.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."env/args_and_vars.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."env/comptime_refuses.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."x/json/query_kernel.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+[tests."x/json/typed_getters.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+[tests."x/json/rows_and_boundaries.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
+[tests."x/json/path_helpers.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
+# The two census rows sc09 re-owned to `std.fmt` and `std.hex`, landed. Both
+# are three-lane, for the same structural reason sc09's sixteen were: `str.get`
+# and `s.bytes()` execute on every rung, and neither body touches a generic, a
+# `Map`, a `const` or a `trait`/`enum`/`impl` module.
+[tests."fmt/truncate_boundaries.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."hex/encode_text.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# F-0052's closure, held as a test. s70's match tier made a handler's `match`
+# discriminate on every lane; sc09's rule says a claim about what an
+# implementation ANSWERS is a test or it is a rumour, so this is the test. The
+# arms are written in both orders on purpose — a first-arm-always
+# implementation cannot satisfy both halves.
+[tests."errors/handler_discriminates.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
