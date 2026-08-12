@@ -11,10 +11,16 @@
 # nightly lane watches the drift, report-never-gate.
 
 [lupin]
-# 0.1.6 (sc09 bump, tag v0.1.6). lupin names `13b811f` — the sc08 data pin —
-# as its own conformance pin, while the `wolf` binary below sits at trunk
-# `8321aba`: the lawful two-upstream drift this file's header describes, with
-# the nightly lane watching it. The drift narrowed by one wave this bump.
+# 0.1.6, HELD at sc10 (v0.1.7 exists and is deliberately not chased — a pin
+# bump is a sprint's decision, not a release's). lupin names `13b811f` — the
+# sc08 data pin — as its own conformance pin, while the `wolf` binary below
+# sits at trunk `e94b879`: the lawful two-upstream drift this file's header
+# describes, and it is now THREE waves wide, the widest this repo has
+# recorded. That drift is the whole explanation for sc10's lupin column: the
+# interpreter has no `time_*`, `env_*` or `json_*` builtins because they did
+# not exist at its pin, which is a drift rather than a design refusal like
+# `fs`/`net`, and it closes on a release rather than on a decision.
+# What the sc09 bump changed, unchanged here:
 # What the bump changes for this repo, all re-measured:
 # - **this machine runs WARNING analyses now** (wolf-interp#19): eleven
 #   shared-analysis lints (W0304–W0309, W0401, W0602, W1101, W1102, W1302)
@@ -43,34 +49,58 @@ pin = "13b811ffc03092c78873bed1cc9b400d166f04fd"
 version = "0.0.1"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver -p wolf_rt.
-# sc09 bump: trunk 8321aba — the s36 deterministic-scheduler merge plus its
-# two off-linux follow-ups ("gate the w1- token validator behind the task
-# layer's linux posture"). NOTHING in the wave reaches this repo's surface:
-# s36 is the scheduler (seeded picks, virtual timers, replay from seed or
-# `w1-` token, zero scheduler symbols in release builds) and std ships no
-# concurrent code at all. Re-measured anyway, because a pin is a pin:
-# - the builtin `str` set is unchanged from 13b811f (the s37 21-method set,
-#   `get` included), which is what sc09 spends;
-# - `count("")`, `split("")` and `replace(s, "", …)` are still REFUSED on
-#   the checked lane ("count of an empty needle") while native DEFINES them
-#   (0, one whole piece, identity) — the three-lane split F-0055 files and
-#   `std.str` now guards ahead of every delegate;
-# - `repeat(s, n)` with `n < 0` still traps `bounds` on the checked lane and
-#   answers `""` natively and under lupin (F-0056; `std.str.repeat` guards);
+# sc10 bump: trunk e94b879 — THREE merged waves, and this is the largest
+# surface change any pin bump has brought this repo.
+# - **s40 (os, time and json — "argv arrives")**: fourteen new builtins in
+#   three families. `env_args`/`env_get`/`env_set`/`env_vars`/`os_cwd`/
+#   `os_exit` (I13 `env`/`exec`) and `time_now_ms`/`time_unix_ms`/
+#   `time_sleep_ms` (I13 `Clock`) execute on BOTH compiler rungs;
+#   `os_spawn`/`os_wait`/`os_kill` and `json_valid`/`json_get`/`json_type`/
+#   `json_len` are checked-lane only, the native rung refusing each family
+#   by name. The json four are the one PURE builtin family — no capability
+#   tag, no sandbox category — and upstream's own comment names
+#   `std.x.json` as their consumer. sc10 spends `time`, `env` and `json`.
+# - **s70 (the match tier)**: **F-0052 IS CLOSED** (wolf-lang#48). A `match`
+#   inside an `else` handler resolves bare idents against the scrutinee's
+#   tags before binding, so it discriminates correctly — re-measured here on
+#   all three lanes with the arms written in both orders, and held as
+#   `tests/errors/handler_discriminates.lu`. Also #54 (str patterns are
+#   literal patterns) and #55 (`l[i] = v` through bracket places).
+# - **s69 (the idiom arbiter)**: eleven new convention lints, W0310–W0316 and
+#   W0602–W0604 and W1002/W1003, several of which police exactly what
+#   API-CONVENTIONS §1 already says (no `get_` prefix, `is_` answers `bool`,
+#   `as_` borrows, bare `get` carries a row, a `pub` item is documented).
+#   Nothing in `std/` trips one that this rig can see — but the rig can only
+#   see the ENTRY file (F-0053), so that is not the same as clean.
+# Re-measured at this sha rather than assumed:
+# - the builtin `str` set is unchanged (the s37 21-method set, `get`
+#   included); `count("")`/`split("")`/`replace(s, "", …)` are still refused
+#   on the checked lane and defined natively (F-0055, `std.str` guards);
+# - `/` truncates toward zero and `%` takes the dividend's sign on all three
+#   lanes (`-7 / 2 == -3`, `-7 % 2 == -1`) — measured because `std.time`'s
+#   calendar arithmetic needs to know, and it corrects to floor explicitly
+#   rather than assume;
 # - `--deny-warnings` is STILL rejected by `conform-run` (F-0046/F-0053,
 #   re-verified at this sha: `unknown flag`), so the warning gate is still
-#   the record's `warnings` array, now read on two lanes (lupin 0.1.6).
+#   the record's `warnings` array, read on two lanes;
+# - F-0037 (an enum through an error row is always a miss) is UNMOVED, which
+#   is why `std.json.parse` is still a contract after its F-0018 blocker
+#   retired;
+# - F-0034 is unmoved and now costs a module pair: `std.x.json` and
+#   `std.json` are both `json` to an importer, so one program may not import
+#   both (E0306 on both rungs, `unsupported` under lupin — F-0058).
 #
-# THE SECOND GATE (F-0024's lesson, applied for the sixth time): the pin is
+# THE SECOND GATE (F-0024's lesson, applied for the seventh time): the pin is
 # verified by `cargo test --workspace` AND `cargo run -p xtask -- ci` in a
-# clean scratch clone at the sha. Both are green at 8321aba **on their first
-# attempt** — F-0054's proc-seam flakiness (each gate failed once at
-# 13b811f) did not reproduce here, on 1-for-1 evidence. The finding stays
-# open: one clean pair is not proof the timing dependence is gone, and the
-# lawful posture remains "state the attempt count in this note".
+# clean scratch clone at the sha. Both are green at e94b879 **on their first
+# attempt**, which is the second clean pair in a row; F-0054 stays open on
+# the same reasoning (two clean pairs are not proof a timing dependence is
+# gone) and the lawful posture remains "state the attempt count in this
+# note". The sha is also green in upstream CI.
 #
 # The native rung needs `libwolf_rt.a` beside the binary
 # (`cargo build -p wolf_rt` at the same sha, or `$WOLF_RT_LIB`); doctor
 # reports its absence and the lane goes dark rather than silent. It executes
-# the fs/io tier now and refuses the net tier by name.
-pin = "8321aba4e77d16f598a77e7934c146700cbcfa46"
+# the fs/io and os/env/time tiers now and refuses the net, process and json
+# tiers by name.
+pin = "e94b8790c738f05082d64a8c4a12e10ced914b45"
