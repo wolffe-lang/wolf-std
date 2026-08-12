@@ -139,5 +139,4 @@ ran is not documentation.
 ## Commits
 
 Chunked (one logical change), terse imperative, <250 chars, tests in the
-same commit as the code. No coauthor lines, no generated-with trailers,
-never `git add -A`.
+same commit as the code. Never `git add -A`.
