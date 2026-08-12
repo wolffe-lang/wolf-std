@@ -170,7 +170,18 @@ pub struct VersionLine {
     pub version: String,
     /// Short pin when the tool names one: `lupin 0.1.0 (wolf-interp, pin
     /// cbde620)` → `Some("cbde620")`; `wolf 0.0.1 (pre-alpha)` → `None`.
+    /// Read from the FIRST line only (see `pairing`).
     pub pin_short: Option<String>,
+    /// The remaining lines of a multi-line `--version`, verbatim.
+    ///
+    /// wolf 0.1.0 (the r01 release) answers two lines: its own identity,
+    /// then `paired with lupin 0.1.8 (reference interpreter), pin
+    /// 7886559`. That second sha is the INTERPRETER's commit in the
+    /// wolf-interp repository, not a wolf-lang commit, so reading it as
+    /// this tool's conformance pin compares two histories and fails
+    /// doctor at every pin (measured at sc11's bump). Identity is the
+    /// first line's business; the rest is reported and never gated.
+    pub pairing: Option<String>,
 }
 
 pub fn probe_version(bin: &Path) -> Result<VersionLine, String> {
@@ -190,7 +201,10 @@ pub fn probe_version(bin: &Path) -> Result<VersionLine, String> {
         .ok_or_else(|| format!("unrecognized --version line: `{}`", got.stdout.trim()))
 }
 
-pub fn parse_version_line(line: &str) -> Option<VersionLine> {
+pub fn parse_version_line(text: &str) -> Option<VersionLine> {
+    let mut lines = text.lines();
+    let line = lines.next()?;
+    let pairing: Vec<&str> = lines.map(str::trim).filter(|l| !l.is_empty()).collect();
     let mut words = line.split_whitespace();
     let name = words.next()?.to_string();
     let version = words.next()?.to_string();
@@ -207,6 +221,7 @@ pub fn parse_version_line(line: &str) -> Option<VersionLine> {
         name,
         version,
         pin_short,
+        pairing: (!pairing.is_empty()).then(|| pairing.join(" · ")),
     })
 }
 
@@ -220,9 +235,29 @@ mod tests {
         assert_eq!(l.name, "lupin");
         assert_eq!(l.version, "0.1.0");
         assert_eq!(l.pin_short.as_deref(), Some("cbde620"));
+        assert_eq!(l.pairing, None);
         let w = parse_version_line("wolf 0.0.1 (pre-alpha)").unwrap();
         assert_eq!(w.pin_short, None);
         assert!(parse_version_line("garbage").is_none());
+    }
+
+    /// The r01 release's two-line `--version`: the second line names
+    /// the INTERPRETER's sha, which is not this tool's pin. Identity
+    /// comes from line one; the pairing is reported, never gated.
+    #[test]
+    fn a_pairing_line_is_not_this_tools_pin() {
+        let w = parse_version_line(
+            "wolf 0.1.0 (wolfgang)\n\
+             paired with lupin 0.1.8 (reference interpreter), pin 7886559\n",
+        )
+        .unwrap();
+        assert_eq!(w.name, "wolf");
+        assert_eq!(w.version, "0.1.0");
+        assert_eq!(w.pin_short, None);
+        assert_eq!(
+            w.pairing.as_deref(),
+            Some("paired with lupin 0.1.8 (reference interpreter), pin 7886559")
+        );
     }
 
     #[test]

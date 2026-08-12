@@ -62,17 +62,22 @@ const WOLFC_WAIVERS: &[(&str, &str, &str)] = &[];
 /// Two reasons put a module here, and sc10 added the second.
 ///
 /// 1. **An OS CAPABILITY (I13) an implementation may honestly not have**
-///    (sc07): `fs`, `io`, `net`, and now `time` (`Clock`) and `env`
-///    (`env`) — lupin has none of those builtin tiers, by design, with a
-///    sentence in its refusal.
+///    (sc07): `fs`, `io`, `net`, `time` (`Clock`), `env` (`env`) and — from
+///    sc11 — `process` (`Exec`). At the sc11 pin lupin has the `time_*`
+///    and `env_*` tiers and declines `fs`, `net`, `json` and the process
+///    trio, each with a sentence in its refusal; the list stays as it is
+///    because a lane an implementation may honestly not have is what the
+///    entry records, not the lane it happens to have today.
 /// 2. **A builtin tier only one rung has landed** (sc10): `x.json`
 ///    reaches no capability at all — the `json_*` family is the one PURE
 ///    builtin family, no I13 tag, no sandbox category — and its kernels
 ///    execute on the checked tier alone at s40, because the native mirror
-///    and the interpreter's own are unwritten. The honesty this list
-///    encodes is the same either way: the example ran somewhere, and the
-///    lanes that refused said so.
-const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "x.json"];
+///    and the interpreter's own are unwritten. `process` is in this class
+///    too, from the other direction: the native rung refuses the trio by
+///    name, so its examples run on the checked lane alone. The honesty this
+///    list encodes is the same either way: the example ran somewhere, and
+///    the lanes that refused said so.
+const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "process", "x.json"];
 
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
@@ -483,10 +488,14 @@ mod tests {
         // joined in sc10 for the same reason at the `Clock` and `env`
         // tiers; `x.json` joined in sc10 for a DIFFERENT reason, which is
         // why the constant's doc names two — it reaches no capability at
-        // all and its builtin tier has one rung.
+        // all and its builtin tier has one rung. `process` joined in sc11
+        // for BOTH reasons at once: `Exec` is a capability an
+        // implementation may decline entirely (lupin does, by design) and
+        // the trio's native rung is unwritten, so its examples run on the
+        // checked lane alone.
         assert_eq!(
             CAPABILITY_MODULES,
-            &["fs", "io", "net", "time", "env", "x.json"]
+            &["fs", "io", "net", "time", "env", "process", "x.json"]
         );
     }
 

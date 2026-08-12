@@ -4,103 +4,135 @@
 # Resolution order: $LUPIN_BIN / $WOLF_BIN → .wolf-bin/ → PATH.
 #
 # `pin` is the wolf-lang commit the binary conforms to. lupin names its
-# pin in `--version` and doctor verifies it; wolf pre-M1 names none
-# ("wolf 0.0.1 (wolfgang)") — doctor reports that pin as trusted from
-# acquisition, unverifiable from the binary. Note the two binaries may
-# lawfully sit at different wolf-lang pins (two moving upstreams); the
-# nightly lane watches the drift, report-never-gate.
+# pin in `--version` and doctor verifies it; `wolf` names none of its own
+# — and as of 0.1.0 it names its PAIRING instead, on a second line
+# ("paired with lupin 0.1.8 (reference interpreter), pin 7886559"). That
+# sha is the INTERPRETER's commit in wolf-interp, not a wolf-lang commit,
+# so the rig reads identity from the first line only and reports the
+# pairing without gating it (F-0064, and the doctor line that shows it).
+# The two binaries may lawfully sit at different wolf-lang pins (two
+# moving upstreams); the nightly lane watches the drift, report-never-gate.
 
 [lupin]
-# 0.1.6, HELD at sc10 (v0.1.7 exists and is deliberately not chased — a pin
-# bump is a sprint's decision, not a release's). lupin names `13b811f` — the
-# sc08 data pin — as its own conformance pin, while the `wolf` binary below
-# sits at trunk `e94b879`: the lawful two-upstream drift this file's header
-# describes, and it is now THREE waves wide, the widest this repo has
-# recorded. That drift is the whole explanation for sc10's lupin column: the
-# interpreter has no `time_*`, `env_*` or `json_*` builtins because they did
-# not exist at its pin, which is a drift rather than a design refusal like
-# `fs`/`net`, and it closes on a release rather than on a decision.
-# What the sc09 bump changed, unchanged here:
-# What the bump changes for this repo, all re-measured:
-# - **this machine runs WARNING analyses now** (wolf-interp#19): eleven
-#   shared-analysis lints (W0304–W0309, W0401, W0602, W1101, W1102, W1302)
-#   with the counterparty's spans, and the record's `warnings` array is
-#   populated per `[proto.record.warn]`. The compiler-only four (W0402,
-#   W0601, W0801, W1001) stay honest-absent — so the lupin lane is a
-#   SECOND warning signal for this rig, still entry-file-only (F-0053).
-# - **reads through frozen containers are legal** (wolf-interp#20, spec
-#   `[mem.region.freeze.4]`): a method receiver that does not change is not
-#   written back, so `frozen[0].body.words()` reads where 0.1.5 trapped
-#   `region-fault`. Nothing in this repo's ledger moved on it (no std test
-#   reads through a frozen container), recorded because sc02's freeze entry
-#   in the guide claimed less than the machine now does.
-# - **E1101/E1102/E1103 and E0004 reject at this machine's resolve rung**
-#   with wolfc's codes and spans — the #41 capture law is enforced on both
-#   implementations at last, which retires the guide's "silent wrong answer
-#   on one lane" warning about task captures.
-# What it does NOT change: no `fs_*` builtins, no `read_line`, no `net_*` (all
-# three declined by design, with a sentence in the refusal), `var k = 0` is
-# still `i32`, and `count("")`/`split("")`/`replace("", …)` are still
-# refused as `unsupported` rather than defined (F-0055 — std guards them).
-version = "0.1.6"
-pin = "13b811ffc03092c78873bed1cc9b400d166f04fd"
+# 0.1.8 (sc11 bump, from 0.1.6 — v0.1.9 exists and is deliberately not
+# chased: a pin bump is a sprint's decision, not a release's). lupin 0.1.8
+# is the release wolf 0.1.0 was differentially paired against, and it names
+# `26fa98e` — the s72 merge — as its own conformance pin, two waves ahead of
+# the 0.1.6 pin this repo held at sc10. The two-upstream drift is therefore
+# NARROWER than at any point since sc07: the interpreter is behind the
+# `wolf` binary below by s41 (llvm), s51 (the package manager), s73 (native
+# conc) and the fmt fuzz work, and by nothing that std wraps.
+#
+# What the bump changes for this repo, all re-measured at the bump:
+# - **the `time_*` family and FOUR FIFTHS of the os/env family EXECUTE here
+#   now** (they arrived with s40, three waves after 0.1.6's pin):
+#   `time_now_ms`, `time_unix_ms`, `time_sleep_ms`, `env_args`, `env_get`,
+#   `env_set`, `os_cwd` and `os_exit` all run on the interpreter lane — two
+#   ledger rows here plus `std.process`'s `exit`. The sc10 note called that
+#   absence a DRIFT rather than a design refusal and said it would close on a
+#   release rather than on a decision; it did, exactly that way. **The fifth
+#   env call is missing**: `env_vars` "does not resolve" (F-0070), which is why
+#   `tests/env/args_and_vars.lu` keeps its dark lupin column. Measured one
+#   builtin at a time, because "the family landed" is the kind of sentence that
+#   is four-fifths true and entirely wrong.
+# - **`json_*` is DECLINED BY DESIGN, and that is a change of KIND rather
+#   than of lane**: `json_valid` under 0.1.8 is
+#   `unsupported: … its reference kernel is the counterparty's
+#   `wolf_mem::json`, and this machine declines the surface rather than risk
+#   a second, guessed RFC 8259 reading`. So `std.x.json`'s dark interpreter
+#   column is now a posture like `fs`/`net`, not a wave of drift, and the
+#   guide entry that said otherwise is corrected.
+# - **the process trio is DECLINED BY DESIGN too** — `os_spawn` answers
+#   `unsupported: … this machine runs no child processes by design, so the
+#   tier is declined rather than mocked`. sc11's `std.process` therefore has
+#   one executing lane from the day it lands, and the refusal is a sentence
+#   rather than a gap.
+# - `else |Tag(p)|` binds the payload here as it does on both compiler rungs
+#   (s71/#43); the empty needle is DEFINED (`count("")` 0, `split("")` one
+#   whole piece, `replace(s, "", …)` identity) and a negative `repeat` traps
+#   `assert`, both on this lane too — F-0055 and F-0056 are closed and
+#   `std.str`'s six guards are gone.
+# What it does NOT change: no `fs_*`, no `read_line`, no `net_*` (all three
+# declined by design, each with a sentence in the refusal), and `var k = 0`
+# is still `i32`.
+version = "0.1.8"
+pin = "26fa98e73a72b13f5650c475330dd83427077860"
 
 [wolf]
-version = "0.0.1"
+version = "0.1.0"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver -p wolf_rt.
-# sc10 bump: trunk e94b879 — THREE merged waves, and this is the largest
-# surface change any pin bump has brought this repo.
-# - **s40 (os, time and json — "argv arrives")**: fourteen new builtins in
-#   three families. `env_args`/`env_get`/`env_set`/`env_vars`/`os_cwd`/
-#   `os_exit` (I13 `env`/`exec`) and `time_now_ms`/`time_unix_ms`/
-#   `time_sleep_ms` (I13 `Clock`) execute on BOTH compiler rungs;
-#   `os_spawn`/`os_wait`/`os_kill` and `json_valid`/`json_get`/`json_type`/
-#   `json_len` are checked-lane only, the native rung refusing each family
-#   by name. The json four are the one PURE builtin family — no capability
-#   tag, no sandbox category — and upstream's own comment names
-#   `std.x.json` as their consumer. sc10 spends `time`, `env` and `json`.
-# - **s70 (the match tier)**: **F-0052 IS CLOSED** (wolf-lang#48). A `match`
-#   inside an `else` handler resolves bare idents against the scrutinee's
-#   tags before binding, so it discriminates correctly — re-measured here on
-#   all three lanes with the arms written in both orders, and held as
-#   `tests/errors/handler_discriminates.lu`. Also #54 (str patterns are
-#   literal patterns) and #55 (`l[i] = v` through bracket places).
-# - **s69 (the idiom arbiter)**: eleven new convention lints, W0310–W0316 and
-#   W0602–W0604 and W1002/W1003, several of which police exactly what
-#   API-CONVENTIONS §1 already says (no `get_` prefix, `is_` answers `bool`,
-#   `as_` borrows, bare `get` carries a row, a `pub` item is documented).
-#   Nothing in `std/` trips one that this rig can see — but the rig can only
-#   see the ENTRY file (F-0053), so that is not the same as clean.
-# Re-measured at this sha rather than assumed:
-# - the builtin `str` set is unchanged (the s37 21-method set, `get`
-#   included); `count("")`/`split("")`/`replace(s, "", …)` are still refused
-#   on the checked lane and defined natively (F-0055, `std.str` guards);
-# - `/` truncates toward zero and `%` takes the dividend's sign on all three
-#   lanes (`-7 / 2 == -3`, `-7 % 2 == -1`) — measured because `std.time`'s
-#   calendar arithmetic needs to know, and it corrects to floor explicitly
-#   rather than assume;
-# - `--deny-warnings` is STILL rejected by `conform-run` (F-0046/F-0053,
-#   re-verified at this sha: `unknown flag`), so the warning gate is still
-#   the record's `warnings` array, read on two lanes;
-# - F-0037 (an enum through an error row is always a miss) is UNMOVED, which
-#   is why `std.json.parse` is still a contract after its F-0018 blocker
-#   retired;
-# - F-0034 is unmoved and now costs a module pair: `std.x.json` and
-#   `std.json` are both `json` to an importer, so one program may not import
-#   both (E0306 on both rungs, `unsupported` under lupin — F-0058).
+# sc11 bump: trunk `0b4e79c` — FIVE merged waves (s71, s72, s51, s41, s73)
+# plus the r01 identity release, and the first bump this repo has taken
+# where trunk's HEAD was not the pin.
 #
-# THE SECOND GATE (F-0024's lesson, applied for the seventh time): the pin is
+# **The pin is one commit BEHIND trunk's tip, deliberately.** `17ea078`
+# (trunk HEAD at the bump) fails the first ritual gate: it banks an unfixed
+# fmt fuzz class as `tests/regressions/unfixed/idem_class_six.lu.pending`,
+# and `wolf_fmt`'s `fuzz_regressions` sweep walks that directory with
+# `read_dir` + `fs::read`, so the sweep panics `IsADirectory` and
+# `cargo test --workspace` exits 101 (F-0063, filed). `0b4e79c` is its
+# parent, is green on BOTH gates on the first attempt, and contains every
+# wave below.
+#
+# What the bump brings, in the order it matters to std:
+# - **s71 (release polish)**: `else |Tag(p)|` is RULED — the handler pattern
+#   must cover the row (E0809) and the payload binds on all three lanes, so
+#   F-0043's surviving half is closed and `tests/errors/coarsen_and_chain.lu`
+#   stops being a held rejection. The empty needle is DEFINED in the spec
+#   (`[mem.str.empty]`: count 0, split one whole piece, replace identity)
+#   and a negative `repeat` is ruled `assert` rather than `bounds`
+#   (`[mem.str.repeat]`) — #56 and #57 closed, F-0055 and F-0056 with them,
+#   and six guards plus one placeholder answer in `std.str` deleted.
+# - **s72 (the mode rules get their teeth)**: D40 iteration exclusivity
+#   (E1013 via the loop-extent read claim — `for` no longer MOVES its
+#   iterable, so the E1001 accident sc02's single-read rule was built around
+#   is structurally dead) and D39 read-mode teeth (E1014 for a callee-side
+#   write through a read binding). Nothing in `std/` or `tests/` trips
+#   either, re-measured; the single-read discipline stays in the guide as
+#   history rather than law.
+# - **s73 (native concurrency)**: scope/spawn/join, channels with region
+#   payload transfer, select, `when`, and procs with monitor/kill/cancel all
+#   lower natively now, with honest refusals that name their tier. std wraps
+#   no concurrency surface at this pin (c05's closures and the task facade
+#   are later sprints), so the ripple here is DOCUMENTARY and it is real:
+#   every "the interpreter is the only machine that runs conc" sentence in
+#   this repo's docs is now false, and the task-capture entries that said
+#   the rejection was checked-lane-only are corrected.
+# - **s41 (llvm lowering)** and **s51 (the package manager)**: a release
+#   tier (`wolf build --release`) and `wolf add/audit/tree`. Neither is a
+#   lane this rig observes — the ledger's three columns are unchanged — and
+#   the capability audit `wolf audit` renders is the consumer of the
+#   per-function I13 notes API-CONVENTIONS §14 makes std write.
+# - **r01 (the identity release)**: `wolf 0.1.0 (wolfgang)`, paired with
+#   lupin 0.1.8. Its two-line `--version` broke this rig's doctor until the
+#   parser learned that a pairing line is not a pin (F-0064).
+# Re-measured at this sha rather than assumed:
+# - the process trio is CHECKED-LANE ONLY, unchanged from s40: the native
+#   rung refuses by name ("process builtins in native lowering (checked lane
+#   only at s40)"), which is `std.process`'s whole lane story;
+# - the `json_*` four are still checked-lane only, refused natively by name;
+# - the builtin `str` set is unchanged at 21 methods, and the three
+#   empty-argument shapes now AGREE on all three lanes (see s71 above);
+# - `--deny-warnings` is STILL rejected by `conform-run` (F-0046/F-0053,
+#   re-verified at this sha: `unknown flag`), so the warning gate remains
+#   the record's `warnings` array, read on two lanes;
+# - F-0057 is UNMOVED and #58 is open: there is still no `str.from_utf8`, no
+#   `strbuf.push_byte` and no `char`, so `std.bytes.to_str` stays a reviewed
+#   contract for the third sprint running (probed, not assumed);
+# - F-0037 (an enum through an error row is always a miss) is unmoved.
+#
+# THE SECOND GATE (F-0024's lesson, applied for the eighth time): the pin is
 # verified by `cargo test --workspace` AND `cargo run -p xtask -- ci` in a
-# clean scratch clone at the sha. Both are green at e94b879 **on their first
-# attempt**, which is the second clean pair in a row; F-0054 stays open on
-# the same reasoning (two clean pairs are not proof a timing dependence is
-# gone) and the lawful posture remains "state the attempt count in this
-# note". The sha is also green in upstream CI.
+# clean scratch clone at the sha. At `17ea078` the first gate is RED
+# (F-0063); at `0b4e79c` both are green **on their first attempt**, which is
+# the third clean pair in a row, so F-0054 stays open on the same reasoning
+# (three clean pairs are not proof a timing dependence is gone) and the
+# posture remains "state the attempt count in this note".
 #
 # The native rung needs `libwolf_rt.a` beside the binary
 # (`cargo build -p wolf_rt` at the same sha, or `$WOLF_RT_LIB`); doctor
 # reports its absence and the lane goes dark rather than silent. It executes
-# the fs/io and os/env/time tiers now and refuses the net, process and json
-# tiers by name.
-pin = "e94b8790c738f05082d64a8c4a12e10ced914b45"
+# the fs/io, os/env/time and (new at s73) concurrency tiers, and refuses the
+# net, process and json tiers by name.
+pin = "0b4e79c5deb48e93468d58971ae32b3ad8fed9b9"

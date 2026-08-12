@@ -57,6 +57,12 @@ fn check_one(imp: Impl, pin: &ToolPin, repo: &std::path::Path) -> Result<(), Str
     );
     let v = bins::probe_version(&resolved.path)?;
     println!("        version: {} {}", v.name, v.version);
+    if let Some(pairing) = &v.pairing {
+        // Reported, never gated: a pairing line names the OTHER tool's
+        // repository, so it is information and not a pin (see
+        // `bins::VersionLine::pairing`).
+        println!("        pairing: {pairing}");
+    }
     if v.name != name {
         return Err(format!(
             "doctor: {name}: binary names itself `{}` — wrong tool on the rung",
