@@ -14,6 +14,36 @@
 # moving upstreams); the nightly lane watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.11 (sc13 bump, from 0.1.10). Its own conformance pin is `f8dca42`,
+# which is the sc12 `wolf` pin exactly — so for the first time the
+# interpreter names the compiler sha this repository held one sprint ago,
+# and the two-upstream drift is three merged waves (s79, s80, s81) rather
+# than a list of unrelated ones.
+#
+# What the bump changes for this repo, re-measured one call at a time:
+# - **F-0037 stays closed** (wolf-interp#16, closed at 0.1.10): the
+#   finding's own reproducer — `fn id(v: V) -> V ! {none} { v }` — answers
+#   "value path wins 7" here. That is the measurement the json DOM waited
+#   five sprints for, taken again at the new release rather than inherited,
+#   and `std.json.get`/`at` ship on it.
+# - **`str_from_utf8` DOES NOT RESOLVE HERE** (F-0075): s81's validating
+#   bytes-to-str primitive is in the compiler's prelude and not in this
+#   machine's, and the refusal is the generic unknown-name one
+#   (`unsupported: `str_from_utf8` does not resolve`) rather than the
+#   reasoned decline this machine gives `fs_*`, `net_*`, `json_*` and the
+#   process trio. So `std.bytes.to_str` lands with TWO lanes and its test's
+#   interpreter column is dark. Measured, not assumed: F-0070 is the entry
+#   that taught this repo a builtin FAMILY is not a unit of evidence.
+# - **F-0029 is unmoved**: an enum VALUE crosses a module boundary — and
+#   now crosses one through an error row — while a `match` in the importer
+#   is still "no `match` arm applied; exhaustiveness is the type checker's".
+#   That is exactly the shape `std.json` is designed around (inspection
+#   lives in the declaring module), so the DOM getters are unaffected.
+# What it does NOT change: no `fs_*`, no `read_line`, no `net_*`, no
+# `json_*`, no process trio (all declined by design, each with a sentence),
+# and `var k = 0` is still `i32`.
+#
+# The sc12 note, kept for the history it records:
 # 0.1.10 (sc12 bump, from 0.1.8 — 0.1.9 skipped, so this bump carries two
 # releases). Its own conformance pin is `613c3dc`, which is an ANCESTOR of
 # the `wolf` pin below (ten commits back, before s74/s53/s75/s78/s76/s77):
@@ -84,14 +114,58 @@
 # What it does NOT change: no `fs_*`, no `read_line`, no `net_*` (all three
 # declined by design, each with a sentence in the refusal), and `var k = 0`
 # is still `i32`.
-version = "0.1.10"
-pin = "613c3dc2bdec3b151c23fc200227f3a6230f68c4"
+version = "0.1.11"
+pin = "f8dca42118a944a801b7a6d2709004ccfeb01572"
 
 [wolf]
 version = "0.1.0"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver -p wolf_rt.
 #
+# sc13 bump: trunk `4e316ad`, which IS trunk's tip at the bump and is green
+# on BOTH ritual gates on the FIRST attempt (`cargo test --workspace` = 0,
+# `cargo run -p xtask -- ci` = 0, exit codes printed rather than inferred
+# from a summary line — F-0063's lesson). Fifth clean pair in a row, so
+# F-0054 stays open on the same reasoning it has stayed open on since sc09.
+#
+# Three waves arrive in one step (s79 bench, s80 token audit, s81 str
+# equality) — the three sc12 named as in flight and deliberately did not
+# chase. One of them is why this sprint exists:
+# - **s81 (#58): `str_from_utf8(b: List[int]) -> str ! {utf8}` — the
+#   language's first bytes-to-str path, and it VALIDATES.** Lone
+#   continuations, truncated and overlong sequences, surrogates, scalars
+#   past U+10FFFF, the never-bytes and elements that are not bytes at all
+#   are each a `{utf8}` ROW rather than a trap, and an interior NUL is
+#   ACCEPTED because a `str` carries its length. It is a prelude name, it
+#   is PURE (no I13 capability, no sandbox category — the second such
+#   family after `json_*`), and the comptime engine evaluates it. F-0057
+#   is CLOSED after four sprints and `std.bytes.to_str` — a reviewed
+#   contract since sc05 — is four lines of delegation. The commit says
+#   "wolf-std's to_str is unblocked" in those words.
+# - **s80 (the token claim, audited)** fixed a real miscompile en route
+#   ("the aliasing unit is the role, not the region"). Nothing in `std/`
+#   was mis-lowered by it that this rig can observe, and the ledger is
+#   unchanged across the bump.
+# - **s79 (a suite worth believing)** is a benchmark-credibility wave: it
+#   measures the right binary against a baseline that executes. No lane
+#   here observes it.
+# Re-measured at this sha rather than assumed:
+# - the builtin `str` set is unchanged at 21 methods; s81 changed the
+#   LOWERING of `==` and added one prelude function, so nothing in std had
+#   to change to keep working;
+# - `str_from_utf8` is refused at COMPTIME by neither machine — it is pure,
+#   so the D33 sandbox has no reason to refuse it, and `std.bytes.to_str`
+#   is the first os-adjacent-looking std function that is honestly
+#   comptime-safe;
+# - the process trio and `json_*` are still checked-lane only, refused
+#   natively by name; net likewise;
+# - `--deny-warnings` is STILL rejected by `conform-run` (F-0046/F-0053,
+#   re-verified at this sha), so the warning gate remains the record's
+#   `warnings` array, read on two lanes;
+# - the `--version` pairing line still says "paired with lupin 0.1.8" three
+#   releases later (F-0073, filed as wolf-lang#87, unmoved).
+#
+# The sc12 note, kept for the history it records:
 # sc12 bump: trunk `f8dca42`, which IS trunk's tip at the bump and is green
 # on BOTH ritual gates on the FIRST attempt (`cargo test --workspace` = 0,
 # `cargo run -p xtask -- ci` = 0, exit codes printed rather than inferred
@@ -226,4 +300,4 @@ version = "0.1.0"
 # reports its absence and the lane goes dark rather than silent. It executes
 # the fs/io, os/env/time and (new at s73) concurrency tiers, and refuses the
 # net, process and json tiers by name.
-pin = "f8dca42118a944a801b7a6d2709004ccfeb01572"
+pin = "4e316ad7c4236be5bcf05231a16bbecadccc2018"
