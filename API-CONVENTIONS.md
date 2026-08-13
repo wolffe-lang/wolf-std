@@ -890,7 +890,58 @@ new and it is a debt, not a courtesy. sc10's census had to name both
 functions as "no longer blocked, still unwritten" to keep them from sitting
 quietly, which is one sprint of grace and no more.
 
+**§14 amendment (sc13): the debt clause, paid once and re-armed once.**
+sc11 added the third clause of the refusal rule — *a capability or tier module
+writes its contract into the module header with the finding that would unblock
+it, and ships the function in the sprint after that finding closes.* sc13 is
+the first sprint to be on the receiving end of it twice, and both halves are
+worth recording because they are the clause working rather than the clause
+being invoked.
+
+- **Paid.** F-0037 (an enum returned through an error row is always a miss)
+  closed at sc12's pin. `std.json.get` and `std.json.at` — written, tested and
+  withdrawn at sc05 — ship here, in the next sprint, with the signatures the
+  contract wrote and no amendment. The rule's value is visible in that last
+  clause: a contract written while the function was unwritable turned out to
+  be right, because it was written as a specification rather than as an
+  apology.
+- **Re-armed.** F-0057 (nothing builds a `str` from a number) closes at THIS
+  sprint's pin, and `std.bytes.to_str` — the one function the sprint brief
+  named — ships with it. Everything ELSE that finding was blocking is now owed
+  at sc14 and says so in its own header: `std.json.unescape`, `std.json.parse`
+  behind it, `std.json.escape`'s totality (a signature change, because it
+  removes `boundary` from `stringify`'s row), and `std.hex.decode_str` (§11's
+  encoder/decoder pairing, refused for four sprints). Naming them in four
+  headers rather than in one closeout is the point: the debt lives where the
+  function is missing.
+
+Two additions the pair earned, both about EVIDENCE rather than about surface.
+
+- **A pure tier gets its row vocabulary adopted verbatim too.** §14 wrote the
+  rule for capability tiers (fs, io, net, process) and sc10 extended the
+  lane-honesty half to pure ones (`json_*`). `to_str`'s `{utf8}` is the third
+  case and the cleanest: the row is `str_from_utf8`'s, unrenamed and
+  uncoarsened, and the test that proves it is not a handler asserting the tag
+  but the RECORD naming it (`error: utf8`, exit 1). A wrapper that renamed or
+  widened a row would look identical from inside a handler, which is exactly
+  why the propagation test is the one that matters.
+- **When a std function wraps a validating primitive, its test walks the
+  primitive's whole refusal surface through the FACADE.** Not a sample — every
+  named class, plus the accepted rules that are easy to lose (an empty input,
+  an interior NUL, the boundary value adjacent to the first invalid one). And
+  where std already had an independent implementation of the same predicate
+  (`bytes.is_utf8`), it KEEPS it and a test holds the two to the same answers.
+  Delegating the predicate to the primitive would have made the agreement a
+  tautology and cost the predicate a lane; two implementations that must agree
+  is a stronger arrangement than one, and this is the case that showed it.
+
 ## Review record
+
+- 2026-08-20, sc13 amendments: §14 gains the debt clause's first payment and
+  its re-arming (the four functions F-0057's closure now owes, each named in
+  its own header), the verbatim-row rule extended to a pure tier's `{utf8}`,
+  and the evidence rule for wrapping a validating primitive. Review rides the
+  same pending sc00 gate.
 
 - 2026-08-19, sc12 amendments: §9 gains the byte-view rules (a shape that
   costs a lane is not a shape std writes, even when the cost is only speed;

@@ -79,6 +79,35 @@ const WOLFC_WAIVERS: &[(&str, &str, &str)] = &[];
 ///    the lanes that refused said so.
 const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "process", "x.json"];
 
+/// The waiver `CAPABILITY_MODULES` must not become: ONE FUNCTION of an
+/// otherwise equal-laned module whose tier a named implementation has not
+/// got, keyed by the call the example makes so that no OTHER example in
+/// the same module is excused by it.
+///
+/// `(module, the call that must appear in the example, the finding)`.
+///
+/// The distinction this keeps is the one the constant above states in its
+/// own doc — a module lands in that list when its WHOLE surface is
+/// something an implementation may not have, "never to excuse one
+/// function". `std.bytes` is the counter-example that forced the second
+/// mechanism: eight of its nine functions run on all three lanes, and
+/// `to_str` cannot run under lupin 0.1.11 because that release has no
+/// `str_from_utf8` (F-0075). Putting `bytes` in `CAPABILITY_MODULES`
+/// would have excused every future `std.bytes` example the interpreter
+/// ever refuses, which is exactly the masking the tiny-list rule exists
+/// to prevent.
+///
+/// A waived block still has to RUN SOMEWHERE: the `exit(0)` requirement
+/// below applies to it, so what a waiver buys is one dark lane and never
+/// a documented example nothing executed. Like `WOLFC_WAIVERS`, an entry
+/// here is a debt with a name — this one dies at the lupin release that
+/// resolves the primitive.
+const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[(
+    "bytes",
+    "bytes.to_str",
+    "F-0075 — lupin 0.1.11 has no `str_from_utf8`",
+)];
+
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
     /// `x.deque_int`, …). The bound name is its last segment.
@@ -127,7 +156,11 @@ pub fn doc_examples() -> Result<(), String> {
         let staged_root = scratch.join("pkg");
         let staged = stage::stage_test(&entry_path, &repo.join("std"), &staged_root)?;
         let capability = CAPABILITY_MODULES.contains(&b.module.as_str());
+        let tier_waiver = LUPIN_TIER_WAIVERS
+            .iter()
+            .find(|(m, needle, _)| *m == b.module && b.lines.iter().any(|l| l.contains(needle)));
         let mut any_ran = false;
+        let mut tier_waived_here = false;
         for (imp, bin) in &lanes {
             let (verdict, warnings) = run_lane(*imp, bin, &staged, ceiling)?;
             if !warnings.is_empty() {
@@ -149,10 +182,20 @@ pub fn doc_examples() -> Result<(), String> {
             if matches!(&verdict, Verdict::Exit(0)) {
                 any_ran = true;
             }
+            let tier_waived = tier_waiver.is_some()
+                && matches!(imp, Impl::Lupin)
+                && matches!(&verdict, Verdict::Unsupported);
+            if tier_waived {
+                tier_waived_here = true;
+            }
             let ok = waived
+                || tier_waived
                 || matches!(&verdict, Verdict::Exit(0))
                 || ((compiler_lane || capability) && matches!(&verdict, Verdict::Unsupported));
-            let tag = if waived {
+            let tag = if tier_waived {
+                let (_, _, finding) = tier_waiver.expect("matched above");
+                format!("WAIVED: one function's tier, {finding}")
+            } else if waived {
                 let (_, _, finding) = WOLFC_WAIVERS
                     .iter()
                     .find(|(m, _, _)| *m == b.module)
@@ -187,6 +230,16 @@ pub fn doc_examples() -> Result<(), String> {
             reds.push(format!(
                 "{}: no lane reached exit(0) — a capability module's example still has to \
                  run somewhere (§4)",
+                b.origin
+            ));
+        }
+        // The same floor for a tier waiver, and it is the whole price of
+        // the mechanism: a waived lane is a lane that refused, never a
+        // block nothing executed.
+        if tier_waived_here && !any_ran {
+            reds.push(format!(
+                "{}: no lane reached exit(0) — a tier-waived example still has to run \
+                 somewhere (§4)",
                 b.origin
             ));
         }
@@ -497,6 +550,33 @@ mod tests {
             CAPABILITY_MODULES,
             &["fs", "io", "net", "time", "env", "process", "x.json"]
         );
+    }
+
+    #[test]
+    fn a_tier_waiver_names_one_call_and_not_a_module() {
+        // sc13: the second waiver mechanism, and the test that keeps it
+        // from becoming the first one. An entry excuses the LUPIN lane
+        // for the examples that make ONE named call, so a `std.bytes`
+        // example that does not mention `bytes.to_str` is still held to
+        // three lanes.
+        assert_eq!(
+            LUPIN_TIER_WAIVERS
+                .iter()
+                .map(|(m, needle, _)| (*m, *needle))
+                .collect::<Vec<_>>(),
+            vec![("bytes", "bytes.to_str")]
+        );
+        let waived = |module: &str, line: &str| {
+            LUPIN_TIER_WAIVERS
+                .iter()
+                .any(|(m, needle, _)| *m == module && line.contains(needle))
+        };
+        assert!(waived("bytes", "(bytes.to_str(b) else \"?\") == \"wolf\""));
+        assert!(!waived(
+            "bytes",
+            "bytes.is_utf8(bytes.from_str(\"x\")) == true"
+        ));
+        assert!(!waived("str", "str.len(\"wolf\") == 4"));
     }
 
     #[test]

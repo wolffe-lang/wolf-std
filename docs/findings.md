@@ -83,6 +83,10 @@ finding gets a row; the filing link is the proof it left the building.
 
 | F-0074 | 2026-08-19 | **`List.push` is O(n) per push under lupin, so every `List`-returning std function is quadratic on the reference lane**: 4k/8k/16k/32k pushes take 0.46/1.91/7.83/37.53s (doubling N quadruples the time) where both compiler rungs finish 32k in 0.14s of whole-process time. Suffix slicing and `starts_with` are both linear, measured, so it is the list representation and not the scanner shape. It is the ceiling behind this rig's slowest test (`fmt/decimal/shortest_round_trip.lu`, 28-35s against a 60s per-test limit, timed out once under load this sprint) and std cannot write around it: pushing into a fresh list IS the portable spelling (sc04's rule, because index assignment runs on one lane). Also measured: 0.1.10 is ~15% slower than 0.1.8 on that test | wolf-interp | [filed: wolf-interp#24](https://github.com/wolffe-lang/wolf-interp/issues/24) |
 
+| F-0075 | 2026-08-20 | **lupin 0.1.11 does not have s81's `str_from_utf8`**: the language's first bytes-to-str primitive is in the compiler's prelude (both rungs execute it) and the interpreter answers ``unsupported: `str_from_utf8` does not resolve`` — the generic unknown-name refusal, not the reasoned decline that machine gives `fs_*`, `net_*`, `json_*` and the process trio, so it reads as drift rather than posture (F-0070's shape, second occurrence). It costs `std.bytes.to_str` its interpreter lane the day the function lands: two ledger rows are `unsupported / run / run` where the module's other eight are three-lane, and `bytes.is_utf8` stays hand-written rather than delegating precisely so the predicate keeps the third lane | wolf-interp | [filed: wolf-interp#26](https://github.com/wolffe-lang/wolf-interp/issues/26) |
+| F-0076 | 2026-08-20 | **`bool` comparisons are `unsupported` on the native rung**: `a == b`, `a != b`, `a == true` and even `true == false` are all `unsupported — comparison outside integers/floats (str/enum compares, c06/std)` at `mem`, where `int` and `f64` have always lowered and `str` does since s81. The refusal names str and enums and does not name `bool`, which is why it has gone six sprints undiagnosed: `tests/fmt/parse_bool.lu` has carried a dark native column since sc05 for exactly this and the ledger attributed it to nothing in particular. It is cheap to write around (`!p` and a branch instead of `p == q`), and that is the argument for fixing it rather than against: nothing about a `bool` compare is hard, so a library pays a lane for a spelling | wolf-lang s28/native lowering | [filed: wolf-lang#100](https://github.com/wolffe-lang/wolf-lang/issues/100) |
+| F-0077 | 2026-08-20 | **`List[int]()` inside a `comptime fn` is `unsupported` at resolve**, with no code and no reason string (F-0051's silence again), on both compiler rungs — `var k = 0`, a `str` literal, an `else` and a row return all evaluate there. The consequence is a rule rather than an inconvenience: **a pure builtin whose argument is a `List` cannot be reached at comptime at all**, because a `List` is the only way to spell the argument. `str_from_utf8` is the first such builtin and `std.bytes.to_str` is the first std function whose comptime story is "the sandbox has no objection and the engine cannot get there" | wolf-lang s16 (CTFE engine) | [filed: wolf-lang#101](https://github.com/wolffe-lang/wolf-lang/issues/101) |
+
 
 ## F-0001 — the std search path
 
@@ -2704,3 +2708,222 @@ implementation's data structure is precisely the workaround
 that matter — the ceiling and the doubling — are here so the next sprint
 that sees a timeout knows within a minute whether it has found a new
 problem or this one.
+
+## Retirements and movements at the sc13 pins
+
+The pin bump is wolf `f8dca42` → trunk **`4e316ad`** ("snapshots: s81's two
+str shapes carry s80's role immediate"), three merged waves in one step
+(s79 bench, s80 token audit, s81 str equality) — the three sc12 named as in
+flight and deliberately did not chase. lupin goes **0.1.10 → 0.1.11**.
+
+Both ritual gates were run in a clean scratch clone at the sha and both are
+green on their FIRST attempt (`cargo test --workspace` = 0,
+`cargo run -p xtask -- ci` = 0, exit codes printed rather than read off a
+summary line — F-0063's lesson). Fifth clean pair in a row, so F-0054 stays
+open on the same reasoning it has stayed open on since sc09: five clean
+pairs are not proof a timing dependence is gone, and the posture is to state
+the attempt count.
+
+### F-0057 is CLOSED, and the border post is open
+
+For four sprints `std.bytes.to_str` was a reviewed contract because nothing
+in the language built a `str` from a number: no `char`, no `from_utf8`, no
+`strbuf.push_byte`, probed four ways at four consecutive pins. s81
+(wolf-lang#58) landed `str_from_utf8(b: List[int]) -> str ! {utf8}` in the
+prelude, and it is the function the contract described rather than the cast
+the representation invited:
+
+```text
+lone continuation (80)          {utf8}
+truncated (E2 82)               {utf8}
+overlong (C0 AF, E0 80 80)      {utf8}
+surrogate (ED A0 80, ED BF BF)  {utf8}
+past U+10FFFF (F4 90 80 80)     {utf8}
+never-bytes (C0, C1, F5..FF)    {utf8}
+not a byte (300, -1)            {utf8}
+interior NUL (77 00 66)         accepted — a str carries its length
+"wolf é".bytes() round trip     accepted — the view and the source agree
+```
+
+`std.bytes.to_str` is four lines over it, its row is the primitive's own
+(§14's verbatim-adoption rule, applied to a pure tier), and the sc05
+contract needed no amendment to land — which is the thing worth recording.
+std refused to ship an ASCII-only border post for four sprints and the
+toolchain refused to ship an unchecked cast; both refusals were right and
+the function they produced is the one both descriptions asked for.
+
+What it does NOT close: `str_from_utf8` is the compiler's prelude only
+(F-0075 below), so the function has two lanes. And its own family stays
+open — `fs_read_bytes` (F-0044) is still unwritten, so a byte read still has
+no producer to hand `to_str`.
+
+### F-0037's closure is SPENT: the json DOM has its navigation
+
+sc12 measured F-0037 closed and deliberately did not write the functions,
+per sc10's rule that every finding on the SIGNATURE gets re-measured first.
+This sprint did that re-measurement before writing a line:
+
+- **F-0037** — `fn id(v: V) -> V ! {none} { v }` under lupin 0.1.11 prints
+  `value path wins 7`. Closed, re-measured at the new release rather than
+  inherited from sc12's note.
+- **F-0029** — UNMOVED, and it is the finding the design already lives
+  with. An enum VALUE crosses a module boundary (and now crosses one
+  through an error row); a `match` in the importer is still
+  `unsupported: no `match` arm applied; exhaustiveness is the type
+  checker's`. `std.json` keeps every inspection inside the declaring module
+  (`type_name`, `as_*`, `is_null`), so `get` and `at` hand an importer a
+  value it can only read through this module — which is exactly what the
+  four sc05 accessors already did.
+- **F-0039** — UNMOVED. `int ! {none} ! {none}` runs under lupin 0.1.11 and
+  is `fail(E0201)` at PARSE on both compiler rungs, re-measured with a
+  fresh reproducer. It touches neither getter: one `!` per type is the
+  portable budget and both signatures spend exactly one.
+
+`std.json.get` and `std.json.at` ship with the signatures the sc05 contract
+wrote, unchanged. The module's lanes are unchanged too (F-0029 + `Map`), so
+the two new rows are `run / unsupported / unsupported` beside the four the
+module already had.
+
+**What is left, and it is now a debt rather than a wall.** `parse` and
+`unescape` have both had every finding on them re-measured and both are
+UNBLOCKED at these pins — `parse` by F-0037's closure, `unescape` by
+F-0057's. §14's rule says a contract ships in the sprint AFTER its blocker
+closes, which is one sprint of grace and no more, so both are owed next
+sprint and both module headers say so with the clause. `escape`'s totality
+rides with them, because it changes `stringify`'s row.
+
+### Re-verified UNMOVED, each re-measured rather than assumed
+
+- **F-0073** — the `--version` pairing line still says "paired with lupin
+  0.1.8" at `4e316ad`, three releases after 0.1.8. Filed as wolf-lang#87,
+  unmoved, and doctor still reports it without gating it.
+- **F-0046 / F-0053** — `conform-run` still rejects `--deny-warnings`, and
+  the record's `warnings` array still covers the entry file only. The rig
+  denies warnings itself and stayed green.
+- **F-0074** — measured again, because this sprint's rig went RED on it
+  once. `fmt/decimal/shortest_round_trip.lu` under lupin 0.1.11 takes
+  24.8 / 25.3 / 26.8 / 27.7 s on an idle machine and **116.6 s on a loaded
+  one** — the same program, the same staged tree, five runs. The 60 s
+  per-test ceiling is therefore not a margin the test has, it is a margin
+  the MACHINE has, and sc12's "a CI timeout is a bisect, not a flake" reads
+  one notch stronger from here: the bisect was already done, the mechanism
+  is known, and what a red run means now is "this host was busy", which is
+  a scheduling fact and not new evidence. Nothing in `std/` changed for it,
+  for sc12's reason.
+- F-0004, F-0011, F-0012, F-0016, F-0025's last third, F-0026, F-0027,
+  F-0029, F-0030, F-0035 (the byte-type half), F-0038, F-0039, F-0040,
+  F-0044, F-0045, F-0047, F-0049, F-0050, F-0051, F-0054, F-0058, F-0060,
+  F-0061, F-0065, F-0066, F-0067, F-0068, F-0069, F-0070, F-0071, F-0072:
+  all retested or unaffected, all open.
+
+### The ledger movement
+
+**Four rows added, zero rows moved.** 185 → 189. The two json rows are
+one-lane (`run / unsupported / unsupported`) and the two bytes rows are
+two-lane the other way (`unsupported / run / run`), which is the sprint in
+one sentence: both halves are a closure being spent, and they have opposite
+lane shapes because one is blocked by an interpreter-only enum property and
+the other by a compiler-only prelude name.
+
+No existing row changed verdict across the bump. s81 changed the LOWERING
+of `str` equality and ADDED a prelude function; s80 fixed a miscompile no
+lane here observes; s79 is a benchmark wave. That is the third time this
+repository has recorded "the ledger is unchanged and that is the expected
+result" (sc10, sc12, sc13), and the reason is the same one every time: the
+ledger measures how deep each implementation gets, not what it costs.
+
+## F-0075 — the interpreter has no `str_from_utf8`
+
+s81 put the language's first bytes-to-str primitive in the compiler's
+prelude. lupin 0.1.11, whose own conformance pin is `f8dca42` — the commit
+before s81 merged — does not have it:
+
+```text
+$ lupin conform-run ./main.lu
+unsupported: `str_from_utf8` does not resolve
+```
+
+That is the GENERIC unknown-name refusal. It is not the reasoned decline
+this machine gives the four tiers it has decided about (`fs_*`: no
+filesystem by design; `net_*`: no sockets; `json_*`: "declines the surface
+rather than risk a second, guessed RFC 8259 reading"; the process trio:
+"runs no child processes by design"). A pure, total, table-free function
+that turns a `List[int]` into a `str` is nothing like those four — there is
+no capability to decline and no second reading to risk, since RFC 3629 is
+one page and this repository has already implemented it twice (once in
+`bytes.is_utf8`, once in `str.code_points`). So this reads as drift, which
+is F-0070's shape a second time, and F-0070's lesson holds: a builtin
+FAMILY is not a unit of evidence, a builtin is.
+
+**The cost, in this repository:** `std.bytes.to_str` lands with two lanes
+instead of three, and `tests/bytes/to_str_border.lu` and
+`to_str_row.lu` carry dark interpreter columns while the module's eight
+other rows stay three-lane (lupin resolves module bodies lazily, so nothing
+else in `std.bytes` pays). It also decided a design question:
+`bytes.is_utf8` did NOT become a one-line call to the primitive, because
+that would have traded the predicate's third lane for a tautology. The two
+decoders stay independent and a test asserts they agree, which is the
+better arrangement anyway and would not have been chosen without this
+finding.
+
+The ask is the builtin, at the release that re-pins past `4e316ad`.
+
+## F-0076 — the native rung cannot compare two `bool`s
+
+Measured with four one-line programs after `tests/bytes/to_str_border.lu`
+lost its native lane to `is_utf8(b) == accepts(b)`:
+
+```text
+a == b          unsupported — comparison outside integers/floats  @mem
+a == true       unsupported — comparison outside integers/floats  @mem
+t() == true     unsupported — comparison outside integers/floats  @mem
+true == false   unsupported — comparison outside integers/floats  @mem
+t() != false    unsupported — comparison outside integers/floats  @mem
+s1() == "wolf"  run  (str equality lowers since s81)
+n == 3          run
+x == 1.5        run
+```
+
+The refusal's parenthetical is "(str/enum compares, c06/std)", which names
+the two cases it was written for and does not name `bool` — and that is why
+this has gone six sprints undiagnosed. `tests/fmt/parse_bool.lu` is ten
+`== true`/`== false` assertions and has carried `native = "unsupported"`
+since sc05 with no explanation beside it; that row is this finding, and it
+is where the claim is now held.
+
+Writing around it is trivial: `!p` instead of `p == false`, and a branch
+instead of `p == q`. That is the argument FOR fixing it rather than
+against. Nothing about comparing two `i1`s is hard, the checked tier and
+the interpreter both do it, and what a library pays today is a lane for a
+spelling — which is the same shape as F-0071 and gets the same response
+here: write the form that keeps every lane, and file the one that does not.
+
+## F-0077 — a `comptime fn` cannot build a `List`
+
+```text
+comptime fn probe() -> int { var k = 0  k = k + 3  k }        run
+comptime fn probe() -> int { let s = "hi"  s.len }            run
+comptime fn probe() -> int { miss(3) else 0 }                 run
+comptime fn probe() -> int { let b = List[int]()  b.len }     unsupported @resolve
+comptime fn probe() -> int { str_from_utf8(List[int]()) … }   unsupported @resolve
+```
+
+Both compiler rungs, no code and no reason string in the record — F-0051's
+silence, which is why this needed a bisect rather than a reading. The
+refusal is the `List`, not the builtin and not the row.
+
+The consequence is a rule and not an inconvenience: **a pure builtin whose
+argument is a `List` is unreachable at comptime, whatever the sandbox
+thinks.** `str_from_utf8` is the first such builtin and `std.bytes.to_str`
+is the first std function whose comptime story has to be written as "the
+D33 sandbox has no objection — it carries no capability and no sandbox
+category — and the engine cannot get there anyway". That sentence is in the
+function's doc, measured rather than inferred, because the alternative was
+to write "pure and comptime-safe" and be wrong in a way no test here would
+have caught (§13, sc09's rule: a doc sentence about what an implementation
+answers is a test or it is a rumour — and when it cannot be a test, it is a
+measurement with its date on it).
+
+The ask: `List` construction and indexing inside the comptime engine (s16's
+own scope), or a named refusal so a package author learns why — F-0060 and
+F-0069 have asked for the second half twice, and this is the third caller.

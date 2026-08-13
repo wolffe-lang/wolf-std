@@ -757,3 +757,124 @@ row owes F-0039 (nested rows) and F-0029 (cross-module enum consumption) a
 fresh measurement first. API-CONVENTIONS §11's "no std accessor returns an
 enum through an error row" was written as an interim with F-0037 as its exit,
 and the exit has arrived.
+
+## 11. sc13 — two closures spent, in opposite directions
+
+Pins: wolf trunk **`4e316ad`** (three waves past sc12's `f8dca42`: s79 bench,
+s80 token audit, s81 str equality — the three sc12 named as in flight and
+deliberately did not chase), lupin **0.1.11**, whose own conformance pin is
+`f8dca42`: the interpreter now names the compiler sha this repository held
+one sprint ago, which is the narrowest drift yet and the first time it has
+been exactly one sprint. Both ritual gates green in a clean scratch clone at
+the sha, **first attempt, exit codes printed** (`cargo test --workspace` = 0,
+`cargo run -p xtask -- ci` = 0).
+
+| measure | sc12 | sc13 |
+|---|---|---|
+| modules under `std/` | 34 | **34** |
+| `pub fn` in `std/`, nursery excluded | 342 | **345** (+3) |
+| `pub fn` including `std/x/` | 373 | **376** (+3) |
+| entry tests | 185 | **189** (+4) |
+| doc-example blocks, extracted and RUN | 331 | **334** (+3) |
+| reviewed contracts RETIRED into code | — | **3** (`json.get`, `json.at`, `bytes.to_str`) |
+| findings filed | F-0071…F-0074 (four) | **F-0075, F-0076, F-0077** (three) |
+| findings CLOSED | 2 | **2** (F-0057 upstream; F-0037 spent) |
+
+**Three functions, and every one of them was a reviewed contract somebody
+wrote and withdrew.** `std.json.get` and `std.json.at` were written, tested
+and withdrawn at sc05; `std.bytes.to_str` has been a contract since sc05 and
+was re-probed at four consecutive pins. Nothing here is new design. What
+this sprint did was re-measure, then spend.
+
+### The two halves have opposite lane shapes, and that is the finding
+
+| function | lupin | wolfc | native | what decides it |
+|---|---|---|---|---|
+| `json.get` / `json.at` | **run** | unsupported | unsupported | F-0029 + `Map`: an imported module that produces an enum is refused on both compiler rungs |
+| `bytes.to_str` | **unsupported** | run | run | F-0075: `str_from_utf8` is the compiler's prelude only |
+
+One closure was the interpreter's (F-0037, an enum through an error row) and
+lands on the lane only the interpreter has; the other was the compiler's
+(F-0057, a bytes-to-str primitive) and lands on the lanes only the compilers
+have. A reader who takes either half as "std gained a lane" would be wrong in
+both directions, which is why the row is drawn this way.
+
+### The re-measurement, before a line was written
+
+sc10's rule — "the blocker retired" is not "writable" until every finding on
+the SIGNATURE has been re-measured — applied to itself. sc12 named the two
+findings the json sprint owed a measurement, and both were taken first:
+
+- **F-0037** — `fn id(v: V) -> V ! {none} { v }` prints `value path wins 7`
+  under lupin 0.1.11. Closed, and now SPENT.
+- **F-0029** — unmoved. An enum value crosses a module boundary (and now
+  crosses one through a row); an importer's `match` on it does not. That
+  costs the getters nothing, because every inspection in `std.json` lives in
+  the declaring module by construction.
+- **F-0039** — unmoved. `int ! {none} ! {none}` runs under lupin and is
+  `fail(E0201)` at parse on both compiler rungs. Neither getter needs a
+  second `!`.
+
+### What did NOT land, and it is now a DEBT rather than a wall
+
+`std.json.parse` and `std.json.unescape` are the two contracts left in that
+module, and at these pins **neither has a blocker**: `parse`'s was F-0037
+(closed), `unescape`'s was F-0057 (closed by s81 — the same primitive
+`bytes.to_str` spends). `escape`'s remaining refusal has been writable since
+sc09 and rides with them, because making it total changes `stringify`'s row
+from `{boundary, deep}` to `{deep}` and that is a signature change worth
+making once.
+
+API-CONVENTIONS §14's sc11 clause is what governs: a contract ships in the
+sprint AFTER its blocker closes — one sprint of grace and no more. F-0037
+closed at sc12's pin, so the getters were owed HERE and are here. F-0057
+closes at sc13's pin, so `unescape` (and `parse` behind it) are owed at
+sc14, and both module headers say so with the clause named. That is the
+whole reason this section exists rather than a note.
+
+### The lane table at these pins
+
+189 tests × 3 lanes:
+
+| lane | run | unsupported | fail(E…) | (sc12) |
+|---|---|---|---|---|
+| lupin | **148** | 41 | 0 | 146 / 39 / 0 |
+| wolfc `--checked` | **152** | 33 | 4 | 150 / 31 / 4 |
+| native | **101** | 84 | 4 | 99 / 82 / 4 |
+
+**Every flip, listed, and there are none.** No row this repo carried into the
+bump moved in any direction; the whole difference is the four rows sc13 adds:
+
+| test | lupin | wolfc | native | why |
+|---|---|---|---|---|
+| `json/navigation.lu` | run | unsupported | unsupported | the getters' value side |
+| `json/navigation_rows.lu` | run | unsupported | unsupported | `none` and `kind`, one ridden out of `main` |
+| `bytes/to_str_border.lu` | **unsupported** | run | run | every UTF-8 rejection class through the facade, plus the 256-byte sweep |
+| `bytes/to_str_row.lu` | **unsupported** | run | run | the `utf8` tag, named by the record |
+
+Third sprint in a row with an unchanged existing ledger, and the reason is
+the same one every time: this ledger measures how DEEP each implementation
+gets, not what it costs, and s79/s80/s81 are a benchmark wave, a miscompile
+fix and a lowering change plus one prelude name.
+
+### The blocked inventory
+
+F-0049 (5), F-0050 (1), F-0044 (6), F-0046 (1), F-0004 (2), F-0058 (1),
+F-0061 (1), F-0065 (6) stand as sc12 recorded them.
+
+**F-0057 LEAVES the inventory** and takes `std.bytes`' last contract with it:
+the module has nine reviewed functions and nine bodies. Its neighbour does
+not leave — `fs_read_bytes` (F-0044) is still unwritten, so a byte read has
+no producer to hand `to_str`, and the two halves of that pair have now been
+waiting for each other for six sprints.
+
+**F-0037 leaves too**, and what it leaves behind is the debt above rather
+than a contract: two functions that nothing blocks.
+
+**Three findings arrive and none of them adds a contract.** F-0075 costs one
+function one lane. F-0076 costs a SPELLING (`p == q` on two `bool`s is
+refused natively) and is the second instance of F-0071's lesson — write the
+form that keeps every lane, file the one that does not. F-0077 costs a
+sentence in a doc: a pure builtin whose argument is a `List` cannot be
+reached at comptime, so `to_str`'s comptime story is "the sandbox has no
+objection and the engine cannot get there", measured rather than inferred.
