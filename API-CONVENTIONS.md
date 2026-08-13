@@ -348,7 +348,36 @@ being asked. "Are these bytes text?" has an answer for a non-byte, and a
 predicate a caller must guard before calling is not a predicate. §11's
 rule is unchanged for the encoders it was written for.
 
-## 10. Numerics, and the iterator combinator's name (sc04)
+**§9 amendment (sc12): the byte view, and the rule a performance primitive
+needs.** s77 made `s.bytes()` the receiver's own pointer and length, read in
+place wherever the call is consumed. Writing eight bodies against it settled
+three things.
+
+- **A shape that costs a lane is not a shape std writes.** §14 says a
+  capability module may not emulate, degrade or ship an operation whose
+  failure mode it cannot distinguish, all in the service of a green lane. The
+  same discipline governs an OPTIMIZATION, and it needed saying because the
+  temptation is opposite in direction and identical in kind: the fast shape is
+  right there, it runs on two of three lanes, and taking it would trade a
+  documented execution lane for a cost nothing in this repository can measure.
+  The compiler consumes the view in seven positions; wolfc's checked tier
+  models two (`for b in s.bytes()` and `s.bytes().len` — F-0071), so std uses
+  two. Where the natural body wants the other five, the ALGORITHM changes:
+  `str.code_points` is a one-pass state machine because a view cannot be read
+  ahead of on that lane.
+- **Do not assert a property this rig cannot observe.** The no-call,
+  no-allocation claim belongs to the counterparty, where it is a pinned IR
+  snapshot; here it would be a rumour in the §13 sense. std's docs say what
+  the body DOES (walks the view, carries a counter, allocates the output) and
+  cite the wave that made it cheap, and the test that ships with them
+  (`tests/str/byte_view_walk.lu`) pins the shapes RUNNING and answering, which
+  is the part this rig can see. A repository that cannot measure a property
+  does not assert it, and saying so in the test header is how the next reader
+  learns which half was measured.
+- **A doc that explains a body's shape must name the constraint, not just the
+  wave.** "Written as a `for` because s77 made iteration free" is half the
+  sentence; the other half is "and because indexing the view costs the checked
+  lane". A reader who has only the first half will helpfully rewrite the loop.
 
 - **Checked is the default, recoverable is the complement, and the docs
   say when each is right.** `a + b` traps on overflow in every profile
@@ -489,8 +518,16 @@ worked example until the tables land.
   its name). Until the filing closes, every new tag gets grepped against
   the module names in std and the item names in its own module.
 - **No std accessor returns an enum through an error row.** The same
-  shape is a silent wrong answer (F-0037), which is why `json.get`/`at`
-  ship as contracts. Return a total value, or a non-enum payload, or wait.
+  shape was a silent wrong answer (F-0037), which is why `json.get`/`at`
+  shipped as contracts. Return a total value, or a non-enum payload, or wait.
+  **RETIRED at the sc12 pin**: the rule was written as an interim with F-0037
+  as its exit, wolf-interp#16 closed at lupin 0.1.10 ("an enum variant is a
+  value, not a raise"), and the one-line reproducer takes the value path on
+  the lane that matters. The shape is legal now and the withdrawn functions
+  are writable; the sprint that writes them owes F-0039 and F-0029 a fresh
+  measurement first, because "the blocker retired" is not "writable" until
+  every finding on the SIGNATURE has been re-measured (§14's sc10 rule,
+  applied to the finding that taught it).
 - **Locale is never a parameter, in core, ever.** Grouping separators are
   the caller's argument; digit-group size is fixed at three; no function
   reads an environment.
@@ -855,6 +892,12 @@ quietly, which is one sprint of grace and no more.
 
 ## Review record
 
+- 2026-08-19, sc12 amendments: §9 gains the byte-view rules (a shape that
+  costs a lane is not a shape std writes, even when the cost is only speed;
+  do not assert a property this rig cannot observe; a doc explaining a body's
+  shape names the constraint and not only the wave), and §11's
+  no-enum-through-a-row rule is RETIRED with F-0037's closure at lupin
+  0.1.10. Review rides the same pending sc00 gate.
 - 2026-08-18, sc11 amendments: §14 gains the process tier (the row
   vocabulary's fourth verbatim adoption with the new `signal` mark, the
   keyword-collision naming rule, the pure-builder rule and its lane

@@ -77,6 +77,12 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0068 | 2026-08-18 | **`conform-run <bare-name.lu>` says the wrong thing**: a path with no directory component has an empty parent, so the package root is searched in nowhere and the message is "the package root has no wolf source files" about a directory holding exactly one `.lu` file. `./main.lu` works. No cost to this rig (it passes absolute paths) and every cost to a person at a prompt. The ask: normalize `Path::parent` of a bare name to `.`, and name the root that was searched | wolf-lang driver owners | sc11 evidence; unfiled at report time, routed with the closeout |
 | F-0069 | 2026-08-18 | **`?` inside a `comptime fn` is `unsupported`, and it MASKS the capability refusal**: a row RETURN, a raise and an `else` all evaluate at comptime; `let v = inner(x)?` answers `unsupported` at resolve with an empty `diagnostics` array. The interaction is the finding — `tests/process/comptime_refuses.lu` written the obvious way (`os_kill(slot)?`) answers `unsupported` instead of `fail(E0701)`, so a D33 rejection test proves NOTHING while looking healthy, and the bare-call form trips `W0601` (a discarded `() ! {io}`) which this rig denies. Two asks: support `?` or refuse it by name (F-0060's shape again), and make the permanent check (the sandbox) win over the temporary one (the subset) | wolf-lang s16 (CTFE engine) owners | sc11 evidence; unfiled at report time, routed with the closeout |
 | F-0070 | 2026-08-18 | **lupin 0.1.8 has four fifths of the os/env builtin family**: `env_args`, `env_get`, `env_set`, `os_cwd`, `os_exit` and every `time_*` call run at its own conformance pin; `env_vars` "does not resolve" — the generic unknown-name refusal, not the reasoned decline this machine gives `fs_*`/`net_*`/`json_*`/the process trio, so it reads as an oversight. Costs one ledger row (`tests/env/args_and_vars.lu`) and nearly cost three documents a wrong sentence: **a builtin FAMILY is not a unit of evidence; a builtin is** | wolf-interp | sc11 evidence; unfiled at report time, routed with the closeout |
+| F-0071 | 2026-08-19 | **wolfc's checked tier models two of s77's seven byte-view positions**: `for b in s.bytes()` and `s.bytes().len` run on all three lanes, while `s.bytes()[i]` is `unsupported — indexing outside the modelled surface` and `.get(i)`/`.first()`/`.count()` are `unsupported — List method on a temporary`, both at `mem` — the materialized shape (`let bs = s.bytes()` then `bs[i]`) still runs everywhere, so the gap is the TEMPORARY and not the operation. std cannot spend a lane on a performance shape, so seven bodies were rewritten onto `for`-and-counter forms (including a UTF-8 decoder turned into a one-pass state machine) rather than onto the fast indexed ones | wolf-lang s77/s23 (checked execution) | [filed: wolf-lang#85](https://github.com/wolffe-lang/wolf-lang/issues/85), held as `tests/str/byte_view_index.lu` |
+| F-0072 | 2026-08-19 | **A byte view cannot cross a function boundary, so `std.bytes`' nine functions are copy-only**: s77 materializes in every non-consuming position — a `let`, an argument, a return — which is the right conservative default and means `bytes.is_utf8(bytes.from_str(s))` copies `s` where `str.char_count(s)` walks it. The difference is the PARAMETER, not the implementation, and the library cannot fix it from its side. The ask is the `Bytes` type this repo has documented as an interim since sc05, or a mode that lets a callee borrow `{ptr, len}` (which a `str` parameter already is), plus a spec rule about which positions materialize — today that is discoverable only from a comment in `wolf_wir::lower` | wolf-lang s37/s77 core types | [filed: wolf-lang#86](https://github.com/wolffe-lang/wolf-lang/issues/86) |
+| F-0073 | 2026-08-19 | **The `--version` pairing line is a hardcoded constant and it rots**: trunk `f8dca42` says "paired with lupin 0.1.8" one day after lupin 0.1.10 shipped, and 0.1.10's own conformance pin is ten commits BEHIND that sha — so the two binaries really are meant to be used together and the line says otherwise. The line is genuinely useful (F-0064 taught this rig to read it), which is exactly why a claim inside a shipped binary needs a mechanism keeping it true: a reader trusts it more than a note | wolf-lang release owners | [filed: wolf-lang#87](https://github.com/wolffe-lang/wolf-lang/issues/87) |
+
+| F-0074 | 2026-08-19 | **`List.push` is O(n) per push under lupin, so every `List`-returning std function is quadratic on the reference lane**: 4k/8k/16k/32k pushes take 0.46/1.91/7.83/37.53s (doubling N quadruples the time) where both compiler rungs finish 32k in 0.14s of whole-process time. Suffix slicing and `starts_with` are both linear, measured, so it is the list representation and not the scanner shape. It is the ceiling behind this rig's slowest test (`fmt/decimal/shortest_round_trip.lu`, 28-35s against a 60s per-test limit, timed out once under load this sprint) and std cannot write around it: pushing into a fresh list IS the portable spelling (sc04's rule, because index assignment runs on one lane). Also measured: 0.1.10 is ~15% slower than 0.1.8 on that test | wolf-interp | [filed: wolf-interp#24](https://github.com/wolffe-lang/wolf-interp/issues/24) |
+
 
 ## F-0001 — the std search path
 
@@ -2423,3 +2429,278 @@ of evidence; a builtin is.**
 The ask: implement `env_vars` (sorted `K=V` lines, non-UTF-8 entries skipped —
 the semantics `wolf_mem`'s `os_builtin` already pins and `std.env.vars`
 documents), or decline it with a reason the way the other refusals do.
+
+## Retirements and movements at the sc12 pins
+
+The pin bump is wolf `0b4e79c` → trunk **`f8dca42`** (ten commits: s74, s53,
+s75, s78, s76, s77 and the rt test gating), with lupin **0.1.8 → 0.1.10**,
+skipping 0.1.9. Both ritual gates were run in a clean scratch clone at the sha
+and both are green on their FIRST attempt — the fourth clean pair in a row, so
+F-0054 stays open on the reasoning it has always stayed open on: a clean run is
+not proof that a timing dependence is gone, and the posture is to state the
+attempt count.
+
+The pin is trunk's tip, which is a change from sc11 (where the tip was red,
+F-0063). Three compiler sprints — s79 bench, s80 token audit, s81 str
+equality — were in flight during this sprint and none of them is in this pin,
+deliberately: the pin is taken once and held.
+
+### F-0037 is CLOSED, and it is the biggest thing in the interpreter's half
+
+For five sprints a function whose return type was an ENUM and whose signature
+carried an error row took the MISS path on every call — `fn id(v: W) -> W !
+{none} { v }` raised instead of returning `v`, in one line, with no
+diagnostic. wolf-interp#16 fixed it at 0.1.10 ("an enum variant is a value,
+not a raise": `ErrorValue` records where its name resolved, and `is_error` —
+the only question `?` and `else` ask — reads it). Re-measured here with the
+finding's own reproducer, on the lane that matters:
+
+```
+$ lupin ./main.lu
+value path wins
+```
+
+**What it unblocks, and what this sprint deliberately did not do with it.**
+`std.json.parse`, `json.get` and `json.at` were written, tested and withdrawn
+to reviewed contracts on this finding — `parse`'s signature is `-> Value !
+{syntax, deep}`, an enum through a row — and the interpreter is `std.json`'s
+only executing lane, so the module's DOM half becomes writable for the first
+time. None of it is in this sprint's contract and none of it is written; the
+module header still says blocked, and the sprint that owns the json row owns
+the change. sc10's rule applies to itself here: "the blocker retired" is not
+"writable" until every finding on the SIGNATURE has been re-measured, and the
+sprint that takes it should re-measure F-0039 (nested rows) and F-0029
+(cross-module enum consumption) before writing a line.
+
+API-CONVENTIONS §11's rule — "No std accessor returns an enum through an error
+row" — was written as an interim with this finding as its exit, and the exit
+has arrived.
+
+### F-0032 is closed too
+
+`s as nonsense` was a silent no-op under lupin (the value passed through
+unchanged, no diagnostic). At 0.1.10 it is `E0301` at resolve, spanning the
+type name, matching the counterparty span for span (wolf-interp#17). Nothing
+in `std/` depended on the bug, so the closure costs no row and is recorded
+because a silent wrong answer that closes deserves the same paragraph one that
+opens gets.
+
+### Re-verified UNMOVED, each re-measured rather than assumed
+
+- **F-0057** — the four probes sc11 used, run again at this pin:
+  `str.from_utf8(b)` "does not resolve", `(mut b).push_byte(104)` is
+  "`StrBuf` has no method `push_byte` in this machine's std subset", `'h'` is
+  `E0101` at the LEXER, `bytes_to_str` "does not resolve". `std.bytes.to_str`
+  is a reviewed contract for the fourth sprint running. What is NEW is
+  agreement about the shape of the fix: s77's lowering says the byte view
+  "cannot become a `str` … a `List[int] -> str` conversion would have to
+  VALIDATE (wolf-std's `bytes.to_str`, still blocked, and this is why: it
+  wants a checked primitive, not a cast)". The view is now bit-identical to a
+  `str`, which makes an unchecked conversion look one instruction away, and
+  the compiler names that as the forging hole rather than taking it.
+- **F-0070** — `env_vars` still "does not resolve" under lupin 0.1.10, so
+  `tests/env/args_and_vars.lu` keeps its dark interpreter column while its
+  four siblings run. Two releases later, unmoved.
+- **F-0046 / F-0053** — `conform-run` still rejects `--deny-warnings`
+  (`unknown flag`, re-measured at this sha) and the record's `warnings` array
+  still covers the entry file only. The rig denies warnings itself and stayed
+  green across 185 tests and 317 doc-example blocks.
+- **F-0016** — `wolf fmt` still splits a dotted call under a `//` comment.
+  Sixth sprint running; this sprint's rewrites carry their notes in `///` docs
+  instead, which is the documented dodge and is now simply how this repository
+  writes.
+- **F-0026's checked-tier ceiling** is what F-0071 is a new face of: the tier
+  models a subset of the machine, and the subset is where std has to live.
+- F-0004, F-0011, F-0012, F-0025's last third, F-0027, F-0029, F-0030,
+  F-0035 (the byte-type half), F-0038, F-0039, F-0040, F-0044, F-0045,
+  F-0047, F-0049, F-0050, F-0051, F-0054, F-0058, F-0061, F-0065, F-0066,
+  F-0067, F-0068, F-0069: all retested, all open.
+
+### The ledger movement
+
+**Zero rows moved and two rows were added.** The 183 tests this repo carried
+into the bump answer exactly what they answered at the sc11 pin — 144 / 149 /
+97 `run` on lupin / checked / native, with 39 / 30 / 82 `unsupported` and
+0 / 4 / 4 held rejections — and the two new sc12 rows are the byte-view pair
+(`str/byte_view_walk.lu` three lanes, `str/byte_view_index.lu` two).
+
+That is the honest report and it is the second time this repo has recorded it
+(sc10 was the first). The reason is structural rather than lucky: s77 changed
+the LOWERING of `bytes()` and not its surface, s76 and s75 changed where and
+how containers allocate and not what they answer, and the seven std bodies
+rewritten this sprint were rewritten to keep the lanes they had. A wave that
+makes existing code faster moves no ledger row by construction — the ledger
+measures depth, not cost — which is worth stating plainly, because a sprint
+whose whole subject is a performance primitive and whose ledger is unchanged
+looks like a sprint that did nothing.
+
+## F-0071 — the checked tier models two of the byte view's seven positions
+
+s77 (#80) makes `s.bytes()` the receiver's own `{ptr, len}` pair and reads it
+in place wherever the call is CONSUMED. The lowering names seven such
+positions: iteration, indexing, and the `len`/`count`/`is_empty`/`get`/`first`/
+`last` queries. `wolf conform-run --checked` models two.
+
+```text
+s.bytes()[0]        unsupported — indexing outside the modelled surface  @mem
+s.bytes().get(i)    unsupported — List method on a temporary             @mem
+s.bytes().first()   unsupported — List method on a temporary             @mem
+s.bytes().count()   unsupported — List method on a temporary             @mem
+for b in s.bytes()  run, all three lanes
+s.bytes().len       run, all three lanes
+let bs = s.bytes(); bs[i]   run, all three lanes (the materialized shape)
+```
+
+The last line is what makes this a gap rather than a design: the checked tier
+indexes a byte LIST perfectly well. What it does not model is the temporary.
+
+**The cost, measured in bodies rather than in nanoseconds.** wolf-std cannot
+spend an execution lane on a performance shape — that is §14's honesty applied
+to an optimization instead of to a capability — so this sprint's seven
+rewrites are all on the two-position subset:
+
+- `str.char_count`, `str.is_ascii` — `for` over the view, one of them
+  returning out of the loop;
+- `str.char_offsets` — `for` plus a counter, where the natural body indexes;
+- `str.code_points` — the UTF-8 decoder rewritten from a random-access walk
+  (`bs[i + 1]`, `bs[i + 2]`, `bs[i + 3]`) into a one-pass state machine with a
+  pending-continuation count, because lookahead is exactly what a view cannot
+  do on this lane;
+- `fmt.digit_of`, `hex.digit_of`, `base64.value_of` — each takes its first
+  byte by iterating and returning out of the first iteration.
+
+Every one of those is a fine body. The rule they add up to is not fine: an
+algorithm that needs genuine random access over bytes must keep materializing
+or drop a lane, and the next one might not have a one-pass form.
+
+Two asks, either of which closes it: model the view's indexing and query
+family in the checked tier, or — if the temporary is deliberate there — say so
+in the refusal. `unsupported — List method on a temporary` is a place-model
+sentence that never mentions views, and learning that `for` was the shape to
+keep took a four-program bisect.
+
+Held as `tests/str/byte_view_index.lu` (`lupin=run`, `wolfc=unsupported`,
+`native=run`) so the day the tier models it, the row advances and says so.
+
+## F-0072 — a byte view cannot cross a function boundary
+
+s77's own comment states the boundary: every position that is not consuming —
+a `let` binding, an argument, a return — materializes through
+`__wolf_rt_str_bytes`. That is the right conservative default, and this
+finding is about what it costs a library, so the cost is on the record when
+the `Bytes` question is decided.
+
+`std.bytes` is nine functions whose first parameter is `List[int]`, so every
+one of them receives its bytes as an ARGUMENT and every call from a string
+copies the string first:
+
+```wolf
+bytes.is_utf8(bytes.from_str(s))   // copies s, then validates
+str.char_count(s)                  // walks s in place (the sc12 rewrite)
+```
+
+Same kind of work; one of them is free. The difference is the parameter, not
+the implementation, and std cannot fix it from its side: there is no signature
+that accepts a view, and inlining the byte tier into `std.str` to get the win
+would duplicate the module and destroy the split `std.bytes` exists for
+(bytes a program HOLDS, versus bytes it walks through once).
+
+The ask is a design one: the `Bytes` type this repo has documented as an
+interim since sc05, or a parameter mode that lets a callee borrow `{ptr, len}`
+without materializing — which a `str` parameter already is, so the machinery
+exists and only the name is missing — plus a spec rule about which positions
+materialize, since today that is discoverable only from a comment in
+`wolf_wir::lower`.
+
+The module header now says this in the place a reader meets it, because the
+alternative is a library that looks slower than it is for a reason nobody can
+see from the signature.
+
+## F-0073 — the pairing line is a constant, and it rots
+
+```
+$ wolf --version
+wolf 0.1.0 (wolfgang)
+paired with lupin 0.1.8 (reference interpreter), pin 7886559
+```
+
+Measured at trunk `f8dca42` (2026-08-13), one day after lupin 0.1.10 shipped
+(2026-08-12) — and 0.1.10's own conformance pin is `613c3dc`, a wolf-lang
+commit ten commits behind this sha. So the two binaries this repo pins really
+are meant to be used together, the drift really is the narrowest it has ever
+been, and the line still names the release before last.
+
+r01 introduced the line and F-0064 taught this repo's doctor to read it:
+identity from the first line, the pairing reported and never gated. It is
+useful — it answers "are these two meant to be used together?", which
+`vendor/tools.toml` had been answering in prose for ten sprints. That is
+exactly why it needs a mechanism: a claim that comes out of a binary is
+trusted more than a note, and this one has nothing keeping it true.
+
+The ask: make the pairing a value the release process writes, or state it with
+the DATE of the differential run that established it, so that a stale line
+reads as history rather than as a claim about now.
+
+## F-0074 — the reference lane builds every list quadratically
+
+Found by accident, which is the only reason it is in this sprint at all:
+`tests/fmt/decimal/shortest_round_trip.lu` timed out at the rig's 60-second
+per-test ceiling during a `cargo xtask ci` run, having passed three
+`std-test` runs the same hour. Chasing the timeout produced a much larger
+answer than the flake it started as.
+
+The canonical list-building loop — the one every `std` function returning a
+`List` writes, because pushing into a fresh list is the portable spelling
+(sc04's rule: index assignment executes on one lane only) — is quadratic
+under lupin:
+
+| N pushes | lupin 0.1.10 | wolf `--checked` | wolf `--native` |
+|---|---|---|---|
+| 4 000 | 0.46 s | — | — |
+| 8 000 | 1.91 s | 0.08 s whole process | 0.22 s whole process |
+| 16 000 | 7.83 s | — | — |
+| 32 000 | 37.53 s | 0.14 s whole process | 0.13 s whole process |
+
+Doubling N quadruples the time (4.1x, 4.1x, 4.8x), which is a copy per push
+rather than an amortized doubling. Both compiler rungs are flat at the same
+sizes, so this is the interpreter's list representation and not a cost the
+language imposes.
+
+**Two suspects cleared before filing**, both measured rather than reasoned
+about, and both worth recording because a std scanner does them constantly:
+
+- suffix slicing (`rest = rest[1..]` until empty) is LINEAR: 2 000 / 4 000 /
+  8 000 / 16 000 bytes → 0.008 / 0.013 / 0.025 / 0.055 s;
+- `starts_with` is O(1) in the receiver: 200 000 probes cost 0.73 s against a
+  16-byte string and 0.80 s against an 8 192-byte one.
+
+So a scanner that walks a string is fine here; a scanner that BUILDS
+something is not.
+
+**What it costs this repository.** `hex.decode`, `base64.decode`,
+`str.split`/`find_all`/`char_offsets`/`code_points`, `list.map`/`filter`/
+`concat`, `sort`'s merge passes and `fmt.decimal`'s big-integer limb
+arithmetic are all quadratic in their output size on the reference machine.
+The visible symptom is the slowest test sitting at 28-35 s against a 60 s
+ceiling — which is why it fell over once under load — and the invisible one
+is that this repository has been describing those functions' costs in terms
+of the algorithm rather than the machine.
+
+Also measured while isolating it: lupin 0.1.10 is consistently ~15% slower
+than 0.1.8 on that test (28.3 / 35.3 s versus 24.0 / 31.0 s, alternating
+runs, one staged std tree). Reported with the filing, not separately: a
+release that adds analyses may legitimately cost time, and 15% is not the
+story next to a quadratic.
+
+The ask is amortized growth, or — if the representation is deliberately
+persistent — a sentence saying so, because the shape wolf-std has
+standardized on is that representation's worst case.
+
+**What this sprint did NOT do about it.** Nothing in `std/` changed for it.
+The portable spelling is still the portable spelling, the alternative
+(index assignment) still costs a lane, and rewriting the library around one
+implementation's data structure is precisely the workaround
+`CONTRIBUTING.md` forbids. It is filed, it is measured, and the two numbers
+that matter — the ceiling and the doubling — are here so the next sprint
+that sees a timeout knows within a minute whether it has found a new
+problem or this one.

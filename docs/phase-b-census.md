@@ -557,3 +557,203 @@ F-0058 (1), F-0061 (1), and **F-0065 adds 6** (`process.output`,
 being the seventh named in the header). F-0066 adds no contract and one debt:
 the module's central claim — a child's exit code comes back — has no portable
 witness in this repository at all.
+
+## 10. sc12 — the byte view, and a wave that moves no row
+
+Pins: wolf trunk `f8dca42` (ten commits past sc11's `0b4e79c`: s74, s53, s75,
+s78, s76, s77 and the rt test gating), lupin **0.1.10** (skipping 0.1.9), its
+own conformance pin `613c3dc` being an ANCESTOR of the wolf sha — the
+narrowest two-upstream drift this repo has recorded, and the first one
+measurable as a commit distance rather than as a list of waves. Both ritual
+gates green in a clean scratch clone, first attempt.
+
+**This repository's own gate needed two attempts, and the reason is a
+finding.** The first `cargo xtask ci` run went RED on a single row —
+`tests/fmt/decimal/shortest_round_trip.lu` timed out at the rig's 60-second
+per-test ceiling — after three `std-test` runs had passed it in the same
+hour. The re-run was green and so was the run after it, and the flake is
+load: that test takes 28-35 s under lupin 0.1.10 on a quiet machine. Chasing
+it produced F-0074 (`List.push` is O(n) per push on the interpreter lane),
+which is the largest thing this sprint found and was not in its contract.
+The attempt count is stated here for the same reason the pin ritual states
+its own: a gate that needed a re-run is information, and a sprint that only
+reports the green run is reporting half of what happened.
+
+| measure | sc11 | sc12 |
+|---|---|---|
+| modules under `std/` | 34 | **34** |
+| `pub fn` in `std/`, nursery excluded | 342 | **342** |
+| `pub fn` including `std/x/` | 373 | **373** |
+| function BODIES rewritten | — | **8** (5 public, 3 private, +1 new private helper) |
+| entry tests | 183 | **185** (+2) |
+| doc-example blocks, extracted and RUN | 317 (sc10) | **331** |
+| findings filed | F-0062…F-0070 (eight) | **F-0071 … F-0074** (four) |
+| findings CLOSED | 4 | **2** (F-0037, F-0032 — both upstream, both lupin's half) |
+
+**Zero functions added and zero signatures changed**, which is the first time
+a sprint here can say that. The subject was not new surface; it was what s77
+made cheap.
+
+### What s77 gave, and what std was allowed to take
+
+`s.bytes()` is the receiver's own `{ptr, len}` pair now — bit-identical to the
+`str` and to every zero-copy subslice `trim`/`split`/`get` already returned —
+read in place wherever the call is CONSUMED. `s[a..b]` and `s.get(a..b)`
+stopped calling the runtime in the same wave. The compiler's consuming set is
+seven positions: iteration, indexing, and `len`/`count`/`is_empty`/`get`/
+`first`/`last`.
+
+**std may use two of them** (F-0071, filed as wolf-lang#85). Measured, one
+program per position:
+
+| shape | lupin | checked | native |
+|---|---|---|---|
+| `for b in s.bytes()` | run | run | run |
+| `s.bytes().len` | run | run | run |
+| `s.bytes()[i]` | run | **unsupported** — indexing outside the modelled surface | run |
+| `s.bytes().get(i)` | run | **unsupported** — List method on a temporary | run |
+| `s.bytes().count()` | run | **unsupported** — same | run |
+| `s.bytes().first()` | **unsupported** — no `first` in this std subset | **unsupported** — same | run |
+| `let bs = s.bytes()` then `bs[i]` | run | run | run (materializes) |
+
+std cannot spend an execution lane on a performance shape, so every rewrite
+below is on the two-position subset. The last row is the one that makes this a
+gap rather than a design: the checked tier indexes a byte LIST perfectly well,
+and what it does not model is the temporary.
+
+### The eight bodies, and what changed shape
+
+| function | was | is |
+|---|---|---|
+| `str.char_count` | `let bs = s.bytes()` + `while` + `bs[i]` | `for b in s.bytes()` |
+| `str.is_ascii` | same, with an early `return false` | `for` over the view, returning out of it |
+| `str.char_offsets` | bind + indexed walk | `for` + an offset counter |
+| `str.code_points` | bind + RANDOM-ACCESS walk (`bs[i+1..i+3]`, advance by width) | one-pass state machine: a lead byte sets a pending count, each continuation folds six bits |
+| `hex.encode_str` | `encode(s.bytes())` — a materializing ARGUMENT | `for` over the view, `byte_digits` per byte |
+| `hex.digit_of` | up to 32 `starts_with` probes against an owned alphabet | one byte, three ASCII range tests |
+| `fmt.digit_of` | up to `2 * radix` probes (72 at radix 36) | one byte, three range tests, one radix bound |
+| `base64.value_of` | 64 one-byte slices + `starts_with` | one byte, then a `for` over the alphabet's bytes comparing numbers |
+
+Two of those are more than a mechanical substitution and both are worth
+naming. `code_points` lost its lookahead: a view cannot be indexed on the
+checked lane, so the decoder had to become a machine that carries state
+forward instead of reading ahead — and the result is shorter than what it
+replaced. The three digit probes lost sc03's INVERSION, which is a small
+piece of this repository's history retiring: "probe the input with a literal
+you own, never slice the caller's string" was the rule that made `parse_int`,
+`hex.decode` and three base64 decoders total over arbitrary UTF-8 while the
+language had no byte accessor. The totality survives with a shorter argument —
+a byte is a byte, and a multi-byte character's lead byte (195 for `é`) is
+simply not a digit — and the probe loop it required is gone.
+
+### What did NOT get rewritten, and why
+
+- **`std.bytes`, all nine functions.** Their first parameter is `List[int]`,
+  and an argument is exactly the position s77 materializes in, so
+  `bytes.is_utf8(bytes.from_str(s))` copies `s` where `str.char_count(s)`
+  walks it. The difference is the parameter, not the implementation, and the
+  library cannot fix it from its side: F-0072 (wolf-lang#86) is the ask —
+  the `Bytes` type this repo has documented as an interim since sc05, or a
+  mode that lets a callee borrow `{ptr, len}`.
+- **`str.bytes`** still allocates, and its doc now says that this is a
+  statement about its SIGNATURE rather than about the pin: it RETURNS the
+  list, which is a materializing position and must be, because the list
+  outlives the expression.
+- **`fmt.truncate_to`** keeps its `get` walk. The byte at the caller's width
+  would answer the boundary question in one load, but §9's sc09 rule says the
+  recoverable slice is for offsets the CALLER named, and that rule is
+  doctrine rather than a cost problem. Recorded so the next sprint does not
+  re-derive the question.
+- **`str.find_all`, `splitn`, `replacen`** keep their `find` loops: the
+  builtin search is the implementation's, and slicing at the offset it
+  returned stopped calling the runtime in the same wave with no source change.
+
+### The one number this sprint can show, and where it came from
+
+The sprint was told to measure nothing, and the rig cannot see an
+allocation, so no benchmark was written. One number arrived anyway, from a
+CI timeout that turned into a bisect (F-0074), and it is worth recording
+because it is the only direct evidence here that the rewrites do anything:
+
+`hex.decode` over an 8 192-character hex string, under lupin, same input,
+same output (`8192 4096`), the only difference being `digit_of`:
+
+| digit probe | wall |
+|---|---|
+| the sc03 alphabet probe (up to 16 iterations of slice + `starts_with` + `upper()` + `starts_with`) | **364.6 s** |
+| the sc12 byte view (`for` over `s.bytes()`, three range tests) | **3.7 s** |
+
+Roughly 100x, on the lane where the view MATERIALIZES and therefore should
+have helped least. The old probe's cost was the per-iteration `.upper()`
+allocation and the sixteen one-byte slices, not the search; the new one
+reads a byte. Two caveats keep this honest: both versions remain
+superlinear in the input for a reason that has nothing to do with either
+probe (F-0074: `List.push` is O(n) per push on this lane, and `decode`
+pushes a byte per pair), and this is one input on one lane on one machine.
+It is an anecdote with a mechanism, not a benchmark, and it is labelled as
+one.
+
+**The one rewrite this sprint made and then withdrew** is the other half of
+the lesson. `std.fmt.decimal`'s `dval` is the hottest private function in
+the library (once per digit, and a subnormal has 750), so it looked like the
+best candidate of all. Its only executing lane is the interpreter — the f64
+body is `unsupported` on both compiler rungs (F-0026, F-0061) — and there
+the view materializes, so the rewrite measured neutral-to-slower against a
+probe that was already cheap (no `.upper()`, ten single-byte slices). It was
+reverted inside the sprint. **Check which lane runs the module before
+rewriting it onto a primitive whose win is native-only**: a one-lane module
+whose lane is the interpreter gets nothing from s77, and `std.fmt.decimal`
+is the whole class.
+
+### The lane table at these pins
+
+185 tests × 3 lanes:
+
+| lane | run | unsupported | fail(E…) | (sc11) |
+|---|---|---|---|---|
+| lupin | **146** | 39 | 0 | 144 / 39 / 0 |
+| wolfc `--checked` | **150** | 31 | 4 | 149 / 30 / 4 |
+| native | **99** | 82 | 4 | 97 / 82 / 4 |
+
+**Every flip, listed, and there are none.** Not one of the 183 rows this repo
+carried into the bump moved in any direction — measured before a single std
+edit, with the rig green against the sc11 ledger at the sc12 pin — and the
+whole difference above is the two rows sc12 adds:
+
+| test | lupin | wolfc | native | why |
+|---|---|---|---|---|
+| `str/byte_view_walk.lu` | run | run | run | the two portable view shapes, held so they cannot rot |
+| `str/byte_view_index.lu` | run | **unsupported** | run | the held refusal behind F-0071 |
+
+A wave that makes existing code faster moves no ledger row by construction:
+this ledger measures how DEEP each implementation gets, and s77/s76/s75
+changed cost rather than depth. That is worth stating plainly, because a
+sprint whose entire subject is a performance primitive and whose ledger is
+unchanged looks, from the ledger alone, like a sprint that did nothing. What
+changed is in the diff: eight bodies, one of them an algorithm.
+
+### The blocked inventory
+
+F-0049 (5), F-0050 (1), F-0044 (6), F-0046 (1), F-0004 (2), F-0057 (1),
+F-0058 (1), F-0061 (1), F-0065 (6) all stand as sc11 recorded them, each
+re-measured. **F-0072 adds no contract and one debt** (`std.bytes` is
+copy-only at every entry point). **F-0071 adds no contract either**, and
+what it costs is a shape rather than a function. **F-0074 adds no contract
+and the largest debt on this list**: every `List`-returning function in the
+library is quadratic on the reference lane, which is a fact about the
+machine and not about the algorithms, and the only thing std could do about
+it is the workaround `CONTRIBUTING.md` forbids.
+
+**One block LEAVES the inventory, and it is the biggest one here.** F-0037 —
+an enum returned through an error row takes the miss path on every call — is
+CLOSED at lupin 0.1.10 (wolf-interp#16), re-measured with the finding's own
+reproducer. `std.json.parse`, `json.get` and `json.at` were written, tested
+and withdrawn to reviewed contracts on that finding, and the interpreter is
+`std.json`'s only executing lane, so the DOM half of json is writable for the
+first time. sc12 does not write it: it is not in this sprint's contract, and
+sc10's rule applies to itself — "the blocker retired" is not "writable" until
+every finding on the SIGNATURE has been re-measured. The sprint that takes the
+row owes F-0039 (nested rows) and F-0029 (cross-module enum consumption) a
+fresh measurement first. API-CONVENTIONS §11's "no std accessor returns an
+enum through an error row" was written as an interim with F-0037 as its exit,
+and the exit has arrived.
