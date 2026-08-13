@@ -1,0 +1,38 @@
+//! check: run(exit=1, stdout="utf8 taken\nerror: utf8")
+//! phase: run
+//! conforms: std.bytes, err.row, err.else, err.propagate
+//!
+//! `to_str`'s one tag, named by the toolchain rather than by this
+//! repository.
+//!
+//! `to_str_border.lu` proves the refusals are refusals; this proves WHICH
+//! row they are. sc07's two-part shape: an `else` shows the miss path was
+//! taken and produces a value, and a final `?` lets the tag ride out of
+//! `main`, where `error: utf8` on stdout and exit 1 are the record's own
+//! words. That distinction matters more than usual here, because the row
+//! is not std's — it is adopted verbatim from the primitive (§14's rule,
+//! for a pure tier this time), and a wrapper that renamed or coarsened it
+//! would look identical from inside a handler.
+//!
+//! Two lanes, for `to_str_border.lu`'s reason (F-0075).
+
+use std.bytes
+
+fn main() -> !int {
+    var bad = List[int]()
+    (mut bad).push(237)
+    (mut bad).push(160)
+    (mut bad).push(128)
+
+    let handled = bytes.to_str(bad) else |_| {
+        print("utf8 taken")
+        ""
+    }
+    if handled == "" {} else { return 2 }
+
+    var again = List[int]()
+    (mut again).push(255)
+    let forced = bytes.to_str(again)?
+    if forced.len >= 0 {} else { return 3 }
+    0
+}

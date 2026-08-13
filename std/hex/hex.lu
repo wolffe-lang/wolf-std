@@ -7,7 +7,8 @@
 //! `bytes`, the type `std.bytes` describes. That module has code as of
 //! sc09 — eight of its nine functions, over exactly this currency — and it
 //! still describes a `Bytes` TYPE that does not exist: a byte-width element
-//! type that can hold invalid UTF-8 (F-0018/F-0057). So the currency here
+//! type that can hold invalid UTF-8 (F-0035, and F-0072 for the cost it
+//! carries today). So the currency here
 //! is unchanged and so is the interim: `List[int]` with every element in
 //! 0..255 — documented, checked at the boundary, and trivially replaced by
 //! `Bytes` when `Bytes` exists, since every signature keeps its shape
@@ -19,10 +20,12 @@
 //! of this module in any language and it was missing for four sprints
 //! because nothing could read a `str`'s bytes (F-0035); `s.bytes()` can,
 //! on every lane (s37, and `std.bytes.from_str` wraps it), so the
-//! function is one delegation. Its inverse is NOT here and will not be
-//! until bytes can become text again (F-0057) — `encode_str`'s own doc
-//! argues that asymmetry, because §11 pairs every encoder with its
-//! decoder and this is the one place the pairing is refused.
+//! function is one delegation. Its inverse is NOT here yet, and the
+//! reason CHANGED at sc13: F-0057 closed (s81's `str_from_utf8`, wrapped
+//! as `std.bytes.to_str`), so `decode_str` is `decode` plus one call and
+//! §11's encoder/decoder pairing is a debt with a date rather than a
+//! refusal — §14's clause gives it the sprint after the closure.
+//! `encode_str`'s own doc argues the asymmetry.
 //!
 //! One name note: `encode_str` and not `encode`, because wolf has no
 //! overloading and `encode(b: List[int])` owns the short name. It goes to
@@ -213,15 +216,16 @@ pub fn decode(s: str) -> List[int] ! {parse} {
 /// The `assert` `encode` documents is unreachable through this door: every
 /// element of a `str`'s byte view is a byte by construction.
 ///
-/// **There is no `decode_str`, and that is a filing rather than an
-/// omission** (§11's encoder/decoder pairing rule, refused honestly):
-/// hex text decodes to bytes and nothing in the language turns bytes back
-/// into a `str` — no `from_utf8`, no `char`, no `strbuf.push_byte`
-/// (F-0057). `decode` plus `std.bytes.to_str` is the round trip, and
-/// `std.bytes.to_str` is itself still a contract. So this module promises
-/// the FORWARD direction only for text, and says so here rather than
-/// shipping an ASCII-only inverse that would refuse the text people
-/// actually hex-encode.
+/// **There is no `decode_str` YET, and at these pins that is a debt
+/// rather than a filing** (§11's encoder/decoder pairing rule). It was a
+/// refusal for four sprints because nothing in the language turned bytes
+/// back into a `str`; s81's `str_from_utf8` closed F-0057 and
+/// `std.bytes.to_str` wraps it, so the round trip is `decode` plus one
+/// call and the only thing missing is the sprint that writes it (§14: a
+/// contract ships the sprint after its blocker closes). Until then this
+/// module promises the FORWARD direction only for text, and says so here
+/// rather than shipping an ASCII-only inverse that would refuse the text
+/// people actually hex-encode.
 ///
 /// Uppercase is `encode_str(s).upper()`; there is no `encode_upper_str`,
 /// because a second name for a call anyone can write is a second thing to

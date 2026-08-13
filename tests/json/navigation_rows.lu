@@ -1,0 +1,52 @@
+//! check: run(exit=1, stdout="none taken\nkind taken\nerror: none")
+//! phase: run
+//! conforms: std.json, err.row, err.else, err.propagate
+//!
+//! The two tags `get` and `at` can raise, each through its own miss path,
+//! and then one of them RIDDEN OUT of `main` so the record names it.
+//!
+//! That two-part shape is sc07's and it is still the only way this rig
+//! witnesses a tag's IDENTITY: an `else` proves the miss path was taken
+//! and produces a value, and a final `?` lets the tag reach the process
+//! outcome, where `error: <tag>` on stdout and exit 1 record which one it
+//! was. A handler can discriminate at these pins (F-0052 closed at s70) —
+//! but a handler saying "it was `none`" is this repository asserting its
+//! own reading, where the record's `error: none` is the toolchain saying
+//! it.
+//!
+//! The two tags, and why the pair is two tags rather than one:
+//!
+//! - `none` — the container is the right kind and has nothing there. A
+//!   caller plans for this one.
+//! - `kind` — the value is not a container of that kind at all. A caller
+//!   is wrong about its own data.
+//!
+//! This is also the file that would have caught F-0037: under the finding
+//! the FIRST `else` fired for a hit, so a version of this test asserting
+//! only "the miss path produces a value" passed while `get` was broken.
+//! `navigation.lu` holds the hits for exactly that reason — the pair of
+//! files is the evidence, not either one alone.
+
+use std.json
+
+fn main() -> !int {
+    var m = Map[str, json.Value]()
+    m["a"] = json.from_int(1)
+    let obj = json.from_map(m)
+
+    let gone = json.get(obj, "nope") else |_| {
+        print("none taken")
+        json.null()
+    }
+    if json.is_null(gone) {} else { return 2 }
+
+    let wrong = json.at(obj, 0) else |_| {
+        print("kind taken")
+        json.null()
+    }
+    if json.is_null(wrong) {} else { return 3 }
+
+    let forced = json.get(obj, "nope")?
+    if json.is_null(forced) {} else { return 4 }
+    0
+}

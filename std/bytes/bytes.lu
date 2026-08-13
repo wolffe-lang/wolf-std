@@ -3,13 +3,25 @@
 //! std.bytes — the raw byte view of a string: the honesty valve D25 buys
 //! by refusing `s[i]` on `str`. Stability tier: core.
 //!
-//! **This module had no code for five sprints, and s37 is what changed.**
-//! `str.bytes()` now produces the byte view (`List[int]`, one element per
-//! byte, 0..255) on all three lanes, so every function below has both a
-//! producer and a body. What has NOT arrived is the other direction: no
-//! expression anywhere turns bytes back into a `str`, which is why exactly
-//! one function of the reviewed nine is still a contract (`to_str`, at the
-//! bottom of this header) and why `is_utf8` exists.
+//! **This module had no code for five sprints, s37 gave it a producer, and
+//! s81 closed the circle.** `str.bytes()` produces the byte view
+//! (`List[int]`, one element per byte, 0..255) on all three lanes, and
+//! `str_from_utf8` — the prelude's validating way back, landed at s81
+//! (wolf-lang#58, F-0057 CLOSED) — is what `to_str` delegates to. **All
+//! nine reviewed functions are code now**; the module has no contract left.
+//! `is_utf8` keeps its job, because the question "are these bytes text?"
+//! has a boolean answer a caller may want without the text.
+//!
+//! **`to_str` is the one function here with unequal lanes, and it is a
+//! tier gap rather than a capability.** `str_from_utf8` is PURE (no I13
+//! capability, no sandbox category — the second such family after `json_*`)
+//! and it executes on both compiler rungs; lupin 0.1.11 answers
+//! `unsupported: `str_from_utf8` does not resolve`, the generic
+//! unknown-name refusal rather than a reasoned decline, so the interpreter
+//! column of `tests/bytes/to_str_border.lu` is dark and its eight siblings
+//! still run on three lanes (F-0075). Nothing else in the module changes
+//! lane: lupin resolves module bodies lazily, so a program that never calls
+//! `to_str` never learns it is missing.
 //!
 //! **s77 made the byte view free, and NONE of that reaches this module —
 //! which is a fact about its signatures, not a gap to fix.** `s.bytes()` is
@@ -58,47 +70,26 @@
 //! The freedom has a price, and it is the whole reason `to_str` validates:
 //! bytes are where the UTF-8 invariant is ALLOWED to be absent.
 //!
-//! The one function still blocked, with its contract exactly as it will
-//! land:
+//! **The border post, and why it took five sprints — kept because the
+//! reason is the design.** `to_str` was a reviewed contract from sc05 to
+//! sc12 and the blocker was never tables: nothing in the language built a
+//! `str` from a number (no `char`, no `from_utf8`, no `strbuf.push_byte`,
+//! probed four ways at four pins), so the MATERIALIZATION step had nowhere
+//! to happen while the VALIDATION half sat here written and tested as
+//! `is_utf8`. An ASCII-only `to_str` would have been a border post that
+//! refuses text, which §9 forbids, so the function waited.
 //!
-//! ```text
-//! to_str(b: Bytes) -> str ! {utf8}
-//!     `b` viewed as a string, VALIDATED: `utf8` when the bytes are not
-//!     well-formed UTF-8 (overlong forms, surrogates, truncated
-//!     sequences, stray continuation bytes and scalars above U+10FFFF all
-//!     miss). Zero-copy on success. This is the border post D24 demands —
-//!     the one place bytes become a `str`, and the reason `str` needs no
-//!     validity check anywhere else.
-//!
-//!     BLOCKED on a primitive, not on tables: nothing in the language
-//!     builds a `str` from a number. There is no `char`, no `from_utf8`
-//!     builtin, no way to append a byte to a `strbuf` — so the
-//!     materialization step has no spelling, and a version of this
-//!     function that only handled ASCII would be a `to_str` that refuses
-//!     text, which is worse than not having one (§9: refusal over
-//!     approximation). `is_utf8` below is its PREDICATE half, written and
-//!     tested, so a program can at least ask the border's question; the
-//!     day a bytes-to-str primitive lands, this function is four lines
-//!     over that predicate. Filed as F-0057 and upstream as
-//!     wolf-lang#58, still OPEN — and re-measured at the sc12 pin with
-//!     four probes rather than assumed: `str.from_utf8(b)` is "does not
-//!     resolve", `(mut b).push_byte(104)` is "`StrBuf` has no method
-//!     `push_byte` in this machine's std subset", a `'h'` character
-//!     literal is `E0101` at the LEXER ("`'` begins no token"), and
-//!     there is no `bytes_to_str` builtin. Four sprints, one answer.
-//!
-//!     What is new at the sc12 pin is that the COUNTERPARTY states the
-//!     shape of the fix in the same words this contract does. s77 gave the
-//!     byte view a `str`-identical representation and deliberately emitted
-//!     no path back: the view "cannot become a `str` … a `List[int] -> str`
-//!     conversion would have to VALIDATE (wolf-std's `bytes.to_str`, still
-//!     blocked, and this is why: it wants a checked primitive, not a
-//!     cast)". A bit-identical representation makes an unchecked
-//!     conversion look one instruction away, and the compiler names that
-//!     as the forging hole rather than taking it. This function is the
-//!     border post on the other side of the same decision, and the two
-//!     descriptions of the fix now agree.
-//! ```
+//! What it waited for is exactly what landed. s77 made the byte view
+//! bit-identical to a `str` and deliberately emitted no path back, naming
+//! the reason in the compiler's own words — the view "cannot become a
+//! `str` … a `List[int] -> str` conversion would have to VALIDATE
+//! (wolf-std's `bytes.to_str`, still blocked, and this is why: it wants a
+//! checked primitive, not a cast)". s81 wrote that primitive: a `{utf8}`
+//! row rather than a trap, a cast nowhere in it, and the same six
+//! rejection classes `is_utf8` enumerates plus one this library could not
+//! have raised at all (an element that is not a byte). std did not lower
+//! its standard and the toolchain did not take the shortcut; the border
+//! post is the same function the sc05 contract described, four lines long.
 
 /// The number of bytes in `b`. O(1). Total: no error row, no traps.
 ///
@@ -295,9 +286,64 @@ pub fn from_str(s: str) -> List[int] {
     s.bytes()
 }
 
-/// Whether `b` is well-formed UTF-8 — the predicate half of the blocked
-/// `to_str` (module header), and the one function here that reads the
-/// bytes as text rather than as numbers. The empty sequence is valid.
+/// `b` as text, VALIDATED — the border post D24 demands, the one place in
+/// wolf where bytes become a `str`, and the reason `str` needs no validity
+/// check anywhere else.
+///
+/// Rows: `utf8`, and nothing else. **Nothing here traps**, including for
+/// input this module's own element contract calls impossible: a stray
+/// continuation byte, a truncated sequence, an overlong form, a surrogate
+/// (U+D800..U+DFFF), a scalar above U+10FFFF, a byte that begins no
+/// sequence (`C0`, `C1`, `F5`..`FF`), and an element outside 0..255 are all
+/// a MISS. Bytes are data — §2's rule, and the same reasoning that makes
+/// `is_utf8` answer `false` rather than trapping on a non-byte.
+///
+/// An interior NUL is VALID and is not a terminator: a wolf `str` carries
+/// its length, so `to_str` of `[119, 0, 102]` is a three-byte string.
+///
+/// `is_utf8` is this function's predicate half and the two agree by
+/// measurement, not by construction — they are different code (one is a
+/// decoder written here in divisions and range tests, the other is the
+/// toolchain's), and `tests/bytes/to_str_border.lu` walks the classes
+/// through both and asserts they answer the same. Ask `is_utf8` for a
+/// boolean; call `to_str` when you want the text.
+///
+/// Pure: `str_from_utf8` carries no I13 capability and no sandbox
+/// category, so with `json_*` it is the second such builtin family and
+/// the D33 sandbox has no reason to refuse it. That is a statement about
+/// the SANDBOX and not a promise about comptime, because the engine
+/// cannot reach this function for an unrelated reason: `List[int]()`
+/// inside a `comptime fn` is `unsupported` at resolve (F-0077), and a
+/// `List` is the only way to spell the argument. Measured, both compiler
+/// rungs, rather than inferred from the absence of a capability.
+///
+/// Delegates to the prelude's `str_from_utf8` (s81, wolf-lang#58). **Two
+/// lanes**: both compiler rungs; lupin 0.1.11 does not resolve the name
+/// (F-0075), so the interpreter column of this function's test is dark
+/// while the module's other eight keep three lanes.
+///
+/// ```wolf-doc-example
+/// (bytes.to_str(bytes.from_str("wolf é")) else "?") == "wolf é"
+/// (bytes.to_str(List[int]()) else "?") == ""
+/// var lone = List[int]()
+/// (mut lone).push(128)
+/// (bytes.to_str(lone) else "?") == "?"
+/// ```
+pub fn to_str(b: List[int]) -> str ! {utf8} {
+    str_from_utf8(b)?
+}
+
+/// Whether `b` is well-formed UTF-8 — the predicate half of `to_str`, and
+/// the one function here that reads the bytes as text rather than as
+/// numbers. The empty sequence is valid.
+///
+/// It stays hand-written now that `to_str` exists, for two measured
+/// reasons. It runs on ALL THREE lanes where `to_str` runs on two
+/// (F-0075), and a predicate written over the border post would have
+/// inherited the narrower lane set for a question that needs no text. And
+/// two independent decoders that must agree are worth more than one: the
+/// agreement is a test (`tests/bytes/to_str_border.lu`) rather than a
+/// tautology, and it is the test that would catch either side drifting.
 ///
 /// It rejects everything the standard rejects, not merely truncation: a
 /// stray continuation byte, a truncated multi-byte sequence, an OVERLONG

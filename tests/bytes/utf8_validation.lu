@@ -2,10 +2,14 @@
 //! phase: run
 //! conforms: std.bytes
 //!
-//! `is_utf8` — the predicate half of the blocked `to_str` (F-0057), and the
-//! only function in std that reads bytes as text. It is the border post's
-//! question without the border post's answer, so its correctness is the
-//! whole of what this module can currently promise about validity.
+//! `is_utf8` — the predicate half of `to_str`, and the only function in std
+//! that reads bytes as text in wolf source. It was the border post's
+//! question without the border post's answer for four sprints; the answer
+//! landed at sc13 (`to_str`, over s81's `str_from_utf8`) and the predicate
+//! stayed hand-written, because it keeps a third lane the primitive has
+//! not got (F-0075). `to_str_border.lu` is where the two are held to the
+//! same answers; this file is where the wolf-source decoder is held to
+//! the standard.
 //!
 //! Every rejection class the standard names gets a row, built byte by byte
 //! because `str` cannot express any of them (that is the point): a stray

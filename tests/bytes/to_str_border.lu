@@ -1,0 +1,167 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.bytes, err.row, err.else
+//!
+//! `to_str` — the border post, and the question this file exists to
+//! answer is not "does it work" but "does the WRAPPER weaken what the
+//! primitive checks".
+//!
+//! `std.bytes.to_str` is one line over the prelude's `str_from_utf8`
+//! (s81, wolf-lang#58, F-0057 closed). A delegation that widens a
+//! contract is the classic way a facade goes wrong: the caller reads
+//! std's doc, the doc promises validation, and the wrapper quietly
+//! accepts something the primitive rejects — or the primitive rejects and
+//! the wrapper turns the row into a trap on the way out. So every
+//! rejection class UTF-8 names goes through the FACADE here, one sequence
+//! at a time, and each one must miss and must miss as a value.
+//!
+//! The classes, in the order they appear below: a lone continuation byte,
+//! a truncated sequence, an overlong form (`C0 AF` for `/`, `E0 80 80`,
+//! `F0 80 80 80`), a surrogate (`ED A0 80` = U+D800, `ED BF BF` =
+//! U+DFFF), a scalar past U+10FFFF (`F4 90 80 80`), the bytes that begin
+//! no sequence at all (`C0`, `C1`, `F5`..`FF`), and two an in-library
+//! validator could not even be handed: an element above 255 and a
+//! negative one.
+//!
+//! Accepted, and each one is a rule rather than a happy path: ASCII, a
+//! two-byte scalar, the astral plane, the EMPTY sequence, the last valid
+//! scalar (U+10FFFF) adjacent to the first invalid one, and an interior
+//! NUL — which is text and not a terminator, because a wolf `str` carries
+//! its length.
+//!
+//! The last two sections are the agreement check and the sweep.
+//! `bytes.is_utf8` is a decoder written in this repository in divisions
+//! and range tests; `to_str` is the toolchain's. They are independent
+//! code answering one question, so what matters is that they never
+//! disagree — and that is a real test rather than a tautology precisely
+//! because `is_utf8` did NOT become a call to the primitive when the
+//! primitive landed (it keeps a third lane the primitive has not got,
+//! F-0075).
+//!
+//! Two lanes: `str_from_utf8` does not resolve under lupin 0.1.11
+//! (F-0075), so this file's interpreter column is dark while the module's
+//! eight other tests keep three lanes — lupin resolves module bodies
+//! lazily, so nothing else in `std.bytes` pays for this function.
+
+use std.bytes
+
+fn seq1(a: int) -> List[int] {
+    var out = List[int]()
+    (mut out).push(a)
+    out
+}
+
+fn seq2(a: int, b: int) -> List[int] {
+    var out = List[int]()
+    (mut out).push(a)
+    (mut out).push(b)
+    out
+}
+
+fn seq3(a: int, b: int, c: int) -> List[int] {
+    var out = List[int]()
+    (mut out).push(a)
+    (mut out).push(b)
+    (mut out).push(c)
+    out
+}
+
+fn seq4(a: int, b: int, c: int, d: int) -> List[int] {
+    var out = List[int]()
+    (mut out).push(a)
+    (mut out).push(b)
+    (mut out).push(c)
+    (mut out).push(d)
+    out
+}
+
+/// Whether the FACADE accepts `b`. The handler diverges, so the refusal
+/// is observed as a value and never as a sentinel string a valid input
+/// could have produced.
+fn accepts(b: List[int]) -> bool {
+    let got = bytes.to_str(b) else |_| { return false }
+    got.len >= 0
+}
+
+/// Whether the two decoders say the same thing about `b`.
+///
+/// Written as a branch and not as `is_utf8(b) == accepts(b)`, which is
+/// the natural spelling and costs this file its native lane: a `bool`
+/// comparison is `unsupported — comparison outside integers/floats` on
+/// the native rung, where `int`, `f64` and (since s81) `str` comparisons
+/// all lower (F-0076).
+fn agree(b: List[int]) -> bool {
+    if bytes.is_utf8(b) {
+        return accepts(b)
+    }
+    !accepts(b)
+}
+
+fn main() -> !int {
+    // Accepted. The round trip through the byte view is the witness that
+    // the two directions agree about the same bytes.
+    if (bytes.to_str(bytes.from_str("wolf")) else "?") == "wolf" {} else { return 1 }
+    if (bytes.to_str(bytes.from_str("héllo")) else "?") == "héllo" {} else { return 2 }
+    if (bytes.to_str(bytes.from_str("🐺")) else "?") == "🐺" {} else { return 3 }
+    if (bytes.to_str(List[int]()) else "?") == "" {} else { return 4 }
+
+    // An interior NUL is text.
+    let nul = bytes.to_str(seq3(119, 0, 102)) else "?"
+    if nul.len == 3 {} else { return 5 }
+
+    // Every rejection class, one at a time, through the facade.
+    if !accepts(seq1(128)) {} else { return 6 }
+    if !accepts(seq1(191)) {} else { return 7 }
+    if !accepts(seq1(195)) {} else { return 8 }
+    if !accepts(seq2(195, 0)) {} else { return 9 }
+    if !accepts(seq2(226, 130)) {} else { return 10 }
+    if !accepts(seq3(226, 130, 0)) {} else { return 11 }
+    if !accepts(seq2(192, 175)) {} else { return 12 }
+    if !accepts(seq3(224, 128, 128)) {} else { return 13 }
+    if !accepts(seq4(240, 128, 128, 128)) {} else { return 14 }
+    if !accepts(seq3(237, 160, 128)) {} else { return 15 }
+    if !accepts(seq3(237, 191, 191)) {} else { return 16 }
+    if !accepts(seq4(244, 144, 128, 128)) {} else { return 17 }
+    if !accepts(seq4(245, 128, 128, 128)) {} else { return 18 }
+    if !accepts(seq1(192)) {} else { return 19 }
+    if !accepts(seq1(193)) {} else { return 20 }
+    if !accepts(seq1(255)) {} else { return 21 }
+    if !accepts(seq1(300)) {} else { return 22 }
+    if !accepts(seq1(0 - 1)) {} else { return 23 }
+
+    // A valid sequence with one byte of garbage after it is a refusal:
+    // validation is over the whole input, not over a prefix.
+    if !accepts(seq3(195, 169, 128)) {} else { return 24 }
+
+    // The last valid scalar and the first invalid one, adjacent.
+    if accepts(seq4(244, 143, 191, 191)) {} else { return 25 }
+
+    // Agreement between the two decoders, class by class.
+    if agree(bytes.from_str("wolf")) {} else { return 26 }
+    if agree(bytes.from_str("héllo 🐺")) {} else { return 27 }
+    if agree(List[int]()) {} else { return 28 }
+    if agree(seq3(119, 0, 102)) {} else { return 29 }
+    if agree(seq1(128)) {} else { return 30 }
+    if agree(seq2(226, 130)) {} else { return 31 }
+    if agree(seq2(192, 175)) {} else { return 32 }
+    if agree(seq3(237, 160, 128)) {} else { return 33 }
+    if agree(seq4(245, 128, 128, 128)) {} else { return 34 }
+    if agree(seq1(300)) {} else { return 35 }
+    if agree(seq1(0 - 1)) {} else { return 36 }
+    if agree(seq4(244, 143, 191, 191)) {} else { return 37 }
+    if agree(seq4(244, 144, 128, 128)) {} else { return 38 }
+    if agree(seq3(195, 169, 128)) {} else { return 39 }
+
+    // The sweep: every one-byte input through both decoders. 0..127 are
+    // text and 128..255 are not, and neither decoder may think otherwise.
+    var i = 0
+    while i < 256 {
+        if agree(seq1(i)) {} else { return 40 }
+        let ok = accepts(seq1(i))
+        if i < 128 {
+            if ok {} else { return 41 }
+        } else if !ok {} else { return 42 }
+        i = i + 1
+    }
+    0
+}

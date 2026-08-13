@@ -1,0 +1,109 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.json, err.row, err.else
+//!
+//! `get` and `at` — the two typed getters, five sprints late.
+//!
+//! They were written at sc05, tested, and withdrawn before they shipped:
+//! a function whose return type is an ENUM and whose signature carries an
+//! error row took the MISS path on every call, silently (F-0037). The
+//! finding closed at lupin 0.1.10 and was re-measured at 0.1.11 with its
+//! own one-line reproducer before a line of this file was written.
+//!
+//! What this file holds is the pair's whole contract on the value side:
+//! a hit returns the node (and the node is still a `Value` the module's
+//! own accessors read), a `null` node is a HIT and not a miss, an absent
+//! key and an out-of-range index are `none`, and the wrong container kind
+//! is `kind`. `navigation_rows.lu` is the other half — it names the tags
+//! by riding one out of `main`, which is the only way this rig witnesses
+//! a tag's identity rather than asserting its own reading.
+//!
+//! Nesting is the point of a DOM, so the deepest assertion here walks
+//! object → array → object without re-parsing anything, which is exactly
+//! what `std.x.json`'s dotted-path queries cannot do.
+
+use std.json
+
+fn main() -> !int {
+    var m = Map[str, json.Value]()
+    m["n"] = json.from_int(7)
+    m["s"] = json.from_str("wolf")
+    m["z"] = json.null()
+    let obj = json.from_map(m)
+
+    // A hit hands back the node, and the node is an ordinary `Value`.
+    let n = json.get(obj, "n") else json.from_int(0 - 1)
+    if (json.as_int(n) else 0) == 7 {} else { return 1 }
+    let s = json.get(obj, "s") else json.from_str("?")
+    if (json.as_str(s) else "?") == "wolf" {} else { return 2 }
+
+    // A `null` MEMBER is a hit. The document said null; it did not say
+    // nothing.
+    let z = json.get(obj, "z") else json.from_str("miss")
+    if json.is_null(z) {} else { return 3 }
+
+    // An absent key misses, and a non-object misses differently — both
+    // `else`s produce a value here, and `navigation_rows.lu` names them.
+    let gone = json.get(obj, "nope") else json.from_str("miss")
+    if (json.as_str(gone) else "?") == "miss" {} else { return 4 }
+    let wrong = json.get(json.from_int(1), "n") else json.from_str("miss")
+    if (json.as_str(wrong) else "?") == "miss" {} else { return 5 }
+    let from_arr = json.get(json.from_list(List[json.Value]()), "n") else json.from_str("miss")
+    if (json.as_str(from_arr) else "?") == "miss" {} else { return 6 }
+
+    // `has` survives `get` and answers the other question.
+    if json.has(obj, "z") {} else { return 7 }
+    if !json.has(obj, "nope") {} else { return 8 }
+
+    var xs = List[json.Value]()
+    (mut xs).push(json.from_str("first"))
+    (mut xs).push(json.null())
+    (mut xs).push(json.from_int(3))
+    let arr = json.from_list(xs)
+
+    let a0 = json.at(arr, 0) else json.from_str("miss")
+    if (json.as_str(a0) else "?") == "first" {} else { return 9 }
+    let a1 = json.at(arr, 1) else json.from_str("miss")
+    if json.is_null(a1) {} else { return 10 }
+    let a2 = json.at(arr, 2) else json.from_int(0 - 1)
+    if (json.as_int(a2) else 0) == 3 {} else { return 11 }
+
+    // Out of range in both directions is a row, never a trap: an index
+    // into a document is data, and a negative index is not a
+    // from-the-end read.
+    let past = json.at(arr, 3) else json.from_str("miss")
+    if (json.as_str(past) else "?") == "miss" {} else { return 12 }
+    let below = json.at(arr, 0 - 1) else json.from_str("miss")
+    if (json.as_str(below) else "?") == "miss" {} else { return 13 }
+    let not_arr = json.at(obj, 0) else json.from_str("miss")
+    if (json.as_str(not_arr) else "?") == "miss" {} else { return 14 }
+    let empty = json.at(json.from_list(List[json.Value]()), 0) else json.from_str("miss")
+    if (json.as_str(empty) else "?") == "miss" {} else { return 15 }
+
+    // Nesting: object -> array -> object, one value, no re-parse.
+    var inner = Map[str, json.Value]()
+    inner["name"] = json.from_str("wolf")
+    var holder = List[json.Value]()
+    (mut holder).push(json.from_map(inner))
+    var root = Map[str, json.Value]()
+    root["users"] = json.from_list(holder)
+    let doc = json.from_map(root)
+
+    let users = json.get(doc, "users") else json.null()
+    let user = json.at(users, 0) else json.null()
+    let name = json.get(user, "name") else json.from_str("?")
+    if (json.as_str(name) else "?") == "wolf" {} else { return 16 }
+
+    // The navigation that shipped while these two were withdrawn still
+    // works, and gives the same answer.
+    let fields = json.as_obj(doc) else Map[str, json.Value]()
+    let same = json.as_arr(fields["users"]) else List[json.Value]()
+    if (json.as_str(json.get(same[0], "name") else json.from_str("?")) else "?") == "wolf" {} else {
+        return 17
+    }
+
+    // A serializer round trip over a navigated subtree: `get` hands back
+    // the value itself, so `stringify` of it is the subtree's text.
+    if (json.stringify(user) else "?") == "{{\"name\":\"wolf\"}}" {} else { return 18 }
+    0
+}

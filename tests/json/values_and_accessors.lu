@@ -7,10 +7,11 @@
 //! raises `kind` for the rest, and the widening rule is exactly one —
 //! `as_float` accepts an `Int`, `as_int` never accepts a `Num`.
 //!
-//! Navigation is `has` + `as_obj`/`as_arr` and the language's own
-//! indexing, because `get` and `at` cannot execute at these pins: a
-//! function returning an ENUM through an error row takes the miss path on
-//! every call (F-0037). The module header carries their contracts.
+//! Navigation here stays `has` + `as_obj`/`as_arr` and the language's own
+//! indexing — the shape this module shipped while `get` and `at` were
+//! withdrawn behind F-0037. It is kept deliberately now that the pair
+//! executes (`tests/json/navigation.lu`): the two paths must agree, and a
+//! file that only used the new one would stop watching the old one.
 
 use std.json
 

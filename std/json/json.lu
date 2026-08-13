@@ -3,47 +3,50 @@
 //! std.json — the JSON data model, its accessors, and the serializer.
 //! Stability tier: core.
 //!
-//! **What ships and what does not, stated first — and the reason CHANGED
-//! under this module's feet.** `parse` is not here, and until sc09 it
-//! could not be: a JSON reader walks a string past code points whose
-//! length it does not know, the only way to learn a length was to slice at
-//! a guessed offset, and a wrong guess traps `bounds` uncatchably (D30).
-//! That was F-0018, and a `parse` written by guessing would have died on
-//! `{"name": "café"}` — legal input.
+//! **What ships and what does not, stated first — and the answer moved
+//! this sprint.** `get` and `at`, the two typed getters that navigate the
+//! model, were written at sc05, tested, and WITHDRAWN before they shipped:
+//! a function whose return type is an enum and whose signature carries an
+//! error row took the miss path on every call, in one line, with no
+//! diagnostic (F-0037). That held for five sprints and cost this module
+//! its whole navigation surface. It closed at lupin 0.1.10, it was
+//! re-measured here at 0.1.11 with the finding's own reproducer, and
+//! **both functions are below as code.**
 //!
-//! **That blocker is gone, and sc09 concluded from it that all three were
-//! writable. sc10 took the census row, re-measured, and found TWO OTHER
-//! FINDINGS standing behind the famous one.** The lesson is worth more
-//! than the functions: "the blocker retired" is not "writable" until every
-//! finding on the SIGNATURE has been re-measured, not just the one that
-//! was in the way last time.
+//! Two contracts are left, `parse` and `unescape`, and the rule this
+//! module wrote at sc10 applies to them one more time: "the blocker
+//! retired" is not "writable" until every finding on the SIGNATURE has
+//! been re-measured, not just the one that was in the way last time. Both
+//! have now had every finding on them re-measured, and BOTH ARE UNBLOCKED
+//! — which makes them a debt this module owes rather than a wall it is
+//! behind. §14's rule is where the debt is written down: a capability or
+//! tier contract ships in the sprint AFTER its blocker closes, one sprint
+//! of grace and no more.
 //!
-//! - `parse` is blocked by **F-0037**, not F-0018. Its return type is an
-//!   enum and its signature carries an error row, and that combination
-//!   takes the miss path on every call — one line, no diagnostic,
-//!   re-measured unmoved at the sc10 pins. The SCANNER is writable now;
-//!   the signature is not, and neither is `get`/`at`, withdrawn at sc05
-//!   for the same reason.
-//! - `unescape` is blocked by **F-0057**, not F-0018. Walking the text is
-//!   fine; the walk has to PRODUCE a code point from `\uXXXX`, and nothing
-//!   in the language builds a `str` from a number — no `from_utf8`, no
-//!   `char`, no `strbuf.push_byte`. An ASCII-only `unescape` would be a
-//!   border post that refuses text, which §9 forbids std from shipping.
-//! - `escape`'s one refusal IS writable at these pins, over
-//!   `str.code_points`/`char_offsets`, and is the one of the three that is
-//!   genuinely just unwritten. It is left for the sprint that lands
-//!   `parse`, because making `escape` total changes `stringify`'s row from
-//!   `{boundary, deep}` to `{deep}` and that ripples through every test
-//!   and doc example here — a signature change worth making once, beside
-//!   the function that makes this module a reader.
+//! - `parse` was blocked by **F-0037** (closed, above); its scanner has
+//!   been writable since sc09 and its signature is writable now. What it
+//!   still needs from this module is `unescape`, for a string payload.
+//! - `unescape` was blocked by **F-0057** — the walk was always fine, the
+//!   walk's OUTPUT was not, because decoding `é` means building `"é"`
+//!   out of the number 233 and nothing in the language built a `str` from
+//!   a number. **s81 landed the prelude's validating `str_from_utf8` and
+//!   F-0057 is CLOSED at this sprint's pin.** `unescape` becomes UTF-8
+//!   encoding into a `List[int]` — arithmetic this module can already
+//!   write — plus one call to `std.bytes.to_str`, and the lone-surrogate
+//!   rule its contract names is then the primitive's own refusal, which is
+//!   the right place for it.
+//! - `escape`'s one refusal is writable and has been since sc09, over
+//!   `str.code_points`/`char_offsets`. It stays here for the reason it has
+//!   always stated: making `escape` total changes `stringify`'s row from
+//!   `{boundary, deep}` to `{deep}`, which ripples through every test and
+//!   doc example in this module, and that is a signature change worth
+//!   making once — beside the function that makes this module a reader.
 //!
-//! The three reviewed contracts below are unchanged, and the day they land
-//! nothing in the value model or the serializer moves.
-//!
-//! What that leaves is still most of a JSON library: the value model, the
-//! accessors, and a serializer that turns wolf data into text. A program
-//! that WRITES JSON — a log line, a request body, a config dump — is
-//! served completely.
+//! So the honest summary is: this is a complete DOM that cannot yet be
+//! built FROM text. The value model, the navigation and the serializer are
+//! here, so a program that WRITES JSON — a log line, a request body, a
+//! config dump — is served completely; a program that READS it is one
+//! sprint away, with nothing in the way and the debt named.
 //!
 //! **The value model.** `Value` is one recursive enum with seven
 //! variants: `Null`, `Bool(bool)`, `Int(int)`, `Num(f64)`, `Str(str)`,
@@ -76,8 +79,9 @@
 //! `lupin = run, wolfc = unsupported, native = unsupported`, exactly as
 //! the sprint contract's non-target predicted.
 //!
-//! The reviewed contracts themselves, with the blocker each one actually
-//! has (re-measured at the sc10 pins, not inherited):
+//! The two reviewed contracts themselves, each with what it is waiting for
+//! (re-measured at the sc13 pins, not inherited — and what both are
+//! waiting for now is a sprint, not a finding):
 //!
 //! ```text
 //! parse(s: str) -> Value ! {syntax, deep}
@@ -91,22 +95,8 @@
 //!     (`std.fmt.decimal.parse_float`, which is already here and already
 //!     exact). `syntax` carries the byte offset when sc06's payload
 //!     conventions land; at this pin it would be a bare mark.
-//! get(v: Value, key: str) -> Value ! {kind, none}
-//!     The value at `key`; `none` when the object has no such entry and
-//!     `kind` when `v` is not an object. Written, tested, and WITHDRAWN
-//!     before it shipped: a function whose return type is an ENUM and
-//!     whose signature carries an error row takes the MISS path on every
-//!     call, value or not — `fn id(v: Value) -> Value ! {none} { v }`
-//!     hands its caller a raise (F-0037, filed with that one-line
-//!     reproducer). The two functions here that would return a `Value`
-//!     through a row are therefore contracts, and `has` + `as_obj` are
-//!     the navigation that executes in the meantime.
-//! at(v: Value, i: int) -> Value ! {kind, none}
-//!     The element at `i`; `none` outside the array, `kind` when `v` is
-//!     not one. A row rather than `List`'s `bounds` trap (§8): an index
-//!     into a document is data, and a caller cannot have checked what the
-//!     document contains. Blocked by F-0037 with `get`; `as_arr` plus the
-//!     language's own indexing is today's spelling.
+//!     UNBLOCKED at the sc13 pins (F-0037 closed; `unescape` below is its
+//!     last internal dependency). Owed next sprint, per §14.
 //! unescape(s: str) -> str ! {parse}
 //!     The inverse of `escape`: `\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`,
 //!     `\t` and `\uXXXX` (surrogate pairs joined into one code point),
@@ -114,11 +104,15 @@
 //!     The tag is `parse` and not `boundary` now: `boundary` was the
 //!     interim mark for "this pin cannot find the code-point boundary"
 //!     (§11) and that condition is gone, so what is left is ordinary bad
-//!     data. **Blocked by F-0057, not by F-0018**: the walk is writable
-//!     and its OUTPUT is not — decoding `\u00e9` means building `"é"` out
-//!     of the number 233, and nothing in the language turns a scalar into
-//!     a `str`. An ASCII-only version would refuse text, which §9
-//!     forbids.
+//!     data. Blocked by F-0057 for four sprints, and **UNBLOCKED at the
+//!     sc13 pins**: s81's `str_from_utf8` is the primitive, and
+//!     `std.bytes.to_str` is its facade, so the walk's OUTPUT finally has
+//!     somewhere to happen. The old sentence, kept because it is the
+//!     mechanism: the walk was writable and its output was not — decoding
+//!     `\u00e9` means building `"é"` out
+//!     of the number 233, and until s81 nothing in the language turned a
+//!     scalar into a `str`. An ASCII-only version would refuse text, which
+//!     §9 forbids. Owed next sprint, per §14.
 //! ```
 
 use std.fmt
@@ -375,9 +369,11 @@ pub fn as_obj(v: Value) -> Map[str, Value] ! {kind} {
 /// other variant, because "does this document have this field" has a
 /// useful answer for a non-object too, and it is no.
 ///
-/// This is what `get` would be if `get` could execute — see the module
-/// header's contract block and F-0037. Together with `as_obj`, it is the
-/// navigation path that works today: ask `has`, then read the map.
+/// It survives `get`'s arrival rather than being replaced by it, and the
+/// reason is §1's: a question with a boolean answer keeps its predicate.
+/// `has` is what a caller writes when the value is not wanted (a schema
+/// check, a "did this field appear at all" branch over a `null` that IS
+/// present); `get` is what a caller writes when it is.
 ///
 /// ```wolf-doc-example
 /// var m = Map[str, json.Value]()
@@ -408,6 +404,108 @@ fn obj_has(m: Map[str, Value], key: str) -> bool {
         }
     }
     false
+}
+
+/// The value at `key`; `none` when the object has no entry there, `kind`
+/// when `v` is not an object at all.
+///
+/// **Two tags rather than one, because the two questions are different.**
+/// "This document has no `port` field" is a thing a caller routinely plans
+/// for; "the thing you are indexing is a number" is a caller's mistake
+/// about its own data — and §12 keeps them apart so an `else` can too. A
+/// caller that genuinely does not care writes `else json.null()`.
+///
+/// Bare `get` with a row is §1's checked-access spelling. There is no
+/// `get_` prefix and no unchecked twin: an absent key is not a fault
+/// (§8), so the trapping direction this function could have had does not
+/// exist and never will.
+///
+/// **This function and `at` were written at sc05, tested, and withdrawn
+/// for five sprints** — a `Value` returned through an error row took the
+/// miss path on every call, silently (F-0037, closed at lupin 0.1.10 and
+/// re-measured at 0.1.11). Nothing about the signature changed in the
+/// meantime, which is the point: the contract in the module header was
+/// right, and what was missing was a machine that ran it.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, json.Value]()
+/// m["a"] = json.from_int(7)
+/// m["n"] = json.null()
+/// let obj = json.from_map(m)
+/// let a = json.get(obj, "a") else json.from_int(0 - 1)
+/// (json.as_int(a) else 0) == 7
+/// let missing = json.get(obj, "zz") else json.from_str("absent")
+/// (json.as_str(missing) else "?") == "absent"
+/// let n = json.get(obj, "n") else json.from_int(0 - 1)
+/// json.is_null(n) == true
+/// let wrong = json.get(json.from_int(1), "a") else json.from_str("not an object")
+/// (json.as_str(wrong) else "?") == "not an object"
+/// ```
+pub fn get(v: Value, key: str) -> Value ! {kind, none} {
+    match v {
+        Obj(m) => obj_get(m, key)?,
+        _ => kind,
+    }
+}
+
+/// The lookup itself. Private, and a linear scan for `obj_has`'s two
+/// recorded reasons (F-0011's absent-key read, F-0002's `Eq` bound).
+///
+/// A duplicate key cannot occur in a `Map`, so "the last one wins" is a
+/// rule `parse` will enforce on the way IN rather than one this reader has
+/// to state.
+fn obj_get(m: Map[str, Value], key: str) -> Value ! {none} {
+    for pair in m.pairs() {
+        if pair.0 == key {
+            return pair.1
+        }
+    }
+    none
+}
+
+/// The element at `i`; `none` when `i` is outside the array, `kind` when
+/// `v` is not an array.
+///
+/// **A row where `List` traps** (§8, and this is the worked example of
+/// its rule): an index into a document is DATA — the caller could not have
+/// checked what the document contains, because reading the document is
+/// what it is doing — so an out-of-range index is an outcome this function
+/// reports and never a process this function ends. A negative index is the
+/// same miss and not a from-the-end read; `^n` does not exist in wolf and
+/// inventing it here would be a second dialect.
+///
+/// Withdrawn with `get` at sc05 and shipped with it now; see `get`.
+///
+/// ```wolf-doc-example
+/// var xs = List[json.Value]()
+/// (mut xs).push(json.from_str("first"))
+/// (mut xs).push(json.null())
+/// let arr = json.from_list(xs)
+/// let a = json.at(arr, 0) else json.from_str("?")
+/// (json.as_str(a) else "?") == "first"
+/// let past = json.at(arr, 2) else json.from_str("past the end")
+/// (json.as_str(past) else "?") == "past the end"
+/// let below = json.at(arr, 0 - 1) else json.from_str("below zero")
+/// (json.as_str(below) else "?") == "below zero"
+/// let wrong = json.at(json.from_int(1), 0) else json.from_str("not an array")
+/// (json.as_str(wrong) else "?") == "not an array"
+/// ```
+pub fn at(v: Value, i: int) -> Value ! {kind, none} {
+    match v {
+        Arr(xs) => arr_at(xs, i)?,
+        _ => kind,
+    }
+}
+
+/// The indexing itself, with the bounds test the row is made of. Private.
+fn arr_at(xs: List[Value], i: int) -> Value ! {none} {
+    if i < 0 {
+        return none
+    }
+    if i >= xs.len {
+        return none
+    }
+    xs[i]
 }
 
 /// The keys of an object, in the map's unspecified order; `kind` for

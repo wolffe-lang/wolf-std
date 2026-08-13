@@ -1361,3 +1361,47 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "unsupported"
+
+# ---- sc13: the json DOM's navigation, and the border post ----
+# THE sc13 PIN BUMP is wolf trunk `f8dca42` -> `4e316ad` (s79 bench, s80 token
+# audit, s81 str equality + `str_from_utf8`) with lupin 0.1.10 -> 0.1.11. Both
+# ritual gates green at the sha on the first attempt, exit codes printed.
+#
+# Two closures land in five rows, and the two halves have opposite lane
+# shapes — which is the whole story of this sprint's ledger.
+#
+# `std.json` gains `get` and `at`, withdrawn at sc05 because a `Value`
+# returned through an error row took the miss path on every call (F-0037,
+# closed at lupin 0.1.10 and re-measured at 0.1.11). The module's lanes are
+# unchanged by that: an imported module that PRODUCES an enum is
+# `unsupported` in the checked tier and has no recorded type natively
+# (F-0029, re-measured unmoved), and `Map` is not typed by the compiler at
+# all. So the two new rows join the four the module already had, one lane
+# each, exactly as its header predicted in sc05.
+[tests."json/navigation.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."json/navigation_rows.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+# `std.bytes` gains `to_str` — a reviewed contract since sc05 and the last
+# unwritten member of the byte block — over s81's `str_from_utf8`. Its lanes
+# are the MIRROR of the json pair: both compiler rungs execute it and lupin
+# 0.1.11 does not resolve the name (F-0075), which is the generic unknown-name
+# refusal rather than the reasoned decline that machine gives `fs_*`, `net_*`,
+# `json_*` and the process trio. The module's eight other rows keep three
+# lanes: lupin resolves module bodies lazily, so a program that never calls
+# `to_str` never learns it is missing.
+[tests."bytes/to_str_border.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."bytes/to_str_row.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

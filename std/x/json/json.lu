@@ -61,13 +61,25 @@
 //! it. Every test and every doc example here imports exactly one.
 //!
 //! They divide the work the way their lanes do. `std.json` owns the DOM —
-//! a `Value` enum you build, navigate and serialize — and cannot parse,
-//! because a function returning an enum through an error row takes the
-//! miss path on every call (F-0037, re-measured unmoved at these pins).
-//! This module owns the read direction — text in, wolf values out — and
-//! cannot build anything, because the kernel is queries only. Between
-//! them a program can read JSON and write JSON today; neither half can do
-//! both alone, and both say so.
+//! a `Value` enum you build, NAVIGATE and serialize. Navigation arrived
+//! there at sc13: F-0037 (an enum returned through an error row takes the
+//! miss path on every call) closed at lupin 0.1.10 and `json.get`/`at`
+//! ship, so the sentence this paragraph carried for three sprints —
+//! "the DOM cannot be walked" — is retired. What `std.json` still cannot
+//! do is PARSE, and that is now a debt with a date rather than a
+//! refusal: nothing blocks `parse` at these pins and §14 gives it one
+//! sprint of grace. This module owns the read direction — text in, wolf
+//! values out — and cannot build anything, because the kernel is queries
+//! only.
+//!
+//! **Which means the graduation question this module's clock asks gets
+//! sharper rather than easier.** The register says `x.json` either
+//! graduates as the streaming QUERY face beside `std.json`'s DOM or is
+//! deleted in favour of it; the DOM answering `parse` is exactly the
+//! event that decides it, and it is one sprint away. Nothing about the
+//! banner, the clock or the trigger changes here — this is a note for
+//! whoever holds the stdc02 closeout, written where they will be
+//! standing.
 //!
 //! ## The tier this delegates to
 //!
@@ -150,8 +162,9 @@
 //!     is quadratic in a shape programs reach for constantly. It lands
 //!     when the tier grows a cursor, or in the DOM.
 //! parse(doc: str) -> Value   ·   stringify(v: Value) -> str
-//!     The DOM directions. `stringify` is `std.json`'s and shipped;
-//!     `parse` is `std.json`'s and blocked by F-0037.
+//!     The DOM directions, both `std.json`'s. `stringify` shipped at
+//!     sc05 and `get`/`at` at sc13; `parse` is unblocked at these pins
+//!     (F-0037 closed) and owed there next sprint, not here.
 //! ```
 
 use std.fmt
