@@ -14,6 +14,35 @@
 # moving upstreams); the nightly lane watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.10 (sc12 bump, from 0.1.8 — 0.1.9 skipped, so this bump carries two
+# releases). Its own conformance pin is `613c3dc`, which is an ANCESTOR of
+# the `wolf` pin below (ten commits back, before s74/s53/s75/s78/s76/s77):
+# the two-upstream drift is the narrowest this repo has ever recorded, and
+# for the first time it is measured as a commit distance rather than as a
+# list of waves.
+#
+# What the bump changes for this repo, re-measured one call at a time:
+# - **F-0037 IS CLOSED** (wolf-interp#16): an enum returned through an
+#   error row took the miss path on every call for five sprints —
+#   `fn id(v: W) -> W ! {none} { v }` raised — and it returns the VALUE
+#   now. The interpreter is `std.json`'s only lane, so this unblocks the
+#   json DOM (`parse`, `get`, `at`) and retires API-CONVENTIONS §11's "no
+#   std accessor returns an enum through an error row" as an interim.
+#   Measured, not inferred, with the one-line reproducer the finding names.
+# - **F-0032 is closed too** (wolf-interp#17): `s as nonsense` is `E0301`
+#   at resolve spanning the type name, where it used to pass the value
+#   through silently. `s as int` is `E0805`.
+# - **the byte view runs here**: `for b in s.bytes()`, `s.bytes()[i]` and
+#   `s.bytes().len` all execute (the interpreter materializes; the shape
+#   is what matters to std, and it is legal on this lane).
+# - **bytes-to-str is UNMOVED**, probed the same four ways sc11 used:
+#   `str.from_utf8` does not resolve, `StrBuf.push_byte` is not a method,
+#   `'h'` is `E0101` at the lexer, `bytes_to_str` does not resolve.
+# What it does NOT change: no `fs_*`, no `read_line`, no `net_*`, no
+# `json_*`, no process trio (all declined by design, each with a sentence),
+# and `var k = 0` is still `i32`.
+#
+# The sc11 note, kept for the history it records:
 # 0.1.8 (sc11 bump, from 0.1.6 — v0.1.9 exists and is deliberately not
 # chased: a pin bump is a sprint's decision, not a release's). lupin 0.1.8
 # is the release wolf 0.1.0 was differentially paired against, and it names
@@ -55,13 +84,75 @@
 # What it does NOT change: no `fs_*`, no `read_line`, no `net_*` (all three
 # declined by design, each with a sentence in the refusal), and `var k = 0`
 # is still `i32`.
-version = "0.1.8"
-pin = "26fa98e73a72b13f5650c475330dd83427077860"
+version = "0.1.10"
+pin = "613c3dc2bdec3b151c23fc200227f3a6230f68c4"
 
 [wolf]
 version = "0.1.0"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver -p wolf_rt.
+#
+# sc12 bump: trunk `f8dca42`, which IS trunk's tip at the bump and is green
+# on BOTH ritual gates on the FIRST attempt (`cargo test --workspace` = 0,
+# `cargo run -p xtask -- ci` = 0, exit codes printed rather than inferred
+# from a summary line — F-0063's lesson). Fourth clean pair in a row, so
+# F-0054 stays open on the same reasoning it has stayed open on since sc09.
+#
+# Three concurrent compiler sprints (s79 bench, s80 token audit, s81 str
+# equality) were in flight during this sprint and NONE of them is in this
+# pin. That is deliberate: the pin is taken once and held, so a std sprint
+# never chases a moving trunk. The consequence to record is s81's: if it
+# lands a validating `List[int] -> str ! {utf8}` primitive, `bytes.to_str`
+# becomes writable — at THIS pin it is not, probed four ways (below).
+#
+# What the bump brings, in the order it matters to std:
+# - **s77 (#80): `s.bytes()` IS THE RECEIVER'S OWN POINTER AND LENGTH.** A
+#   byte view is bit-identical to a `str` and to every zero-copy subslice
+#   the runtime already returned, so there is one representation and one
+#   lifetime story. Lowering reads the pair where it is CONSUMED —
+#   iteration, indexing, `len`/`count`/`is_empty`/`get`/`first`/`last` — and
+#   a byte walk emits no call and no allocation. `s[a..b]` and `s.get(a..b)`
+#   stopped calling the runtime too (one inlined domain helper shared with
+#   `get`, so `[mem.str.get]`'s law is literally the same code). THE CAVEAT
+#   THAT SHAPES STD: every OTHER position — a `let` binding, an argument, a
+#   return — still materializes through `__wolf_rt_str_bytes`, so the win is
+#   inside one function body and a `std.bytes` function whose parameter is
+#   `List[int]` cannot have it. That is why this sprint's rewrites are
+#   `std.str`'s own walks and the encoders' digit probes, and why
+#   `bytes.from_str` is unchanged.
+# - **s76: containers allocate in the ambient region at the site.** A `List`
+#   built inside `region r { }` is freed with it and growth stays in the
+#   birth region. `std.list`'s header claim ("every function allocates in
+#   the ambient region and no signature asks for one") was a promise about
+#   the API and is now also true of the machine.
+# - **s75: element access is a load, not a call** (`gep + load`), which is
+#   the shape s77's byte view then reused at stride 1.
+# - **s74/s78/s42/s43/s63/s53**: the correctness cluster, the aliasing
+#   facts, the mid-end, whole-program, diagnostics polish, and `wolf doc` +
+#   script mode. None of them moves a ledger row here; `wolf doc` is worth
+#   naming because upstream now GENERATES api docs over this repository
+#   (358 items, 357 documented, 309 with an example at e9f11f4), which makes
+#   §4's doc discipline someone else's input.
+# Re-measured at this sha rather than assumed:
+# - the builtin `str` set is unchanged at 21 methods; `bytes()` changed its
+#   LOWERING, not its surface, so nothing in std had to change to keep
+#   working and everything in std that walks bytes could change to get
+#   faster;
+# - **F-0057 is UNMOVED and #58 is open**, probed the same four ways sc11
+#   used: `str.from_utf8` does not resolve, `strbuf.push_byte` is not a
+#   method, `'h'` is `E0101` at the lexer, no `bytes_to_str` builtin. s77's
+#   own commit says why in the compiler's words: the view "cannot become a
+#   `str`… a `List[int] -> str` conversion would have to VALIDATE (wolf-std's
+#   `bytes.to_str`, still blocked, and this is why: it wants a checked
+#   primitive, not a cast)". Four sprints, one answer, now with the
+#   counterparty agreeing about the shape of the fix;
+# - the process trio and `json_*` are still checked-lane only, refused
+#   natively by name; net likewise;
+# - `--deny-warnings` is STILL rejected by `conform-run` (F-0046/F-0053,
+#   re-verified at this sha), so the warning gate remains the record's
+#   `warnings` array, read on two lanes.
+#
+# The sc11 note, kept for the history it records:
 # sc11 bump: trunk `0b4e79c` — FIVE merged waves (s71, s72, s51, s41, s73)
 # plus the r01 identity release, and the first bump this repo has taken
 # where trunk's HEAD was not the pin.
@@ -135,4 +226,4 @@ version = "0.1.0"
 # reports its absence and the lane goes dark rather than silent. It executes
 # the fs/io, os/env/time and (new at s73) concurrency tiers, and refuses the
 # net, process and json tiers by name.
-pin = "0b4e79c5deb48e93468d58971ae32b3ad8fed9b9"
+pin = "f8dca42118a944a801b7a6d2709004ccfeb01572"
