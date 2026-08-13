@@ -1,0 +1,79 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: str.views, std.str
+//!
+//! The two byte-view shapes std is allowed to write, held as a test so
+//! they cannot rot (§13, sc09's rule: a claim about what an implementation
+//! answers is a test or it is a rumour).
+//!
+//! s77 made `s.bytes()` the receiver's own pointer and length, read in
+//! place wherever the call is CONSUMED. The compiler's consuming set is
+//! seven positions; wolfc's checked tier models TWO of them, and these are
+//! the two: `for b in s.bytes()` and `s.bytes().len`. The other five —
+//! indexing and the `get`/`first`/`last`/`count`/`is_empty` queries — cost
+//! that lane, which is what `byte_view_index.lu` records and F-0071 files.
+//! Every walk in `std.str`, `std.fmt`, `std.hex` and `std.base64` is
+//! written over these two spellings for that reason.
+//!
+//! What this file pins, and does NOT pin: it pins the SHAPES running and
+//! answering correctly on every lane. It does not pin that they allocate
+//! nothing — no lane this rig observes can see an allocation, and the
+//! no-call/no-allocation claim belongs to the counterparty's own
+//! `lower_shapes` suite, where it is a pinned IR snapshot. A repository
+//! that cannot measure a property does not assert it.
+
+use std.str
+
+fn sum_bytes(s: str) -> int {
+    var n = 0
+    for b in s.bytes() {
+        n = n + b
+    }
+    n
+}
+
+fn view_len(s: str) -> int {
+    s.bytes().len
+}
+
+fn first_byte(s: str) -> int {
+    for b in s.bytes() {
+        return b
+    }
+    0 - 1
+}
+
+fn count_leads(s: str) -> int {
+    var seen = 0
+    for b in s.bytes() {
+        if b < 128 || b > 191 {
+            seen = seen + 1
+        }
+    }
+    seen
+}
+
+fn main() -> !int {
+    // The walk sees unsigned bytes: `é` is 195, 169 and never negative.
+    if sum_bytes("hé") == 468 {} else { return 1 }
+    if sum_bytes("") == 0 {} else { return 2 }
+    if sum_bytes("A") == 65 {} else { return 3 }
+    // The view's length IS the string's byte length, on both spellings.
+    if view_len("hé") == 3 {} else { return 4 }
+    if view_len("") == 0 {} else { return 5 }
+    if view_len("🐺") == 4 {} else { return 6 }
+    if view_len("héllo") == str.len("héllo") {} else { return 7 }
+    // A `for` that returns out of its first iteration is how a body reads
+    // one byte without indexing — the shape `std.fmt`, `std.hex` and
+    // `std.base64` take their digit from.
+    if first_byte("wolf") == 119 {} else { return 8 }
+    if first_byte("é") == 195 {} else { return 9 }
+    if first_byte("") == 0 - 1 {} else { return 10 }
+    // std's own walks agree with a hand-written one, which is the whole
+    // claim of the sc12 rewrite: the bodies changed shape and not answers.
+    if count_leads("héllo") == str.char_count("héllo") {} else { return 11 }
+    if count_leads("é🐺") == str.char_count("é🐺") {} else { return 12 }
+    if count_leads("") == str.char_count("") {} else { return 13 }
+    if count_leads("wolf-lang") == 9 {} else { return 14 }
+    0
+}

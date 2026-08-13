@@ -1,0 +1,46 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: str.views
+//!
+//! The byte-view shape std may NOT write, held as a ledger row so the
+//! finding cannot rot (F-0071). `s.bytes()[i]` reads the receiver's own
+//! storage under native lowering and answers correctly under lupin, and
+//! wolfc's checked tier refuses it at `mem`:
+//!
+//! ```text
+//! unsupported — indexing outside the modelled surface
+//! ```
+//!
+//! The same tier refuses `s.bytes().get(i)`, `.first()`, `.last()` and
+//! `.count()` with `unsupported — List method on a temporary`. So five of
+//! the seven positions s77 lowers natively cost a lane, and this file is
+//! the standing measurement of that: the day the checked tier models
+//! indexing, this row advances from `unsupported` to `run` and the
+//! indexed walks `std.str` gave up become writable again.
+//!
+//! No import: the surface under test is the language's own, exactly as in
+//! `slice_oob_traps.lu`. A hand-written index walk is the only thing here,
+//! and it is deliberately the body `str.char_offsets` would have if the
+//! lane allowed it.
+
+fn offset_of_last_lead(s: str) -> int {
+    let n = s.len
+    var at = 0 - 1
+    var i = 0
+    while i < n {
+        let b = s.bytes()[i]
+        if b < 128 || b > 191 {
+            at = i
+        }
+        i = i + 1
+    }
+    at
+}
+
+fn main() -> !int {
+    if offset_of_last_lead("héllo") == 5 {} else { return 1 }
+    if offset_of_last_lead("é🐺") == 2 {} else { return 2 }
+    if offset_of_last_lead("") == 0 - 1 {} else { return 3 }
+    if offset_of_last_lead("wolf") == 3 {} else { return 4 }
+    0
+}

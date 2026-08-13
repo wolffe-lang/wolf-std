@@ -68,6 +68,44 @@
 //!     about this pin's `str` brings it closer.
 //! ```
 //!
+//! **THE BYTE VIEW IS A VIEW NOW, AND FOUR BODIES HERE ARE WRITTEN AGAINST
+//! THAT** (s77 / wolf-lang#80, the sc12 pin). `s.bytes()` is the receiver's
+//! own pointer and length — bit-identical to the `str` and to every zero-copy
+//! subslice `trim`/`split`/`get` already returned. Lowering reads that pair
+//! wherever the call is CONSUMED, so a byte walk emits no call and no
+//! allocation; `s[a..b]` and `s.get(a..b)` stopped calling the runtime in
+//! the same wave.
+//!
+//! **std may use TWO of those consuming positions, not seven, and the
+//! difference is measured** (F-0071). The compiler's set is iteration,
+//! indexing and the `len`/`count`/`is_empty`/`get`/`first`/`last` queries —
+//! in NATIVE lowering. wolfc's checked tier models two of them:
+//! `for b in s.bytes()` and `s.bytes().len` run on all three lanes, while
+//! `s.bytes()[i]` is `unsupported — indexing outside the modelled surface`
+//! and `s.bytes().get(i)`/`first()`/`count()` are
+//! `unsupported — List method on a temporary`, both at `mem`. A shape that
+//! costs a lane is not a shape std writes (§14's honesty, applied to an
+//! optimization rather than to a capability), so every walk here is a `for`
+//! over the view with whatever counter or accumulator the algorithm needs.
+//! That is why `code_points` is a state machine and `char_offsets` carries
+//! its own offset.
+//!
+//! What changed for this module is four bodies and no signature.
+//! `char_count`, `char_offsets`, `code_points` and `is_ascii` were written
+//! in sc09 as `let bs = s.bytes()` plus a walk over `bs`, which was the only
+//! shape available when the builtin materialized a `List[int]` per call.
+//! Nothing a caller can see moved: same answers, same rows, same lanes, and
+//! `tests/str/code_point_view.lu` is what says so.
+//!
+//! **The boundary of the win is a function boundary**, and it is worth
+//! stating where a reader will meet it: every position that is NOT
+//! consuming — a `let` binding, an argument, a return — materializes
+//! exactly as before. So `str.bytes(s)` below still allocates (it returns
+//! the list), `std.bytes`' functions still take a materialized `List[int]`,
+//! and a std function cannot pass a view to a helper. The win lives inside
+//! one body today, which is why this sprint's work was rewriting bodies and
+//! not signatures.
+//!
 //! **THE EMPTY NEEDLE IS RULED, AND STD'S GUARDS ARE GONE** (`[mem.str.empty]`,
 //! wolf-lang#56, F-0055 CLOSED at the sc11 pin). For three sprints
 //! `count("")`, `split("")` and `replace(s, "", …)` were undefined and the
@@ -173,10 +211,21 @@ pub fn get(s: str, from: int, to: int) -> str ! {none} {
 
 /// The raw bytes of `s`, in order, as the 0..255 element values §11's
 /// interim byte currency uses — `std.bytes` is the module that operates on
-/// them and `bytes.from_str` is the same view from that side. Allocates
-/// the list (`to_`-grade, §1: the name is the bare noun the convention
-/// reserves for a view, and it is a view of `s`'s bytes even though this
-/// pin materializes it). Total: no error row, no traps beyond allocation.
+/// them and `bytes.from_str` is the same view from that side. Total: no
+/// error row, no traps beyond allocation.
+///
+/// **This function allocates and the language's `s.bytes()` no longer
+/// does, and the difference is the whole s77 story.** A byte view is the
+/// receiver's own pointer and length, read in place wherever it is
+/// CONSUMED — `for b in s.bytes()`, `s.bytes()[i]`, `s.bytes().len` and the
+/// small query family — and materialized in every other position, which
+/// includes being RETURNED from a function like this one. So this wrapper
+/// is the honest `to_`-grade copy its name reserves the right to be (§1),
+/// and the fast path is the language's own spelling inside one body. std's
+/// own walks (`char_count`, `char_offsets`, `code_points`, `is_ascii`)
+/// stopped calling this function in sc12 for exactly that reason; a caller
+/// who wants the list — to keep it, to pass it to `std.bytes`, to hold it
+/// past `s` — still wants this.
 ///
 /// ```wolf-doc-example
 /// var n = 0
@@ -790,7 +839,13 @@ pub fn join(sep: str, parts: List[str]) -> str {
 /// Counted by the UTF-8 invariant rather than by decoding: a lead byte is
 /// anything outside 128..191, so the count is the number of non-
 /// continuation bytes and no arithmetic can overflow. Total: no error row,
-/// no traps beyond the byte view's allocation.
+/// no traps.
+///
+/// The walk consumes the byte view where it stands (`for b in s.bytes()`)
+/// rather than binding it first. s77 made that the difference between a
+/// view and a copy: `bytes()` is the receiver's own pointer and length in
+/// a consuming position, and a `let` binding is what materializes it. The
+/// body sc09 wrote bound `bs` and paid a list for every string it counted.
 ///
 /// ```wolf-doc-example
 /// str.char_count("wolf") == 4
@@ -799,16 +854,11 @@ pub fn join(sep: str, parts: List[str]) -> str {
 /// str.char_count("") == 0
 /// ```
 pub fn char_count(s: str) -> int {
-    let bs = s.bytes()
-    let n = bs.len
     var seen = 0
-    var i = 0
-    while i < n {
-        let b = bs[i]
+    for b in s.bytes() {
         if b < 128 || b > 191 {
             seen = seen + 1
         }
-        i = i + 1
     }
     seen
 }
@@ -818,7 +868,15 @@ pub fn char_count(s: str) -> int {
 /// offset in it is a boundary `get` will accept. `len(s)` is deliberately
 /// NOT included: this lists code points, and there is none at the end.
 ///
-/// Allocates the list. Total: no error row, no traps beyond allocation.
+/// Allocates the OUTPUT list and nothing else. The offset is carried in a
+/// counter beside a `for` over the byte view rather than driving an index
+/// INTO it, and that spelling is a lane decision rather than a taste:
+/// `s.bytes()[i]` is `unsupported — indexing outside the modelled surface`
+/// on wolfc's checked tier (F-0071), where `for b in s.bytes()` runs on all
+/// three lanes. The body sc09 wrote bound `bs` first and copied every byte
+/// of `s` before reading one of them.
+///
+/// Total: no error row, no traps beyond the output list's allocation.
 ///
 /// ```wolf-doc-example
 /// var last = 0 - 1
@@ -826,16 +884,13 @@ pub fn char_count(s: str) -> int {
 /// last == 5
 /// ```
 pub fn char_offsets(s: str) -> List[int] {
-    let bs = s.bytes()
-    let n = bs.len
     var out = List[int]()
-    var i = 0
-    while i < n {
-        let b = bs[i]
+    var at = 0
+    for b in s.bytes() {
         if b < 128 || b > 191 {
-            (mut out).push(i)
+            (mut out).push(at)
         }
-        i = i + 1
+        at = at + 1
     }
     out
 }
@@ -850,7 +905,24 @@ pub fn char_offsets(s: str) -> List[int] {
 /// Total over every `str`: a `str` is valid UTF-8 by construction (D24), so
 /// the decode below has no error path and needs no validation — the
 /// version of it that DOES validate is `std.bytes.is_utf8`, over bytes
-/// nobody promised anything about. Allocates the list.
+/// nobody promised anything about. Allocates the OUTPUT list and nothing
+/// else.
+///
+/// **The decoder is a one-pass state machine now, and that is the shape the
+/// byte view asks for.** sc09 wrote it as a random-access walk — bind the
+/// list, read `bs[i + 1]`, `bs[i + 2]`, `bs[i + 3]`, advance `i` by the
+/// width — which needed a materialized copy to index into. s77 makes
+/// iteration the free position and indexing the expensive one (and
+/// `s.bytes()[i]` is refused outright by the checked tier, F-0071), so the
+/// lead byte now sets a PENDING count and each continuation folds six bits
+/// into the accumulator. The two forms agree byte for byte; this one reads
+/// `s`'s own storage and never builds a list to read it from.
+///
+/// The continuation count is trusted rather than checked, and that is the
+/// UTF-8 invariant rather than an oversight: a lead byte in a valid `str`
+/// is followed by exactly as many continuations as it announces.
+/// `std.bytes.is_utf8` is where that assumption is checked, because there
+/// the bytes are a caller's and not the language's.
 ///
 /// ```wolf-doc-example
 /// var sum = 0
@@ -859,31 +931,27 @@ pub fn char_offsets(s: str) -> List[int] {
 /// sum == 330
 /// ```
 pub fn code_points(s: str) -> List[int] {
-    let bs = s.bytes()
-    let n = bs.len
     var out = List[int]()
-    var i = 0
-    while i < n {
-        let b0 = bs[i]
-        if b0 < 128 {
-            (mut out).push(b0)
-            i = i + 1
-        } else if b0 < 224 {
-            let b1 = bs[i + 1]
-            (mut out).push((b0 - 192) * 64 + (b1 - 128))
-            i = i + 2
-        } else if b0 < 240 {
-            let b1 = bs[i + 1]
-            let b2 = bs[i + 2]
-            (mut out).push((b0 - 224) * 4096 + (b1 - 128) * 64 + (b2 - 128))
-            i = i + 3
+    var acc = 0
+    var pending = 0
+    for b in s.bytes() {
+        if pending > 0 {
+            acc = acc * 64 + (b - 128)
+            pending = pending - 1
+            if pending == 0 {
+                (mut out).push(acc)
+            }
+        } else if b < 128 {
+            (mut out).push(b)
+        } else if b < 224 {
+            acc = b - 192
+            pending = 1
+        } else if b < 240 {
+            acc = b - 224
+            pending = 2
         } else {
-            let b1 = bs[i + 1]
-            let b2 = bs[i + 2]
-            let b3 = bs[i + 3]
-            let hi = (b0 - 240) * 262144 + (b1 - 128) * 4096
-            (mut out).push(hi + (b2 - 128) * 64 + (b3 - 128))
-            i = i + 4
+            acc = b - 240
+            pending = 3
         }
     }
     out
@@ -892,12 +960,17 @@ pub fn code_points(s: str) -> List[int] {
 /// Whether every code point in `s` is ASCII (below U+0080) — the cheap
 /// question a caller asks before treating byte offsets as character
 /// positions, and the one classification that needs no tables at all.
-/// The empty string is ASCII. Total: no error row, no traps beyond the
-/// byte view's allocation.
+/// The empty string is ASCII. Total: no error row, no traps.
 ///
 /// `is_ascii(s)` is exactly `char_count(s) == len(s)`, and it is a
 /// function rather than that expression because the equality is a fact
 /// about UTF-8 the caller should not have to know.
+///
+/// It is also the cheapest function in this module to get wrong the
+/// expensive way: until sc12 it copied every byte of `s` into a list and
+/// then returned `false` at the first one above 127. It walks the view now
+/// and stops there — a `return` out of a `for` over `s.bytes()` runs on all
+/// three lanes.
 ///
 /// ```wolf-doc-example
 /// str.is_ascii("wolf-lang") == true
@@ -905,15 +978,10 @@ pub fn code_points(s: str) -> List[int] {
 /// str.is_ascii("") == true
 /// ```
 pub fn is_ascii(s: str) -> bool {
-    let bs = s.bytes()
-    let n = bs.len
-    var i = 0
-    while i < n {
-        let b = bs[i]
+    for b in s.bytes() {
         if b > 127 {
             return false
         }
-        i = i + 1
     }
     true
 }

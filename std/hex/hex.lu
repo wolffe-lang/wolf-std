@@ -34,26 +34,46 @@
 //! every byte sequence, and `tests/hex/round_trip.lu` holds the property
 //! over the shared adversarial fixtures rather than over a happy path.
 //!
-//! Decoding is TOTAL over arbitrary UTF-8 input: the digit probe runs
-//! against an ASCII alphabet this module owns rather than slicing the
-//! caller's string at a guessed offset, so `decode("é")` is a `parse`
-//! miss and never a `bounds` trap (sc03's inversion, F-0018).
+//! Decoding is TOTAL over arbitrary UTF-8 input, and at the sc12 pin it is
+//! total for a simpler reason than the one it shipped with. sc03's
+//! inversion — probe the input with an ASCII literal this module owns,
+//! never slice the caller's string at a guessed offset — is what made
+//! `decode("é")` a `parse` miss rather than a `bounds` trap while the
+//! language had no byte accessor (F-0018). s77 gives the digit probe the
+//! byte itself (`s.bytes()[0]`, one load rather than up to thirty-two
+//! `starts_with` calls), and a byte cannot be a partial code point, so the
+//! totality argument is now "a byte is a byte" and the answers are
+//! unchanged member for member. `tests/hex/decode_misses.lu` is what holds
+//! them to that.
 
 /// The value of the hex digit `s` starts with, or -1. Case-insensitive.
 /// Private.
+///
+/// **It reads one byte now, and that is s77's doing.** sc03's inversion
+/// said: probe the input with a literal you own, because slicing the
+/// caller's string at a guessed offset can trap. The probe cost up to
+/// thirty-two `starts_with` calls per character, and it bought totality.
+/// The byte view buys the same totality for one load — a byte is a byte, a
+/// non-ASCII lead byte is 195 and not a digit — and it reads the
+/// receiver's own storage rather than a copy.
+///
+/// The first byte is taken by ITERATING and returning, not by indexing:
+/// `s.bytes()[0]` is refused by wolfc's checked tier (F-0071), and a shape
+/// that costs a lane is not one std writes. An empty `s` runs the loop zero
+/// times and falls through to the miss, which is the answer the
+/// `starts_with` probe gave it too.
 fn digit_of(s: str) -> int {
-    let alphabet = "0123456789abcdef"
-    var i: int = 0
-    while i < 16 {
-        let lower_digit = alphabet[i..i + 1]
-        if s.starts_with(lower_digit) {
-            return i
+    for c in s.bytes() {
+        if c >= 48 && c <= 57 {
+            return c - 48
         }
-        let upper_digit = lower_digit.upper()
-        if s.starts_with(upper_digit) {
-            return i
+        if c >= 97 && c <= 102 {
+            return c - 87
         }
-        i = i + 1
+        if c >= 65 && c <= 70 {
+            return c - 55
+        }
+        return 0 - 1
     }
     0 - 1
 }
@@ -178,9 +198,20 @@ pub fn decode(s: str) -> List[int] ! {parse} {
 /// **The census row this closes.** Hex-encoding text is the commonest use
 /// of a hex encoder anywhere and this module shipped without it for four
 /// sprints, because nothing in the language could read a `str`'s bytes
-/// (F-0035). s37's `s.bytes()` can, on every lane, so the body is one
-/// delegation — `encode(s.bytes())` — and the gap was a debt rather than
-/// a wall after sc09 measured it.
+/// (F-0035). s37's `s.bytes()` can, on every lane, and the gap was a debt
+/// rather than a wall after sc09 measured it.
+///
+/// **The body was `encode(s.bytes())` until sc12 and is a walk now.**
+/// Passing the view to `encode` is exactly the position s77 materializes
+/// in — an argument — so the delegation copied the whole string into a
+/// `List[int]` before rendering a digit. Consuming the view here costs the
+/// duplication of one four-line loop and no longer allocates a list per
+/// call. The digits still come from `byte_digits`, so there is one
+/// rendering and the two entry points cannot drift; what is duplicated is
+/// the LOOP, not the answer.
+///
+/// The `assert` `encode` documents is unreachable through this door: every
+/// element of a `str`'s byte view is a byte by construction.
 ///
 /// **There is no `decode_str`, and that is a filing rather than an
 /// omission** (§11's encoder/decoder pairing rule, refused honestly):
@@ -203,5 +234,10 @@ pub fn decode(s: str) -> List[int] ! {parse} {
 /// hex.encode_str("\n") == "0a"
 /// ```
 pub fn encode_str(s: str) -> str {
-    encode(s.bytes())
+    var out = ""
+    for b in s.bytes() {
+        let pair = byte_digits(b)
+        out = "{out}{pair}"
+    }
+    out
 }

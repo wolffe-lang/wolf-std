@@ -21,20 +21,34 @@
 //!
 //! Regions (D10): every function allocates in the ambient region and no
 //! signature asks for one. The `.in(r)` targets are s37's plumbing, not
-//! this module's.
+//! this module's. **s76 made that sentence true of the machine and not
+//! only of the API** (the sc12 pin): a `List` allocates in the ambient
+//! region AT THE SITE, so a list built inside `region r { }` is freed with
+//! it and growth stays in the region it was born in. Nothing here changed
+//! to earn that, which is the point — a region-silent algorithm inherits
+//! its operands' homes, and now it does so in fact rather than in
+//! intention.
+//!
+//! HISTORY, kept because two campaigns of bodies were shaped by it:
+//! - **The single-read rule is DEAD** (s72's D40, `[mem.iter.excl]`, closed
+//!   at the sc11 pin). wolfc's mem tier used to treat every read of a
+//!   container place as a MOVE, so two read SITES over one binding in one
+//!   body was E1001 (`xs.len` twice; `xs.len` then `xs[i]`; `for x in xs`
+//!   then anything), and that is why every body here reads through `len`
+//!   and the private `at` — one call per site — instead of projecting
+//!   twice. Iteration takes a read claim over the loop's whole extent now,
+//!   `for` no longer moves its iterable, and a write during the loop is
+//!   `E1013` statically and `trap(exclusivity)` dynamically (F-0005 and
+//!   F-0014, both closed). The bodies keep their shape because they are
+//!   correct and rewriting them would be churn; new code in this module
+//!   does not need the ceremony.
+//! - The absence-spelling interim is retired: the tag is lowercase
+//!   everywhere as of sc06 (F-0003 dead), and this header carried a
+//!   half-renamed sentence about it — "`none`, not the convention's
+//!   `none`" — for six sprints afterwards. A rename that touches 148 sites
+//!   should have a reader on the prose too.
 //!
 //! INTERIM SPELLINGS (each filed, flipped by the pin bump that fixes it):
-//! - Absence is spelled `none`, not the convention's `none`: wolfc does
-//!   not resolve a lowercase bare tag in raise position (E0301). lupin
-//!   0.1.1 resolves both — the divergence, not the convention, is the
-//!   reason we wait (F-0003).
-//! - **The single-read rule.** wolfc's pinned mem tier treats every read
-//!   of a container place as a MOVE, so two read SITES over one binding
-//!   in one body is E1001 (`xs.len` twice; `xs.len` then `xs[i]`; `for x
-//!   in xs` then anything). Passing the container to a function is not a
-//!   move, so every body here reads through `len` and `at` — one call
-//!   per site — instead of projecting twice. That is why `at` exists
-//!   (F-0005 / wolf-lang#6); the bodies simplify when the fix lands.
 //! - The `[T: Eq]` family (`contains`, `index_of`, `last_index_of`,
 //!   `dedup`, `starts_with`, `ends_with`) is NOT in this file: importing
 //!   std.cmp for the bound would make every importer of std.list

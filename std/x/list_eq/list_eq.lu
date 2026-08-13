@@ -20,8 +20,13 @@
 //! satisfied, which is the evidence that the signatures are writable at
 //! all.
 //!
-//! Absence is spelled `none` pending F-0003; the bodies obey std.list's
-//! single-read rule (F-0005) via the local `len`/`at` helpers.
+//! Absence is spelled `none`, which is the convention's own spelling as of
+//! sc06 — F-0003 is dead and "pending" was stale prose for six sprints
+//! after the rename. The bodies read through the local `len`/`at` helpers
+//! because std.list's single-read rule required it when they were written;
+//! that rule died at the sc11 pin (s72's D40, F-0005 and F-0014 closed),
+//! and the shape survives as correct-and-not-worth-churning rather than as
+//! law.
 
 use std.cmp
 

@@ -83,21 +83,38 @@ fn digit_char(d: int) -> str {
 /// not start with one. Case-insensitive above radix 10. Private; the
 /// public entry points are the `parse_*` family.
 ///
-/// The probe runs in the safe direction: `starts_with` against a literal
-/// this module owns, never a slice of the caller's input. That is what
-/// makes `parse_int("é")` a miss rather than a `bounds` trap (F-0018).
+/// **One byte, one classification** (s77, the sc12 pin). This ran as
+/// sc03's inversion until now — `starts_with` against a literal this
+/// module owns, never a slice of the caller's input — which is what made
+/// `parse_int("é")` a miss rather than a `bounds` trap while nothing could
+/// read a byte (F-0018). It cost up to `2 * radix` probes per character,
+/// so a base-36 parse asked seventy-two questions to answer one. The byte
+/// view answers it directly, out of `s`'s own storage, and the ASCII ranges
+/// below are the same alphabet `digit_char` renders, read backwards.
+///
+/// The byte is taken by ITERATING and returning rather than by indexing:
+/// `s.bytes()[0]` is `unsupported` on wolfc's checked tier (F-0071), and a
+/// shape that costs a lane is not one std writes. An empty `s` runs the
+/// loop zero times and falls through to the miss, exactly as the
+/// `starts_with` probe did.
+///
+/// Totality survives the change and its argument gets shorter: a byte is a
+/// byte, so a multi-byte character's lead byte (195 for `é`) is simply not
+/// a digit.
 fn digit_of(s: str, radix: int) -> int {
-    var i: int = 0
-    while i < radix {
-        let lower_digit = digit_char(i)
-        if s.starts_with(lower_digit) {
-            return i
+    for c in s.bytes() {
+        var v: int = 0 - 1
+        if c >= 48 && c <= 57 {
+            v = c - 48
+        } else if c >= 97 && c <= 122 {
+            v = c - 87
+        } else if c >= 65 && c <= 90 {
+            v = c - 55
         }
-        let upper_digit = lower_digit.upper()
-        if s.starts_with(upper_digit) {
-            return i
+        if v >= radix {
+            return 0 - 1
         }
-        i = i + 1
+        return v
     }
     0 - 1
 }

@@ -11,6 +11,24 @@
 //! one function of the reviewed nine is still a contract (`to_str`, at the
 //! bottom of this header) and why `is_utf8` exists.
 //!
+//! **s77 made the byte view free, and NONE of that reaches this module —
+//! which is a fact about its signatures, not a gap to fix.** `s.bytes()` is
+//! the receiver's own pointer and length wherever the call is CONSUMED
+//! (`for b in s.bytes()`, `s.bytes().len`), and it materializes through
+//! `__wolf_rt_str_bytes` in every other position — including being passed
+//! as an ARGUMENT, which is how every function here receives its bytes. So
+//! `bytes.len(bytes.from_str(s))` copies `s` and `str.char_count(s)` does
+//! not, and the difference is the parameter, not the implementation.
+//! `std.str`'s four walks moved onto the view in sc12 for exactly this
+//! reason; the nine functions below cannot, and the ask that would change
+//! it — a way to pass a view across a function boundary, or the `Bytes`
+//! type this header has wanted since sc05 — is filed as F-0072.
+//!
+//! What this module is FOR is unchanged and worth restating in that light:
+//! bytes a program HOLDS (a decoder's output, a list it built, a buffer it
+//! was handed) rather than bytes it is walking through once. A one-pass
+//! walk over a string's bytes belongs in `std.str` and is written there.
+//!
 //! **THE TYPE IS `List[int]`, AND THAT IS A RECORDED INTERIM** (§11's byte
 //! currency, the same one `std.hex` and `std.base64` carry). A real `Bytes`
 //! wants two things this pin has not got: a byte-width element type, and a
@@ -62,12 +80,24 @@
 //!     tested, so a program can at least ask the border's question; the
 //!     day a bytes-to-str primitive lands, this function is four lines
 //!     over that predicate. Filed as F-0057 and upstream as
-//!     wolf-lang#58, still OPEN — and re-measured at the sc11 pin with
+//!     wolf-lang#58, still OPEN — and re-measured at the sc12 pin with
 //!     four probes rather than assumed: `str.from_utf8(b)` is "does not
 //!     resolve", `(mut b).push_byte(104)` is "`StrBuf` has no method
 //!     `push_byte` in this machine's std subset", a `'h'` character
 //!     literal is `E0101` at the LEXER ("`'` begins no token"), and
-//!     there is no `bytes_to_str` builtin. Three sprints, one answer.
+//!     there is no `bytes_to_str` builtin. Four sprints, one answer.
+//!
+//!     What is new at the sc12 pin is that the COUNTERPARTY states the
+//!     shape of the fix in the same words this contract does. s77 gave the
+//!     byte view a `str`-identical representation and deliberately emitted
+//!     no path back: the view "cannot become a `str` … a `List[int] -> str`
+//!     conversion would have to VALIDATE (wolf-std's `bytes.to_str`, still
+//!     blocked, and this is why: it wants a checked primitive, not a
+//!     cast)". A bit-identical representation makes an unchecked
+//!     conversion look one instruction away, and the compiler names that
+//!     as the forging hole rather than taking it. This function is the
+//!     border post on the other side of the same decision, and the two
+//!     descriptions of the fix now agree.
 //! ```
 
 /// The number of bytes in `b`. O(1). Total: no error row, no traps.
@@ -246,10 +276,15 @@ pub fn ends_with(b: List[int], suffix: List[int]) -> bool {
 /// is the same view from the other side, and the io tier's byte reads are
 /// filed and unbuilt (F-0044).
 ///
-/// This pin MATERIALIZES the view (the builtin returns a `List`), so it
-/// allocates; the zero-copy form arrives with D28's iterator protocol and
-/// changes nothing about this signature. Total: no error row, no traps
-/// beyond allocation.
+/// **This function materializes, and after s77 that is a statement about
+/// its SIGNATURE rather than about the pin.** The language's `s.bytes()` is
+/// the receiver's own pointer and length when it is consumed on the spot;
+/// returning it — which is all this function does — is one of the positions
+/// that still copies, and it must be, because the list outlives the
+/// expression that produced it. So the allocation is the price of having a
+/// value rather than a walk, and a caller who only wants to walk should
+/// write `for b in s.bytes()` (or call `std.str`'s walks, which do). Total:
+/// no error row, no traps beyond allocation.
 ///
 /// ```wolf-doc-example
 /// bytes.at(bytes.from_str("A"), 0) == 65

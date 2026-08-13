@@ -50,11 +50,35 @@ fn char_of(v: int, alphabet: str) -> str {
 
 /// The 6-bit value of the character `s` starts with, or -1. Private: the
 /// probe runs against the owned alphabet, never a slice of the input.
+///
+/// **It compares bytes now, not slices** (s77, the sc12 pin). The search is
+/// still linear over the alphabet — it has to be, because the alphabet is a
+/// PARAMETER here and the two RFC 4648 profiles differ only in their last
+/// two characters — but each step was a one-byte slice plus a `starts_with`
+/// call and is now a comparison of two bytes read out of storage neither
+/// side copies. Both walks are `for` loops over the view rather than
+/// indexed reads, because indexing a view is `unsupported` on wolfc's
+/// checked tier (F-0071) and a shape that costs a lane is not one std
+/// writes.
+///
+/// The totality argument is unchanged in substance and simpler in form:
+/// every alphabet character is ASCII, so a first byte at or above 128 can
+/// never match one, and a non-ASCII character is a miss rather than a trap.
+/// An empty `s` yields no first byte and misses.
 fn value_of(s: str, alphabet: str) -> int {
+    for b in s.bytes() {
+        return value_in(b, alphabet)
+    }
+    0 - 1
+}
+
+/// The index of the byte `c` in `alphabet`, or -1. Private, and separate
+/// from `value_of` only because the first-byte loop above returns out of
+/// its own iteration.
+fn value_in(c: int, alphabet: str) -> int {
     var i: int = 0
-    while i < 64 {
-        let c = alphabet[i..i + 1]
-        if s.starts_with(c) {
+    for a in alphabet.bytes() {
+        if a == c {
             return i
         }
         i = i + 1

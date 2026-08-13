@@ -1096,6 +1096,26 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# ---- sc12: the byte view, and the two rows that record what std may write
+# over it. s77 made `s.bytes()` the receiver's own pointer and length in
+# seven consuming positions; wolfc's checked tier models two of them. The
+# first file holds the two that work, the second holds the refusal.
+
+[tests."str/byte_view_walk.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# The held refusal (F-0071): `s.bytes()[i]` is `unsupported — indexing
+# outside the modelled surface` at `mem` on the checked tier, and runs on
+# the two lanes that model the shape. When this row advances to `run`,
+# `str.char_offsets` and `str.code_points` may go back to indexed walks —
+# until then they are `for`-and-counter, and this row is why.
+[tests."str/byte_view_index.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
 # The two empty-argument guards (F-0055). std traps `assert` where the
 # builtin's answer is three different things on three lanes.
 [tests."str/split_empty_separator.lu"]

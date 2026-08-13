@@ -20,8 +20,12 @@
 //! would want a compaction rule; that is a decision for the graduating
 //! sprint, recorded here rather than guessed.
 //!
-//! Absence is spelled `none` pending F-0003; the bodies obey std.list's
-//! single-read rule (F-0005) — every length read goes through `count`.
+//! Absence is spelled `none`, the convention's own spelling as of sc06
+//! (F-0003 is dead; "pending" was stale prose for six sprints). Every
+//! length read goes through `count` because std.list's single-read rule
+//! required it when these bodies were written; that rule died at the sc11
+//! pin (s72's D40, F-0005 and F-0014 closed) and the shape is kept because
+//! it is correct, not because it is required.
 
 /// The queue: elements `items[head .. items.len]`, front first.
 pub struct DequeInt {
