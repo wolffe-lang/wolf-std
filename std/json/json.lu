@@ -3,50 +3,50 @@
 //! std.json — the JSON data model, its accessors, and the serializer.
 //! Stability tier: core.
 //!
-//! **What ships and what does not, stated first — and the answer moved
-//! this sprint.** `get` and `at`, the two typed getters that navigate the
-//! model, were written at sc05, tested, and WITHDRAWN before they shipped:
-//! a function whose return type is an enum and whose signature carries an
-//! error row took the miss path on every call, in one line, with no
-//! diagnostic (F-0037). That held for five sprints and cost this module
-//! its whole navigation surface. It closed at lupin 0.1.10, it was
-//! re-measured here at 0.1.11 with the finding's own reproducer, and
-//! **both functions are below as code.**
+//! **The module is a READER now, and that is this sprint's whole story.**
+//! For eight sprints this was a complete DOM that could not be built from
+//! text: `parse` and `unescape` were reviewed contracts, and `escape`
+//! carried a refusal. §14's debt clause — a contract ships in the sprint
+//! AFTER its blocker closes, one sprint of grace and no more — came due
+//! here on all three at once, and all three are below as code.
 //!
-//! Two contracts are left, `parse` and `unescape`, and the rule this
-//! module wrote at sc10 applies to them one more time: "the blocker
-//! retired" is not "writable" until every finding on the SIGNATURE has
-//! been re-measured, not just the one that was in the way last time. Both
-//! have now had every finding on them re-measured, and BOTH ARE UNBLOCKED
-//! — which makes them a debt this module owes rather than a wall it is
-//! behind. §14's rule is where the debt is written down: a capability or
-//! tier contract ships in the sprint AFTER its blocker closes, one sprint
-//! of grace and no more.
+//! - **`parse`** was blocked by F-0037 (an enum returned through an error
+//!   row took the miss path on every call), closed at lupin 0.1.10 and
+//!   spent at sc13 on `get`/`at`. Its scanner has been writable since
+//!   sc09; the SIGNATURE was what was missing.
+//! - **`unescape`** was blocked by F-0057 — the walk was always fine, the
+//!   walk's OUTPUT was not, because decoding `é` means building `"é"` out
+//!   of the number 233 and nothing in the language built a `str` from a
+//!   number. s81 landed the prelude's validating `str_from_utf8`, and
+//!   **lupin 0.1.12 resolves it too** (F-0075 closed), which matters more
+//!   here than anywhere: the interpreter is this module's only executing
+//!   lane, so a primitive the compilers alone had would have left
+//!   `unescape` with no lane at all (sc10's `float_at` rule).
+//! - **`escape` is TOTAL** and its `boundary` tag is gone. The walk is a
+//!   byte walk now: the four characters JSON must escape are ASCII, every
+//!   byte of a multi-byte code point is ≥ 0x80 and therefore never one of
+//!   them, and a run between two escapes is a slice at offsets this module
+//!   computed. So the function needs no code-point measurement at all —
+//!   which is why it was reachable a full wave before anyone thought.
 //!
-//! - `parse` was blocked by **F-0037** (closed, above); its scanner has
-//!   been writable since sc09 and its signature is writable now. What it
-//!   still needs from this module is `unescape`, for a string payload.
-//! - `unescape` was blocked by **F-0057** — the walk was always fine, the
-//!   walk's OUTPUT was not, because decoding `é` means building `"é"`
-//!   out of the number 233 and nothing in the language built a `str` from
-//!   a number. **s81 landed the prelude's validating `str_from_utf8` and
-//!   F-0057 is CLOSED at this sprint's pin.** `unescape` becomes UTF-8
-//!   encoding into a `List[int]` — arithmetic this module can already
-//!   write — plus one call to `std.bytes.to_str`, and the lone-surrogate
-//!   rule its contract names is then the primitive's own refusal, which is
-//!   the right place for it.
-//! - `escape`'s one refusal is writable and has been since sc09, over
-//!   `str.code_points`/`char_offsets`. It stays here for the reason it has
-//!   always stated: making `escape` total changes `stringify`'s row from
-//!   `{boundary, deep}` to `{deep}`, which ripples through every test and
-//!   doc example in this module, and that is a signature change worth
-//!   making once — beside the function that makes this module a reader.
+//! **The signature change that follows, said out loud.** `escape`'s row
+//! disappears, so `stringify` and `stringify_pretty` go from
+//! `{boundary, deep}` to `{deep}` and `quote` becomes total. Every caller
+//! that wrote `else "?"` still compiles — a narrower row is a subtype at a
+//! `?` boundary and an `else` over one tag reads the same — but a caller
+//! matching on `boundary` by name does not, and there is no deprecation
+//! period in a library at this stage. It is one tag, removed once, in the
+//! sprint that made it removable.
 //!
-//! So the honest summary is: this is a complete DOM that cannot yet be
-//! built FROM text. The value model, the navigation and the serializer are
-//! here, so a program that WRITES JSON — a log line, a request body, a
-//! config dump — is served completely; a program that READS it is one
-//! sprint away, with nothing in the way and the debt named.
+//! **What `parse` costs the reader is one number-tier tag**, and the
+//! sc05 contract did not have it: the row is `{syntax, deep, overflow}`
+//! rather than `{syntax, deep}`. `overflow` is what a magnitude with no
+//! `f64` raises (`1e400`), because `std.fmt.decimal.parse_float` refuses
+//! it rather than answering infinity, and this module refuses to turn
+//! that into "the text is not JSON" — the two are different sentences and
+//! §12 gives a distinct actionable failure its own tag. RFC 8259 §6
+//! permits an implementation to limit the range it accepts; it does not
+//! permit a parser to lie about which document it was handed.
 //!
 //! **The value model.** `Value` is one recursive enum with seven
 //! variants: `Null`, `Bool(bool)`, `Int(int)`, `Num(f64)`, `Str(str)`,
@@ -55,7 +55,9 @@
 //! non-integral (or out-of-range) numbers become `Num`, so a document
 //! carrying a 64-bit id round-trips through wolf without passing through
 //! a `f64` that cannot hold it. The i53 boundary is where the two
-//! postures visibly differ and `tests/json/number_posture.lu` pins it.
+//! postures visibly differ and `tests/json/number_posture_and_depth.lu` pins
+//! it, from the writing side, with `tests/json/parse_shapes.lu` pinning the
+//! reading side.
 //!
 //! **Constructors are functions, not `Value.Int(3)`.** An enum's variants
 //! cannot be named from outside the declaring module at these pins —
@@ -79,42 +81,35 @@
 //! `lupin = run, wolfc = unsupported, native = unsupported`, exactly as
 //! the sprint contract's non-target predicted.
 //!
-//! The two reviewed contracts themselves, each with what it is waiting for
-//! (re-measured at the sc13 pins, not inherited — and what both are
-//! waiting for now is a sprint, not a finding):
+//! **The scanner's tag is `syntax`, not `parse`, and the reason is a
+//! measurement rather than a preference.** A row tag is resolved as an
+//! ordinary name at the raise site, so a tag that shares a name with
+//! anything in scope silently becomes that thing (F-0036). This module now
+//! declares `pub fn parse`, so a `parse` TAG raised anywhere in it would
+//! resolve to that function and ride out as a value with no `else` firing
+//! and no diagnostic. Re-measured at this sprint's pins rather than
+//! inherited: the compiler closed its half at sc07 and **lupin still hands
+//! back the colliding thing**, silently. So `unescape` raises `syntax`
+//! too, which reads better anyway — a bad `\q` escape IS a syntax error in
+//! the document it came from.
 //!
-//! ```text
-//! parse(s: str) -> Value ! {syntax, deep}
-//!     The strict RFC 8259 profile: no comments, no trailing commas, no
-//!     leading `+` or bare `.5`, `\u` escapes decoded with surrogate
-//!     pairs joined, duplicate keys keeping the LAST occurrence, and a
-//!     nesting depth limit (`depth_limit()`) whose breach is the `deep`
-//!     tag and never a stack trap. Numbers follow the posture above:
-//!     `Int` when the text denotes an integer that fits `int`, `Num`
-//!     otherwise, with the conversion correctly rounded
-//!     (`std.fmt.decimal.parse_float`, which is already here and already
-//!     exact). `syntax` carries the byte offset when sc06's payload
-//!     conventions land; at this pin it would be a bare mark.
-//!     UNBLOCKED at the sc13 pins (F-0037 closed; `unescape` below is its
-//!     last internal dependency). Owed next sprint, per §14.
-//! unescape(s: str) -> str ! {parse}
-//!     The inverse of `escape`: `\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`,
-//!     `\t` and `\uXXXX` (surrogate pairs joined into one code point),
-//!     with any other backslash sequence and any lone surrogate a miss.
-//!     The tag is `parse` and not `boundary` now: `boundary` was the
-//!     interim mark for "this pin cannot find the code-point boundary"
-//!     (§11) and that condition is gone, so what is left is ordinary bad
-//!     data. Blocked by F-0057 for four sprints, and **UNBLOCKED at the
-//!     sc13 pins**: s81's `str_from_utf8` is the primitive, and
-//!     `std.bytes.to_str` is its facade, so the walk's OUTPUT finally has
-//!     somewhere to happen. The old sentence, kept because it is the
-//!     mechanism: the walk was writable and its output was not — decoding
-//!     `\u00e9` means building `"é"` out
-//!     of the number 233, and until s81 nothing in the language turned a
-//!     scalar into a `str`. An ASCII-only version would refuse text, which
-//!     §9 forbids. Owed next sprint, per §14.
-//! ```
+//! **What is deliberately NOT accepted.** No comments, no trailing commas,
+//! no leading `+`, no bare `.5`, no `NaN`/`Infinity` spellings, no raw
+//! control character inside a string: RFC 8259's grammar, strictly. Every
+//! one of them is a `syntax` miss, because a library that guesses at
+//! extensions reads a different language from the one its callers' other
+//! tools read. There is also no offset in the tag — `syntax` is a
+//! payload-free mark until §12's payload conventions reach this module,
+//! and when the position arrives the tag GAINS a payload rather than a
+//! sibling (§12's rule 4).
+//!
+//! **Duplicate keys keep the last occurrence**, which is a `Map`
+//! assignment and not a policy this module implements; a document with
+//! duplicate keys is legal and its readings differ across libraries, so
+//! the rule is stated here and held as a test rather than left to be
+//! inferred from the container.
 
+use std.bytes
 use std.fmt
 use std.fmt.decimal
 
@@ -131,12 +126,17 @@ pub enum Value {
     Obj(Map[str, Value]),
 }
 
-/// The nesting depth `stringify` and `stringify_pretty` will render
-/// before raising `deep`. A limit rather than a stack overflow: a JSON
-/// value can be built to any depth by a program, and a serializer that
-/// dies on one is a denial-of-service surface rather than a function
-/// (the sprint contract's rule for `parse`, applied to the direction that
-/// ships).
+/// The nesting depth this module reads and renders before raising `deep` —
+/// one number for `parse`, `stringify` and `stringify_pretty`, so a value
+/// that came in can always go back out.
+///
+/// A limit rather than a stack overflow, in BOTH directions and for the
+/// same reason: a JSON value can be built to any depth by a program and a
+/// document can be nested to any depth by whoever sent it, and there is no
+/// unwinding in wolf (D30), so a library that recurses until the stack ends
+/// hands its caller a denial-of-service surface rather than a function.
+/// `parse` was the sprint contract's example of the rule; `stringify`
+/// shipped it first because it shipped first.
 ///
 /// ```wolf-doc-example
 /// json.depth_limit() == 64
@@ -423,9 +423,9 @@ fn obj_has(m: Map[str, Value], key: str) -> bool {
 /// **This function and `at` were written at sc05, tested, and withdrawn
 /// for five sprints** — a `Value` returned through an error row took the
 /// miss path on every call, silently (F-0037, closed at lupin 0.1.10 and
-/// re-measured at 0.1.11). Nothing about the signature changed in the
-/// meantime, which is the point: the contract in the module header was
-/// right, and what was missing was a machine that ran it.
+/// re-measured at 0.1.11 and again at 0.1.12). Nothing about the signature
+/// changed in the meantime, which is the point: the contract in the module
+/// header was right, and what was missing was a machine that ran it.
 ///
 /// ```wolf-doc-example
 /// var m = Map[str, json.Value]()
@@ -554,137 +554,652 @@ pub fn len(v: Value) -> int ! {kind} {
     }
 }
 
-/// `s` with the characters JSON forbids inside a string replaced by their
-/// escapes: `"` and `\` by their backslash forms, and every control
-/// character below U+0020 by `\b`, `\f`, `\n`, `\r`, `\t` or `\u00XX`.
-/// Every other character — including every non-ASCII one — passes through
-/// verbatim, because RFC 8259 permits raw UTF-8 and escaping it would
-/// only make the output bigger.
+/// `s` parsed as one JSON document — the direction this module could not
+/// go for eight sprints.
 ///
-/// **The one refusal, and it is now a debt rather than a wall.** The
-/// primitive that would remove it landed at s37 and `std.str` spends it
-/// (sc09), so this function can become total in a `std.json` sprint by
-/// walking with `str.code_points` instead of one ASCII character at a
-/// time; the row and the tag survive only until then. (The tag is
-/// `boundary`, naming the code-point boundary the walk cannot find, and
-/// deliberately not `escape`:
-/// a tag that shares a name with anything else in scope at the raise site
-/// — here, this very function — resolves to that thing and leaves the
-/// function as a silent value, F-0036. The tag disappears entirely when
-/// the primitive lands and `escape` becomes total.)
-/// A string that needs no
-/// escaping at all comes back unchanged, whatever it contains; a string
-/// that needs escaping is rewritten by walking it one ASCII character at
-/// a time. The walk cannot pass a NON-ASCII code point, because nothing
-/// at this pin can measure one — so a string that contains both a
-/// non-ASCII character AND, after it, a character needing an escape,
-/// raises `boundary`. `"café"` escapes fine (it needs nothing);
-/// `"say \"hi\""` escapes fine (all ASCII); `"café \"x\""` is the shape
-/// that refuses, and it refuses loudly instead of trapping or corrupting.
+/// **The profile is RFC 8259, strictly**, and the module header lists what
+/// that excludes. Whitespace (space, tab, CR, LF) is allowed around every
+/// token and nowhere inside one; trailing content after the value is a
+/// miss, so `"1 2"` does not parse as `1`.
+///
+/// **Numbers keep the posture the model was built for**: text that denotes
+/// an integer `int` can hold becomes `Int` and keeps every digit, and
+/// everything else becomes `Num` through `std.fmt.decimal.parse_float`,
+/// which is correctly rounded. So a document carrying a 64-bit id survives
+/// a round trip and `1e2` arrives as the double `100.0` rather than as the
+/// integer 100 — the text said it was not an integer.
+///
+/// **Three tags.** `syntax` is a malformed document. `deep` is nesting
+/// past `depth_limit()`, raised rather than recursing until the stack
+/// ends: an untrusted document must not be able to end the process, which
+/// is the same argument `stringify` makes from the writing side. `overflow`
+/// is a number whose magnitude has no `f64` (`1e400`) — the number tier
+/// refuses it rather than answering infinity, and this module refuses to
+/// call that a malformed document.
+///
+/// A duplicate key keeps the LAST occurrence.
 ///
 /// ```wolf-doc-example
-/// (json.escape("wolf") else "?") == "wolf"
-/// (json.escape("café") else "?") == "café"
-/// (json.escape("a\"b") else "?") == "a\\\"b"
-/// (json.escape("a\\b") else "?") == "a\\\\b"
-/// (json.escape("a\nb") else "?") == "a\\nb"
+/// let v = json.parse("[1, true, null]") else json.null()
+/// (json.len(v) else 0) == 3
+/// let n = json.parse("  42  ") else json.null()
+/// (json.as_int(n) else 0) == 42
+/// let s = json.parse("\"a\\nb\"") else json.null()
+/// (json.as_str(s) else "?") == "a\nb"
+/// let bad = json.parse("[1,]") else json.from_str("not json")
+/// (json.as_str(bad) else "?") == "not json"
 /// ```
-pub fn escape(s: str) -> str ! {boundary} {
-    if !needs_escape(s) {
-        return s
+pub fn parse(s: str) -> Value ! {syntax, deep, overflow} {
+    var c = Cursor { text: s, i: 0 }
+    skip_ws(mut c)
+    let v = parse_value(mut c, 0)?
+    skip_ws(mut c)
+    if c.i < c.text.len {
+        return syntax
     }
-    var out = ""
-    var rest = s
-    while rest.len > 0 {
-        if !needs_escape(rest) {
-            return "{out}{rest}"
-        }
-        let mapped = escape_next(rest)
-        if mapped == "" {
-            // The next code point is not ASCII and a later one needs an
-            // escape: the walk cannot step over it (F-0018). Note the
-            // order — the ASCII probe comes FIRST and the one-byte
-            // advance only after it matched, because slicing to find out
-            // is exactly the trap this module refuses to take.
-            return boundary
-        }
-        out = "{out}{mapped}"
-        rest = rest[1..]
-    }
-    out
+    v
 }
 
-/// Whether `s` contains any character that must be escaped inside a JSON
-/// string. Private: the fast path's whole job, and the walk's stopping
-/// rule.
-fn needs_escape(s: str) -> bool {
-    if s.contains("\"") {
-        return true
-    }
-    if s.contains("\\") {
-        return true
-    }
-    control_index(s) >= 0
+/// The scanner's position in the text it is reading. Private, and it is
+/// deliberately a `str` and an offset rather than a byte list: a
+/// `List[int]` INDEX READ is O(n) under the interpreter (F-0078), which is
+/// this module's only executing lane, so a scanner built on `bs[i]` would
+/// be quadratic in the document. `text.get(i..i + 1)` is O(1) there,
+/// measured, and it is what `byte_at` below is written over.
+struct Cursor {
+    text: str,
+    i: int,
 }
 
-/// The index in the control table of the first control character `s`
-/// contains, or -1. Private.
-fn control_index(s: str) -> int {
-    var i: int = 0
-    while i < 32 {
-        if s.contains(control_char(i)) {
-            return i
-        }
-        i = i + 1
+/// The byte at `at`, or -1 when `at` is past the end OR inside a code
+/// point. Private, and the conflation is deliberate: every byte this
+/// scanner tests for is ASCII, no byte of a multi-byte code point is
+/// ASCII, and a position inside one is therefore "not a delimiter" — the
+/// same answer as "not there". It is what makes the whole scanner total
+/// over arbitrary UTF-8 without measuring a single code point.
+///
+/// The first byte comes from ITERATING a one-character slice, not from
+/// indexing it: `s.bytes()[0]` is refused by wolfc's checked tier
+/// (F-0071), and a shape that costs a lane is not one std writes even in a
+/// module whose other lanes are already dark.
+fn byte_at(text: str, at: int) -> int {
+    let ch = text.get(at..at + 1) else ""
+    for b in ch.bytes() {
+        return b
     }
     0 - 1
 }
 
-/// The control character with code `i` (0..31), as a one-byte string.
-/// Private: written as four literals of eight rather than thirty-two
-/// branches, and sliced by this module rather than by the caller, so the
-/// offset is always a code-point boundary.
-fn control_char(i: int) -> str {
-    let table = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"
-    table[i..i + 1]
+/// Past any run of the four characters RFC 8259 calls whitespace. Private.
+fn skip_ws(mut c: Cursor) {
+    var going = true
+    while going {
+        let b = byte_at(c.text, c.i)
+        if b == 32 || b == 9 || b == 10 || b == 13 {
+            c.i = c.i + 1
+        } else {
+            going = false
+        }
+    }
 }
 
-/// The JSON escape for the ASCII character `rest` STARTS WITH — the
-/// character itself when it needs none — or the empty string when the
-/// next code point is not ASCII at all, which is the signal `escape`
-/// stops on. Private.
+/// One value, dispatched on its first byte. Private; `depth` is checked on
+/// entry so a deeply nested document raises `deep` instead of exhausting
+/// the stack.
+fn parse_value(mut c: Cursor, depth: int) -> Value ! {syntax, deep, overflow} {
+    if depth > depth_limit() {
+        return deep
+    }
+    let b = byte_at(c.text, c.i)
+    if b == 123 {
+        let obj = parse_object(mut c, depth)?
+        return obj
+    }
+    if b == 91 {
+        let arr = parse_array(mut c, depth)?
+        return arr
+    }
+    if b == 34 {
+        let text = parse_string(mut c)?
+        return Value.Str(text)
+    }
+    if b == 116 {
+        if !take_word(mut c, "true") {
+            return syntax
+        }
+        return Value.Bool(true)
+    }
+    if b == 102 {
+        if !take_word(mut c, "false") {
+            return syntax
+        }
+        return Value.Bool(false)
+    }
+    if b == 110 {
+        if !take_word(mut c, "null") {
+            return syntax
+        }
+        return Value.Null
+    }
+    if b == 45 || is_digit_byte(b) {
+        let num = parse_number(mut c)?
+        return num
+    }
+    syntax
+}
+
+/// An array body, cursor on the `[`. Private. A trailing comma is a miss
+/// because the element after it is not a value.
+fn parse_array(mut c: Cursor, depth: int) -> Value ! {syntax, deep, overflow} {
+    c.i = c.i + 1
+    var out = List[Value]()
+    skip_ws(mut c)
+    if byte_at(c.text, c.i) == 93 {
+        c.i = c.i + 1
+        return Value.Arr(out)
+    }
+    var going = true
+    while going {
+        skip_ws(mut c)
+        let v = parse_value(mut c, depth + 1)?
+        (mut out).push(v)
+        skip_ws(mut c)
+        let b = byte_at(c.text, c.i)
+        if b == 44 {
+            c.i = c.i + 1
+        } else if b == 93 {
+            c.i = c.i + 1
+            going = false
+        } else {
+            return syntax
+        }
+    }
+    Value.Arr(out)
+}
+
+/// An object body, cursor on the `{`. Private. A key must be a string —
+/// a bare identifier is JavaScript, not JSON — and the last occurrence of
+/// a duplicate key is what the `Map` keeps.
+fn parse_object(mut c: Cursor, depth: int) -> Value ! {syntax, deep, overflow} {
+    c.i = c.i + 1
+    var m = Map[str, Value]()
+    skip_ws(mut c)
+    if byte_at(c.text, c.i) == 125 {
+        c.i = c.i + 1
+        return Value.Obj(m)
+    }
+    var going = true
+    while going {
+        skip_ws(mut c)
+        if byte_at(c.text, c.i) != 34 {
+            return syntax
+        }
+        let key = parse_string(mut c)?
+        skip_ws(mut c)
+        if byte_at(c.text, c.i) != 58 {
+            return syntax
+        }
+        c.i = c.i + 1
+        skip_ws(mut c)
+        let v = parse_value(mut c, depth + 1)?
+        m[key] = v
+        skip_ws(mut c)
+        let b = byte_at(c.text, c.i)
+        if b == 44 {
+            c.i = c.i + 1
+        } else if b == 125 {
+            c.i = c.i + 1
+            going = false
+        } else {
+            return syntax
+        }
+    }
+    Value.Obj(m)
+}
+
+/// A string payload, cursor on the opening quote, returned UNESCAPED.
+/// Private.
 ///
-/// Every probe is `starts_with` against a literal this module owns, and
-/// nothing here slices the caller's string: that is what makes the
-/// function total over arbitrary UTF-8 instead of a `bounds` trap waiting
-/// for its input (sc03's inversion, F-0018).
-fn escape_next(rest: str) -> str {
-    if rest.starts_with("\"") {
-        return "\\\""
+/// The scan finds the closing quote and nothing else: a backslash consumes
+/// the byte after it (so an escaped quote does not end the string) and
+/// every other byte is content. A raw control character below U+0020 is a
+/// miss, which is RFC 8259's rule and the one place this module is
+/// stricter than the parsers that let a raw newline through. The escapes
+/// themselves are `unescape`'s business, on the span this found.
+fn parse_string(mut c: Cursor) -> str ! {syntax} {
+    let n = c.text.len
+    let start = c.i + 1
+    var j = start
+    var end = start
+    var closed = false
+    while j < n {
+        let b = byte_at(c.text, j)
+        if b == 92 {
+            if j + 1 >= n {
+                return syntax
+            }
+            j = j + 2
+        } else if b == 34 {
+            end = j
+            closed = true
+            j = n
+        } else if b >= 0 && b < 32 {
+            return syntax
+        } else {
+            j = j + 1
+        }
     }
-    if rest.starts_with("\\") {
-        return "\\\\"
+    if !closed {
+        return syntax
     }
+    let raw = c.text[start..end]
+    c.i = end + 1
+    unescape(raw)?
+}
+
+/// A number, cursor on its first byte. Private.
+///
+/// The grammar is checked before the text is converted — `-`? then `0` or
+/// a nonzero digit run, then an optional fraction with at least one digit,
+/// then an optional exponent with at least one digit — so `01`, `.5`, `1.`
+/// , `+1` and `1e` are all misses rather than partial reads. Which
+/// CONSTRUCTOR the text gets is decided by the text: an integer that fits
+/// `int` keeps every digit in `Int`, and everything else goes through
+/// `parse_float`.
+///
+/// **The handler on `parse_float` is a wildcard, deliberately.** That call
+/// declares `{parse, overflow}` and only `overflow` is reachable from here:
+/// the grammar above accepts a strict subset of what `parse_float` reads,
+/// so text that got this far cannot be text it rejects. A discriminating
+/// handler would also be a lie on one lane — a multi-arm `else |e| match e`
+/// over a row raised ACROSS A MODULE BOUNDARY takes its first arm under
+/// lupin, silently (F-0079, filed this sprint, measured in both arm orders
+/// on all three lanes), and lupin is this module's only executing lane. A
+/// wildcard that claims nothing is the right handler when a module cannot
+/// act on the difference (§14, sc08's rule), and here it cannot see it
+/// either.
+fn parse_number(mut c: Cursor) -> Value ! {syntax, overflow} {
+    let start = c.i
+    var j = c.i
+    if byte_at(c.text, j) == 45 {
+        j = j + 1
+    }
+    let first = byte_at(c.text, j)
+    if first == 48 {
+        j = j + 1
+    } else if first >= 49 && first <= 57 {
+        j = j + 1
+        while is_digit_byte(byte_at(c.text, j)) {
+            j = j + 1
+        }
+    } else {
+        return syntax
+    }
+    var integral = true
+    if byte_at(c.text, j) == 46 {
+        integral = false
+        j = j + 1
+        if !is_digit_byte(byte_at(c.text, j)) {
+            return syntax
+        }
+        while is_digit_byte(byte_at(c.text, j)) {
+            j = j + 1
+        }
+    }
+    let marker = byte_at(c.text, j)
+    if marker == 101 || marker == 69 {
+        integral = false
+        j = j + 1
+        let sign = byte_at(c.text, j)
+        if sign == 43 || sign == 45 {
+            j = j + 1
+        }
+        if !is_digit_byte(byte_at(c.text, j)) {
+            return syntax
+        }
+        while is_digit_byte(byte_at(c.text, j)) {
+            j = j + 1
+        }
+    }
+    let text = c.text[start..j]
+    c.i = j
+    if integral {
+        if fits_int(text) {
+            let whole = fmt.parse_int(text) else 0
+            return Value.Int(whole)
+        }
+    }
+    let x = decimal.parse_float(text) else |_| {
+        return overflow
+    }
+    Value.Num(x)
+}
+
+/// `word` at the cursor, consumed. Private, and the whole of `true`,
+/// `false` and `null`: a prefix match would accept `truex`, so the caller
+/// checks what follows by parsing it as the next token.
+fn take_word(mut c: Cursor, word: str) -> bool {
+    let end = c.i + word.len
+    if end > c.text.len {
+        return false
+    }
+    let got = c.text.get(c.i..end) else ""
+    if got == word {
+        c.i = end
+        return true
+    }
+    false
+}
+
+/// Whether `b` is an ASCII digit. Private.
+fn is_digit_byte(b: int) -> bool {
+    b >= 48 && b <= 57
+}
+
+/// Whether the integer text `text` denotes fits in `int`. Private, and the
+/// gate in front of `fmt.parse_int`, which TRAPS `overflow` on text that
+/// does not fit — correctly, because to `fmt` the digits are a caller's
+/// argument. Here they came out of a DOCUMENT, so §10's rule applies from
+/// the other side: data raises where a caller's mistake traps, and what
+/// this module does with a number too big for `int` is not to raise at all
+/// but to keep it as a `Num`.
+///
+/// The comparison is on the text: 19 digits is the boundary width, and at
+/// exactly 19 the leading 18 are compared against `int`'s own, with the
+/// negative bound one larger. Leading zeros cannot appear — the grammar
+/// above rejects them — so a width comparison is exact.
+fn fits_int(text: str) -> bool {
+    var body = text
+    var negative = false
+    if body.starts_with("-") {
+        negative = true
+        body = body[1..]
+    }
+    let width = body.len
+    if width == 0 {
+        return false
+    }
+    if width < 19 {
+        return true
+    }
+    if width > 19 {
+        return false
+    }
+    let head_text = body[0..18]
+    let tail_text = body[18..19]
+    let head = fmt.parse_int(head_text) else 0 - 1
+    let tail = fmt.parse_int(tail_text) else 0 - 1
+    if head < 0 {
+        return false
+    }
+    if tail < 0 {
+        return false
+    }
+    let head_limit: int = 922337203685477580
+    var tail_limit: int = 7
+    if negative {
+        tail_limit = 8
+    }
+    if head > head_limit {
+        return false
+    }
+    if head == head_limit {
+        return tail <= tail_limit
+    }
+    true
+}
+
+/// `s` with the characters JSON forbids inside a string replaced by their
+/// escapes: `"` and `\` by their backslash forms, and every control
+/// character below U+0020 by `\b`, `\f`, `\n`, `\r`, `\t` or `\u00XX`.
+/// Every other character — including every non-ASCII one — passes through
+/// verbatim, because RFC 8259 permits raw UTF-8 and escaping it would only
+/// make the output bigger.
+///
+/// **Total, as of sc14, and its `boundary` tag is gone.** For five sprints
+/// this function refused a string that held a non-ASCII code point AND,
+/// after it, a character needing an escape: the walk stepped one ASCII
+/// character at a time and nothing could measure a wider one. What removed
+/// the refusal is not the code-point primitive the old contract named but
+/// a change of QUESTION. The four characters that must be escaped are
+/// ASCII; every byte of a multi-byte code point is ≥ 0x80 and so is never
+/// one of them; a run between two escapes is therefore a slice at two
+/// offsets THIS function computed, and a byte walk needs no code-point
+/// measurement at all. The old body was answering a harder question than
+/// the job asked.
+///
+/// The removal is a signature change and the module header says so:
+/// `stringify` and `stringify_pretty` lose `boundary` from their rows.
+///
+/// A string needing no escape at all comes back unchanged, and the fast
+/// path is the walk finding nothing rather than a second pass.
+///
+/// ```wolf-doc-example
+/// json.escape("wolf") == "wolf"
+/// json.escape("café") == "café"
+/// json.escape("café \"x\"") == "café \\\"x\\\""
+/// json.escape("a\"b") == "a\\\"b"
+/// json.escape("a\\b") == "a\\\\b"
+/// json.escape("a\nb") == "a\\nb"
+/// ```
+pub fn escape(s: str) -> str {
+    var out = ""
+    var start: int = 0
     var i: int = 0
-    while i < 32 {
-        if rest.starts_with(control_char(i)) {
-            return control_escape(i)
+    for b in s.bytes() {
+        let mapped = byte_escape(b)
+        if !mapped.is_empty() {
+            let run = s[start..i]
+            out = "{out}{run}{mapped}"
+            start = i + 1
         }
         i = i + 1
     }
-    let printable = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{{|}}~"
-    var j: int = 0
-    while j < 95 {
-        let c = printable[j..j + 1]
-        if rest.starts_with(c) {
-            return c
+    if start == 0 {
+        return s
+    }
+    let tail = s[start..s.len]
+    "{out}{tail}"
+}
+
+/// The JSON escape for one byte, or the empty string when the byte passes
+/// through. Private. Every byte of a multi-byte code point lands in the
+/// last case, which is why the walk above never has to know it was inside
+/// one.
+fn byte_escape(b: int) -> str {
+    if b == 34 {
+        return "\\\""
+    }
+    if b == 92 {
+        return "\\\\"
+    }
+    if b >= 32 {
+        return ""
+    }
+    control_escape(b)
+}
+
+/// `s` with JSON's escapes resolved — `escape`'s inverse, and the function
+/// `parse` reads every string payload through.
+///
+/// The eight two-character escapes (`\"`, `\\`, `\/`, `\b`, `\f`, `\n`,
+/// `\r`, `\t`) and `\uXXXX`, with a surrogate PAIR joined into the one code
+/// point it denotes. Any other character after a backslash is a `syntax`
+/// miss, and so is a lone surrogate, a truncated `\u`, and a trailing
+/// backslash. Text with no backslash in it comes back unchanged.
+///
+/// **The tag is `syntax` and not the `parse` its sc05 contract named**,
+/// because this module now has a FUNCTION called `parse` and a row tag
+/// that shares a name with anything in scope resolves to that thing —
+/// silently, with no `else` firing and no diagnostic (F-0036, re-measured
+/// under lupin at this sprint's pins and still live there). The rename is
+/// also the better name.
+///
+/// **What it waited four sprints for.** Decoding `é` means building
+/// `"é"` out of the number 233, and nothing in the language built a `str`
+/// from a number until s81's validating `str_from_utf8` (F-0057, closed at
+/// the sc13 pin, wrapped as `std.bytes.to_str`). An ASCII-only version
+/// would have refused text, which §9 forbids.
+///
+/// ```wolf-doc-example
+/// (json.unescape("wolf") else "?") == "wolf"
+/// (json.unescape("a\\nb") else "?") == "a\nb"
+/// (json.unescape("a\\\"b") else "?") == "a\"b"
+/// (json.unescape("\\u00e9") else "?") == "é"
+/// (json.unescape("\\ud83d\\udc3a") else "?") == "🐺"
+/// (json.unescape("a\\qb") else "bad escape") == "bad escape"
+/// (json.unescape("\\ud800") else "lone surrogate") == "lone surrogate"
+/// ```
+pub fn unescape(s: str) -> str ! {syntax} {
+    let n = s.len
+    var out = ""
+    var start: int = 0
+    var i: int = 0
+    while i < n {
+        if byte_at(s, i) == 92 {
+            let step = escape_at(s, i)?
+            let run = s[start..i]
+            let text = step.0
+            out = "{out}{run}{text}"
+            i = step.1
+            start = i
+        } else {
+            i = i + 1
         }
-        j = j + 1
     }
-    if rest.starts_with("\x7f") {
-        return "\x7f"
+    if start == 0 {
+        return s
     }
-    ""
+    let tail = s[start..n]
+    "{out}{tail}"
+}
+
+/// The text one escape at `at` denotes, and the offset just past it.
+/// Private. A tuple rather than two functions because the two answers are
+/// one reading, and a `(str, int)` through a row runs on every lane that
+/// has rows at all (sc09 measured the `(str, str)` half).
+fn escape_at(text: str, at: int) -> (str, int) ! {syntax} {
+    let n = text.len
+    if at + 1 >= n {
+        return syntax
+    }
+    let e = byte_at(text, at + 1)
+    if e == 34 {
+        return ("\"", at + 2)
+    }
+    if e == 92 {
+        return ("\\", at + 2)
+    }
+    if e == 47 {
+        return ("/", at + 2)
+    }
+    if e == 98 {
+        return ("\x08", at + 2)
+    }
+    if e == 102 {
+        return ("\x0c", at + 2)
+    }
+    if e == 110 {
+        return ("\n", at + 2)
+    }
+    if e == 114 {
+        return ("\r", at + 2)
+    }
+    if e == 116 {
+        return ("\t", at + 2)
+    }
+    if e != 117 {
+        return syntax
+    }
+    let first = hex4(text, at + 2)?
+    if first < 55296 || first > 57343 {
+        let one = utf8_of(first)?
+        return (one, at + 6)
+    }
+    if first > 56319 {
+        return syntax
+    }
+    if at + 7 >= n {
+        return syntax
+    }
+    if byte_at(text, at + 6) != 92 {
+        return syntax
+    }
+    if byte_at(text, at + 7) != 117 {
+        return syntax
+    }
+    let second = hex4(text, at + 8)?
+    if second < 56320 || second > 57343 {
+        return syntax
+    }
+    let joined = 65536 + (first - 55296) * 1024 + (second - 56320)
+    let pair = utf8_of(joined)?
+    (pair, at + 12)
+}
+
+/// The four hex digits at `at` as a number. Private; upper and lower case
+/// both, as RFC 8259 requires, and fewer than four digits is a miss.
+fn hex4(text: str, at: int) -> int ! {syntax} {
+    if at + 4 > text.len {
+        return syntax
+    }
+    var v: int = 0
+    var k: int = 0
+    while k < 4 {
+        let d = hex_value(byte_at(text, at + k))
+        if d < 0 {
+            return syntax
+        }
+        v = v * 16 + d
+        k = k + 1
+    }
+    v
+}
+
+/// The value of one hex digit byte, or -1. Private.
+fn hex_value(b: int) -> int {
+    if b >= 48 && b <= 57 {
+        return b - 48
+    }
+    if b >= 97 && b <= 102 {
+        return b - 87
+    }
+    if b >= 65 && b <= 70 {
+        return b - 55
+    }
+    0 - 1
+}
+
+/// The code point `cp` as text. Private, and the function F-0057 blocked:
+/// the UTF-8 arithmetic was always writable here and its OUTPUT had
+/// nowhere to go until `str_from_utf8` landed.
+///
+/// The `syntax` fallback is the primitive's own validation, and it is
+/// unreachable through this door: `escape_at` filters the surrogate range
+/// before calling, and every other scalar `\uXXXX` can name encodes to
+/// well-formed UTF-8. It is kept rather than swallowed because a wrapper
+/// that discards a validating primitive's row is asserting where it could
+/// be checking — the same rule `std.bytes.to_str`'s test is built on.
+fn utf8_of(cp: int) -> str ! {syntax} {
+    var b = List[int]()
+    if cp < 128 {
+        (mut b).push(cp)
+    } else if cp < 2048 {
+        (mut b).push(192 + cp / 64)
+        (mut b).push(128 + cp % 64)
+    } else if cp < 65536 {
+        (mut b).push(224 + cp / 4096)
+        (mut b).push(128 + cp / 64 % 64)
+        (mut b).push(128 + cp % 64)
+    } else {
+        (mut b).push(240 + cp / 262144)
+        (mut b).push(128 + cp / 4096 % 64)
+        (mut b).push(128 + cp / 64 % 64)
+        (mut b).push(128 + cp % 64)
+    }
+    bytes.to_str(b) else |_| {
+        return syntax
+    }
 }
 
 /// The escape for the control character with code `i`: the five
@@ -710,8 +1225,10 @@ fn control_escape(i: int) -> str {
 }
 
 /// `v` rendered as compact JSON text — no spaces, no newlines, keys in
-/// the map's unspecified order. `boundary` when a string payload is the
-/// shape `escape` refuses; `deep` when nesting passes `depth_limit()`.
+/// the map's unspecified order. One tag: `deep`, when nesting passes
+/// `depth_limit()`. It used to be two — `boundary` left with sc14's total
+/// `escape`, and a caller that named that tag is the one call site this
+/// module's history breaks.
 ///
 /// Numbers: an `Int` renders as a decimal integer, exactly; a `Num`
 /// renders through `std.fmt.decimal.to_str`, the shortest text that reads
@@ -732,7 +1249,7 @@ fn control_escape(i: int) -> str {
 /// (mut xs).push(json.null())
 /// (json.stringify(json.from_list(xs)) else "?") == "[1,null]"
 /// ```
-pub fn stringify(v: Value) -> str ! {boundary, deep} {
+pub fn stringify(v: Value) -> str ! {deep} {
     render(v, 0)?
 }
 
@@ -751,7 +1268,7 @@ pub fn stringify(v: Value) -> str ! {boundary, deep} {
 /// var empty = List[json.Value]()
 /// (json.stringify_pretty(json.from_list(empty), 2) else "?") == "[]"
 /// ```
-pub fn stringify_pretty(v: Value, indent: int) -> str ! {boundary, deep} {
+pub fn stringify_pretty(v: Value, indent: int) -> str ! {deep} {
     if indent < 0 {
         assert(false)
     }
@@ -761,7 +1278,7 @@ pub fn stringify_pretty(v: Value, indent: int) -> str ! {boundary, deep} {
 /// The compact renderer. Private; `depth` is checked against
 /// `depth_limit()` on entry so that a cycle-free but very deep value
 /// raises instead of exhausting the stack.
-fn render(v: Value, depth: int) -> str ! {boundary, deep} {
+fn render(v: Value, depth: int) -> str ! {deep} {
     if depth > depth_limit() {
         return deep
     }
@@ -770,7 +1287,7 @@ fn render(v: Value, depth: int) -> str ! {boundary, deep} {
         Bool(b) => "{b}",
         Int(n) => fmt.to_str(n),
         Num(x) => render_num(x),
-        Str(s) => quote(s)?,
+        Str(s) => quote(s),
         Arr(xs) => render_arr(xs, depth)?,
         Obj(m) => render_obj(m, depth)?,
     }
@@ -793,13 +1310,13 @@ fn render_num(x: f64) -> str {
 }
 
 /// A string payload, escaped and quoted. Private.
-fn quote(s: str) -> str ! {boundary} {
-    let body = escape(s)?
+fn quote(s: str) -> str {
+    let body = escape(s)
     "\"{body}\""
 }
 
 /// The compact array body. Private.
-fn render_arr(xs: List[Value], depth: int) -> str ! {boundary, deep} {
+fn render_arr(xs: List[Value], depth: int) -> str ! {deep} {
     var out = "["
     let n = xs.len
     var i: int = 0
@@ -816,11 +1333,11 @@ fn render_arr(xs: List[Value], depth: int) -> str ! {boundary, deep} {
 }
 
 /// The compact object body. Private.
-fn render_obj(m: Map[str, Value], depth: int) -> str ! {boundary, deep} {
+fn render_obj(m: Map[str, Value], depth: int) -> str ! {deep} {
     var out = "{{"
     var first = true
     for pair in m.pairs() {
-        let key = quote(pair.0)?
+        let key = quote(pair.0)
         let piece = render(pair.1, depth + 1)?
         if first {
             out = "{out}{key}:{piece}"
@@ -833,7 +1350,7 @@ fn render_obj(m: Map[str, Value], depth: int) -> str ! {boundary, deep} {
 }
 
 /// The indented renderer. Private.
-fn render_pretty(v: Value, indent: int, depth: int) -> str ! {boundary, deep} {
+fn render_pretty(v: Value, indent: int, depth: int) -> str ! {deep} {
     if depth > depth_limit() {
         return deep
     }
@@ -854,7 +1371,7 @@ fn pad(indent: int, level: int) -> str {
 }
 
 /// The indented array body. Private.
-fn pretty_arr(xs: List[Value], indent: int, depth: int) -> str ! {boundary, deep} {
+fn pretty_arr(xs: List[Value], indent: int, depth: int) -> str ! {deep} {
     let n = xs.len
     if n == 0 {
         return "[]"
@@ -876,7 +1393,7 @@ fn pretty_arr(xs: List[Value], indent: int, depth: int) -> str ! {boundary, deep
 }
 
 /// The indented object body. Private.
-fn pretty_obj(m: Map[str, Value], indent: int, depth: int) -> str ! {boundary, deep} {
+fn pretty_obj(m: Map[str, Value], indent: int, depth: int) -> str ! {deep} {
     if m.len == 0 {
         return "{{}}"
     }
@@ -885,7 +1402,7 @@ fn pretty_obj(m: Map[str, Value], indent: int, depth: int) -> str ! {boundary, d
     var out = "{{"
     var first = true
     for pair in m.pairs() {
-        let key = quote(pair.0)?
+        let key = quote(pair.0)
         let piece = render_pretty(pair.1, indent, depth + 1)?
         if first {
             out = "{out}\n{inner}{key}: {piece}"

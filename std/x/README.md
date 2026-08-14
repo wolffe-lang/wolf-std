@@ -67,3 +67,17 @@ is house doctrine (sc01), and this directory is where the bill goes instead.
   judged: its trigger is an upstream mirror nobody has scheduled, and one
   campaign is the review interval rather than the deadline. Whatever happens,
   it is written in that closeout with a reason — which is the whole mechanism.
+- **HALF of `json`'s trigger fired at sc14**, and the closeout should read it
+  as evidence rather than as a verdict. The trigger has two clauses: an
+  upstream mirror of `wolf_mem::json` (unmoved — the kernels are still the
+  checked tier's alone), and *a ruling on whether a query face belongs beside
+  `std.json`'s DOM or is deleted in favour of it*. `std.json` is now a
+  complete DOM in both directions — `parse` and `stringify`, `get`/`at`,
+  `escape`/`unescape` — so the second clause is answerable for the first
+  time, and the question it turns into is sharp: this resident's 11 functions
+  re-parse the document on every read (its own header calls that the
+  second-loudest argument for the DOM), which is exactly what the DOM now
+  makes unnecessary. What it still has that the DOM has not is a dotted path
+  and a one-call read. That is a convenience question, not a capability one,
+  and a convenience that costs a quadratic read is the kind D31's nursery
+  exists to delete rather than to graduate.

@@ -12,16 +12,16 @@
 //! `is_utf8` keeps its job, because the question "are these bytes text?"
 //! has a boolean answer a caller may want without the text.
 //!
-//! **`to_str` is the one function here with unequal lanes, and it is a
-//! tier gap rather than a capability.** `str_from_utf8` is PURE (no I13
-//! capability, no sandbox category — the second such family after `json_*`)
-//! and it executes on both compiler rungs; lupin 0.1.11 answers
-//! `unsupported: `str_from_utf8` does not resolve`, the generic
-//! unknown-name refusal rather than a reasoned decline, so the interpreter
-//! column of `tests/bytes/to_str_border.lu` is dark and its eight siblings
-//! still run on three lanes (F-0075). Nothing else in the module changes
-//! lane: lupin resolves module bodies lazily, so a program that never calls
-//! `to_str` never learns it is missing.
+//! **`to_str` had unequal lanes for exactly one sprint, and it has three
+//! now.** `str_from_utf8` is PURE (no I13 capability, no sandbox category —
+//! the second such family after `json_*`) and executed on the compiler rungs
+//! alone at sc13, where lupin 0.1.11 answered
+//! `unsupported: `str_from_utf8` does not resolve` — the generic unknown-name
+//! refusal rather than a reasoned decline, which is why it was filed as drift
+//! (F-0075). **lupin 0.1.12 resolves it and the finding is CLOSED**,
+//! re-measured with its own reproducer at the sc14 pin, so all nine functions
+//! here are three-lane and the module has neither a contract nor an unequal
+//! row left.
 //!
 //! **s77 made the byte view free, and NONE of that reaches this module —
 //! which is a fact about its signatures, not a gap to fix.** `s.bytes()` is
@@ -317,10 +317,11 @@ pub fn from_str(s: str) -> List[int] {
 /// `List` is the only way to spell the argument. Measured, both compiler
 /// rungs, rather than inferred from the absence of a capability.
 ///
-/// Delegates to the prelude's `str_from_utf8` (s81, wolf-lang#58). **Two
-/// lanes**: both compiler rungs; lupin 0.1.11 does not resolve the name
-/// (F-0075), so the interpreter column of this function's test is dark
-/// while the module's other eight keep three lanes.
+/// Delegates to the prelude's `str_from_utf8` (s81, wolf-lang#58). **Three
+/// lanes** as of the sc14 pins: both compiler rungs had it at s81 and lupin
+/// 0.1.12 resolves it too (F-0075, filed at sc13 and closed one release
+/// later), so this function's test columns are all lit and no caller pays a
+/// lane for reading text out of bytes.
 ///
 /// ```wolf-doc-example
 /// (bytes.to_str(bytes.from_str("wolf é")) else "?") == "wolf é"
@@ -337,13 +338,14 @@ pub fn to_str(b: List[int]) -> str ! {utf8} {
 /// the one function here that reads the bytes as text rather than as
 /// numbers. The empty sequence is valid.
 ///
-/// It stays hand-written now that `to_str` exists, for two measured
-/// reasons. It runs on ALL THREE lanes where `to_str` runs on two
-/// (F-0075), and a predicate written over the border post would have
-/// inherited the narrower lane set for a question that needs no text. And
-/// two independent decoders that must agree are worth more than one: the
-/// agreement is a test (`tests/bytes/to_str_border.lu`) rather than a
-/// tautology, and it is the test that would catch either side drifting.
+/// It stays hand-written now that `to_str` exists, and the reason has
+/// OUTLIVED the reason it was written for. It was kept at sc13 because it
+/// had three lanes where `to_str` had two (F-0075, since closed), and that
+/// argument is spent; what is not spent is the other one: two independent
+/// decoders that must agree are worth more than one. The agreement is a
+/// test (`tests/bytes/to_str_border.lu`) rather than a tautology, and it is
+/// the test that would catch either side drifting — this module's RFC 3629
+/// reading or the toolchain's.
 ///
 /// It rejects everything the standard rejects, not merely truncation: a
 /// stray continuation byte, a truncated multi-byte sequence, an OVERLONG

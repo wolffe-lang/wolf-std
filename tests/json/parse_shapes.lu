@@ -1,0 +1,129 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.json
+//!
+//! `parse`'s hit paths: every value kind, whitespace, nesting, the number
+//! posture, duplicate keys, and the round trip back through `stringify`.
+//!
+//! The round trip is the assertion that catches a scanner that reads the
+//! right SHAPE out of the wrong TEXT: `parse` then `stringify` of a
+//! single-key document is byte-comparable, where a multi-key one is not
+//! (the map's order is unspecified, §8) — so the multi-key cases are
+//! checked through the accessors instead.
+
+use std.json
+
+fn main() -> !int {
+    // The three literals and the two number constructors.
+    let t = json.parse("true") else json.null()
+    if (json.as_bool(t) else false) == true {} else { return 1 }
+    let f = json.parse("false") else json.null()
+    if json.type_name(f) == "bool" {} else { return 2 }
+    if (json.as_bool(f) else true) == false {} else { return 3 }
+    let z = json.parse("null") else json.from_int(0)
+    if json.is_null(z) {} else { return 4 }
+
+    // Whitespace is legal around a value and nowhere inside one.
+    let padded = json.parse("  \t\r\n 42 \n") else json.null()
+    if (json.as_int(padded) else 0) == 42 {} else { return 5 }
+
+    // Numbers: the text decides the constructor.
+    let neg = json.parse("-7") else json.null()
+    if (json.as_int(neg) else 0) == 0 - 7 {} else { return 6 }
+    let zero = json.parse("0") else json.null()
+    if (json.as_int(zero) else 0 - 1) == 0 {} else { return 7 }
+    let frac = json.parse("1.5") else json.null()
+    if json.type_name(frac) == "num" {} else { return 8 }
+    if (json.as_float(frac) else 0.0) == 1.5 {} else { return 9 }
+    // An exponent says "not an integer" even when the value is integral.
+    let exp = json.parse("1e2") else json.null()
+    if json.type_name(exp) == "num" {} else { return 10 }
+    if (json.as_float(exp) else 0.0) == 100.0 {} else { return 11 }
+    let sci = json.parse("-2.5E-2") else json.null()
+    if (json.as_float(sci) else 0.0) == -0.025 {} else { return 12 }
+    // Exactness at the i53 boundary and at int's own edges.
+    let big = json.parse("9007199254740993") else json.null()
+    if (json.as_int(big) else 0) == 9007199254740993 {} else { return 13 }
+    let imax = json.parse("9223372036854775807") else json.null()
+    if (json.as_int(imax) else 0) == 9223372036854775807 {} else { return 14 }
+    let imin = json.parse("-9223372036854775808") else json.null()
+    if (json.as_int(imin) else 0) == -9223372036854775808 {} else { return 15 }
+    // One past int, on both sides, becomes a `Num` rather than a miss.
+    let past = json.parse("9223372036854775808") else json.null()
+    if json.type_name(past) == "num" {} else { return 16 }
+    let past_low = json.parse("-9223372036854775809") else json.null()
+    if json.type_name(past_low) == "num" {} else { return 17 }
+
+    // Strings, with the escapes `unescape` resolves.
+    let s = json.parse("\"a\\nb\"") else json.null()
+    if (json.as_str(s) else "?") == "a\nb" {} else { return 18 }
+    let uni = json.parse("\"caf\\u00e9\"") else json.null()
+    if (json.as_str(uni) else "?") == "café" {} else { return 19 }
+    // Raw UTF-8 in the document travels through untouched.
+    let raw = json.parse("\"🐺\"") else json.null()
+    if (json.as_str(raw) else "?") == "🐺" {} else { return 20 }
+    let empty_str = json.parse("\"\"") else json.null()
+    if (json.as_str(empty_str) else "?") == "" {} else { return 21 }
+
+    // Arrays: empty, flat, nested, and whitespace between every token.
+    let none_yet = json.parse("[]") else json.null()
+    if (json.len(none_yet) else 0 - 1) == 0 {} else { return 22 }
+    let flat = json.parse("[1, true, null, \"x\"]") else json.null()
+    if (json.len(flat) else 0) == 4 {} else { return 23 }
+    let first = json.at(flat, 0) else json.null()
+    if (json.as_int(first) else 0) == 1 {} else { return 24 }
+    let last = json.at(flat, 3) else json.null()
+    if (json.as_str(last) else "?") == "x" {} else { return 25 }
+    let nested = json.parse("[ [ 1 ] , [ ] ]") else json.null()
+    if (json.len(nested) else 0) == 2 {} else { return 26 }
+    let inner = json.at(nested, 0) else json.null()
+    if (json.len(inner) else 0) == 1 {} else { return 27 }
+
+    // Objects: empty, one key, nested, and a key needing an escape.
+    let no_keys = json.parse("{{}}") else json.null()
+    if (json.len(no_keys) else 0 - 1) == 0 {} else { return 28 }
+    let obj = json.parse("{{\"a\": 1, \"b\": [2, 3]}}") else json.null()
+    if json.type_name(obj) == "obj" {} else { return 29 }
+    if (json.len(obj) else 0) == 2 {} else { return 30 }
+    let a = json.get(obj, "a") else json.null()
+    if (json.as_int(a) else 0) == 1 {} else { return 31 }
+    let b = json.get(obj, "b") else json.null()
+    if (json.len(b) else 0) == 2 {} else { return 32 }
+    if json.has(obj, "c") == false {} else { return 33 }
+    let escaped_key = json.parse("{{\"a\\tb\": 1}}") else json.null()
+    if json.has(escaped_key, "a\tb") {} else { return 34 }
+
+    // A duplicate key keeps the LAST occurrence.
+    let dup = json.parse("{{\"k\": 1, \"k\": 2}}") else json.null()
+    if (json.len(dup) else 0) == 1 {} else { return 35 }
+    let kept = json.get(dup, "k") else json.null()
+    if (json.as_int(kept) else 0) == 2 {} else { return 36 }
+
+    // The round trip, on documents whose rendering is order-free.
+    if (json.stringify(json.parse("[1,null,true]") else json.null()) else "?") == "[1,null,true]" {} else {
+        return 37
+    }
+    if (json.stringify(json.parse("{{\"k\":\"a\\nb\"}}") else json.null()) else "?") ==
+        "{{\"k\":\"a\\nb\"}}" {} else {
+        return 38
+    }
+    // And the other direction: text this module rendered reads back.
+    var xs = List[json.Value]()
+    (mut xs).push(json.from_str("café \"x\""))
+    (mut xs).push(json.from_int(0 - 1))
+    let rendered = json.stringify(json.from_list(xs)) else "?"
+    let reread = json.parse(rendered) else json.null()
+    let text = json.at(reread, 0) else json.null()
+    if (json.as_str(text) else "?") == "café \"x\"" {} else { return 39 }
+
+    // Nesting to the limit is legal; one past it is `parse_deep_row`'s job.
+    var deep_text = ""
+    var i: int = 0
+    while i < 60 {
+        deep_text = "[{deep_text}]"
+        i = i + 1
+    }
+    let deep_value = json.parse(deep_text) else json.from_str("REFUSED")
+    if json.type_name(deep_value) == "arr" {} else { return 40 }
+    0
+}

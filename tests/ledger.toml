@@ -1396,12 +1396,74 @@ native = "unsupported"
 # `json_*` and the process trio. The module's eight other rows keep three
 # lanes: lupin resolves module bodies lazily, so a program that never calls
 # `to_str` never learns it is missing.
+# (the two `to_str` rows move at the sc14 bump and are re-stated at the end
+# of this file with the finding that moved them)
+
+# ---- sc14: the debt clause paid in full — the json reader, and hex's
+# ---- text decoder ----
+# THE sc14 PIN BUMP is wolf trunk `4e316ad` -> `27cdb14` (s82 lane coverage,
+# s83 the ABI inventory, s84 allocation-free iteration) with lupin 0.1.11 ->
+# 0.1.12. Both ritual gates green at the sha, exit codes printed; second
+# attempt, and the first attempt's reason is recorded in `vendor/tools.toml`.
+#
+# **Two rows MOVE, and it is the first ledger movement from a pin bump since
+# sc11.** lupin 0.1.12 resolves `str_from_utf8` (F-0075, filed at sc13 and
+# closed one release later), so `std.bytes.to_str` has three lanes where it
+# had two, and its module's nine functions are now uniformly three-lane. That
+# closure is also what made this sprint possible at all: `std.json`'s only
+# executing lane is the interpreter, so `unescape` — which builds a `str` out
+# of a number — would have had ZERO lanes at the sc13 pin (sc10's `float_at`
+# rule, and the reason that function was withdrawn).
 [tests."bytes/to_str_border.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc14 pin bump: lupin 0.1.12 has str_from_utf8 (F-0075 closed)
 wolfc = "run"
 native = "run"
 
 [tests."bytes/to_str_row.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc14 pin bump: lupin 0.1.12 has str_from_utf8 (F-0075 closed)
 wolfc = "run"
 native = "run"
+
+# `std.hex` gains `decode_str`, which closes §11's encoder/decoder pairing
+# for the module and leaves it with no reviewed contract. Three lanes: the
+# body is `decode` plus `std.bytes.to_str`, and every lane has both now.
+[tests."hex/decode_text.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."hex/decode_str_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# `std.json` gains `parse`, `unescape` and a TOTAL `escape`. The module's
+# lanes are unchanged and dark on both compiler rungs for the reason its
+# header has stated since sc05: an imported module that produces an enum is
+# `unsupported` in the checked tier and has no recorded type natively
+# (F-0029), and `Map` is not typed by the compiler at all. Five rows, one
+# lane each.
+[tests."json/parse_shapes.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."json/parse_misses.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."json/parse_deep_row.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."json/parse_overflow_row.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."json/unescape_shapes.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "unsupported"

@@ -1,0 +1,101 @@
+//! check: run(exit=1, stdout="syntax taken\nerror: syntax")
+//! phase: run
+//! conforms: std.json, err.row, err.else, err.propagate
+//!
+//! `unescape`: every escape JSON has, every way one can be malformed, and
+//! the round trip against `escape`.
+//!
+//! The `\uXXXX` cases are the ones F-0057 blocked for four sprints, so they
+//! are walked at every UTF-8 width rather than sampled: an ASCII scalar
+//! (one byte out), a Latin-1 one (two), a CJK one (three), and a surrogate
+//! PAIR joined into one astral code point (four). The lone-surrogate
+//! refusals are here for the same reason — they are the case a decoder gets
+//! wrong quietly, by emitting the three bytes UTF-8 forbids.
+
+use std.json
+
+fn missed(text: str) -> bool {
+    (json.unescape(text) else "REFUSED") == "REFUSED"
+}
+
+fn main() -> !int {
+    // No backslash: the string comes back as itself, whatever it holds.
+    if (json.unescape("") else "?") == "" {} else { return 1 }
+    if (json.unescape("wolf") else "?") == "wolf" {} else { return 2 }
+    if (json.unescape("café 🐺") else "?") == "café 🐺" {} else { return 3 }
+
+    // The eight two-character escapes.
+    if (json.unescape("a\\\"b") else "?") == "a\"b" {} else { return 4 }
+    if (json.unescape("a\\\\b") else "?") == "a\\b" {} else { return 5 }
+    if (json.unescape("a\\/b") else "?") == "a/b" {} else { return 6 }
+    if (json.unescape("a\\bb") else "?") == "a\x08b" {} else { return 7 }
+    if (json.unescape("a\\fb") else "?") == "a\x0cb" {} else { return 8 }
+    if (json.unescape("a\\nb") else "?") == "a\nb" {} else { return 9 }
+    if (json.unescape("a\\rb") else "?") == "a\rb" {} else { return 10 }
+    if (json.unescape("a\\tb") else "?") == "a\tb" {} else { return 11 }
+
+    // Position: first, last, adjacent, and nothing but escapes.
+    if (json.unescape("\\na") else "?") == "\na" {} else { return 12 }
+    if (json.unescape("a\\n") else "?") == "a\n" {} else { return 13 }
+    if (json.unescape("\\n\\t") else "?") == "\n\t" {} else { return 14 }
+    if (json.unescape("\\\\\\\\") else "?") == "\\\\" {} else { return 15 }
+
+    // `\uXXXX`, at every width the encoder has to produce.
+    if (json.unescape("\\u0041") else "?") == "A" {} else { return 16 }
+    if (json.unescape("\\u00e9") else "?") == "é" {} else { return 17 }
+    if (json.unescape("\\u00E9") else "?") == "é" {} else { return 18 }
+    if (json.unescape("\\u65e5") else "?") == "日" {} else { return 19 }
+    if (json.unescape("\\ud83d\\udc3a") else "?") == "🐺" {} else { return 20 }
+    // The boundary scalars of the 2-, 3- and 4-byte forms.
+    if (json.unescape("\\u007f") else "?") == "\x7f" {} else { return 21 }
+    if (json.unescape("\\u0080") else "?").len == 2 {} else { return 22 }
+    if (json.unescape("\\u07ff") else "?").len == 2 {} else { return 23 }
+    if (json.unescape("\\u0800") else "?").len == 3 {} else { return 24 }
+    if (json.unescape("\\uffff") else "?").len == 3 {} else { return 25 }
+    if (json.unescape("\\udbff\\udfff") else "?").len == 4 {} else { return 26 }
+    // An escaped NUL is a character, not a terminator: a `str` carries its
+    // length, so this is one byte of text.
+    if (json.unescape("\\u0000") else "?").len == 1 {} else { return 27 }
+    if (json.unescape("a\\u0000b") else "?").len == 3 {} else { return 28 }
+    // An escape beside raw non-ASCII text, both orders — the case `escape`
+    // refused until this sprint, from the other direction.
+    if (json.unescape("é\\ná") else "?") == "é\ná" {} else { return 29 }
+
+    // Malformed: an escape JSON does not have, a trailing backslash, a
+    // truncated or misspelt `\u`.
+    if missed("a\\qb") {} else { return 30 }
+    if missed("a\\") {} else { return 31 }
+    if missed("\\") {} else { return 32 }
+    if missed("\\u") {} else { return 33 }
+    if missed("\\u12") {} else { return 34 }
+    if missed("\\u123") {} else { return 35 }
+    if missed("\\u12g4") {} else { return 36 }
+    if missed("\\U0041") {} else { return 37 }
+    if missed("\\x41") {} else { return 38 }
+    // Surrogates: a lone high one, a lone low one, a high one followed by
+    // something that is not a low one, and a high one at the very end.
+    if missed("\\ud83d") {} else { return 39 }
+    if missed("\\udc3a") {} else { return 40 }
+    if missed("\\ud83d\\u0041") {} else { return 41 }
+    if missed("\\ud83dx") {} else { return 42 }
+    if missed("\\ud83d\\ud83d") {} else { return 43 }
+
+    // The pair property: `escape` then `unescape` is the identity, on the
+    // strings that exercise both directions.
+    if (json.unescape(json.escape("a\"b\\c\nd")) else "?") == "a\"b\\c\nd" {} else { return 44 }
+    if (json.unescape(json.escape("café \"x\" 🐺\t")) else "?") == "café \"x\" 🐺\t" {} else {
+        return 45
+    }
+    if (json.unescape(json.escape("\x00\x1f")) else "?") == "\x00\x1f" {} else { return 46 }
+
+    // The miss path produces a value, and the tag rides out of `main`.
+    let handled = json.unescape("\\ud800") else |_| {
+        print("syntax taken")
+        ""
+    }
+    if handled == "" {} else { return 47 }
+
+    let forced = json.unescape("a\\qb")?
+    if forced.len >= 0 {} else { return 48 }
+    0
+}

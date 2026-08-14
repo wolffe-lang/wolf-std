@@ -20,12 +20,15 @@
 //! of this module in any language and it was missing for four sprints
 //! because nothing could read a `str`'s bytes (F-0035); `s.bytes()` can,
 //! on every lane (s37, and `std.bytes.from_str` wraps it), so the
-//! function is one delegation. Its inverse is NOT here yet, and the
-//! reason CHANGED at sc13: F-0057 closed (s81's `str_from_utf8`, wrapped
-//! as `std.bytes.to_str`), so `decode_str` is `decode` plus one call and
-//! §11's encoder/decoder pairing is a debt with a date rather than a
-//! refusal — §14's clause gives it the sprint after the closure.
-//! `encode_str`'s own doc argues the asymmetry.
+//! function is one delegation.
+//!
+//! **And `decode_str` is here now too, which closes §11's encoder/decoder
+//! pairing for this module.** It was a refusal for four sprints because
+//! nothing in the language turned bytes back into a `str`; s81's
+//! validating `str_from_utf8` closed F-0057 at the sc13 pin and
+//! `std.bytes.to_str` wraps it, so §14's debt clause — a contract ships in
+//! the sprint AFTER its blocker closes — comes due here and is paid. The
+//! module has no reviewed contract left.
 //!
 //! One name note: `encode_str` and not `encode`, because wolf has no
 //! overloading and `encode(b: List[int])` owns the short name. It goes to
@@ -48,6 +51,8 @@
 //! totality argument is now "a byte is a byte" and the answers are
 //! unchanged member for member. `tests/hex/decode_misses.lu` is what holds
 //! them to that.
+
+use std.bytes
 
 /// The value of the hex digit `s` starts with, or -1. Case-insensitive.
 /// Private.
@@ -216,16 +221,10 @@ pub fn decode(s: str) -> List[int] ! {parse} {
 /// The `assert` `encode` documents is unreachable through this door: every
 /// element of a `str`'s byte view is a byte by construction.
 ///
-/// **There is no `decode_str` YET, and at these pins that is a debt
-/// rather than a filing** (§11's encoder/decoder pairing rule). It was a
-/// refusal for four sprints because nothing in the language turned bytes
-/// back into a `str`; s81's `str_from_utf8` closed F-0057 and
-/// `std.bytes.to_str` wraps it, so the round trip is `decode` plus one
-/// call and the only thing missing is the sprint that writes it (§14: a
-/// contract ships the sprint after its blocker closes). Until then this
-/// module promises the FORWARD direction only for text, and says so here
-/// rather than shipping an ASCII-only inverse that would refuse the text
-/// people actually hex-encode.
+/// **Its inverse is `decode_str`, below**, which arrived at sc14 when
+/// §14's debt clause came due on s81's `str_from_utf8`. §11's
+/// encoder/decoder pairing rule is satisfied for this module: every
+/// encoder here ships beside its decoder.
 ///
 /// Uppercase is `encode_str(s).upper()`; there is no `encode_upper_str`,
 /// because a second name for a call anyone can write is a second thing to
@@ -244,4 +243,44 @@ pub fn encode_str(s: str) -> str {
         out = "{out}{pair}"
     }
     out
+}
+
+/// `s` decoded from hexadecimal and read back as text — `encode_str`'s
+/// inverse, and the round trip §11 requires of every encoder here.
+///
+/// **Two tags, and they are two different failures.** `parse` is
+/// `decode`'s: the text is not hexadecimal (an odd length, or a character
+/// that is not a hex digit). `utf8` is `std.bytes.to_str`'s: the text WAS
+/// hexadecimal and the bytes it denotes are not well-formed UTF-8, which
+/// is what `"ff"` decodes to. Coarsening them into one tag would tell a
+/// caller "that was not hex" about a document that was, so the row is the
+/// union and neither tag is renamed (§14's verbatim-row rule, and §12's).
+/// Case is not significant and may be mixed, exactly as in `decode`.
+///
+/// Total: every input either decodes or misses — no traps, on any input,
+/// including non-ASCII (a miss like any other non-digit).
+///
+/// **The census row this closes, and the clause that made it due.** A hex
+/// decoder that cannot answer in text was half a module for four sprints,
+/// and the reason was never this module's: nothing in the language turned
+/// a `List[int]` back into a `str` (F-0057). s81's validating
+/// `str_from_utf8` closed it at the sc13 pin, so §14's debt clause — a
+/// contract ships in the sprint AFTER its blocker closes — fell due here.
+/// The body is `decode` plus one call, which is what the contract always
+/// said it would be.
+///
+/// Three lanes: `str_from_utf8` is the compiler's prelude AND, as of
+/// lupin 0.1.12, the interpreter's (F-0075 closed).
+///
+/// ```wolf-doc-example
+/// (hex.decode_str("776f6c66") else "?") == "wolf"
+/// (hex.decode_str("") else "?") == ""
+/// (hex.decode_str("c3a9") else "?") == "é"
+/// (hex.decode_str("C3A9") else "?") == "é"
+/// (hex.decode_str("zz") else "not hex") == "not hex"
+/// (hex.decode_str("ff") else "not text") == "not text"
+/// ```
+pub fn decode_str(s: str) -> str ! {parse, utf8} {
+    let raw = decode(s)?
+    bytes.to_str(raw)?
 }

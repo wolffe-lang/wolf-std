@@ -1,0 +1,47 @@
+//! check: run(exit=1, stdout="deep taken\nerror: deep")
+//! phase: run
+//! conforms: std.json, err.row, err.else, err.propagate
+//!
+//! `parse`'s `deep` tag: nesting one level past `depth_limit()` is a RAISE
+//! and never a stack trap.
+//!
+//! That is the whole security argument for the limit — a parser handed an
+//! untrusted document must not be able to have the process ended by it, and
+//! D30's no-unwinding means a stack exhaustion could not be caught by
+//! anyone. `stringify` makes the same promise from the writing side and
+//! `number_posture_and_depth.lu` holds that half.
+//!
+//! Its own file rather than an arm in `parse_misses.lu`, because the tag's
+//! identity is only witnessed by riding it out of `main`: a multi-arm
+//! handler over a row raised across a MODULE BOUNDARY takes its first arm
+//! under lupin (F-0079), so the handler that would name it here is exactly
+//! the shape that cannot.
+
+use std.json
+
+fn nested(levels: int) -> str {
+    var text = ""
+    var i: int = 0
+    while i < levels {
+        text = "[{text}]"
+        i = i + 1
+    }
+    text
+}
+
+fn main() -> !int {
+    // The limit itself parses: 64 levels is legal, and the innermost value
+    // is an empty array.
+    let ok = json.parse(nested(64)) else json.from_str("REFUSED")
+    if json.type_name(ok) == "arr" {} else { return 2 }
+
+    let handled = json.parse(nested(80)) else |_| {
+        print("deep taken")
+        json.null()
+    }
+    if json.is_null(handled) {} else { return 3 }
+
+    let forced = json.parse(nested(80))?
+    if json.is_null(forced) {} else { return 4 }
+    0
+}

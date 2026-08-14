@@ -1,0 +1,38 @@
+//! check: run(exit=1, stdout="parse taken\nutf8 taken\nerror: utf8")
+//! phase: run
+//! conforms: std.hex, err.row, err.else, err.propagate
+//!
+//! `decode_str`'s two tags, told apart by what each `else` catches and then
+//! one of them named by the toolchain.
+//!
+//! `utf8` is the one ridden out, and the reason is §14's verbatim-row rule:
+//! that tag is not this module's, it is `str_from_utf8`'s, arriving through
+//! `std.bytes.to_str` unrenamed and uncoarsened. A wrapper that renamed or
+//! widened it would look identical from inside a handler, so the RECORD
+//! naming it is the evidence and a handler asserting it would not be.
+//!
+//! The two `else` blocks are wildcards rather than a discriminating
+//! multi-arm handler on purpose: that shape takes its first arm under lupin
+//! when the row is raised across a module boundary (F-0079), which is
+//! exactly this call. Two `else`s over two different inputs prove the same
+//! thing without the shape that cannot.
+
+use std.hex
+
+fn main() -> !int {
+    let not_hex = hex.decode_str("zz") else |_| {
+        print("parse taken")
+        ""
+    }
+    if not_hex == "" {} else { return 2 }
+
+    let not_text = hex.decode_str("ff") else |_| {
+        print("utf8 taken")
+        ""
+    }
+    if not_text == "" {} else { return 3 }
+
+    let forced = hex.decode_str("ff")?
+    if forced.len >= 0 {} else { return 4 }
+    0
+}

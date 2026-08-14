@@ -3,9 +3,10 @@
 //! conforms: std.json
 //!
 //! `stringify_pretty`'s layout (one entry per line, `indent` spaces per
-//! level, empty containers on one line) and `escape`'s five rules —
-//! including the one refusal this pin forces, which the test pins as
-//! carefully as the successes.
+//! level, empty containers on one line) and `escape`'s rules — including
+//! the shape that REFUSED until sc14 (a non-ASCII code point followed by a
+//! character needing an escape), which is the case this file exists to
+//! keep honest now that the function is total.
 
 use std.json
 
@@ -40,30 +41,34 @@ fn main() -> !int {
         return 8
     }
     // escape: nothing to do, and the fast path returns the string itself.
-    if (json.escape("wolf") else "?") == "wolf" {} else { return 9 }
-    if (json.escape("") else "?") == "" {} else { return 10 }
+    if json.escape("wolf") == "wolf" {} else { return 9 }
+    if json.escape("") == "" {} else { return 10 }
     // Non-ASCII passes through verbatim: RFC 8259 permits raw UTF-8.
-    if (json.escape("café 🐺") else "?") == "café 🐺" {} else { return 11 }
+    if json.escape("café 🐺") == "café 🐺" {} else { return 11 }
     // The two backslash forms and the named control escapes.
-    if (json.escape("a\"b") else "?") == "a\\\"b" {} else { return 12 }
-    if (json.escape("a\\b") else "?") == "a\\\\b" {} else { return 13 }
-    if (json.escape("a\nb") else "?") == "a\\nb" {} else { return 14 }
-    if (json.escape("a\tb") else "?") == "a\\tb" {} else { return 15 }
-    if (json.escape("a\rb") else "?") == "a\\rb" {} else { return 16 }
-    if (json.escape("a\x08b") else "?") == "a\\bb" {} else { return 17 }
-    if (json.escape("a\x0cb") else "?") == "a\\fb" {} else { return 18 }
+    if json.escape("a\"b") == "a\\\"b" {} else { return 12 }
+    if json.escape("a\\b") == "a\\\\b" {} else { return 13 }
+    if json.escape("a\nb") == "a\\nb" {} else { return 14 }
+    if json.escape("a\tb") == "a\\tb" {} else { return 15 }
+    if json.escape("a\rb") == "a\\rb" {} else { return 16 }
+    if json.escape("a\x08b") == "a\\bb" {} else { return 17 }
+    if json.escape("a\x0cb") == "a\\fb" {} else { return 18 }
     // Every other control character takes the \u00XX form.
-    if (json.escape("\x00") else "?") == "\\u0000" {} else { return 19 }
-    if (json.escape("\x01") else "?") == "\\u0001" {} else { return 20 }
-    if (json.escape("\x1f") else "?") == "\\u001f" {} else { return 21 }
+    if json.escape("\x00") == "\\u0000" {} else { return 19 }
+    if json.escape("\x01") == "\\u0001" {} else { return 20 }
+    if json.escape("\x1f") == "\\u001f" {} else { return 21 }
     // DEL is not a JSON escape and passes through.
-    if (json.escape("\x7f") else "?") == "\x7f" {} else { return 22 }
-    // THE ONE REFUSAL (F-0018): a non-ASCII code point followed by
-    // something that needs escaping cannot be walked past, so `escape`
-    // raises `boundary` instead of trapping or corrupting. Everything
-    // BEFORE the non-ASCII character escapes fine, and a string whose
-    // specials all precede the non-ASCII text works.
-    if (json.escape("café \"x\"") else "REFUSED") == "REFUSED" {} else { return 23 }
-    if (json.escape("\"x\" café") else "?") == "\\\"x\\\" café" {} else { return 24 }
+    if json.escape("\x7f") == "\x7f" {} else { return 22 }
+    // THE SHAPE THAT USED TO REFUSE (sc05..sc13): a non-ASCII code point
+    // followed by a character needing an escape. The byte walk steps over
+    // it without measuring it, because no byte of a multi-byte code point
+    // is one of the four ASCII characters JSON escapes.
+    if json.escape("café \"x\"") == "café \\\"x\\\"" {} else { return 23 }
+    if json.escape("\"x\" café") == "\\\"x\\\" café" {} else { return 24 }
+    // Both directions past a 4-byte code point, and an escape on each side.
+    if json.escape("\n🐺\n") == "\\n🐺\\n" {} else { return 25 }
+    // The run between two escapes is a slice at offsets `escape` computed,
+    // and it carries whatever was in it.
+    if json.escape("a\tébc\td") == "a\\tébc\\td" {} else { return 26 }
     0
 }

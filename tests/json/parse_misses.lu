@@ -1,0 +1,91 @@
+//! check: run(exit=1, stdout="syntax taken\nerror: syntax")
+//! phase: run
+//! conforms: std.json, err.row, err.else, err.propagate
+//!
+//! Every class of document `parse` refuses, and then the `syntax` tag
+//! named by the toolchain.
+//!
+//! The strict-profile rejections are the point of the file: a parser is
+//! judged by what it refuses, and every extension it might have guessed at
+//! (a comment, a trailing comma, a bare key, `NaN`, a leading `+`) is here
+//! as a miss rather than as a silence.
+//!
+//! The last two assertions are sc07's two-part row shape: an `else` proves
+//! the miss path was taken and produced a value, and a final `?` lets the
+//! tag ride out of `main`, where `error: syntax` and exit 1 are the
+//! toolchain's own words rather than this repository's reading.
+//!
+//! The other two tags get their own files (`parse_deep_row.lu`,
+//! `parse_overflow_row.lu`) rather than a multi-arm handler here, and the
+//! reason is a measurement taken while writing this file: a
+//! `else |e| match e` over a row raised ACROSS A MODULE BOUNDARY takes its
+//! FIRST ARM under lupin, in both arm orders, silently (F-0079). The same
+//! shape over a row raised in the entry file discriminates correctly, which
+//! is what `tests/errors/handler_discriminates.lu` holds — so the two files
+//! together say exactly where the line is.
+
+use std.json
+
+fn refused(text: str) -> bool {
+    let v = json.parse(text) else json.from_str("REFUSED")
+    (json.as_str(v) else "?") == "REFUSED"
+}
+
+fn main() -> !int {
+    // Nothing, and nothing but whitespace.
+    if refused("") {} else { return 1 }
+    if refused("   \n\t ") {} else { return 2 }
+    // Trailing content after a complete value.
+    if refused("1 2") {} else { return 3 }
+    if refused("[1] x") {} else { return 4 }
+    if refused("truex") {} else { return 5 }
+    // Half a word.
+    if refused("tru") {} else { return 6 }
+    if refused("nul") {} else { return 7 }
+    // Unterminated containers and strings.
+    if refused("[1, 2") {} else { return 8 }
+    if refused("{{\"a\": 1") {} else { return 9 }
+    if refused("\"abc") {} else { return 10 }
+    if refused("\"abc\\\"") {} else { return 11 }
+    // The number grammar: no leading zero, no bare fraction, no bare
+    // point, no leading plus, no empty exponent, no lone sign.
+    if refused("01") {} else { return 12 }
+    if refused("-01") {} else { return 13 }
+    if refused(".5") {} else { return 14 }
+    if refused("1.") {} else { return 15 }
+    if refused("+1") {} else { return 16 }
+    if refused("1e") {} else { return 17 }
+    if refused("1e+") {} else { return 18 }
+    if refused("-") {} else { return 19 }
+    // The spellings JSON does not have.
+    if refused("NaN") {} else { return 20 }
+    if refused("Infinity") {} else { return 21 }
+    if refused("0x10") {} else { return 22 }
+    // The extensions this profile deliberately refuses.
+    if refused("[1,]") {} else { return 23 }
+    if refused("{{\"a\": 1,}}") {} else { return 24 }
+    if refused("{{a: 1}}") {} else { return 25 }
+    if refused("{{'a': 1}}") {} else { return 26 }
+    if refused("[1] // trailing") {} else { return 27 }
+    if refused("[1 2]") {} else { return 28 }
+    if refused("{{\"a\" 1}}") {} else { return 29 }
+    if refused("{{\"a\": }}") {} else { return 30 }
+    // Escapes inside a string, and the one raw character a string may not
+    // hold (RFC 8259 forbids an unescaped control character).
+    if refused("\"a\\qb\"") {} else { return 31 }
+    if refused("\"\\ud800\"") {} else { return 32 }
+    if refused("\"\\u00g0\"") {} else { return 33 }
+    if refused("\"a\nb\"") {} else { return 34 }
+
+    // The miss path produces a value, and then the tag rides out of `main`
+    // so the record names it.
+    let handled = json.parse("[1,]") else |_| {
+        print("syntax taken")
+        json.null()
+    }
+    if json.is_null(handled) {} else { return 35 }
+
+    let forced = json.parse("{{\"a\" 1}}")?
+    if json.is_null(forced) {} else { return 36 }
+    0
+}
