@@ -178,3 +178,44 @@ Three observations the later modules added, each earned by writing one:
   (F-0066). §10's "accuracy is a measured contract" has its error-tier
   counterpart here — a tag std cannot witness says so on the function, in the
   test header and in the census, and no test claims otherwise.
+
+## sc14: the first tag std has RETIRED, and the reader's two new ones
+
+Re-measured over `std/` at the sc14 pins (20 distinct tags, 15 two-tag
+signatures, 21 with three or more — the os and query tiers are where the
+wide rows live, and `std.json.parse` is the first three-tag row in the pure
+core).
+
+- **`boundary` is retired: 3 sites → 0.** It was `json.escape`,
+  `json.stringify` and `json.stringify_pretty`, and it meant "this pin
+  cannot find the code-point boundary I need". §11 declared it temporary
+  when it was added at sc05 and named F-0018 as its exit. It leaves for a
+  different reason than the one predicted: `escape` did not need the
+  code-point primitive at all, it needed a byte walk, and the four
+  characters JSON escapes are ASCII. **This is the first tag this library
+  has ever removed**, and the cost was eight row annotations plus one test
+  file. An interim tag that outlives its condition is worse than no tag,
+  because by then callers have written handlers for it.
+- **`syntax` arrives: 2 sites** (`json.parse`, `json.unescape`). "This text
+  is not a JSON document" — one actionable failure mode, payload-free by
+  §12's casing rule, and it will GAIN a byte offset as a payload rather
+  than a sibling tag when §12's payload conventions reach this module.
+  Spelled `syntax` and not the `parse` the sc05 contract named, because
+  `std.json` now declares `pub fn parse` and a tag that shares a name with
+  anything in scope resolves to that thing, silently (F-0036, re-measured
+  live under lupin at this pin). **The rule that generalizes: check a new
+  `pub fn` name against your module's TAGS, not only a new tag against the
+  module's functions.**
+- **`overflow` gains a site** (`json.parse`, 5 → 6 including the nursery's
+  `x.json.int_at`): a JSON number whose magnitude has no `f64`. It is
+  deliberately not `syntax` — the document is well-formed and saying
+  otherwise would be a lie about the caller's data — and deliberately not
+  silent infinity, which `stringify` would render back as `null`.
+- **`parse` and `utf8` each gain a site** (`hex.decode_str`, whose row is
+  `{parse, utf8}`): "that was not hexadecimal" and "those bytes are not
+  text" are different answers about the same input, and coarsening them
+  would tell a caller its hex was bad when it was not. The `utf8` half is
+  `str_from_utf8`'s row arriving verbatim through `std.bytes.to_str`
+  (§14's rule for a pure tier), which is why the test that matters rides
+  it out of `main` rather than asserting it in a handler.
+

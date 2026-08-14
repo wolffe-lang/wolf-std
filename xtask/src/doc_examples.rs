@@ -100,13 +100,17 @@ const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "process
 /// A waived block still has to RUN SOMEWHERE: the `exit(0)` requirement
 /// below applies to it, so what a waiver buys is one dark lane and never
 /// a documented example nothing executed. Like `WOLFC_WAIVERS`, an entry
-/// here is a debt with a name — this one dies at the lupin release that
-/// resolves the primitive.
-const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[(
-    "bytes",
-    "bytes.to_str",
-    "F-0075 — lupin 0.1.11 has no `str_from_utf8`",
-)];
+/// here is a debt with a name — this one died at the lupin release that
+/// resolved the primitive.
+///
+/// **EMPTY at the sc14 pin, one sprint after it was added, and that is the
+/// mechanism working rather than the mechanism being unnecessary.** The one
+/// entry was `("bytes", "bytes.to_str", "F-0075 — lupin 0.1.11 has no
+/// `str_from_utf8`")`; lupin 0.1.12 resolves the name, the example runs on
+/// three lanes, and the waiver went out in the same commit as the
+/// measurement. A waiver list that never empties is a list of excuses;
+/// this one emptied on schedule, exactly as `WOLFC_WAIVERS` did at sc03.
+const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[];
 
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
@@ -554,29 +558,34 @@ mod tests {
 
     #[test]
     fn a_tier_waiver_names_one_call_and_not_a_module() {
-        // sc13: the second waiver mechanism, and the test that keeps it
-        // from becoming the first one. An entry excuses the LUPIN lane
-        // for the examples that make ONE named call, so a `std.bytes`
-        // example that does not mention `bytes.to_str` is still held to
-        // three lanes.
-        assert_eq!(
-            LUPIN_TIER_WAIVERS
-                .iter()
-                .map(|(m, needle, _)| (*m, *needle))
-                .collect::<Vec<_>>(),
-            vec![("bytes", "bytes.to_str")]
+        // sc13 added the mechanism with one entry; sc14 emptied it, because
+        // lupin 0.1.12 resolves `str_from_utf8` (F-0075 closed). The test
+        // keeps BOTH halves: the list is empty now, and the matcher it is
+        // read through still keys on the CALL rather than on the module, so
+        // the next entry cannot quietly excuse a whole module.
+        assert!(
+            LUPIN_TIER_WAIVERS.is_empty(),
+            "a tier waiver is a debt with a name; add one only with its \
+             finding, and delete it at the release that closes it"
         );
         let waived = |module: &str, line: &str| {
             LUPIN_TIER_WAIVERS
                 .iter()
                 .any(|(m, needle, _)| *m == module && line.contains(needle))
         };
-        assert!(waived("bytes", "(bytes.to_str(b) else \"?\") == \"wolf\""));
-        assert!(!waived(
+        assert!(!waived("bytes", "(bytes.to_str(b) else \"?\") == \"wolf\""));
+        assert!(!waived("str", "str.len(\"wolf\") == 4"));
+        let sample: &[(&str, &str, &str)] = &[("bytes", "bytes.to_str", "F-0000")];
+        let matches = |module: &str, line: &str| {
+            sample
+                .iter()
+                .any(|(m, needle, _)| *m == module && line.contains(needle))
+        };
+        assert!(matches("bytes", "(bytes.to_str(b) else \"?\") == \"wolf\""));
+        assert!(!matches(
             "bytes",
             "bytes.is_utf8(bytes.from_str(\"x\")) == true"
         ));
-        assert!(!waived("str", "str.len(\"wolf\") == 4"));
     }
 
     #[test]

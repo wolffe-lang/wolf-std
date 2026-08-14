@@ -81,11 +81,13 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0072 | 2026-08-19 | **A byte view cannot cross a function boundary, so `std.bytes`' nine functions are copy-only**: s77 materializes in every non-consuming position — a `let`, an argument, a return — which is the right conservative default and means `bytes.is_utf8(bytes.from_str(s))` copies `s` where `str.char_count(s)` walks it. The difference is the PARAMETER, not the implementation, and the library cannot fix it from its side. The ask is the `Bytes` type this repo has documented as an interim since sc05, or a mode that lets a callee borrow `{ptr, len}` (which a `str` parameter already is), plus a spec rule about which positions materialize — today that is discoverable only from a comment in `wolf_wir::lower` | wolf-lang s37/s77 core types | [filed: wolf-lang#86](https://github.com/wolffe-lang/wolf-lang/issues/86) |
 | F-0073 | 2026-08-19 | **The `--version` pairing line is a hardcoded constant and it rots**: trunk `f8dca42` says "paired with lupin 0.1.8" one day after lupin 0.1.10 shipped, and 0.1.10's own conformance pin is ten commits BEHIND that sha — so the two binaries really are meant to be used together and the line says otherwise. The line is genuinely useful (F-0064 taught this rig to read it), which is exactly why a claim inside a shipped binary needs a mechanism keeping it true: a reader trusts it more than a note | wolf-lang release owners | [filed: wolf-lang#87](https://github.com/wolffe-lang/wolf-lang/issues/87) |
 
-| F-0074 | 2026-08-19 | **`List.push` is O(n) per push under lupin, so every `List`-returning std function is quadratic on the reference lane**: 4k/8k/16k/32k pushes take 0.46/1.91/7.83/37.53s (doubling N quadruples the time) where both compiler rungs finish 32k in 0.14s of whole-process time. Suffix slicing and `starts_with` are both linear, measured, so it is the list representation and not the scanner shape. It is the ceiling behind this rig's slowest test (`fmt/decimal/shortest_round_trip.lu`, 28-35s against a 60s per-test limit, timed out once under load this sprint) and std cannot write around it: pushing into a fresh list IS the portable spelling (sc04's rule, because index assignment runs on one lane). Also measured: 0.1.10 is ~15% slower than 0.1.8 on that test | wolf-interp | [filed: wolf-interp#24](https://github.com/wolffe-lang/wolf-interp/issues/24) |
+| F-0074 | 2026-08-19 | **CLOSED at lupin 0.1.12** (wolf-interp#24: the cost was the METHOD CALL copying the receiver four times, not `push`; the fix lends it — 32k pushes 30.33s → 0.191s upstream's numbers, and this repo's slowest test 41.5s → 33.5s on one loaded host). **The index read is NOT fixed and is F-0078.** The filing as it stood: **`List.push` is O(n) per push under lupin, so every `List`-returning std function is quadratic on the reference lane**: 4k/8k/16k/32k pushes take 0.46/1.91/7.83/37.53s (doubling N quadruples the time) where both compiler rungs finish 32k in 0.14s of whole-process time. Suffix slicing and `starts_with` are both linear, measured, so it is the list representation and not the scanner shape. It is the ceiling behind this rig's slowest test (`fmt/decimal/shortest_round_trip.lu`, 28-35s against a 60s per-test limit, timed out once under load this sprint) and std cannot write around it: pushing into a fresh list IS the portable spelling (sc04's rule, because index assignment runs on one lane). Also measured: 0.1.10 is ~15% slower than 0.1.8 on that test | wolf-interp | [filed: wolf-interp#24](https://github.com/wolffe-lang/wolf-interp/issues/24) |
 
-| F-0075 | 2026-08-20 | **lupin 0.1.11 does not have s81's `str_from_utf8`**: the language's first bytes-to-str primitive is in the compiler's prelude (both rungs execute it) and the interpreter answers ``unsupported: `str_from_utf8` does not resolve`` — the generic unknown-name refusal, not the reasoned decline that machine gives `fs_*`, `net_*`, `json_*` and the process trio, so it reads as drift rather than posture (F-0070's shape, second occurrence). It costs `std.bytes.to_str` its interpreter lane the day the function lands: two ledger rows are `unsupported / run / run` where the module's other eight are three-lane, and `bytes.is_utf8` stays hand-written rather than delegating precisely so the predicate keeps the third lane | wolf-interp | [filed: wolf-interp#26](https://github.com/wolffe-lang/wolf-interp/issues/26) |
+| F-0075 | 2026-08-20 | **CLOSED at lupin 0.1.12** (one release after filing, re-measured with the finding's own reproducer at sc14: `str_from_utf8([195, 169])` is `é`, `[255]` is the `utf8` row). Two ledger rows advance and the doc rig's tier-waiver list is empty again. The filing as it stood: **lupin 0.1.11 does not have s81's `str_from_utf8`**: the language's first bytes-to-str primitive is in the compiler's prelude (both rungs execute it) and the interpreter answers ``unsupported: `str_from_utf8` does not resolve`` — the generic unknown-name refusal, not the reasoned decline that machine gives `fs_*`, `net_*`, `json_*` and the process trio, so it reads as drift rather than posture (F-0070's shape, second occurrence). It costs `std.bytes.to_str` its interpreter lane the day the function lands: two ledger rows are `unsupported / run / run` where the module's other eight are three-lane, and `bytes.is_utf8` stays hand-written rather than delegating precisely so the predicate keeps the third lane | wolf-interp | [filed: wolf-interp#26](https://github.com/wolffe-lang/wolf-interp/issues/26) |
 | F-0076 | 2026-08-20 | **`bool` comparisons are `unsupported` on the native rung**: `a == b`, `a != b`, `a == true` and even `true == false` are all `unsupported — comparison outside integers/floats (str/enum compares, c06/std)` at `mem`, where `int` and `f64` have always lowered and `str` does since s81. The refusal names str and enums and does not name `bool`, which is why it has gone six sprints undiagnosed: `tests/fmt/parse_bool.lu` has carried a dark native column since sc05 for exactly this and the ledger attributed it to nothing in particular. It is cheap to write around (`!p` and a branch instead of `p == q`), and that is the argument for fixing it rather than against: nothing about a `bool` compare is hard, so a library pays a lane for a spelling | wolf-lang s28/native lowering | [filed: wolf-lang#100](https://github.com/wolffe-lang/wolf-lang/issues/100) |
 | F-0077 | 2026-08-20 | **`List[int]()` inside a `comptime fn` is `unsupported` at resolve**, with no code and no reason string (F-0051's silence again), on both compiler rungs — `var k = 0`, a `str` literal, an `else` and a row return all evaluate there. The consequence is a rule rather than an inconvenience: **a pure builtin whose argument is a `List` cannot be reached at comptime at all**, because a `List` is the only way to spell the argument. `str_from_utf8` is the first such builtin and `std.bytes.to_str` is the first std function whose comptime story is "the sandbox has no objection and the engine cannot get there" | wolf-lang s16 (CTFE engine) | [filed: wolf-lang#101](https://github.com/wolffe-lang/wolf-lang/issues/101) |
+| F-0078 | 2026-08-21 | **The `List` INDEX READ is O(n) under lupin, and a read-mode `List` ARGUMENT copies the whole list per call** — the half of F-0074 that 0.1.12's lend did not reach. Measured at 2k/4k/8k/16k: `xs[i]` in a loop is 0.072/0.234/0.895/3.442s (four times per doubling) where `for v in xs` is 0.016/0.027/0.053/0.107s, and 20k calls of `fn value_at(bs: List[int], at: int)` over a 20k list is 58.1s against 5.3s for the same index read inline. It is why this repo's slowest test got 20% faster rather than 100× at the bump (base-10^9 limbs, indexed), and it changed a design decision inside the sprint: `std.json.parse`'s scanner walks `text.get(i..i + 1)` instead of materializing `s.bytes()` and indexing it | wolf-interp | [filed: wolf-interp#28](https://github.com/wolffe-lang/wolf-interp/issues/28) |
+| F-0079 | 2026-08-21 | **Silent wrong answer**: a multi-arm handler (`expr else \|e\| match e { … }`) takes its FIRST ARM for every tag when the row is raised by a function in an IMPORTED MODULE — measured in both arm orders (`fwd: 10 10 10`, `rev: 30 30 30` where both should be `10 20 30`), exit 0, no diagnostic. The same shape over an entry-file raise discriminates correctly on all three lanes, which is what `tests/errors/handler_discriminates.lu` holds. It is the mirror of F-0052 (the compiler's checked lane, closed at s70) and it costs the same thing: a loop that stops on one tag and re-raises the others is unwritable across a module boundary on the reference lane | wolf-interp | [filed: wolf-interp#29](https://github.com/wolffe-lang/wolf-interp/issues/29) |
 
 
 ## F-0001 — the std search path
@@ -2927,3 +2929,98 @@ measurement with its date on it).
 The ask: `List` construction and indexing inside the comptime engine (s16's
 own scope), or a named refusal so a package author learns why — F-0060 and
 F-0069 have asked for the second half twice, and this is the third caller.
+
+## F-0078 — the reference lane reads a list as slowly as it used to build one
+
+wolf-interp#24 (F-0074) is FIXED at 0.1.12, and the fix is worth stating
+because it explains what is left: the cost was never in `push`, it was in
+`eval_method` copying the receiver out of its slot, copying it again to
+compare against, comparing two whole values to decide whether the method
+had written, and copying the result back. Four traversals per append. The
+fix lends the receiver instead. Upstream measures 32k pushes at 30.33s
+before and 0.191s after.
+
+**The index read gets none of that**, measured here at the new pin, release
+build, same program at four sizes:
+
+| N | `xs[i]` in a loop | `for v in xs` |
+|---|---|---|
+| 2 000 | 0.072 s | 0.016 s |
+| 4 000 | 0.234 s | 0.027 s |
+| 8 000 | 0.895 s | 0.053 s |
+| 16 000 | 3.442 s | 0.107 s |
+
+Four times the work per doubling against twice. And a read-mode `List`
+ARGUMENT copies as well, so the two costs compound: 20 000 calls of
+`fn value_at(bs: List[int], at: int) -> int { bs[at] }` over a
+20 000-element list is **58.1 s**, where the same index read written inline
+in the loop is 5.3 s and a `str` read-mode argument at the same size is
+0.33 s. It is the container, not argument passing in general.
+
+**What it cost this sprint, in the design rather than in the clock.**
+`std.json.parse` was going to materialize `s.bytes()` once (the shape
+F-0071 says runs everywhere) and index it. That is quadratic in the
+document on the module's ONLY executing lane, so the scanner reads through
+`text.get(i..i + 1)` and takes the first byte with a one-element `for`
+instead — measured at 0.876s for 40 000 steps against the index walk's
+curve above. The shape is fine and the body is no worse for it, but it was
+chosen for one implementation's cost, which is the thing this repository's
+house rule tries not to do. Saying so here is the alternative to pretending
+it was a language-level preference.
+
+**What it explains.** `fmt/decimal/shortest_round_trip.lu` is this repo's
+slowest test (26–43s against a 60s ceiling on a host running three other
+sprints' cargo jobs) and it is base-10⁹ limbs in a `List[int]` indexed in
+the inner loop. The push fix made it about 20% faster — 41.5s → 33.5s and
+33.1s → 25.9s, two pairs of runs, same host, same load — and not 100×,
+which is exactly what this finding predicts and is the reason to state the
+mechanism rather than to celebrate the release and move on.
+
+## F-0079 — a handler cannot tell an imported module's tags apart
+
+**Silent wrong answer**, and the mirror of F-0052 (which was the compiler's
+checked lane doing the same thing until s70).
+
+```wolf
+// std/tagmod/tagmod.lu
+pub fn miss(k: int) -> int ! {alpha, beta, gamma} { … }
+
+// entry
+tagmod.miss(k) else |e| match e { alpha => 10, beta => 20, gamma => 30 }
+```
+
+| lane | arms forward | arms reversed | expected |
+|---|---|---|---|
+| **lupin 0.1.12** | `10 10 10` | `30 30 30` | `10 20 30` |
+| wolf `--checked` | `10 20 30` | `10 20 30` | ✓ |
+| wolf `--native` | `10 20 30` | `10 20 30` | ✓ |
+
+Exit 0, no diagnostic, both arm orders measured — which is the experiment
+that tells "first arm always" from "one tag happened to be right", and it
+is sc08's experiment run again on the other machine. The tag is NOT lost on
+the way out: the same call propagated out of `main` prints `error: beta`
+correctly, and a wildcard `else |_| { … }` behaves. It is the arm
+resolution against an IMPORTED callee's row.
+
+The same shape over a row raised in the ENTRY FILE discriminates correctly
+here — `tests/errors/handler_discriminates.lu` is three-lane green at this
+pin, re-run — so the two files together say exactly where the line is.
+
+**How it was found**, which is the part worth keeping: a 66-level document
+made `std.json.parse` raise `deep`, and the test's handler printed
+`syntax`. The reproducer that mattered was not the handler but the
+alternative witness — the same document with the tag ridden out of `main`
+printed `error: deep`, and the disagreement between those two readings is
+what turned "my parser has a bug" into "the handler is lying". When two
+ways of observing the same value disagree, bisect the OBSERVERS before the
+code (sc12's rule, arriving from a new direction).
+
+**The cost here**: `std.json.parse`'s number branch uses a wildcard
+`else |_| { return overflow }` rather than the two-arm handler it wants
+(honest, because the grammar has already been checked and only one tag is
+reachable — but chosen for this and not only for that), and `deep` and
+`overflow` each get their own test file so the record names the tag instead
+of a handler asserting it. §14's "a wildcard that claims nothing is the
+right handler when the module cannot act on the difference" now has a
+second clause: it is also the right handler when the module cannot SEE the
+difference.

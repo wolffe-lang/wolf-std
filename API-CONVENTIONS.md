@@ -507,7 +507,12 @@ worked example until the tables land.
   nesting limit reached, which a serializer raises instead of exhausting
   the stack), and **`boundary`** (this pin cannot find the code-point
   boundary an operation needs; an interim tag that disappears with
-  F-0018). `overflow` is reused from §10 unchanged, for a decimal that
+  F-0018). **`boundary` is GONE as of sc14** — the first tag std has ever
+  removed — and it went the way an interim should: `json.escape` became
+  total, its three sites went to zero in one commit, and `stringify`'s row
+  narrowed with it. An interim tag that is documented as temporary and then
+  outlives its condition is worse than no tag at all, because callers write
+  handlers for it. `overflow` is reused from §10 unchanged, for a decimal that
   rounds outside the finite range.
 - **A row tag may not share a name with anything else in scope**, and this
   is a house rule only because the implementation makes it one: a
@@ -551,9 +556,10 @@ section's worked home, as `std.option` is §2's.
 
 - **Marks are lowercase, payload-carrying tags are CapCase.** A mark is a
   payload-free tag naming a failure mode: `none`, `gone`, `eof`, `done`,
-  `parse`, `base`, `utf8`, `overflow`, `div_zero`, `deep`, `boundary`, and,
-  from the os tier, `not_found`, `denied`, `io`, `missing`, `invalid`,
-  `refused`, `timeout`, `closed`, `signal`. A
+  `parse`, `base`, `utf8`, `overflow`, `div_zero`, `deep`, ~~`boundary`~~
+  (RETIRED at sc14 — see below), `syntax` (sc14, `std.json`'s malformed
+  document), and, from the os tier, `not_found`, `denied`, `io`, `missing`,
+  `invalid`, `refused`, `timeout`, `closed`, `signal`. A
   payload-carrying tag is CapCase and names its payload TYPE:
   `Parse(ParseErr)`. The case is the reader's signal about whether there
   is anything to destructure.
@@ -935,7 +941,80 @@ Two additions the pair earned, both about EVIDENCE rather than about surface.
   tautology and cost the predicate a lane; two implementations that must agree
   is a stronger arrangement than one, and this is the case that showed it.
 
+**§14 amendment (sc14): the debt clause, PAID IN FULL — and what a contract
+is worth when it comes due.** sc13 re-armed the clause on four functions and
+named them in four headers. sc14 ships all four (`json.parse`,
+`json.unescape`, `json.escape`'s totality, `hex.decode_str`) with no
+extension and no renegotiation, which makes this the clause's first complete
+cycle: armed, named where the function was missing, and paid on the date.
+Four rules the payment settled.
+
+- **A contract written as a specification survives its wait; a contract
+  written as an apology does not.** Every signature sc05 and sc10 wrote for
+  these four was still right, except where a MEASUREMENT had moved under it,
+  and both movements are worth the ink. `unescape`'s tag changed from `parse`
+  to `syntax` because the module gained a `pub fn parse` and F-0036 makes a
+  tag that shares a name with anything in scope resolve to that thing — so
+  **a new `pub fn` must be checked against its module's TAGS, not only a new
+  tag against the module's functions**; the collision is symmetric and only
+  one direction has ever been written down. And `parse`'s row gained
+  `overflow`, because the number tier refuses a magnitude with no `f64` and
+  §12 gives a distinct actionable failure its own tag: "this document is
+  malformed" and "this number has no `f64`" are different sentences and a
+  parser that conflates them lies about the caller's data.
+- **Re-ask what the function NEEDS, not whether its named blocker closed.**
+  `json.escape`'s refusal was documented for five sprints as waiting on
+  `str.code_points` — a code-point walk, to step over a character it must not
+  escape. It needed no primitive: the characters JSON escapes are all ASCII,
+  no byte of a multi-byte code point is ASCII, so a BYTE walk never has to
+  know it is inside one. It had been writable since s37. sc10's rule ("the
+  blocker retired" is not "writable") has a blind side, and this is it — a
+  contract can name the wrong blocker and then be believed for years.
+- **A signature change is a paragraph, not a policy.** Making `escape` total
+  removed `boundary` from `stringify`'s and `stringify_pretty`'s rows. The
+  cost was eight annotations, one test file and one doc example; callers that
+  wrote `else "?"` still compile, and a caller that named the tag in a handler
+  does not. std states such a change in the module header, in the census and
+  in the sprint report, and makes it in the sprint that makes it possible. A
+  library at this stage does not carry a tag to avoid a change.
+- **A blocked lane is not a blocked function until you check WHOSE lane it
+  is.** §14's sc10 rule (check a resident's dependencies against its own
+  lanes) generalizes: `std.json` executes on the interpreter alone, so
+  `unescape` — which builds a `str` from a `\uXXXX` scalar — needed
+  `str_from_utf8` ON THAT LANE, not merely in the language. At sc13's pin it
+  would have had zero lanes and would have been withdrawn like
+  `x.json.float_at`. It ships because lupin 0.1.12 closed F-0075 one release
+  after it was filed. The rule for the register: **file the mechanism, not
+  the symptom** — "this machine cannot build a `str` from bytes" is what the
+  next sprint reads, where "one ledger column is dark" is not.
+
+**§14 amendment (sc14): a wildcard handler is also right when the module
+cannot SEE the difference.** sc08's rule was that a wildcard claiming nothing
+is the right handler when a module cannot ACT on the difference between tags.
+F-0079 adds the harder half: under lupin a multi-arm `else |e| match e` over
+a row raised ACROSS A MODULE BOUNDARY takes its first arm, silently, in both
+arm orders — the compiler rungs are correct, the interpreter is not, and it
+is F-0052 exactly, on the other machine, two sprints after that one closed.
+So a std body that must discriminate an imported module's tags cannot, on
+that lane, and the shapes that stay honest are: a wildcard where only one tag
+is reachable (with the reachability argued in the doc), and one TEST FILE PER
+TAG riding it out of `main`, where `error: <tag>` is the toolchain's word and
+not this repository's. That second habit is what caught the finding — a
+handler said `syntax` and the record said `deep` about the same document — so
+the rule it earns is general: **when two ways of observing one value
+disagree, bisect the observers before the code.**
+
 ## Review record
+
+- 2026-08-21, sc14 amendments: §14 gains the debt clause's first COMPLETE
+  cycle (the four contracts paid on the date, the symmetric tag/function
+  naming rule, `parse`'s extra `overflow` tag, the re-ask-what-it-needs rule
+  that cost `json.escape` five sprints, the signature-change posture, and the
+  whose-lane-is-it rule with F-0075's closure as its worked case), plus the
+  wildcard-handler rule's second half (F-0079: a multi-arm handler cannot
+  discriminate an imported module's tags under lupin) and the
+  bisect-the-observers rule it earned. Review rides the same pending sc00
+  gate.
 
 - 2026-08-20, sc13 amendments: §14 gains the debt clause's first payment and
   its re-arming (the four functions F-0057's closure now owes, each named in

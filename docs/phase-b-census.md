@@ -878,3 +878,168 @@ form that keeps every lane, file the one that does not. F-0077 costs a
 sentence in a doc: a pure builtin whose argument is a `List` cannot be
 reached at comptime, so `to_str`'s comptime story is "the sandbox has no
 objection and the engine cannot get there", measured rather than inferred.
+
+## 12. sc14 — the debt clause paid in full, and one lane arrives just in time
+
+Pins: wolf trunk **`27cdb14`** (merge s84 — three waves past sc13's `4e316ad`:
+s82 lane coverage, s83 the ABI inventory, s84 allocation-free iteration),
+lupin **0.1.12**, whose own conformance pin is `4e316ad`: the interpreter
+names the compiler sha this repository held one sprint ago, for the second
+bump running. Both ritual gates green in a clean scratch clone at the sha,
+exit codes written to a file as they happened — **second attempt**, and the
+first attempt is recorded rather than hidden (`vendor/tools.toml`: gate 2's
+net suite hung and failed under a sandboxed shell on a host running three
+other sprints' cargo jobs, where gate 1 had just passed the same two tests).
+
+| measure | sc13 | sc14 |
+|---|---|---|
+| modules under `std/` | 34 | **34** |
+| `pub fn` in `std/`, nursery excluded | 345 | **348** (+3) |
+| `pub fn` including `std/x/` | 376 | **379** (+3) |
+| entry tests | 189 | **196** (+7) |
+| doc-example blocks, extracted and RUN | 334 | **337** (+3) |
+| reviewed contracts RETIRED into code | 3 | **3** (`json.parse`, `json.unescape`, `hex.decode_str`) — plus one REFUSAL removed (`json.escape`) |
+| findings filed | F-0075…F-0077 (three) | **F-0078, F-0079** (two) |
+| findings CLOSED | 2 | **2** (F-0075 upstream, F-0074's push half upstream) |
+
+**Every reviewed contract §14's debt clause named at sc13 is now code, and
+there are none left in either module.** sc13 wrote the debt into four
+headers rather than into one closeout, and this is what that bought: nothing
+had to be rediscovered, every signature was already specified, and the only
+surprises were measurements.
+
+### The four, and what each actually cost
+
+| function | lupin | wolfc | native | what it took |
+|---|---|---|---|---|
+| `hex.decode_str` | **run** | **run** | **run** | two lines over `decode` + `bytes.to_str` |
+| `json.escape` (now TOTAL) | **run** | unsupported | unsupported | a byte walk — no primitive at all |
+| `json.unescape` | **run** | unsupported | unsupported | UTF-8 arithmetic + `bytes.to_str` |
+| `json.parse` | **run** | unsupported | unsupported | a `str`-cursor recursive-descent scanner |
+
+- **`escape` did not need the primitive its contract named.** The old body
+  walked one ASCII character at a time and refused when it met a wider code
+  point, and the contract said `str.code_points` would fix it. What fixed it
+  was a change of QUESTION: the four characters JSON must escape are ASCII,
+  no byte of a multi-byte code point is ASCII, so a byte walk with a counter
+  never has to know it is inside one. The refusal had been removable for a
+  full wave before anyone re-asked what the function needed. That is sc10's
+  rule ("the blocker retired is not writable") arriving from its blind side:
+  re-ask what a function NEEDS, not only whether its named blocker closed.
+- **The signature change**, said out loud because §14 asks for it: `escape`'s
+  `boundary` tag is gone, so `stringify` and `stringify_pretty` go from
+  `{boundary, deep}` to `{deep}` and `quote` becomes total. Cost: eight row
+  annotations, one test file's `else` wrappers, and one doc example. A caller
+  that named `boundary` in a handler breaks; a caller that wrote `else "?"`
+  does not. It is one tag, removed once, in the sprint that made it
+  removable.
+- **`parse` gains a tag the sc05 contract did not have**: `{syntax, deep,
+  overflow}`. `overflow` is a magnitude with no `f64` (`1e400`), which
+  `std.fmt.decimal.parse_float` refuses rather than answering infinity. §12
+  gives a distinct actionable failure its own tag, and a well-formed document
+  is not a malformed one.
+- **`unescape`'s tag is `syntax`, not the `parse` its contract named**, and
+  the reason is F-0036 re-measured at this pin: this module now declares
+  `pub fn parse`, and a tag sharing a name with anything in scope resolves to
+  that thing under lupin, silently. The rename is also the better name.
+
+### One lane arrived exactly in time, and it is worth naming
+
+`std.json`'s only executing lane is the interpreter. `unescape` builds a
+`str` out of a `\uXXXX` scalar, which needs `str_from_utf8` — a compiler
+prelude name at the sc13 pin (F-0075). **At that pin `unescape` would have
+had zero lanes**, which is precisely why `std.x.json.float_at` was withdrawn
+inside sc10, and this sprint would have shipped two functions instead of
+four. lupin 0.1.12 resolves the name, F-0075 closes one release after it was
+filed, and the sprint is whole. The lesson is the filing's: a finding that
+costs one function one lane today can cost a different module its ONLY lane
+tomorrow, so file it with the mechanism rather than with the symptom.
+
+### The parser, differentially tested before it was believed
+
+sc05's rule — differential-test a numeric library against a reference you
+already trust — applied to a parser. **86 documents through `std.json.parse`
+and through CPython's `json`, compared on acceptance and, where both accept,
+on the value read back**: 81 agree exactly, and all five disagreements are
+the reference being deliberately lenient where RFC 8259 is not.
+
+| document | wolf | CPython | who is right |
+|---|---|---|---|
+| `NaN`, `Infinity`, `-Infinity` | reject | accept | RFC 8259 has no such literal; CPython documents these as an extension (`parse_constant`) |
+| `"\ud800"`, `"\udc00"` | reject | accept | a lone surrogate is not a scalar value; a Python `str` can hold one and a wolf `str` cannot, so refusing is forced as well as correct |
+
+The agreeing 81 include the whole number grammar (leading zeros, bare
+fractions, empty exponents, `+`), both extension shapes a JSON library
+usually leaks (trailing commas, bare keys), the escapes, whitespace in every
+legal position, `12345678901234567890` and the two `int` edges, and the
+nesting cases. The harness is 40 lines of Python driving `lupin` and diffing
+— nothing about it is wolf-specific, and running it BEFORE writing the tests
+would have been better still.
+
+### The ledger at these pins
+
+196 tests × 3 lanes:
+
+| lane | run | unsupported | fail(E…) | (sc13) |
+|---|---|---|---|---|
+| lupin | **157** | 39 | 0 | 148 / 41 / 0 |
+| wolfc `--checked` | **154** | 38 | 4 | 152 / 33 / 4 |
+| native | **103** | 89 | 4 | 101 / 84 / 4 |
+
+**Two rows MOVE and seven are new** — the first ledger movement a pin bump
+has caused since sc11. `bytes/to_str_border.lu` and `bytes/to_str_row.lu`
+flip `unsupported` → `run` on the lupin column (F-0075 closed), so
+`std.bytes`' nine functions are uniformly three-lane again. The seven new
+rows are two `hex` files at three lanes each and five `json` files at one.
+
+The doc rig's `LUPIN_TIER_WAIVERS` list is **empty** again, one sprint after
+sc13 added it with `bytes.to_str` as its only entry and documented it as
+dying at the release that resolved the primitive. A waiver list that never
+empties is a list of excuses; this one emptied on schedule, as
+`WOLFC_WAIVERS` did at sc03.
+
+### The blocked inventory
+
+F-0049 (5), F-0050 (1), F-0044 (6), F-0046 (1), F-0004 (2), F-0058 (1),
+F-0061 (1), F-0065 (6) stand as sc13 recorded them.
+
+**`std.hex` and `std.json` LEAVE the inventory entirely**: neither module has
+a reviewed contract left. `std.bytes` left at sc13, so the byte/text block —
+`bytes`, `hex`, `base64`, `json` — is complete for the first time since
+sc05, with one exception that is somebody else's: `fs_read_bytes` (F-0044)
+still has no producer to hand `to_str`, so a program can hex-decode text it
+was given and cannot read a binary file to hex-encode it.
+
+**Two findings arrive and neither adds a contract.** F-0078 (the `List`
+index read is O(n) and a read-mode `List` argument copies) costs a SHAPE —
+`std.json`'s scanner walks `text.get(i..i + 1)` instead of a materialized
+byte view — and it is the mechanism behind this repo's slowest test staying
+slow after the push fix. F-0079 (a multi-arm handler takes its first arm
+when the row crosses a module boundary, under lupin) costs a HANDLER: one
+wildcard where a two-arm match was wanted, and two extra test files so the
+record names the tag instead of a handler asserting it.
+
+### Timings, now that `push` is linear
+
+lupin 0.1.12 fixes wolf-interp#24 (F-0074): 32k pushes go 30.33s → 0.191s on
+upstream's numbers. What that is worth HERE, measured on the same loaded host
+with both binaries back to back:
+
+| program | 0.1.11 | 0.1.12 |
+|---|---|---|
+| `fmt/decimal/shortest_round_trip.lu` (run 1 / run 2) | 41.5s / 33.1s | 33.5s / 25.9s |
+
+About 20% rather than 100×, and the reason is F-0078: that test is
+base-10⁹ limbs in a `List[int]` INDEXED in its inner loop, and the lend that
+fixed `push` does not reach an index read. The rig's own `ci` run went RED on
+it once at the 60s ceiling while this host carried three other sprints'
+cargo jobs (load average 20; the two runs that followed at load 12 and 9
+were GREEN, exit 0 both times), which is sc13's rule holding a second time — once the mechanism is named, a
+red run under load is a scheduling fact, so run the rig on a quiet machine,
+state the load, and do not shrink the test.
+
+Everything this sprint added is fast: the five `json` files and two `hex`
+files run in 0.00–0.21s each on the interpreter lane (measured, same host),
+because a scanner that WALKS is linear there (sc12's measurement, unchanged)
+and this sprint's scanner was written to walk.
+
