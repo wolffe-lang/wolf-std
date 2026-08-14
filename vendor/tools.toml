@@ -14,6 +14,40 @@
 # moving upstreams); the nightly lane watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.12 (sc14 bump, from 0.1.11). Its own conformance pin is `4e316ad`,
+# which is the sc13 `wolf` pin exactly — the interpreter names the compiler
+# sha this repository held one sprint ago, for the second bump running.
+#
+# What the bump changes for this repo, re-measured one call at a time:
+# - **`str_from_utf8` RESOLVES HERE NOW** (F-0075 CLOSED, one release after
+#   it was filed): `str_from_utf8([195, 169])` is `é` and `[255]` is the
+#   `utf8` row, measured with the finding's own reproducer. Two ledger rows
+#   flip (`bytes/to_str_border.lu`, `bytes/to_str_row.lu`: `unsupported` ->
+#   `run`), `std.bytes.to_str` has three lanes, and — the reason this
+#   sprint could be written at all — `std.json.unescape` has a lane, since
+#   the interpreter is that module's only executing one.
+# - **`List.push` is LINEAR here now** (wolf-interp#24 fixed, F-0074's
+#   first half): 32k pushes go 30.33s -> 0.191s upstream's measurement, and
+#   this repo's slowest test agrees (`fmt/decimal/shortest_round_trip.lu`,
+#   24.8s at 0.1.11, see the sc14 census row). The fix is a LEND of the
+#   receiver rather than four whole-value copies per method call.
+# - **The INDEX READ is not fixed and is the other half** (F-0078, filed
+#   here): `xs[i]` on a `List` binding is O(n), so a 16k-element walk by
+#   index is 3.4s where the same walk by `for` is 0.107s, and passing a
+#   `List` as a read ARGUMENT copies it per call (20k calls over a 20k list:
+#   58s). `std.json`'s scanner is written over `str.get` because of it.
+# - **F-0036 is UNMOVED here**: a row tag that shares a name with a function
+#   in scope resolves to the FUNCTION and rides out as a value with no
+#   `else` firing (measured with a `parse` tag beside a `parse` fn). That is
+#   why `std.json.unescape` raises `syntax`.
+# - **F-0029 is unmoved**: an importer still cannot `match` on an enum an
+#   imported module produced, so `std.json` keeps its one lane and every
+#   inspection stays inside the declaring module.
+# What it does NOT change: no `fs_*`, no `read_line`, no `net_*`, no
+# `json_*`, no process trio (all declined by design, each with a sentence),
+# and `var k = 0` is still `i32`.
+#
+# The sc13 note, kept for the history it records:
 # 0.1.11 (sc13 bump, from 0.1.10). Its own conformance pin is `f8dca42`,
 # which is the sc12 `wolf` pin exactly — so for the first time the
 # interpreter names the compiler sha this repository held one sprint ago,
@@ -114,14 +148,56 @@
 # What it does NOT change: no `fs_*`, no `read_line`, no `net_*` (all three
 # declined by design, each with a sentence in the refusal), and `var k = 0`
 # is still `i32`.
-version = "0.1.11"
-pin = "f8dca42118a944a801b7a6d2709004ccfeb01572"
+version = "0.1.12"
+pin = "4e316ad7c4236be5bcf05231a16bbecadccc2018"
 
 [wolf]
 version = "0.1.0"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver -p wolf_rt.
 #
+# sc14 bump: trunk `27cdb14` (merge s84), which IS trunk's tip at the bump
+# and is green on BOTH ritual gates in a clean scratch clone at the sha
+# (`cargo test --workspace` = 0, `cargo run -p xtask -- ci` = 0, exit codes
+# written to a file as they happened rather than read off a summary line —
+# F-0063's lesson). **Second attempt, and the first attempt is worth
+# recording rather than hiding**: gate 2's `wolf_driver` net suite hung on
+# `peer_close_is_the_closed_row` and failed `refused_row_handles_and_propagates`
+# in a sandboxed shell on a host running three other sprints' cargo jobs,
+# where gate 1 had just passed the same two tests. Re-run on the quiet
+# machine outside the sandbox: both gates green, first time. Sixth clean
+# pair, so F-0054 stays open on the reasoning it has stayed open on since
+# sc09 — and sc13's "a red run under load is a scheduling fact" now has a
+# second instance, this time in the pin ritual rather than in the rig.
+#
+# Three waves arrive in one step (s82 lane coverage, s83 the ABI inventory,
+# s84 iteration that does not allocate). None of them moves a ledger row
+# here, and that is the expected result for the third sprint running:
+# - **s84 (`words`/`lines`/`split` iterate without allocating)** is a
+#   lowering change under three `str` methods `std.str` already delegates
+#   to. The surface is unchanged at 21 methods, so nothing in std had to
+#   change to keep working, and no lane this rig has can observe the
+#   allocation (sc12's rule: a claim about what an implementation COSTS is
+#   somebody else's test, and you cite it).
+# - **s83 (the ABI inventory)** and **s82 (the lanes cover what they claim,
+#   with the differ publishing and GATING per-lane coverage)** are upstream
+#   evidence work. s82 is worth naming because it is the counterparty
+#   adopting this repository's own posture: lane coverage as a first-class,
+#   gated number rather than a summary sentence.
+# Re-measured at this sha rather than assumed:
+# - the builtin `str` set is unchanged at 21 methods;
+# - `str_from_utf8` is unchanged (still pure, still comptime-refused by
+#   neither machine, still `{utf8}`);
+# - the process trio and `json_*` are still checked-lane only, refused
+#   natively by name; net likewise;
+# - `--deny-warnings` is STILL rejected by `conform-run` (F-0046/F-0053,
+#   re-verified at this sha), so the warning gate remains the record's
+#   `warnings` array, read on two lanes;
+# - the `--version` pairing line still says "paired with lupin 0.1.8", four
+#   releases later (F-0073, filed as wolf-lang#87, unmoved for a third
+#   sprint).
+#
+# The sc13 note, kept for the history it records:
 # sc13 bump: trunk `4e316ad`, which IS trunk's tip at the bump and is green
 # on BOTH ritual gates on the FIRST attempt (`cargo test --workspace` = 0,
 # `cargo run -p xtask -- ci` = 0, exit codes printed rather than inferred
@@ -300,4 +376,4 @@ version = "0.1.0"
 # reports its absence and the lane goes dark rather than silent. It executes
 # the fs/io, os/env/time and (new at s73) concurrency tiers, and refuses the
 # net, process and json tiers by name.
-pin = "4e316ad7c4236be5bcf05231a16bbecadccc2018"
+pin = "27cdb141895a30377e190a32bbd2756d4223f042"
