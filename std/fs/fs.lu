@@ -1,15 +1,16 @@
 //! member: true
 //!
-//! std.fs — the filesystem, over rows: read and write whole texts, a
-//! file-descriptor tier for the streaming cases, and pure path
-//! arithmetic. Stability tier: core.
+//! std.fs — the filesystem, over rows: whole texts and whole BYTES, a
+//! file-descriptor tier for the streaming cases, directories, metadata,
+//! and pure path arithmetic. Stability tier: core.
 //!
 //! **Errors are rows, never traps** (D30, and API-CONVENTIONS §2's
 //! trap rule): a missing file, a refused permission, a host failure and
 //! a text that is not UTF-8 are all ORDINARY outcomes a caller handles
 //! with `else` or propagates with `?`. Nothing in this module traps, and
-//! nothing returns a sentinel. The vocabulary is the s38 builtin tier's,
-//! adopted verbatim so that std adds no translation layer:
+//! nothing returns a sentinel. The vocabulary is the builtin tier's,
+//! adopted verbatim so that std adds no translation layer — s38's five,
+//! and s90's three:
 //!
 //! - `not_found` — the path does not exist (or, on a write, its parent
 //!   directory does not)
@@ -17,26 +18,43 @@
 //! - `io` — every other host failure, coarsened to one tag because no
 //!   caller can act differently on them yet (§12's rule 3)
 //! - `utf8` — the bytes are not well-formed UTF-8; wolf `str` is UTF-8
-//!   by definition, so a text read that cannot decode is a miss
+//!   by definition, so a text read that cannot decode is a miss. The
+//!   BYTE tier below has no `utf8` row anywhere, which is its point.
 //! - `eof` — a read reached the end of the file, which is an outcome
 //!   rather than a failure (the fd tier only)
+//! - `exists` — the path is already there and the operation demanded to
+//!   create it (`create_dir`, and nothing else here)
+//! - `invalid` — a `List[int]` element that is not a byte (outside
+//!   0..255) was offered to a byte write. It is the WRITE's spelling of
+//!   the refusal `str_from_utf8` makes on the way in: writing is not
+//!   decoding, so `utf8` would be a lie
+//! - `cross_device` — declared by `fs_rename` and never raised by this
+//!   module: `move_file` HANDLES it, which is what the fallback below is
+//!   for
 //!
 //! **Capability: `fs` (I13).** Every function here reaches the host
 //! filesystem, is tagged `fs` in the toolchain's sandbox table, and is
 //! categorically refused at comptime (D33) — a `comptime fn` cannot read
-//! a file, and the refusal names the reason. The pure path helpers at the
-//! bottom of this module are the exception in both directions: they touch
+//! a file, and the refusal names the reason. s90 widened the surface and
+//! did NOT widen the sandbox: the fifteen new builtins carry the same tag
+//! and the same categorical refusal. The pure path helpers at the bottom
+//! of this module are the exception in both directions: they touch
 //! nothing and are comptime-safe.
 //!
 //! **The three-way split** (§8/§9's rule, applied to files). The
-//! IMPLEMENTATION owns the builtins this module delegates to
-//! (`fs_read_text`, `fs_write_text`, `fs_open`, `fs_create`, `fs_read`,
-//! `fs_write`, `fs_close`, `fs_remove`, `fs_exists`) — their semantics
-//! are therefore part of this module's contract and are documented
-//! per function. std owns everything else: the `File` value, the
-//! consuming `close`, `append_text`, `copy_file`, `move_file`, and the
-//! path arithmetic. The LANGUAGE owns nothing here; there is no file
-//! syntax.
+//! IMPLEMENTATION owns the builtins this module delegates to — s38's
+//! nine (`fs_read_text`, `fs_write_text`, `fs_open`, `fs_create`,
+//! `fs_read`, `fs_write`, `fs_close`, `fs_remove`, `fs_exists`) and
+//! s90's fifteen (`fs_open_mode`, `fs_read_bytes`, `fs_write_bytes`,
+//! `fs_read_chunk`, `fs_write_chunk`, `fs_read_dir`, `fs_create_dir`,
+//! `fs_create_dir_all`, `fs_remove_dir`, `fs_remove_dir_all`,
+//! `fs_rename`, `fs_is_file`, `fs_is_dir`, `fs_size`,
+//! `fs_modified_ms`) — so their semantics are part of this module's
+//! contract and are documented per function. std owns everything else:
+//! the `File` value, the consuming `close`, the mode choice behind
+//! `append_text`/`open_append`, `move_file`'s fast path and its
+//! fallback, and the path arithmetic. The LANGUAGE owns nothing here;
+//! there is no file syntax.
 //!
 //! **Paths are `str`, forward slashes travel everywhere.** wolf has no
 //! `Path` type at v0 and this module does not invent one: a path is a
@@ -46,36 +64,79 @@
 //! in the s38 test sweep). The path helpers here therefore split on `/`
 //! only, and say so.
 //!
-//! **What is deliberately absent.** No directory listing (`read_dir`),
-//! no directory creation, no byte-level read or write, no atomic rename,
-//! no metadata, no buffered reader or writer — every one of them is a
-//! reviewed contract with a filing behind it rather than an
-//! approximation:
+//! **THE WORKAROUNDS ARE GONE, AND WHAT REPLACED THEM IS WORTH NAMING**
+//! (s90, wolf-lang#51/#52, F-0044 and F-0045 both CLOSED). For seven
+//! sprints three of this module's functions were shaped by builtins that
+//! did not exist, and their docs said so:
 //!
-//! - `read_dir(path) -> List[str] ! {not_found, denied, io}` — no
-//!   builtin walks a directory at this pin (F-0044).
-//! - `read_bytes` / `write_bytes` — `std.bytes` is `List[int]` at best
-//!   and no builtin moves bytes to or from a file, which is also why
-//!   `copy_file` below is a TEXT copy (F-0044, F-0035).
-//! - `rename(from, to)` — an ATOMIC move. `move_file` below is
-//!   copy-then-remove and promises nothing about atomicity, so it wears
-//!   a different name (F-0044).
-//! - `create_dir`, `remove_dir` (F-0044); `size`, `modified` (F-0044).
+//! - `append_text` read the whole file, concatenated in memory and wrote
+//!   it back, behind an `fs_exists` check its own doc called a race. It
+//!   is `fs_open_mode(path, 2)` + one write + one close now: it touches
+//!   no existing byte, it asks no question whose answer can change under
+//!   it, and its `utf8` row went with the read that no longer happens.
+//! - `copy_file` and `move_file` were TEXT operations, so a file holding
+//!   a lone `0x80` did not survive them. Both are byte operations now,
+//!   and both lost `utf8` for the same reason.
+//! - `move_file` was copy-then-remove as its ONLY path. `fs_rename` is
+//!   the fast path now and copy-then-remove is the FALLBACK, reached
+//!   through the `cross_device` row the builtin declares for exactly
+//!   this purpose.
+//!
+//! **What is still deliberately absent**, each a reviewed contract
+//! rather than an approximation:
+//!
+//! - `rename(from, to)` as an ATOMIC move — **WITHDRAWN, not blocked.**
+//!   The contract asked for atomicity; the language deliberately does
+//!   not promise it, because POSIX `rename(2)` replaces a destination
+//!   atomically and windows `MoveFileEx` is documented to replace but
+//!   not to replace atomically. Upstream therefore ships `fs_rename`
+//!   claiming only the EFFECT and no `fs_rename_atomic` at all, per the
+//!   platform rule (a promise that cannot be kept on a tier-1 target
+//!   does not get a `#[cfg]` that keeps it on two out of three). std
+//!   adopts that reading rather than re-promising it one level up:
+//!   `move_file` is the wrapper, it says what it does and does not
+//!   guarantee, and there is no second name for the same call. The one
+//!   atomically-promisable primitive the language DOES offer everywhere
+//!   is `fs_open_mode`'s create-new mode, which nothing in std needs
+//!   yet; the sprint that writes a lock file or a unique temp name
+//!   wraps it, and this paragraph is where that decision was recorded.
+//! - `stem` / `extension` — a pair that has to decide what a dot means
+//!   (a leading dot, a doubled extension, no dot at all). That was never
+//!   a filing about the builtin tier; it is a design question this
+//!   module has not answered, and the earlier citation of F-0044 beside
+//!   it was wrong.
+//! - `is_absolute`, and `join`'s behaviour on an absolute `name` —
+//!   documented on `join` itself.
 //! - `io.Read`/`io.Write` traits and buffering — blocked on trait
-//!   dispatch (F-0004), not on the filesystem.
+//!   dispatch (F-0004), not on the filesystem. Every write here is
+//!   unbuffered and every function says so.
 //!
-//! **Lanes (re-measured at the sc08 pin).** BOTH compiler rungs are
-//! executing lanes now: the checked tier performs real host operations, and
-//! the native rung lowers the whole fs tier as of #40 — six of this
-//! module's seven tests run natively, where every one of them was an
-//! honest `unsupported` in sc07. The comptime sandbox is the one place
-//! these operations are refused (D33). lupin still has no fs builtins by
-//! design, so a program that reaches one is an honest `unsupported` at
-//! resolve — but lupin resolves module bodies LAZILY, so the pure path
-//! helpers RUN there: `tests/fs/path_helpers.lu` is a lupin `run` row at
-//! this pin, which is a property of the lane split rather than a leak. The
-//! posture is the rig's to record once (`CONTRIBUTING.md`, the ledger's
-//! sc07/sc08 sections) rather than each test's to restate.
+//! **What this module CANNOT witness, stated rather than implied**
+//! (§14's rule for a claim a green rig would otherwise imply):
+//! `denied` needs a permission call, `cross_device` needs two
+//! filesystems, and `read_dir`'s `utf8` needs a file name the host holds
+//! in bytes no `str` can carry. None of the three has a portable litmus,
+//! so no test here observes them; their meanings are documented on the
+//! functions and nothing claims more. `move_file`'s fallback is reached
+//! only through `cross_device`, so the TRIGGER is unwitnessed here even
+//! though the fallback's body — `copy_file` then `remove` — is two
+//! tested functions.
+//!
+//! **Lanes (re-measured at the sc12 pin, one call at a time).** BOTH
+//! compiler rungs are executing lanes: the checked tier performs real
+//! host operations and the native rung lowers all twenty-four fs
+//! builtins over the eu ABI (s90, `RT_SYMBOLS` 83 -> 94), so every new
+//! function here lands with two lanes from its first commit rather than
+//! gaining the second one later. The comptime sandbox is the one place
+//! these operations are refused (D33). lupin has no fs builtins by
+//! design, and the refusal for the s90 names is the generic
+//! unknown-name one (``unsupported: `fs_read_dir` does not resolve``,
+//! measured) rather than a reasoned decline — but lupin resolves module
+//! bodies LAZILY, so the pure path helpers RUN there:
+//! `tests/fs/path_helpers.lu` is a lupin `run` row at this pin, which is
+//! a property of the lane split rather than a leak. The posture is the
+//! rig's to record once (`CONTRIBUTING.md`, the ledger's fs section)
+//! rather than each test's to restate.
 
 /// An open file: the host descriptor this process may read from or
 /// write to, according to how it was opened.
@@ -95,6 +156,10 @@
 /// dynamically, enforced earlier and for free. `std.pool`'s handles need
 /// generations because a pool hands out many; a `File` has exactly one
 /// owner.
+///
+/// The value does not record which MODE opened it. Writing to a handle
+/// `open` produced is `io`, and reading one `create` produced is `io`,
+/// because the host refuses — not because this struct checked.
 pub struct File {
     fd: int,
 }
@@ -105,6 +170,9 @@ pub struct File {
 /// host refuses, `io` for any other host failure, `utf8` when the bytes
 /// are not well-formed UTF-8 (nothing is returned in that case — this is
 /// not a lossy decode). Never traps.
+///
+/// `read_bytes` is the same read without the decode, and it is what a
+/// program reaches for when the file is not text.
 ///
 /// Capability `fs`; refused at comptime (D33). Delegates to
 /// `fs_read_text`, whose whole-file read is not incremental: a file
@@ -129,8 +197,10 @@ pub fn read_text(path: str) -> str ! {not_found, denied, io, utf8} {
 ///
 /// Not atomic: a failure part-way leaves the file part-written, exactly
 /// as the host's write does. A caller who needs all-or-nothing writes to
-/// a temporary path and then moves it — and wants `rename`, which is a
-/// reviewed contract at this pin (F-0044).
+/// a temporary path and then calls `move_file` — which is a host rename
+/// when both paths share a filesystem, and which promises the EFFECT
+/// rather than atomicity (see its doc, and the module header on why the
+/// atomic name does not exist).
 ///
 /// Capability `fs`; refused at comptime (D33). Delegates to
 /// `fs_write_text`.
@@ -146,23 +216,40 @@ pub fn write_text(path: str, text: str) -> () ! {not_found, denied, io} {
     fs_write_text(path, text)?
 }
 
-/// Append `text` to the file at `path`, creating it when it is absent.
+/// Append `text` to the end of the file at `path`, creating it when it
+/// is absent.
 ///
 /// Rows: `not_found` when the parent directory does not exist, `denied`
-/// when the host refuses, `io` for any other host failure, and `utf8`
-/// when the EXISTING contents are not well-formed UTF-8 — which is the
-/// honest cost of the implementation: there is no append-mode open in the
-/// builtin tier at this pin, so this function reads the file, appends in
-/// memory, and writes the whole thing back (F-0045 asks for the
-/// open-mode the operation wants). Never traps.
+/// when the host refuses, `io` for any other host failure. Never traps.
 ///
-/// Two consequences a caller must know, both of them the reason the
-/// filing exists rather than a design choice: the cost is linear in the
-/// file's SIZE rather than in `text`, and the operation is not atomic —
-/// two appenders racing lose one of the writes. An absent file is not an
-/// error; it starts empty.
+/// **It is an append now, and the three things that used to be true
+/// about it are not.** Until s90 there was no append-mode open, so this
+/// function read the whole file, concatenated in memory and wrote it
+/// back — behind an `fs_exists` check that was a check-then-use race its
+/// own doc had to warn about. It opens the file in append mode, writes
+/// once and closes:
 ///
-/// Capability `fs`; refused at comptime (D33).
+/// - it reads NO existing byte, so its cost is in `text` rather than in
+///   the file's size, and a `utf8` row is gone with the decode that no
+///   longer happens — appending to a file that is not valid UTF-8 is now
+///   an ordinary append;
+/// - it asks no question whose answer can change before it acts: the
+///   create and the open are one host call, so the absent-file case
+///   needs no probe;
+/// - every write lands at the end of the file AS IT IS AT THE MOMENT OF
+///   THE WRITE (the mode's whole point), so two processes appending
+///   lines to one log no longer lose one of them.
+///
+/// What it still does not promise: that ONE call is atomic. A single
+/// short write to an append handle is what the host makes of it, and
+/// nothing in the language claims more.
+///
+/// The handle is closed on every exit, including the error path, by a
+/// `defer` — which is the idiom §12 records for exactly this and the
+/// reason a failed write here does not leak a descriptor.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_open_mode` (mode 2), `fs_write` and `fs_close`.
 ///
 /// ```wolf-doc-example
 /// fs.write_text("doc-append.tmp", "one\n")?
@@ -170,13 +257,82 @@ pub fn write_text(path: str, text: str) -> () ! {not_found, denied, io} {
 /// (fs.read_text("doc-append.tmp") else "?") == "one\ntwo\n"
 /// fs.remove("doc-append.tmp")?
 /// ```
-pub fn append_text(path: str, text: str) -> () ! {not_found, denied, io, utf8} {
-    if fs_exists(path) {
-        let old = fs_read_text(path)?
-        fs_write_text(path, "{old}{text}")?
-    } else {
-        fs_write_text(path, text)?
-    }
+pub fn append_text(path: str, text: str) -> () ! {not_found, denied, io} {
+    let fd = append_fd(path)?
+    defer fs_close(fd) else |_| {}
+    fs_write(fd, text)?
+}
+
+/// The whole contents of the file at `path`, as bytes — no decode, no
+/// `utf8` row, nothing refused for being data.
+///
+/// Rows: `not_found` when the path does not exist, `denied` when the
+/// host refuses, `io` for any other host failure. Never traps.
+///
+/// This is the read `copy_file` is built from, and the reason a file
+/// holding a lone `0x80` survives this module now. `std.bytes` is the
+/// vocabulary for what comes back; `std.bytes.to_str` is the way to text
+/// when the caller wants to find out whether it IS text.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_read_bytes`.
+///
+/// ```wolf-doc-example
+/// var raw = List[int]()
+/// (mut raw).push(128)
+/// (mut raw).push(0)
+/// (mut raw).push(255)
+/// fs.write_bytes("doc-read-bytes.tmp", raw)?
+/// let back = fs.read_bytes("doc-read-bytes.tmp") else List[int]()
+/// back.len == 3
+/// back[0] == 128
+/// back[2] == 255
+/// fs.remove("doc-read-bytes.tmp")?
+/// ```
+pub fn read_bytes(path: str) -> List[int] ! {not_found, denied, io} {
+    fs_read_bytes(path)?
+}
+
+/// Write `b` to `path` as bytes, replacing whatever was there and
+/// creating the file if it does not exist.
+///
+/// Rows: `not_found` when the path's parent directory does not exist,
+/// `denied` when the host refuses, `io` for any other host failure, and
+/// **`invalid` when an element of `b` is not a byte** — outside 0..255,
+/// which the interim `List[int]` currency (§11) makes spellable. Never
+/// traps.
+///
+/// That last row is a deliberate departure from §11's encoder rule,
+/// which has `hex.encode` TRAP on an element out of range. The rule
+/// there is that a caller who hands an encoder a non-byte violated a
+/// contract it could have checked; the rule here is §14's, which is
+/// stronger for an os module and wins: the row vocabulary is the
+/// toolchain's, adopted verbatim, and the builtin answers `invalid`.
+/// A caller who would rather trap can check the elements first;
+/// a library that traps where the toolchain raises has taken a decision
+/// away from its caller.
+///
+/// Not atomic, exactly as `write_text` is not.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_write_bytes`.
+///
+/// ```wolf-doc-example
+/// var raw = List[int]()
+/// (mut raw).push(119)
+/// (mut raw).push(0)
+/// (mut raw).push(102)
+/// fs.write_bytes("doc-write-bytes.tmp", raw)?
+/// (fs.size("doc-write-bytes.tmp") else 0 - 1) == 3
+/// var bad = List[int]()
+/// (mut bad).push(300)
+/// var refused = false
+/// fs.write_bytes("doc-write-bytes.tmp", bad) else |_| { refused = true }
+/// refused == true
+/// fs.remove("doc-write-bytes.tmp")?
+/// ```
+pub fn write_bytes(path: str, b: List[int]) -> () ! {not_found, denied, invalid, io} {
+    fs_write_bytes(path, b)?
 }
 
 /// Does something exist at `path`?
@@ -188,8 +344,9 @@ pub fn append_text(path: str, text: str) -> () ! {not_found, denied, io, utf8} {
 /// row from the operation itself is authoritative (the check-then-use
 /// race is the caller's to avoid, not this function's to hide).
 ///
-/// Answers `true` for a directory as well as a file; there is no
-/// `is_file` at this pin because no builtin reports metadata (F-0044).
+/// Answers `true` for a directory as well as a file. `is_file` and
+/// `is_dir` are the two that say WHICH, and they are total for the same
+/// reason this one is.
 ///
 /// Capability `fs`; refused at comptime (D33). Delegates to `fs_exists`.
 ///
@@ -204,15 +361,126 @@ pub fn exists(path: str) -> bool {
     fs_exists(path)
 }
 
+/// Is there a regular FILE at `path`?
+///
+/// Total: no rows, no traps. A missing path is not a file, a directory
+/// is not a file, and a path the process cannot ask about answers
+/// `false` — the same posture `exists` takes, and for the same reason
+/// (a predicate that raised would be a predicate every caller had to
+/// wrap).
+///
+/// Like `exists`, this is a probe and not a lock: the answer can change
+/// between this call and the next one, and only the row from the
+/// operation itself is authoritative.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_is_file`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-is-file.tmp", "x")?
+/// fs.is_file("doc-is-file.tmp") == true
+/// fs.is_dir("doc-is-file.tmp") == false
+/// fs.is_file("doc-is-file-absent.tmp") == false
+/// fs.remove("doc-is-file.tmp")?
+/// ```
+pub fn is_file(path: str) -> bool {
+    fs_is_file(path)
+}
+
+/// Is there a DIRECTORY at `path`?
+///
+/// Total: no rows, no traps — `is_file`'s twin, with the same
+/// probe-not-lock caveat.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_is_dir`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir("doc-is-dir.tmp")?
+/// fs.is_dir("doc-is-dir.tmp") == true
+/// fs.is_file("doc-is-dir.tmp") == false
+/// fs.is_dir("doc-is-dir-absent.tmp") == false
+/// fs.remove_dir("doc-is-dir.tmp")?
+/// ```
+pub fn is_dir(path: str) -> bool {
+    fs_is_dir(path)
+}
+
+/// The size of the file at `path`, in BYTES.
+///
+/// Rows: `not_found` when the path does not exist, `denied` when the
+/// host refuses, `io` for any other host failure. Never traps.
+///
+/// Bytes are the currency here as they are in `std.str` (§9): this is
+/// the number `read_bytes` will hand back, and for a text file it is the
+/// number `read_text`'s result reports as `len`. The size of a DIRECTORY
+/// is whatever the host says it is and means nothing portable; ask
+/// `read_dir` how many entries there are instead.
+///
+/// A size read is not a lease. The file can grow between this call and
+/// the read that follows it, which is why nothing in this module sizes a
+/// file in order to read it.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_size`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-size.tmp", "héllo")?
+/// (fs.size("doc-size.tmp") else 0 - 1) == 6
+/// (fs.size("doc-size-absent.tmp") else 0 - 1) == 0 - 1
+/// fs.remove("doc-size.tmp")?
+/// ```
+pub fn size(path: str) -> int ! {not_found, denied, io} {
+    fs_size(path)?
+}
+
+/// When the file at `path` was last modified, in MILLISECONDS from the
+/// Unix epoch — negative before it.
+///
+/// Rows: `not_found` when the path does not exist, `denied` when the
+/// host refuses, `io` for any other host failure, which includes a host
+/// that has a file but no modification time for it. Never traps.
+///
+/// **The unit is in the name, and that is a departure this doc owes an
+/// explanation.** §14's rule is that when a builtin hands std a bare
+/// `int` whose UNIT is the whole contract, std names the unit in a TYPE
+/// — which is why `std.time` ships `Instant` and `Duration`. Returning a
+/// `time.Instant` here would make `std.fs` depend on `std.time`, and a
+/// dependency between two std modules is charged per PROGRAM at this pin
+/// (two modules that declare a same-named function cannot be linked into
+/// one native binary, F-0026), so every program that touched a file
+/// would carry the calendar. The unit therefore rides in the name, where
+/// it is at least impossible to miss. The scale is deliberately
+/// `time_unix_ms`'s, so `time.unix_ms() - fs.modified_ms(p)?` is an age
+/// in milliseconds with no conversion — and the day a `Path`/`Instant`
+/// pair is worth the dependency, that is the signature change to make.
+///
+/// Resolution is the host's: a filesystem that stores seconds answers
+/// multiples of 1000, and nothing here rounds or pretends otherwise.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_modified_ms`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-modified.tmp", "x")?
+/// let stamp = fs.modified_ms("doc-modified.tmp") else 0 - 1
+/// stamp > 0
+/// (fs.modified_ms("doc-modified-absent.tmp") else 0 - 1) == 0 - 1
+/// fs.remove("doc-modified.tmp")?
+/// ```
+pub fn modified_ms(path: str) -> int ! {not_found, denied, io} {
+    fs_modified_ms(path)?
+}
+
 /// Remove the file at `path`.
 ///
 /// Rows: `not_found` when there is nothing to remove — removing an
 /// absent file is a MISS, not a silent success, because a caller who
 /// wanted "make sure it is gone" can say so with `else` and a caller who
 /// expected a file wants to hear about it. `denied` when the host
-/// refuses, `io` for any other host failure (which includes asking to
-/// remove a directory: `remove_dir` is a reviewed contract, F-0044).
-/// Never traps.
+/// refuses, `io` for any other host failure, which includes asking to
+/// remove a DIRECTORY: `remove_dir` and `remove_dir_all` are the two
+/// that do that, and the tag stays `io` because the platforms spell the
+/// refusal differently and no caller acts differently on them. Never
+/// traps.
 ///
 /// Capability `fs`; refused at comptime (D33). Delegates to `fs_remove`.
 ///
@@ -225,20 +493,31 @@ pub fn remove(path: str) -> () ! {not_found, denied, io} {
     fs_remove(path)?
 }
 
-/// Copy the TEXT of `from` to `to`, replacing `to` if it exists.
+/// Copy the BYTES of `from` to `to`, replacing `to` if it exists.
 ///
 /// Rows: `not_found` when `from` does not exist or `to`'s parent
 /// directory does not, `denied` when the host refuses either half, `io`
-/// for any other host failure, and `utf8` when `from` is not
-/// well-formed UTF-8 — the honest limit of a copy built from
-/// `read_text` + `write_text`. A byte-for-byte copy of arbitrary file
-/// contents needs a `fs_copy` builtin or byte-level io, and is the
-/// filing rather than a version of this function that corrupts
-/// binaries (F-0044).
+/// for any other host failure. Never traps.
 ///
-/// Not atomic, and it reads the whole file into memory. Copying a file
-/// onto itself is a truncating no-op in the honest case (the read
-/// happens first) and is not a supported operation.
+/// **It is a byte copy now, and the row it lost says so.** Until s90 it
+/// was `read_text` + `write_text`, which meant a file holding a lone
+/// `0x80` came back refused with `utf8` — a copy that works on text and
+/// corrupts (or declines) everything else. It is `fs_read_bytes` +
+/// `fs_write_bytes`, there is no decode anywhere in it, and `utf8` is
+/// gone from the row because nothing here can raise it.
+///
+/// `fs_write_bytes` declares `invalid` for an element that is not a
+/// byte. This function cannot raise it: the bytes came out of
+/// `fs_read_bytes` one line earlier and are bytes by construction. The
+/// handler below therefore reports `io` on that arm — the coarsening a
+/// caller could not act on differently — rather than widening this
+/// signature with a tag no input can reach (§14: a function's row is the
+/// union of what its delegates raise, MINUS what it handles itself).
+///
+/// Not atomic, and it reads the whole file into memory: a file larger
+/// than the process wants to hold wants the fd tier's `read_chunk` /
+/// `write_chunk` in a loop. Copying a file onto itself truncates it and
+/// is not a supported operation.
 ///
 /// Capability `fs`; refused at comptime (D33).
 ///
@@ -249,28 +528,55 @@ pub fn remove(path: str) -> () ! {not_found, denied, io} {
 /// fs.remove("doc-copy-src.tmp")?
 /// fs.remove("doc-copy-dst.tmp")?
 /// ```
-pub fn copy_file(from: str, to: str) -> () ! {not_found, denied, io, utf8} {
-    let text = fs_read_text(from)?
-    fs_write_text(to, text)?
+pub fn copy_file(from: str, to: str) -> () ! {not_found, denied, io} {
+    let raw = fs_read_bytes(from)?
+    fs_write_bytes(to, raw) else |e| match e {
+        not_found => { return not_found },
+        denied => { return denied },
+        invalid => { return io },
+        io => { return io },
+    }
 }
 
-/// Move the file at `from` to `to` by copying its text and removing the
-/// original.
+/// Move the file at `from` to `to`.
 ///
-/// Rows: the union of `copy_file`'s and `remove`'s — `not_found`, `denied`,
-/// `io`, `utf8`. Never traps.
+/// Rows: `not_found` when `from` does not exist or `to`'s parent
+/// directory does not, `denied` when the host refuses, `io` for any
+/// other host failure. Never traps.
 ///
-/// **It is not a rename and the name says so.** A host rename is atomic
-/// within a filesystem and moves bytes rather than text; this function
-/// is `copy_file` followed by `remove`, so it is not atomic (a failure between
-/// the two leaves both files), it is linear in the file's size, and it
-/// refuses a file that is not UTF-8. `rename` is the reviewed contract
-/// this becomes an alias of the day the builtin lands (F-0044) — the
-/// day it does, `move_file` keeps this signature and gains atomicity,
-/// which is why callers should already prefer it to writing the two
-/// calls out.
+/// **The host rename is the fast path and copy-then-remove is the
+/// fallback** — which is the other way round from every earlier pin,
+/// where the copy was the only path. The rename moves the directory
+/// entry without reading a byte, so a gigabyte within one filesystem
+/// costs the same as an empty file. Two of `fs_rename`'s rows are the
+/// fallback's triggers rather than failures, and this function handles
+/// both:
 ///
-/// Capability `fs`; refused at comptime (D33).
+/// - `cross_device` — `from` and `to` are on different filesystems
+///   (`EXDEV`, `ERROR_NOT_SAME_DEVICE`), which no rename can do
+///   anywhere. The fallback is `copy_file` then `remove`, and because
+///   `copy_file` is a BYTE copy the fallback is a real fallback and not
+///   a text operation wearing a disguise.
+/// - `exists` — the destination is there and this host's rename will not
+///   replace it. unix replaces a file and an empty directory; windows
+///   refuses a directory outright. The fallback replaces it, so callers
+///   see one behaviour on every tier-1 target instead of the platform's.
+///
+/// **It is not atomic and it does not claim to be.** A host rename is
+/// atomic within a filesystem on unix; windows does not promise that,
+/// so the LANGUAGE does not promise it (there is no `fs_rename_atomic`)
+/// and neither does this function. On the fallback path it is plainly
+/// not atomic: a failure between the copy and the remove leaves both
+/// files, which is the same exposure this function has always had and is
+/// now the uncommon case rather than the only one.
+///
+/// The fallback's TRIGGER cannot be witnessed portably — a test would
+/// need two filesystems — so no test here reaches it, and the module
+/// header says so. Its body is `copy_file` followed by `remove`, both of
+/// which are tested.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_rename`,
+/// and to `copy_file` + `fs_remove` on the fallback.
 ///
 /// ```wolf-doc-example
 /// fs.write_text("doc-move-src.tmp", "pack\n")?
@@ -279,10 +585,172 @@ pub fn copy_file(from: str, to: str) -> () ! {not_found, denied, io, utf8} {
 /// (fs.read_text("doc-move-dst.tmp") else "?") == "pack\n"
 /// fs.remove("doc-move-dst.tmp")?
 /// ```
-pub fn move_file(from: str, to: str) -> () ! {not_found, denied, io, utf8} {
-    let text = fs_read_text(from)?
-    fs_write_text(to, text)?
-    fs_remove(from)?
+pub fn move_file(from: str, to: str) -> () ! {not_found, denied, io} {
+    var by_hand = false
+    fs_rename(from, to) else |e| match e {
+        not_found => { return not_found },
+        denied => { return denied },
+        cross_device => { by_hand = true },
+        exists => { by_hand = true },
+        io => { return io },
+    }
+    if by_hand {
+        copy_file(from, to)?
+        fs_remove(from)?
+    }
+}
+
+/// The entry NAMES directly inside the directory at `path`, SORTED.
+///
+/// Rows: `not_found` when the path does not exist, `denied` when the
+/// host refuses, `io` for any other host failure — which includes
+/// asking a regular file for its entries. `utf8` when an entry's name is
+/// bytes no `str` can carry: the LISTING fails rather than the entry
+/// being dropped, because a `read_dir` that silently omits a file lies
+/// about the directory. Never traps.
+///
+/// **Names, not paths.** An entry comes back as `"today.txt"`, never as
+/// `"logs/today.txt"` — join it yourself with `join`, which is the pure
+/// helper at the bottom of this module and exists for exactly this.
+/// Returning names is the builtin's decision and std does not decorate
+/// it: a caller who wants paths says so in one call, and a caller who
+/// wants names cannot get them back out of a path without cutting.
+///
+/// **Sorted is a promise, and it is the toolchain's.** Filesystem order
+/// differs per filesystem, so an unsorted listing makes every program
+/// written against it machine-dependent and every test of one a coin
+/// flip. The order is by the name's bytes, which is `str`'s own
+/// relational order (`[mem.str.order]`) and therefore the order
+/// `std.sort` would put them in. `.` and `..` are not entries and do not
+/// appear.
+///
+/// The listing is a snapshot, not a lock: an entry can be gone by the
+/// time the caller opens it, which is the same check-then-use caveat
+/// `exists` carries.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_read_dir`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir("doc-read-dir.tmp")?
+/// fs.write_text("doc-read-dir.tmp/beta.txt", "b")?
+/// fs.write_text("doc-read-dir.tmp/alpha.txt", "a")?
+/// let names = fs.read_dir("doc-read-dir.tmp") else List[str]()
+/// names.len == 2
+/// names[0] == "alpha.txt"
+/// names[1] == "beta.txt"
+/// fs.remove_dir_all("doc-read-dir.tmp")?
+/// ```
+pub fn read_dir(path: str) -> List[str] ! {not_found, denied, utf8, io} {
+    fs_read_dir(path)?
+}
+
+/// Create ONE directory at `path`.
+///
+/// Rows: `exists` when something is already there — a directory, a file,
+/// anything — because this function's contract is that it CREATED the
+/// directory, and "it was already here" is a different outcome a caller
+/// may well act on. `not_found` when the parent directory does not
+/// exist: this form creates exactly one level. `denied` when the host
+/// refuses, `io` for any other host failure. Never traps.
+///
+/// `create_dir_all` is the idempotent form: it creates the parents and
+/// an existing directory is not an error there, which is what makes it
+/// the one to reach for before a write. Reach for THIS one when the
+/// creation is the point — a lock directory, a run whose output must not
+/// land on top of an earlier one.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_create_dir`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir("doc-create-dir.tmp")?
+/// fs.is_dir("doc-create-dir.tmp") == true
+/// var again = false
+/// fs.create_dir("doc-create-dir.tmp") else |_| { again = true }
+/// again == true
+/// fs.remove_dir("doc-create-dir.tmp")?
+/// ```
+pub fn create_dir(path: str) -> () ! {exists, not_found, denied, io} {
+    fs_create_dir(path)?
+}
+
+/// Create the directory at `path` and every missing parent of it.
+///
+/// Rows: `denied` when the host refuses, `io` for any other host
+/// failure — which includes a path whose parent is a regular FILE, since
+/// no directory can be created under it. Never traps.
+///
+/// **It is idempotent, and that is why it has no `exists` row**: a
+/// directory that is already there is success, because the caller asked
+/// for the directory to EXIST rather than for it to be created. There is
+/// no `not_found` either — a missing parent is the thing this function
+/// makes.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_create_dir_all`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-create-all.tmp/a/b")?
+/// fs.is_dir("doc-create-all.tmp/a/b") == true
+/// fs.create_dir_all("doc-create-all.tmp/a/b")?
+/// fs.remove_dir_all("doc-create-all.tmp")?
+/// ```
+pub fn create_dir_all(path: str) -> () ! {denied, io} {
+    fs_create_dir_all(path)?
+}
+
+/// Remove the EMPTY directory at `path`.
+///
+/// Rows: `not_found` when there is nothing there, `denied` when the host
+/// refuses, `io` for any other host failure — which includes a
+/// directory that is not empty and a path that is a regular file. The
+/// non-empty case is `io` rather than a tag of its own because the
+/// platforms spell the errno differently and a caller's response is the
+/// same either way (§12's rule 3: one tag per failure mode a caller can
+/// ACT on). Never traps.
+///
+/// `remove_dir_all` is the recursive form, and it is the one that
+/// deletes data a caller did not name.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_remove_dir`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir("doc-remove-dir.tmp")?
+/// fs.remove_dir("doc-remove-dir.tmp")?
+/// fs.exists("doc-remove-dir.tmp") == false
+/// ```
+pub fn remove_dir(path: str) -> () ! {not_found, denied, io} {
+    fs_remove_dir(path)?
+}
+
+/// Remove the directory at `path` and EVERYTHING inside it.
+///
+/// Rows: `not_found` when there is nothing there, `denied` when the host
+/// refuses, `io` for any other host failure. Never traps.
+///
+/// **This deletes files the caller did not name**, which is the one
+/// operation in this module with that property, and it is worth one
+/// sentence of ceremony: there is no confirmation, no dry run and no
+/// undo, and a path assembled from data is a path that can name
+/// somewhere unintended. `remove_dir` is the form that refuses to delete
+/// anything it was not pointed at.
+///
+/// It is not atomic: a failure part-way leaves part of the tree, exactly
+/// as the host's walk does.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_remove_dir_all`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-remove-all.tmp/a")?
+/// fs.write_text("doc-remove-all.tmp/a/x.txt", "x")?
+/// fs.remove_dir_all("doc-remove-all.tmp")?
+/// fs.exists("doc-remove-all.tmp") == false
+/// ```
+pub fn remove_dir_all(path: str) -> () ! {not_found, denied, io} {
+    fs_remove_dir_all(path)?
 }
 
 /// Open the file at `path` for READING and return its handle.
@@ -290,12 +758,14 @@ pub fn move_file(from: str, to: str) -> () ! {not_found, denied, io, utf8} {
 /// Rows: `not_found` when the path does not exist, `denied` when the
 /// host refuses, `io` for any other host failure. Never traps.
 ///
-/// The handle must be closed with `close`, which consumes it. There is
-/// no read-write or append mode at this pin — `open` reads, `create`
-/// writes, and the mode inventory is the filing (F-0045). `defer` is the
-/// idiom for the close, and `errdefer` the idiom for a close on the
-/// error path only (§12); neither is available inside a doc example, so
-/// the example below closes explicitly.
+/// The handle must be closed with `close`, which consumes it. `create`
+/// is the write-and-truncate mode and `open_append` the append mode;
+/// the builtin tier also has a read-write mode and an exclusive
+/// create-new mode, neither of which std wraps yet and both of which the
+/// module header accounts for. `defer` is the idiom for the close, and
+/// `errdefer` the idiom for a close on the error path only (§12);
+/// neither is available inside a doc example, so the example below
+/// closes explicitly.
 ///
 /// Capability `fs`; refused at comptime (D33). Delegates to `fs_open`.
 ///
@@ -308,6 +778,40 @@ pub fn move_file(from: str, to: str) -> () ! {not_found, denied, io, utf8} {
 /// ```
 pub fn open(path: str) -> File ! {not_found, denied, io} {
     File { fd: fs_open(path)? }
+}
+
+/// Open the file at `path` for APPENDING and return its handle,
+/// creating the file when it is absent.
+///
+/// Rows: `not_found` when the parent directory does not exist, `denied`
+/// when the host refuses, `io` for any other host failure. Never traps.
+///
+/// Every write through this handle lands at the end of the file as it is
+/// at the moment of the write, so a second writer cannot be overwritten
+/// by this one's stale idea of where the end was. The handle is
+/// write-only: reading it is `io`.
+///
+/// `append_text` is this function plus one write and one close, and is
+/// what a program that appends once should call. Reach for the handle
+/// when a program appends repeatedly — a log writer opens once and pays
+/// for one open instead of one per line.
+///
+/// The handle must be closed with `close`, which consumes it.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_open_mode` (mode 2).
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-open-append.tmp", "one\n")?
+/// var f = fs.open_append("doc-open-append.tmp")?
+/// fs.write(mut f, "two\n")?
+/// fs.write(mut f, "three\n")?
+/// fs.close(take f)?
+/// (fs.read_text("doc-open-append.tmp") else "?") == "one\ntwo\nthree\n"
+/// fs.remove("doc-open-append.tmp")?
+/// ```
+pub fn open_append(path: str) -> File ! {not_found, denied, io} {
+    File { fd: append_fd(path)? }
 }
 
 /// Create (or truncate) the file at `path` for WRITING and return its
@@ -342,11 +846,12 @@ pub fn create(path: str) -> File ! {denied, io} {
 /// this function rather than a test against a length. `io` when the
 /// handle is closed or foreign, or the host failed. `utf8` when the
 /// bytes read are not well-formed UTF-8, WHICH INCLUDES a chunk boundary
-/// that lands inside a code point: a fixed-size read of text is not
-/// safe in general, and the honest fix is byte-level io or a
-/// boundary-aware read, filed rather than hidden (F-0044). ASCII text
-/// chunks at any size, and a `max` at or above the file's remaining size
-/// always decodes.
+/// that lands inside a code point: a fixed-size read of text is not safe
+/// in general. **`read_chunk` is the honest fix and it exists now** — it
+/// hands back the bytes and lets the caller decide where a code point
+/// ends, which is a decision only the caller can make when the
+/// boundaries are unknown. ASCII text chunks at any size, and a `max` at
+/// or above the file's remaining size always decodes.
 ///
 /// `mut f` because the operation advances the file's POSITION: the
 /// bytes a second call sees depend on the first, which is state the
@@ -368,6 +873,40 @@ pub fn read(mut f: File, max: int) -> str ! {eof, io, utf8} {
     fs_read(f.fd, max)?
 }
 
+/// Read up to `max` BYTES from `f`, advancing the file's position — no
+/// decode, no `utf8` row, no boundary to land inside.
+///
+/// Rows: `eof` when the file is already at its end, `io` when the handle
+/// is closed, foreign or write-only, or the host failed. Never traps.
+///
+/// This is the streaming read that works on data: `read` refuses a chunk
+/// whose boundary splits a code point, and nothing can choose a safe
+/// chunk size for a file whose contents are unknown. A caller that wants
+/// text from a stream reads chunks, joins them, and decodes the join
+/// with `std.bytes.to_str` — where the validation happens once, over the
+/// whole thing, instead of once per arbitrary boundary.
+///
+/// `mut f` for the same reason `read` takes it: the position advances,
+/// and the bytes a second call sees depend on the first.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_read_chunk`.
+///
+/// ```wolf-doc-example
+/// var w = fs.create("doc-read-chunk.tmp")?
+/// fs.write(mut w, "wolf")?
+/// fs.close(take w)?
+/// var f = fs.open("doc-read-chunk.tmp")?
+/// let head = fs.read_chunk(mut f, 2) else List[int]()
+/// head.len == 2
+/// head[0] == 119
+/// fs.close(take f)?
+/// fs.remove("doc-read-chunk.tmp")?
+/// ```
+pub fn read_chunk(mut f: File, max: int) -> List[int] ! {eof, io} {
+    fs_read_chunk(f.fd, max)?
+}
+
 /// Write `text` to `f` at its current position, advancing it.
 ///
 /// Rows: `io` when the handle is closed, foreign or read-only, or the
@@ -378,6 +917,10 @@ pub fn read(mut f: File, max: int) -> str ! {eof, io, utf8} {
 /// Writes are unbuffered — every call reaches the host — so a program
 /// that writes small pieces in a loop pays for each one, and the
 /// buffered writer that would fix it waits on trait dispatch (F-0004).
+///
+/// On a handle from `open_append` the position is the END of the file at
+/// the moment of each write, so "current position" means what the mode
+/// says rather than what an earlier write left behind.
 ///
 /// Capability `fs`; refused at comptime (D33). Delegates to `fs_write`.
 ///
@@ -390,6 +933,37 @@ pub fn read(mut f: File, max: int) -> str ! {eof, io, utf8} {
 /// ```
 pub fn write(mut f: File, text: str) -> () ! {io} {
     fs_write(f.fd, text)?
+}
+
+/// Write the bytes `b` to `f` at its current position, advancing it.
+///
+/// Rows: `invalid` when an element of `b` is not a byte (outside
+/// 0..255), `io` when the handle is closed, foreign or read-only, or the
+/// host failed. Never traps.
+///
+/// `invalid` is reachable here where it is not reachable inside
+/// `copy_file`, and the difference is whose bytes they are: a caller
+/// builds this list, so a non-byte in it is data this function must
+/// report rather than an impossibility it may coarsen. See `write_bytes`
+/// for why the answer is a row and not a trap.
+///
+/// Unbuffered, exactly as `write` is, and `mut f` for the same reason.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_write_chunk`.
+///
+/// ```wolf-doc-example
+/// var raw = List[int]()
+/// (mut raw).push(128)
+/// (mut raw).push(255)
+/// var f = fs.create("doc-write-chunk.tmp")?
+/// fs.write_chunk(mut f, raw)?
+/// fs.close(take f)?
+/// (fs.size("doc-write-chunk.tmp") else 0 - 1) == 2
+/// fs.remove("doc-write-chunk.tmp")?
+/// ```
+pub fn write_chunk(mut f: File, b: List[int]) -> () ! {invalid, io} {
+    fs_write_chunk(f.fd, b)?
 }
 
 /// Close `f`, consuming it.
@@ -429,6 +1003,9 @@ pub fn close(take f: File) -> () ! {io} {
 /// a path helper that decides to ignore one of its arguments is a
 /// helper that hides a bug (the day `is_absolute` exists, this doc says
 /// what it does about it).
+///
+/// This is the function that turns a `read_dir` NAME into a path, which
+/// is the shape every directory walk takes.
 ///
 /// Separators are `/` on every platform (see the module header):
 /// windows accepts forward slashes at the API, and a backslash in a wolf
@@ -479,7 +1056,9 @@ pub fn parent(path: str) -> str ! {none} {
 ///
 /// This is the base name including any extension; splitting the
 /// extension off wants a `stem`/`extension` pair, which is a reviewed
-/// contract rather than a guess about what a dot means (F-0044).
+/// contract rather than a guess about what a dot means. That contract is
+/// blocked on nothing — it is a design decision this module has not
+/// taken (see the module header).
 ///
 /// ```wolf-doc-example
 /// (fs.file_name("logs/2026/today.txt") else "?") == "today.txt"
@@ -494,4 +1073,26 @@ pub fn file_name(path: str) -> str ! {none} {
     let rest = path.get(at + 1..path.len)?
     if rest.is_empty() { return none }
     rest
+}
+
+/// An append-mode descriptor for `path`, with the two tags mode 2 cannot
+/// reach coarsened to `io`.
+///
+/// Private, and the only place in this module that names a MODE number.
+/// `fs_open_mode` declares `{not_found, denied, exists, invalid, io}`
+/// across its five modes; with the mode fixed at 2 by this function
+/// rather than by a caller, `invalid` (a mode outside the set) and
+/// `exists` (mode 4 losing its exclusive create) cannot happen. Both
+/// arms answer `io` so that a future pin which does reach them still
+/// gets a truthful coarsening rather than a wrong tag, and neither
+/// appears in any public signature — which is what keeps `append_text`
+/// and `open_append` from carrying rows they can never raise.
+fn append_fd(path: str) -> int ! {not_found, denied, io} {
+    fs_open_mode(path, 2) else |e| match e {
+        not_found => { return not_found },
+        denied => { return denied },
+        exists => { return io },
+        invalid => { return io },
+        io => { return io },
+    }
 }
