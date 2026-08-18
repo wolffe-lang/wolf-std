@@ -75,15 +75,28 @@ and once per tier in `tests/ledger.toml`, never per file. It is
 re-measured at every pin, because a capability lane is the kind of claim
 that rots.
 
-- **fs and io, at the sc11 pin: two executing lanes.** The checked tier
-  performs REAL host operations, and the native rung lowers both tiers
-  as of #40. Six of the seven `fs` tests execute natively and so do all
-  three `io` tests; the seventh `fs` row is a rejection witness that
-  never reaches lowering. In sc07 the native rung refused both tiers by
-  name. lupin has no `fs_*` builtins and no `read_line`, so it refuses
-  those at RESOLVE. It resolves module bodies LAZILY, so
-  `fs/path_helpers.lu` runs there, and lupin 0.1.5's `eprint` and
-  `eprint_raw` moved `io/writers_and_streams.lu` to `run` too.
+- **fs and io, at the sc12 (02-os) pin: two executing lanes, over a
+  surface that TRIPLED.** The checked tier performs REAL host operations
+  and the native rung lowers both tiers — all twenty-four `fs_*` builtins
+  as of s90, in the same wave that added fifteen of them, so nothing
+  `std.fs` gained this sprint has an unequal lane. Thirteen of the
+  fourteen `fs` tests execute natively and so do all three `io` tests;
+  the fourteenth `fs` row is a rejection witness that never reaches
+  lowering. In sc07 the native rung refused both tiers by name. lupin has
+  no `fs_*` builtins and no `read_line`, so it refuses those at RESOLVE.
+  It resolves module bodies LAZILY, so `fs/path_helpers.lu` runs there,
+  and lupin 0.1.5's `eprint` and `eprint_raw` moved
+  `io/writers_and_streams.lu` to `run` too.
+
+  One wrinkle worth recording where the posture is recorded: **lupin's
+  refusal for the s90 names is not the same SENTENCE as for the s38
+  ones.** The old nine get its reasoned decline ("this machine has no
+  filesystem … by design, so the fs tier is declined rather than
+  mocked"); the new fifteen get the generic ``unsupported: `fs_read_dir`
+  does not resolve``. No lane moves either way, so no row records it —
+  which is exactly why it is written down here and filed as F-0081: this
+  repository's whole method for reading a dark column is telling a
+  posture from drift, and the refusal text is where that is decided.
 - **net, at the sc11 pin: one executing lane.** The checked tier opens
   real sockets. lupin has no `net_*` builtins by design. The native rung
   refuses the tier by name ("net builtins in native lowering (checked
@@ -105,14 +118,18 @@ that rots.
   and lupin now DECLINES the surface by design ("rather than risk a
   second, guessed RFC 8259 reading"). That is a posture, like `fs` and
   `net`. It is not a wave to wait out.
-- **process, at the sc11 pin: one executing lane, and no test starts a
-  program.** The checked tier spawns real children. lupin declines the
+- **process, at the sc12 (02-os) pin: one executing lane, and no test
+  starts a program.** The checked tier spawns real children. lupin declines the
   trio by design ("this machine runs no child processes by design, so
   the tier is declined rather than mocked"), and the native rung refuses
   it by name. No `.lu` test here starts a real program, and the reason
-  is portability: no program exists on every tier-1 host, a wolf program
-  cannot learn its own path, and the directive schema has no
-  per-platform gate (F-0066). Every witness is deterministic on all of
+  is portability: no program exists on every tier-1 host and the
+  directive schema has no per-platform gate (F-0066). One of that
+  finding's three legs came off at the sc12 (02-os) pin — s90's `os_exe`
+  means a program CAN learn its own path — and the finding stays open,
+  because a self-spawn would still run on the checked lane alone and
+  still needs a way for the child to know it is the child. `std.process`
+  says the same thing in its header. Every witness is deterministic on all of
   them: a name no host has, an empty argv, a forged handle. The
   exit-code path rests on the toolchain's own unix-gated tests, which
   the module header says out loud.

@@ -51,8 +51,8 @@ recorded question for a later sprint.
 | `div_zero` | 1 (`math.checked_div`) | none | conforming; **renamed** from `DivZero` |
 | `io` | 13 (`fs.read_text/write_text/append_text/remove/copy_file/move_file/open/create/read/write/close`, `io.input_line/prompt`) | none — and it is already a COARSENING: every host failure that is not `not_found` or `denied` arrives as `io` (§12 rule 3, and the builtin tier decides it, not std) | conforming; **watch** — the day a caller can act on "disk full" versus "broken pipe" it needs a payload, and F-0043 must close first or the caller cannot read one |
 | `not_found` | 7 (`fs.read_text/write_text/append_text/remove/copy_file/move_file/open`) | none today; `NotFound{path}` is the landing shape the sprint contract named | conforming; **watch** — the payload is what a caller wants (WHICH path was missing, in a chain of them) and it is blocked on F-0043, not on this taxonomy |
-| `utf8` | 7 (`fs.read_text/append_text/copy_file/move_file/read`, `io.input_line/prompt`) | none | conforming — no longer merely reserved: "these bytes are not text" is one actionable mode, and std cannot test it at this pin (F-0044) |
-| `denied` | 8 (the same fs family plus `fs.create`, whose row is `{denied, io}` — a directory it cannot write is `io` there, not `not_found`) | none | conforming, and **untestable at this pin**: making a file unreadable needs a permission call the language does not have (F-0044). Documented per function, observed nowhere |
+| `utf8` | 5 in `std.fs`/`std.io` (`fs.read_text/read`, `fs.read_dir`, `io.input_line/prompt`) plus `bytes.to_str` and `std.net.read` | none | conforming, and **witnessed at last**: `fs.write_bytes` can make a file that is not text, so `tests/fs/utf8_row.lu` rides the tag out of `main`. It also LEFT three signatures at the sc12 (02-os) pin — `append_text`, `copy_file`, `move_file` stopped decoding anything (F-0045/F-0044 closed), and a row a function can no longer raise does not stay in it |
+| `denied` | 17 (the whole `std.fs` host-reaching surface, `fs.create` included — whose row is `{denied, io}`, since a directory it cannot write is `io` there, not `not_found`) | none | conforming, and **still untestable**: making a file unreadable needs a permission call the language does not have. It is the last fs tag with no witness now that `utf8` has one, and the module header says so in those words. Documented per function, observed nowhere |
 | `eof` | 3 (`fs.read`, `io.input_line`, `io.prompt`) | none | conforming — an END is an outcome, not a failure, which is why it is its own noun rather than `none` (the same ruling as `done`) |
 | `gone` | 0 in std (the language's own `weak.upgrade`, `[mem.shared.rc.3]`) | none | conforming, reserved |
 
@@ -136,7 +136,11 @@ What the tier reveals about §12's rules:
   writable from wolf at this pin (F-0044). §10's "accuracy is a measured
   contract" has an error-tier counterpart, and this is it: a tag std
   cannot witness says so on the function and in the test header, and no
-  test claims otherwise.
+  test claims otherwise. **(One of the two came off this list at the sc12
+  (02-os) pin: `fs.write_bytes` makes a file that is not text, so `utf8`
+  is witnessed the same way `not_found` is. `denied` is still there, and
+  `cross_device` joined it — a tag `move_file` HANDLES rather than raises,
+  whose trigger needs two filesystems.)**
 
 ## The os tier's later tags (sc08, sc10, sc11)
 
@@ -219,3 +223,34 @@ core).
   (§14's rule for a pure tier), which is why the test that matters rides
   it out of `main` rather than asserting it in a handler.
 
+
+
+## sc12 (02-os): three marks from the fs surface, and a row that left
+
+The s90 fs wave adds three marks to §12's inventory, all payload-free by
+that section's casing rule, all adopted from the toolchain verbatim (§14's
+rule for the fifth time — fs, io, net, process, and now the widened fs):
+
+| tag | sites | payload | verdict |
+|---|---|---|---|
+| `exists` | 1 (`fs.create_dir`) | none | conforming — "it was already here" is a different outcome from "I made it", and a caller that wanted idempotence has `create_dir_all` beside it. It is the first std tag whose NAME collides with a `pub fn` in the module that raises it (`fs.exists`), which F-0036 says can make a tag ride out as the function with no `else` firing; measured not to here, on both compiler rungs, and held as `tests/fs/exists_row.lu` |
+| `invalid` | 2 (`fs.write_bytes`, `fs.write_chunk`) | none | conforming — a `List[int]` element outside 0..255, which the interim byte currency (§11) makes spellable. Reused from `std.env`'s inventory rather than given a synonym |
+| `cross_device` | 0 raised, 1 handled (`fs.move_file`) | none | conforming, and the interesting shape: it is declared by `fs_rename` precisely so a std wrapper can FALL BACK on it, so it appears in no public signature here. A tag std handles is not a tag std hides — the doc names it, and the module header says its trigger has no portable litmus |
+
+**A row LEFT three signatures, which is the second time std has removed one**
+(after `boundary` at sc14). `append_text`, `copy_file` and `move_file` all
+carried `utf8` because all three DECODED: the append read the file back, and
+the copy and the move were `read_text` + `write_text`. None of them decodes
+now, so none of them can raise it, and §14's rule cuts both ways — a
+function's row is the union of what its delegates raise minus what it
+handles, and a tag that survived the delegate that raised it is a lie a
+caller writes a handler for.
+
+**One tag is DELIBERATELY not in a signature it could have been in.**
+`fs_write_bytes` declares `invalid`; `copy_file` calls it and does not
+declare it, because the bytes came out of `fs_read_bytes` one line earlier
+and are bytes by construction. The handler answers `io` on that unreachable
+arm rather than widening the signature. The same tag IS on `write_bytes` and
+`write_chunk`, where the list is the caller's. Whose data it is decides
+whether a tag is reachable, and the two functions sit four lines apart to
+make the difference readable.

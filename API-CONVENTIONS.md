@@ -559,7 +559,8 @@ section's worked home, as `std.option` is §2's.
   `parse`, `base`, `utf8`, `overflow`, `div_zero`, `deep`, ~~`boundary`~~
   (RETIRED at sc14 — see below), `syntax` (sc14, `std.json`'s malformed
   document), and, from the os tier, `not_found`, `denied`, `io`, `missing`,
-  `invalid`, `refused`, `timeout`, `closed`, `signal`. A
+  `invalid`, `refused`, `timeout`, `closed`, `signal`, and — from sc12
+  (02-os)'s widened fs tier — `exists` and `cross_device`. A
   payload-carrying tag is CapCase and names its payload TYPE:
   `Parse(ParseErr)`. The case is the reader's signal about whether there
   is anything to destructure.
@@ -1004,7 +1005,82 @@ handler said `syntax` and the record said `deep` about the same document — so
 the rule it earns is general: **when two ways of observing one value
 disagree, bisect the observers before the code.**
 
+
+**§14 amendment (sc12, 02-os): what happens when the tier a module was
+writing around finally lands.** `std.fs` is the first module of this section
+to have its OWN contracts filled rather than a new module's written, and the
+five rules that came out of doing it are all about the second half of a
+capability's life.
+
+- **A row is deleted the day its delegate stops raising it.** `append_text`,
+  `copy_file` and `move_file` all carried `utf8` because all three DECODED —
+  the append read the file back, the copy and the move were `read_text` +
+  `write_text`. None of them decodes now, so `utf8` came off all three
+  signatures in the same commit as the bodies. This is §14's union rule read
+  in the shrinking direction, and it needs saying because the growing
+  direction is the one that feels like work: **a tag that outlives the
+  delegate that raised it is a lie a caller writes a handler for**, and it
+  costs a caller more than an added tag ever does.
+- **A row is NOT added for a tag the function's own arguments cannot reach,
+  and the coarsening goes in a private helper.** `fs_open_mode` declares
+  five tags across its five modes; with the mode fixed at 2 by std rather
+  than by a caller, `invalid` (a mode outside the set) and `exists` (mode 4
+  losing its exclusive create) cannot happen, so a private `append_fd`
+  handles both — answering `io`, which is truthful if a future pin ever does
+  reach them — and `append_text`/`open_append` carry three tags instead of
+  five. The same judgement leaves `invalid` off `copy_file` (its bytes came
+  out of `fs_read_bytes`) and ON `write_bytes` (the list is the caller's).
+  **Whose data it is decides whether a tag is reachable**, and two functions
+  that differ only in that should sit near each other so the difference is
+  readable.
+- **A contract can be answered by a DECISION, and then it is withdrawn
+  rather than left open.** `std.fs.rename` was a reviewed contract for an
+  ATOMIC move. The language deliberately does not promise atomicity — POSIX
+  replaces a destination atomically, windows `MoveFileEx` is documented to
+  replace but not to replace atomically, and upstream's platform rule says a
+  promise that cannot be kept on a tier-1 target does not get a `#[cfg]`
+  keeping it on two out of three — so there is no `fs_rename_atomic` and
+  there will not be. std adopts that reading instead of re-promising it one
+  level up: `move_file` is the wrapper, there is no second name for the same
+  call, and the module header records the withdrawal with the reason. A
+  contract left open forever because its exact words were never met is worse
+  than a withdrawal that says what happened.
+- **When the toolchain hands std a tag whose TRIGGER has no portable litmus,
+  the tag is still documented and the gap is stated in three places.**
+  `cross_device` appears in no `std.fs` signature because `move_file`
+  HANDLES it, and its fallback therefore cannot be reached by any test in
+  this repository (it needs two filesystems). §14's sc11 posture applies
+  unchanged: say so on the function, in the module header and in the report,
+  and never let a green rig imply coverage. What DID become witnessable is
+  worth the same honesty in reverse — `utf8` had been declared on
+  `fs.read_text` since sc07 and observed nowhere, and the moment
+  `write_bytes` existed it got the same standard of evidence as
+  `not_found`: a tag ridden out of `main` where the record names it.
+- **An optimization that lands does not license undoing the algorithm it
+  forced.** §9's sc12 amendment ruled that a shape costing a lane is not a
+  shape std writes, and the lane cost is gone (F-0071 closed at this pin:
+  the checked tier models all seven byte-view positions). std's walks did
+  not go back to indexing, because the one-pass forms are SHORTER than what
+  they replaced. The rule the pair leaves: a constraint that produced a
+  better body has paid for itself, and the closure buys the NEXT body an
+  option rather than obliging this one to change. Where the code stays, the
+  doc must still move — a comment claiming a live refusal that has closed is
+  the sc13 failure mode, so each of the six sites now reads "was refused
+  when this was written, closed at the sc12 pin, kept because".
+
 ## Review record
+
+- 2026-08-22, sc12 (02-os) amendments: §14 gains the second-half-of-a-
+  capability rules (a row deleted when its delegate stops raising it; a row
+  not added for a tag the arguments cannot reach, with the coarsening in a
+  private helper and "whose data it is" as the test; a contract answered by a
+  DECISION and therefore withdrawn, with `rename`'s atomicity as the worked
+  case; a handled tag documented anyway when its trigger has no portable
+  litmus, and its mirror — a declared tag gaining a witness the day the
+  surface allows one; and the rule that an optimization's closure does not
+  license undoing the algorithm it forced). §12's mark inventory gains
+  `exists`, `invalid` (reused) and `cross_device`. Review rides the same
+  pending sc00 gate.
 
 - 2026-08-21, sc14 amendments: §14 gains the debt clause's first COMPLETE
   cycle (the four contracts paid on the date, the symmetric tag/function

@@ -1043,3 +1043,186 @@ files run in 0.00–0.21s each on the interpreter lane (measured, same host),
 because a scanner that WALKS is linear there (sc12's measurement, unchanged)
 and this sprint's scanner was written to walk.
 
+
+## 13. sc12 (02-os) — the fs surface std was writing around
+
+The sprint number is reused: this is `sprints/stdlib/02-os/sc12-fs-on-the-
+real-surface.md`, written after sc14 in wall time and numbered into the os
+campaign. Where an earlier entry in this file says "sc12", it means the byte
+view sprint (§10); this section says "sc12 (02-os)" throughout.
+
+### The pin
+
+wolf trunk `27cdb14` -> **`02c1e88`**, lupin **unchanged** at 0.1.12 — the
+first compiler-only bump this repository has taken, and the first since sc11
+to move a ledger row. Both ritual gates green in the checkout at the sha on
+the FIRST attempt, exit codes written to a file as they happened rather than
+read off a summary line (F-0063's lesson). Seventh clean pair; F-0054 stays
+open on the reasoning it has stayed open on since sc09.
+
+Three waves, and unlike the last three bumps none of them is invisible here:
+
+- **s90 (#51/#52/#69)** — fifteen `fs_*` builtins plus `os_exe`, lowered
+  natively in the same wave (`RT_SYMBOLS` 83 -> 94). Modes (including a real
+  append), whole-file and handle byte io, directories, metadata, and
+  `fs_rename` with a `cross_device` row.
+- **s88 (#100/#101/#103/#88)** — four holes, two of them this repository's
+  findings: `bool == bool` lowers natively (F-0076) and a temporary can be
+  read from (F-0071).
+- **s89 (#85/#86)** — the argument position is a LEND, so eight of
+  `std.bytes`' nine functions stop copying (F-0072).
+
+### What changed in `std/`
+
+**`std.fs` goes from 15 functions and one type to 29 and one type.** Fifteen
+of the sixteen s90 builtins are wrapped (`os_exe` is the exception and its
+absence is argued in `std.process`'s header); one builtin mode
+(`fs_open_mode`'s exclusive create-new) is wrapped by nothing yet and the
+module header records the decision rather than leaving it to be noticed.
+
+| function | what it is now |
+|---|---|
+| `append_text` | `fs_open_mode(path, 2)` + one write + one close. Reads no existing byte, asks no question whose answer can change under it, and **lost its `utf8` row** |
+| `copy_file` | `fs_read_bytes` + `fs_write_bytes`. **Lost `utf8`**; a file holding a lone `0x80` survives it |
+| `move_file` | `fs_rename` as the fast path, copy-then-remove as the FALLBACK behind `cross_device` and `exists`. **Lost `utf8`** |
+| `read_bytes`, `write_bytes` | whole-file byte io. `write_bytes` keeps `invalid` because the list is the caller's |
+| `read_chunk`, `write_chunk` | the fd tier in bytes — the honest answer to `read`'s documented `utf8` limit, which had been filed for four sprints |
+| `open_append` | the append handle, for a program that appends more than once |
+| `read_dir` | entry NAMES, sorted, with the promise carried into std's doc rather than left a builtin detail |
+| `create_dir`, `create_dir_all`, `remove_dir`, `remove_dir_all` | strict and recursive, in both directions |
+| `is_file`, `is_dir`, `size`, `modified_ms` | the metadata four, the predicates total like `exists` |
+
+**`std.bytes` gains no function and loses a copy per call.** Its nine
+`List[int]` takers are unchanged as source; s89 made eight of them lendable,
+which is a property of their BODIES rather than of their signatures, and the
+module header now explains the verdict (`to_str` is the ninth and
+materializes because it hands its parameter to a builtin). The doc examples
+moved to `"…".bytes()` because that is the call a reader should now write.
+
+### The rows that moved, and the rule they moved under
+
+A function must not keep a row it can no longer raise, nor drop one it
+still can — which cut three ways this sprint.
+
+- **`utf8` left three signatures** (`append_text`, `copy_file`,
+  `move_file`), because all three decoded and none of them does now. That is
+  the second tag std has removed from a shipped signature (after `boundary`
+  at sc14), and it is the same posture: a library at this stage does not
+  carry a tag to avoid a change.
+- **Three marks joined the inventory** — `exists`, `invalid`,
+  `cross_device` — adopted verbatim, which is §14's rule for the fifth time.
+  `cross_device` appears in no public signature because `move_file` HANDLES
+  it; it is documented anyway, because a tag std handles is not a tag std
+  hides.
+- **`invalid` is on `write_bytes` and NOT on `copy_file`**, four lines
+  apart, and the difference is whose data it is: a caller can spell a
+  non-byte, and `fs_read_bytes`'s output cannot be one. The unreachable arm
+  answers `io` rather than widening the signature — which is also why
+  `append_text` and `open_append` do not carry `exists` and `invalid` from
+  `fs_open_mode`'s five-mode row: one private helper fixes the mode at 2 and
+  coarsens the two tags that mode cannot reach.
+
+### The acceptance witness, and the one measurement this rig cannot take
+
+**A byte, not a stopwatch.** `tests/fs/binary_round_trip.lu` writes
+`00 80 FF 0A C0`, reads it back, copies it, moves it, and checks every byte
+at every step — with `read_text` on the same file asserted to MISS, so the
+file is provably not text. It could not have been written at any earlier
+pin: nothing could put an `0x80` in a file, and `copy_file` would have
+refused it.
+
+**For the append the evidence is syscalls**, because §9's sc12 rule says a
+claim about what an implementation COSTS is somebody else's test unless you
+can take the measurement — and here, off to the side of the rig, it can be
+taken. `strace` on the native rung, one 14-byte append to a 1 MiB log,
+counting only calls that touch the file:
+
+| | syscalls on the file | bytes read | bytes written |
+|---|---|---|---|
+| the old body, transcribed verbatim | 8 | 1 048 576 | 1 048 590 |
+| `fs.append_text` at this pin | 3 | **0** | 14 |
+
+The old body's extra `statx` is `fs_exists` — the check-then-use race its
+own doc had to warn about — and it is absent from the new one because the
+question is not asked. **No doc in `std/` states this number**: the tests
+pin the SEMANTICS (an append to a file the text tier cannot read, which the
+old body could not have done at all), and the cost lives here and in
+F-0045's closure note, where a reader can see how it was measured.
+
+### The ledger at these pins
+
+205 tests × 3 lanes:
+
+| lane | run | unsupported | fail(E…) | (sc14) |
+|---|---|---|---|---|
+| lupin | **158** | 47 | 0 | 157 / 39 / 0 |
+| wolfc `--checked` | **164** | 37 | 4 | 154 / 38 / 4 |
+| native | **113** | 88 | 4 | 103 / 89 / 4 |
+
+**Two rows move from the bump alone and nine are new.** `fmt/parse_bool.lu`
+lights its native column (F-0076) and `str/byte_view_index.lu` lights its
+wolfc column (F-0071) — both measured before a single edit to `std/`, which
+is the only way to attribute them honestly. The nine new rows: six `fs`
+files at two lanes each, one `bytes` file at three, and two `str` files
+(F-0071's closure, split from its surviving half so the three-lane file
+stays three-lane).
+
+Doc examples: **351 blocks**, up from 337.
+
+### The blocked inventory
+
+F-0049 (5), F-0050 (1), F-0046 (1), F-0004 (2), F-0058 (1), F-0061 (1),
+F-0065 (6) stand as sc14 recorded them.
+
+**`std.fs` LEAVES the six-contract block it has carried since sc07.** Five
+became code; the sixth — an ATOMIC `rename` — is **WITHDRAWN rather than
+delivered**, and that is the entry worth reading twice. The contract asked
+for atomicity; the language deliberately does not promise it, because POSIX
+replaces a destination atomically and windows `MoveFileEx` does not, so
+upstream ships `fs_rename` claiming the EFFECT and no `fs_rename_atomic` at
+all. std adopts that reading rather than re-promising one level up. A
+contract can be answered by a decision instead of by code, and the honest
+record of that is a withdrawal with the reason, not a contract left open
+forever.
+
+Two path contracts stay and one had its citation corrected: `stem` /
+`extension` was never blocked by F-0044 at all — it is a design question
+about what a dot means that this module has not answered — and a header that
+cites a closed finding is the failure mode sc13 named.
+
+### Findings
+
+**Five close** (F-0044, F-0045, F-0071, F-0072, F-0076) and **two are
+filed**:
+
+- **F-0080** — the net tier has no byte-level read or write, where the fs
+  tier now does. The same gap, the same fix, shipped one tier over; and it
+  is worse on a socket than it was on a file, because the boundary is the
+  network's packetization rather than the caller's chunk size, so the same
+  program is right on loopback and wrong across a fragmenting link.
+- **F-0081** — lupin declines the s38 fs names with a sentence and refuses
+  the s90 names with the generic unknown-name message. It costs no ledger
+  row and never will. It costs the reader's ability to tell a POSTURE from
+  DRIFT, which this repository has now had turn out to be the whole question
+  twice (F-0070, F-0075).
+
+Both closures on the byte view are worth one line together: **an
+optimization finding and a capability finding close the same way**, and
+neither moved a signature. F-0072 changed what a CALL costs and F-0071
+changed what a BODY may write, and std's answer to both was to leave the
+code alone — the walks are shorter than the indexed forms they replaced, and
+the lend needs no spelling at the call site. The sprint's whole surface
+change is in `std.fs`.
+
+### Still refused, said out loud
+
+`os_spawn`/`os_wait`/`os_kill`, the `net_*` seven and the `json_*` four are
+**still checked-lane only**, refused by name in native lowering and declined
+by design under lupin — all re-measured at this pin (`os_spawn` natively:
+`unsupported — process builtins in native lowering (checked lane only at
+s40)` at `mem`). `os_exe` landing in the same wave as the fs surface does
+not change that, and the one doc that could have implied otherwise now says
+so: `std.process`'s header retires the clause "a wolf program cannot learn
+its own path" — true from sc11 to sc12, false now — and states that F-0066
+stays OPEN because its other two legs hold. A finding whose cheapest fix
+arrives is not a finding that closed.

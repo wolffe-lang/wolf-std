@@ -50,8 +50,8 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0041 | 2026-08-13 | (sc06 Target 2) **The error-set alias surface** — s15's parked amendment, filed with the measured cost: 49 `pub` signatures carry a row across 16 modules, 11 distinct shapes, 45 of them one tag and 4 of them two, and NOTHING exceeds two. Core does not need aliases yet and the filing says so; what it argues is the semantics (`error Set Name = {…}` as a transparent name, never nominal — from D30) and the io taxonomy that makes it urgent in stdc02, plus the `try`⇄Result bridge's standing dependency on s16 | wolf-lang s03 grammar + s37 (std error taxonomy owners) | [filed: wolf-lang#36](https://github.com/wolffe-lang/wolf-lang/issues/36) |
 | F-0042 | 2026-08-13 | (sc06 Target 6) **`wolf test` must subsume this rig without rewrites** — the s39 alignment requirements, with the rig as the working reference: directive-header compatibility (`check:`/`phase:`/`conforms:` verbatim), one trap expectation per entry file as the catch mechanism, subtest naming (Go 12166), a `--json` record stream (Go 2981), the three-lane ledger as a first-class concept, and the D36 bench-format reservation so `std.bench` can land in stdc02+ without a format war | wolf-lang s39 (+ D36 owners) | [filed: wolf-lang#34](https://github.com/wolffe-lang/wolf-lang/issues/34) |
 | F-0043 | 2026-08-14 | (sc07 Targets 1-3) **A multi-tag error row cannot be branched on at all**, which is the io tier's whole vocabulary: a bare identifier in an `else` handler BINDS instead of matching (`else \|eof\|` fires for `io` too — measured on a `-> str ! {eof, io}` raising each tag), and a payload pattern is now refused by wolfc as refutable (`E0806: this pattern can fail to match, but a binding cannot`) even for a ONE-tag row, while lupin executes it. So API-CONVENTIONS §13's own row-expectation convention (`else \|Tag(p)\|`) is a compiler rejection, `std.io.input_all` cannot tell end-of-input from a read error, and the `NotFound{path}` payload retrofit the sprint contract predicted would not help until this closes | wolf-lang s14/s15 (else-handler patterns) + wolf-interp | [filed: wolf-lang#43](https://github.com/wolffe-lang/wolf-lang/issues/43) — **CLOSED at sc11**: s71 ruled the handler pattern (#43/#59), so a covering pattern binds its payload on all three lanes (`E0809` names the tags left out) and the `E0806` half is gone. With F-0052 closed at s70, both blockers of `io.input_all`/`net.read_all` are retired and both functions ship in sc11 |
-| F-0044 | 2026-08-14 | (sc07 Target 1) **The fs builtin set is nine calls wide and five std functions cannot be written honestly over it**: no `read_dir` (so no directory listing at all), no byte-level read or write (so `copy_file`/`move_file` are TEXT operations that refuse a non-UTF-8 file, and a fixed-size `read` can split a code point and raise `utf8`), no atomic `rename`, no `create_dir`/`remove_dir`, no metadata (`size`, `modified`, `is_file`). Also: `denied` and `utf8` have no portable litmus, so std ships two documented tags it cannot test | wolf-lang s38 owners (the fs builtin tier) | [filed: wolf-lang#51](https://github.com/wolffe-lang/wolf-lang/issues/51) (filed late, at sc08 — re-verified unmoved) |
-| F-0045 | 2026-08-14 | (sc07 Target 1) **`fs_open` has no mode**: it opens read-only and `fs_create` truncates, so there is no append-mode open and no read-write handle. `std.fs.append_text` is therefore read-concat-write — linear in the FILE's size rather than the text's, non-atomic, and carrying a `utf8` row for the existing contents it must decode. The ask is an open-mode argument (or `fs_open_append`), and a positioned write | wolf-lang s38 owners | [filed: wolf-lang#52](https://github.com/wolffe-lang/wolf-lang/issues/52) (filed late, at sc08 — re-verified unmoved) |
+| F-0044 | 2026-08-14 | **CLOSED at the sc12 (02-os) pin** (s90, wolf-lang#51/#52: fifteen new `fs_*` builtins, natively lowered in the same wave). Five contracts became code and one — an ATOMIC `rename` — was WITHDRAWN rather than shipped, because the language deliberately does not promise atomicity on a tier-1 target windows cannot keep it on. The filing as it stood: (sc07 Target 1) **The fs builtin set is nine calls wide and five std functions cannot be written honestly over it**: no `read_dir` (so no directory listing at all), no byte-level read or write (so `copy_file`/`move_file` are TEXT operations that refuse a non-UTF-8 file, and a fixed-size `read` can split a code point and raise `utf8`), no atomic `rename`, no `create_dir`/`remove_dir`, no metadata (`size`, `modified`, `is_file`). Also: `denied` and `utf8` have no portable litmus, so std ships two documented tags it cannot test | wolf-lang s38 owners (the fs builtin tier) | [filed: wolf-lang#51](https://github.com/wolffe-lang/wolf-lang/issues/51) (filed late, at sc08 — re-verified unmoved) |
+| F-0045 | 2026-08-14 | **CLOSED at the sc12 (02-os) pin** (s90, wolf-lang#52: `fs_open_mode(path, mode)` with five modes, mode 2 a real `O_APPEND`/`FILE_APPEND_DATA` handle). `std.fs.append_text` is open-write-close, reads zero bytes of the file (measured: three syscalls touching a 1 MiB log, none of them a read, against eight and a whole-file read for the old body) and has lost its `utf8` row. The filing as it stood: (sc07 Target 1) **`fs_open` has no mode**: it opens read-only and `fs_create` truncates, so there is no append-mode open and no read-write handle. `std.fs.append_text` is therefore read-concat-write — linear in the FILE's size rather than the text's, non-atomic, and carrying a `utf8` row for the existing contents it must decode. The ask is an open-mode argument (or `fs_open_append`), and a positioned write | wolf-lang s38 owners | [filed: wolf-lang#52](https://github.com/wolffe-lang/wolf-lang/issues/52) (filed late, at sc08 — re-verified unmoved) |
 | F-0046 | 2026-08-14 | (sc07 Target 2) **The io tier's three gaps, from writing the facade**: `conform-run` cannot inject stdin (the checked machine's `run_checked_with_input` exists but no flag reaches it), so std can witness only `eof` and `read_all`/`prompt`'s hit paths are untestable in this rig; there is no `read_all` builtin, and a line read strips the terminator, so the whole-input operation cannot be composed from `read_line` even with a working handler; and writes are infallible with no flush, so `prompt` cannot guarantee its prompt appears before the read | wolf-lang s38 + s39 (`wolf test` stdin) | its deny-warnings half is [filed: wolf-lang#49](https://github.com/wolffe-lang/wolf-lang/issues/49) with F-0053; the stdin and flush asks are re-verified unmoved at sc11 (`--deny-warnings` is still `unknown flag`) and still unfiled on their own. **RE-SHAPED at sc11**: `std.io.input_all` SHIPS — the blocker was never this finding but the handler that could not discriminate (F-0043/F-0052, both closed) — so the surviving read ask is byte-exactness, not composition: a line read strips terminators, so `"a\nb"` and `"a\nb\n"` are indistinguishable through std and `io.read_bytes` is the contract that replaces the old `read_all` one |
 | F-0047 | 2026-08-14 | (sc07 Target 2) **Silent wrong answer, and a name std cannot have**: a module item whose name matches an AMBIENT PRELUDE name resolves differently in the two implementations. `pub fn read_line() { read_line()? }` in `std.io` — the obvious facade — delegates to the builtin under wolfc and recurses forever under lupin (`unsupported — call depth exceeded 512 frames`), with no diagnostic on either side; the reverse case (`assert`) shadows the intrinsic module-wide in both. std renamed its reader `input_line` rather than depend on a resolution order. The ask: retire the ambient host names now that the real std surface exists (the prelude's own comment promises exactly that), and rule the shadowing question for the names that stay | wolf-lang resolve owners + wolf-interp | [filed: wolf-lang#44](https://github.com/wolffe-lang/wolf-lang/issues/44) |
 | F-0048 | 2026-08-14 | **The checked lane's verdict is not deterministic**: the same program, same binary, same inputs answers `exit(0)` or `unsupported — place projection outside the modelled surface` at random — measured 5 of 12 runs one way and 7 the other on `tests/str/byte_length_honesty.lu`, and reproduced on `tests/str/interpolation_interplay.lu` (2 of 136 tests, both `str`-heavy). Verdict stability is a conformance property, not a nicety: spec/06's differential protocol compares records across implementations, and this rig's ledger gate cannot express "sometimes" without the `unstable(…)` vocabulary this sprint had to add | wolf-lang s23/s31 (checked execution) | [filed: wolf-lang#42](https://github.com/wolffe-lang/wolf-lang/issues/42) — **CLOSED and RETIRED at the sc08 pin** (14-for-14 deterministic on both files) |
@@ -77,17 +77,19 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0068 | 2026-08-18 | **`conform-run <bare-name.lu>` says the wrong thing**: a path with no directory component has an empty parent, so the package root is searched in nowhere and the message is "the package root has no wolf source files" about a directory holding exactly one `.lu` file. `./main.lu` works. No cost to this rig (it passes absolute paths) and every cost to a person at a prompt. The ask: normalize `Path::parent` of a bare name to `.`, and name the root that was searched | wolf-lang driver owners | sc11 evidence; unfiled at report time, routed with the closeout |
 | F-0069 | 2026-08-18 | **`?` inside a `comptime fn` is `unsupported`, and it MASKS the capability refusal**: a row RETURN, a raise and an `else` all evaluate at comptime; `let v = inner(x)?` answers `unsupported` at resolve with an empty `diagnostics` array. The interaction is the finding — `tests/process/comptime_refuses.lu` written the obvious way (`os_kill(slot)?`) answers `unsupported` instead of `fail(E0701)`, so a D33 rejection test proves NOTHING while looking healthy, and the bare-call form trips `W0601` (a discarded `() ! {io}`) which this rig denies. Two asks: support `?` or refuse it by name (F-0060's shape again), and make the permanent check (the sandbox) win over the temporary one (the subset) | wolf-lang s16 (CTFE engine) owners | sc11 evidence; unfiled at report time, routed with the closeout |
 | F-0070 | 2026-08-18 | **lupin 0.1.8 has four fifths of the os/env builtin family**: `env_args`, `env_get`, `env_set`, `os_cwd`, `os_exit` and every `time_*` call run at its own conformance pin; `env_vars` "does not resolve" — the generic unknown-name refusal, not the reasoned decline this machine gives `fs_*`/`net_*`/`json_*`/the process trio, so it reads as an oversight. Costs one ledger row (`tests/env/args_and_vars.lu`) and nearly cost three documents a wrong sentence: **a builtin FAMILY is not a unit of evidence; a builtin is** | wolf-interp | sc11 evidence; unfiled at report time, routed with the closeout |
-| F-0071 | 2026-08-19 | **wolfc's checked tier models two of s77's seven byte-view positions**: `for b in s.bytes()` and `s.bytes().len` run on all three lanes, while `s.bytes()[i]` is `unsupported — indexing outside the modelled surface` and `.get(i)`/`.first()`/`.count()` are `unsupported — List method on a temporary`, both at `mem` — the materialized shape (`let bs = s.bytes()` then `bs[i]`) still runs everywhere, so the gap is the TEMPORARY and not the operation. std cannot spend a lane on a performance shape, so seven bodies were rewritten onto `for`-and-counter forms (including a UTF-8 decoder turned into a one-pass state machine) rather than onto the fast indexed ones | wolf-lang s77/s23 (checked execution) | [filed: wolf-lang#85](https://github.com/wolffe-lang/wolf-lang/issues/85), held as `tests/str/byte_view_index.lu` |
-| F-0072 | 2026-08-19 | **A byte view cannot cross a function boundary, so `std.bytes`' nine functions are copy-only**: s77 materializes in every non-consuming position — a `let`, an argument, a return — which is the right conservative default and means `bytes.is_utf8(bytes.from_str(s))` copies `s` where `str.char_count(s)` walks it. The difference is the PARAMETER, not the implementation, and the library cannot fix it from its side. The ask is the `Bytes` type this repo has documented as an interim since sc05, or a mode that lets a callee borrow `{ptr, len}` (which a `str` parameter already is), plus a spec rule about which positions materialize — today that is discoverable only from a comment in `wolf_wir::lower` | wolf-lang s37/s77 core types | [filed: wolf-lang#86](https://github.com/wolffe-lang/wolf-lang/issues/86) |
+| F-0071 | 2026-08-19 | **CLOSED at the sc12 (02-os) pin** (s88, wolf-lang#85: "a temporary can be read from"). All five refused shapes — `s.bytes()[i]`, `.get(i)`, `.first()`, `.last()`, `.count()` — execute on the checked tier now, re-measured one at a time; `tests/str/byte_view_index.lu` advanced from `unsupported` to `run` and grew the two shapes it did not cover. std did NOT undo the rewrites: the one-pass state machine is shorter than the indexed walk it replaced. **One half survives on the other machine and is its own row now**: lupin has no `first`/`last` on a `List` at all (`tests/str/byte_view_first_last.lu`). The filing as it stood: **wolfc's checked tier models two of s77's seven byte-view positions**: `for b in s.bytes()` and `s.bytes().len` run on all three lanes, while `s.bytes()[i]` is `unsupported — indexing outside the modelled surface` and `.get(i)`/`.first()`/`.count()` are `unsupported — List method on a temporary`, both at `mem` — the materialized shape (`let bs = s.bytes()` then `bs[i]`) still runs everywhere, so the gap is the TEMPORARY and not the operation. std cannot spend a lane on a performance shape, so seven bodies were rewritten onto `for`-and-counter forms (including a UTF-8 decoder turned into a one-pass state machine) rather than onto the fast indexed ones | wolf-lang s77/s23 (checked execution) | [filed: wolf-lang#85](https://github.com/wolffe-lang/wolf-lang/issues/85), held as `tests/str/byte_view_index.lu` |
+| F-0072 | 2026-08-19 | **CLOSED at the sc12 (02-os) pin** (s89, wolf-lang#86: the argument position is a LEND). Eight of the nine take a view without copying, `to_str` materializes because a builtin consumer does, and a lend that would outlive its call is `E1015` rather than a silent copy. The ask was answered in the shape it was asked in — a mode-like borrow rather than a new type — and the `Bytes` type this repo wants is still open on its own merits. The filing as it stood: **A byte view cannot cross a function boundary, so `std.bytes`' nine functions are copy-only**: s77 materializes in every non-consuming position — a `let`, an argument, a return — which is the right conservative default and means `bytes.is_utf8(bytes.from_str(s))` copies `s` where `str.char_count(s)` walks it. The difference is the PARAMETER, not the implementation, and the library cannot fix it from its side. The ask is the `Bytes` type this repo has documented as an interim since sc05, or a mode that lets a callee borrow `{ptr, len}` (which a `str` parameter already is), plus a spec rule about which positions materialize — today that is discoverable only from a comment in `wolf_wir::lower` | wolf-lang s37/s77 core types | [filed: wolf-lang#86](https://github.com/wolffe-lang/wolf-lang/issues/86) |
 | F-0073 | 2026-08-19 | **The `--version` pairing line is a hardcoded constant and it rots**: trunk `f8dca42` says "paired with lupin 0.1.8" one day after lupin 0.1.10 shipped, and 0.1.10's own conformance pin is ten commits BEHIND that sha — so the two binaries really are meant to be used together and the line says otherwise. The line is genuinely useful (F-0064 taught this rig to read it), which is exactly why a claim inside a shipped binary needs a mechanism keeping it true: a reader trusts it more than a note | wolf-lang release owners | [filed: wolf-lang#87](https://github.com/wolffe-lang/wolf-lang/issues/87) |
 
 | F-0074 | 2026-08-19 | **CLOSED at lupin 0.1.12** (wolf-interp#24: the cost was the METHOD CALL copying the receiver four times, not `push`; the fix lends it — 32k pushes 30.33s → 0.191s upstream's numbers, and this repo's slowest test 41.5s → 33.5s on one loaded host). **The index read is NOT fixed and is F-0078.** The filing as it stood: **`List.push` is O(n) per push under lupin, so every `List`-returning std function is quadratic on the reference lane**: 4k/8k/16k/32k pushes take 0.46/1.91/7.83/37.53s (doubling N quadruples the time) where both compiler rungs finish 32k in 0.14s of whole-process time. Suffix slicing and `starts_with` are both linear, measured, so it is the list representation and not the scanner shape. It is the ceiling behind this rig's slowest test (`fmt/decimal/shortest_round_trip.lu`, 28-35s against a 60s per-test limit, timed out once under load this sprint) and std cannot write around it: pushing into a fresh list IS the portable spelling (sc04's rule, because index assignment runs on one lane). Also measured: 0.1.10 is ~15% slower than 0.1.8 on that test | wolf-interp | [filed: wolf-interp#24](https://github.com/wolffe-lang/wolf-interp/issues/24) |
 
 | F-0075 | 2026-08-20 | **CLOSED at lupin 0.1.12** (one release after filing, re-measured with the finding's own reproducer at sc14: `str_from_utf8([195, 169])` is `é`, `[255]` is the `utf8` row). Two ledger rows advance and the doc rig's tier-waiver list is empty again. The filing as it stood: **lupin 0.1.11 does not have s81's `str_from_utf8`**: the language's first bytes-to-str primitive is in the compiler's prelude (both rungs execute it) and the interpreter answers ``unsupported: `str_from_utf8` does not resolve`` — the generic unknown-name refusal, not the reasoned decline that machine gives `fs_*`, `net_*`, `json_*` and the process trio, so it reads as drift rather than posture (F-0070's shape, second occurrence). It costs `std.bytes.to_str` its interpreter lane the day the function lands: two ledger rows are `unsupported / run / run` where the module's other eight are three-lane, and `bytes.is_utf8` stays hand-written rather than delegating precisely so the predicate keeps the third lane | wolf-interp | [filed: wolf-interp#26](https://github.com/wolffe-lang/wolf-interp/issues/26) |
-| F-0076 | 2026-08-20 | **`bool` comparisons are `unsupported` on the native rung**: `a == b`, `a != b`, `a == true` and even `true == false` are all `unsupported — comparison outside integers/floats (str/enum compares, c06/std)` at `mem`, where `int` and `f64` have always lowered and `str` does since s81. The refusal names str and enums and does not name `bool`, which is why it has gone six sprints undiagnosed: `tests/fmt/parse_bool.lu` has carried a dark native column since sc05 for exactly this and the ledger attributed it to nothing in particular. It is cheap to write around (`!p` and a branch instead of `p == q`), and that is the argument for fixing it rather than against: nothing about a `bool` compare is hard, so a library pays a lane for a spelling | wolf-lang s28/native lowering | [filed: wolf-lang#100](https://github.com/wolffe-lang/wolf-lang/issues/100) |
+| F-0076 | 2026-08-20 | **CLOSED at the sc12 (02-os) pin** (s88, wolf-lang#100: "native: two bools can be compared"). `tests/fmt/parse_bool.lu`'s native column is lit after six sprints dark. std keeps the `!p`-and-a-branch spellings the finding prescribed — they cost nothing and reverting them would be churn. The filing as it stood: **`bool` comparisons are `unsupported` on the native rung**: `a == b`, `a != b`, `a == true` and even `true == false` are all `unsupported — comparison outside integers/floats (str/enum compares, c06/std)` at `mem`, where `int` and `f64` have always lowered and `str` does since s81. The refusal names str and enums and does not name `bool`, which is why it has gone six sprints undiagnosed: `tests/fmt/parse_bool.lu` has carried a dark native column since sc05 for exactly this and the ledger attributed it to nothing in particular. It is cheap to write around (`!p` and a branch instead of `p == q`), and that is the argument for fixing it rather than against: nothing about a `bool` compare is hard, so a library pays a lane for a spelling | wolf-lang s28/native lowering | [filed: wolf-lang#100](https://github.com/wolffe-lang/wolf-lang/issues/100) |
 | F-0077 | 2026-08-20 | **`List[int]()` inside a `comptime fn` is `unsupported` at resolve**, with no code and no reason string (F-0051's silence again), on both compiler rungs — `var k = 0`, a `str` literal, an `else` and a row return all evaluate there. The consequence is a rule rather than an inconvenience: **a pure builtin whose argument is a `List` cannot be reached at comptime at all**, because a `List` is the only way to spell the argument. `str_from_utf8` is the first such builtin and `std.bytes.to_str` is the first std function whose comptime story is "the sandbox has no objection and the engine cannot get there" | wolf-lang s16 (CTFE engine) | [filed: wolf-lang#101](https://github.com/wolffe-lang/wolf-lang/issues/101) |
 | F-0078 | 2026-08-21 | **The `List` INDEX READ is O(n) under lupin, and a read-mode `List` ARGUMENT copies the whole list per call** — the half of F-0074 that 0.1.12's lend did not reach. Measured at 2k/4k/8k/16k: `xs[i]` in a loop is 0.072/0.234/0.895/3.442s (four times per doubling) where `for v in xs` is 0.016/0.027/0.053/0.107s, and 20k calls of `fn value_at(bs: List[int], at: int)` over a 20k list is 58.1s against 5.3s for the same index read inline. It is why this repo's slowest test got 20% faster rather than 100× at the bump (base-10^9 limbs, indexed), and it changed a design decision inside the sprint: `std.json.parse`'s scanner walks `text.get(i..i + 1)` instead of materializing `s.bytes()` and indexing it | wolf-interp | [filed: wolf-interp#28](https://github.com/wolffe-lang/wolf-interp/issues/28) |
 | F-0079 | 2026-08-21 | **Silent wrong answer**: a multi-arm handler (`expr else \|e\| match e { … }`) takes its FIRST ARM for every tag when the row is raised by a function in an IMPORTED MODULE — measured in both arm orders (`fwd: 10 10 10`, `rev: 30 30 30` where both should be `10 20 30`), exit 0, no diagnostic. The same shape over an entry-file raise discriminates correctly on all three lanes, which is what `tests/errors/handler_discriminates.lu` holds. It is the mirror of F-0052 (the compiler's checked lane, closed at s70) and it costs the same thing: a loop that stops on one tag and re-raises the others is unwritable across a module boundary on the reference lane | wolf-interp | [filed: wolf-interp#29](https://github.com/wolffe-lang/wolf-interp/issues/29) |
+| F-0080 | 2026-08-22 | **The net tier has no byte-level read or write, where the fs tier now does.** `net_read` returns a `str` and raises `utf8`, so a TCP stream carrying non-ASCII text splits a code point across two reads and the second one is a miss — a caller cannot join the pieces, because the pieces it would join do not exist. This used to be the same gap as `std.fs`'s and s90 closed the fs half (`fs_read_chunk`/`fs_write_chunk` carry `List[int]`, no `utf8` row anywhere), so the shape of the fix is settled, measured and shipped one tier over: `net_read_bytes`/`net_write_bytes` with the same `List[int]` currency and the same `invalid` row for a non-byte element. Until then `std.net.read_all` is safe only over ASCII and says so, and the `utf8` row on `net.read` is a limitation of the surface rather than a property of the data | wolf-lang s39/s90 owners | sc12 (02-os) evidence; unfiled at report time, routed with the closeout |
+| F-0081 | 2026-08-22 | **lupin refuses the s90 fs names with the generic unknown-name message, where it declines the s38 ones with a sentence** — ``unsupported: `fs_read_dir` does not resolve`` beside "`fs_write_text` is the s38 io/fs surface; this machine has no filesystem (or injectable stdin) by design, so the fs tier is declined rather than mocked". Costs NO ledger row and never will: that machine has no filesystem under either sentence. What it costs is a reader's ability to tell a POSTURE from DRIFT, which is the exact distinction sc11 spent a sprint learning to record and which F-0070 and F-0075 both turned on — one of those was drift and closed on a release, the other was a decision. The ask is one line: put the s90 names in the same declined-by-design table as the s38 ones | wolf-interp | sc12 (02-os) evidence; unfiled at report time, routed with the closeout |
 
 
 ## F-0001 — the std search path
@@ -1246,6 +1248,30 @@ both implementations.
 
 ## F-0044 — the fs builtin set, and the five functions above it
 
+**CLOSED at the sc12 (02-os) pin** (s90, wolf-lang#51/#52). Fifteen new
+`fs_*` builtins land and the native rung lowers all of them in the same
+wave, so nothing std wrote over them has an unequal lane. Contract by
+contract: `read_dir` ships (names, sorted); `read_bytes`/`write_bytes` and
+`read_chunk`/`write_chunk` ship, so `copy_file` and `move_file` are byte
+operations and a file holding a lone `0x80` survives both;
+`create_dir`/`create_dir_all`/`remove_dir`/`remove_dir_all` ship;
+`size`/`modified_ms`/`is_file`/`is_dir` ship. **One contract was WITHDRAWN
+rather than filled**, and that is the finding's most interesting outcome:
+`rename` was asked for as an ATOMIC move, and upstream deliberately does
+not promise atomicity — POSIX replaces a destination atomically and windows
+`MoveFileEx` is documented to replace but not to replace atomically, so
+there is no `fs_rename_atomic` and there will not be. `fs_rename` claims
+the EFFECT, `std.fs.move_file` wraps it with copy-then-remove behind the
+`cross_device` row, and the atomically-promisable primitive the language
+does offer everywhere is `fs_open_mode`'s exclusive create-new. std adopted
+that reading instead of re-promising one level up. Two rows this repository
+could never observe are still unobserved and still documented: `denied`
+needs a permission call, `cross_device` needs two filesystems. `utf8` left
+that list — `fs.write_bytes` can make a file that is not text, so
+`tests/fs/utf8_row.lu` witnesses the tag the toolchain's way.
+
+The filing as it stood:
+
 Nine builtins (`fs_read_text`, `fs_write_text`, `fs_open`, `fs_create`,
 `fs_read`, `fs_write`, `fs_close`, `fs_remove`, `fs_exists`) carried the
 whole of `std.fs`, and the shape of what is missing is one theme: bytes,
@@ -1275,6 +1301,29 @@ directories, and atomicity.
   function and no test claims to have observed them.
 
 ## F-0045 — `fs_open` has no mode, so `append_text` is a rewrite
+
+**CLOSED at the sc12 (02-os) pin** (s90, wolf-lang#52). `fs_open_mode(path,
+mode)` has five modes — 0 read, 1 write+truncate, 2 append (create), 3
+read-write (create, no truncate), 4 create-new (exclusive) — with a mode
+outside the set decided as `invalid` before the filesystem is touched.
+`std.fs.append_text` is now open-write-close over mode 2 and `open_append`
+exposes the handle.
+
+**Measured, because the finding's whole complaint was a cost** (syscalls,
+not a stopwatch; `strace` on the native rung, one append of 14 bytes to a
+1 MiB log, counting only calls that touch the file):
+
+| | syscalls on the file | bytes read | bytes written |
+|---|---|---|---|
+| the old body, transcribed verbatim | 8 (`statx`, `openat` RDONLY, 2×`read`, `close`, `openat` WRONLY\|TRUNC, `write`, `close`) | 1 048 576 | 1 048 590 |
+| `fs.append_text` at this pin | 3 (`openat` WRONLY\|CREAT\|APPEND, `write`, `close`) | 0 | 14 |
+
+The `statx` in the first row is `fs_exists`, which is the check-then-use
+race the old doc had to warn about; it is not in the second row because the
+question is not asked. The `utf8` row went with the read that no longer
+happens.
+
+The filing as it stood:
 
 `fs_open` opens read-only; `fs_create` truncates. There is no
 append-mode open, no read-write handle, and no positioned write. So
@@ -2542,6 +2591,28 @@ looks like a sprint that did nothing.
 
 ## F-0071 — the checked tier models two of the byte view's seven positions
 
+**CLOSED at the sc12 (02-os) pin** (s88, wolf-lang#85 — "a temporary can be
+read from"). Re-measured one shape at a time on the checked tier at
+`02c1e88`: `"wolf".bytes()[1]` is 111, `.get(1)` is 111, `.first()` is 119,
+`.last()` is 102, `.count()` is 4 — five verdicts where every one of them
+used to be `unsupported` at `mem`. `tests/str/byte_view_index.lu` advanced
+`unsupported` -> `run` on that lane and now asserts indexing, `get` and
+`count` together.
+
+Two things worth recording beside the closure. **std did not undo the
+rewrites**: `str.code_points`' one-pass state machine is shorter than the
+random-access walk it replaced, and a constraint that forced a better
+algorithm is not one to reverse the day it lifts — what the closure buys is
+that a FUTURE body may index a view without paying a lane. And **half of
+the finding survives on the other machine**: lupin has no `first` and no
+`last` on a `List` at all ("`List` has no method `last` in this machine's
+std subset"), which is a gap in its container surface rather than anything
+about views, and it is held as its own ledger row
+(`tests/str/byte_view_first_last.lu`) rather than left inside a closed
+finding where nothing would measure it.
+
+The filing as it stood:
+
 s77 (#80) makes `s.bytes()` the receiver's own `{ptr, len}` pair and reads it
 in place wherever the call is CONSUMED. The lowering names seven such
 positions: iteration, indexing, and the `len`/`count`/`is_empty`/`get`/`first`/
@@ -2589,6 +2660,30 @@ Held as `tests/str/byte_view_index.lu` (`lupin=run`, `wolfc=unsupported`,
 `native=run`) so the day the tier models it, the row advances and says so.
 
 ## F-0072 — a byte view cannot cross a function boundary
+
+**CLOSED at the sc12 (02-os) pin** (s89, wolf-lang#86 — "a byte view that
+can cross a call"). The answer is the one the filing asked for, in the shape
+it asked for it: not a new type, but the region checker's argument one scale
+down. A `List[int]` parameter whose every use is one of s77's read positions
+(or a re-lend into another such parameter) is **Lendable**, and the caller
+hands over the string's own `{ptr, len}`; anything unproven is **Opaque** and
+materializes exactly as before, which is never wrong and only slower; a use
+that provably outlives the call is **E1015** with the one-word fix in the
+diagnostic (bind first — a `let` materializes). Eight of `std.bytes`' nine
+functions are lendable; `to_str` is not, because it hands its parameter to
+`str_from_utf8` and a builtin consumer materializes.
+
+What this repository can and cannot say about it: the no-copy half is an IR
+property, pinned upstream in `wolf_wir`'s `lower_shapes` suite and
+`wolf_mem`'s `byteview` tests, and no lane here observes an allocation. So
+`tests/bytes/lend_across_calls.lu` asserts the half that IS observable — the
+same nine calls through a view and through an owned list must agree, on all
+three lanes — and its header cites the other half rather than restating it
+(§9's sc12 rule). The `Bytes` type this repository has wanted since sc05 is
+still open on its own merits; the lend is what stopped the interim currency
+costing a copy per call.
+
+The filing as it stood:
 
 s77's own comment states the boundary: every position that is not consuming —
 a `let` binding, an argument, a return — materializes through
@@ -2872,6 +2967,15 @@ The ask is the builtin, at the release that re-pins past `4e316ad`.
 
 ## F-0076 — the native rung cannot compare two `bool`s
 
+**CLOSED at the sc12 (02-os) pin** (s88, wolf-lang#100 — "native: two bools
+can be compared"). `tests/fmt/parse_bool.lu`'s native column advanced
+`unsupported` -> `run`, six sprints after it went dark and two after the
+mechanism was named. std's bodies are unchanged: `!p` instead of
+`p == false`, and a branch instead of `p == q`, cost nothing and reverting
+them would be churn with no reader-visible gain.
+
+The filing as it stood:
+
 Measured with four one-line programs after `tests/bytes/to_str_border.lu`
 lost its native lane to `is_utf8(b) == accepts(b)`:
 
@@ -3024,3 +3128,68 @@ of a handler asserting it. §14's "a wildcard that claims nothing is the
 right handler when the module cannot act on the difference" now has a
 second clause: it is also the right handler when the module cannot SEE the
 difference.
+
+
+## F-0080 — the net tier has no byte-level read or write
+
+`net_read(fd, max) -> str ! {closed, timeout, utf8, io}`. TCP delivers
+whatever has arrived, so a stream carrying non-ASCII text splits a code
+point across two reads and the second sequence is a `utf8` miss — and there
+is nothing a caller can do about it, because the two halves it would join
+never become values. `std.net.read`'s doc has said so since sc08 and
+`std.net.read_all` is honest only over ASCII.
+
+**This used to be the same gap as `std.fs`'s, and it is not any more.** s90
+gave the fs tier `fs_read_bytes`/`fs_write_bytes` (whole file) and
+`fs_read_chunk`/`fs_write_chunk` (handle), all carrying `List[int]`, with no
+`utf8` row anywhere and an `invalid` row for an element that is not a byte —
+so `std.fs.copy_file` is a byte copy and a file holding a lone `0x80`
+survives it. The shape of the fix is therefore settled, implemented,
+lowered on both compiler rungs and shipped one tier over.
+
+**The ask**: `net_read_bytes(fd, max) -> List[int] ! {closed, timeout, io}`
+and `net_write_bytes(fd, b) -> () ! {closed, invalid, io}`, the same
+currency and the same rows the fs chunk pair uses. Then a reader joins
+chunks and validates once with `str_from_utf8`, where the validation belongs
+— over the whole message, rather than once per arbitrary boundary the
+network chose.
+
+Why it matters more than a `utf8` row usually would: the fs tier's version
+of this bug was silent corruption of a caller's data (`copy_file` refusing a
+binary file), and the net tier's version is worse, because the boundary is
+not the caller's chunk size but the network's packetization — the same
+program is correct on a fast loopback and wrong across a link that
+fragments. `std.net`'s header records the gap and cites this finding where
+it used to cite F-0044.
+
+## F-0081 — the interpreter declines the s38 fs names with a sentence and the s90 names with a shrug
+
+Two refusals from lupin 0.1.12, same tier, same machine, same run:
+
+```text
+unsupported: `fs_write_text` is the s38 io/fs surface; this machine has no
+filesystem (or injectable stdin) by design, so the fs tier is declined
+rather than mocked
+
+unsupported: `fs_read_dir` does not resolve
+```
+
+The first is a POSTURE — a decision, recorded, permanent, and exactly what
+`CONTRIBUTING.md` records once for the whole tier. The second is the generic
+unknown-name refusal, which is what a name that simply has not been wired
+looks like: DRIFT, the kind that closes on a release.
+
+**It costs no ledger row and it never will**: lupin has no filesystem under
+either sentence, so every `tests/fs` row is `unsupported` either way. What it
+costs is the reader's ability to tell those two things apart, and this
+repository has now twice had that distinction turn out to be the whole
+question. F-0070 (`env_vars` "does not resolve" while its four siblings ran)
+was drift and closed on a release. F-0075 (`str_from_utf8`) was drift and
+closed one release after filing. `json_*` and the process trio are postures
+and will not close at all. The rule sc11 wrote — *a drift closes on a
+release, a posture closes on a decision* — is unusable when the refusal text
+does not say which one it is.
+
+**The ask is one line**: put the fifteen s90 names in the same
+declined-by-design table as the s38 nine, so the whole fs tier answers with
+the sentence it has earned. Nothing else about the machine needs to change.
