@@ -138,15 +138,32 @@
 //! **No test and no doc example in this module starts a real program**, and
 //! that is a portability statement rather than a shortcut: there is no
 //! program every tier-1 host has (`/bin/sh` is not on windows, `cmd.exe`
-//! is not on linux), a wolf program cannot learn its own path
-//! (`env_args` drops argv[0]), and the directive schema has no per-platform
-//! gate — so a spawn test that ran anywhere real would be red on some
-//! supported host. What every witness here uses instead is deterministic on
-//! ALL of them: a program name no host has (`not_found`), an empty argv
+//! is not on linux) and the directive schema has no per-platform gate — so
+//! a spawn test that ran anything real would be red on some supported
+//! host. What every witness here uses instead is deterministic on ALL of
+//! them: a program name no host has (`not_found`), an empty argv
 //! (`not_found` again), and a forged handle (`io`). The happy path — a live
 //! child, its exit code, its `signal` row after a kill — is proven upstream
 //! in the toolchain's own unix-gated tests, and this module's inability to
 //! witness it here is filed as F-0066 rather than papered over.
+//!
+//! **One of F-0066's three legs came off at the sc12 pin, and the filing
+//! stays open — which is worth stating precisely rather than leaving to be
+//! inferred from a closed finding.** The filing named the cheapest fix as
+//! an `os_exe` builtin, "which lets a test spawn ITSELF", and s90 landed
+//! exactly that (wolf-lang#69: `os_exe() -> str ! {io}`, the running
+//! executable's path, capability `Env` and comptime-refused beside
+//! `os_cwd`). So the clause "a wolf program cannot learn its own path" is
+//! RETIRED: it was true from sc11 to sc12 and it is not true now. The
+//! finding is not closed, because its other two legs hold. A self-spawn
+//! test would run on the CHECKED lane alone — the native rung still refuses
+//! the process trio by name and lupin still declines it by design, both
+//! re-measured at this pin — and a program that spawns itself must tell the
+//! child from the parent, which needs an argument the child reads back and
+//! therefore a second capability inside the child. std wraps `os_exe`
+//! nowhere at this pin: nothing in the library needs it, and a
+//! `process.exe()` whose only caller would be a test this module still
+//! cannot write is surface without a use.
 
 /// A program and its arguments, as the argument VECTOR the host receives.
 ///
