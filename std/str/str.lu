@@ -76,19 +76,21 @@
 //! allocation; `s[a..b]` and `s.get(a..b)` stopped calling the runtime in
 //! the same wave.
 //!
-//! **std may use TWO of those consuming positions, not seven, and the
-//! difference is measured** (F-0071). The compiler's set is iteration,
-//! indexing and the `len`/`count`/`is_empty`/`get`/`first`/`last` queries —
-//! in NATIVE lowering. wolfc's checked tier models two of them:
-//! `for b in s.bytes()` and `s.bytes().len` run on all three lanes, while
-//! `s.bytes()[i]` is `unsupported — indexing outside the modelled surface`
-//! and `s.bytes().get(i)`/`first()`/`count()` are
-//! `unsupported — List method on a temporary`, both at `mem`. A shape that
-//! costs a lane is not a shape std writes (§14's honesty, applied to an
-//! optimization rather than to a capability), so every walk here is a `for`
-//! over the view with whatever counter or accumulator the algorithm needs.
-//! That is why `code_points` is a state machine and `char_offsets` carries
-//! its own offset.
+//! **std used TWO of those consuming positions for two sprints because the
+//! other five cost a lane, and at the sc12 pin the constraint is GONE**
+//! (F-0071 CLOSED by s88's #85, "a temporary can be read from" —
+//! re-measured shape by shape: `s.bytes()[i]`, `.get(i)`, `.first()`,
+//! `.last()` and `.count()` all execute on wolfc's checked tier now, where
+//! every one of them was `unsupported` at `mem`). The walks below did not
+//! change back, and that is a decision rather than an oversight: the
+//! one-pass state machine `code_points` became is SHORTER than the
+//! random-access walk it replaced, and a constraint that forced a better
+//! algorithm is not one to undo the day it lifts. What the closure buys is
+//! that a future body may index a view without paying a lane for it. The
+//! rule it was an instance of stands unchanged: a shape that costs a lane
+//! is not a shape std writes (§14's honesty, applied to an optimization
+//! rather than to a capability). lupin still has no `first` on a `List`,
+//! measured at this pin, so that one position is still not portable.
 //!
 //! What changed for this module is four bodies and no signature.
 //! `char_count`, `char_offsets`, `code_points` and `is_ascii` were written
@@ -870,11 +872,11 @@ pub fn char_count(s: str) -> int {
 ///
 /// Allocates the OUTPUT list and nothing else. The offset is carried in a
 /// counter beside a `for` over the byte view rather than driving an index
-/// INTO it, and that spelling is a lane decision rather than a taste:
-/// `s.bytes()[i]` is `unsupported — indexing outside the modelled surface`
-/// on wolfc's checked tier (F-0071), where `for b in s.bytes()` runs on all
-/// three lanes. The body sc09 wrote bound `bs` first and copied every byte
-/// of `s` before reading one of them.
+/// INTO it. That spelling was a lane decision when it was written — indexing
+/// a view was refused by wolfc's checked tier (F-0071, closed at the sc12
+/// pin) — and it is kept now because it is the better body: one pass, one
+/// counter, no list. The body sc09 wrote bound `bs` first and copied every
+/// byte of `s` before reading one of them.
 ///
 /// Total: no error row, no traps beyond the output list's allocation.
 ///
@@ -912,11 +914,12 @@ pub fn char_offsets(s: str) -> List[int] {
 /// byte view asks for.** sc09 wrote it as a random-access walk — bind the
 /// list, read `bs[i + 1]`, `bs[i + 2]`, `bs[i + 3]`, advance `i` by the
 /// width — which needed a materialized copy to index into. s77 makes
-/// iteration the free position and indexing the expensive one (and
-/// `s.bytes()[i]` is refused outright by the checked tier, F-0071), so the
-/// lead byte now sets a PENDING count and each continuation folds six bits
-/// into the accumulator. The two forms agree byte for byte; this one reads
-/// `s`'s own storage and never builds a list to read it from.
+/// iteration the free position, so the lead byte now sets a PENDING count
+/// and each continuation folds six bits into the accumulator. The two forms
+/// agree byte for byte; this one reads `s`'s own storage and never builds a
+/// list to read it from, and it is shorter — which is why it stayed after
+/// F-0071 (the checked tier's refusal of an indexed view) closed at the
+/// sc12 pin.
 ///
 /// The continuation count is trusted rather than checked, and that is the
 /// UTF-8 invariant rather than an oversight: a lead byte in a valid `str`

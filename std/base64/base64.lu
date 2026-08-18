@@ -58,9 +58,9 @@ fn char_of(v: int, alphabet: str) -> str {
 /// two characters — but each step was a one-byte slice plus a `starts_with`
 /// call and is now a comparison of two bytes read out of storage neither
 /// side copies. Both walks are `for` loops over the view rather than
-/// indexed reads, because indexing a view is `unsupported` on wolfc's
-/// checked tier (F-0071) and a shape that costs a lane is not one std
-/// writes.
+/// indexed reads: indexing a view was `unsupported` on wolfc's checked tier
+/// when they were written (F-0071, closed at the sc12 pin), and a one-pass
+/// loop is what these two want anyway.
 ///
 /// The totality argument is unchanged in substance and simpler in form:
 /// every alphabet character is ASCII, so a first byte at or above 128 can

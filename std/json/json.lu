@@ -619,9 +619,10 @@ struct Cursor {
 /// over arbitrary UTF-8 without measuring a single code point.
 ///
 /// The first byte comes from ITERATING a one-character slice, not from
-/// indexing it: `s.bytes()[0]` is refused by wolfc's checked tier
-/// (F-0071), and a shape that costs a lane is not one std writes even in a
-/// module whose other lanes are already dark.
+/// indexing it. `s.bytes()[0]` was refused by wolfc's checked tier when
+/// this was written (F-0071, closed at the sc12 pin) and a shape that costs
+/// a lane is not one std writes even in a module whose other lanes are
+/// already dark; the loop is kept because nothing about it got worse.
 fn byte_at(text: str, at: int) -> int {
     let ch = text.get(at..at + 1) else ""
     for b in ch.bytes() {

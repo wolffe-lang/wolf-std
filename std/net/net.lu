@@ -109,9 +109,12 @@
 //! - UDP (`send_to`/`recv_from`), name resolution, and any HTTP: no
 //!   builtin surface at this pin, and the sprint's non-targets besides.
 //!   TLS is never this tier's business.
-//! - Byte-level `read_bytes`/`write_bytes` — the same missing byte type
-//!   and byte io that make `std.fs.copy_file` a text operation
-//!   (F-0035/F-0044). It is why `read` carries a `utf8` row at all.
+//! - Byte-level `read_bytes`/`write_bytes` — no `net_*` builtin moves
+//!   bytes at this pin. This used to be the same gap as `std.fs`'s and it
+//!   is not any more: s90 gave the FS tier its byte calls (F-0044 closed,
+//!   `fs.copy_file` is a byte copy now) and left the net tier where it
+//!   was, so the shape of the fix is known and the socket half is
+//!   unwritten (F-0080). It is why `read` carries a `utf8` row at all.
 //!
 //! **Lanes (re-measured at the sc11 pin).** The compiler's checked tier is
 //! the executing lane: it opens REAL sockets (the comptime sandbox is the one place they are refused,
@@ -278,8 +281,9 @@ pub fn connect(addr: str) -> Socket ! {refused, timeout, io} {
 /// `std.fs.read` is not: TCP delivers whatever has arrived, so a stream
 /// carrying non-ASCII text can split a code point across two reads and the
 /// second byte-sequence is a `utf8` miss. ASCII is safe at any size, and
-/// the honest fix is byte-level io (F-0035/F-0044), filed rather than
-/// hidden. `max` at or below zero reads nothing and answers the empty
+/// the honest fix is byte-level io (F-0080, and the fs tier has had it
+/// since s90 — `fs.read_chunk` is the shape this one wants), filed rather
+/// than hidden. `max` at or below zero reads nothing and answers the empty
 /// string without touching the socket.
 ///
 /// `mut s` because reading CONSUMES from the stream: the bytes this call

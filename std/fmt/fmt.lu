@@ -92,11 +92,11 @@ fn digit_char(d: int) -> str {
 /// view answers it directly, out of `s`'s own storage, and the ASCII ranges
 /// below are the same alphabet `digit_char` renders, read backwards.
 ///
-/// The byte is taken by ITERATING and returning rather than by indexing:
-/// `s.bytes()[0]` is `unsupported` on wolfc's checked tier (F-0071), and a
-/// shape that costs a lane is not one std writes. An empty `s` runs the
-/// loop zero times and falls through to the miss, exactly as the
-/// `starts_with` probe did.
+/// The byte is taken by ITERATING and returning rather than by indexing.
+/// `s.bytes()[0]` was `unsupported` on wolfc's checked tier when this was
+/// written (F-0071, closed at the sc12 pin); the loop stayed because it is
+/// the same code either way. An empty `s` runs the loop zero times and
+/// falls through to the miss, exactly as the `starts_with` probe did.
 ///
 /// Totality survives the change and its argument gets shorter: a byte is a
 /// byte, so a multi-byte character's lead byte (195 for `é`) is simply not

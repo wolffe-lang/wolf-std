@@ -65,10 +65,11 @@ use std.bytes
 /// non-ASCII lead byte is 195 and not a digit — and it reads the
 /// receiver's own storage rather than a copy.
 ///
-/// The first byte is taken by ITERATING and returning, not by indexing:
-/// `s.bytes()[0]` is refused by wolfc's checked tier (F-0071), and a shape
-/// that costs a lane is not one std writes. An empty `s` runs the loop zero
-/// times and falls through to the miss, which is the answer the
+/// The first byte is taken by ITERATING and returning, not by indexing.
+/// That was forced when it was written — `s.bytes()[0]` was refused by
+/// wolfc's checked tier (F-0071, closed at the sc12 pin) — and it is kept
+/// because it is the same length and reads the same. An empty `s` runs the
+/// loop zero times and falls through to the miss, which is the answer the
 /// `starts_with` probe gave it too.
 fn digit_of(s: str) -> int {
     for c in s.bytes() {
