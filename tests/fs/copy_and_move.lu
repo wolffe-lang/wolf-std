@@ -3,14 +3,19 @@
 //! conforms: std.fs, err.row, err.else
 //!
 //! `copy_file` leaves both files; `move_file` leaves only the
-//! destination. Both are text operations built from `read_text` +
-//! `write_text` at this pin (there is no byte-level copy or atomic
-//! rename in the builtin tier — F-0044), so what this test pins is the
-//! CONTRACT the byte-level versions must keep: same contents at the
-//! destination, source present after a copy and absent after a move,
-//! destination replaced rather than appended to — the middle of the
-//! program writes a longer text to the destination first, so a copy that
-//! appended (or that left a tail behind) could not pass.
+//! destination. This file is the TEXT half of their contract: same
+//! contents at the destination, source present after a copy and absent
+//! after a move, destination replaced rather than appended to — the
+//! middle of the program writes a longer text to the destination first,
+//! so a copy that appended (or that left a tail behind) could not pass.
+//!
+//! Both functions became BYTE operations at s90 (`fs_read_bytes` +
+//! `fs_write_bytes`, with `fs_rename` as `move_file`'s fast path), and
+//! every assertion below is unchanged by that — which is what writing it
+//! as a CONTRACT rather than as a transcript of the implementation was
+//! for. `binary_round_trip.lu` is the other half, and the half that
+//! could not be written at all before: the same two functions over a
+//! file no `str` can hold.
 //!
 //! The note above that step is in this header rather than above the call:
 //! `wolf fmt` splits a dotted call at the dot when a `//` comment sits

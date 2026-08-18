@@ -1,0 +1,45 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: str.views
+//!
+//! **F-0071's surviving half, held as a ledger row.** s77 gave the byte
+//! view seven consuming positions; five of them cost the checked lane
+//! until s88's #85 closed that (see `byte_view_index.lu`). Two are still
+//! not portable, and the reason has moved to the other implementation:
+//! lupin has no `first` and no `last` on a `List` at all —
+//!
+//! ```text
+//! `List` has no method `last` in this machine's std subset
+//! ```
+//!
+//! — which is a gap in that machine's container surface rather than
+//! anything to do with views, and it applies to an owned list exactly as
+//! it applies to a view.
+//!
+//! The file is separate from `byte_view_index.lu` for the reason sc10
+//! recorded about capability modules and sc13 about tier waivers: an
+//! allowance keyed wider than the truth stops recording it. Folding these
+//! two calls into the three-lane file would have taken that file's lupin
+//! column dark and hidden three shapes that DO run there behind two that
+//! do not. One claim, one file, one row.
+//!
+//! When lupin grows the two methods this row goes to `run` on every lane
+//! and the finding closes completely.
+
+fn ends_of(s: str) -> int {
+    let head = s.bytes().first() else 0
+    let tail = s.bytes().last() else 0
+    head + tail
+}
+
+fn main() -> !int {
+    // "wolf" is 119 … 102.
+    if ends_of("wolf") == 221 {} else { return 1 }
+    // "é" is C3 A9 — 195 + 169.
+    if ends_of("é") == 364 {} else { return 2 }
+    // One byte is both ends.
+    if ends_of("A") == 130 {} else { return 3 }
+    // The empty view has neither, and both misses fall back to 0.
+    if ends_of("") == 0 {} else { return 4 }
+    0
+}

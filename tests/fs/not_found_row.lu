@@ -16,11 +16,12 @@
 //! absent file is a miss for the same reason — `remove` does not pretend
 //! that "there was nothing to do" is success.
 //!
-//! `denied` and `utf8` have no portable litmus at this pin: making a file
-//! unreadable needs a permission call and making one un-decodable needs
-//! byte-level writing, neither of which exists in the builtin tier
-//! (F-0044). Their meanings are documented on the functions; nothing here
-//! claims to have observed them.
+//! `denied` still has no portable litmus: making a file unreadable needs
+//! a permission call the language does not have. Its meaning is documented
+//! on the functions and nothing here claims to have observed it. **`utf8`
+//! is no longer in that sentence** — making a file un-decodable needs
+//! byte-level writing, which is what s90 added, and `utf8_row.lu`
+//! witnesses the tag the same way this file witnesses `not_found`.
 
 use std.fs
 

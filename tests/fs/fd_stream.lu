@@ -15,7 +15,11 @@
 //! Chunk sizes here are ASCII-safe on purpose. A fixed-size read of
 //! non-ASCII text can split a code point and raise `utf8` — a real limit
 //! of a byte-count read over a `str`, documented on `fs.read` and filed
-//! (F-0044) rather than papered over.
+//! rather than papered over for four sprints. **The fix landed** (s90,
+//! F-0044 closed): `fs.read_chunk` reads BYTES, which have no boundary to
+//! split, and `chunk_stream.lu` is the file that measures the difference
+//! on the same bytes. This one stays ASCII because it is the TEXT tier's
+//! test and the text tier's limit is real.
 
 use std.fs
 

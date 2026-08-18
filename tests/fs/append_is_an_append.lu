@@ -1,0 +1,72 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fs, err.row, err.else
+//!
+//! `append_text` stopped being a read-concat-write, and this file pins
+//! the three behaviours that changed with it. What it does NOT pin is
+//! the COST — no lane in this repository can count an allocation or a
+//! syscall, so the "reads none of the file" claim is upstream's to hold
+//! (s90's own fs tests) and this repository's to cite, per §9's sc12
+//! rule. What is observable here is every semantic the new
+//! implementation is supposed to have:
+//!
+//! - **It appends to a file it cannot read.** The file is written with
+//!   `write_bytes` and holds a lone `0x80`, so the old body — which read
+//!   the file as text before writing it back — would have missed with
+//!   `utf8` here. The append succeeds and the original bytes are still
+//!   in front of the appended ones. That is the strongest witness this
+//!   rig can give that no read happens: not a count, but a read that
+//!   COULD NOT have succeeded.
+//! - **It creates an absent file**, with no `fs_exists` probe in front of
+//!   it, and the file it creates holds exactly the appended text.
+//! - **Repeated appends accumulate in order**, through the whole-text
+//!   spelling and through a held handle (`open_append`), and the two
+//!   interleave: a handle opened before another append still writes at
+//!   the end as it is at the moment of ITS write, which is the mode's
+//!   point and the reason two appenders no longer lose one of the
+//!   writes.
+//!
+//! The `utf8` row is gone from `append_text`'s signature, so there is
+//! nothing here to catch it with — which is itself the test: this file
+//! would not compile if the row were still declared and handled, and it
+//! would not pass if the row could still be raised.
+
+use std.fs
+
+fn main() -> !int {
+    // A file the TEXT tier cannot read: 0x80 begins no UTF-8 sequence.
+    var raw = List[int]()
+    (mut raw).push(128)
+    (mut raw).push(129)
+    let p = "append-binary.tmp"
+    fs.write_bytes(p, raw)?
+    if (fs.read_text(p) else "not-text") != "not-text" { return 1 }
+    fs.append_text(p, "tail\n")?
+    let back = fs.read_bytes(p)?
+    if back.len != 7 { return 2 }
+    if back[0] != 128 { return 3 }
+    if back[1] != 129 { return 4 }
+    if back[2] != 116 { return 5 }
+    if (fs.size(p) else 0 - 1) != 7 { return 6 }
+
+    // An absent file: created by the append itself, no probe in front.
+    let fresh = "append-fresh.tmp"
+    if fs.exists(fresh) { return 7 }
+    fs.append_text(fresh, "one\n")?
+    fs.append_text(fresh, "two\n")?
+    if (fs.read_text(fresh) else "?") != "one\ntwo\n" { return 8 }
+
+    // A held handle and a whole-text append, interleaved. The handle is
+    // opened BEFORE the third line goes in and writes after it anyway,
+    // because an append handle's position is the end of the file at the
+    // moment of the write rather than where the open left it.
+    var f = fs.open_append(fresh)?
+    fs.append_text(fresh, "three\n")?
+    fs.write(mut f, "four\n")?
+    fs.close(take f)?
+    if (fs.read_text(fresh) else "?") != "one\ntwo\nthree\nfour\n" { return 9 }
+
+    fs.remove(p)?
+    fs.remove(fresh)?
+    0
+}

@@ -1,0 +1,107 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fs, mem.str.order, err.row, err.else
+//!
+//! The directory and metadata tier, all of it in one theme file
+//! (§13: happy-path assertions group, because a satisfied assertion is
+//! silent and effect-free).
+//!
+//! The properties worth pinning, and why each is a property rather than
+//! an implementation detail:
+//!
+//! - **`read_dir` is SORTED**, by the name's bytes. Filesystem order
+//!   differs per filesystem, so an unsorted listing would make this test
+//!   a coin flip on somebody's machine — which is exactly why the
+//!   builtin sorts and why `std.fs`'s doc carries the promise instead of
+//!   leaving it a builtin detail. The entries are created in an order
+//!   that is neither sorted nor reversed, so a listing that merely
+//!   preserved creation order could not pass.
+//! - **`read_dir` returns NAMES, not paths**: `"alpha.txt"`, never
+//!   `"tree/alpha.txt"`. `join` is the way back to a path and this test
+//!   uses it, which is the shape every directory walk takes.
+//! - **`.` and `..` are not entries.** The count is exact, so a listing
+//!   that included them would fail here.
+//! - **`create_dir` is one level and strict**; `create_dir_all` makes
+//!   parents and is idempotent, so calling it twice on the same path is
+//!   success rather than the `exists` row its strict sibling raises.
+//! - **`is_file` and `is_dir` are total and disagree** on every path: a
+//!   file, a directory and an absent path give three different pairs,
+//!   and none of them raises.
+//! - **`size` is the byte count**, which for `"héllo"` is 6 and not 5 —
+//!   the same byte currency §9 makes `str.len` use, measured on the
+//!   other side of the filesystem.
+//! - **`modified_ms` is milliseconds from the Unix epoch**, so it is
+//!   positive on any host whose clock is set, and a file written after
+//!   another is not stamped before it. The test asserts an INEQUALITY
+//!   and nothing more, because a clock test can only assert inequalities
+//!   (sc10's rule) — filesystem timestamp resolution is the host's, so
+//!   two writes may well share a millisecond.
+//! - **`remove_dir` refuses a non-empty directory** (`io`, the tag the
+//!   platforms agree on through coarsening), `remove_dir_all` takes the
+//!   tree, and an EMPTY directory IS removed by the strict form — which
+//!   the last three lines pin.
+//!
+//! The four entries are created beta, alpha, delta, carol: neither sorted
+//! nor reversed, so neither a listing that preserved creation order nor
+//! one that reversed it could pass. (These notes are in this header rather
+//! than above the calls because `wolf fmt` splits a dotted call at the dot
+//! when a `//` comment sits directly above it — F-0016, sixth sprint
+//! running — and fmt is law, D34.)
+
+use std.fs
+
+fn main() -> !int {
+    let root = "tree"
+    fs.create_dir(root)?
+    if !fs.is_dir(root) { return 1 }
+    if fs.is_file(root) { return 2 }
+
+    fs.write_text(fs.join(root, "beta.txt"), "b")?
+    fs.write_text(fs.join(root, "alpha.txt"), "héllo")?
+    fs.write_text(fs.join(root, "delta.txt"), "d")?
+    fs.create_dir_all(fs.join(root, "carol"))?
+    fs.create_dir_all(fs.join(root, "carol"))?
+
+    let names = fs.read_dir(root)?
+    if names.len != 4 { return 3 }
+    if names[0] != "alpha.txt" { return 4 }
+    if names[1] != "beta.txt" { return 5 }
+    if names[2] != "carol" { return 6 }
+    if names[3] != "delta.txt" { return 7 }
+
+    let first = fs.join(root, names[0])
+    if first != "tree/alpha.txt" { return 8 }
+    if !fs.is_file(first) { return 9 }
+    if fs.is_dir(first) { return 10 }
+    if (fs.size(first) else 0 - 1) != 6 { return 11 }
+
+    // Absent: both predicates false, both metadata reads a miss.
+    let absent = fs.join(root, "nothing.txt")
+    if fs.is_file(absent) { return 12 }
+    if fs.is_dir(absent) { return 13 }
+    if (fs.size(absent) else 0 - 1) != 0 - 1 { return 14 }
+    if (fs.modified_ms(absent) else 0 - 1) != 0 - 1 { return 15 }
+
+    let stamp = fs.modified_ms(first)?
+    if stamp <= 0 { return 16 }
+    let later = fs.join(root, "later.txt")
+    fs.write_text(later, "x")?
+    if (fs.modified_ms(later) else 0 - 1) < stamp { return 17 }
+
+    // A directory the caller did not empty is not removed by the strict
+    // form; the recursive form takes the whole tree.
+    var refused = false
+    fs.remove_dir(root) else |_| {
+        refused = true
+    }
+    if !refused { return 18 }
+    if !fs.exists(root) { return 19 }
+    fs.remove_dir_all(root)?
+    if fs.exists(root) { return 20 }
+    if fs.is_dir(root) { return 21 }
+
+    fs.create_dir(root)?
+    fs.remove_dir(root)?
+    if fs.exists(root) { return 22 }
+    0
+}

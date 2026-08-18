@@ -1,0 +1,49 @@
+//! check: run(exit=1, stdout="handled: fallback\nerror: utf8")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate, err.else
+//!
+//! **The `utf8` litmus, which this repository could not write until
+//! s90.** `utf8` has been declared on `fs.read_text` since sc07 and
+//! observed nowhere: making a file un-decodable needs byte-level
+//! WRITING, and the builtin tier had none (the sc07 note on
+//! `not_found_row.lu` and the `utf8` row of `docs/error-taxonomy.md`
+//! both said so). `fs.write_bytes` is the missing half, so the tag now
+//! has the same standard of evidence as `not_found` and `io`: an `else`
+//! that handles it, and a `?` that rides it out of `main`, where the
+//! record NAMES it.
+//!
+//! The bytes are chosen to be un-decodable for the plainest possible
+//! reason rather than a subtle one: `0x80` is a continuation byte, so it
+//! begins no sequence at all. Nothing here depends on a boundary, a
+//! length, or an overlong form — `std.bytes`' `to_str_border.lu` is
+//! where the full RFC 3629 refusal surface is walked, and this file only
+//! has to prove that the FILE tier reports it as its own row.
+//!
+//! Deterministic on any host: the file is written by the line above,
+//! into a scratch directory staging has just cleared, from bytes this
+//! program names.
+//!
+//! Two tags in this module's vocabulary still have no portable litmus
+//! and this file does not pretend otherwise: `denied` needs a permission
+//! call the language does not have, and `cross_device` needs two
+//! filesystems. `std.fs`'s header says so, in those words.
+
+use std.fs
+
+fn main() -> !int {
+    let p = "not-text.bin"
+    var raw = List[int]()
+    (mut raw).push(119)
+    (mut raw).push(128)
+    (mut raw).push(102)
+    fs.write_bytes(p, raw)?
+    // The byte tier carries it fine — the miss is the DECODE, not the read.
+    let bytes_back = fs.read_bytes(p)?
+    if bytes_back.len != 3 { return 1 }
+    if bytes_back[1] != 128 { return 2 }
+    let text = fs.read_text(p) else |_| "fallback"
+    print("handled: {text}")
+    let strict = fs.read_text(p)?
+    print("unreachable: {strict}")
+    0
+}

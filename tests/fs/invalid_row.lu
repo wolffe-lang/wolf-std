@@ -1,0 +1,44 @@
+//! check: run(exit=1, stdout="handled: refused\nerror: invalid")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate, err.else
+//!
+//! The `invalid` litmus — the second tag s90 added here — witnessed the
+//! same way `not_found` and `exists` are: an `else` that handles it, and
+//! a `?` that rides it out of `main` so the RECORD names the tag rather
+//! than this repository asserting its own reading of it.
+//!
+//! What `invalid` means and why it is a row at all: the byte currency is
+//! `List[int]` (§11's recorded interim), so a caller can spell an element
+//! that is not a byte, and the builtin tier answers `invalid` rather than
+//! writing something the caller did not mean. §11's encoder rule has
+//! `hex.encode` TRAP on the same input, and the difference is decided by
+//! §14, which is the stronger rule for an os module: the row vocabulary
+//! is the toolchain's, adopted verbatim, and a library that traps where
+//! the toolchain raises has taken a decision away from its caller.
+//!
+//! Both directions of the range are here — a negative element and one
+//! above 255 — because "is not a byte" has two edges and a check written
+//! for one of them is a check that passes the other.
+//!
+//! `copy_file` cannot raise this tag and does not declare it: its bytes
+//! came out of `read_bytes` and are bytes by construction. That absence
+//! is a signature, not an omission, and `std.fs`'s doc says so on both
+//! functions.
+
+use std.fs
+
+fn main() -> !int {
+    var high = List[int]()
+    (mut high).push(119)
+    (mut high).push(256)
+    var handled = "not-handled"
+    fs.write_bytes("invalid-row.bin", high) else |_| {
+        handled = "refused"
+    }
+    print("handled: {handled}")
+    var low = List[int]()
+    (mut low).push(0 - 1)
+    fs.write_bytes("invalid-row.bin", low)?
+    print("unreachable")
+    0
+}

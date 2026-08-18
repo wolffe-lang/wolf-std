@@ -1,0 +1,76 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fs, err.row, err.else
+//!
+//! **THE ACCEPTANCE WITNESS, AND IT IS A BYTE.** A file holding a lone
+//! `0x80` — a continuation byte no UTF-8 sequence can begin with, so a
+//! file no `str` can hold — is written, read back, COPIED and MOVED, and
+//! every byte of it is still there at the end. Until s90 that program
+//! could not be written at all: there was no way to put a `0x80` in a
+//! file, and `copy_file`/`move_file` were `read_text` + `write_text`, so
+//! the copy of a binary file was a `utf8` miss rather than a copy.
+//!
+//! What each step pins, in the order the program does it:
+//!
+//! - `write_bytes` accepts the whole byte range, including `0` (an
+//!   interior NUL is data, not a terminator) and `255` (a byte no
+//!   well-formed UTF-8 uses anywhere);
+//! - `read_bytes` gives back the same count and the same values, and
+//!   raises no `utf8` row because it has none to raise;
+//! - `size` agrees with the byte count, which is the same number in both
+//!   directions;
+//! - `copy_file` leaves both files byte-identical, and the destination
+//!   is REPLACED rather than appended to (the middle of the program
+//!   writes a longer file to the destination first, so a copy that
+//!   appended or left a tail could not pass);
+//! - `move_file` leaves only the destination, byte-identical;
+//! - `read_text` on the same file still MISSES with a row, which is the
+//!   control: the bytes are genuinely not text, so the byte tier is
+//!   carrying something the text tier cannot.
+//!
+//! The move here takes the `fs_rename` fast path (one filesystem, one
+//! staged directory). Its `cross_device` fallback needs two filesystems
+//! and has no portable litmus, which `std.fs`'s header says out loud;
+//! the fallback's body is `copy_file` + `remove`, and both halves are
+//! exercised above it.
+
+use std.fs
+
+fn main() -> !int {
+    var raw = List[int]()
+    (mut raw).push(0)
+    (mut raw).push(128)
+    (mut raw).push(255)
+    (mut raw).push(10)
+    (mut raw).push(192)
+    let src = "binary-src.bin"
+    fs.write_bytes(src, raw)?
+    if (fs.size(src) else 0 - 1) != 5 { return 1 }
+    let back = fs.read_bytes(src)?
+    if back.len != 5 { return 2 }
+    if back[0] != 0 { return 3 }
+    if back[1] != 128 { return 4 }
+    if back[2] != 255 { return 5 }
+    if back[3] != 10 { return 6 }
+    if back[4] != 192 { return 7 }
+    // The control: these bytes are not text, and the text tier says so.
+    if (fs.read_text(src) else "not-text") != "not-text" { return 8 }
+    let dst = "binary-dst.bin"
+    fs.write_text(dst, "stale contents that are much longer than five bytes\n")?
+    fs.copy_file(src, dst)?
+    if !fs.exists(src) { return 9 }
+    let copied = fs.read_bytes(dst)?
+    if copied.len != 5 { return 10 }
+    if copied[1] != 128 { return 11 }
+    if copied[4] != 192 { return 12 }
+    let moved = "binary-moved.bin"
+    fs.move_file(dst, moved)?
+    if fs.exists(dst) { return 13 }
+    let after = fs.read_bytes(moved)?
+    if after.len != 5 { return 14 }
+    if after[1] != 128 { return 15 }
+    if after[2] != 255 { return 16 }
+    fs.remove(src)?
+    fs.remove(moved)?
+    0
+}

@@ -1,0 +1,73 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: str.views, mem.str.view.lend, std.bytes
+//!
+//! **A byte view crosses a call now** (s89, wolf-lang#86), so every
+//! `std.bytes` function can be handed `s.bytes()` directly instead of a
+//! list somebody allocated to pass it. This file calls all nine that
+//! way, on every lane, and pins the only half of the change this
+//! repository can see: that the answers are IDENTICAL to the answers
+//! the same calls give over an owned list.
+//!
+//! The other half — that eight of the nine emit no copy — is an IR
+//! property, pinned upstream in `wolf_wir`'s `lower_shapes` suite and in
+//! `wolf_mem`'s `byteview` tests, and no lane here can observe an
+//! allocation. §9's sc12 rule is that a claim about what an
+//! implementation COSTS is somebody else's test and you cite it rather
+//! than repeating it as your own; this header is that citation, and the
+//! assertions below are what this rig actually measured.
+//!
+//! Which is why the file is written as a differential rather than as a
+//! second copy of `search_and_affixes.lu`: each property is asserted
+//! through the view AND through `from_str`, and the two must agree. An
+//! optimization that changed an answer would fail here even though
+//! nothing in the surface changed, which is the failure mode a
+//! lowering-level change actually has.
+//!
+//! `to_str` is the ninth and the one upstream measures as opaque (it
+//! hands its parameter to `str_from_utf8`, and a builtin consumer
+//! materializes). It is called both ways here anyway: the caller writes
+//! the same thing either way, which is the point — the lend is an
+//! optimization, never a second spelling.
+
+use std.bytes
+
+fn main() -> !int {
+    let s = "wolf é"
+    let owned = bytes.from_str(s)
+
+    if bytes.len(s.bytes()) != bytes.len(owned) { return 1 }
+    if bytes.len(s.bytes()) != 7 { return 2 }
+    if bytes.is_empty(s.bytes()) { return 3 }
+    if !bytes.is_empty("".bytes()) { return 4 }
+    if bytes.at(s.bytes(), 0) != 119 { return 5 }
+    if bytes.at(s.bytes(), 5) != 195 { return 6 }
+    if bytes.at(s.bytes(), 5) != bytes.at(owned, 5) { return 7 }
+
+    let cut = bytes.slice(s.bytes(), 0, 4)
+    if bytes.len(cut) != 4 { return 8 }
+    if bytes.at(cut, 3) != 102 { return 9 }
+
+    if (bytes.find(s.bytes(), "lf".bytes()) else 0 - 1) != 2 { return 10 }
+    if (bytes.find(s.bytes(), "zz".bytes()) else 0 - 1) != 0 - 1 { return 11 }
+    if (bytes.find(s.bytes(), "".bytes()) else 0 - 1) != 0 { return 12 }
+    // Both arguments lent at once, which is the shape a two-view callee
+    // takes and the one the upstream corpus file pins by name.
+    if (bytes.find(s.bytes(), "é".bytes()) else 0 - 1) != 5 { return 13 }
+
+    if !bytes.starts_with(s.bytes(), "wo".bytes()) { return 14 }
+    if bytes.starts_with(s.bytes(), "of".bytes()) { return 15 }
+    if !bytes.ends_with(s.bytes(), "é".bytes()) { return 16 }
+    if bytes.ends_with(s.bytes(), "wo".bytes()) { return 17 }
+
+    if !bytes.is_utf8(s.bytes()) { return 18 }
+    if !bytes.is_utf8("".bytes()) { return 19 }
+    if (bytes.to_str(s.bytes()) else "?") != s { return 20 }
+    if (bytes.to_str(s.bytes()) else "?") != (bytes.to_str(owned) else "!") { return 21 }
+
+    // A view of a SLICE of a string is the same view one level down, and
+    // it crosses the call the same way.
+    if bytes.len(s[0..4].bytes()) != 4 { return 22 }
+    if !bytes.starts_with(s[0..4].bytes(), "wol".bytes()) { return 23 }
+    0
+}

@@ -819,7 +819,7 @@ native = "run"  # sc08 pin bump (13b811f)
 [tests."fmt/parse_bool.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc12 pin bump (02c1e88): F-0076 closed, bool == bool lowers
 
 [tests."fmt/decimal/fixed_and_exp.lu"]
 lupin = "run"
@@ -1106,14 +1106,16 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-# The held refusal (F-0071): `s.bytes()[i]` is `unsupported — indexing
-# outside the modelled surface` at `mem` on the checked tier, and runs on
-# the two lanes that model the shape. When this row advances to `run`,
-# `str.char_offsets` and `str.code_points` may go back to indexed walks —
-# until then they are `for`-and-counter, and this row is why.
+# F-0071's held refusal, ADVANCED at the sc12 pin (s88's #85): `s.bytes()[i]`
+# was `unsupported — indexing outside the modelled surface` at `mem` on the
+# checked tier and executes there now, with `.get(i)` and `.count()` beside
+# it. `str.char_offsets` and `str.code_points` MAY go back to indexed walks
+# and deliberately have not — the one-pass forms are shorter — so this row
+# moved and no std body did. The two positions that are still not portable
+# (`first`, `last`, which lupin has no `List` method for) are their own file.
 [tests."str/byte_view_index.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc12 pin bump (02c1e88): F-0071 closed on the checked lane
 native = "run"
 
 # The two empty-argument guards (F-0055). std traps `assert` where the
@@ -1467,3 +1469,111 @@ native = "unsupported"
 lupin = "run"
 wolfc = "unsupported"
 native = "unsupported"
+
+
+# ---- sc12 (02-os): the fs surface std was writing around ----
+# THE sc12 PIN BUMP is wolf trunk `27cdb14` -> `02c1e88` (s90 the fs surface,
+# s88 four holes a newcomer finds first, s89 a byte view that can cross a
+# call, plus the lane-coverage ratchet) with lupin UNCHANGED at 0.1.12. Both
+# ritual gates green at the sha on the FIRST attempt, exit codes written to a
+# file as they happened rather than read off a summary line (F-0063's
+# lesson). Seventh clean pair, so F-0054 stays open on the reasoning it has
+# stayed open on since sc09.
+#
+# **TWO ROWS MOVE FROM THE BUMP ALONE**, both advances, both measured before
+# a single edit to `std/` (the rows themselves are up in their own sections):
+#
+# - `fmt/parse_bool.lu` [native] `unsupported` -> `run`. F-0076 is CLOSED
+#   (s88's #100, "native: two bools can be compared"): `bool == bool` was
+#   `unsupported — comparison outside integers/floats` on the native rung,
+#   which is the one thing that file does, and its native column had been
+#   dark for six sprints with nothing beside it saying why until sc13 named
+#   the mechanism. std's bodies are unchanged — the workaround the finding
+#   prescribed (`!p` rather than `p == false`) costs nothing and stays.
+# - `str/byte_view_index.lu` [wolfc] `unsupported` -> `run`. F-0071 is CLOSED
+#   on the checked lane (s88's #85, "a temporary can be read from"):
+#   `s.bytes()[i]`, `.get(i)`, `.first()`, `.last()` and `.count()` were all
+#   `unsupported` at `mem` and all five execute now, re-measured one shape at
+#   a time. `std.str`'s walks did NOT go back to indexing — the one-pass
+#   state machine is shorter than what it replaced — so the closure moves a
+#   row and no body, which is the honest result and is said out loud in the
+#   test header.
+#
+# **Nine rows are NEW.** Six in `tests/fs` (the s90 surface: bytes,
+# directories, metadata, the real append, and the three row litmuses — two of
+# them tags this module did not have and one, `utf8`, declared since sc07 and
+# unwitnessable until a program could write a file that is not text), one in
+# `tests/bytes` (the s89 lend, three lanes), and two in `tests/str` (F-0071's
+# closure, split from its surviving half).
+#
+# The fs posture is unchanged and re-measured: the checked tier and the
+# native rung execute, lupin refuses. What DID change is the SHAPE of
+# lupin's refusal, and it is worth a line because it is the only thing here
+# that reads like drift: the s38 names get that machine's reasoned decline
+# ("this machine has no filesystem ... by design, so the fs tier is declined
+# rather than mocked") while the s90 names get the generic unknown-name
+# refusal (``unsupported: `fs_read_dir` does not resolve``). No lane moves
+# either way — lupin has no filesystem under either sentence — but a reader
+# cannot tell a posture from drift, which is F-0070's shape a third time and
+# is filed as F-0081.
+
+[tests."fs/binary_round_trip.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/append_is_an_append.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/directories_and_metadata.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/chunk_stream.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# The three row litmuses s90 made writable. `exists` and `invalid` are new
+# tags in this module's vocabulary; `utf8` has been DECLARED on
+# `fs.read_text` since sc07 and observed nowhere, because making a file
+# un-decodable needs byte-level writing and there was none. Each rides its
+# tag out of `main`, where the record names it — the toolchain's word rather
+# than this repository's (§14's sc14 rule). `exists_row.lu` is doing a second
+# job: the tag shares a name with `fs.exists`, and F-0036 says a colliding
+# tag can ride out as the FUNCTION with no `else` firing, so this row is also
+# the standing measurement that it does not here.
+[tests."fs/exists_row.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/invalid_row.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/utf8_row.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# s89's lend, asserted as a DIFFERENTIAL: every `std.bytes` function called
+# with `s.bytes()` and with an owned list, and the two must agree. The
+# no-copy half is an IR property pinned upstream and unobservable here, which
+# the file's header says rather than implies.
+[tests."bytes/lend_across_calls.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# F-0071's surviving half, split out so the three-lane file above stays
+# three-lane: lupin has no `first` and no `last` on a `List` at all, which is
+# a gap in that machine's container surface rather than anything about views.
+[tests."str/byte_view_first_last.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

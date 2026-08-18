@@ -1,0 +1,87 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.fs, err.row, err.else
+//!
+//! The BYTE fd tier: `write_chunk` and `read_chunk`, and the one thing
+//! they can do that `write`/`read` cannot.
+//!
+//! `fs.read` decodes, so a fixed-size read of text raises `utf8` when
+//! the chunk boundary lands inside a code point — a real limit
+//! documented on that function since sc07 and, until s90, filed rather
+//! than fixable. This file is the fix, measured: the same file read in
+//! two-byte chunks is a `utf8` MISS through `read` and comes back whole
+//! through `read_chunk`, because bytes have no boundaries to split.
+//! Joining the chunks and validating once is then the caller's move, and
+//! `std.bytes.to_str` is where that happens — not here, because a test
+//! imports exactly one module (F-0026's per-program collision rule).
+//!
+//! Also pinned: `read_chunk` ends on the `eof` ROW like `read` does (a
+//! reader loops until the miss rather than testing a length), a short
+//! final chunk comes back short rather than padded, and `write_chunk`
+//! answers `invalid` for an element that is not a byte — the one row in
+//! this module a CALLER can reach with data of its own, which is why it
+//! is in the signature where `copy_file` coarsens it away.
+//!
+//! The bytes the program builds are `C3 A9 C3 A9 80` — two copies of "é"
+//! and then a lone continuation byte, so the text tier has a code point to
+//! split and a byte that begins no sequence. (That note is here rather
+//! than above the pushes because `wolf fmt` splits a dotted call at the
+//! dot when a `//` comment sits directly above it — F-0016, sixth sprint
+//! running — and fmt is law, D34.)
+
+use std.fs
+
+fn main() -> !int {
+    let p = "chunk.bin"
+    var raw = List[int]()
+    (mut raw).push(195)
+    (mut raw).push(169)
+    (mut raw).push(195)
+    (mut raw).push(169)
+    (mut raw).push(128)
+    var w = fs.create(p)?
+    fs.write_chunk(mut w, raw)?
+    fs.close(take w)?
+    if (fs.size(p) else 0 - 1) != 5 { return 1 }
+
+    // Through the TEXT read a two-byte chunk is fine on a boundary and a
+    // one-byte chunk splits the code point: a `utf8` miss.
+    var t = fs.open(p)?
+    if (fs.read(mut t, 1) else "split") != "split" { return 2 }
+    fs.close(take t)?
+
+    // Through the BYTE read every chunk size works, the final chunk is
+    // short rather than padded, and the end is the `eof` row.
+    var f = fs.open(p)?
+    let a = fs.read_chunk(mut f, 2)?
+    if a.len != 2 { return 3 }
+    if a[0] != 195 { return 4 }
+    if a[1] != 169 { return 5 }
+    let b = fs.read_chunk(mut f, 2)?
+    if b.len != 2 { return 6 }
+    let tail = fs.read_chunk(mut f, 2)?
+    if tail.len != 1 { return 7 }
+    if tail[0] != 128 { return 8 }
+    var ended = false
+    fs.read_chunk(mut f, 2) else |_| {
+        ended = true
+        List[int]()
+    }
+    if !ended { return 9 }
+    fs.close(take f)?
+
+    // A non-byte element is the caller's data, so it is a row.
+    var bad = List[int]()
+    (mut bad).push(0 - 1)
+    var refused = false
+    var g = fs.create("chunk-bad.bin")?
+    fs.write_chunk(mut g, bad) else |_| {
+        refused = true
+    }
+    fs.close(take g)?
+    if !refused { return 10 }
+
+    fs.remove(p)?
+    fs.remove("chunk-bad.bin")?
+    0
+}

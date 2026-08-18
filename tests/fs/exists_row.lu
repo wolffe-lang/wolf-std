@@ -1,0 +1,52 @@
+//! check: run(exit=1, stdout="handled: again\nerror: exists")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate, err.else
+//!
+//! The `exists` litmus — one of the two tags s90 added to this module's
+//! vocabulary — in both directions a caller can take it: an `else` that
+//! turns the miss into a value and lets the program continue, and a `?`
+//! that propagates it out of `main`, where the process outcome NAMES the
+//! tag on stdout and exits 1.
+//!
+//! That last line is how this rig witnesses a tag's IDENTITY, and it is
+//! the only way that is worth anything: a handler asserting its own
+//! reading of which tag fired is this repository talking to itself,
+//! while `error: exists` is the toolchain naming it (§14's sc14 rule,
+//! learned from F-0079). It matters more here than usual, because
+//! `exists` is a row tag whose name is also a `pub fn` in the module
+//! that raises it — `fs.exists` — and F-0036 says a colliding tag can
+//! resolve to the function and ride out as a VALUE with no `else`
+//! firing. This file is the standing measurement that it does not: the
+//! `else` fires, and the record says `exists` rather than exiting 0 with
+//! a function in its hand.
+//!
+//! Deterministic on any host: the directory is created by the line
+//! before, inside a scratch directory staging has just cleared, so the
+//! second creation cannot fail for any other reason. The program opens by
+//! REMOVING that directory, because it ends by riding its tag out and so
+//! never reaches a cleanup line, while the rig stages once and runs three
+//! lanes in the one directory — without the clear, the second lane meets a
+//! world the first one left behind. (That note is in this header because
+//! `wolf fmt` splits a dotted call under a `//` comment, F-0016, and fmt
+//! is law, D34.)
+//!
+//! `create_dir_all` deliberately has NO `exists` row and is not tested
+//! here for one: it is idempotent by contract, and
+//! `directories_and_metadata.lu` calls it twice on one path and expects
+//! success.
+
+use std.fs
+
+fn main() -> !int {
+    let d = "already-here"
+    fs.remove_dir(d) else |_| {}
+    fs.create_dir(d)?
+    var again = "not-handled"
+    fs.create_dir(d) else |_| {
+        again = "again"
+    }
+    print("handled: {again}")
+    fs.create_dir(d)?
+    print("unreachable")
+    0
+}
