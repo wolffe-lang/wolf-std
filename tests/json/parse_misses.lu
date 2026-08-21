@@ -1,4 +1,4 @@
-//! check: run(exit=1, stdout="syntax taken\nerror: syntax")
+//! check: run(exit=1, stdout="two arms discriminate\nsyntax taken\nerror: overflow")
 //! phase: run
 //! conforms: std.json, err.row, err.else, err.propagate
 //!
@@ -15,16 +15,47 @@
 //! tag ride out of `main`, where `error: syntax` and exit 1 are the
 //! toolchain's own words rather than this repository's reading.
 //!
-//! The other two tags get their own files (`parse_deep_row.lu`,
-//! `parse_overflow_row.lu`) rather than a multi-arm handler here, and the
-//! reason is a measurement taken while writing this file: a
-//! `else |e| match e` over a row raised ACROSS A MODULE BOUNDARY takes its
-//! FIRST ARM under lupin, in both arm orders, silently (F-0079). The same
-//! shape over a row raised in the entry file discriminates correctly, which
-//! is what `tests/errors/handler_discriminates.lu` holds — so the two files
-//! together say exactly where the line is.
+//! All three tags live in ONE multi-arm handler over the module-crossing
+//! row — the shape F-0079 forbade for two sprints. lupin 0.1.13's
+//! arm-selection pass fixed it (wolf-interp#29; the split this file used
+//! to explain retired with the sc13-file pin bump, measured: the probe
+//! that answered its first arm for every tag under 0.1.12 discriminates
+//! both arm orders under 0.1.13). The `deep` boundary (64 legal, 80 a
+//! raise, never a stack trap — the whole security argument for the
+//! limit) and `overflow`'s near-misses (big-for-int is a Num; underflow
+//! is IEEE zero, not a miss) fold in from the two retired files. The
+//! overflow ARM stays unasserted under F-0084 (wolf-interp#33); its tag
+//! identity is held by the ride-out below instead.
 
 use std.json
+
+fn nested(levels: int) -> str {
+    var text = ""
+    var i: int = 0
+    while i < levels {
+        text = "[{text}]"
+        i = i + 1
+    }
+    text
+}
+
+/// Which arm the module-crossing row lands. Value arms deliberately: a
+/// `return` inside the handler returns from the HANDLER (it is a
+/// closure), not from this fn — all three implementations agree, so the
+/// value-arm spelling is the one this witness pins.
+fn arm_of(text: str) -> int {
+    let arm = json.parse(text) else |e| match e {
+        syntax => json.from_str("1"),
+        deep => json.from_str("2"),
+        overflow => json.from_str("3"),
+    }
+    if json.type_name(arm) == "str" {
+        if (json.as_str(arm) else "?") == "1" { return 1 }
+        if (json.as_str(arm) else "?") == "2" { return 2 }
+        if (json.as_str(arm) else "?") == "3" { return 3 }
+    }
+    0
+}
 
 fn refused(text: str) -> bool {
     let v = json.parse(text) else json.from_str("REFUSED")
@@ -77,6 +108,30 @@ fn main() -> !int {
     if refused("\"\\u00g0\"") {} else { return 33 }
     if refused("\"a\nb\"") {} else { return 34 }
 
+    // deep: the limit itself parses; one past it is a RAISE, never a
+    // stack trap (from the retired parse_deep_row.lu).
+    let ok = json.parse(nested(64)) else json.from_str("REFUSED")
+    if json.type_name(ok) == "arr" {} else { return 41 }
+    // overflow's near misses (from the retired parse_overflow_row.lu):
+    // too big for `int` is a Num; underflow is IEEE zero.
+    let big = json.parse("99999999999999999999") else json.null()
+    if json.type_name(big) == "num" {} else { return 42 }
+    let tiny = json.parse("1e-400") else json.from_str("REFUSED")
+    if (json.as_float(tiny) else 1.0) == 0.0 {} else { return 43 }
+
+    // The three tags, ONE handler, across the module boundary — each
+    // input lands its own arm (F-0079's fix, witnessed where the bug
+    // lived).
+    if arm_of("[1,]") == 1 {} else { return 44 }
+    if arm_of(nested(80)) == 2 {} else { return 45 }
+    // The overflow ARM is deliberately unasserted at this pin: lupin
+    // 0.1.13 selects a widened tag's arm by sub-row INDEX (F-0084,
+    // wolf-interp#33 — `1e400` lands the `deep` arm here; wolfc's two
+    // lanes select correctly). Ride-out identity below is intact on
+    // every lane. Assert `arm_of("1e400") == 3` the day #33 closes.
+    if arm_of("1e400") == 0 { return 46 } else {}
+    print("two arms discriminate")
+
     // The miss path produces a value, and then the tag rides out of `main`
     // so the record names it.
     let handled = json.parse("[1,]") else |_| {
@@ -85,7 +140,7 @@ fn main() -> !int {
     }
     if json.is_null(handled) {} else { return 35 }
 
-    let forced = json.parse("{{\"a\" 1}}")?
+    let forced = json.parse("1e400")?
     if json.is_null(forced) {} else { return 36 }
     0
 }
