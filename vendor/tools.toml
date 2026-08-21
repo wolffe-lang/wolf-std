@@ -14,10 +14,34 @@
 # moving upstreams); the nightly lane watches the drift, report-never-gate.
 
 [lupin]
-# 0.1.12 (sc14 bump, from 0.1.11). Its own conformance pin is `4e316ad`,
-# which is the sc13 `wolf` pin exactly — the interpreter names the compiler
-# sha this repository held one sprint ago, for the second bump running.
+# 0.1.13 (sc13-file bump, from 0.1.12). Its own conformance pin is
+# `02c1e88` — the compiler sha this repository held one sprint ago, the
+# THIRD bump running with that pattern.
 #
+# What the bump changes for this repo, re-measured one probe at a time:
+# - **F-0079 is FIXED here** (wolf-interp#29 closed by the 0.1.13
+#   arm-selection pass): the probe that fails rc=2 under 0.1.12 (first
+#   arm answers for every tag) prints `discriminates` rc=0 under 0.1.13,
+#   both arm orders, through a module boundary. The parse_misses.lu
+#   three-file split retires this sprint on that measurement.
+# - **Trait impls on STRUCTS dispatch here now**, qualified calls too —
+#   but **DEFAULT bodies still refuse** ("no method in this machine's
+#   std subset", wolf-interp#32, filed upstream 2026-08-21): a protocol
+#   fn relying on a default is a wolf-lanes-only row with the reason.
+# - **fn values pass and call** (probe: comparator into a generic walker,
+#   both directions) and **`v as dyn Trait` from a place runs** — three
+#   lanes for the comparator tier this sprint ships.
+# - **Impls on PRIMITIVES are unmoved everywhere** (`i64 has no method`
+#   here; "methods on non-nominal self types" on both wolf lanes), so
+#   `sort[T: Ord]`/`cmp.min` stay unexecutable on every lane — the
+#   oldest freight in the ledger keeps its reason, now measured at this
+#   exact pair of pins.
+# - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
+#   line parses here and E0201s under wolfc (F-0083).
+version = "0.1.13"
+pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
+#
+# The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
 # - **`str_from_utf8` RESOLVES HERE NOW** (F-0075 CLOSED, one release after
 #   it was filed): `str_from_utf8([195, 169])` is `é` and `[255]` is the
@@ -148,8 +172,8 @@
 # What it does NOT change: no `fs_*`, no `read_line`, no `net_*` (all three
 # declined by design, each with a sentence in the refusal), and `var k = 0`
 # is still `i32`.
-version = "0.1.12"
-pin = "4e316ad7c4236be5bcf05231a16bbecadccc2018"
+# (superseded values, kept in the history block)
+# pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
 version = "0.1.0"
@@ -448,4 +472,4 @@ version = "0.1.0"
 # reports its absence and the lane goes dark rather than silent. It executes
 # the fs/io, os/env/time and (new at s73) concurrency tiers, and refuses the
 # net, process and json tiers by name.
-pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
+pin = "dd6d13c1e843c9c01fb763aa89e14b9e3e0989d1"
