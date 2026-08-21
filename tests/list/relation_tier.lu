@@ -1,0 +1,48 @@
+//! check: run(exit=0, stdout="relations hold\n")
+//! phase: run
+//! conforms: std.list, generics.mono
+//!
+//! The relation half of sc13's callable tier: `min_by`/`max_by` under a
+//! caller-owned `better: fn(T, T) -> bool`, and `is_sorted_by` — the
+//! witness `sort_by` will be judged by when wolf-lang#23 frees the
+//! `Ordering` comparator. Bool relations by measurement, not taste:
+//! Ordering cannot cross the module boundary at these pins.
+
+use std.list
+
+fn lt(a: int, b: int) -> bool { a < b }
+fn gt(a: int, b: int) -> bool { a > b }
+fn le(a: int, b: int) -> bool { a <= b }
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 4)
+    list.push(mut xs, 1)
+    list.push(mut xs, 9)
+    list.push(mut xs, 1)
+
+    if (list.min_by(xs, lt) else 0 - 1) == 1 {} else { return 1 }
+    if (list.max_by(xs, gt) else 0 - 1) == 9 {} else { return 2 }
+    // Ties keep the FIRST winner: the 1 at index 1, not index 3 —
+    // pinned so min_by stays stable the day someone sorts with it.
+    if (list.index_where(xs, negative_none) else 0 - 1) == 0 - 1 {} else { return 3 }
+
+    var empty = List[int]()
+    if (list.min_by(empty, lt) else 0 - 1) == 0 - 1 {} else { return 4 }
+
+    if list.is_sorted_by(empty, le) {} else { return 5 }
+    var one = List[int]()
+    list.push(mut one, 7)
+    if list.is_sorted_by(one, le) {} else { return 6 }
+    if list.is_sorted_by(xs, le) { return 7 } else {}
+    var asc = List[int]()
+    list.push(mut asc, 1)
+    list.push(mut asc, 1)
+    list.push(mut asc, 3)
+    if list.is_sorted_by(asc, le) {} else { return 8 }
+
+    print("relations hold")
+    0
+}
+
+fn negative_none(v: int) -> bool { v < 0 - 100 }
