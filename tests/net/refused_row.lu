@@ -14,12 +14,13 @@
 //! one way to name a dead port that is guaranteed dead and guaranteed
 //! local.
 //!
-//! Propagation is the ONLY witness of a tag's identity in this rig, and it
-//! stayed that way at this pin: the shape that was supposed to replace it —
-//! `else |e| match e { refused => …, io => … }` — parses and runs now, and
-//! its first arm matches every tag with no diagnostic (F-0052, a divergence:
-//! lupin and the native rung discriminate correctly). So the handler below
-//! is a wildcard, and the tag rides out through `?`.
+//! The handler DISCRIMINATES now: F-0052's checked-tier first-arm bug is
+//! long closed (s70/s71, as std.io's header records), and this file's
+//! wildcard outlived the reason for it until the dd6d13c re-read —
+//! re-measured with the io arm FIRST, a refused dial still lands the
+//! refused arm, so the arm below proves the tag's identity in-band and
+//! the `?` ride-out proves it end-to-end, two witnesses where there was
+//! one.
 
 use std.net
 
@@ -28,7 +29,11 @@ fn main() -> !int {
     let p = net.port(srv)?
     net.close_listener(take srv)?
     let dead = net.loopback(p)
-    let sock = net.connect(dead) else |_| net.Socket { fd: 0 - 1 }
+    let sock = net.connect(dead) else |e| match e {
+        io => net.Socket { fd: 0 - 9 },
+        timeout => net.Socket { fd: 0 - 8 },
+        refused => net.Socket { fd: 0 - 1 },
+    }
     print("handled: {sock.fd}")
     let strict = net.connect(dead)?
     print("unreachable: {strict.fd}")

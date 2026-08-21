@@ -109,7 +109,7 @@ native = "run"
 [tests."option/or_else_default.lu"]
 lupin = "run"
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."option/to_list_roundtrip.lu"]
 lupin = "run"
@@ -118,17 +118,17 @@ lupin = "run"
 # raise alone (F-0015). Depth 1 -> 0 in the rig's ranking; an advance in
 # truth, since nothing is refused any more.
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."option/exists_marking.lu"]
 lupin = "run"
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."option/is_none_marking.lu"]
 lupin = "run"
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 # ---- std.errors: the payload taxonomy (sc06) ----
 # The only sc06 module with two executing lanes: monomorphic structs and
@@ -291,7 +291,19 @@ native = "run"  # sc08 pin bump (13b811f)
 [tests."list/push_len_empty.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
+
+[tests."list/predicate_tier.lu"]
+# sc13: fn VALUES as predicates (call.ind) — probe-proven three-lane.
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."list/relation_tier.lu"]
+# sc13: fn VALUES as relations; is_sorted_by is sort_by's future judge.
+lupin = "run"
+wolfc = "run"
+native = "run"
 
 [tests."list/get_hit_miss.lu"]
 lupin = "run"
@@ -299,37 +311,37 @@ lupin = "run"
 # answers `unsupported — module items in checked execution` (F-0015). The
 # same code inlined into an entry file runs.
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."list/first_last_hit_miss.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."list/pop_drains.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."list/set_and_swap.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."list/insert_remove.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."list/clear_truncate_fill.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."list/reverse_extend_concat_repeat.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."list/index_bounds_trap.lu"]
 lupin = "run"
@@ -339,12 +351,12 @@ native = "run"  # sc08 pin bump (13b811f)
 [tests."list/remove_bounds_trap.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."list/set_bounds_trap.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 # Renamed to `…_trap.lu` at the sc11 bump: s72's D40 made this `exclusivity`
 # under lupin (it used to run silently) and `E1013` on the compiler rungs (it
@@ -357,7 +369,7 @@ native = "fail(E1013)"
 [tests."list/freeze_then_read.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 # ---- sc02: std.map (lupin executes the builtin; wolfc does not type
 # `Map` at all — F-0011) ----
@@ -735,17 +747,17 @@ native = "unsupported"
 [tests."rand/stream_pinned.lu"]
 lupin = "run"
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."rand/range_and_bool.lu"]
 lupin = "run"
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."rand/next_float_pinned.lu"]
 lupin = "run"
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."rand/shuffle_and_choose.lu"]
 lupin = "run"
@@ -755,12 +767,12 @@ native = "unsupported"
 [tests."rand/choose_empty_miss.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."rand/below_zero_trap.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 # ---- sc04: std.range. The compiler resolves no type named `range`, so
 # both of its rungs REJECT — the only fail(E…) rows in the ledger, and
@@ -1451,16 +1463,6 @@ wolfc = "unsupported"
 native = "unsupported"
 
 [tests."json/parse_misses.lu"]
-lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
-
-[tests."json/parse_deep_row.lu"]
-lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
-
-[tests."json/parse_overflow_row.lu"]
 lupin = "run"
 wolfc = "unsupported"
 native = "unsupported"

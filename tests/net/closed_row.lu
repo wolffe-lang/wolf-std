@@ -11,13 +11,12 @@
 //! **The propagation is the only witness of a tag's identity, and at this
 //! pin that is worse than it sounds.** sc07 recorded that a bare-identifier
 //! handler binds every tag (F-0043); the shape that was supposed to replace
-//! it — `else |e| match e { closed => …, io => … }` — now PARSES and RUNS on
-//! the executing lane, and its first arm still matches every tag, with no
-//! diagnostic. Measured both ways round (swap the arms and the answers swap
-//! with them), and it is a divergence: lupin 0.1.5 and the native rung
-//! discriminate correctly, the checked tier does not (F-0052). So this file
-//! deliberately does NOT contain a discriminating handler: a test that
-//! passed by agreeing with the wrong answer would fossilize it.
+//! it — `else |e| match e { closed => …, io => … }` — discriminates on
+//! every lane since s70/s71 closed F-0052, and the dd6d13c re-read
+//! measured it again (arms flipped, the tag still finds its own arm).
+//! The handler below is that shape at last: the wildcard this file
+//! carried outlived its reason, and a test that proves the arm is
+//! stronger than one that refuses to ask.
 //!
 //! What that costs `std.net` is written into the module header:
 //! `read_all` is a reviewed contract rather than a function, because a loop
@@ -32,9 +31,14 @@ fn main() -> !int {
     var conn = net.accept(mut srv)?
     net.close(take conn)?
     var handled = "not-fired"
-    let gone = net.read(mut cli, 16) else |_| {
-        handled = "handled"
-        ""
+    let gone = net.read(mut cli, 16) else |e| match e {
+        io => "io-arm",
+        timeout => "timeout-arm",
+        closed => {
+            handled = "handled"
+            ""
+        },
+        utf8 => "utf8-arm",
     }
     print("peer-gone: {handled}{gone}")
     let strict = net.read(mut cli, 16)?

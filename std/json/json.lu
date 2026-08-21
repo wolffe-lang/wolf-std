@@ -812,12 +812,12 @@ fn parse_string(mut c: Cursor) -> str ! {syntax} {
 /// declares `{parse, overflow}` and only `overflow` is reachable from here:
 /// the grammar above accepts a strict subset of what `parse_float` reads,
 /// so text that got this far cannot be text it rejects. A discriminating
-/// handler would also be a lie on one lane — a multi-arm `else |e| match e`
-/// over a row raised ACROSS A MODULE BOUNDARY takes its first arm under
-/// lupin, silently (F-0079, filed this sprint, measured in both arm orders
-/// on all three lanes), and lupin is this module's only executing lane. A
-/// wildcard that claims nothing is the right handler when a module cannot
-/// act on the difference (§14, sc08's rule), and here it cannot see it
+/// handler is not needed for a different reason than it once was: F-0079
+/// (the first-arm bug this comment used to cite) is FIXED at lupin
+/// 0.1.13, and `tests/json/parse_misses.lu` now holds the three-arm
+/// discrimination this module's row supports. The wildcard stays because
+/// §14's rule still applies on its own terms: a module keeps a wildcard
+/// when it cannot act on the difference, and here it cannot see it
 /// either.
 fn parse_number(mut c: Cursor) -> Value ! {syntax, overflow} {
     let start = c.i

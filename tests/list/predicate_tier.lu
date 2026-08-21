@@ -1,0 +1,51 @@
+//! check: run(exit=0, stdout="predicates hold\n")
+//! phase: run
+//! conforms: std.list, generics.mono, err.row
+//!
+//! The predicate half of sc13's callable tier: `any`, `all`,
+//! `count_where`, `index_where`, `find_where` over fn VALUES — the c22
+//! `call.ind` surface, on every lane. The predicates live at top level
+//! in THIS file because that is where a fn value can come from today:
+//! nested fns do not resolve (F-0086) and a cross-module qualified fn
+//! value refuses on the compiled lanes (F-0085) — this file is the
+//! measured witness for the shape the module's prose examples cite.
+
+use std.list
+
+fn odd(v: int) -> bool { v % 2 == 1 }
+fn negative(v: int) -> bool { v < 0 }
+fn short(s: str) -> bool { s == "ok" }
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 2)
+    list.push(mut xs, 3)
+    list.push(mut xs, 8)
+    list.push(mut xs, 5)
+
+    if list.any(xs, odd) {} else { return 1 }
+    if list.any(xs, negative) { return 2 } else {}
+    if list.all(xs, odd) { return 3 } else {}
+    if list.count_where(xs, odd) == 2 {} else { return 4 }
+    if (list.index_where(xs, odd) else 0 - 1) == 1 {} else { return 5 }
+    if (list.find_where(xs, odd) else 0 - 1) == 3 {} else { return 6 }
+
+    // The empty list: any false, all vacuously true, finds miss.
+    var empty = List[int]()
+    if list.any(empty, odd) { return 7 } else {}
+    if list.all(empty, odd) {} else { return 8 }
+    if list.count_where(empty, odd) == 0 {} else { return 9 }
+    if (list.index_where(empty, odd) else 0 - 1) == 0 - 1 {} else { return 10 }
+    if (list.find_where(empty, odd) else 0 - 1) == 0 - 1 {} else { return 11 }
+
+    // A second instantiation: List[str] with a str predicate — the
+    // same generic fns, a different T, both instances live at once.
+    var ss = List[str]()
+    list.push(mut ss, "wolf")
+    list.push(mut ss, "ok")
+    if list.count_where(ss, short) == 1 {} else { return 12 }
+    if (list.find_where(ss, short) else "?") == "ok" {} else { return 13 }
+
+    print("predicates hold")
+    0
+}

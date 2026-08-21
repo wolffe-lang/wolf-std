@@ -1226,3 +1226,14 @@ so: `std.process`'s header retires the clause "a wolf program cannot learn
 its own path" — true from sc11 to sc12, false now — and states that F-0066
 stays OPEN because its other two legs hold. A finding whose cheapest fix
 arrives is not a finding that closed.
+
+## sc13 note — no dyn surface, on purpose
+
+D47 made `v as dyn Trait` real and sc13 probed it green on every lane —
+and shipped no dyn API. Every candidate (an erased predicate holder, a
+dyn comparator slot) has a generic spelling that is strictly better at
+these pins: no allocation question, no place-only constraint on the
+caller, and monomorphized dispatch where a vtable would indirect. The
+facade grows on demand (D31); the first std consumer with a real
+erasure need — a heterogeneous collection, a plugin registry — reopens
+this, and the probe (`p3_dyn`) is the shape it starts from.

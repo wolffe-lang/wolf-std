@@ -507,3 +507,113 @@ pub fn repeat[T](xs: List[T], n: int) -> List[T] {
 // exemplar is the same closure blocker. No half-shipped variants: a
 // `map` that takes a named function only would be a different API from
 // the one that lands, and callers would have to change twice.
+
+// ------------------------------------------------------------------
+// The callable tier (sc13): predicates and relations as fn VALUES —
+// the c22 `call.ind` surface, probe-proven on all three lanes. Bool-
+// shaped by measurement, not taste: a comparator returning
+// `cmp.Ordering` cannot be examined across the module boundary
+// (wolf-lang#23), so the relation here is `better: fn(T, T) -> bool`
+// and the predicate `fn(T) -> bool`. Examples are PROSE (the sort_by
+// precedent): a doc example cannot define a fn (nested fns do not
+// resolve, F-0086) nor pass one across modules on the compiled lanes
+// (F-0085) — the test files carry the executable witnesses instead,
+// with their own top-level predicates, on every lane.
+// ------------------------------------------------------------------
+
+/// Does `pred` hold for ANY element? False on the empty list. Walks in
+/// order and stops at the first hit.
+///
+/// Call shape (witnessed by `tests/list/predicate_tier.lu` on all
+/// three lanes): `fn odd(v: int) -> bool { v % 2 == 1 }` … then
+/// `list.any(xs, odd)`.
+pub fn any[T](xs: List[T], pred: fn(T) -> bool) -> bool {
+    for x in xs {
+        if pred(x) { return true }
+    }
+    false
+}
+
+/// Does `pred` hold for EVERY element? Vacuously true on the empty
+/// list — the logician's `all`, and the one that makes
+/// `all(xs, p) == !any(xs, not_p)` an identity.
+pub fn all[T](xs: List[T], pred: fn(T) -> bool) -> bool {
+    for x in xs {
+        if pred(x) {} else { return false }
+    }
+    true
+}
+
+/// How many elements satisfy `pred`. The whole walk, always — there is
+/// nothing to stop early for.
+pub fn count_where[T](xs: List[T], pred: fn(T) -> bool) -> int {
+    var n = 0
+    for x in xs {
+        if pred(x) { n = n + 1 }
+    }
+    n
+}
+
+/// The index of the FIRST element satisfying `pred`; `none` when none
+/// does. The index answers "where", `find_where` answers "what" — two
+/// fns because a `T` is not an `int` and a sentinel index is §1's
+/// forbidden shape.
+pub fn index_where[T](xs: List[T], pred: fn(T) -> bool) -> int ! {none} {
+    var i = 0
+    for x in xs {
+        if pred(x) { return i }
+        i = i + 1
+    }
+    none
+}
+
+/// The first element satisfying `pred`; `none` when none does.
+pub fn find_where[T](xs: List[T], pred: fn(T) -> bool) -> T ! {none} {
+    for x in xs {
+        if pred(x) { return x }
+    }
+    none
+}
+
+/// The BEST element under `better`, where `better(a, b)` reads "a is
+/// better than b": the first element such that no later one beats it.
+/// `none` on the empty list. With `better` = "less than" this is the
+/// minimum; flip the relation and it is the maximum — `max_by` IS this
+/// fn with the arguments of `better` swapped in the caller's relation,
+/// documented rather than duplicated.
+pub fn min_by[T](xs: List[T], better: fn(T, T) -> bool) -> T ! {none} {
+    var have = false
+    var best = first(xs)?
+    for x in xs {
+        if have {
+            if better(x, best) { best = x }
+        }
+        have = true
+    }
+    best
+}
+
+/// `min_by` under the flipped relation, named for the call sites that
+/// read better with it. `max_by(xs, gt)` == `min_by(xs, gt)` when `gt`
+/// is already "greater is better"; the two names exist so neither
+/// caller writes a lambdaless flip by hand.
+pub fn max_by[T](xs: List[T], better: fn(T, T) -> bool) -> T ! {none} {
+    min_by(xs, better)
+}
+
+/// Is `xs` sorted under `le`, where `le(a, b)` reads "a may precede
+/// b"? True for the empty and single-element lists. This is the
+/// witness `sort_by` will be judged by the day wolf-lang#23 frees the
+/// `Ordering` comparator; it lands beside that freight deliberately.
+pub fn is_sorted_by[T](xs: List[T], le: fn(T, T) -> bool) -> bool {
+    var have = false
+    var prev = first(xs) else { return true }
+    for x in xs {
+        if have {
+            if le(prev, x) {} else { return false }
+            prev = x
+        }
+        have = true
+    }
+    true
+}
