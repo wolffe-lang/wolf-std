@@ -1,0 +1,21 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.str, mem.str.words
+//!
+//! sc14's `words_count`: the counting fold over the fused walk — named
+//! because the callable tier cannot hold a counter (F-0085/F-0086, no
+//! capture). Pins the count against `words().len` (the materializing
+//! spelling must agree), mixed whitespace, and the zero cases.
+
+use std.str
+use std.list
+
+fn main() -> !int {
+    if str.words_count("  the wolf	runs ") == 3 {} else { return 1 }
+    let l = str.words("  the wolf	runs ")
+    if str.words_count("  the wolf	runs ") == list.len(l) {} else { return 2 }
+    if str.words_count("") == 0 {} else { return 3 }
+    if str.words_count(" 	 ") == 0 {} else { return 4 }
+    if str.words_count("one") == 1 {} else { return 5 }
+    0
+}

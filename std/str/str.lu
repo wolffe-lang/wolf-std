@@ -19,7 +19,7 @@
 //!   ruling this repo's F-0006 asked for);
 //! - the builtin method set this file delegates to, which is now the whole
 //!   s37 set: `is_empty`, `get`, `bytes`, `contains`, `starts_with`,
-//!   `ends_with`, `find`, `rfind`, `count`, `split`, `words`, `each_word`, `lines`,
+//!   `ends_with`, `find`, `rfind`, `count`, `split`, `words`, `each_word`, `words_count`, `lines`,
 //!   `trim`, `trim_start`, `trim_end`, `lower`, `upper`, `strip_prefix`,
 //!   `strip_suffix`, `repeat`, `replace`.
 //!
@@ -818,6 +818,23 @@ pub fn words(s: str) -> List[str] {
 /// module context (no `__wolf_rt_str_split`, the inline predicate).
 pub fn each_word(s: str, f: fn(str) -> ()) -> () {
     for w in s.words() { f(w) }
+}
+
+/// The number of whitespace-separated words in `s` — `words` without
+/// the list OR the callback: the same fused walk as `each_word`, folded
+/// to a count. This fold earns its own name because the callable tier
+/// cannot express it: a fn value captures nothing (F-0085/F-0086), so
+/// counting through `each_word` has nowhere to put the counter. Word
+/// rule as ever: whitespace is `trim`'s set, no word is empty — a
+/// whitespace-only or empty string counts zero.
+///
+/// ```wolf-doc-example
+/// str.words_count("  the   wolf  runs ") == 3
+/// ```
+pub fn words_count(s: str) -> int {
+    var n = 0
+    for w in s.words() { n = n + 1 }
+    n
 }
 
 /// `parts` concatenated with the separator `sep` between consecutive
