@@ -19,7 +19,7 @@
 //!   ruling this repo's F-0006 asked for);
 //! - the builtin method set this file delegates to, which is now the whole
 //!   s37 set: `is_empty`, `get`, `bytes`, `contains`, `starts_with`,
-//!   `ends_with`, `find`, `rfind`, `count`, `split`, `words`, `lines`,
+//!   `ends_with`, `find`, `rfind`, `count`, `split`, `words`, `each_word`, `lines`,
 //!   `trim`, `trim_start`, `trim_end`, `lower`, `upper`, `strip_prefix`,
 //!   `strip_suffix`, `repeat`, `replace`.
 //!
@@ -798,6 +798,26 @@ pub fn lines(s: str) -> List[str] {
 /// ```
 pub fn words(s: str) -> List[str] {
     s.words()
+}
+
+/// Walks the whitespace-separated words of `s` in order and calls `f`
+/// once per word, building nothing: the walk is the compiler's own lazy
+/// `for`-head over the receiver's bytes (`[mem.str.view]`, s84), so
+/// each word is a zero-copy slice of `s` and no list exists. `words` is
+/// this walk with a `List[str]` at the end; when the list itself is not
+/// wanted, this is the cheaper spelling. Same word rule as `words`:
+/// whitespace is `trim`'s set, empty runs separate, no word is empty —
+/// a string of only whitespace calls `f` zero times.
+///
+/// The example is prose because a doc example can neither define nor
+/// import a fn value (F-0085/F-0086; the sc13 convention): with
+/// `fn shout(w: str) -> () { print("{w}") }` at top level,
+/// `str.each_word("  the wolf  ", shout)` prints `the` then `wolf`.
+/// `tests/str/each_word_walk.lu` is the measured witness — including
+/// the native-lane disassembly proving the walk fuses in std's own
+/// module context (no `__wolf_rt_str_split`, the inline predicate).
+pub fn each_word(s: str, f: fn(str) -> ()) -> () {
+    for w in s.words() { f(w) }
 }
 
 /// `parts` concatenated with the separator `sep` between consecutive

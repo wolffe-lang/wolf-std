@@ -1,0 +1,33 @@
+//! check: run(exit=0, stdout="the\nwolf\nruns\n-\nempty ok\n")
+//! phase: run
+//! conforms: std.str, mem.str.words, generics.mono
+//!
+//! sc14's `each_word`: the lazy word walk as an internal-iteration API
+//! over a fn VALUE — `words` without the list. The walk itself is the
+//! compiler's `for`-head (s84's zero-copy StrIter), so this witness
+//! pins the API's semantics, not a new mechanism — and the mechanism
+//! itself is MEASURED, not assumed: the native-lane disassembly of
+//! `_Wstd.str.each_word` (sc14's probe, 2026-08-22) shows zero
+//! `__wolf_rt_str_split` calls and the inline `[mem.str.ws]`
+//! predicate twice (`cmp 0x20`/`sub 0x9`, the two walk loops), so the
+//! fused for-head reaches std's module context and `each_word` is
+//! sugar plus HOF-composability, never a materializing fallback.
+//! Semantics pinned here: order preserved,
+//! mixed whitespace (space and tab) separates, and a whitespace-only
+//! string calls `f` zero times — if `boom` ever ran, its BOOM line
+//! would break the stdout pin. The callback lives at top level per the
+//! sc13 convention (F-0085/F-0086: that is where a fn value can come
+//! from today).
+
+use std.str
+
+fn shout(w: str) -> () { print("{w}") }
+fn boom(w: str) -> () { print("BOOM {w}") }
+
+fn main() -> !int {
+    str.each_word("  the wolf	runs ", shout)
+    print("-")
+    str.each_word(" 	 ", boom)
+    print("empty ok")
+    0
+}
