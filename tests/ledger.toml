@@ -1575,6 +1575,19 @@ native = "run"
 # F-0071's surviving half, split out so the three-lane file above stays
 # three-lane: lupin has no `first` and no `last` on a `List` at all, which is
 # a gap in that machine's container surface rather than anything about views.
+[tests."str/each_word_walk.lu"]
+# sc14: the lazy word walk over a fn value — the s84 for-head plus
+# call.ind, probe-proven on both machines before the row was written.
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."str/words_count_fold.lu"]
+# sc14: the counting fold, agreeing with words().len on every lane.
+lupin = "run"
+wolfc = "run"
+native = "run"
+
 [tests."str/byte_view_first_last.lu"]
 lupin = "unsupported"
 wolfc = "run"
