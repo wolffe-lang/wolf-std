@@ -7,6 +7,36 @@
 # deeper than its ledger claims fails CI — advancement is deliberate, in
 # its own commit.
 #
+# THE sc15 PIN BUMP (wolf trunk dd6d13c -> 1b149ba, ~240 commits; lupin
+# UNCHANGED at 0.1.13 — a compiler-only bump) MOVED TWENTY ROWS, every
+# wolf-lane column that the three crossing waves reach, and rewrote none:
+# - **s107 (json + process cross natively — "the last checked-lane-only
+#   arms fall").** The four `x/json` native columns flip `unsupported` ->
+#   `run` (`path_helpers.lu` becomes the module's first three-lane row),
+#   and the four runnable `process` native columns follow. This is the
+#   bump sc15's DOM half lands on: its seven new rows enter two-lane on
+#   their first commit rather than flipping later.
+# - **s106 (net crosses; the s39 arm falls).** Seven `net` native columns
+#   flip `unsupported` -> `run`. A deadline also EXISTS upstream now
+#   (read_deadline), so F-0049's "no builtin can arm a deadline" is stale;
+#   `std.net` does not wrap it yet and that doc debt is named in
+#   vendor/tools.toml as owed to the next os sprint.
+# - **s108 (the front end pays its debts) plus the c22 dispatch span.**
+#   `testing/assert_eq_trap`, `assert_ne_trap` and
+#   `x/list_eq/contains_and_index_of` run on the CHECKED tier now —
+#   primitive-receiver `Eq` dispatch executes there (F-0082's checked half
+#   moves; native is unmoved and lupin still answers "i64 has no method").
+#   `x/option_expect/expect_trap` splits: E0401 is gone (F-0040's
+#   rejection retired), native RUNS the trap, and the checked machine now
+#   refuses "control flow in an argument" at mem — an advance wearing an
+#   unsupported verdict. `x/option_flatten/flatten_propagate` loses its
+#   `fail(E0201)` pair: nested rows PARSE (#34) and sema refuses their
+#   meaning by name at resolve, both wolf lanes.
+# The lupin column moved NOWHERE, by construction: the interpreter did not
+# change. The x/json lupin columns in particular stay dark as a POSTURE
+# while is18 lands that machine's own json reading — the sc15 test files
+# are written to flip on that pin bump with no edit.
+#
 # THE sc11 PIN BUMP (wolf trunk e94b879 -> 0b4e79c, five waves — s71, s72,
 # s51, s41, s73 — plus the r01 identity release; lupin 0.1.6 -> 0.1.8) MOVED
 # SEVEN ROWS and rewrote three test files. Every movement is an advance, and
@@ -206,12 +236,12 @@ native = "unsupported"
 
 [tests."testing/assert_eq_trap.lu"]
 lupin = "unsupported"
-wolfc = "unsupported"
+wolfc = "run"  # 1b149ba: primitive-receiver Eq dispatch executes on the checked tier (F-0082 half-moves; native unmoved)
 native = "unsupported"
 
 [tests."testing/assert_ne_trap.lu"]
 lupin = "unsupported"
-wolfc = "unsupported"
+wolfc = "run"  # 1b149ba: primitive-receiver Eq dispatch executes on the checked tier (F-0082 half-moves; native unmoved)
 native = "unsupported"
 
 # sc06: the comparison family as a static contract. Trait dispatch runs
@@ -447,7 +477,7 @@ native = "run"  # sc08 pin bump (13b811f)
 
 [tests."x/list_eq/contains_and_index_of.lu"]
 lupin = "unsupported"
-wolfc = "unsupported"
+wolfc = "run"  # 1b149ba: primitive-receiver Eq dispatch executes on the checked tier (F-0082 half-moves; native unmoved)
 native = "unsupported"
 
 [tests."x/list_eq/dedup_and_affixes.lu"]
@@ -462,20 +492,28 @@ native = "unsupported"
 
 [tests."x/option_flatten/flatten_propagate.lu"]
 lupin = "run"
-# The entry's own `nest` returns `int ! {none} ! {none}`, and wolfc's
-# grammar admits one `!` per type in every position (F-0039). The
-# rejection is at PARSE, so the module never gets a chance either.
-wolfc = "fail(E0201)"
-native = "fail(E0201)"
+# 1b149ba: s108's #34 made the row tail right-recursive, so
+# `int ! {none} ! {none}` PARSES now and the refusal moved from the
+# grammar to sema, by name: "unsupported — a nested error row (its
+# meaning is not ruled yet)" at resolve, both wolf lanes, measured at
+# the bump. E0201 is retired here and F-0039 is now a semantic ruling
+# question rather than a parse gap — the resident's trigger
+# (wolf-lang#34) half-fired, and the closeout reads it with that
+# sentence in hand.
+wolfc = "unsupported"
+native = "unsupported"
 
 [tests."x/option_expect/expect_trap.lu"]
 lupin = "run"
-# `option_expect.expect`'s handler traps, so it produces nothing, and
-# wolfc types an `else` block by its last expression: `E0401: this is (),
-# but the else fallback must produce T`. A generic function has no `T` to
-# conjure — the missing bottom type, F-0040.
-wolfc = "fail(E0401)"
-native = "fail(E0401)"
+# 1b149ba: E0401 is GONE — the trapping `else` block TYPES now (F-0040's
+# rejection retired at s108's front-end wave), and the two wolf lanes
+# split. The native rung RUNS the file: the trap fires with the expected
+# "FAILED: expected a positive" line, measured at the bump. The checked
+# machine types it and then refuses to MODEL it — "unsupported: control
+# flow in an argument" at mem — so the row moved from a rejection to a
+# modelling refusal, which is an advance wearing an unsupported verdict.
+wolfc = "unsupported"
+native = "run"
 
 [tests."x/testing_text/starts_with_pass.lu"]
 lupin = "run"
@@ -1009,12 +1047,12 @@ native = "run"  # sc08 pin bump (13b811f)
 [tests."net/echo_round_trip.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s106 crossed net natively
 
 [tests."net/stream_pieces.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s106 crossed net natively
 
 # The three row litmuses. A tag's IDENTITY rides out of `main` — the process
 # outcome names it on stdout and exits 1 — and that is still the STRONGEST
@@ -1026,17 +1064,17 @@ native = "unsupported"
 [tests."net/refused_row.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s106 crossed net natively
 
 [tests."net/closed_row.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s106 crossed net natively
 
 [tests."net/forged_handle_io_row.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s106 crossed net natively
 
 # The staleness discipline, held as a REJECTION on both compiler lanes:
 # `close` consumes its `Socket` (X1 `take`), so a write afterwards is E1001.
@@ -1061,7 +1099,7 @@ native = "run"
 [tests."net/address_helpers.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s106 crossed net natively
 
 # ---- sc09: std.str's census flip and std.bytes' first code ----
 # Sixteen new rows and every one of them is `run` on ALL THREE LANES — the
@@ -1254,25 +1292,40 @@ lupin = "unsupported"
 wolfc = "run"
 native = "run"
 
+# THE sc15 x/json BLOCK. Every native column here flipped `unsupported` ->
+# `run` at the 1b149ba bump: s107 crossed the `json_*` family natively
+# (`wolf_rt::json` hand-mirroring `wolf_mem::json`, parity-pinned
+# upstream), the last checked-lane-only arm to fall. The lupin columns are
+# a POSTURE, not drift — the machine declines the surface by design while
+# is18 lands the interpreter's own reading — and every file below is
+# written so that column flips on a future lupin pin bump with NO file
+# edit (the sc07/sc08 pattern).
 [tests."x/json/query_kernel.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s107 crossed json natively
 
 [tests."x/json/typed_getters.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s107
 
 [tests."x/json/rows_and_boundaries.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s107
 
 [tests."x/json/path_helpers.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s107 — the module's first three-lane row
+
+
+
+
+
+
+
 
 # The two census rows sc09 re-owned to `std.fmt` and `std.hex`, landed. Both
 # are three-lane, for the same structural reason sc09's sixteen were: `str.get`
@@ -1320,17 +1373,17 @@ native = "run"
 [tests."process/builder.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s107 crossed the process trio natively
 
 [tests."process/not_found_row.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s107 crossed the process trio natively
 
 [tests."process/forged_handle_io_rows.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s107 crossed the process trio natively
 
 # The staleness discipline, held as a REJECTION: `wait` consumes its `Child`
 # (X1 `take`) because waiting REAPS, so a second wait is E1001. `run` means
@@ -1355,7 +1408,7 @@ native = "run"
 [tests."process/exit_code.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s107 crossed the process trio natively
 
 # The two functions sc07 and sc08 refused to write, landed here because
 # F-0043's payload half (s71) and F-0052 (s70) are both closed: a loop over a
@@ -1374,7 +1427,7 @@ native = "run"
 [tests."net/read_all_and_lines.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # 1b149ba: s106 crossed net natively
 
 # ---- sc13: the json DOM's navigation, and the border post ----
 # THE sc13 PIN BUMP is wolf trunk `f8dca42` -> `4e316ad` (s79 bench, s80 token

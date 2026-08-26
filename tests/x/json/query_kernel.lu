@@ -5,12 +5,16 @@
 //! The four query kernels — `is_valid`, `get`, `type_name`, `len` — over
 //! one document that has every JSON shape in it.
 //!
-//! **One lane, and it is not a capability.** The `json_*` builtins are
-//! the one PURE builtin family (no I13 tag, nothing reached), and they
-//! still run on the checked tier alone at s40: the native rung refuses
-//! them by name and lupin 0.1.6 has never had them. That is the first of
-//! the two reasons this module is a nursery resident rather than a facade
-//! member, and it is what the ledger row below records.
+//! **Two lanes as of the sc15 pin, and it is not a capability.** The
+//! `json_*` builtins are the one PURE builtin family (no I13 tag,
+//! nothing reached). They ran on the checked tier alone from s40 until
+//! s107 crossed them natively (`wolf_rt::json`, parity-pinned against
+//! `wolf_mem::json` upstream), so both compiler rungs execute this file
+//! now; lupin declines the surface by design while is18 lands the
+//! interpreter's own reading, and that column flips on a pin bump. The
+//! unequal lanes were the first of the two reasons this module is a
+//! nursery resident, and the ledger row below records what remains of
+//! them.
 //!
 //! Every object literal writes `{{` and `}}`: a brace inside a wolf
 //! string opens an interpolation, so a JSON document in a wolf literal is
