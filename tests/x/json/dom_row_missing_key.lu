@@ -1,0 +1,24 @@
+//! check: run(exit=1, stdout="error: missing")
+//! phase: run
+//! conforms: std.x.json, err.row, err.propagate
+//!
+//! `member`'s absent-key row, ridden out of `main` so the RECORD names
+//! it: the object is fine, the key addresses nothing, and that is
+//! `missing` — a different sentence from `kind` (the holder is the
+//! wrong shape, dom_row_kind.lu) and from `parse` (the document is not
+//! a document, dom_row_parse.lu).
+//!
+//! A null-valued member is NOT this row — presence of `null` and
+//! absence of a key are different answers, and dom_navigation.lu holds
+//! the null side.
+//!
+//! Two lanes at this sprint's pin; lupin flips on a pin, not an edit
+//! (see dom_navigation.lu).
+
+use std.x.json
+
+fn main() -> !int {
+    let r = json.root("{{\"a\": 1}}")?
+    json.member(r, "b")?
+    0
+}

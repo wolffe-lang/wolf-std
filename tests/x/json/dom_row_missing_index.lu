@@ -1,0 +1,26 @@
+//! check: run(exit=1, stdout="error: missing")
+//! phase: run
+//! conforms: std.x.json, err.row, err.propagate
+//!
+//! `element`'s index-out-of-range row, ridden out of `main` so the
+//! RECORD names it: the array has two elements and the index is one
+//! past the end — the boundary value, because the boundary is where an
+//! off-by-one would hide. The path addresses nothing, which is
+//! `missing`, and it is a ROW where `List` indexing traps: the index
+//! came out of a walk over a DOCUMENT, and §10 says data raises where a
+//! caller's mistake traps.
+//!
+//! A negative index is the same miss by the same mechanism (the path
+//! `"-1"` addresses nothing in an array); `element`'s doc says so and
+//! `child_index`'s test holds the path it builds.
+//!
+//! Two lanes at this sprint's pin; lupin flips on a pin, not an edit
+//! (see dom_navigation.lu).
+
+use std.x.json
+
+fn main() -> !int {
+    let r = json.root("[10, 20]")?
+    json.element(r, 2)?
+    0
+}

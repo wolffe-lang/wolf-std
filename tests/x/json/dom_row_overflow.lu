@@ -1,0 +1,22 @@
+//! check: run(exit=1, stdout="error: overflow")
+//! phase: run
+//! conforms: std.x.json, err.row, err.propagate
+//!
+//! `int_of`'s magnitude row, ridden out of `main` so the RECORD names
+//! it: a twenty-digit integer in someone's document is an OUTCOME this
+//! module reports (`overflow`, §10's mark) and never a process it ends —
+//! the same digits handed to `std.fmt.parse_int` would TRAP, correctly,
+//! because there they are a caller's argument and here they came out of
+//! a document. This is the first file in the module to put that tag on
+//! a record; the else-shaped misses live in dom_typed_reads.lu.
+//!
+//! Two lanes at this sprint's pin; lupin flips on a pin, not an edit
+//! (see dom_navigation.lu).
+
+use std.x.json
+
+fn main() -> !int {
+    let n = json.node("[99999999999999999999]", "0")?
+    json.int_of(n)?
+    0
+}

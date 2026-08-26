@@ -1,0 +1,22 @@
+//! check: run(exit=1, stdout="error: kind")
+//! phase: run
+//! conforms: std.x.json, err.row, err.propagate
+//!
+//! `member`'s wrong-shape row, ridden out of `main` so the RECORD names
+//! it: asking an ARRAY for a member is `kind` — the typed navigation
+//! refuses rather than guessing, where the raw dotted path would have
+//! answered `missing` about a segment that parses as no index. The
+//! mirror (element on an OBJECT) is held at the end of
+//! dom_navigation.lu; the record-level identity only needs one witness
+//! and this file is it.
+//!
+//! Two lanes at this sprint's pin; lupin flips on a pin, not an edit
+//! (see dom_navigation.lu).
+
+use std.x.json
+
+fn main() -> !int {
+    let r = json.root("[10, 20]")?
+    json.member(r, "a")?
+    0
+}

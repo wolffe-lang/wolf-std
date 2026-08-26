@@ -34,13 +34,18 @@ is house doctrine (sc01), and this directory is where the bill goes instead.
    `std.x.json.float_at` was written and withdrawn inside one sprint for
    that (F-0061). A refusal that costs one lane is a ledger row; a refusal
    that costs a module's only lane is a withdrawn function.
-2. **A resident and its facade successor cannot be imported by one
-   program.** Module identity is the last path segment (F-0034), so
-   `std.x.json` and `std.json` are both `json` to an importer and the pair is
-   `E0306` on both compiler rungs, `unsupported` under lupin (F-0058). That
-   is a constraint on D31's graduation story itself, filed; until it is
-   ruled, a resident sharing a facade's leaf name divides the work with it
-   strictly by direction and both headers say so.
+2. **A resident and its facade successor CAN be imported by one program,
+   as of the sc15 pin.** For five sprints module identity was the last
+   path segment (F-0034) and the pair was `E0306` on both compiler rungs
+   (F-0058); s108 probe-closed wolf-lang#29 — identity is the FULL path,
+   the leaf clash is only a binding clash, and `use std.x.json as xj`
+   names the second binding. Re-measured at 1b149ba: the pair resolves on
+   all three lanes, and what still separates `std.x.json` from `std.json`
+   is their LANES (the DOM's generic bodies refuse on the compiler rungs,
+   the kernels refuse under lupin), so their tests remain single-module
+   for lane reasons and both headers say which. The constraint on D31's
+   graduation story is retired; the division-by-direction rule survives
+   as documentation hygiene while the two surfaces coexist.
 
 ## Residents
 
@@ -51,7 +56,7 @@ is house doctrine (sc01), and this directory is where the bill goes instead.
 | `option_flatten` | 1 | `flatten`'s nested row (`T ! {none} ! {none}`) is `fail(E0201)` at parse in wolfc (F-0039) | wolf-lang#34 |
 | `option_expect` | 1 | `expect`'s diverging handler needs a bottom type; wolfc says `E0401: this is (), but the else fallback must produce T` (F-0040) | wolf-lang#35 |
 | `testing_text` | 1 | a builtin `str` method used to make every importer `unsupported` at resolve, which would take `std.testing`'s whole floor off the compiler lane (F-0018) | wolf-lang#17 — **re-measure at the next closeout: the `str` ceiling is gone, so this one may simply graduate** |
-| `json` | 11 | **the nursery's first tenant, and the only one D31 named in advance.** Two measured reasons, both in its header: (1) ONE executing lane — the `json_*` kernels are the checked tier's alone at s40, the native rung refusing them by name and lupin being three waves behind its pin; (2) a dotted path is not the API json ends up with — no key enumeration, keys containing `.` unreachable, every read a fresh parse (F-0058) | the native mirror of `wolf_mem::json` plus the interpreter's own — the two-consumer shape every builtin tier goes through — AND a ruling on whether a query face belongs beside `std.json`'s DOM or is deleted in favour of it |
+| `json` | 22 | **the nursery's first tenant, and the only one D31 named in advance.** Two measured reasons, both in its header, ONE of which moved at sc15: (1) unequal lanes — the `json_*` kernels were the checked tier's alone from s40 until the sc15 pin, where s107's native crossing lit the second compiler rung; lupin still declines by design while is18 lands its own reading; (2) a dotted path is not the API json ends up with — no key enumeration (the sc15 NAMED STOP, F-0087), keys containing `.` unreachable, every read a fresh parse. sc15 added the DOM half over the same kernels: `Node` plus `root`/`node`/`member`/`element` and seven reads — the compiled lanes' navigable json, beside `std.json`'s interpreter-lane `Value` | the native mirror of `wolf_mem::json` (**FIRED at the sc15 pin — s107**) plus the interpreter's own (in flight, is18) — AND a ruling on whether a query face belongs beside `std.json`'s DOM or is deleted in favour of it |
 
 ## Clocks
 
@@ -67,6 +72,19 @@ is house doctrine (sc01), and this directory is where the bill goes instead.
   judged: its trigger is an upstream mirror nobody has scheduled, and one
   campaign is the review interval rather than the deadline. Whatever happens,
   it is written in that closeout with a reason — which is the whole mechanism.
+- **`json`'s OTHER trigger clause fired at sc15**: s107 crossed the
+  `json_*` kernels natively (`wolf_rt::json`, the hand mirror of
+  `wolf_mem::json` the trigger named, parity-pinned upstream), so both
+  compiler rungs execute the module and only the interpreter's own reading
+  (is18, concurrent) is outstanding. sc15 also grew the DOM half — `Node`
+  and its navigations, over the same kernels — which RESHAPES the deletion
+  question the sc14 bullet below sharpened: `std.json`'s DOM executes on
+  the interpreter alone (F-0029) and this resident's on the compilers
+  alone, so today each read surface is the only one its lanes have.
+  Deleting the resident in favour of the DOM now costs the compiled lanes
+  every json read; the honest closeout question is no longer "query face
+  or DOM" but "which surface graduates when the lanes converge". Written
+  here so the closeout finds it measured rather than remembered.
 - **HALF of `json`'s trigger fired at sc14**, and the closeout should read it
   as evidence rather than as a verdict. The trigger has two clauses: an
   upstream mirror of `wolf_mem::json` (unmoved — the kernels are still the

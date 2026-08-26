@@ -30,56 +30,76 @@
 //! built the kernel for it — but the reason it is a resident rather than
 //! a member is measured, not decreed, and it is two reasons:
 //!
-//! 1. **One executing lane.** `json_valid`/`json_get`/`json_type`/
-//!    `json_len` are the checked tier's alone at s40: the native rung
-//!    refuses them by name ("json builtins in native lowering (checked
-//!    lane only at s40)") and lupin 0.1.6 has never heard of them. A core
-//!    module with one lane out of three cannot make the promises the
-//!    facade makes. The graduation trigger is the native mirror of
-//!    `wolf_mem::json` plus the interpreter's own — the same two-consumer
-//!    shape every other builtin tier went through.
+//! 1. **Unequal lanes — and the count MOVED at sc15.** `json_valid`/
+//!    `json_get`/`json_type`/`json_len` were the checked tier's alone
+//!    from s40 until this sprint's pin. s107 crossed the family natively
+//!    (`wolf_rt::json`, a hand mirror of `wolf_mem::json` — the locked
+//!    crate graph forbids reuse — with the two copies pinned upstream by
+//!    the driver's json_parity test), so BOTH compiler rungs execute
+//!    every function here now. lupin still declines the surface by
+//!    design ("rather than risk a second, guessed RFC 8259 reading")
+//!    while wolf-interp's own reading lands (is18, concurrent with this
+//!    sprint); its column flips on a pin bump, never on an edit here.
+//!    The graduation trigger was the native mirror plus the
+//!    interpreter's own — the same two-consumer shape every builtin tier
+//!    goes through. The first clause FIRED at this pin; the second is in
+//!    flight, and the register records both.
 //! 2. **This is a query surface, not the API json will end up with.** A
 //!    dotted path is a small language and it cannot express what the
 //!    document can hold: a key containing `.` is unreachable at this tier
 //!    (documented upstream and here), there is no way to enumerate an
 //!    object's keys, and every read re-parses the whole text. The API a
 //!    program eventually wants is `std.json`'s DOM — one parse, a value
-//!    you navigate — and that module already exists with everything
-//!    except the parser (see the sibling note below). When it can parse,
-//!    this module either graduates as the *streaming query* face beside
-//!    it, or it is deleted and its callers move. That is a decision for a
-//!    closeout, and this is where it is written down.
+//!    you navigate — and that module has been complete in both
+//!    directions since sc14 (see the sibling note below). What THIS
+//!    module grew at sc15 is the compiled lanes' counterpart: the `Node`
+//!    half below, a navigable handle over the same four kernels, because
+//!    `std.json`'s `Value` is an enum only the interpreter executes
+//!    (F-0029) and the kernels now execute everywhere else. Whether a
+//!    query face lives on beside the DOM or is deleted in favour of it
+//!    is still a closeout's decision, and this is where it is written
+//!    down.
 //!
-//! ## `std.x.json` and `std.json` are two modules and one program may not
-//! ## import both
+//! ## `std.x.json` and `std.json` are two modules, and what separates
+//! ## them MOVED at this pin
 //!
-//! Module identity is the LAST path segment (F-0034), so `std.x.json` and
-//! `std.json` are both `json` to an importer: `use std.json` beside
-//! `use std.x.json` is `E0306` on both compiler rungs and `unsupported`
-//! under lupin, measured at these pins (F-0058). Importing EITHER on its
-//! own is fine, which is why this module can keep the name upstream gave
-//! it. Every test and every doc example here imports exactly one.
+//! For five sprints module identity was the LAST path segment (F-0034),
+//! so `use std.json` beside `use std.x.json` was `E0306` on both
+//! compiler rungs (F-0058's import half). **s108 probe-closed that**
+//! (wolf-lang#29): identity is the FULL path now, and the pair
+//! RESOLVES on all three lanes — the leaf-name clash is only a binding
+//! clash, and `use std.x.json as xj` names the second binding, exactly
+//! as the E0306 suggestion says. Measured at these pins, both
+//! directions: what stops a co-importing program today is the LANES,
+//! not the names — it dies at the first `std.json` body on the compiler
+//! rungs ("methods on generic std data") and at the first `json_*`
+//! under lupin. So every test and doc example here still imports
+//! exactly one module, and the two halves still compose at the TEXT
+//! level: `text_of` of a container is a document `std.json.parse`
+//! reads, and `stringify` writes a document `root` reads.
 //!
 //! They divide the work the way their lanes do. `std.json` owns the DOM —
 //! a `Value` enum you build, NAVIGATE and serialize. Navigation arrived
 //! there at sc13: F-0037 (an enum returned through an error row takes the
 //! miss path on every call) closed at lupin 0.1.10 and `json.get`/`at`
 //! ship, so the sentence this paragraph carried for three sprints —
-//! "the DOM cannot be walked" — is retired. What `std.json` still cannot
-//! do is PARSE, and that is now a debt with a date rather than a
-//! refusal: nothing blocks `parse` at these pins and §14 gives it one
-//! sprint of grace. This module owns the read direction — text in, wolf
-//! values out — and cannot build anything, because the kernel is queries
-//! only.
+//! "the DOM cannot be walked" — is retired; `parse` arrived at sc14 and
+//! the DOM is complete in both directions. This module owns the read
+//! direction — text in, wolf values out — and cannot build anything,
+//! because the kernel is queries only. The lanes divide the same way the
+//! work does: `std.json`'s `Value` executes on the interpreter alone
+//! (F-0029), while everything here executes exactly where the kernels do
+//! — both compiler rungs at this sprint's pin, lupin pending is18.
 //!
 //! **Which means the graduation question this module's clock asks gets
 //! sharper rather than easier.** The register says `x.json` either
 //! graduates as the streaming QUERY face beside `std.json`'s DOM or is
-//! deleted in favour of it; the DOM answering `parse` is exactly the
-//! event that decides it, and it is one sprint away. Nothing about the
-//! banner, the clock or the trigger changes here — this is a note for
-//! whoever holds the stdc02 closeout, written where they will be
-//! standing.
+//! deleted in favour of it; the DOM answered `parse` at sc14, and at
+//! sc15 this module answered back with the `Node` half, so the question
+//! is symmetric now: two complete read surfaces, one per lane family.
+//! Nothing about the banner, the clock or the trigger changes here —
+//! this is a note for whoever holds the closeout, written where they
+//! will be standing.
 //!
 //! ## The tier this delegates to
 //!
@@ -103,8 +123,11 @@
 //!
 //! **Paths are dotted segments.** `""` is the root; a segment of digits
 //! indexes an array; anything else keys an object. `"users.0.name"` is
-//! the second element's `name`. Build one with `child`/`child_index`
-//! rather than by hand. **A key containing `.` is unreachable** — the
+//! the second element's `name`. The node's KIND is what decides — on an
+//! object every segment is a key, digits included, so a member spelled
+//! `"0"` is reachable (measured; `dom_navigation.lu` pins it) — which is
+//! also why the DOM half's `member`/`element` can be typed at all. Build
+//! a path with `child`/`child_index` rather than by hand. **A key containing `.` is unreachable** — the
 //! tier says so and so does this module; it is not a bug to work around
 //! here, it is the ceiling of a dotted path, and it is one of the reasons
 //! the DOM is where json is going.
@@ -125,12 +148,27 @@
 //! from the other direction. The `f64` half is a contract below and the
 //! reason is measured, not principled.
 //!
+//! **A duplicate key answers its FIRST occurrence at this tier, and the
+//! duplicates COUNT.** Measured at these pins (F-0088): `get` on
+//! `{"a": 1, "a": 2}` at `"a"` is `1` and `len` of that object is 2,
+//! where `std.json.parse` of the same text keeps the LAST occurrence
+//! and counts one member (a `Map` assignment, and the wider ecosystem's
+//! last-wins reading). Both readings are RFC 8259-legal and neither
+//! corpus witness pins one, so the seam is FILED for a ruling rather
+//! than absorbed here, and `tests/x/json/dom_typed_reads.lu` holds the
+//! measurement so a ruling flips a row instead of rotting a sentence.
+//!
 //! **Every read re-parses the document.** `get` on a ten-megabyte text is
 //! a ten-megabyte parse, and ten reads are ten parses. That is the
 //! kernel's shape, not a defect this module can hide, and it is the
 //! second-loudest argument for the DOM. Read a subtree once with `get`
 //! (which hands back a valid JSON text) and query THAT, if the shape of
-//! your data allows it.
+//! your data allows it. **The `Node` half below does not change the
+//! cost**: a `Node` is an ADDRESS — a document and a path — not a
+//! materialization, so each accessor is one more parse. What it buys is
+//! checked construction: a `Node` this module handed out addresses a
+//! node that existed, in a document that parsed, with the misses raised
+//! where the navigation happened rather than at every later read.
 //!
 //! Reviewed contracts, blocked at the tier below:
 //!
@@ -154,18 +192,28 @@
 //!     An object's member names. No builtin enumerates them — `json_len`
 //!     counts members and nothing names them — so an object can be
 //!     counted and not walked, which is the sharpest hole in the query
-//!     tier (F-0058). Blocked, not unwritten.
+//!     tier. **This is sc15's NAMED STOP**: the `Node` half below
+//!     inherits the hole whole (`keys_of` is the same contract over a
+//!     handle), s107 added no enumeration kernel, and the ask is written
+//!     rather than worked around — `json_keys(doc, path) -> List[str]
+//!     ! {parse, missing, kind}`, the `fs_read_dir` shape one tier over
+//!     (F-0087, filed upstream). Blocked, not unwritten.
 //! items(doc: str, path: str) -> List[str] ! {parse, missing, kind}
 //!     An array's elements as sub-documents. Writable TODAY over
 //!     `json_len` plus `child_index` plus `get` in a loop, and left out
 //!     deliberately: it would parse the document once per element, which
-//!     is quadratic in a shape programs reach for constantly. It lands
-//!     when the tier grows a cursor, or in the DOM.
+//!     is quadratic in a shape programs reach for constantly, hidden
+//!     behind one call. sc15's `element` reads ONE element per call, so
+//!     the walk a caller writes — `len_of` plus `element` in a loop —
+//!     costs the same and shows the cost at the call site. A
+//!     list-returning `items` still waits for a cursor in the tier.
 //! parse(doc: str) -> Value   ·   stringify(v: Value) -> str
 //!     The DOM directions, both `std.json`'s. `stringify` shipped at
-//!     sc05, `get`/`at` at sc13 and **`parse` at sc14** — so the DOM half
-//!     is complete and this module's whole reason is the query tier's
-//!     one-call convenience over a text it never turns into values.
+//!     sc05, `get`/`at` at sc13 and `parse` at sc14 — that DOM is
+//!     complete. At sc15 THIS module grew its own `Node` face beside the
+//!     query functions: the compiled lanes' DOM, over the kernels, with
+//!     `root` as its entry point (not `parse` — see `root`'s doc for the
+//!     F-0036 reason).
 //! ```
 
 use std.fmt
@@ -436,6 +484,304 @@ pub fn child(path: str, segment: str) -> str {
 /// ```
 pub fn child_index(path: str, i: int) -> str {
     child(path, "{i}")
+}
+
+/// One location in one well-formed document — the DOM half's handle
+/// (sc15). A `Node` is an ADDRESS, not a materialization: a document and
+/// a dotted path into it, both plain `str`, so the value crosses every
+/// lane a struct crosses and costs nothing to copy but the text it
+/// already shares.
+///
+/// **What a `Node` promises.** Every `Node` this module hands out —
+/// from `root`, `node`, `member` or `element` — addressed an existing
+/// node in a document that parsed, at the moment it was built; the
+/// document is an immutable `str`, so that stays true. The misses are
+/// therefore raised where the NAVIGATION happens, and a later read of a
+/// module-built `Node` cannot miss on `parse` or `missing`.
+///
+/// **What a forged one does.** The fields are open — this tier buys no
+/// privacy (the `std.time` posture) — so a caller can assemble a `Node`
+/// out of any two strings. A forged `Node` produces ROWS and never a
+/// trap: every accessor's `parse` and `missing` tags stay on the
+/// signature because a forged argument can reach them, and the docs
+/// below say which callers can.
+///
+/// **The ceiling travels with the path.** A `Node` is a dotted path, so
+/// a key containing `.` is as unreachable through `member` as through
+/// `child`, and for the same reason: there is no escape in the path
+/// language to hide behind. Keys with dots need `std.json`'s DOM.
+pub struct Node {
+    doc: str,
+    path: str,
+}
+
+/// The root node of a well-formed document.
+///
+/// The DOM half's entry point: one validation, then a handle every later
+/// navigation and read composes from. Rows: `parse` when `doc` is not
+/// RFC 8259 — the only miss a root can have, since the root of a valid
+/// document always exists (`missing` is not on the signature because no
+/// argument can reach it).
+///
+/// **Spelled `root` and not `parse`, and the reason is F-0036's
+/// symmetric rule (sc14): a new `pub fn` is checked against its module's
+/// TAGS.** This module raises the kernel's `parse` tag throughout — `has`
+/// raises it by name, `root` itself does — and a tag that shares a name
+/// with anything in scope resolves to that thing silently. A `pub fn
+/// parse` here would capture every one of those raise sites, including
+/// its own body's. `std.json` hit the same collision from the other side
+/// and renamed its TAG (`syntax`); here the tag is the toolchain's
+/// verbatim and cannot move, so the FUNCTION yields the name.
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_valid`.
+///
+/// ```wolf-doc-example
+/// let r = json.root("{{\"a\": 1}}")?
+/// (json.type_of(r) else "?") == "object"
+/// let scalar = json.root("  42  ")?
+/// (json.int_of(scalar) else -1) == 42
+/// ```
+pub fn root(doc: str) -> Node ! {parse} {
+    if !json_valid(doc) {
+        return parse
+    }
+    Node { doc: doc, path: "" }
+}
+
+/// The node at `path` — the bridge between the two halves: a dotted path
+/// built with `child`/`child_index` (or received as data) becomes a
+/// handle the DOM half reads.
+///
+/// Rows: `parse` when `doc` is not RFC 8259, `missing` when the path
+/// addresses nothing. Never traps.
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_type`.
+///
+/// ```wolf-doc-example
+/// let n = json.node("{{\"a\": {{\"b\": 2}}}}", "a.b")?
+/// (json.int_of(n) else -1) == 2
+/// let whole = json.node("[10, 20]", "")?
+/// (json.len_of(whole) else -1) == 2
+/// ```
+pub fn node(doc: str, path: str) -> Node ! {parse, missing} {
+    json_type(doc, path)?
+    Node { doc: doc, path: path }
+}
+
+/// The member node at `key` of an object node.
+///
+/// Rows: `kind` when `n` is not an object — `member` is the TYPED
+/// navigation, so asking an array or a scalar for a member is a wrong
+/// kind and not a silent miss; `missing` when the object has no entry at
+/// `key`; `parse` and `missing` also cover a forged `n` (see `Node`).
+/// Never traps.
+///
+/// The predicate spelling is the query half's `has` (§1: a question with
+/// a boolean answer keeps its predicate): `has(n.doc, child(n.path,
+/// key))` answers without building the handle a caller does not want.
+///
+/// A `key` containing `.` addresses along the dots — the path ceiling,
+/// stated on `Node` and held as a test, not worked around here.
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_type`.
+///
+/// ```wolf-doc-example
+/// let r = json.root("{{\"pack\": [{{\"name\": \"lupin\"}}]}}")?
+/// let pack = json.member(r, "pack")?
+/// let leader = json.element(pack, 0)?
+/// let name = json.member(leader, "name")?
+/// (json.str_of(name) else "?") == "lupin"
+/// ```
+pub fn member(n: Node, key: str) -> Node ! {parse, missing, kind} {
+    let holder = json_type(n.doc, n.path)?
+    if holder != "object" {
+        return kind
+    }
+    let p = child(n.path, key)
+    json_type(n.doc, p)?
+    Node { doc: n.doc, path: p }
+}
+
+/// The element node at index `i` of an array node.
+///
+/// Rows: `kind` when `n` is not an array — an object with a member
+/// spelled `"0"` is reached by `member`, never by `element`, so the two
+/// navigations cannot be confused; `missing` when `i` is outside the
+/// array (a negative `i` is the same miss and not a from-the-end read —
+/// `at`'s rule in `std.json`, held here too); `parse` and `missing` also
+/// cover a forged `n`. Never traps: the index came out of a walk over a
+/// DOCUMENT, and §10 says data raises where a caller's mistake traps.
+///
+/// The traversal this module has is `len_of` plus `element` in a loop —
+/// one parse per element, the kernel's cost at the call site where the
+/// caller can see it. There is no iterator surface here and none is
+/// coming at this tier (ruled territory).
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_type`.
+///
+/// ```wolf-doc-example
+/// let r = json.root("[10, 20, 30]")?
+/// let second = json.element(r, 1)?
+/// (json.int_of(second) else -1) == 20
+/// ```
+pub fn element(n: Node, i: int) -> Node ! {parse, missing, kind} {
+    let holder = json_type(n.doc, n.path)?
+    if holder != "array" {
+        return kind
+    }
+    let p = child_index(n.path, i)
+    json_type(n.doc, p)?
+    Node { doc: n.doc, path: p }
+}
+
+/// The kind of the node — one of `"object"`, `"array"`, `"str"`,
+/// `"num"`, `"bool"`, `"null"`; the kernel's vocabulary, verbatim, and
+/// `type_name`'s answer over a handle.
+///
+/// Rows: `parse`, `missing` — unreachable for a module-built `Node`,
+/// honest for a forged one. Never traps.
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_type`.
+///
+/// ```wolf-doc-example
+/// let r = json.root("{{\"a\": [1]}}")?
+/// (json.type_of(r) else "?") == "object"
+/// let a = json.member(r, "a")?
+/// (json.type_of(a) else "?") == "array"
+/// ```
+pub fn type_of(n: Node) -> str ! {parse, missing} {
+    json_type(n.doc, n.path)?
+}
+
+/// The node rendered as text — `get`'s answer over a handle: a string
+/// node comes back DECODED, a number keeps its source spelling, `true`,
+/// `false` and `null` spell themselves, and a container comes back as
+/// JSON text, **a valid document in its own right**. That last case is
+/// how this half composes with `std.json`: `text_of` of a container is a
+/// text its `parse` reads, exactly as its `stringify` writes a text
+/// `root` reads (in prose because one program cannot import both — the
+/// two modules share a leaf name, F-0058).
+///
+/// A nested container may be re-rendered compactly rather than sliced
+/// from the source (the kernel's documented shape); it is the same
+/// document either way.
+///
+/// Rows: `parse`, `missing` — forged-`Node` tags, as on `type_of`.
+/// Never traps.
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_get`.
+///
+/// ```wolf-doc-example
+/// let r = json.root("{{\"a\": [1, 2]}}")?
+/// let a = json.member(r, "a")?
+/// (json.text_of(a) else "?") == "[1,2]"
+/// let t = json.text_of(a) else "?"
+/// let sub = json.root(t)?
+/// (json.len_of(sub) else -1) == 2
+/// ```
+pub fn text_of(n: Node) -> str ! {parse, missing} {
+    json_get(n.doc, n.path)?
+}
+
+/// How many elements an array node has, or members an object node has.
+///
+/// Rows: `kind` for a scalar — a number has no length, and answering 0
+/// or 1 would be a guess about which question was asked (`len`'s rule,
+/// over a handle); `parse`, `missing` for a forged `Node`. Never traps.
+///
+/// Capability-free; refused at comptime (D33). Delegates to `json_len`.
+///
+/// ```wolf-doc-example
+/// let r = json.root("[1, 2, 3]")?
+/// (json.len_of(r) else -1) == 3
+/// let empty = json.root("{{}}")?
+/// (json.len_of(empty) else -1) == 0
+/// let scalar = json.root("42")?
+/// (json.len_of(scalar) else -1) == -1
+/// ```
+pub fn len_of(n: Node) -> int ! {parse, missing, kind} {
+    json_len(n.doc, n.path)?
+}
+
+/// The text of a string node, decoded.
+///
+/// Rows: `kind` when the node is not a string — no coercion, ever:
+/// `str_of` of a number is a miss and not `"42"`, because a reader that
+/// guesses across JSON's types loses the document's own information
+/// (`str_at`'s rule, over a handle); `parse`, `missing` for a forged
+/// `Node`. Never traps. `text_of` is the function that renders ANY node.
+///
+/// Capability-free; refused at comptime (D33).
+///
+/// ```wolf-doc-example
+/// let n = json.node("{{\"s\": \"line\\nbreak\"}}", "s")?
+/// (json.str_of(n) else "?") == "line\nbreak"
+/// let wrong = json.node("{{\"s\": 1}}", "s")?
+/// (json.str_of(wrong) else "?") == "?"
+/// ```
+pub fn str_of(n: Node) -> str ! {parse, missing, kind} {
+    str_at(n.doc, n.path)?
+}
+
+/// The boolean a bool node holds.
+///
+/// Rows: `kind` for every non-boolean node — `0`, `""` and `null` are
+/// all `kind`, no coercion (`bool_at`'s rule, over a handle); `parse`,
+/// `missing` for a forged `Node`. Never traps.
+///
+/// Capability-free; refused at comptime (D33).
+///
+/// ```wolf-doc-example
+/// let n = json.node("{{\"on\": true}}", "on")?
+/// (json.bool_of(n) else false) == true
+/// let off = json.node("{{\"on\": false}}", "on")?
+/// (json.bool_of(off) else true) == false
+/// let zero = json.node("{{\"on\": 0}}", "on")?
+/// (json.bool_of(zero) else false) == false
+/// ```
+pub fn bool_of(n: Node) -> bool ! {parse, missing, kind} {
+    bool_at(n.doc, n.path)?
+}
+
+/// The integer a number node holds, exactly.
+///
+/// Rows: `kind` when the node is not a number OR is a number that is not
+/// an integer (`1.5`, `1e3` and `1.0` are all `kind` — the document
+/// wrote a non-integer and this function will not round one); `overflow`
+/// (§10's mark) when the integer is outside `int` — a row and not a
+/// trap, because the digits came out of a DOCUMENT; `parse`, `missing`
+/// for a forged `Node`. Exactness is the point: an id beyond 2^53
+/// survives `int_of`. All of it is `int_at`'s contract, over a handle.
+///
+/// Capability-free; refused at comptime (D33).
+///
+/// ```wolf-doc-example
+/// let n = json.node("{{\"id\": 9007199254740993}}", "id")?
+/// (json.int_of(n) else 0) == 9007199254740993
+/// let fraction = json.node("[1.5]", "0")?
+/// (json.int_of(fraction) else -1) == -1
+/// ```
+pub fn int_of(n: Node) -> int ! {parse, missing, kind, overflow} {
+    int_at(n.doc, n.path)?
+}
+
+/// Whether the node is JSON `null`.
+///
+/// A predicate over a node that EXISTS, so it answers for every node —
+/// which is why it is not `kind`-rowed: "is this null" has a yes-or-no
+/// answer whatever the kind (`is_null_at`'s rule, over a handle). Rows:
+/// `parse`, `missing` for a forged `Node`. Never traps.
+///
+/// Capability-free; refused at comptime (D33).
+///
+/// ```wolf-doc-example
+/// let n = json.node("{{\"a\": null}}", "a")?
+/// (json.is_null(n) else false) == true
+/// let zero = json.node("{{\"a\": 0}}", "a")?
+/// (json.is_null(zero) else true) == false
+/// ```
+pub fn is_null(n: Node) -> bool ! {parse, missing} {
+    is_null_at(n.doc, n.path)?
 }
 
 /// The integer a JSON number's source text denotes. Private.
