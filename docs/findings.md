@@ -64,7 +64,7 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0055 | 2026-08-16 | **CLOSED at sc11 (ruled, `[mem.str.empty]`).** The empty needle is three different things: `count("")`, `split("")` and `replace(s, "", …)` are refused as `unsupported` by lupin 0.1.6 AND the checked tier, and DEFINED by the native runtime (0, one whole piece, identity) — a three-lane split on a shape every caller-supplied separator can reach. `wolf_rt` calls its answers "the documented deterministic placeholder" and `wolf_mem` refuses the same three, so both sides know; neither is ruled. `std.str` guards all six affected functions before delegating (`count` answers 0, the rest trap `assert`) so no caller sees it | wolf-lang s37 (core types) + spec owners | [filed: wolf-lang#56](https://github.com/wolffe-lang/wolf-lang/issues/56) |
 | F-0056 | 2026-08-16 | **CLOSED at sc11 (ruled `assert`, `[mem.str.repeat]`).** `repeat(-1)` traps `bounds` on every lane and no clause says so — and it silently CHANGED: sc03 measured `""` under the interpreter and `std.str.repeat`'s doc claimed that answer for five sprints with no test holding it. `bounds` is also arguably the wrong kind for a caller contract violation (`[conf.trap.map]` spells that `assert`), and `wolf_rt`'s own `__wolf_rt_str_repeat` clamps with `count.max(0)` — so the three lanes agree by construction, not by rule | wolf-lang spec (`[conf.trap.map]` / `[mem.str.*]`) | [filed: wolf-lang#57](https://github.com/wolffe-lang/wolf-lang/issues/57) |
 | F-0057 | 2026-08-16 | **s37 gave the language a byte VIEW and no byte SOURCE**: `s.bytes()` exists on every lane and nothing turns bytes back into a `str`, so `std.bytes.to_str -> str ! {utf8}` — the D24 border post, the last unwritten member of the census's byte block — has no spelling. Needs one of `str.from_utf8`, a `char` type with scalar-to-`str` (F-0018's half), or `strbuf.push_byte`. std ships the predicate half instead (`bytes.is_utf8`, full validation in wolf source, 31 rows on three lanes) so the gap is visible rather than silent | wolf-lang s37 core types | [filed: wolf-lang#58](https://github.com/wolffe-lang/wolf-lang/issues/58) |
-| F-0058 | 2026-08-17 | **The nursery's first tenant cannot be imported beside its facade**: module identity is the last path segment (F-0034), so `std.x.json` and `std.json` are both `json` to an importer — `use std.json` beside `use std.x.json` is `fail(E0306)` on BOTH compiler rungs and `unsupported` under lupin, measured at these pins. D31's whole promise is that graduation is a MOVE (`std.x.foo` becomes `std.foo`, and the path is the release note), and this makes the two paths mutually exclusive for the campaign in which a resident and its successor coexist. Also filed with it: the query tier has no key ENUMERATION (`json_len` counts an object's members and nothing names them), so an object can be counted and not walked | wolf-lang resolve owners (the F-0034 issue) + s40 owners (the json tier) | [filed: wolf-lang#29](https://github.com/wolffe-lang/wolf-lang/issues/29) (module identity) + the json half re-verified against s40 |
+| F-0058 | 2026-08-17 | **The import half CLOSED at the sc15 pin** (s108, wolf-lang#29 probe-closed: module identity is the FULL path; the leaf clash is only a binding clash and `use … as` names the second binding). Re-measured with a co-importing probe at 1b149ba: the pair RESOLVES on all three lanes, and what refuses now is each module's lanes (`std.json`'s generic bodies on the compiler rungs, `json_*` under lupin) — tests stay single-module for lane reasons, not name reasons. **The key-enumeration half is not closed and moves to F-0087**, where sc15's DOM half re-files it with the ask spelled. The filing as it stood: module identity is the last path segment (F-0034), so `std.x.json` and `std.json` are both `json` to an importer — `use std.json` beside `use std.x.json` is `fail(E0306)` on BOTH compiler rungs and `unsupported` under lupin, measured at those pins. D31's whole promise is that graduation is a MOVE (`std.x.foo` becomes `std.foo`, and the path is the release note), and this makes the two paths mutually exclusive for the campaign in which a resident and its successor coexist. Also filed with it: the query tier has no key ENUMERATION (`json_len` counts an object's members and nothing names them), so an object can be counted and not walked | wolf-lang resolve owners (the F-0034 issue) + s40 owners (the json tier) | [filed: wolf-lang#29](https://github.com/wolffe-lang/wolf-lang/issues/29) (module identity) + the json half re-verified against s40 |
 | F-0059 | 2026-08-17 | **The clock ABI is milliseconds and the deadline hole is now everywhere**: `time_now_ms`/`time_unix_ms`/`time_sleep_ms` are the whole time tier, so `std.time` can offer no sub-millisecond resolution (a `_ns` face over a `_ms` source would report a thousand-fold lie) and no `Deadline` type at all — nothing in the toolchain arms a deadline anywhere (F-0049 for sockets, the same hole for everything else), and there is no `select` to race a timer against work. Also: no monotonic-clock IDENTITY, so two `Instant`s from different processes are silently incomparable with no way to detect it; and the s36 clock-hook seam does not yet reach clock READS, so `--schedules`/`--replay` cannot virtualize time and a timing test has no deterministic mode | wolf-lang s40 + s35/s36 owners | filed with sc10's evidence on the s40 tier |
 | F-0060 | 2026-08-17 | **A pure builtin family is refused at comptime with no diagnostic**: `json_valid`/`json_get`/`json_type`/`json_len` carry no I13 capability and no sandbox category by design (the metadata for a package using only them stays capability-free — correct), and the comptime engine still refuses them, as `unsupported` at resolve with no code and no reason string. Every capability family answers `E0701` naming what it reaches and why (`reaches the clock, which comptime code can never touch`); the pure family answers nothing, so a package cannot learn WHY its `comptime fn` will not evaluate, and this repo cannot hold the refusal as a test the way `tests/{net,time,env}/comptime_refuses.lu` hold theirs. The ask is a diagnostic for "no evaluator at v0", distinct from the capability refusal | wolf-lang s16 (CTFE engine) + s40 owners | filed with sc10's evidence |
 | F-0061 | 2026-08-17 | **`std.fmt.decimal.parse_float` is `unsupported` on BOTH compiler rungs** ("arithmetic outside integers" at the mem tier, one body deep — F-0026's f64 ceiling, still open at sc05's row), and that now costs a function rather than a lane: `std.x.json.float_at` was written and WITHDRAWN inside sc10 because the checked tier is `std.x.json`'s only executing lane, so the function would have had zero lanes, no runnable test and no fenceable doc example. A std function nobody can run is a claim, not code | wolf-lang s23/s31 (checked execution) + s28 (native) | re-verified unmoved at this pin on [wolf-lang#26](https://github.com/wolffe-lang/wolf-lang/issues/26) |
@@ -95,6 +95,8 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0084 | 2026-08-21 | **a tag widened from a sub-row selects its handler arm by sub-row INDEX under lupin 0.1.13** — `overflow` raised in a `!{overflow}` helper, `?`-widened into `!{syntax, deep, overflow}`, lands the FIRST arm (`1 2 1` where wolfc's two lanes print `1 2 3`); in the wild, `json.parse("1e400")` lands the `deep` arm of a three-arm handler (index against the sorted row). Ride-out identity is intact — arm selection only, F-0079's sequel one layer deeper. `parse_misses.lu` asserts the syntax/deep arms and deliberately leaves overflow's unasserted with wolf-interp#33 linked | wolf-interp#33 | sc13, the un-split's own measurement |
 | F-0085 | 2026-08-21 | **a cross-module qualified fn VALUE refuses on the compiled lanes** — `let f = str.is_ascii` is "a member access without a recorded type" on both wolf lanes at dd6d13c while lupin 0.1.13 runs it; s95's fn-value reads cover same-module names only. Half of `call.ind`'s value for std waits on this: no doc example can pass a std fn as a predicate | wolf-lang#116 | sc13 probe |
 | F-0086 | 2026-08-21 | **nested fns parse and never resolve, all three lanes agreeing** — a doc example (wrapped in `fn main`) therefore cannot define a predicate, and with F-0085 open cannot import one: the callable tier's examples are prose citing test files, the sort_by precedent. A limit, not a divergence; filed for the resolve story or an honest diagnostic | wolf-lang#116 | sc13 probe |
+| F-0087 | 2026-08-26 | **nothing enumerates a json object's keys, and s107 crossed the family without adding it** — `json_len` counts members and no builtin names them, so an object can be counted and never walked: `keys(doc, path)` has been a reviewed contract in `std.x.json` since sc10, and sc15's DOM half (`Node` + navigation over the kernels) inherits the hole whole (`keys_of` is the same contract over a handle). This is sc15's NAMED STOP under the no-invented-surface rule. The ask is one kernel in the family's own shape: `json_keys(doc, path) -> List[str] ! {parse, missing, kind}`, member names in document order — s90's `fs_read_dir` proved the `List`-returning builtin shape one tier over, and the parity pattern (`wolf_mem` reference + `wolf_rt` hand mirror) is already this family's | wolf-lang | [filed: wolf-lang#123](https://github.com/wolffe-lang/wolf-lang/issues/123); sc15's named stop, see the long entry below |
+| F-0088 | 2026-08-26 | **the json kernels read a duplicate key FIRST-wins where `std.json.parse` keeps the LAST** — measured at the sc15 pins (see the long entry): `json_get` on `{"a": 1, "a": 2}` at `"a"` answers `1` on both compiler rungs, and `json_len` of the same object counts 2 members, where `std.json.parse` of the same text keeps `2` at `"a"` and counts 1 (a `Map` assignment; also the wider ecosystem's reading — last-wins is what JS, serde and Python do). Both are RFC 8259-legal, neither corpus witness pins it, and the two std read surfaces now answer the same document two ways. Filed for a ruling rather than absorbed; `std.x.json`'s docs state the measured behaviour with this finding cited | wolf-lang | [filed: wolf-lang#124](https://github.com/wolffe-lang/wolf-lang/issues/124); sc15 differential seam, see the long entry below |
 
 
 ## F-0001 — the std search path
@@ -3198,3 +3200,79 @@ does not say which one it is.
 **The ask is one line**: put the fifteen s90 names in the same
 declined-by-design table as the s38 nine, so the whole fs tier answers with
 the sentence it has earned. Nothing else about the machine needs to change.
+
+## F-0087 — an object can be counted and never walked: the json tier has no key enumeration
+
+Filed: [wolf-lang#123](https://github.com/wolffe-lang/wolf-lang/issues/123).
+
+The shape, unchanged since sc10 and now inherited twice: `json_len` on an
+object answers how many members it has, `json_get`/`json_type` answer about
+a member you can NAME, and nothing in the family names one. A program
+holding a document with unknown keys — a config with optional sections, a
+map keyed by user data, every "iterate the object" loop ever written — can
+learn the count and nothing else. `std.x.json.keys(doc, path)` has been a
+reviewed contract in the module header since the module existed, and sc15's
+DOM half inherits the hole whole: `keys_of(n)` over a `Node` is the same
+contract one handle deeper, so the nursery now carries the same missing
+function at two tiers of its own surface.
+
+**Why sc15 files it rather than working around it**: there is no
+workaround. Every other gap in this module's history had a spelling one
+tier down (a loop, a guard, a helper); this one has none — the information
+is simply not exposed. The no-invented-surface rule makes that a NAMED
+STOP: the ask is written, the contract stays in the header, and the sprint
+ships without it.
+
+**The ask**: `json_keys(doc, path) -> List[str] ! {parse, missing, kind}` —
+member names, in document order, `kind` for a non-object exactly as
+`json_len` spells it. Both precedents are already paid for upstream: s90's
+`fs_read_dir` proved the `List`-returning builtin shape (names, sorted,
+over the eu ABI on every lane), and s107 built this family's two-copy
+parity discipline (`wolf_mem::json` reference, `wolf_rt::json` hand
+mirror, the driver's json_parity test pinning them together). One kernel,
+in the family's own shape, and both std read surfaces complete on the day
+it lands.
+
+## F-0088 — the json kernels read a duplicate key first-wins where std.json reads it last-wins
+
+Filed: [wolf-lang#124](https://github.com/wolffe-lang/wolf-lang/issues/124).
+
+Measured at the sc15 pins (wolf at the 1b149ba bump, checked and native
+lanes agreeing), with the probe's own output:
+
+```text
+let doc = "{{\"a\": 1, \"a\": 2}}"
+json_get(doc, "a")   ->  "1"        (the FIRST occurrence)
+json_len(doc, "")    ->  2          (both occurrences COUNT)
+```
+
+`std.json.parse` of the same text keeps the LAST occurrence and counts ONE
+member — a `Map` assignment rather than a policy, held as a test in
+`tests/json/` since sc14 — and last-wins is also the wider ecosystem's
+reading (JavaScript's `JSON.parse`, serde, Python's `json`). RFC 8259 §4
+permits both: names "SHOULD be unique", and when they are not, behaviour
+is explicitly implementation-defined. So neither surface is wrong. What is
+wrong is that ONE toolchain now answers the same legal document two ways
+depending on which std read surface a program reached for, and no corpus
+witness pins either reading (`corpus/json/rows.lu` and `query.lu` never
+present a duplicate key).
+
+**Where it bites**: the walk in `wolf_mem::json` resolves an object
+segment with a first-match scan and `len_of` counts the raw member list,
+so the divergence is structural, identical in the `wolf_rt` mirror (the
+parity test covers the two copies against each other, not against the
+DOM), and invisible to any test that never writes a duplicate key.
+
+**What std does meanwhile**: states the measured behaviour in
+`std.x.json`'s header with this finding cited, and HOLDS it
+(`tests/x/json/dom_typed_reads.lu` pins first-wins-and-both-count through
+the DOM half), so an upstream ruling flips a test row here instead of
+rotting a doc sentence — the sc09 guard discipline, applied to a
+divergence between two surfaces of one toolchain.
+
+**The ask**: a ruling, in the spec or the kernel's module doc, on which
+reading the json tier promises — and if the answer is last-wins, the
+kernel walk takes it in both copies; if first-wins, `std.json.parse`'s
+duplicate rule is restated where its header currently says "a Map
+assignment, not a policy". Either answer retires this finding; the corpus
+gains the one-line witness either way.
