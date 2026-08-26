@@ -180,6 +180,49 @@ version = "0.1.0"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver -p wolf_rt.
 #
+# sc16 (06-crypto) bump: trunk `87405ac`, which IS trunk's tip at the bump
+# (the sc16 contract's floor: "wolf-lang >= 87405ac" — D53 is ruled at this
+# sha and s109's row rulings land in it). Ritual gates at the sha, exit
+# codes captured as they happened (F-0063's lesson): `cargo test
+# --workspace --release` = 0 and `cargo run -p xtask -- ci` = 0, run in the
+# checkout at the sha with a warm cache (the --release deviation from the
+# ritual's plain spelling is recorded here rather than hidden; the test SET
+# is identical). lupin is UNCHANGED at 0.1.13/02c1e88 for the third sprint
+# — is18 (net/json/process on the interpreter) is MERGED upstream but
+# unreleased, so the x/json lupin posture holds exactly as sc15 wrote it.
+# What the span moves here: ONE ledger row (s109 rules nested rows to
+# FLATTEN — [gram.type.row.flatten], one of two new anchors —
+# and `x/option_flatten/flatten_propagate` native goes `unsupported` ->
+# `run`; the other new anchor is [gram.expr.tagident], s109's
+# declared-tags-resolve-wider half, which no current row observes).
+# A hazard this bump surfaced, recorded because doctor cannot catch it:
+# the cached `.wolf-bin/wolf` this worktree inherited was DATED BEFORE
+# the sc15 pin commit (Aug 21 vs 1b149ba's Aug 25) and answered 25 rows
+# shallow — the exact s106/s107 waves. `wolf --version` names no pin
+# (pre-M1), so the "trusted from acquisition" WARN is the only tell; when
+# a fresh worktree's first `std-test` is red on wave-shaped rows, check
+# the binary's date against the pin's date before anything else.
+# Re-measured at this sha rather than assumed, for the sprint this bump
+# serves (the digest ladder; each probe is four lines and each also ran
+# against the predecessor binary, so none of these is a regression the
+# bump brought):
+# - `wrapping[u32]`/`wrapping[u64]` shifts and bitwise operators are
+#   REFUSED by the checked tier ("this operator in checked execution" at
+#   mem; add and multiply run) — F-0091, std.rand's four-sprint-old lane
+#   posture, now load-bearing for crypto and filed on D53's strength.
+# - `int as wrapping[u32]` is REFUSED by the native rung ("narrowing
+#   numeric casts (range-check semantics, s27)") — F-0089, the reason
+#   sha2 carries 32-bit words in the low half of a `wrapping[u64]`.
+# - `List[wrapping[u64]]` is REFUSED by the native rung at resolve
+#   ("prelude container instantiation (generic data)") — F-0090, the
+#   reason every 64-bit table in sha2 is a pair of `List[int]` halves.
+# - a `mut` FIELD-PATH argument (`f(mut s.field)`) is refused by the
+#   native rung ("`mut` places beyond local by-value bindings") exactly
+#   when the base is itself a `mut` PARAMETER; the same path off a LOCAL
+#   by-value binding lowers at this sha (both shapes measured, four
+#   lines each) — F-0092, the reason Sha384's wrapper copies its Sha512
+#   core out and back instead of passing `mut st.st` through.
+#
 # sc15 (05-encoding) bump: trunk `1b149ba`, which IS trunk's tip at the bump
 # and is green on BOTH ritual gates in a clean scratch clone at the sha
 # (`cargo test --workspace` = 0 at 17:41:41, `cargo run -p xtask -- ci` = 0

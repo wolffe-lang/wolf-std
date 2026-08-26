@@ -7,6 +7,13 @@
 # deeper than its ledger claims fails CI — advancement is deliberate, in
 # its own commit.
 #
+# THE sc16 PIN BUMP (wolf trunk 1b149ba -> 87405ac, the s109/s110 span;
+# lupin UNCHANGED at 0.1.13 — a compiler-only bump again) MOVED ONE ROW:
+# `x/option_flatten/flatten_propagate` native `unsupported` -> `run`,
+# because s109 RULED nested rows to FLATTEN ([gram.type.row.flatten]) and
+# the native rung executes the flattened row. Every other row answers
+# byte-identically at the new binary, measured before a single sc16 edit.
+#
 # THE sc15 PIN BUMP (wolf trunk dd6d13c -> 1b149ba, ~240 commits; lupin
 # UNCHANGED at 0.1.13 — a compiler-only bump) MOVED TWENTY ROWS, every
 # wolf-lane column that the three crossing waves reach, and rewrote none:
@@ -501,7 +508,14 @@ lupin = "run"
 # (wolf-lang#34) half-fired, and the closeout reads it with that
 # sentence in hand.
 wolfc = "unsupported"
-native = "unsupported"
+# 87405ac (sc16 bump): s109 RULED the meaning — nested rows FLATTEN
+# ([gram.type.row.flatten], one of the two anchors this bump adds) — and
+# the native rung now executes the flattened row end to end: the file
+# RUNS. The checked machine still answers `unsupported` at its own rung,
+# so the resident's trigger (wolf-lang#34) has now fully fired for the
+# grammar and the ruling halves; what keeps the resident a resident is
+# the checked tier alone. The one row the sc16 bump moves.
+native = "run"
 
 [tests."x/option_expect/expect_trap.lu"]
 lupin = "run"
