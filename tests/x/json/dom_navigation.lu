@@ -1,0 +1,89 @@
+//! check: run(exit=0, stdout="kind taken")
+//! phase: run
+//! conforms: std.x.json, err.row, err.else
+//!
+//! The DOM half's navigation — `root`, `node`, `member`, `element` —
+//! walked through one document with every shape in it, plus the empty
+//! documents and the two properties that keep the handle honest.
+//!
+//! **A `Node` this module built addresses a node that exists.** Every
+//! navigation below either hands back a handle or raises at the
+//! navigation, so the reads that follow cannot miss on `parse` or
+//! `missing`; the file reaching its end is the assertion.
+//!
+//! **The typed navigations cannot be confused.** The kernel keys an
+//! OBJECT by any segment — an object member spelled `"0"` is a legal,
+//! reachable member — so `member` is how it is reached and `element` on
+//! the same node is `kind`, held at the end of this file with the
+//! terminal-else shape (the miss path is the success path).
+//!
+//! **The ceiling travels with the path.** A key containing `.`
+//! addresses along the dots, exactly as `child` documents; the DOM half
+//! does not pretend otherwise, and the grandchild read below is that
+//! sentence held as a test.
+//!
+//! Two lanes at this sprint's pin (s107 crossed the `json_*` family
+//! natively); lupin declines the surface by design while is18 lands its
+//! own reading — this file needs no edit to flip, only a pin.
+
+use std.x.json
+
+fn main() -> !int {
+    let doc = "{{\"pack\": [{{\"name\": \"lupin\"}}, {{\"name\": \"ainu\"}}], \"n\": 42, \"nil\": null}}"
+
+    // root: one validation, a handle out.
+    let r = json.root(doc)?
+    if (json.type_of(r) else "?") != "object" { return 1 }
+
+    // member -> element -> member: the nesting the DOM half exists for.
+    let pack = json.member(r, "pack")?
+    if (json.type_of(pack) else "?") != "array" { return 2 }
+    if (json.len_of(pack) else -1) != 2 { return 3 }
+    let second = json.element(pack, 1)?
+    let name = json.member(second, "name")?
+    if (json.str_of(name) else "?") != "ainu" { return 4 }
+
+    // node: the bridge — a path built with the query half's helpers
+    // becomes a handle the DOM half reads.
+    let path = json.child(json.child_index(json.child("", "pack"), 0), "name")
+    let by_path = json.node(doc, path)?
+    if (json.str_of(by_path) else "?") != "lupin" { return 5 }
+
+    // A null member is a node that EXISTS: navigation hands it back and
+    // the predicate answers, where an absent key would have been the
+    // `missing` row (dom_row_missing_key.lu holds that identity).
+    let nil = json.member(r, "nil")?
+    if (json.is_null(nil) else false) != true { return 6 }
+
+    // The empty documents: roots that exist and hold nothing.
+    let eo = json.root("{{}}")?
+    if (json.type_of(eo) else "?") != "object" { return 7 }
+    if (json.len_of(eo) else -1) != 0 { return 8 }
+    let ea = json.root("[]")?
+    if (json.len_of(ea) else -1) != 0 { return 9 }
+    if (json.has("{{}}", "anything") else true) != false { return 10 }
+
+    // Scalar roots are nodes too — a document is any one JSON value.
+    let sr = json.root("  true  ")?
+    if (json.bool_of(sr) else false) != true { return 11 }
+
+    // Digit segments KEY an object (the kernel decides by the node's
+    // kind, not by the segment's spelling), so member reaches "0".
+    let zk = json.root("{{\"0\": \"zero\"}}")?
+    let z = json.member(zk, "0")?
+    if (json.str_of(z) else "?") != "zero" { return 12 }
+
+    // The ceiling, held: a dotted key addresses the grandchild.
+    let deep_doc = json.root("{{\"a\": {{\"b\": 1}}}}")?
+    let grand = json.member(deep_doc, "a.b")?
+    if (json.int_of(grand) else -1) != 1 { return 13 }
+
+    // Absence asked as a boolean rides the query half's has — the two
+    // halves share one document and one path language.
+    if (json.has(doc, "nope") else true) != false { return 14 }
+
+    // element on an OBJECT is `kind`, even for a member spelled "0":
+    // the terminal else — this file succeeds only through the miss.
+    json.element(zk, 0) else |_| { print("kind taken"); return 0 }
+    1
+}

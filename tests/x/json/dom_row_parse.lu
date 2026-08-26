@@ -1,0 +1,23 @@
+//! check: run(exit=1, stdout="error: parse")
+//! phase: run
+//! conforms: std.x.json, err.row, err.propagate
+//!
+//! `root`'s one row, ridden out of `main` so the RECORD names it: a
+//! document that is not RFC 8259 is `parse` at the DOM half's door,
+//! before any handle exists. One tag, one file — the sc07 shape, because
+//! `error: parse` on the record is the toolchain's word where a handler
+//! printing "it was parse" would be this repository's.
+//!
+//! `root` has no `missing`: the root of a valid document always exists,
+//! and a tag no argument can reach stays off the signature (§14's sc12
+//! rule).
+//!
+//! Two lanes at this sprint's pin; lupin flips on a pin, not an edit
+//! (see dom_navigation.lu).
+
+use std.x.json
+
+fn main() -> !int {
+    json.root("{{")?
+    0
+}

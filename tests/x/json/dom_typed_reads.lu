@@ -1,0 +1,118 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.json, err.row, err.else
+//!
+//! The DOM half's reads — `type_of`, `text_of`, `len_of`, `str_of`,
+//! `bool_of`, `int_of`, `is_null` — every accessor's hit AND its
+//! else-able misses, over handles the navigations built.
+//!
+//! **No coercion, ever** (the `_at` family's law, over a handle):
+//! `str_of` of a number is a miss and not `"42"`, `bool_of` of `1` is a
+//! miss and not `true`, and `int_of` will not round a fraction the
+//! document wrote. `text_of` is the one function that renders ANY node,
+//! which is why the `str_of`-of-null miss sits beside the
+//! `text_of`-of-null hit below.
+//!
+//! **`int_of` is exact and it does not trap.** A 64-bit id survives,
+//! both ends of `int` parse, and one past either end is the `overflow`
+//! ROW (`dom_row_overflow.lu` holds its identity in the record's own
+//! words). The file reaching its last line is the no-trap assertion.
+//!
+//! **`text_of` of a container is a valid document** — the composition
+//! seam: the rendered subtree is re-rooted and walked again below,
+//! which is also how this half meets `std.json`'s writer at the text
+//! level (one program cannot import both modules, F-0058).
+//!
+//! Two lanes at this sprint's pin; lupin flips on a pin, not an edit
+//! (see dom_navigation.lu).
+
+use std.x.json
+
+fn main() -> !int {
+    let zero: int = 0
+    let int_min = zero - 9223372036854775807 - 1
+
+    // type_of: the kernel's six kind names, verbatim.
+    let doc = "{{\"o\": {{}}, \"a\": [], \"s\": \"x\", \"n\": 1.5, \"b\": false, \"z\": null}}"
+    let r = json.root(doc)?
+    let o = json.member(r, "o")?
+    if (json.type_of(o) else "?") != "object" { return 1 }
+    let a = json.member(r, "a")?
+    if (json.type_of(a) else "?") != "array" { return 2 }
+    let s = json.member(r, "s")?
+    if (json.type_of(s) else "?") != "str" { return 3 }
+    let num = json.member(r, "n")?
+    if (json.type_of(num) else "?") != "num" { return 4 }
+    let b = json.member(r, "b")?
+    if (json.type_of(b) else "?") != "bool" { return 5 }
+    let z = json.member(r, "z")?
+    if (json.type_of(z) else "?") != "null" { return 6 }
+
+    // str_of: decoded text on the hit, kind on everything else.
+    let esc = json.node("{{\"s\": \"line\\nbreak\"}}", "s")?
+    if (json.str_of(esc) else "?") != "line\nbreak" { return 7 }
+    if (json.str_of(s) else "?") != "x" { return 8 }
+    if (json.str_of(num) else "?") != "?" { return 9 }
+    if (json.str_of(z) else "?") != "?" { return 10 }
+    if (json.text_of(z) else "?") != "null" { return 11 }
+
+    // bool_of: both values, and no coercion from 1.
+    if (json.bool_of(b) else true) != false { return 12 }
+    let on = json.node("{{\"on\": true}}", "on")?
+    if (json.bool_of(on) else false) != true { return 13 }
+    let one = json.node("[1]", "0")?
+    if (json.bool_of(one) else false) != false { return 14 }
+
+    // int_of: exact on the hit...
+    if (json.int_of(one) else -1) != 1 { return 15 }
+    let big = json.node("[9007199254740993]", "0")?
+    if (json.int_of(big) else 0) != 9007199254740993 { return 16 }
+    let top = json.node("[9223372036854775807]", "0")?
+    if (json.int_of(top) else 0) != 9223372036854775807 { return 17 }
+    let bottom = json.node("[-9223372036854775808]", "0")?
+    if (json.int_of(bottom) else 0) != int_min { return 18 }
+    // ...kind for every non-integer spelling the document could write...
+    let frac = json.node("[1.5]", "0")?
+    if (json.int_of(frac) else -1) != -1 { return 19 }
+    let whole = json.node("[1.0]", "0")?
+    if (json.int_of(whole) else -1) != -1 { return 20 }
+    let exp = json.node("[1e3]", "0")?
+    if (json.int_of(exp) else -1) != -1 { return 21 }
+    if (json.int_of(s) else -1) != -1 { return 22 }
+    // ...and the overflow ROW one past each end, no trap anywhere.
+    let over = json.node("[9223372036854775808]", "0")?
+    if (json.int_of(over) else -1) != -1 { return 23 }
+    let under = json.node("[-9223372036854775809]", "0")?
+    if (json.int_of(under) else -1) != -1 { return 24 }
+
+    // len_of: containers count, scalars are kind.
+    if (json.len_of(r) else -1) != 6 { return 25 }
+    if (json.len_of(a) else -1) != 0 { return 26 }
+    if (json.len_of(s) else -1) != -1 { return 27 }
+
+    // text_of: numbers keep their source spelling, and a container is a
+    // document in its own right — re-root it and keep walking.
+    if (json.text_of(num) else "?") != "1.5" { return 28 }
+    let xs = json.node("{{\"xs\": [1, {{\"k\": 2}}]}}", "xs")?
+    let t = json.text_of(xs) else "?"
+    let sub = json.root(t)?
+    let obj_el = json.element(sub, 1)?
+    let k = json.member(obj_el, "k")?
+    if (json.int_of(k) else -1) != 2 { return 29 }
+
+    // is_null: a predicate over a node that exists, whatever its kind.
+    if (json.is_null(z) else false) != true { return 30 }
+    if (json.is_null(num) else true) != false { return 31 }
+    if (json.is_null(a) else true) != false { return 32 }
+
+    // The duplicate-key seam, HELD rather than absorbed (F-0088): this
+    // tier reads the FIRST occurrence and counts both, where
+    // `std.json.parse` keeps the LAST and counts one. Both are RFC
+    // 8259-legal; the divergence is filed for a ruling, and this pin is
+    // what makes the ruling flip a row here instead of rotting a doc.
+    let dup = json.root("{{\"a\": 1, \"a\": 2}}")?
+    let dupa = json.member(dup, "a")?
+    if (json.int_of(dupa) else -1) != 1 { return 33 }
+    if (json.len_of(dup) else -1) != 2 { return 34 }
+    0
+}

@@ -6,12 +6,13 @@
 //! builtin and are the only part of this module a comptime program could
 //! ever use.
 //!
-//! Two lanes rather than one, and the reason is the same lazy body
-//! resolution that gives `std.net` and `std.fs` a second column: lupin
+//! Three lanes as of the sc15 pin, and the third is the same lazy body
+//! resolution that gives `std.net` and `std.fs` an extra column: lupin
 //! never reaches the `json_*` names it does not have, so a program that
-//! builds paths and queries nothing runs there. The native rung refuses
-//! the module as a whole. That asymmetry inside one module is why the
-//! ledger records lanes per TEST.
+//! builds paths and queries nothing runs there — where its siblings'
+//! lupin columns stay dark until is18's reading ships. The native rung
+//! joined at s107 with the rest of the module. That asymmetry inside
+//! one module is why the ledger records lanes per TEST.
 //!
 //! The last two assertions are the dotted-path language's ceiling, held
 //! as a test rather than only as a sentence: a key containing `.` is
