@@ -1,0 +1,85 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.sha2, arith.wrapping
+//!
+//! The FIPS 180-4 worked examples ("abc") and the empty message, all
+//! three digests, one-shot AND incremental — the module's smoke test.
+//! The full CAVP byte-oriented sets live in the cavp_* files beside
+//! this one; this file is the five-second witness a reviewer runs
+//! first, and the incremental trio's equality with the one-shot is the
+//! init/update/final API's core contract. Expected digests are the
+//! published ones (FIPS 180-4 examples; CAVP Len=0 rows).
+
+use std.x.crypto.sha2
+
+fn main() -> int {
+    let abc = "abc".bytes()
+    let empty = List[int]()
+
+    // SHA-256 (FIPS 180-4 §6.2, the "abc" example)
+    let d256 = sha2.sum256(abc)
+    assert(d256.len == 32, "sha256 digest is 32 bytes")
+    let h256 = sha2.to_hex(d256)
+    assert(h256 == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "sha256 abc")
+    let e256 = sha2.to_hex(sha2.sum256(empty))
+    assert(
+        e256 == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha256 empty",
+    )
+
+    // SHA-512 (FIPS 180-4 §6.4, the "abc" example)
+    let d512 = sha2.sum512(abc)
+    assert(d512.len == 64, "sha512 digest is 64 bytes")
+    let h512 = sha2.to_hex(d512)
+    assert(
+        h512 ==
+            "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+        "sha512 abc",
+    )
+    let e512 = sha2.to_hex(sha2.sum512(empty))
+    assert(
+        e512 ==
+            "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+        "sha512 empty",
+    )
+
+    // SHA-384 (FIPS 180-4 §6.5, the "abc" example)
+    let d384 = sha2.sum384(abc)
+    assert(d384.len == 48, "sha384 digest is 48 bytes")
+    let h384 = sha2.to_hex(d384)
+    assert(
+        h384 ==
+            "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7",
+        "sha384 abc",
+    )
+    let e384 = sha2.to_hex(sha2.sum384(empty))
+    assert(
+        e384 ==
+            "38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b",
+        "sha384 empty",
+    )
+
+    // The incremental trio equals the one-shot, byte for byte.
+    var s2 = sha2.new256()
+    sha2.update256(mut s2, "a".bytes())
+    sha2.update256(mut s2, "b".bytes())
+    sha2.update256(mut s2, "c".bytes())
+    let i256 = sha2.to_hex(sha2.final256(take s2))
+    assert(i256 == h256, "sha256 incremental == one-shot")
+
+    var s5 = sha2.new512()
+    sha2.update512(mut s5, "ab".bytes())
+    sha2.update512(mut s5, "c".bytes())
+    let i512 = sha2.to_hex(sha2.final512(take s5))
+    assert(i512 == h512, "sha512 incremental == one-shot")
+
+    var s3 = sha2.new384()
+    sha2.update384(mut s3, List[int]())
+    sha2.update384(mut s3, "abc".bytes())
+    let i384 = sha2.to_hex(sha2.final384(take s3))
+    assert(i384 == h384, "sha384 incremental == one-shot")
+
+    // to_hex renders the empty sequence as the empty string.
+    assert(sha2.to_hex(List[int]()) == "", "to_hex empty")
+    0
+}

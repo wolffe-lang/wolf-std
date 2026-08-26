@@ -1,0 +1,20 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.crypto.sha2, conf.trap.set
+//!
+//! RFC 5869 §2.3's hard cap, held as a trap: `L <= 255 * HashLen`
+//! because the block counter is one byte. The length is the CALLER's
+//! parameter, not data, so an out-of-range request is a contract
+//! violation (§2's trap rule) — 255 * 32 == 8160 is the last legal
+//! SHA-256 length and 8161 must trap. (The negative-length trap and the
+//! 384/512 caps share the same guard shape; one witness holds the rule.)
+
+use std.x.crypto.sha2
+
+fn main() -> int {
+    let prk = sha2.hkdf256_extract("salt".bytes(), "ikm".bytes())
+    print("extracted {prk.len}")
+    let okm = sha2.hkdf256_expand(prk, List[int](), 8161)
+    print("unreachable: {okm.len}")
+    0
+}

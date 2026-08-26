@@ -1689,3 +1689,39 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# ---- sc16: std.x.crypto.sha2 — the digest ladder's first rung (D53). ----
+# The module's lane shape is std.rand's, for the same mechanism at a new
+# width: the cores are wrapping[u64] shifts and bitwise mixes, which the
+# checked tier refuses at mem ("this operator in checked execution",
+# F-0091), while lupin and the native rung both execute every body. Two
+# deliberate exceptions below: `non_byte_trap` traps at INGESTION, before
+# any wrapping op runs, so even the checked machine reaches it; and
+# `use_after_final_trap` is the mutate_while_iterating precedent — the
+# interpreter traps at its rung (`use-after-move`, satisfying the
+# directive), both compiler rungs reject statically (`fail(E1001)`).
+
+[tests."x/crypto/sha2/known_answers.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/sha2/incremental_chunking.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/sha2/non_byte_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/sha2/hkdf_expand_cap_trap.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/sha2/use_after_final_trap.lu"]
+lupin = "run"
+wolfc = "fail(E1001)"
+native = "fail(E1001)"
