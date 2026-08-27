@@ -2169,3 +2169,24 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+
+# The X25519 contract witnesses: two traps (the caller's scalar length
+# and the 0..255 byte contract, both firing before the ladder — three
+# lanes) and the reject-on-zero row (a small-order public key rides
+# `error: zero` out of main, the toolchain naming the tag; RFC 8446
+# s7.4.2). All three-lane — the guards and the row are checked-int.
+
+[tests."x/crypto/curve25519/scalar_len_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/curve25519/non_byte_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/curve25519/reject_zero_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
