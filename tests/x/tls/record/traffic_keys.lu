@@ -1,0 +1,93 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.tls.record, arith.wrapping
+//!
+//! RFC 8448 §3 traffic keys (§7.3): from each traffic secret,
+//! `[sender]_write_key` (Expand-Label "key", 16 for the trace's
+//! AES-128-GCM) and `[sender]_write_iv` (Expand-Label "iv", 12).
+//! The traffic secrets are the trace's own (asserted in
+//! derived_secrets.lu); here they are inputs. server+client,
+//! handshake+application — the four key/iv pairs the trace
+//! publishes.
+//!
+
+use std.hex
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn key_matches(secret_hex: str, key_len: int, want: str) -> bool {
+    let s = bytes_of(secret_hex)
+    record.to_hex(record.traffic_key(s, key_len)) == want
+}
+
+fn iv_matches(secret_hex: str, want: str) -> bool {
+    let s = bytes_of(secret_hex)
+    record.to_hex(record.traffic_iv(s)) == want
+}
+
+fn main() -> int {
+    assert(
+        key_matches(
+            "b67b7d690cc16c4e75e54213cb2d37b4e9c912bcded9105d42befd59d391ad38",
+            16,
+            "3fce516009c21727d0f2e4e86ee403bc",
+        ),
+        "server handshake write_key",
+    )
+    assert(
+        iv_matches(
+            "b67b7d690cc16c4e75e54213cb2d37b4e9c912bcded9105d42befd59d391ad38",
+            "5d313eb2671276ee13000b30",
+        ),
+        "server handshake write_iv",
+    )
+    assert(
+        key_matches(
+            "a11af9f05531f856ad47116b45a950328204b4f44bfb6b3a4b4f1f3fcb631643",
+            16,
+            "9f02283b6c9c07efc26bb9f2ac92e356",
+        ),
+        "server application write_key",
+    )
+    assert(
+        iv_matches(
+            "a11af9f05531f856ad47116b45a950328204b4f44bfb6b3a4b4f1f3fcb631643",
+            "cf782b88dd83549aadf1e984",
+        ),
+        "server application write_iv",
+    )
+    assert(
+        key_matches(
+            "b3eddb126e067f35a780b3abf45e2d8f3b1a950738f52e9600746a0e27a55a21",
+            16,
+            "dbfaa693d1762c5b666af5d950258d01",
+        ),
+        "client handshake write_key",
+    )
+    assert(
+        iv_matches(
+            "b3eddb126e067f35a780b3abf45e2d8f3b1a950738f52e9600746a0e27a55a21",
+            "5bd3c71b836e0b76bb73265f",
+        ),
+        "client handshake write_iv",
+    )
+    assert(
+        key_matches(
+            "9e40646ce79a7f9dc05af8889bce6552875afa0b06df0087f792ebb7c17504a5",
+            16,
+            "17422dda596ed5d9acd890e3c63f5051",
+        ),
+        "client application write_key",
+    )
+    assert(
+        iv_matches(
+            "9e40646ce79a7f9dc05af8889bce6552875afa0b06df0087f792ebb7c17504a5",
+            "5b78923dee08579033e523d9",
+        ),
+        "client application write_iv",
+    )
+    0
+}

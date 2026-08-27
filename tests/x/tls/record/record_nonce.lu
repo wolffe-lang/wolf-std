@@ -1,0 +1,54 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.tls.record, arith.wrapping
+//!
+//! The per-record nonce (§5.3, pitfall #2): the 64-bit sequence
+//! number big-endian, left-padded with zeros to 12 bytes, XORed
+//! INTO the static write IV — NOT concatenated. seq 0 leaves the
+//! IV unchanged; higher seqs flip the low bytes; a multi-byte seq
+//! exercises the field across byte boundaries. IV is RFC 8448's
+//! server handshake write_iv; expected nonces from an independent
+//! reference.
+//!
+
+use std.hex
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn nonce_matches(iv_hex: str, seq: int, want: str) -> bool {
+    let iv = bytes_of(iv_hex)
+    record.to_hex(record.record_nonce(iv, seq)) == want
+}
+
+fn main() -> int {
+    assert(
+        nonce_matches("5d313eb2671276ee13000b30", 0, "5d313eb2671276ee13000b30"),
+        "seq 0 (nonce = iv)",
+    )
+    assert(nonce_matches("5d313eb2671276ee13000b30", 1, "5d313eb2671276ee13000b31"), "seq 1")
+    assert(nonce_matches("5d313eb2671276ee13000b30", 5, "5d313eb2671276ee13000b35"), "seq 5")
+    assert(
+        nonce_matches("5d313eb2671276ee13000b30", 255, "5d313eb2671276ee13000bcf"),
+        "seq 255 (low byte all-ones)",
+    )
+    assert(
+        nonce_matches("5d313eb2671276ee13000b30", 256, "5d313eb2671276ee13000a30"),
+        "seq 256 (carry into byte 10)",
+    )
+    assert(
+        nonce_matches("5d313eb2671276ee13000b30", 65535, "5d313eb2671276ee1300f4cf"),
+        "seq 65535",
+    )
+    assert(
+        nonce_matches("000000000000000000000000", 72623859790382856, "000000000102030405060708"),
+        "0x0102030405060708 into zero iv",
+    )
+    assert(
+        nonce_matches("ffffffffffffffffffffffff", 72623859790382856, "fffffffffefdfcfbfaf9f8f7"),
+        "same seq into all-ones iv",
+    )
+    0
+}

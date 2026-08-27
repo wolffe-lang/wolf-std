@@ -1,0 +1,31 @@
+//! check: run(exit=1, stdout="witness: fallback empty\nerror: short")
+//! phase: run
+//! conforms: std.x.tls.record, err.row, err.propagate, err.else
+//!
+//! THE SHORT-RECORD WITNESS (§5.2's structural floor): a record that
+//! cannot hold a five-byte header, a sixteen-byte AEAD tag and at least
+//! one content-type octet (< 22 bytes) is rejected BEFORE any key
+//! touches it — the `short` row, no AEAD invoked, no plaintext possible.
+//! The `else` proves the fallback is empty and the `?` rides `short` out
+//! of `main` (`error: short`, exit 1). Twenty-one bytes here: one short
+//! of the floor.
+
+use std.hex
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> !int {
+    let key = bytes_of("ac70443f7fe3bdaf568b1dcdb0a7f3fea098bca189c3455ba41fcd9d488348a4")
+    let iv = bytes_of("5d313eb2671276ee13000b30")
+    let runt = bytes_of("170303001000112233445566778899aabbccddeeff")
+    assert(runt.len < 22, "the runt is under the structural floor")
+    let hush = record.open(key, iv, 0, runt) else List[int]()
+    assert(hush.len == 0, "short record yields zero plaintext")
+    print("witness: fallback empty")
+    let never = record.open(key, iv, 0, runt)?
+    print("unreachable: {never.len}")
+    0
+}
