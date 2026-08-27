@@ -67,5 +67,13 @@ fn main() -> int {
     assert(record.to_hex(record.traffic_iv(shs)) == "5d313eb2671276ee13000b30", "server hs write iv")
     assert(record.to_hex(record.traffic_key(cap, 16)) == "17422dda596ed5d9acd890e3c63f5051", "client ap write key")
     assert(record.to_hex(record.traffic_iv(cap)) == "5b78923dee08579033e523d9", "client ap write iv")
+
+    // The FROZEN ws05 seam: a completed handshake packages the negotiated
+    // suite + the six secrets into a HandshakeResult ws05 hands to sc20.
+    let result = hs.handshake_result(4865, chs, shs, cap, sap, exp, res)
+    assert(result.cipher_suite == 4865, "seam: cipher_suite")
+    assert(hs.to_hex(result.server_handshake_secret) == "b67b7d690cc16c4e75e54213cb2d37b4e9c912bcded9105d42befd59d391ad38", "seam: s hs secret")
+    assert(hs.to_hex(result.client_application_secret) == "9e40646ce79a7f9dc05af8889bce6552875afa0b06df0087f792ebb7c17504a5", "seam: c ap secret")
+    assert(hs.to_hex(result.resumption_master_secret) == "7df235f2031d2a051287d02b0241b0bfdaf86cc856231f2d5aba46c434ec196c", "seam: res master")
     0
 }

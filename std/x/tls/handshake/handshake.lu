@@ -782,6 +782,33 @@ pub struct HandshakeResult {
     resumption_master_secret: List[int],
 }
 
+/// Build the frozen ws05 result (the constructor — a module-qualified
+/// struct literal `handshake.HandshakeResult { }` does not parse across
+/// the module boundary, E0201, so the seam is a function exactly as
+/// `sha2.new256` is). Called once a handshake completes; `cipher_suite`
+/// is the negotiated suite, the six secrets are this module's schedule
+/// outputs. ws05 hands the result to sc20's record layer.
+/// ct: a value container; the secrets are carried, no branch on them.
+pub fn handshake_result(
+    cipher_suite: int,
+    client_handshake_secret: List[int],
+    server_handshake_secret: List[int],
+    client_application_secret: List[int],
+    server_application_secret: List[int],
+    exporter_master_secret: List[int],
+    resumption_master_secret: List[int],
+) -> HandshakeResult {
+    HandshakeResult {
+        cipher_suite: cipher_suite,
+        client_handshake_secret: client_handshake_secret,
+        server_handshake_secret: server_handshake_secret,
+        client_application_secret: client_application_secret,
+        server_application_secret: server_application_secret,
+        exporter_master_secret: exporter_master_secret,
+        resumption_master_secret: resumption_master_secret,
+    }
+}
+
 // ---------------------------------------------------------------------
 // Hex rendering — this module's own (the sha2/chacha20/record precedent,
 // so its tests and doc examples import exactly one module). NOT
