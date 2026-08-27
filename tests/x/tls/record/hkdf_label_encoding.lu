@@ -1,0 +1,97 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.tls.record, arith.wrapping
+//!
+//! RFC 8448 §3 publishes the `info` (the HkdfLabel structure fed
+//! to HKDF-Expand) for every derivation. This pins pitfall #1
+//! byte-for-byte: the exact `"tls13 "` prefix (with the trailing
+//! space), the one-byte length prefixes, and the big-endian
+//! uint16 length. One wrong byte and every downstream key is
+//! wrong; these are the `info` dumps from `rfc8448.txt`.
+//!
+
+use std.hex
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn label_matches(length: int, label: str, ctx_hex: str, want: str) -> bool {
+    let ctx = bytes_of(ctx_hex)
+    record.to_hex(record.hkdf_label(length, label, ctx)) == want
+}
+
+fn main() -> int {
+    assert(
+        label_matches(
+            32,
+            "derived",
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "00200d746c733133206465726976656420e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        ),
+        "derived",
+    )
+    assert(
+        label_matches(
+            32,
+            "c hs traffic",
+            "860c06edc07858ee8e78f0e7428c58edd6b43f2ca3e6e95f02ed063cf0e1cad8",
+            "002012746c7331332063206873207472616666696320860c06edc07858ee8e78f0e7428c58edd6b43f2ca3e6e95f02ed063cf0e1cad8",
+        ),
+        "c hs traffic",
+    )
+    assert(
+        label_matches(
+            32,
+            "s hs traffic",
+            "860c06edc07858ee8e78f0e7428c58edd6b43f2ca3e6e95f02ed063cf0e1cad8",
+            "002012746c7331332073206873207472616666696320860c06edc07858ee8e78f0e7428c58edd6b43f2ca3e6e95f02ed063cf0e1cad8",
+        ),
+        "s hs traffic",
+    )
+    assert(
+        label_matches(
+            32,
+            "c ap traffic",
+            "9608102a0f1ccc6db6250b7b7e417b1a000eaada3daae4777a7686c9ff83df13",
+            "002012746c73313320632061702074726166666963209608102a0f1ccc6db6250b7b7e417b1a000eaada3daae4777a7686c9ff83df13",
+        ),
+        "c ap traffic",
+    )
+    assert(
+        label_matches(
+            32,
+            "s ap traffic",
+            "9608102a0f1ccc6db6250b7b7e417b1a000eaada3daae4777a7686c9ff83df13",
+            "002012746c73313320732061702074726166666963209608102a0f1ccc6db6250b7b7e417b1a000eaada3daae4777a7686c9ff83df13",
+        ),
+        "s ap traffic",
+    )
+    assert(
+        label_matches(
+            32,
+            "exp master",
+            "9608102a0f1ccc6db6250b7b7e417b1a000eaada3daae4777a7686c9ff83df13",
+            "002010746c73313320657870206d6173746572209608102a0f1ccc6db6250b7b7e417b1a000eaada3daae4777a7686c9ff83df13",
+        ),
+        "exp master",
+    )
+    assert(
+        label_matches(
+            32,
+            "res master",
+            "209145a96ee8e2a122ff810047cc952684658d6049e86429426db87c54ad143d",
+            "002010746c73313320726573206d617374657220209145a96ee8e2a122ff810047cc952684658d6049e86429426db87c54ad143d",
+        ),
+        "res master",
+    )
+    assert(
+        label_matches(32, "resumption", "0000", "002010746c73313320726573756d7074696f6e020000"),
+        "resumption",
+    )
+    assert(label_matches(32, "finished", "", "00200e746c7331332066696e697368656400"), "finished")
+    assert(label_matches(16, "key", "", "001009746c733133206b657900"), "key")
+    assert(label_matches(12, "iv", "", "000c08746c73313320697600"), "iv")
+    0
+}

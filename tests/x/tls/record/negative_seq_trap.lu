@@ -1,0 +1,23 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.tls.record, conf.trap.set
+//!
+//! The sequence-number contract, held as a trap: the record sequence
+//! number (§5.3) is a 64-bit counter — non-negative by construction. A
+//! negative sequence number is a caller-contract violation the guard
+//! catches before the field is built, so every lane reaches the trap.
+
+use std.hex
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let iv = bytes_of("5d313eb2671276ee13000b30")
+    print("reached the call")
+    let nonce = record.record_nonce(iv, 0 - 1)
+    print("unreachable: {nonce.len}")
+    0
+}

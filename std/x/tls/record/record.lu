@@ -1,0 +1,572 @@
+//! member: true
+//!
+//! std.x.tls.record — the TLS 1.3 record layer and its key-schedule
+//! primitives (RFC 8446 §5 + §7.1/§7.3). Stability tier: x — the FIRST
+//! rung of the stdc-tls campaign (sprint sc20), the protocol the whole
+//! D53 crypto ladder was built for. This module is the RECORD LAYER and
+//! the KEY SCHEDULE PRIMITIVES, nothing above them: no ClientHello, no
+//! certificate, no state machine — the handshake (sc21) produces the
+//! secrets, this rung derives keys from them and frames records under
+//! them. It is testable in isolation against RFC 8448's published
+//! traces, exactly the sc16-before-everything discipline.
+//!
+//! **The nursery banner (D31).** `std.x.tls.record` is not
+//! `std.tls`: its path, names and behaviour may change or vanish in one
+//! sprint; no other std module may depend on it. Its reason and
+//! graduation trigger live in `std/x/README.md`. It depends on TWO
+//! sibling residents — `std.x.crypto.sha2` (HKDF-SHA-256, the key
+//! schedule) and `std.x.crypto.chacha20` (AEAD_CHACHA20_POLY1305, the
+//! record AEAD) — plus no facade at all. Those two resident-on-resident
+//! edges are ones the graduation move to `std.tls`/`std.crypto` must
+//! resolve, named in the register beside jose's own sha2/curve25519
+//! edges (the sc19 precedent — a resident MAY depend on a sibling
+//! resident, the edge is recorded, not forbidden).
+//!
+//! **Built from the RFC DOCUMENTS, not ported.** RFC 8446 (August 2018)
+//! §7.1 (HKDF-Expand-Label, Derive-Secret), §7.3 (traffic key
+//! calculation), §5.2 (TLSCiphertext framing), §5.3 (the per-record
+//! nonce) and §5.4 (record padding). RFC 8448 (January 2019) §3 is the
+//! vector spine: the trace publishes every intermediate secret, traffic
+//! key, IV and the `info` (HkdfLabel) bytes themselves — asserted
+//! byte-for-byte in `tests/x/tls/record/`.
+//!
+//! ## The four byte-exact rules this module lives or dies on
+//!
+//! 1. **HkdfLabel is byte-exact** (§7.1). The label prefix is the six
+//!    bytes `"tls13 "` — INCLUDING the trailing space (`74 6c 73 31 33
+//!    20`), NOT `"TLS 1.3, "`. The structure is `uint16 length`, then a
+//!    one-byte-prefixed `opaque label = "tls13 " + Label`, then a
+//!    one-byte-prefixed `opaque context`, all big-endian. One wrong
+//!    length byte and every downstream key is wrong; `hkdf_label`'s
+//!    output is asserted against RFC 8448's published `info` dumps.
+//!
+//! 2. **The nonce is IV XOR seq, right-aligned** (§5.3) — NOT `IV ||
+//!    seq` and NOT `seq || IV`. The 64-bit sequence number is encoded
+//!    big-endian and left-padded with zeros to the IV length (12), then
+//!    XORed with the static write IV. `record_nonce` builds exactly that
+//!    field; a wrong nonce fails every AEAD in RFC 8448's trace.
+//!
+//! 3. **The AEAD additional-data is the record HEADER** (§5.2), not
+//!    empty: `opaque_type(23) || legacy_record_version(0x0303) ||
+//!    length`, the five bytes on the wire ahead of the ciphertext.
+//!    `additional_data` builds it and `seal`/`open` pass it; sealing
+//!    without it, or with the wrong length, fails the trace.
+//!
+//! 4. **Padding removal scans from the END for the content-type**
+//!    (§5.4): the deprotected inner plaintext is `content ||
+//!    content_type || zero-padding`, and the real content-type is the
+//!    LAST non-zero octet. An all-zero inner has no content-type and is
+//!    a malformed record (§5.4's `unexpected_message`), raised as the
+//!    `unexpected` row.
+//!
+//! **The AEAD is ChaCha20-Poly1305, the MTI** (RFC 8446 §9.1). RFC
+//! 8448's own records are AES-128-GCM (a rung with its own D-question,
+//! out of this sprint), so the key-schedule/nonce/AAD framing is
+//! asserted against RFC 8448 byte-for-byte and the record AEAD
+//! seal/open byte-match uses ChaCha20-Poly1305 fixtures derived from RFC
+//! 8448's real traffic secrets by an independent reference (the sc17
+//! discipline; F-0094 records the AES-GCM/ChaCha reconciliation).
+//!
+//! **Byte sequences are `List[int]` with the 0..255 element contract**
+//! (§11's interim, F-0035), the sha2/chacha20 convention: an element
+//! outside 0..255 traps `assert` at ingestion.
+//!
+//! **Error rows.** `open` raises `{tag, short, unexpected}`: a forged,
+//! modified or truncated box is the DATA's failure (`tag`, sc17's
+//! verify-before-expose — zero plaintext leaves on this path); a record
+//! too short to hold a header, a tag and one content-type octet is
+//! `short`; a deprotected inner with no non-zero octet is `unexpected`
+//! (§5.4). Everything else is total over its documented domain; length
+//! misuse and non-byte elements are caller-contract violations that trap
+//! `assert`.
+//!
+//! **The sc21-consumable seam (FROZEN).** The handshake sprint gets:
+//! (a) the key schedule — `extract`, `expand_label`, `derive_secret`,
+//! `traffic_key`, `traffic_iv`, `finished_key` — to turn its computed
+//! secrets into AEAD keys; and (b) the framing — `seal`/`open` over
+//! `(key, iv, seq, ...)` — to protect and deprotect records. sc21
+//! produces the secrets (transcript hashes over real handshake
+//! messages); this module never computes a transcript, it takes the
+//! context bytes as an argument. The seam is: GIVEN keys -> sealed/
+//! opened records. It is frozen at sc20; `std/x/README.md` records it.
+//!
+//! **Constant-time obligations (D53's retrofit clause).** c28's
+//! compiler-enforced `#[consttime]` does not exist yet; until it does,
+//! every `pub` fn carries a `ct:` line. The honest summary: the key
+//! schedule handles SECRETS (traffic secrets, keys, IVs) and branches/
+//! indexes only on PUBLIC quantities (label bytes, lengths, the public
+//! sequence number) — the secret flows through sha2's HKDF and chacha20's
+//! AEAD, whose own `ct:` lines carry the wrapping-not-checked posture.
+//! `record_nonce` does wrapping-not-checked arithmetic on the write IV
+//! (a secret) with the public sequence number and is branch-free.
+//! `open`'s padding scan reads the DEPROTECTED length (§5.4) — a
+//! value-dependent loop bound c28 must model; it is marked below. The
+//! 0..255 ingestion guards are the recorded value-dependent branch
+//! shared with sha2/chacha20 (F-0035's real byte type retires them).
+
+use std.x.crypto.sha2
+use std.x.crypto.chacha20
+
+// ---------------------------------------------------------------------
+// Byte helpers (the sha2/chacha20 0..255 contract, and the one wrapping
+// XOR the nonce needs — bitwise `^` on plain `int` costs the checked
+// lane, F-0026, so byte XOR rides `wrapping[u64]` exactly as chacha20's
+// `xor_byte` does).
+// ---------------------------------------------------------------------
+
+/// The 0..255 ingestion guard (§11's `List[int]` byte contract).
+/// ct: NOT free of value-dependent branches — this comparison pair runs
+/// on every input element and is the module's recorded ct exception,
+/// shared verbatim with sha2/chacha20 (it leaves with F-0035's real
+/// byte type).
+fn require_byte(v: int) {
+    if v < 0 {
+        assert(false, "tls.record: element outside 0..255")
+    }
+    if v > 255 {
+        assert(false, "tls.record: element outside 0..255")
+    }
+}
+
+/// One byte XOR in the `wrapping[u64]` domain (bitwise `^` on plain
+/// `int` costs the checked lane, F-0026 — the chacha20 spelling).
+fn xor_byte(a: int, b: int) -> int {
+    ((a as wrapping[u64] ^ b as wrapping[u64]) & 0xff) as int
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §7.1 — HKDF-Expand-Label and Derive-Secret over sc16's HKDF.
+//
+//     struct {
+//         uint16 length = Length;
+//         opaque label<7..255> = "tls13 " + Label;
+//         opaque context<0..255> = Context;
+//     } HkdfLabel;
+//
+//     HKDF-Expand-Label(Secret, Label, Context, Length) =
+//         HKDF-Expand(Secret, HkdfLabel, Length)
+//     Derive-Secret(Secret, Label, Messages) =
+//         HKDF-Expand-Label(Secret, Label,
+//                           Transcript-Hash(Messages), Hash.length)
+// ---------------------------------------------------------------------
+
+/// The six-byte TLS 1.3 label prefix `"tls13 "` (`74 6c 73 31 33 20`),
+/// INCLUDING the trailing space (§7.1). A zero-argument function because
+/// a module `const` costs an execution lane (F-0025).
+fn label_prefix() -> str {
+    "tls13 "
+}
+
+/// Push the bytes of an ASCII `str` onto `out`, asserting each is a
+/// byte (labels are ASCII; the prefixed label is `<7..255>`).
+fn push_ascii(mut out: List[int], s: str) {
+    for b in s.bytes() {
+        require_byte(b)
+        (mut out).push(b)
+    }
+}
+
+/// The `HkdfLabel` structure encoded to bytes (§7.1): `uint16 length`
+/// big-endian, then the one-byte-length-prefixed `"tls13 " + label`,
+/// then the one-byte-length-prefixed `context`. This is the exact
+/// `info` fed to HKDF-Expand — RFC 8448 §3 publishes it as the `info`
+/// dumps, asserted byte-for-byte.
+/// ct: public structure only (label and context are public; the length
+/// prefixes are public) — no secret touched here.
+pub fn hkdf_label(length: int, label: str, context: List[int]) -> List[int] {
+    assert(length >= 0, "tls.record: negative expand length")
+    assert(length <= 65535, "tls.record: expand length exceeds uint16")
+    var full = List[int]()
+    push_ascii(mut full, label_prefix())
+    push_ascii(mut full, label)
+    let full_len = full.len
+    assert(full_len >= 7, "tls.record: label shorter than the 7-byte floor")
+    assert(full_len <= 255, "tls.record: label exceeds 255 bytes")
+    let ctx_len = context.len
+    assert(ctx_len <= 255, "tls.record: context exceeds 255 bytes")
+    var out = List[int]()
+    (mut out).push(length / 256 % 256)
+    (mut out).push(length % 256)
+    (mut out).push(full_len)
+    for b in full {
+        (mut out).push(b)
+    }
+    (mut out).push(ctx_len)
+    for b in context {
+        require_byte(b)
+        (mut out).push(b)
+    }
+    out
+}
+
+/// HKDF-Expand-Label (§7.1): expand `secret` under the structured
+/// `HkdfLabel` to `length` bytes. The digest is SHA-256 (the
+/// TLS_*_SHA256 suites); `std.x.crypto.sha2.hkdf256_expand` is the
+/// HKDF-Expand.
+/// ct: `secret` is the PRK, carried through sha2's HKDF (its `ct:` line
+/// holds the wrapping-not-checked posture); the label/context/length
+/// that select `HkdfLabel` are public.
+pub fn expand_label(secret: List[int], label: str, context: List[int], length: int) -> List[int] {
+    let info = hkdf_label(length, label, context)
+    sha2.hkdf256_expand(secret, info, length)
+}
+
+/// Derive-Secret (§7.1): HKDF-Expand-Label with the transcript hash as
+/// context and the digest length (32) as output. `transcript` is
+/// `Transcript-Hash(Messages)` — this module never computes a
+/// transcript (that is sc21's job over real handshake messages); the
+/// caller supplies the 32-byte hash, or `sha2.sum256([])` for the empty
+/// transcript the "derived"/"finished" steps use.
+/// ct: as `expand_label` — `secret` is carried through HKDF; the
+/// transcript hash is public.
+pub fn derive_secret(secret: List[int], label: str, transcript: List[int]) -> List[int] {
+    expand_label(secret, label, transcript, 32)
+}
+
+/// HKDF-Extract (RFC 5869 §2.2) — the key schedule's extract step, a
+/// thin name over sc16's HKDF so a test can build RFC 8448's whole chain
+/// through this module alone. `salt` is the previous stage's "derived"
+/// secret (or `Hash.length` zeros for the first extract); `ikm` is the
+/// (EC)DHE shared secret (or zeros where there is no input keying
+/// material).
+/// ct: `salt`/`ikm` are secret; carried through sha2's HMAC.
+pub fn extract(salt: List[int], ikm: List[int]) -> List[int] {
+    sha2.hkdf256_extract(salt, ikm)
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §7.3 — traffic key calculation.
+//
+//     [sender]_write_key = HKDF-Expand-Label(Secret, "key", "", key_len)
+//     [sender]_write_iv  = HKDF-Expand-Label(Secret, "iv",  "", iv_len)
+// ---------------------------------------------------------------------
+
+/// The static IV length for TLS 1.3 AEADs (both AES-GCM and
+/// ChaCha20-Poly1305 use a 12-byte nonce, §5.3).
+fn iv_length() -> int {
+    12
+}
+
+/// The `[sender]_write_key` (§7.3): expand the traffic secret under the
+/// `"key"` label to the AEAD's key length (32 for ChaCha20-Poly1305, 16
+/// for AES-128-GCM — the caller states which, since it knows the suite).
+/// The context is empty.
+/// ct: `secret` is the traffic secret; carried through HKDF.
+pub fn traffic_key(secret: List[int], key_len: int) -> List[int] {
+    expand_label(secret, "key", List[int](), key_len)
+}
+
+/// The `[sender]_write_iv` (§7.3): expand the traffic secret under the
+/// `"iv"` label to the 12-byte IV length. The context is empty.
+/// ct: `secret` is the traffic secret; carried through HKDF.
+pub fn traffic_iv(secret: List[int]) -> List[int] {
+    expand_label(secret, "iv", List[int](), iv_length())
+}
+
+/// The Finished MAC key (§4.4.4): `HKDF-Expand-Label(Secret,
+/// "finished", "", Hash.length)`. Not used by the record layer itself,
+/// but part of the same §7.1 vocabulary and published by RFC 8448 §3, so
+/// the seam carries it for sc21's Finished computation.
+/// ct: `secret` is the traffic secret; carried through HKDF.
+pub fn finished_key(secret: List[int]) -> List[int] {
+    expand_label(secret, "finished", List[int](), 32)
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §5.3 — the per-record nonce.
+//
+//   1. The 64-bit record sequence number is encoded in network byte
+//      order (big-endian) and left-padded with zeros to iv_length.
+//   2. The padded sequence number is XORed with the static write IV.
+//
+// NOT IV || seq, NOT seq || IV: the sequence number is XORed INTO the
+// IV, right-aligned. This is the construction everyone gets wrong.
+// ---------------------------------------------------------------------
+
+/// The 12-byte sequence-number field: four zero bytes then the 64-bit
+/// sequence number big-endian (§5.3 step 1). Built in the
+/// `wrapping[u64]` domain with LITERAL shift amounts (a shift by a
+/// plain-`int` binding is refused natively — sc16's measurement — and a
+/// wrapping shift keeps all three lanes).
+fn seq_field(seq: int) -> List[int] {
+    assert(seq >= 0, "tls.record: sequence number must be non-negative")
+    let s = seq as wrapping[u64]
+    var f = List[int]()
+    (mut f).push(0)
+    (mut f).push(0)
+    (mut f).push(0)
+    (mut f).push(0)
+    (mut f).push((s >> 56 & 0xff) as int)
+    (mut f).push((s >> 48 & 0xff) as int)
+    (mut f).push((s >> 40 & 0xff) as int)
+    (mut f).push((s >> 32 & 0xff) as int)
+    (mut f).push((s >> 24 & 0xff) as int)
+    (mut f).push((s >> 16 & 0xff) as int)
+    (mut f).push((s >> 8 & 0xff) as int)
+    (mut f).push((s & 0xff) as int)
+    f
+}
+
+/// The per-record nonce (§5.3): `iv XOR pad_left(seq, iv_length)`. `iv`
+/// is the static `[sender]_write_iv` (12 bytes). `seq` is the record
+/// sequence number (0 for the first record under a key, incrementing).
+/// ct: branch-free over the public sequence number; the wrapping XOR
+/// touches the secret write IV (wrapping-not-checked, marked for c28).
+pub fn record_nonce(iv: List[int], seq: int) -> List[int] {
+    assert(iv.len == iv_length(), "tls.record: write IV must be 12 bytes")
+    let field = seq_field(seq)
+    var out = List[int]()
+    var i = 0
+    while i < iv_length() {
+        let a = iv[i]
+        require_byte(a)
+        (mut out).push(xor_byte(a, field[i]))
+        i = i + 1
+    }
+    out
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §5.1/§5.2 — the record header and TLSCiphertext framing.
+//
+//   struct {
+//       ContentType opaque_type = application_data; /* 23 */
+//       ProtocolVersion legacy_record_version = 0x0303;
+//       uint16 length;
+//       opaque encrypted_record[length];
+//   } TLSCiphertext;
+//
+// The additional_data for the AEAD is the header: opaque_type ||
+// legacy_record_version || length (§5.2).
+// ---------------------------------------------------------------------
+
+/// ContentType `application_data` (23) — the OUTER opaque_type of every
+/// TLSCiphertext (§5.2; the real content type hides inside the
+/// encryption). Zero-argument functions stand in for `const`s (F-0025).
+pub fn content_type_application_data() -> int {
+    23
+}
+
+/// ContentType `handshake` (22) — a common INNER content type (the
+/// EncryptedExtensions/Certificate/Finished flight).
+pub fn content_type_handshake() -> int {
+    22
+}
+
+/// ContentType `alert` (21) — an inner content type a record open may
+/// have to surface.
+pub fn content_type_alert() -> int {
+    21
+}
+
+/// The five-byte TLSCiphertext header for an encrypted record of
+/// `length` bytes: `17 03 03 <length big-endian uint16>` (§5.2). The
+/// legacy_record_version is 0x0303 ("TLS 1.2") on every 1.3 record.
+/// ct: public lengths only.
+pub fn record_header(length: int) -> List[int] {
+    assert(length >= 0, "tls.record: negative record length")
+    assert(length <= 65535, "tls.record: record length exceeds uint16")
+    var out = List[int]()
+    (mut out).push(content_type_application_data())
+    (mut out).push(3)
+    (mut out).push(3)
+    (mut out).push(length / 256 % 256)
+    (mut out).push(length % 256)
+    out
+}
+
+/// The AEAD additional-data for a record whose ciphertext (including the
+/// 16-byte tag) is `cipher_len` bytes: the record header (§5.2). This is
+/// exactly `record_header(cipher_len)`, named for the role.
+/// ct: public lengths only.
+pub fn additional_data(cipher_len: int) -> List[int] {
+    record_header(cipher_len)
+}
+
+/// The AEAD tag length for AEAD_CHACHA20_POLY1305 (16 bytes, §5.2's
+/// AEAD output overhead).
+fn tag_length() -> int {
+    16
+}
+
+/// The TLSInnerPlaintext (§5.2): `content || ContentType content_type ||
+/// zeros[pad]`. The real content type is appended after the content, and
+/// `pad` zero octets follow (§5.4's length hiding). `pad` may be 0.
+/// ct: public structure; `content` is plaintext the caller owns.
+pub fn inner_plaintext(content: List[int], content_type: int, pad: int) -> List[int] {
+    require_byte(content_type)
+    assert(pad >= 0, "tls.record: negative padding")
+    var out = List[int]()
+    for b in content {
+        require_byte(b)
+        (mut out).push(b)
+    }
+    (mut out).push(content_type)
+    var i = 0
+    while i < pad {
+        (mut out).push(0)
+        i = i + 1
+    }
+    out
+}
+
+// ---------------------------------------------------------------------
+// Seal / open — the record AEAD, over ChaCha20-Poly1305 (§5.2).
+// ---------------------------------------------------------------------
+
+/// Seal a record (§5.2): build the TLSInnerPlaintext (`content ||
+/// content_type || pad zeros`), AEAD-seal it under the per-record nonce
+/// with the record header as additional-data, and frame it as a
+/// TLSCiphertext (`header || ciphertext || tag`). The returned bytes are
+/// the complete record on the wire. `key` is the AEAD key, `iv` the
+/// static write IV, `seq` the record sequence number.
+/// ct: the AEAD is chacha20's (its `ct:` line carries); this function
+/// adds only public framing and the nonce (see `record_nonce`).
+pub fn seal(
+    key: List[int],
+    iv: List[int],
+    seq: int,
+    content_type: int,
+    content: List[int],
+    pad: int,
+) -> List[int] {
+    let inner = inner_plaintext(content, content_type, pad)
+    let cipher_len = inner.len + tag_length()
+    let header = record_header(cipher_len)
+    let nonce = record_nonce(iv, seq)
+    let boxed = chacha20.seal(key, nonce, header, inner)
+    var out = List[int]()
+    for b in header {
+        (mut out).push(b)
+    }
+    for b in boxed {
+        (mut out).push(b)
+    }
+    out
+}
+
+/// The smallest legal encrypted record: a five-byte header, a 16-byte
+/// tag, and at least the one content-type octet of an (empty-content,
+/// unpadded) inner plaintext.
+fn min_record_len() -> int {
+    5 + 16 + 1
+}
+
+/// Open a record (§5.2/§5.4): verify the tag BEFORE exposing any
+/// plaintext (sc17's discipline — a `tag` failure returns with ZERO
+/// plaintext), then strip the padding by scanning from the end for the
+/// content-type octet, and return the deprotected inner plaintext
+/// (`content || content_type`, padding removed). Use `content_of` and
+/// `content_type_of` on the result. `record` is the complete wire
+/// record (header included); `key`/`iv`/`seq` as for `seal`.
+///
+/// Rows: `short` — the record cannot hold a header, a tag and one
+/// content-type octet; `tag` — the AEAD rejected the box (forged,
+/// modified or truncated), no plaintext exposed; `unexpected` — the
+/// deprotected inner is all zeros, with no content-type octet (§5.4's
+/// `unexpected_message`).
+/// ct: the tag verification is chacha20's (marked as c28's first target
+/// there). The padding scan below reads the DEPROTECTED length — a
+/// value-dependent loop bound c28 must model (§5.4 notes it as a
+/// constant-time hazard).
+pub fn open(key: List[int], iv: List[int], seq: int, record: List[int]) -> List[int] ! {
+    tag,
+    short,
+    unexpected,
+} {
+    if record.len < min_record_len() {
+        return short
+    }
+    // Split the wire record into the 5-byte header (the AEAD's
+    // additional-data, §5.2) and the encrypted body, in one walk.
+    var header = List[int]()
+    var encrypted = List[int]()
+    var i = 0
+    for b in record {
+        if i < 5 {
+            (mut header).push(b)
+        } else {
+            (mut encrypted).push(b)
+        }
+        i = i + 1
+    }
+    let nonce = record_nonce(iv, seq)
+    // Verify-before-expose: a tag failure leaves as the `tag` row with
+    // no plaintext ever materialized (chacha20.open computes the tag
+    // before decrypting).
+    let inner = chacha20.open(key, nonce, header, encrypted) else |_| {
+        return tag
+    }
+    // §5.4: the content-type is the LAST non-zero octet; a forward walk
+    // that records the index of every non-zero octet ends at it.
+    var ct_index = 0 - 1
+    var j = 0
+    for b in inner {
+        if b != 0 {
+            ct_index = j
+        }
+        j = j + 1
+    }
+    if ct_index < 0 {
+        return unexpected
+    }
+    // Return content || content_type (the deprotected inner, padding
+    // stripped): everything up to and including the content-type octet.
+    var out = List[int]()
+    var k = 0
+    for b in inner {
+        if k <= ct_index {
+            (mut out).push(b)
+        }
+        k = k + 1
+    }
+    out
+}
+
+/// The inner content type recovered by `open`: the last octet of the
+/// deprotected inner plaintext (§5.4).
+/// ct: reads a public position of already-authenticated plaintext.
+pub fn content_type_of(inner: List[int]) -> int {
+    let n = inner.len
+    assert(n >= 1, "tls.record: empty deprotected inner")
+    inner[n - 1]
+}
+
+/// The inner content recovered by `open`: the deprotected inner
+/// plaintext with its trailing content-type octet removed (§5.4).
+/// ct: reads public positions of already-authenticated plaintext.
+pub fn content_of(inner: List[int]) -> List[int] {
+    let n = inner.len
+    assert(n >= 1, "tls.record: empty deprotected inner")
+    var out = List[int]()
+    var i = 0
+    for b in inner {
+        if i < n - 1 {
+            (mut out).push(b)
+        }
+        i = i + 1
+    }
+    out
+}
+
+// ---------------------------------------------------------------------
+// Hex rendering — this module's own, so its tests and doc examples
+// import exactly one module (the sha2/chacha20 precedent). NOT
+// constant-time; a debug/vector convenience only.
+// ---------------------------------------------------------------------
+
+/// Lowercase hex of a byte list. ct: NOT constant-time (a rendering
+/// convenience for tests and vectors, never a secret-handling path).
+pub fn to_hex(b: List[int]) -> str {
+    let alphabet = "0123456789abcdef"
+    var out = ""
+    for v in b {
+        require_byte(v)
+        let hi = v / 16
+        let lo = v % 16
+        let hd = alphabet[hi..hi + 1]
+        let ld = alphabet[lo..lo + 1]
+        out = "{out}{hd}{ld}"
+    }
+    out
+}

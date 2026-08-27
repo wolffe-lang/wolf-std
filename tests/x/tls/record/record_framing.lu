@@ -1,0 +1,47 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.tls.record, arith.wrapping
+//!
+//! TLSCiphertext framing (§5.2, pitfall #3): the five-byte record
+//! header `17 03 03 <uint16 length>` IS the AEAD additional-data.
+//! Asserted against the headers of RFC 8448 §3's actual encrypted
+//! records (their AES-128-GCM bodies belong to that suite's rung;
+//! the header/AAD framing is AEAD-independent and matches). Plus
+//! the TLSInnerPlaintext assembly (§5.4): content || content_type
+//! || zero padding.
+//!
+
+use std.hex
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn header_matches(length: int, want: str) -> bool {
+    record.to_hex(record.record_header(length)) == want
+}
+
+fn aad_matches(length: int, want: str) -> bool {
+    record.to_hex(record.additional_data(length)) == want
+}
+
+fn inner_matches(content_hex: str, content_type: int, pad: int, want: str) -> bool {
+    let c = bytes_of(content_hex)
+    record.to_hex(record.inner_plaintext(c, content_type, pad)) == want
+}
+
+fn main() -> int {
+    assert(header_matches(674, "17030302a2"), "header len 674")
+    assert(aad_matches(674, "17030302a2"), "aad len 674")
+    assert(header_matches(53, "1703030035"), "header len 53")
+    assert(aad_matches(53, "1703030035"), "aad len 53")
+    assert(header_matches(222, "17030300de"), "header len 222")
+    assert(aad_matches(222, "17030300de"), "aad len 222")
+    assert(header_matches(67, "1703030043"), "header len 67")
+    assert(aad_matches(67, "1703030043"), "aad len 67")
+    assert(inner_matches("08000024", 22, 0, "0800002416"), "handshake inner, no pad")
+    assert(inner_matches("08000024", 22, 3, "0800002416000000"), "handshake inner, 3 pad")
+    assert(inner_matches("", 23, 0, "17"), "empty content, app-data type")
+    0
+}

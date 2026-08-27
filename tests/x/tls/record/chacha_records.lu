@@ -1,0 +1,135 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.tls.record, arith.wrapping, err.row
+//!
+//! The record AEAD, seal AND open, over ChaCha20-Poly1305 (the
+//! MTI, §9.1). RFC 8448's records are AES-128-GCM (a separate
+//! rung), so — the sc17 independent-reference discipline — these
+//! fixtures derive a 32-byte ChaCha key + 12-byte IV from RFC
+//! 8448's REAL server-handshake-traffic secret via Expand-Label
+//! and seal RFC 8448's real handshake plaintexts as TLS 1.3
+//! records. `seal` byte-matches the reference record; `open`
+//! recovers the content and the content-type, verifying the tag
+//! first (§5.2). F-0094 records the reconciliation.
+//!
+
+use std.hex
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn seal_matches(key_hex: str, iv_hex: str, seq: int, ct: int, content_hex: str, pad: int, want: str) -> bool {
+    let key = bytes_of(key_hex)
+    let iv = bytes_of(iv_hex)
+    let content = bytes_of(content_hex)
+    record.to_hex(record.seal(key, iv, seq, ct, content, pad)) == want
+}
+
+fn opens_to(key_hex: str, iv_hex: str, seq: int, rec_hex: str, want_ct: int, want_content: str) -> bool {
+    let key = bytes_of(key_hex)
+    let iv = bytes_of(iv_hex)
+    let rec = bytes_of(rec_hex)
+    let inner = record.open(key, iv, seq, rec) else List[int]()
+    if !(record.content_type_of(inner) == want_ct) {
+        return false
+    }
+    record.to_hex(record.content_of(inner)) == want_content
+}
+
+fn main() -> int {
+    assert(
+        seal_matches(
+            "ac70443f7fe3bdaf568b1dcdb0a7f3fea098bca189c3455ba41fcd9d488348a4",
+            "5d313eb2671276ee13000b30",
+            0,
+            22,
+            "080000240022000a00140012001d00170018001901000101010201030104001c0002400100000000",
+            0,
+            "17030300395873757403ed97881d323c4c60ab52fbbd84c6326f776d5e07041bbcee731e6fa17387310108168b8a72aec407a10bb860f502931681eee138",
+        ),
+        "seal: server EncryptedExtensions",
+    )
+    assert(
+        opens_to(
+            "ac70443f7fe3bdaf568b1dcdb0a7f3fea098bca189c3455ba41fcd9d488348a4",
+            "5d313eb2671276ee13000b30",
+            0,
+            "17030300395873757403ed97881d323c4c60ab52fbbd84c6326f776d5e07041bbcee731e6fa17387310108168b8a72aec407a10bb860f502931681eee138",
+            22,
+            "080000240022000a00140012001d00170018001901000101010201030104001c0002400100000000",
+        ),
+        "open: server EncryptedExtensions",
+    )
+    assert(
+        seal_matches(
+            "ac70443f7fe3bdaf568b1dcdb0a7f3fea098bca189c3455ba41fcd9d488348a4",
+            "5d313eb2671276ee13000b30",
+            5,
+            22,
+            "080000240022000a00140012001d00170018001901000101010201030104001c0002400100000000",
+            0,
+            "1703030039d734094316062ac53372215af376c27d256e043badd0cf425a63666c32ef28273ab428e3e733cd8b7ecfd33fa3081065f7ee67b8891750bdb1",
+        ),
+        "seal: server EncryptedExtensions seq5",
+    )
+    assert(
+        opens_to(
+            "ac70443f7fe3bdaf568b1dcdb0a7f3fea098bca189c3455ba41fcd9d488348a4",
+            "5d313eb2671276ee13000b30",
+            5,
+            "1703030039d734094316062ac53372215af376c27d256e043badd0cf425a63666c32ef28273ab428e3e733cd8b7ecfd33fa3081065f7ee67b8891750bdb1",
+            22,
+            "080000240022000a00140012001d00170018001901000101010201030104001c0002400100000000",
+        ),
+        "open: server EncryptedExtensions seq5",
+    )
+    assert(
+        seal_matches(
+            "ac70443f7fe3bdaf568b1dcdb0a7f3fea098bca189c3455ba41fcd9d488348a4",
+            "5d313eb2671276ee13000b30",
+            0,
+            22,
+            "080000240022000a00140012001d00170018001901000101010201030104001c0002400100000000",
+            7,
+            "17030300405873757403ed97881d323c4c60ab52fbbd84c6326f776d5e07041bbcee731e6fa17387310108168b8a7c0597e5e061f295dfce5341b4b213bd5bf4b88edf186d",
+        ),
+        "seal: server EncryptedExtensions pad",
+    )
+    assert(
+        opens_to(
+            "ac70443f7fe3bdaf568b1dcdb0a7f3fea098bca189c3455ba41fcd9d488348a4",
+            "5d313eb2671276ee13000b30",
+            0,
+            "17030300405873757403ed97881d323c4c60ab52fbbd84c6326f776d5e07041bbcee731e6fa17387310108168b8a7c0597e5e061f295dfce5341b4b213bd5bf4b88edf186d",
+            22,
+            "080000240022000a00140012001d00170018001901000101010201030104001c0002400100000000",
+        ),
+        "open: server EncryptedExtensions pad",
+    )
+    assert(
+        seal_matches(
+            "ac70443f7fe3bdaf568b1dcdb0a7f3fea098bca189c3455ba41fcd9d488348a4",
+            "5d313eb2671276ee13000b30",
+            1,
+            22,
+            "140000209b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718",
+            0,
+            "17030300356c925195e5dd14f2266cb042207cb5cd902b2141591cd908fc296f58856e9b253a0deb36f5914eba1535a26bbf201ce947ffe6a778",
+        ),
+        "seal: server Finished",
+    )
+    assert(
+        opens_to(
+            "ac70443f7fe3bdaf568b1dcdb0a7f3fea098bca189c3455ba41fcd9d488348a4",
+            "5d313eb2671276ee13000b30",
+            1,
+            "17030300356c925195e5dd14f2266cb042207cb5cd902b2141591cd908fc296f58856e9b253a0deb36f5914eba1535a26bbf201ce947ffe6a778",
+            22,
+            "140000209b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718",
+        ),
+        "open: server Finished",
+    )
+    0
+}

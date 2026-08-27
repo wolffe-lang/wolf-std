@@ -102,6 +102,8 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0091 | 2026-08-26 | **CLOSED at the sc18 pin (s111, wolf-lang#130)** — shifts, bitwise ops and 2^63+ literals all execute at mem at 21b129e; 41 wolfc rows flipped `unsupported` -> `run` in the bump commit (4 rand + 18 sha2 + 19 chacha20), and the nine still-dark sha2 rows record the tier's step/shadow-memory BUDGETS, a different mechanism, named in the ledger. The original finding: **the checked tier refuses every shift and bitwise operator on `wrapping[T]`** ("this operator in checked execution"; `+`/`*` run) and refuses a `wrapping[u64]` literal above 2^63 - 1 earlier still ("this literal shape") — std.rand's four-sprint-old lane posture, now load-bearing: there is no spelling of SHA-2 without rotations, so the whole digest ladder (module + 1210 vendored vector assertions) is lupin+native with the checked column dark. D53 wants c28's ct tier exercised over exactly these kernels, and a lane that cannot run a rotation cannot ever check one. The filing quotes the round function | wolf-lang | [filed: wolf-lang#130](https://github.com/wolffe-lang/wolf-lang/issues/130); sc16, the digest ladder's named lane cost |
 | F-0092 | 2026-08-26 | **CLOSED at the sc18 pin (s111, wolf-lang#133)** — the shape lowers natively at 21b129e, re-probed at the sha, and `update384` delegates `mut st.st` directly again (the copy dance retired in the bump commit; the diff was one line, the mechanical bar the contract set). The original finding: **the native rung refuses `f(mut param.field)` — a `mut` field path whose base is itself a `mut` parameter** ("`mut` places beyond local by-value bindings"), while the same path off a LOCAL binding lowers at 87405ac (both shapes probed; the local half healed across the sc16 bump, the parameter half did not). Costs `Sha384` its one-line delegation to the `Sha512` core: `update384` copies the core out, advances it, writes it back — semantics X1 already licenses directly, ~330 elements deep-copied per call, measured ~1.9x on the interpreter against SHA-512 on the same core | wolf-lang | [filed: wolf-lang#133](https://github.com/wolffe-lang/wolf-lang/issues/133); sc16 |
 | F-0093 | 2026-08-26 | **under lupin, per-iteration cost grows with program AGE**: the same 129 CAVP SHA-384 short vectors cost ~27s as four programs and ~132s as one (16 alone: 0.69s; first 64: 10.6s) — total quadratic in vector count, not message-length scaling, and `region { }` scoping per vector measures identical. Distinct from F-0074/F-0078's per-operation costs: no per-op fix moves a curve keyed to how much the program has already run. Sized this sprint's suites: the CAVP short sets are chunked 2/4/4 to keep the differential lane inside the ceiling, and the long/Monte suites are `slow`-skipped there (the sc16 ledger word). **sc17 re-measure (the AEAD rung, 0.1.13)**: the curve holds at new constants — 32 ChaCha20-Poly1305 seal+open pairs 98s in one program, 30 opens 29s, a 10-case smoke 2.1s — so the Wycheproof AEAD parts are chunked 32/30 with `slow` and smoke subsets from the start, and each part flips back per-part at the fixing bump (evidence commented on the issue). **sc18 re-measure (the curve rung, 0.1.13, is20 still unreleased)**: the curve is heavier per program than the digests — one X25519 Montgomery ladder is ~2.5-6.5s, one Ed25519 verify ~7-8s, so the differential lupin column shrank to a 5-vector X25519 smoke (~13s) and a 1-valid+1-invalid Ed smoke (~18s); the 1000-iteration chain, the 40-vector Wycheproof parts and the RFC 8032 §7.1 set are native + `slow`, and the checked tier additionally exhausts its STEP budget past a few ladders (a capacity refusal, the sha2-long mechanism, not F-0091's operator gap — that one closed at this pin). is20's fix (merged wolf-interp ec4b9c4, unreleased) is the exit for every curve `slow` row | wolf-interp | [filed: wolf-interp#41](https://github.com/wolffe-lang/wolf-interp/issues/41); sc16, the honest-slow-skip's mechanism; sc17 evidence appended |
+| F-0094 | 2026-08-27 | **the AES-GCM/ChaCha reconciliation for RFC 8448 (a std design decision, not an upstream defect)**: RFC 8448 §3 is the TLS 1.3 record layer's vector spine, but its records are AES-128-GCM (cipher suite TLS_AES_128_GCM_SHA256), while the MTI AEAD this ladder ships is ChaCha20-Poly1305 (§9.1; AES-GCM is a later rung's D-question, out of the sc20 contract). Resolution: the key schedule, the per-record nonce, the record header and the additional-data are all AEAD-INDEPENDENT and are asserted against RFC 8448 byte-for-byte (16-byte AES keys included — `hkdf_label`/`expand_label`/`derive_secret`/`traffic_key`/`traffic_iv` reproduce every §3 secret, `info` dump and traffic key); only the sealed ciphertext+tag needs the actual cipher, and that byte-match uses ChaCha20-Poly1305 fixtures derived from RFC 8448's REAL server-handshake-traffic secret (a 32-byte `"key"` Expand-Label where the trace takes 16 — same derivation, different length), generated and pinned by the independent reference (the sc17 discipline). The trace stays the spine; the cipher stays the MTI. Not filed upstream — this is a vendoring/scope note, recorded so the split is not mistaken for missing coverage | wolf-std (sc20) | docs/findings.md + `vendor/vectors/README.md` (RFC 8448 take/omit); the AES-GCM record rung retires it by adding the second cipher |
+| F-0095 | 2026-08-27 | **the checked mem tier refuses `for x in <List bound through a DIVERGING `else`>` on the reject path** — "unsupported — iteration outside ranges and List". `let inner = chacha20.open(...) else \|_\| { return tag }` then `for b in inner { ... }` runs on the checked tier when the open SUCCEEDS (the valid-record path is three-lane, `chacha_records.lu`), but a program whose executed path makes the open FAIL — the tamper-reject witness `reject_tampered_row.lu` — is `unsupported` at `mem`: after a diverging `else` the tier's abstract value for `inner` is not a modelled List, so the downstream iteration is refused. Per-executed-path, not module-wide (the sc17 dynamic-refusal shape): the module's `open` body is identical in both tests, only the taken path differs. Costs the tamper witness its checked column (`wolfc = "unsupported"`, native runs it); the valid open carries the lane. A decrypt-then-walk reject witness over any AEAD inherits it | wolf-lang | [filed: wolf-lang#139](https://github.com/wolffe-lang/wolf-lang/issues/139); the checked tier should model a List bound through a diverging `else` as the callee's success type; sc20 |
 
 
 ## F-0001 — the std search path
@@ -3329,3 +3331,61 @@ module natively at 21b129e. If a clean release build at the next pinned
 sha reproduces it, it is a native-lowering regression against the sc18
 measurement and gets an F-number and a filing then; recorded here so the
 next bump reads a lead rather than a surprise.
+
+## Retirements and movements at the sc20 pin
+
+**The DATA pin BUMPS 21b129e -> 77466a3; the re-measure moved ZERO
+ledger rows.** sc20's first act — "pin bump to current wolf-lang trunk
+(77466a3+), re-vendor, flip any dark-lane rows s113's D54 lights" —
+resolves to a bump-with-no-flip, stated as a mechanism:
+
+- **The bump is 21b129e -> 77466a3** (`vendor/upstream/PIN` +
+  `vendor/upstream/anchors.json` re-vendored from `spec/anchors.json` at
+  trunk 77466a3; `sync-pin` green). The span 21b129e..77466a3 is s112 +
+  s113. The anchor delta is a clean superset (+24, zero removed): the
+  `ct.*` namespace (s112, the constant-time tier / c28 — `ct.attr.*`,
+  `ct.taint.*`) and the `type.numlit.*` namespace (s113, **D54** — int
+  literals adopt the float type in a float context, casts trap).
+
+- **No binary moved, so no row flips.** lupin stays **0.1.13** (its own
+  conformance sha reports `da8582d`; is20's F-0093 program-age fix is
+  still MERGED-but-UNRELEASED, so every `slow` row keeps its 0.1.13
+  measurement). `wolf` stays **0.1.0**. D54 (s113) is a spec/compiler
+  change the pinned 0.1.0 binary does not carry, and the crypto ladder
+  touches no float context regardless (it is checked-`int` and
+  `wrapping[u64]` throughout), so D54 lights no sc16-20 dark row. The
+  s112 ct tier is verified by c28's OWN witnesses in wolf-lang, not by
+  any std lane. **Flipped rows: 0.** (The sc18/sc19 dark-row set is
+  unchanged: the 9 big sha2 vector rows on the checked step/shadow-memory
+  budget, the curve/JOSE `slow` rows on F-0093.)
+
+- **The sc19 lead did NOT reproduce as a clean regression here.** sc19
+  held one observation for the next bump: a `wolf` from a working
+  checkout at da8582d refused `std.x.crypto.curve25519` natively with
+  "`mut` places beyond local by-value bindings". At the sc20 pin, in THIS
+  sandbox, the `wolf 0.1.0` binary runs `std.x.tls.record` on ALL THREE
+  lanes (lupin, checked, native) including the ChaCha20-Poly1305 record
+  seal/open — so the native rung is NOT globally refusing crypto here.
+  The curve-specific native refusal is not re-probed this sprint (sc20
+  ships no new curve code); it stays a lead for the curve module's next
+  re-measure, not yet an F-number.
+
+**PROVISIONING NOTE (sandbox, not a finding).** `cargo xtask doctor` is
+RED in this sandbox on ONE inherited line: the lupin binary reports pin
+`da8582d` while `vendor/tools.toml` records `02c1e88` for lupin 0.1.13 —
+a binary-acquisition drift, not a product of sc20. Per the sprint's own
+guidance (lupin lane green, CI clean-clone is the real gate for the
+compiled lanes) it is stated and NOT chased: `sync-pin`, `ledger-check`,
+`lint-conventions`, `gen-vectors --check` are all green, and every sc20
+test runs on all three lanes here. The clean-clone CI (3 OSes) is the
+gate that decides the compiled lanes.
+
+**The record layer (sc20) filed ONE upstream lead (F-0095) and one std
+scope note (F-0094).** F-0095 (the checked tier refusing iteration over a
+List bound through a diverging `else`, on the reject path) is a genuine
+compiler modelling gap, costing the tamper-reject witness its checked
+column. F-0094 (the AES-GCM/ChaCha reconciliation) is a vendoring/scope
+decision, not a defect. Everything else is PLUMBING working as designed:
+the module is HKDF (sc16) + AEAD_CHACHA20_POLY1305 (sc17) + public
+framing, three-lane by construction, and the whole RFC 8448 §3 key
+schedule reproduces byte-for-byte.

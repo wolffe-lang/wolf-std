@@ -2286,3 +2286,85 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# ---- sc20: std.x.tls.record — the TLS 1.3 record layer + key schedule
+# (RFC 8446 §5/§7.1/§7.3), the stdc-tls campaign's first rung. All twelve
+# tests are THREE-LANE but for one row, by construction: the module is
+# plumbing over sc16's HKDF (the key schedule) and sc17's
+# AEAD_CHACHA20_POLY1305 (the record AEAD), and adds only public framing
+# (HkdfLabel bytes, the record header/AAD, the IV-XOR-seq nonce) plus a
+# 0..255 ingestion guard — no wrapping arithmetic of its own on the
+# int-plain path, so the F-0091-era checked refusals never bite. Every
+# vector is RFC 8448 §3 (the derived secrets, traffic keys, IVs, the
+# `info`/HkdfLabel dumps) asserted byte-for-byte; the record AEAD
+# seal/open byte-match uses ChaCha20-Poly1305 fixtures over RFC 8448's
+# real traffic secrets (RFC 8448's own records are AES-128-GCM, a
+# separate rung — F-0094 records the reconciliation). No file carries
+# `slow`: the key-schedule expands are cheap (0.5-0.7s under lupin
+# 0.1.13, measured) and the AEAD rides ~60-byte records, all far under
+# the 60s ceiling. The lone non-three-lane row is `reject_tampered_row`:
+# its checked column is `unsupported` because the mem tier cannot model
+# iterating the AEAD-returned plaintext on the tag-FAILURE path (the
+# `else`-diverging bind feeds a `for`; the VALID path, exercised by
+# chacha_records.lu, is three-lane) — native runs it in full, the sc17
+# reject-path pattern.
+
+[tests."x/tls/record/hkdf_label_encoding.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/derived_secrets.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/traffic_keys.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/record_nonce.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/record_framing.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/chacha_records.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/reject_tampered_row.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/tls/record/short_record_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/unexpected_inner_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/iv_len_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/negative_seq_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/record/non_byte_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
