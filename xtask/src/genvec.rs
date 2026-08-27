@@ -83,6 +83,15 @@ const AEAD_SMOKE_MAX_AAD: usize = 16;
 const XDH_SHARED_CHUNK: usize = 40;
 const XDH_SMOKE_COUNT: usize = 5;
 
+/// Ed25519 verify chunking and smoke rules (sc18). Verify is two scalar
+/// multiplications (~7-8s under lupin 0.1.13), so the full set rides the
+/// native lane in chunks (`slow` under lupin) while a tiny mixed smoke
+/// (a few valid AND a few invalid) keeps the interpreter's differential
+/// column under the ceiling.
+const EDDSA_CHUNK: usize = 40;
+const EDDSA_SMOKE_VALID: usize = 1;
+const EDDSA_SMOKE_INVALID: usize = 1;
+
 pub fn gen_vectors(check_only: bool) -> Result<(), String> {
     let repo = crate::repo_root();
     let vec_dir = repo.join("vendor/vectors");
@@ -291,6 +300,38 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
             &show(&out),
             &emit_wycheproof_xdh(&zsmoke, false, 0, 0, corpus.zero.len()),
         )?;
+        place(&out, &text, check_only, &mut drift, &mut written)?;
+    }
+
+    // ---- sc18: Wycheproof Ed25519 (the signature rung). ----
+    {
+        let out_dir = repo.join("tests/x/crypto/curve25519");
+        let wp = vec_dir.join("wycheproof/ed25519_test.json");
+        let cases = parse_wycheproof_eddsa(&read(&wp)?, &show(&wp))?;
+        let parts: Vec<&[EddsaCase]> = cases.chunks(EDDSA_CHUNK).collect();
+        for (i, part) in parts.iter().enumerate() {
+            let out = out_dir.join(format!("wycheproof_ed25519_p{}.lu", i + 1));
+            let text = fmt(
+                &show(&out),
+                &emit_wycheproof_eddsa(part, i + 1, parts.len(), cases.len()),
+            )?;
+            place(&out, &text, check_only, &mut drift, &mut written)?;
+        }
+        let mut smoke: Vec<EddsaCase> = cases
+            .iter()
+            .filter(|c| c.valid)
+            .take(EDDSA_SMOKE_VALID)
+            .cloned()
+            .collect();
+        smoke.extend(
+            cases
+                .iter()
+                .filter(|c| !c.valid)
+                .take(EDDSA_SMOKE_INVALID)
+                .cloned(),
+        );
+        let out = out_dir.join("wycheproof_ed25519_smoke.lu");
+        let text = fmt(&show(&out), &emit_wycheproof_eddsa(&smoke, 0, 0, cases.len()))?;
         place(&out, &text, check_only, &mut drift, &mut written)?;
     }
 
@@ -612,6 +653,61 @@ fn parse_wycheproof_xdh(text: &str, what: &str) -> Result<XdhCorpus, String> {
         return Err(format!("{what}: suspiciously empty x25519 corpus"));
     }
     Ok(corpus)
+}
+
+#[derive(Clone)]
+struct EddsaCase {
+    tc_id: u64,
+    public: String,
+    msg: String,
+    sig: String,
+    valid: bool,
+}
+
+/// The Ed25519 rules (sc18): every vector is `valid` or `invalid` (the
+/// file has no `acceptable`), and the public key is the GROUP's
+/// `publicKey.pk`. `valid` -> verify must answer true; `invalid` ->
+/// verify must answer false (a wrong length, non-canonical encoding,
+/// S >= L malleability, or a bad point all decide to false). Any other
+/// result is a hard error so a re-vendored file cannot blur coverage.
+fn parse_wycheproof_eddsa(text: &str, what: &str) -> Result<Vec<EddsaCase>, String> {
+    let v: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("{what}: bad json: {e}"))?;
+    let mut out = Vec::new();
+    let groups = v["testGroups"]
+        .as_array()
+        .ok_or(format!("{what}: no testGroups"))?;
+    for gp in groups {
+        let pk = gp["publicKey"]["pk"]
+            .as_str()
+            .ok_or(format!("{what}: group has no publicKey.pk"))?
+            .to_string();
+        for t in gp["tests"].as_array().ok_or(format!("{what}: no tests"))? {
+            let tc = t["tcId"].as_u64().ok_or(format!("{what}: tcId"))?;
+            let result = t["result"].as_str().unwrap_or("");
+            let valid = match result {
+                "valid" => true,
+                "invalid" => false,
+                other => {
+                    return Err(format!(
+                        "{what}: tcId {tc} is `{other}` — the Ed25519 file is \
+                         valid/invalid only; a new result needs a ruling here"
+                    ));
+                }
+            };
+            out.push(EddsaCase {
+                tc_id: tc,
+                public: pk.clone(),
+                msg: t["msg"].as_str().unwrap_or_default().to_string(),
+                sig: t["sig"].as_str().unwrap_or_default().to_string(),
+                valid,
+            });
+        }
+    }
+    if out.is_empty() {
+        return Err(format!("{what}: no eddsa vectors parsed"));
+    }
+    Ok(out)
 }
 
 // --------------------------------------------------------------- emission
@@ -1020,6 +1116,71 @@ fn emit_wycheproof_xdh(
     s
 }
 
+fn emit_wycheproof_eddsa(
+    cases: &[EddsaCase],
+    part: usize,
+    parts: usize,
+    total: usize,
+) -> String {
+    let mut s = String::new();
+    let _ = write!(
+        s,
+        "//! check: run(exit=0)\n//! phase: run\n//! conforms: std.x.crypto.curve25519, arith.checked\n//!\n\
+         //! GENERATED — `cargo xtask gen-vectors`, from\n\
+         //! `vendor/vectors/wycheproof/ed25519_test.json` (provenance:\n\
+         //! `vendor/vectors/README.md`). Do not edit by hand; ci's\n\
+         //! `gen-vectors --check` holds this file byte-identical to its source.\n//!\n"
+    );
+    let nvalid = cases.iter().filter(|c| c.valid).count();
+    let ninvalid = cases.len() - nvalid;
+    if part > 0 {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 Ed25519 verify, part {part} of {parts} ({n} of the\n\
+             //! set's {total}: {nv} valid + {ni} invalid): `verify` must answer\n\
+             //! true for every valid vector and FALSE for every invalid one —\n\
+             //! the invalid set is the point (wrong lengths, non-canonical\n\
+             //! encodings, S >= L malleability, swapped/garbage signatures), and\n\
+             //! the single cofactorless verify with strict S < L decides them\n\
+             //! all. The interpreter column is `slow` (verify is two scalar\n\
+             //! mults, ~7-8s under lupin 0.1.13, F-0093); the smoke file keeps\n\
+             //! the differential column.\n",
+            n = cases.len(),
+            nv = nvalid,
+            ni = ninvalid,
+        );
+    } else {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 Ed25519 verify, the DIFFERENTIAL SMOKE SUBSET:\n\
+             //! {nv} valid and {ni} invalid vectors (of the set's {total}) — small\n\
+             //! enough that the interpreter runs the file inside the ceiling, so\n\
+             //! sign/verify keeps a three-lane column while the full set rides\n\
+             //! the `..._p*.lu` parts on the native lane.\n",
+            nv = nvalid,
+            ni = ninvalid,
+        );
+    }
+    s.push_str("\nuse std.hex\nuse std.x.crypto.curve25519\n\n");
+    let _ = write!(
+        s,
+        "fn verify_is(pub_hex: str, msg_hex: str, sig_hex: str, want: bool) -> bool {{\n\
+         \x20   let pk = hex.decode(pub_hex) else List[int]()\n\
+         \x20   let msg = hex.decode(msg_hex) else List[int]()\n\
+         \x20   let sig = hex.decode(sig_hex) else List[int]()\n\
+         \x20   curve25519.verify(pk, msg, sig) == want\n}}\n\nfn main() -> int {{\n"
+    );
+    for c in cases {
+        let _ = writeln!(
+            s,
+            "    assert(verify_is(\"{}\", \"{}\", \"{}\", {}), \"tc {}\")",
+            c.public, c.msg, c.sig, c.valid, c.tc_id
+        );
+    }
+    s.push_str("    0\n}\n");
+    s
+}
+
 fn dashed(stem: &str) -> String {
     format!("SHA-{}", stem.trim_start_matches("SHA"))
 }
@@ -1202,6 +1363,22 @@ mod tests {
         assert_eq!(c.shared.len(), 2);
         assert_eq!(c.zero.len(), 1);
         assert_eq!(c.zero[0].tc_id, 3);
+    }
+
+    #[test]
+    fn eddsa_partitions_valid_invalid_and_refuses_acceptable() {
+        let text = r#"{"testGroups":[{"publicKey":{"pk":"aabb"},"tests":[
+            {"tcId":1,"result":"valid","msg":"","sig":"11"},
+            {"tcId":2,"result":"invalid","msg":"72","sig":"22"}
+        ]}]}"#;
+        let c = parse_wycheproof_eddsa(text, "t").unwrap();
+        assert_eq!(c.len(), 2);
+        assert!(c[0].valid && c[0].public == "aabb");
+        assert!(!c[1].valid);
+        let bad = r#"{"testGroups":[{"publicKey":{"pk":"aa"},"tests":[
+            {"tcId":3,"result":"acceptable","msg":"","sig":"11"}
+        ]}]}"#;
+        assert!(parse_wycheproof_eddsa(bad, "t").is_err());
     }
 
     #[test]
