@@ -1,0 +1,359 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.chacha20, arith.wrapping
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/chacha20_poly1305_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 ChaCha20-Poly1305, the VALID set, part 7 of
+//! 8 (32 vectors of the set's 256): each case seals to the
+//! published ciphertext||tag AND opens back to the message —
+//! Ktv, pseudorandom, and the edge-case Poly1305/keystream
+//! constructions. The interpreter column is `slow` (the sc16
+//! ledger word): 32 seal+open pairs measure 98s under lupin
+//! 0.1.13 against the rig's 60s ceiling (F-0093's program-age
+//! curve), the `..._smoke.lu` subset keeps the differential
+//! column, and the chunking is what flips this file back to
+//! `run` when wolf-interp#41 lands.
+
+use std.hex
+use std.x.crypto.chacha20
+
+fn aead_matches(key_hex: str, iv_hex: str, aad_hex: str, msg_hex: str, box_hex: str) -> bool {
+    let key = hex.decode(key_hex) else List[int]()
+    let iv = hex.decode(iv_hex) else List[int]()
+    let aad = hex.decode(aad_hex) else List[int]()
+    let msg = hex.decode(msg_hex) else List[int]()
+    let boxed = chacha20.seal(key, iv, aad, msg)
+    if !(chacha20.to_hex(boxed) == box_hex) {
+        return false
+    }
+    let opened = chacha20.open(key, iv, aad, boxed) else List[int]()
+    chacha20.to_hex(opened) == msg_hex
+}
+
+fn main() -> int {
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "f28ce708bf26aab862d97e1b42f31ef3df03ca84082f7f70ad8e4004cabd2ce42b38aca2438b588d5459493e97e7fa3328fd413caab1d02bf1c65753aa2ad3b95403478f2869b93ee29c837e95fb6b9924f74a3289ddad78bac3990e5ab8897d",
+            "d1ffffffffffffffffffffffffffffffacc4198b86a494a1f7152dfd27dba807faffffffffffffffffffffffffffffffd8fb02f8c11606afaeafd52ab8dc2705faffffffffffffffffffffffffffffffd8fb02f8c11606afaeafd52ab8dc27050fca702228817d53ee64d142b192e665",
+        ),
+        "tc 253",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "f38ce708bf26aab862d97e1b42f31ef31ffc31ae69399394b8c338674c3dfde92938aca2438b588d5459493e97e7fa33477ec8cf3ea3d4d5d76d85ad2b7f0bb85603478f2869b93ee29c837e95fb6b994b74c3c11dcfa9869c684bf0dbed517c",
+            "d0ffffffffffffffffffffffffffffff6c3be2a1e7b27845e258559ea15b790af8ffffffffffffffffffffffffffffffb7788b0b55040251880407d43989ff04f8ffffffffffffffffffffffffffffffb7788b0b55040251880407d43989ff04efc3b035ded6b460bfce6f494955e677",
+        ),
+        "tc 254",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "4f115e67ecd3d4178c4c60e713ab4e5e4156269fe3da101eeb0abf8dda20fe8fff47139a5f4e3f8e92d7a3b71eb4ff0e6aece983e64f97e43ff5295bc884fa7773a0085c32ddfcbeb01a8be4c34d5331a2d909c10a1bdcd318046d320583f6b7",
+            "d6ffffffffffffffffffffffffffffffd85108996dfff8a26ede1e76de151701e8ffffffffffffffffffffffffffffffc5265a700c30c72da2df2eb129447b0ae8ffffffffffffffffffffffffffffffc5265a700c30c72da2df2eb129447b0a3ea8f9b2012321e63d5fb5bc2c5d332d",
+        ),
+        "tc 255",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060703e76f6f",
+            "ffffffff",
+            "1fde9b9ec8b247d42bbee2016d6715baf999461058f6d7733e5cd0d1639d9025cbf0b056a2eecc51d30838e640615e14520a0da50439db00e289e1791342068e24d14da7b4f76f9f68fa8903138d563ce8b3936a14dcbc5a3be38f7f641e87db",
+            "ffffffffffffffffffffffffffffffff44ec3cacb339c2569701eaf20829057cfafffffffffffffffffffffffffffffff5156664cb3f3f5b06357c7c726bfa0afafffffffffffffffffffffffffffffff5156664cb3f3f5b06357c7c726bfa0abf7fbd422cbf0e700fd1605be8fd212f",
+        ),
+        "tc 256",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "2bfd0d56ece98771756d60d9d9106cd0c6fc106936c7ef347c078fd71c54228164fc903b0438a3978d3a54ef992aa3ae",
+            "088e15a1ac30d236e84be13d641c8ddcb53bc366b84c04e5269ce22ef132a662b53bc366b84c04e5269ce22ef132a662345fc9fe573c136c1be83730500ce662",
+        ),
+        "tc 257",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "f68ce708bf26aab862d97e1b42f31ef37cc2255decdf8e0fe1373591da0e28e42838aca2438b588d5459493e97e7fa33e291fb4838019c51dfb7141515bb53b15703478f2869b93ee29c837e95fb6b99ee9bf0461b6de10294b2da48e5290975",
+            "d5ffffffffffffffffffffffffffffff0f05f652625465debbac58683768ac07f9ffffffffffffffffffffffffffffff1297b88c53a64ad580de966c074da70df9ffffffffffffffffffffffffffffff1297b88c53a64ad580de966c074da70d336f97a5faa995a2a03781b591588da8",
+        ),
+        "tc 258",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "c68ce708bf26aab862d97e1b42f31ef37ab66f8090c149e452ec7f20327eb2ea0438aca2438b588d5459493e97e7fa338d2613ea0ef8b656b247373ecec015bc7b03478f2869b93ee29c837e95fb6b99812c18e42d94cb05f942f9633e524f78",
+            "e5ffffffffffffffffffffffffffffff0971bc8f1e4aa235087712d9df183609d5ffffffffffffffffffffffffffffff7d20502e655f60d2ed2eb547dc36e100d5ffffffffffffffffffffffffffffff7d20502e655f60d2ed2eb547dc36e1009351c680c8a5d34882d42145e89745c4",
+        ),
+        "tc 259",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "c68ce708bf26aab862d97e1b42f31ef374b66f8090c149e452ec7f20327eb2ea2e38aca2438b588d5459493e97e7fa33acd9ec859e0866620cc24c8a97d5d9f55103478f2869b93ee29c837e95fb6b99a0d3e78bbd641b3147c782d767478331",
+            "e5ffffffffffffffffffffffffffffff0771bc8f1e4aa235087712d9df183609ffffffffffffffffffffffffffffffff5cdfaf41f5afb0e653abcef385232d49ffffffffffffffffffffffffffffffff5cdfaf41f5afb0e653abcef385232d49d79266cd25a784599a0a8e31fc84d604",
+        ),
+        "tc 260",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "f78ce708bf26aab862d97e1b42f31ef34251cd29b0aaa960557c9ea2828334e4e4e231db0a27fac9ec9e744886eb0133c5232142ddf48b3f185140f0fc05f043",
+            "d4ffffffffffffffffffffffffffffff31961e263e2142b10fe7f35b6fe5b00735256286b6535dbb4738c289eef304ff35256286b6535dbb4738c289eef304ff9d671d407d7660459d5d582d83915efe",
+        ),
+        "tc 261",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "f58ce708bf26aab862d97e1b42f31ef373bd9f01bf3331b12e31dd14cf11feee1d38aca2438b588d5459493e97e7fa33625c6965f61a1c36118c747076d5b7b76203478f2869b93ee29c837e95fb6b996e56626bd57661655a89ba2d8647ed73",
+            "d6ffffffffffffffffffffffffffffff007a4c0e31b8da6074aab0ed22777a0dccffffffffffffffffffffffffffffff925a2aa19dbdcab24ee5f6096423430bccffffffffffffffffffffffffffffff925a2aa19dbdcab24ee5f6096423430b7b207c2c3278c64f0d6b913fe371fe63",
+        ),
+        "tc 262",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060703e76f6f",
+            "ffffffff",
+            "1fde9b9ec8b247d42bbee2016d6715bad64add2aa3c5a30a31d9e65e90f93ad1cbf0b056a2eecc51d30838e640615e14de9aeab86144d5464811b2373ba4cc8324d14da7b4f76f9f68fa8903138d563c6423747771a1b21c917bdc314cf84dd6",
+            "ffffffffffffffffffffffffffffffff6b3fa796480ab62f9884dc7dfb4daf88faffffffffffffffffffffffffffffff79858179ae42311dacad2f325a8d3007faffffffffffffffffffffffffffffff79858179ae42311dacad2f325a8d300762630c18de8c10876adb9f30f300963f",
+        ),
+        "tc 263",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "dc8ce708bf26aab862d97e1b42f31ef3ec0933f0bfb91218cea0d74e061f559e2d38aca2438b588d5459493e97e7fa338d5b67e0acee534ce2d9791487b1ecb25203478f2869b93ee29c837e95fb6b9981516cee8f822e1fa9dcb7497723b676",
+            "ffffffffffffffffffffffffffffffff9fcee0ff3132f9c9943bbab7eb79d17dfcffffffffffffffffffffffffffffff7d5d2424c74985c8bdb0fb6d9547180efcffffffffffffffffffffffffffffff7d5d2424c74985c8bdb0fb6d9547180e3672162bb1f3ff537ece013f1aca4f68",
+        ),
+        "tc 264",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060703e76f6f",
+            "ffffffff",
+            "1fde9b9ec8b247d42bbee2016d6715bacc3492272b8a4b112a4e7d7ccf092692cef0b056a2eecc51d30838e640615e1430ce678e9375b2af0b82c2d2fbd7928c21d14da7b4f76f9f68fa8903138d563c8a77f9418390d5f5d2e8acd48c8b13d9",
+            "ffffffffffffffffffffffffffffffff7141e89bc0455e348313475fa4bdb3cbffffffffffffffffffffffffffffffff97d10c4f5c7356f4ef3e5fd79afe6e08ffffffffffffffffffffffffffffffff97d10c4f5c7356f4ef3e5fd79afe6e08feb6412b9031f076eddcd9426fff5b31",
+        ),
+        "tc 265",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "dc8ce708bf26aab862d97e1b42f31ef3ee83a14f48db696291080edfcc898b882b38aca2438b588d5459493e97e7fa338ad5f6b0283a8b39ebedce92785da9b65403478f2869b93ee29c837e95fb6b9986dffdbe0b56f66aa0e800cf88cff372",
+            "ffffffffffffffffffffffffffffffff9d447240c65082b3cb93632621ef0f6bfaffffffffffffffffffffffffffffff7ad3b574439d5dbdb4844ceb6aab5d0afaffffffffffffffffffffffffffffff7ad3b574439d5dbdb4844ceb6aab5d0a3572163b99284f5f3e4aa94dbab85677",
+        ),
+        "tc 266",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060703e76f6f",
+            "ffffffff",
+            "34de9b9ec8b247d42bbee2016d6715ba722b6549c9df0f4b04b5f7432203fa54cef0b056a2eecc51d30838e640615e1487de186cd28e43544c73de628fd1d60e21d14da7b4f76f9f68fa8903138d563c3d6786a3c26b240e9519b064f88d575b",
+            "d4ffffffffffffffffffffffffffffffcf5e1ff522101a6eade8cd6049b76f0dffffffffffffffffffffffffffffffff20c173ad1d88a70fa8cf4367eef82a8affffffffffffffffffffffffffffffff20c173ad1d88a70fa8cf4367eef82a8adafdf430c8124483c175404b6bff5b41",
+        ),
+        "tc 267",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "dc8ce708bf26aab862d97e1b42f31ef3e87dd08ed4e4e04c5877616cbb02cabb2938aca2438b588d5459493e97e7fa33874f0401d457e336f4311f1152f957ba5603478f2869b93ee29c837e95fb6b998b450f0ff73b9e65bf34d14ca26b0d7e",
+            "ffffffffffffffffffffffffffffffff9bba03815a6f0b9d02ec0c9556644e58f8ffffffffffffffffffffffffffffff774947c5bff035b2ab589d68400fa306f8ffffffffffffffffffffffffffffff774947c5bff035b2ab589d68400fa3063472164b815d9e6afec5505c5aa75d86",
+        ),
+        "tc 268",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "4c115e67ecd3d4178c4c60e713ab4e5ebb5357ed314ad740b9910fad6f01d781f047139a5f4e3f8e92d7a3b71eb4ff0ec8042b414fdd1bba3a6c936b7ed678797ca0085c32ddfcbeb01a8be4c34d53310031cb03a389508d1d9dd702b3d174b9",
+            "d5ffffffffffffffffffffffffffffff225479ebbf6f3ffc3c45ae566b343e0fe7ffffffffffffffffffffffffffffff67ce98b2a5a24b73a74694819f16f904e7ffffffffffffffffffffffffffffff67ce98b2a5a24b73a74694819f16f904e6022cc3ba20e3f9065fdfcc43a9dc40",
+        ),
+        "tc 269",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "c88ce708bf26aab862d97e1b42f31ef36be436e346f8f2b32f4cbbaef95150ef0438aca2438b588d5459493e97e7fa332fb76b5132e930f6d0acf70875e977b57b03478f2869b93ee29c837e95fb6b9923bd605f11854da59ba93955857b2d71",
+            "ebffffffffffffffffffffffffffffff1823e5ecc873196275d7d6571437d40cd5ffffffffffffffffffffffffffffffdfb12895594ee6728fc57571671f8309d5ffffffffffffffffffffffffffffffdfb12895594ee6728fc57571671f83093a7216d7ee1da018ce8412f251656b19",
+        ),
+        "tc 270",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "66115e67ecd3d4178c4c60e713ab4e5ef64296975af7fced168181f76c6508e1c947139a5f4e3f8e92d7a3b71eb4ff0e4975060f7ddef4a098699333b30fbf7c45a0085c32ddfcbeb01a8be4c34d53318140e64d918abf97bf98d75a7e08b3bc",
+            "ffffffffffffffffffffffffffffffff6f45b891d4d214519355200c6850e16fdeffffffffffffffffffffffffffffffe6bfb5fc97a1a469054394d952cf3e01deffffffffffffffffffffffffffffffe6bfb5fc97a1a469054394d952cf3e01353e304fd8553286b26e0d59942fe7cd",
+        ),
+        "tc 271",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "c58ce708bf26aab862d97e1b42f31ef3783cf9302c7d22914b38aca2e7d374ef1d38aca2438b588d5459493e97e7fa33228f2d23597640d574f8e20c4f6b6bb56203478f2869b93ee29c837e95fb6b992e85262d7a1a3d863ffd2c51bff93171",
+            "e6ffffffffffffffffffffffffffffff0bfb2a3fa2f6c94011a3c15b0ab5f00cccffffffffffffffffffffffffffffffd2896ee732d196512b9160755d9d9f09ccffffffffffffffffffffffffffffffd2896ee732d196512b9160755d9d9f09367216178ff1dc45ce73b02cd21f8755",
+        ),
+        "tc 272",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "dc8ce708bf26aab862d97e1b42f31ef35db72f89d1402b1a0373ff0a9c5cd44b6d67af40798f5455501792953248ec234ca6bfd9ae5c25a3a4d8a62d48a61d53",
+            "ffffffffffffffffffffffffffffffff2e70fc865fcbc0cb59e892f3713a50a8bca0fc1dc5fbf327fbb124545a50e9efbca0fc1dc5fbf327fbb124545a50e9ef0b4961c9525ea2f2cdad6273e1c7824c",
+        ),
+        "tc 273",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "dc8ce708bf26aab862d97e1b42f31ef35f215ec87d62a264cadb519b4ac90a7668d1dd03e56eda6399ac7803e7dd22114910cd9a32bdab956d634cbb9d33d361",
+            "ffffffffffffffffffffffffffffffff2ce68dc7f3e949b590403c62a7af8e95b9168e5e591a7d11320acec28fc527ddb9168e5e591a7d11320acec28fc527dd0a4961d93a93f1fd8d290a8281b6895b",
+        ),
+        "tc 274",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060710abb165",
+            "ffffffff",
+            "dc8ce708bf26aab862d97e1b42f31ef3d15ad590dd0f40ba18acd168f6ac777a0f38aca2438b588d5459493e97e7fa33932a097f1d39a04ad30f1b6c650260bf7003478f2869b93ee29c837e95fb6b999f2002713e55dd19980ad53195903a7b",
+            "ffffffffffffffffffffffffffffffffa29d069f5384ab6b4237bc911bcaf399deffffffffffffffffffffffffffffff632c4abb769e76ce8c66991577f49403deffffffffffffffffffffffffffffff632c4abb769e76ce8c66991577f494033572161355240943de9406292a64c551",
+        ),
+        "tc 275",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "4d115e67ecd3d4178c4c60e713ab4e5e6ee628fc4b5830184cd293364a213e84fe47139a5f4e3f8e92d7a3b71eb4ff0e29db953ad5458fea61f013ea1854fe7572a0085c32ddfcbeb01a8be4c34d5331e1ee75783911c4dd46015783d553f2b5",
+            "d4fffffffffffffffffffffffffffffff7e106fac57dd8a4c90632cd4e14d70ae9ffffffffffffffffffffffffffffff861126c93f3adf23fcda1400f9947f08e9ffffffffffffffffffffffffffffff861126c93f3adf23fcda1400f9947f08e00d2e8bae5d09c28e9bf59409545d09",
+        ),
+        "tc 276",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "000102030405060703e76f6f",
+            "ffffffff",
+            "3ede9b9ec8b247d42bbee2016d6715ba8567a7fde812a3aa2f552a33c1718c58e2f0b056a2eecc51d30838e640615e14bb8729fd148f23b2a916b7f40f2f29810dd14da7b4f76f9f68fa8903138d563c013eb732046a44e8707cd9f27873a8d4",
+            "deffffffffffffffffffffffffffffff3812dd4103ddb68f86081010aac51901d3ffffffffffffffffffffffffffffff1c98423cdb89c7e94daa2af16e06d505d3ffffffffffffffffffffffffffffff1c98423cdb89c7e94daa2af16e06d505b4ccb422bc5f7264aff73f3675ff5b19",
+        ),
+        "tc 277",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "43eadae036f733ea9b5b7eb22aee395db6f51a4d10bc2460810c229651556acf384ad82e3e280cad69f0df25b42b83b0",
+            "da047b7825db1802e8e8e1aac6ba88fc2ff2344b9e99ccdc04d8836d556083412ff2344b9e99ccdc04d8836d55608341973e270a7afcab75348e14dbe19c5156",
+        ),
+        "tc 278",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "6a115e67ecd3d4178c4c60e713ab4e5e519cccebf72573dbee8c12f74255d18c0add1035861ffc0b7f40079b969f8c63b2af4fa3ccd16cb38f425c3996140def",
+            "f3ffffffffffffffffffffffffffffffc89be2ed79009b676b58b30c466038021d65fc5026ae3c7a12685bd377d48c921d65fc5026ae3c7a12685bd377d48c92a22390224c5db0f01696743d870725c5",
+        ),
+        "tc 279",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "e235b8c21384557085c3f2eb2a8fa36058cffd2af743dacf96b4ae4d51b4e488d6703f49d9d7f2027e4853feb4ca0df7",
+            "7bdb195a00a87e98f6706df3c6db12c1c1c8d32c7966327313600fb655810d06c1c8d32c7966327313600fb655810d06437d1efad21b0865a541b5cab62e2a44",
+        ),
+        "tc 280",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "66115e67ecd3d4178c4c60e713ab4e5e8fab58574a322bac6f394474e4ce7eaec347139a5f4e3f8e92d7a3b71eb4ff0e71532dfb0e9141b00983394722829e7c4fa0085c32ddfcbeb01a8be4c34d5331b966cdb9e2c50a872e727d2eef8592bc",
+            "ffffffffffffffffffffffffffffffff16ac7651c417c310eaede58fe0fb9720d4ffffffffffffffffffffffffffffffde999e08e4ee117994a93eadc3421f01d4ffffffffffffffffffffffffffffffde999e08e4ee117994a93eadc3421f01acf4ffa20c0d06d61a18e9a8d4c84d1d",
+        ),
+        "tc 281",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "61115e67ecd3d4178c4c60e713ab4e5e5efe679ba17384c55eb8cc193666fe8d04608c3503d217aa3f90a9b0e1b3b313bc12d3a3491c8712cf92f212e138329f",
+            "f8ffffffffffffffffffffffffffffffc7f9499d2f566c79db6c6de23253170313d86050a363d7db52b8f5f800f8b3e213d86050a363d7db52b8f5f800f8b3e2cd466d06e75b7fd18d5fe21d9227d9a7",
+        ),
+        "tc 282",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "9064b88a282052a1ee44df05ad213da679f8d1f971da17437a2b5e04fbca167151b2650ec945fec70588bc65a616a5f24f354c0c1580af3662d5f8151e3f7e82dd557ec8a4d63df7274594367bef09cd",
+            "098a19123b0c79499df7401d41758c07e0ffffffffffffffffffffffffffffff460a896b69f43eb668a0e02d475da503e0ffffffffffffffffffffffffffffff460a896b69f43eb668a0e02d475da503ce8a3d4d887d95613d829b538ed01196",
+        ),
+        "tc 283",
+    )
+    assert(
+        aead_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "00010203040506072dd4cd40",
+            "ffffffff",
+            "43115e67ecd3d4178c4c60e713ab4e5eeef67bd4795b74015a3493905d544a86e847139a5f4e3f8e92d7a3b71eb4ff0e3197be28eff843592bd8fc8d578421d664a0085c32ddfcbeb01a8be4c34d5331f9a25e6a03ac086e0c29b8e49a832d16",
+            "daffffffffffffffffffffffffffffff77f155d2f77e9cbddfe0326b5961a308ffffffffffffffffffffffffffffffff9e5d0ddb05871390b6f2fb67b644a0abffffffffffffffffffffffffffffffff9e5d0ddb05871390b6f2fb67b644a0ab08289f5199df476fe90475cb95225566",
+        ),
+        "tc 284",
+    )
+    0
+}

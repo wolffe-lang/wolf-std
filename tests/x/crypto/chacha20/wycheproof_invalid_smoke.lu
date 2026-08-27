@@ -1,0 +1,133 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.chacha20, arith.wrapping
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/chacha20_poly1305_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 ChaCha20-Poly1305, the DIFFERENTIAL SMOKE SUBSET
+//! of the invalid set: the first 10 `ModifiedTag` vectors (of the
+//! set's 60) — `open` must answer the `tag` row for every one,
+//! on the interpreter lane too, so the reject path stays
+//! differential while the full set rides the `..._p*.lu` parts on
+//! the native lane.
+
+use std.hex
+use std.x.crypto.chacha20
+
+fn open_verdict(key_hex: str, iv_hex: str, aad_hex: str, box_hex: str) -> int {
+    let key = hex.decode(key_hex) else List[int]()
+    let iv = hex.decode(iv_hex) else List[int]()
+    let aad = hex.decode(aad_hex) else List[int]()
+    let boxed = hex.decode(box_hex) else List[int]()
+    let opened = chacha20.open(key, iv, aad, boxed) else |_| {
+        return -1
+    }
+    opened.len
+}
+
+fn main() -> int {
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f5409bb729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 146",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f6409bb729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 147",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "74409bb729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 148",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4419bb729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 149",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409b3729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 150",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb728039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 151",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb72b039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 152",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d8814ac514054323f44",
+        ) <
+            0,
+        "tc 153",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d0815ac514054323f44",
+        ) <
+            0,
+        "tc 154",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d08148c514054323f44",
+        ) <
+            0,
+        "tc 155",
+    )
+    0
+}

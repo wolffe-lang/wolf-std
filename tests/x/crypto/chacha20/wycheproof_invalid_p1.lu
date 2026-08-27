@@ -1,0 +1,340 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.chacha20, arith.wrapping
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/chacha20_poly1305_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 ChaCha20-Poly1305, the INVALID set, part 1 of
+//! 2 (30 vectors of the set's 60, every one a
+//! `ModifiedTag`: bit flips at every tag position, the flipped
+//! MSBs, the truncated-to-prefix shapes): `open` must answer the
+//! `tag` row — witnessed as a negative sentinel from the helper's
+//! handler — and hand back NO plaintext. The 9 source
+//! `InvalidNonceSize` vectors are omitted by name: the API
+//! answers a wrong-size nonce with the documented `assert` trap
+//! held by `nonce_len_trap.lu`. The file has no `acceptable`
+//! cases to decide; the generator hard-errors if one appears.
+//! The interpreter column is `slow` (F-0093; 30 opens measure
+//! 29s under lupin 0.1.13); `..._invalid_smoke.lu` keeps the
+//! differential column.
+
+use std.hex
+use std.x.crypto.chacha20
+
+fn open_verdict(key_hex: str, iv_hex: str, aad_hex: str, box_hex: str) -> int {
+    let key = hex.decode(key_hex) else List[int]()
+    let iv = hex.decode(iv_hex) else List[int]()
+    let aad = hex.decode(aad_hex) else List[int]()
+    let boxed = hex.decode(box_hex) else List[int]()
+    let opened = chacha20.open(key, iv, aad, boxed) else |_| {
+        return -1
+    }
+    opened.len
+}
+
+fn main() -> int {
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f5409bb729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 146",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f6409bb729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 147",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "74409bb729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 148",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4419bb729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 149",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409b3729039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 150",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb728039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 151",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb72b039d0814ac514054323f44",
+        ) <
+            0,
+        "tc 152",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d8814ac514054323f44",
+        ) <
+            0,
+        "tc 153",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d0815ac514054323f44",
+        ) <
+            0,
+        "tc 154",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d08148c514054323f44",
+        ) <
+            0,
+        "tc 155",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d0814ac504054323f44",
+        ) <
+            0,
+        "tc 156",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d0814ac514055323f44",
+        ) <
+            0,
+        "tc 157",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d0814ac514056323f44",
+        ) <
+            0,
+        "tc 158",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d0814ac514054323f45",
+        ) <
+            0,
+        "tc 159",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d0814ac514054323f46",
+        ) <
+            0,
+        "tc 160",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d0814ac514054323f04",
+        ) <
+            0,
+        "tc 161",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d0814ac514054323fc4",
+        ) <
+            0,
+        "tc 162",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "f4409bb729039d8814ac514054323fc4",
+        ) <
+            0,
+        "tc 163",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "00000000000000000000000000000000",
+        ) <
+            0,
+        "tc 164",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "ffffffffffffffffffffffffffffffff",
+        ) <
+            0,
+        "tc 165",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995a28914007a6119dd3f109bba21ce9a7d6",
+        ) <
+            0,
+        "tc 166",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995a2b914007a6119dd3f109bba21ce9a7d6",
+        ) <
+            0,
+        "tc 167",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995aa9914007a6119dd3f109bba21ce9a7d6",
+        ) <
+            0,
+        "tc 168",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995a29904007a6119dd3f109bba21ce9a7d6",
+        ) <
+            0,
+        "tc 169",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995a29914087a6119dd3f109bba21ce9a7d6",
+        ) <
+            0,
+        "tc 170",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995a29914007a7119dd3f109bba21ce9a7d6",
+        ) <
+            0,
+        "tc 171",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995a29914007a4119dd3f109bba21ce9a7d6",
+        ) <
+            0,
+        "tc 172",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995a29914007a6119d53f109bba21ce9a7d6",
+        ) <
+            0,
+        "tc 173",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995a29914007a6119dd3f009bba21ce9a7d6",
+        ) <
+            0,
+        "tc 174",
+    )
+    assert(
+        open_verdict(
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+            "000102030405060708090a0b",
+            "000102",
+            "d03bcb3ca52d48d1d203b1e7b1a5995a29914007a6119dd3f129bba21ce9a7d6",
+        ) <
+            0,
+        "tc 175",
+    )
+    0
+}

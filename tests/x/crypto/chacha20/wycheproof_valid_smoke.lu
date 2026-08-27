@@ -1,0 +1,135 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.chacha20, arith.wrapping
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/chacha20_poly1305_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 ChaCha20-Poly1305, the DIFFERENTIAL SMOKE SUBSET
+//! of the valid set: the first 10 valid vectors with msg <= 48
+//! and aad <= 16 bytes (of the set's 256) — small enough that
+//! the interpreter runs the file inside the rig's ceiling, so the
+//! AEAD keeps a differential column while the full set rides the
+//! `..._p*.lu` parts on the native lane.
+
+use std.hex
+use std.x.crypto.chacha20
+
+fn aead_matches(key_hex: str, iv_hex: str, aad_hex: str, msg_hex: str, box_hex: str) -> bool {
+    let key = hex.decode(key_hex) else List[int]()
+    let iv = hex.decode(iv_hex) else List[int]()
+    let aad = hex.decode(aad_hex) else List[int]()
+    let msg = hex.decode(msg_hex) else List[int]()
+    let boxed = chacha20.seal(key, iv, aad, msg)
+    if !(chacha20.to_hex(boxed) == box_hex) {
+        return false
+    }
+    let opened = chacha20.open(key, iv, aad, boxed) else List[int]()
+    chacha20.to_hex(opened) == msg_hex
+}
+
+fn main() -> int {
+    assert(
+        aead_matches(
+            "80ba3192c803ce965ea371d5ff073cf0f43b6a2ab576b208426e11409c09b9b0",
+            "4da5bf8dfd5852c1ea12379d",
+            "",
+            "",
+            "76acb342cf3166a5b63c0c0ea1383c8d",
+        ),
+        "tc 2",
+    )
+    assert(
+        aead_matches(
+            "7a4cd759172e02eb204db2c3f5c746227df584fc1345196391dbb9577a250742",
+            "a92ef0ac991dd516a3c6f689",
+            "bd506764f2d2c410",
+            "",
+            "906fa6284b52f87b7359cbaa7563c709",
+        ),
+        "tc 3",
+    )
+    assert(
+        aead_matches(
+            "cc56b680552eb75008f5484b4cb803fa5063ebd6eab91f6ab6aef4916a766273",
+            "99e23ec48985bccdeeab60f1",
+            "",
+            "2a",
+            "3acac27dec0968801e9f6eded69d807522",
+        ),
+        "tc 4",
+    )
+    assert(
+        aead_matches(
+            "46f0254965f769d52bdb4a70b443199f8ef207520d1220c55e4b70f0fda620ee",
+            "ab0dca716ee051d2782f4403",
+            "91ca6c592cbcca53",
+            "51",
+            "c4168310ca45b1f7c66cad4e99e43f72b9",
+        ),
+        "tc 5",
+    )
+    assert(
+        aead_matches(
+            "2f7f7e4f592bb389194989743507bf3ee9cbde1786b6695fe6c025fd9ba4c100",
+            "461af122e9f2e0347e03f2db",
+            "",
+            "5c60",
+            "4d1391e8b61efb39c122195453077b22e5e2",
+        ),
+        "tc 6",
+    )
+    assert(
+        aead_matches(
+            "c8833dce5ea9f248aa2030eacfe72bffe69a620caf793344e5718fe0d7ab1a58",
+            "61546ba5f1720590b6040ac6",
+            "88364fc8060518bf",
+            "ddf2",
+            "b60dead0fd4697ec2e5558237719d02437a2",
+        ),
+        "tc 7",
+    )
+    assert(
+        aead_matches(
+            "bd8ed7fb0d607522f04d0b12d42c92570bccc5ba2486953d70ba2e8193f6225a",
+            "d2ab0abb50a8e9fba25429e1",
+            "",
+            "201221",
+            "3cf470a27a69c9d7ee84586f11388c6884e63a",
+        ),
+        "tc 8",
+    )
+    assert(
+        aead_matches(
+            "1c8b59b17a5ceced31bde97d4cefd9aaaa63362e096e863ec1c89580bca79b7a",
+            "94f32a6dff588f2b5a2ead45",
+            "6c8cf2ab3820b695",
+            "453f95",
+            "610925a8a7883eb7e40bc40e2e5922ae95ddc3",
+        ),
+        "tc 9",
+    )
+    assert(
+        aead_matches(
+            "e4912cb75a1174345f1a457366f18885fe8460b06478e04be2f7fb4ec9c113e5",
+            "7aa5ad8bf5254762171ec869",
+            "",
+            "9e4c1d03",
+            "fe6849aa99ad07871b25c27defc31a541bd5c418",
+        ),
+        "tc 10",
+    )
+    assert(
+        aead_matches(
+            "e05777ef3d989ace7d2abfba452bfded54801dbd5c66e91c0c2ef00479d85572",
+            "b7f526e3fd71cf5720961aec",
+            "15d93a96d0e6c5a9",
+            "17bfda03",
+            "f4710e51b957c6a37b6a4c94996c002186d63b2b",
+        ),
+        "tc 11",
+    )
+    0
+}
