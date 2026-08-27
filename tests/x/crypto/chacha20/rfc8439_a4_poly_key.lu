@@ -1,0 +1,46 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.chacha20, arith.wrapping
+//!
+//! RFC 8439 Appendix A.4 — Poly1305 key generation using ChaCha20,
+//! all three published vectors (§2.6: the block at counter zero,
+//! truncated to 32 bytes). Vector 3's key/nonce pair is A.5's, so a
+//! failure here localizes an A.5 failure to the derivation half. Hex
+//! quoted from `vendor/vectors/rfc/rfc8439.txt`.
+
+use std.hex
+use std.x.crypto.chacha20
+
+fn otk_matches(key_hex: str, nonce_hex: str, want: str) -> bool {
+    let key = hex.decode(key_hex) else List[int]()
+    let nonce = hex.decode(nonce_hex) else List[int]()
+    chacha20.to_hex(chacha20.poly_key(key, nonce)) == want
+}
+
+fn main() -> int {
+    assert(
+        otk_matches(
+            "0000000000000000000000000000000000000000000000000000000000000000",
+            "000000000000000000000000",
+            "76b8e0ada0f13d90405d6ae55386bd28bdd219b8a08ded1aa836efcc8b770dc7",
+        ),
+        "A.4 vector 1",
+    )
+    assert(
+        otk_matches(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+            "000000000000000000000002",
+            "ecfa254f845f647473d3cb140da9e87606cb33066c447b87bc2666dde3fbb739",
+        ),
+        "A.4 vector 2",
+    )
+    assert(
+        otk_matches(
+            "1c9240a5eb55d38af333888604f6b5f0473917c1402b80099dca5cbc207075c0",
+            "000000000000000000000002",
+            "965e3bc6f9ec7ed9560808f4d229f94b137ff275ca9b3fcbdd59deaad23310ae",
+        ),
+        "A.4 vector 3",
+    )
+    0
+}

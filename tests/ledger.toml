@@ -1866,3 +1866,76 @@ native = "run"
 lupin = "run"
 wolfc = "unsupported"
 native = "run"
+
+# ---- sc17: std.x.crypto.chacha20 — the cipher that needs no tables ----
+# (D53's second rung, RFC 8439). The lane shape refines sha2's: the
+# ChaCha core is wrapping[u64] rotations, which the checked tier refuses
+# at mem ("this operator in checked execution", F-0091/#130 — the
+# INHERITED dark-lane posture; s111 is fixing it concurrently and the
+# next pin bump flips sha2 and this module together). But the refusal is
+# DYNAMIC — per executed path, not per module — and Poly1305 here is
+# CHECKED-int arithmetic by construction (the sc17 probe delta), so
+# `rfc8439_a3_poly1305` is a THREE-LANE row inside a wrapping module,
+# and the four trap files run everywhere because every guard fires
+# before any keystream arithmetic. The two row files ride `error: tag`
+# out of main (the toolchain names the tag; exit 1).
+
+[tests."x/crypto/chacha20/known_answers.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/chacha20/rfc8439_a1_block.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/chacha20/rfc8439_a2_cipher.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/chacha20/rfc8439_a3_poly1305.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/chacha20/rfc8439_a4_poly_key.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/chacha20/rfc8439_a5_aead.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/chacha20/flipped_tag_row.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/chacha20/truncated_box_row.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/chacha20/key_len_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/chacha20/nonce_len_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/chacha20/counter_wrap_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/chacha20/non_byte_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"

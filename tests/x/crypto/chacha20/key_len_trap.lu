@@ -1,0 +1,20 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.crypto.chacha20, conf.trap.set
+//!
+//! The key contract, held as a trap: RFC 8439 §2.3's key is 256 bits,
+//! the length is the caller's parameter, and a 16-byte key is a
+//! contract violation (§2's trap rule) — ChaCha20 has no 128-bit
+//! variant in this document and silently zero-padding one would be
+//! inventing a cipher. The guard runs before any keystream arithmetic,
+//! so every lane reaches the trap.
+
+use std.x.crypto.chacha20
+
+fn main() -> int {
+    let short_key = "sixteen bytes ok".bytes()
+    print("reached the call")
+    let ks = chacha20.block(short_key, 1, "twelve bytes".bytes())
+    print("unreachable: {ks.len}")
+    0
+}

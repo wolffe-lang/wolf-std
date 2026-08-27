@@ -1,0 +1,23 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.crypto.chacha20, conf.trap.set
+//!
+//! The nonce contract, held as a trap: RFC 8439 §2.3's nonce is 96
+//! bits and the length is the CALLER's parameter, not data, so an
+//! 8-byte nonce is a contract violation (§2's trap rule). This file is
+//! also the named holder of the NINE Wycheproof `InvalidNonceSize`
+//! vectors omitted from the generated tables (nonce lengths 0, 8, 11,
+//! 13, 14, 16, 20, 24 and 32 bytes — one comparison refuses them all;
+//! `vendor/vectors/README.md` names the omission, the sc16
+//! SizeTooLarge precedent). The guard runs before any keystream
+//! arithmetic, so every lane reaches the trap.
+
+use std.x.crypto.chacha20
+
+fn main() -> int {
+    let key = "wolf sc17: a 32-byte chacha key!".bytes()
+    print("reached the call")
+    let boxed = chacha20.seal(key, "8 bytes!".bytes(), List[int](), "msg".bytes())
+    print("unreachable: {boxed.len}")
+    0
+}

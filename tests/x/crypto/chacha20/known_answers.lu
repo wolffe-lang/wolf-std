@@ -1,0 +1,90 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.chacha20, arith.wrapping
+//!
+//! The RFC 8439 Section-2 worked examples, every one of them — the
+//! module's five-second smoke test a reviewer runs first. §2.3.2 (the
+//! block function), §2.4.2 (the cipher, BOTH directions — stream_xor
+//! is its own inverse), §2.5.2 (Poly1305), §2.6.2 (the per-nonce
+//! Poly1305 key), §2.8.2 (the AEAD: seal against the published
+//! ciphertext||tag, open back to the plaintext, and the §2.6
+//! intermediate one-time key against the RFC's own printing of it).
+//! Hex is quoted from `vendor/vectors/rfc/rfc8439.txt`; the appendix-A
+//! sets live in the rfc8439_a*_*.lu files beside this one.
+
+use std.hex
+use std.x.crypto.chacha20
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let key = bytes_of("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+    let nonce232 = bytes_of("000000090000004a00000000")
+    let ks = chacha20.to_hex(chacha20.block(key, 1, nonce232))
+    assert(
+        ks ==
+            "10f1e7e4d13b5915500fdd1fa32071c4c7d1f4c733c068030422aa9ac3d46c4ed2826446079faa0914c2d705d98b02a2b5129cd1de164eb9cbd083e8a2503c4e",
+        "s2.3.2 block",
+    )
+
+    let nonce242 = bytes_of("000000000000004a00000000")
+    let pt = bytes_of(
+        "4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e",
+    )
+    let ct = chacha20.stream_xor(key, 1, nonce242, pt)
+    assert(
+        chacha20.to_hex(ct) ==
+            "6e2e359a2568f98041ba0728dd0d6981e97e7aec1d4360c20a27afccfd9fae0bf91b65c5524733ab8f593dabcd62b3571639d624e65152ab8f530c359f0861d807ca0dbf500d6a6156a38e088a22b65e52bc514d16ccf806818ce91ab77937365af90bbf74a35be6b40b8eedf2785e42874d",
+        "s2.4.2 encrypt",
+    )
+    let back242 = chacha20.to_hex(chacha20.stream_xor(key, 1, nonce242, ct))
+    assert(
+        back242 ==
+            "4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e",
+        "s2.4.2 decrypt",
+    )
+
+    let mac = chacha20.
+        poly1305(
+        bytes_of("85d6be7857556d337f4452fe42d506a80103808afb0db2fd4abff6af4149f51b"),
+        bytes_of("43727970746f6772617068696320466f72756d2052657365617263682047726f7570"),
+    )
+    assert(chacha20.to_hex(mac) == "a8061dc1305136c6c22b8baf0c0127a9", "s2.5.2 poly1305")
+
+    let otk = chacha20.
+        poly_key(
+        bytes_of("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f"),
+        bytes_of("000000000001020304050607"),
+    )
+    assert(
+        chacha20.to_hex(otk) == "8ad5a08b905f81cc815040274ab29471a833b637e3fd0da508dbb8e2fdd1a646",
+        "s2.6.2 poly key",
+    )
+
+    let k8 = bytes_of("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f")
+    let n8 = bytes_of("070000004041424344454647")
+    let aad = bytes_of("50515253c0c1c2c3c4c5c6c7")
+    let msg = bytes_of(
+        "4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e",
+    )
+    let boxed = chacha20.seal(k8, n8, aad, msg)
+    assert(
+        chacha20.to_hex(boxed) ==
+            "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d63dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b61161ae10b594f09e26a7e902ecbd0600691",
+        "s2.8.2 seal",
+    )
+    let opened = chacha20.open(k8, n8, aad, boxed) else List[int]()
+    assert(
+        chacha20.to_hex(opened) ==
+            "4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e",
+        "s2.8.2 open",
+    )
+    assert(
+        chacha20.to_hex(chacha20.poly_key(k8, n8)) ==
+            "7bac2b252db447af09b67a55a4e955840ae1d6731075d9eb2a9375783ed553ff",
+        "s2.8.2 poly key",
+    )
+    0
+}
