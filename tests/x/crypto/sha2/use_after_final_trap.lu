@@ -1,0 +1,23 @@
+//! check: run(exit=trap(use-after-move))
+//! phase: run
+//! conforms: std.x.crypto.sha2, mem.tier0.move.1, mem.tier0.move.2
+//!
+//! The finished-digest discipline (the `fs.close(take f)` precedent):
+//! `final256` takes its state by `take`, so updating a finished
+//! computation is a use-after-move. The two machines hold it at their
+//! own rungs — the interpreter traps `use-after-move` at the read, both
+//! compiler rungs reject statically (`fail(E1001)`, the ledger's word
+//! for this file) — and either answer is the discipline working: no
+//! liveness flag, no row on every call, no way to keep hashing into a
+//! digest that has already been produced.
+
+use std.x.crypto.sha2
+
+fn main() -> int {
+    var st = sha2.new256()
+    sha2.update256(mut st, "abc".bytes())
+    let d = sha2.final256(take st)
+    sha2.update256(mut st, "def".bytes())
+    print("unreachable: {d.len}")
+    0
+}

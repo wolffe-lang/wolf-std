@@ -1,0 +1,92 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.sha2, arith.wrapping
+//!
+//! Chunking invariance: absorbing a message one byte at a time, or in
+//! ragged chunks that straddle every block boundary, produces the digest
+//! the one-shot produces — for all three digests, over a message long
+//! enough to cross several 512-bit AND several 1024-bit blocks (300
+//! bytes: 4+ SHA-256 blocks, 2+ SHA-512 blocks, plus a padding block
+//! each). Self-consistency only, no external literals: the known-answer
+//! and CAVP files pin the absolute values; this file pins that the
+//! incremental API cannot depend on how a caller slices the stream.
+
+use std.x.crypto.sha2
+
+fn pattern(n: int) -> List[int] {
+    var out = List[int]()
+    var i: int = 0
+    while i < n {
+        (mut out).push(i * 7 % 256)
+        i = i + 1
+    }
+    out
+}
+
+fn chunked256(msg: List[int], first: int, second: int) -> str {
+    var st = sha2.new256()
+    var a = List[int]()
+    var b = List[int]()
+    var c = List[int]()
+    for v in msg {
+        if a.len < first {
+            (mut a).push(v)
+        } else if b.len < second {
+            (mut b).push(v)
+        } else {
+            (mut c).push(v)
+        }
+    }
+    sha2.update256(mut st, a)
+    sha2.update256(mut st, b)
+    sha2.update256(mut st, c)
+    sha2.to_hex(sha2.final256(take st))
+}
+
+fn main() -> int {
+    let msg = pattern(300)
+    let one256 = sha2.to_hex(sha2.sum256(msg))
+    let one384 = sha2.to_hex(sha2.sum384(msg))
+    let one512 = sha2.to_hex(sha2.sum512(msg))
+
+    // Byte-at-a-time, all three digests.
+    var b256 = sha2.new256()
+    var b384 = sha2.new384()
+    var b512 = sha2.new512()
+    for v in msg {
+        var one = List[int]()
+        (mut one).push(v)
+        sha2.update256(mut b256, one)
+        sha2.update384(mut b384, one)
+        sha2.update512(mut b512, one)
+    }
+    assert(sha2.to_hex(sha2.final256(take b256)) == one256, "256: byte-at-a-time")
+    assert(sha2.to_hex(sha2.final384(take b384)) == one384, "384: byte-at-a-time")
+    assert(sha2.to_hex(sha2.final512(take b512)) == one512, "512: byte-at-a-time")
+
+    // Ragged chunks that straddle the 64-byte boundary (63+2+rest and
+    // 64+64+rest) and the 128-byte boundary for the 512 core.
+    assert(chunked256(msg, 63, 2) == one256, "256: 63/2/rest")
+    assert(chunked256(msg, 64, 64) == one256, "256: 64/64/rest")
+    assert(chunked256(msg, 1, 127) == one256, "256: 1/127/rest")
+
+    var r512 = sha2.new512()
+    var head = List[int]()
+    var tail = List[int]()
+    for v in msg {
+        if head.len < 127 {
+            (mut head).push(v)
+        } else {
+            (mut tail).push(v)
+        }
+    }
+    sha2.update512(mut r512, head)
+    sha2.update512(mut r512, tail)
+    assert(sha2.to_hex(sha2.final512(take r512)) == one512, "512: 127/rest")
+
+    var r384 = sha2.new384()
+    sha2.update384(mut r384, head)
+    sha2.update384(mut r384, tail)
+    assert(sha2.to_hex(sha2.final384(take r384)) == one384, "384: 127/rest")
+    0
+}

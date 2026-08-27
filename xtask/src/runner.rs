@@ -260,6 +260,7 @@ pub fn std_test() -> Result<(), String> {
     let mut forward_tags = 0usize;
     let mut conservatism: Vec<String> = Vec::new();
     let mut unstable: Vec<String> = Vec::new();
+    let mut slow_skips: Vec<String> = Vec::new();
     let mut divergences: Vec<serde_json::Value> = Vec::new();
     let mut ran = 0usize;
 
@@ -285,6 +286,28 @@ pub fn std_test() -> Result<(), String> {
         let mut runtime_records: Vec<(Impl, Record)> = Vec::new();
         for (imp, resolved) in &lanes {
             let Some(resolved) = resolved else { continue };
+            // A `slow` row (sc16, lupin-only by the ledger's grammar): the
+            // lane's SEMANTICS reach this program (its fast siblings are
+            // `run`), its speed does not — the tree-walk would blow the
+            // ceiling by minutes, a red-on-timeout would record load
+            // rather than depth, and `unsupported` would be a lie. The
+            // lane is not invoked; the skip is printed in its own ledger
+            // below, louder than a `run`, and is owed a re-measure at
+            // every pin bump.
+            let want_pre = match imp {
+                Impl::Lupin => &expect.lupin,
+                Impl::Wolf => &expect.wolfc,
+                Impl::Native => &expect.native,
+            };
+            if matches!(want_pre, Expect::Slow) {
+                slow_skips.push(format!(
+                    "slow({}): {test} — in-lane semantics, skipped at the \
+                     {}s ceiling; re-measure at pin bumps (sc16)",
+                    imp.ledger_name(),
+                    ceiling.as_secs()
+                ));
+                continue;
+            }
             let rec = match invoke(*imp, &resolved.path, &staged, &check, &phase, ceiling) {
                 Ok(rec) => rec,
                 Err(e) => {
@@ -371,6 +394,9 @@ pub fn std_test() -> Result<(), String> {
                     // An OBSERVATION is never unstable — only a ledger row
                     // is (the observation is one run's outcome).
                     Expect::Unstable(_) => unreachable!("an observation is a single outcome"),
+                    // A `slow` row is skipped before invocation, so no
+                    // observation can carry it either.
+                    Expect::Slow => unreachable!("a slow lane is never invoked"),
                 }
             }
         }
@@ -421,12 +447,16 @@ pub fn std_test() -> Result<(), String> {
     }
     println!(
         "std-test: {ran} test(s); forward tags: {forward_tags}; \
-         conservatism ledger: {} entr{}; unstable rows: {}",
+         conservatism ledger: {} entr{}; unstable rows: {}; slow skips: {}",
         conservatism.len(),
         if conservatism.len() == 1 { "y" } else { "ies" },
-        unstable.len()
+        unstable.len(),
+        slow_skips.len()
     );
     for line in &unstable {
+        println!("  {line}");
+    }
+    for line in &slow_skips {
         println!("  {line}");
     }
     for line in &conservatism {

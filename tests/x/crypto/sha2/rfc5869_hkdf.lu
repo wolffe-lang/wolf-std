@@ -1,0 +1,91 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.sha2, arith.wrapping
+//!
+//! RFC 5869 (HKDF) Appendix A: the three SHA-256 test cases, hex quoted
+//! verbatim from `vendor/vectors/rfc/rfc5869.txt` — both HALVES
+//! asserted per case: the PRK out of `hkdf256_extract` and the OKM out
+//! of `hkdf256_expand`, plus the one-call `hkdf256` against the same
+//! OKM. Cases A.4-A.7 are omitted by name: they are HMAC-SHA-1 vectors
+//! and SHA-1 is outside D53's ladder (the RFC has no SHA-384/512
+//! vectors; those digests' HKDF is gated on the Wycheproof files beside
+//! this one). A.3 is the zero-length salt AND zero-length info case —
+//! the RFC's "salt not provided" reading, which this module's empty
+//! list spells identically by construction.
+
+use std.hex
+use std.x.crypto.sha2
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let ikm1 = bytes_of("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+    let salt1 = bytes_of("000102030405060708090a0b0c")
+    let info1 = bytes_of("f0f1f2f3f4f5f6f7f8f9")
+    let prk1 = sha2.hkdf256_extract(salt1, ikm1)
+    assert(
+        sha2.to_hex(prk1) == "077709362c2e32df0ddc3f0dc47bba6390b6c73bb50f9c3122ec844ad7c2b3e5",
+        "A.1 prk",
+    )
+    let okm1 = sha2.hkdf256_expand(prk1, info1, 42)
+    assert(
+        sha2.to_hex(okm1) ==
+            "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865",
+        "A.1 okm",
+    )
+    let one1 = sha2.hkdf256(salt1, ikm1, info1, 42)
+    assert(
+        sha2.to_hex(one1) ==
+            "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865",
+        "A.1 one-call",
+    )
+    let ikm2 = bytes_of(
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+    )
+    let salt2 = bytes_of(
+        "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+    )
+    let info2 = bytes_of(
+        "b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+    )
+    let prk2 = sha2.hkdf256_extract(salt2, ikm2)
+    assert(
+        sha2.to_hex(prk2) == "06a6b88c5853361a06104c9ceb35b45cef760014904671014a193f40c15fc244",
+        "A.2 prk",
+    )
+    let okm2 = sha2.hkdf256_expand(prk2, info2, 82)
+    assert(
+        sha2.to_hex(okm2) ==
+            "b11e398dc80327a1c8e7f78c596a49344f012eda2d4efad8a050cc4c19afa97c59045a99cac7827271cb41c65e590e09da3275600c2f09b8367793a9aca3db71cc30c58179ec3e87c14c01d5c1f3434f1d87",
+        "A.2 okm",
+    )
+    let one2 = sha2.hkdf256(salt2, ikm2, info2, 82)
+    assert(
+        sha2.to_hex(one2) ==
+            "b11e398dc80327a1c8e7f78c596a49344f012eda2d4efad8a050cc4c19afa97c59045a99cac7827271cb41c65e590e09da3275600c2f09b8367793a9aca3db71cc30c58179ec3e87c14c01d5c1f3434f1d87",
+        "A.2 one-call",
+    )
+    let ikm3 = bytes_of("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
+    let salt3 = bytes_of("")
+    let info3 = bytes_of("")
+    let prk3 = sha2.hkdf256_extract(salt3, ikm3)
+    assert(
+        sha2.to_hex(prk3) == "19ef24a32c717b167f33a91d6f648bdf96596776afdb6377ac434c1c293ccb04",
+        "A.3 prk",
+    )
+    let okm3 = sha2.hkdf256_expand(prk3, info3, 42)
+    assert(
+        sha2.to_hex(okm3) ==
+            "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8",
+        "A.3 okm",
+    )
+    let one3 = sha2.hkdf256(salt3, ikm3, info3, 42)
+    assert(
+        sha2.to_hex(one3) ==
+            "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8",
+        "A.3 one-call",
+    )
+    0
+}

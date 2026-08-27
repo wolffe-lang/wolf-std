@@ -1,0 +1,1153 @@
+//! member: true
+//!
+//! std.x.crypto.sha2 — SHA-256, SHA-384 and SHA-512 (FIPS 180-4), HMAC
+//! (FIPS 198-1 / RFC 2104) and HKDF (RFC 5869). Stability tier: x — the
+//! D53 crypto ladder's first rung (campaign stdc-crypto, sprint sc16).
+//!
+//! **The nursery banner (D31).** `std.x.crypto.sha2` is not `std.crypto`:
+//! its path, names and behaviour may change or vanish in one sprint; no
+//! other std module may depend on it (it may depend on the facade, and
+//! does: nothing — the module is self-contained on purpose); its reason
+//! and graduation trigger live in `std/x/README.md`. HMAC and HKDF live
+//! IN this module rather than beside it because a nursery resident may
+//! not depend on another resident — the graduation move splits them.
+//!
+//! **Implemented from the FIPS 180-4 DOCUMENT, not ported.** Every
+//! constant block and every schedule below cites its section of
+//! NIST FIPS 180-4 (August 2015), fetched into the planning repo's
+//! `refs/specs/fips-180-4.pdf`. The vectors (NIST CAVP byte-oriented
+//! sets, RFC 4231, RFC 5869, Wycheproof v1) catch transcription errors;
+//! the document is the authority.
+//!
+//! **The word currency is `wrapping[u64]`, for both cores.** SHA-256's
+//! 32-bit words are carried in the low half of a `wrapping[u64]` and
+//! masked after every add and rotation, because the native rung refuses
+//! `int as wrapping[u32]` (a NARROWING cast — "range-check semantics,
+//! s27" — F-0089) while the widening `int as wrapping[u64]` lowers
+//! everywhere. The mask discipline: every value entering a round is
+//! 32-bit-clean, and every sum or rotation is masked before it is
+//! stored. SHA-512's words are the full `wrapping[u64]` and need none.
+//!
+//! **Schedule words and round constants are stored as `int`.** A 32-bit
+//! word always fits an `int`. A 64-bit word does NOT (`as int` is a
+//! CHECKED conversion everywhere — a value with the top bit set traps
+//! `overflow`, measured at these pins), so every 64-bit table in this
+//! module is a PAIR of `List[int]` — high and low 32-bit halves — split
+//! by `push_word_halves` from the verbatim FIPS literal and recombined
+//! at the use site. `List[wrapping[u64]]` would spell it directly and is
+//! refused by the native rung ("prelude container instantiation
+//! (generic data)", F-0090).
+//!
+//! **Lanes, measured at these pins**: lupin RUNS and native RUNS; the
+//! checked tier answers `unsupported` at `mem` — shifts and bitwise
+//! operators on `wrapping[T]` are outside its modelled surface ("this
+//! operator in checked execution", F-0091, std.rand's four-sprint
+//! precedent) and a `wrapping[u64]` literal above 2^63 - 1 is refused
+//! as "this literal shape" even before the operators. Long-vector and
+//! Monte Carlo tests additionally record the interpreter lane as `slow`
+//! (the sc16 ledger word): semantically in-lane, skipped at the rig's
+//! per-test ceiling, re-measured at pin bumps.
+//!
+//! **Byte sequences are `List[int]` with the documented 0..255 element
+//! contract** (§11's interim, F-0035): an element outside 0..255 traps
+//! `assert` at ingestion — the caller promised bytes (a contract
+//! violation, §2's trap rule), and a wrapping cast would otherwise
+//! digest a value the caller never meant. `to_hex` is this module's own
+//! hex rendering so that its tests and doc examples import exactly one
+//! module (the `std.bytes.from_str` precedent); `std.hex.encode` is the
+//! facade spelling of the same operation.
+//!
+//! **Constant-time obligations (D53's retrofit clause).** c28's
+//! compiler-enforced tier does not exist yet; until it does, every `pub`
+//! fn below carries a `ct:` line stating its obligation class, so the
+//! claims are auditable now and verifiable later. The honest summary:
+//! the digest cores branch and index on PUBLIC quantities only (byte
+//! counts, round numbers) — with ONE recorded exception, the 0..255
+//! ingestion guard, which compares every input element and is exactly
+//! the kind of value-dependent branch c28 will flag (it leaves with
+//! F-0035's real byte type). `to_hex` is NOT constant-time (it indexes
+//! an alphabet by the byte's value) and says so. HMAC's key path
+//! branches on the key's LENGTH alone, never on key bytes.
+//!
+//! No error rows anywhere in this module: every function is total over
+//! its documented domain, and the two failure modes (a non-byte
+//! element, an out-of-range HKDF length) are caller contract violations
+//! that trap `assert`.
+
+// ---------------------------------------------------------------------
+// Byte <-> word helpers (the endianness seam, written and tested first:
+// FIPS 180-4 §3.1 — big-endian words at the schedule and the output).
+// ---------------------------------------------------------------------
+
+/// The low-32-bit mask, as a total zero-argument function (a module
+/// `const` costs an execution lane at these pins, F-0025/F-0026).
+fn mask32() -> wrapping[u64] {
+    0xffffffff
+}
+
+/// One big-endian 32-bit word from four bytes (FIPS 180-4 §3.1), carried
+/// in the low half of a `wrapping[u64]`.
+fn word32_be(b0: int, b1: int, b2: int, b3: int) -> wrapping[u64] {
+    b0 as wrapping[u64] << 24 |
+        b1 as wrapping[u64] << 16 |
+        b2 as wrapping[u64] << 8 |
+        b3 as wrapping[u64]
+}
+
+/// Append the low 32 bits of `w` to `out`, big-endian (FIPS 180-4 §3.1).
+fn push_word32_be(mut out: List[int], w: wrapping[u64]) {
+    (mut out).push((w >> 24 & 0xff) as int)
+    (mut out).push((w >> 16 & 0xff) as int)
+    (mut out).push((w >> 8 & 0xff) as int)
+    (mut out).push((w & 0xff) as int)
+}
+
+/// Append the eight bytes of `w` to `out`, big-endian (FIPS 180-4 §3.1).
+fn push_word64_be(mut out: List[int], w: wrapping[u64]) {
+    (mut out).push((w >> 56 & 0xff) as int)
+    (mut out).push((w >> 48 & 0xff) as int)
+    (mut out).push((w >> 40 & 0xff) as int)
+    (mut out).push((w >> 32 & 0xff) as int)
+    (mut out).push((w >> 24 & 0xff) as int)
+    (mut out).push((w >> 16 & 0xff) as int)
+    (mut out).push((w >> 8 & 0xff) as int)
+    (mut out).push((w & 0xff) as int)
+}
+
+/// Split a 64-bit word into its two 32-bit halves and push them onto the
+/// parallel high/low lists — the storage shape every 64-bit table in
+/// this module takes (`as int` is checked, so a full 64-bit word cannot
+/// ride a `List[int]` element; the halves always can).
+fn push_word_halves(mut hi: List[int], mut lo: List[int], w: wrapping[u64]) {
+    (mut hi).push((w >> 32) as int)
+    (mut lo).push((w & 0xffffffff) as int)
+}
+
+/// The 0..255 ingestion guard (§11's `List[int]` byte contract).
+/// ct: NOT free of value-dependent branches — this comparison pair runs
+/// on every input element and is the module's one recorded ct exception
+/// (see the header; it leaves with F-0035's real byte type).
+fn require_byte(v: int) {
+    if v < 0 {
+        assert(false, "sha2: element outside 0..255")
+    }
+    if v > 255 {
+        assert(false, "sha2: element outside 0..255")
+    }
+}
+
+// ---------------------------------------------------------------------
+// FIPS 180-4 §4.1.2 / §4.1.3 — the six logical functions per core.
+// ROTR n(x) is spelled (x >> n | x << (w - n)) with literal shift
+// amounts; the 256 family masks back to 32 bits after every mix.
+// ---------------------------------------------------------------------
+
+/// Ch(x, y, z) = (x AND y) XOR (NOT x AND z) — FIPS 180-4 (4.2)/(4.8).
+/// NOT is XOR against the all-ones word; the 256 core's operands are
+/// 32-bit-clean so the high garbage the XOR briefly creates is removed
+/// by the caller's mask.
+fn ch(x: wrapping[u64], y: wrapping[u64], z: wrapping[u64]) -> wrapping[u64] {
+    x & y ^ (x ^ 0xffffffffffffffff) & z
+}
+
+/// Maj(x, y, z) = (x AND y) XOR (x AND z) XOR (y AND z) —
+/// FIPS 180-4 (4.3)/(4.9).
+fn maj(x: wrapping[u64], y: wrapping[u64], z: wrapping[u64]) -> wrapping[u64] {
+    x & y ^ x & z ^ y & z
+}
+
+/// Sigma0{256}(x) = ROTR2 ^ ROTR13 ^ ROTR22 — FIPS 180-4 (4.4).
+fn bsig0_256(x: wrapping[u64]) -> wrapping[u64] {
+    ((x >> 2 | x << 30) ^ (x >> 13 | x << 19) ^ (x >> 22 | x << 10)) & mask32()
+}
+
+/// Sigma1{256}(x) = ROTR6 ^ ROTR11 ^ ROTR25 — FIPS 180-4 (4.5).
+fn bsig1_256(x: wrapping[u64]) -> wrapping[u64] {
+    ((x >> 6 | x << 26) ^ (x >> 11 | x << 21) ^ (x >> 25 | x << 7)) & mask32()
+}
+
+/// sigma0{256}(x) = ROTR7 ^ ROTR18 ^ SHR3 — FIPS 180-4 (4.6).
+fn ssig0_256(x: wrapping[u64]) -> wrapping[u64] {
+    ((x >> 7 | x << 25) ^ (x >> 18 | x << 14) ^ x >> 3) & mask32()
+}
+
+/// sigma1{256}(x) = ROTR17 ^ ROTR19 ^ SHR10 — FIPS 180-4 (4.7).
+fn ssig1_256(x: wrapping[u64]) -> wrapping[u64] {
+    ((x >> 17 | x << 15) ^ (x >> 19 | x << 13) ^ x >> 10) & mask32()
+}
+
+/// Sigma0{512}(x) = ROTR28 ^ ROTR34 ^ ROTR39 — FIPS 180-4 (4.10).
+fn bsig0_512(x: wrapping[u64]) -> wrapping[u64] {
+    (x >> 28 | x << 36) ^ (x >> 34 | x << 30) ^ (x >> 39 | x << 25)
+}
+
+/// Sigma1{512}(x) = ROTR14 ^ ROTR18 ^ ROTR41 — FIPS 180-4 (4.11).
+fn bsig1_512(x: wrapping[u64]) -> wrapping[u64] {
+    (x >> 14 | x << 50) ^ (x >> 18 | x << 46) ^ (x >> 41 | x << 23)
+}
+
+/// sigma0{512}(x) = ROTR1 ^ ROTR8 ^ SHR7 — FIPS 180-4 (4.12).
+fn ssig0_512(x: wrapping[u64]) -> wrapping[u64] {
+    (x >> 1 | x << 63) ^ (x >> 8 | x << 56) ^ x >> 7
+}
+
+/// sigma1{512}(x) = ROTR19 ^ ROTR61 ^ SHR6 — FIPS 180-4 (4.13).
+fn ssig1_512(x: wrapping[u64]) -> wrapping[u64] {
+    (x >> 19 | x << 45) ^ (x >> 61 | x << 3) ^ x >> 6
+}
+
+// ---------------------------------------------------------------------
+// FIPS 180-4 §4.2.2 — the sixty-four K{256} constants: "the first
+// thirty-two bits of the fractional parts of the cube roots of the
+// first sixty-four prime numbers", transcribed left to right from the
+// document's table.
+// ---------------------------------------------------------------------
+
+fn k256() -> List[int] {
+    var k = List[int]()
+    (mut k).push(0x428a2f98)
+    (mut k).push(0x71374491)
+    (mut k).push(0xb5c0fbcf)
+    (mut k).push(0xe9b5dba5)
+    (mut k).push(0x3956c25b)
+    (mut k).push(0x59f111f1)
+    (mut k).push(0x923f82a4)
+    (mut k).push(0xab1c5ed5)
+    (mut k).push(0xd807aa98)
+    (mut k).push(0x12835b01)
+    (mut k).push(0x243185be)
+    (mut k).push(0x550c7dc3)
+    (mut k).push(0x72be5d74)
+    (mut k).push(0x80deb1fe)
+    (mut k).push(0x9bdc06a7)
+    (mut k).push(0xc19bf174)
+    (mut k).push(0xe49b69c1)
+    (mut k).push(0xefbe4786)
+    (mut k).push(0x0fc19dc6)
+    (mut k).push(0x240ca1cc)
+    (mut k).push(0x2de92c6f)
+    (mut k).push(0x4a7484aa)
+    (mut k).push(0x5cb0a9dc)
+    (mut k).push(0x76f988da)
+    (mut k).push(0x983e5152)
+    (mut k).push(0xa831c66d)
+    (mut k).push(0xb00327c8)
+    (mut k).push(0xbf597fc7)
+    (mut k).push(0xc6e00bf3)
+    (mut k).push(0xd5a79147)
+    (mut k).push(0x06ca6351)
+    (mut k).push(0x14292967)
+    (mut k).push(0x27b70a85)
+    (mut k).push(0x2e1b2138)
+    (mut k).push(0x4d2c6dfc)
+    (mut k).push(0x53380d13)
+    (mut k).push(0x650a7354)
+    (mut k).push(0x766a0abb)
+    (mut k).push(0x81c2c92e)
+    (mut k).push(0x92722c85)
+    (mut k).push(0xa2bfe8a1)
+    (mut k).push(0xa81a664b)
+    (mut k).push(0xc24b8b70)
+    (mut k).push(0xc76c51a3)
+    (mut k).push(0xd192e819)
+    (mut k).push(0xd6990624)
+    (mut k).push(0xf40e3585)
+    (mut k).push(0x106aa070)
+    (mut k).push(0x19a4c116)
+    (mut k).push(0x1e376c08)
+    (mut k).push(0x2748774c)
+    (mut k).push(0x34b0bcb5)
+    (mut k).push(0x391c0cb3)
+    (mut k).push(0x4ed8aa4a)
+    (mut k).push(0x5b9cca4f)
+    (mut k).push(0x682e6ff3)
+    (mut k).push(0x748f82ee)
+    (mut k).push(0x78a5636f)
+    (mut k).push(0x84c87814)
+    (mut k).push(0x8cc70208)
+    (mut k).push(0x90befffa)
+    (mut k).push(0xa4506ceb)
+    (mut k).push(0xbef9a3f7)
+    (mut k).push(0xc67178f2)
+    k
+}
+
+// ---------------------------------------------------------------------
+// FIPS 180-4 §4.2.3 — the eighty K{512} constants: "the first sixty-four
+// bits of the fractional parts of the cube roots of the first eighty
+// prime numbers", transcribed left to right from the document's table.
+// Each literal is verbatim; `push_word_halves` owns the storage split.
+// ---------------------------------------------------------------------
+
+fn k512(mut hi: List[int], mut lo: List[int]) {
+    push_word_halves(mut hi, mut lo, 0x428a2f98d728ae22)
+    push_word_halves(mut hi, mut lo, 0x7137449123ef65cd)
+    push_word_halves(mut hi, mut lo, 0xb5c0fbcfec4d3b2f)
+    push_word_halves(mut hi, mut lo, 0xe9b5dba58189dbbc)
+    push_word_halves(mut hi, mut lo, 0x3956c25bf348b538)
+    push_word_halves(mut hi, mut lo, 0x59f111f1b605d019)
+    push_word_halves(mut hi, mut lo, 0x923f82a4af194f9b)
+    push_word_halves(mut hi, mut lo, 0xab1c5ed5da6d8118)
+    push_word_halves(mut hi, mut lo, 0xd807aa98a3030242)
+    push_word_halves(mut hi, mut lo, 0x12835b0145706fbe)
+    push_word_halves(mut hi, mut lo, 0x243185be4ee4b28c)
+    push_word_halves(mut hi, mut lo, 0x550c7dc3d5ffb4e2)
+    push_word_halves(mut hi, mut lo, 0x72be5d74f27b896f)
+    push_word_halves(mut hi, mut lo, 0x80deb1fe3b1696b1)
+    push_word_halves(mut hi, mut lo, 0x9bdc06a725c71235)
+    push_word_halves(mut hi, mut lo, 0xc19bf174cf692694)
+    push_word_halves(mut hi, mut lo, 0xe49b69c19ef14ad2)
+    push_word_halves(mut hi, mut lo, 0xefbe4786384f25e3)
+    push_word_halves(mut hi, mut lo, 0x0fc19dc68b8cd5b5)
+    push_word_halves(mut hi, mut lo, 0x240ca1cc77ac9c65)
+    push_word_halves(mut hi, mut lo, 0x2de92c6f592b0275)
+    push_word_halves(mut hi, mut lo, 0x4a7484aa6ea6e483)
+    push_word_halves(mut hi, mut lo, 0x5cb0a9dcbd41fbd4)
+    push_word_halves(mut hi, mut lo, 0x76f988da831153b5)
+    push_word_halves(mut hi, mut lo, 0x983e5152ee66dfab)
+    push_word_halves(mut hi, mut lo, 0xa831c66d2db43210)
+    push_word_halves(mut hi, mut lo, 0xb00327c898fb213f)
+    push_word_halves(mut hi, mut lo, 0xbf597fc7beef0ee4)
+    push_word_halves(mut hi, mut lo, 0xc6e00bf33da88fc2)
+    push_word_halves(mut hi, mut lo, 0xd5a79147930aa725)
+    push_word_halves(mut hi, mut lo, 0x06ca6351e003826f)
+    push_word_halves(mut hi, mut lo, 0x142929670a0e6e70)
+    push_word_halves(mut hi, mut lo, 0x27b70a8546d22ffc)
+    push_word_halves(mut hi, mut lo, 0x2e1b21385c26c926)
+    push_word_halves(mut hi, mut lo, 0x4d2c6dfc5ac42aed)
+    push_word_halves(mut hi, mut lo, 0x53380d139d95b3df)
+    push_word_halves(mut hi, mut lo, 0x650a73548baf63de)
+    push_word_halves(mut hi, mut lo, 0x766a0abb3c77b2a8)
+    push_word_halves(mut hi, mut lo, 0x81c2c92e47edaee6)
+    push_word_halves(mut hi, mut lo, 0x92722c851482353b)
+    push_word_halves(mut hi, mut lo, 0xa2bfe8a14cf10364)
+    push_word_halves(mut hi, mut lo, 0xa81a664bbc423001)
+    push_word_halves(mut hi, mut lo, 0xc24b8b70d0f89791)
+    push_word_halves(mut hi, mut lo, 0xc76c51a30654be30)
+    push_word_halves(mut hi, mut lo, 0xd192e819d6ef5218)
+    push_word_halves(mut hi, mut lo, 0xd69906245565a910)
+    push_word_halves(mut hi, mut lo, 0xf40e35855771202a)
+    push_word_halves(mut hi, mut lo, 0x106aa07032bbd1b8)
+    push_word_halves(mut hi, mut lo, 0x19a4c116b8d2d0c8)
+    push_word_halves(mut hi, mut lo, 0x1e376c085141ab53)
+    push_word_halves(mut hi, mut lo, 0x2748774cdf8eeb99)
+    push_word_halves(mut hi, mut lo, 0x34b0bcb5e19b48a8)
+    push_word_halves(mut hi, mut lo, 0x391c0cb3c5c95a63)
+    push_word_halves(mut hi, mut lo, 0x4ed8aa4ae3418acb)
+    push_word_halves(mut hi, mut lo, 0x5b9cca4f7763e373)
+    push_word_halves(mut hi, mut lo, 0x682e6ff3d6b2b8a3)
+    push_word_halves(mut hi, mut lo, 0x748f82ee5defb2fc)
+    push_word_halves(mut hi, mut lo, 0x78a5636f43172f60)
+    push_word_halves(mut hi, mut lo, 0x84c87814a1f0ab72)
+    push_word_halves(mut hi, mut lo, 0x8cc702081a6439ec)
+    push_word_halves(mut hi, mut lo, 0x90befffa23631e28)
+    push_word_halves(mut hi, mut lo, 0xa4506cebde82bde9)
+    push_word_halves(mut hi, mut lo, 0xbef9a3f7b2c67915)
+    push_word_halves(mut hi, mut lo, 0xc67178f2e372532b)
+    push_word_halves(mut hi, mut lo, 0xca273eceea26619c)
+    push_word_halves(mut hi, mut lo, 0xd186b8c721c0c207)
+    push_word_halves(mut hi, mut lo, 0xeada7dd6cde0eb1e)
+    push_word_halves(mut hi, mut lo, 0xf57d4f7fee6ed178)
+    push_word_halves(mut hi, mut lo, 0x06f067aa72176fba)
+    push_word_halves(mut hi, mut lo, 0x0a637dc5a2c898a6)
+    push_word_halves(mut hi, mut lo, 0x113f9804bef90dae)
+    push_word_halves(mut hi, mut lo, 0x1b710b35131c471b)
+    push_word_halves(mut hi, mut lo, 0x28db77f523047d84)
+    push_word_halves(mut hi, mut lo, 0x32caab7b40c72493)
+    push_word_halves(mut hi, mut lo, 0x3c9ebe0a15c9bebc)
+    push_word_halves(mut hi, mut lo, 0x431d67c49c100d4c)
+    push_word_halves(mut hi, mut lo, 0x4cc5d4becb3e42b6)
+    push_word_halves(mut hi, mut lo, 0x597f299cfc657e2a)
+    push_word_halves(mut hi, mut lo, 0x5fcb6fab3ad6faec)
+    push_word_halves(mut hi, mut lo, 0x6c44198c4a475817)
+}
+
+// ---------------------------------------------------------------------
+// SHA-256 (FIPS 180-4 §5.3.3, §6.2)
+// ---------------------------------------------------------------------
+
+/// An in-progress SHA-256 computation. The fields are the interim
+/// backing (F-0035's byte currency, and 32-bit words in `wrapping[u64]`
+/// halves per the header) — never part of the API. A caller can forge
+/// one; a forged state produces a wrong digest, never a trap, because
+/// every field value is arithmetically valid.
+pub struct Sha256 {
+    h0: wrapping[u64],
+    h1: wrapping[u64],
+    h2: wrapping[u64],
+    h3: wrapping[u64],
+    h4: wrapping[u64],
+    h5: wrapping[u64],
+    h6: wrapping[u64],
+    h7: wrapping[u64],
+    buf: List[int],
+    total: int,
+    k: List[int],
+}
+
+/// A fresh SHA-256 state — FIPS 180-4 §5.3.3's initial hash value ("the
+/// first thirty-two bits of the fractional parts of the square roots of
+/// the first eight prime numbers"). Total: no rows, no traps.
+/// ct: no secret is present yet; construction is input-independent.
+///
+/// ```wolf-doc-example
+/// var st = sha2.new256()
+/// sha2.update256(mut st, "abc".bytes())
+/// sha2.to_hex(sha2.final256(take st)) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+/// ```
+pub fn new256() -> Sha256 {
+    let a0: wrapping[u64] = 0x6a09e667
+    let a1: wrapping[u64] = 0xbb67ae85
+    let a2: wrapping[u64] = 0x3c6ef372
+    let a3: wrapping[u64] = 0xa54ff53a
+    let a4: wrapping[u64] = 0x510e527f
+    let a5: wrapping[u64] = 0x9b05688c
+    let a6: wrapping[u64] = 0x1f83d9ab
+    let a7: wrapping[u64] = 0x5be0cd19
+    Sha256 {
+        h0: a0,
+        h1: a1,
+        h2: a2,
+        h3: a3,
+        h4: a4,
+        h5: a5,
+        h6: a6,
+        h7: a7,
+        buf: List[int](),
+        total: 0,
+        k: k256(),
+    }
+}
+
+/// One 512-bit block — FIPS 180-4 §6.2.2: the message schedule (step 1),
+/// the eight working variables (step 2), sixty-four rounds (step 3) and
+/// the intermediate hash value (step 4). Addition is modulo 2^32 (the
+/// masked `wrapping[u64]` discipline). Requires `st.buf.len == 64`.
+fn compress256(mut st: Sha256) {
+    var w = List[int]()
+    var t: int = 0
+    while t < 16 {
+        let off = t * 4
+        let wt = word32_be(st.buf[off], st.buf[off + 1], st.buf[off + 2], st.buf[off + 3])
+        (mut w).push(wt as int)
+        t = t + 1
+    }
+    while t < 64 {
+        let wt = ssig1_256(w[t - 2] as wrapping[u64]) +
+            w[t - 7] as wrapping[u64] +
+            ssig0_256(w[t - 15] as wrapping[u64]) +
+            w[t - 16] as wrapping[u64] &
+            mask32()
+        (mut w).push(wt as int)
+        t = t + 1
+    }
+    var a = st.h0
+    var b = st.h1
+    var c = st.h2
+    var d = st.h3
+    var e = st.h4
+    var f = st.h5
+    var g = st.h6
+    var h = st.h7
+    t = 0
+    while t < 64 {
+        let t1 = h + bsig1_256(e) + ch(e, f, g) + st.k[t] as wrapping[u64] + w[t] as wrapping[u64] &
+            mask32()
+        let t2 = bsig0_256(a) + maj(a, b, c) & mask32()
+        h = g
+        g = f
+        f = e
+        e = d + t1 & mask32()
+        d = c
+        c = b
+        b = a
+        a = t1 + t2 & mask32()
+        t = t + 1
+    }
+    st.h0 = st.h0 + a & mask32()
+    st.h1 = st.h1 + b & mask32()
+    st.h2 = st.h2 + c & mask32()
+    st.h3 = st.h3 + d & mask32()
+    st.h4 = st.h4 + e & mask32()
+    st.h5 = st.h5 + f & mask32()
+    st.h6 = st.h6 + g & mask32()
+    st.h7 = st.h7 + h & mask32()
+    st.buf = List[int]()
+}
+
+/// Absorbs `data` into the running SHA-256 computation. Bytes are
+/// buffered until a 512-bit block is full, then compressed; calling
+/// `update256` in any chunking produces the digest one call would (held
+/// by `tests/x/crypto/sha2/incremental_chunking.lu`). Traps `assert`
+/// when an element of `data` is outside 0..255 (§11's byte contract).
+/// ct: branches and indexes on byte COUNTS only, never on byte values —
+/// except the 0..255 ingestion guard recorded in the module header.
+pub fn update256(mut st: Sha256, data: List[int]) {
+    for byte_v in data {
+        require_byte(byte_v)
+        (mut st.buf).push(byte_v)
+        st.total = st.total + 1
+        if st.buf.len == 64 {
+            compress256(mut st)
+        }
+    }
+}
+
+/// Pads (FIPS 180-4 §5.1.1: one `0x80` byte, zeros to 56 mod 64, the
+/// message length in BITS as a big-endian 64-bit word) and returns the
+/// 32 digest bytes, big-endian per word (§6.2.2 step 4, §3.1). Consumes
+/// the state — a finished computation cannot be updated again, and the
+/// mode system is what enforces it (`take`, the builders' `finish`
+/// precedent). Total for every state `new256`/`update256` can produce.
+/// ct: padding branches on the buffered LENGTH (public); the length
+/// word is public by definition.
+///
+/// ```wolf-doc-example
+/// var st = sha2.new256()
+/// sha2.update256(mut st, List[int]())
+/// sha2.to_hex(sha2.final256(take st)) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+/// ```
+pub fn final256(take st: Sha256) -> List[int] {
+    var s = st
+    let bits = s.total as wrapping[u64] << 3
+    (mut s.buf).push(0x80)
+    if s.buf.len > 56 {
+        while s.buf.len < 64 {
+            (mut s.buf).push(0)
+        }
+        compress256(mut s)
+    }
+    while s.buf.len < 56 {
+        (mut s.buf).push(0)
+    }
+    push_word64_be(mut s.buf, bits)
+    compress256(mut s)
+    var out = List[int]()
+    push_word32_be(mut out, s.h0)
+    push_word32_be(mut out, s.h1)
+    push_word32_be(mut out, s.h2)
+    push_word32_be(mut out, s.h3)
+    push_word32_be(mut out, s.h4)
+    push_word32_be(mut out, s.h5)
+    push_word32_be(mut out, s.h6)
+    push_word32_be(mut out, s.h7)
+    out
+}
+
+/// The SHA-256 digest of `msg`, one shot: `new256` + `update256` +
+/// `final256`. 32 bytes out. Traps `assert` on an element outside
+/// 0..255; total otherwise.
+/// ct: as the incremental trio — public-count branching only, plus the
+/// recorded ingestion-guard exception.
+///
+/// ```wolf-doc-example
+/// sha2.to_hex(sha2.sum256("abc".bytes())) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+/// sha2.sum256("abc".bytes()).len == 32
+/// ```
+pub fn sum256(msg: List[int]) -> List[int] {
+    var st = new256()
+    update256(mut st, msg)
+    final256(take st)
+}
+
+// ---------------------------------------------------------------------
+// SHA-512 (FIPS 180-4 §5.3.5, §6.4)
+// ---------------------------------------------------------------------
+
+/// An in-progress SHA-512 computation. Same field posture as `Sha256`;
+/// the schedule constants ride as high/low halves (`khi`/`klo`) per the
+/// module header's storage rule.
+pub struct Sha512 {
+    h0: wrapping[u64],
+    h1: wrapping[u64],
+    h2: wrapping[u64],
+    h3: wrapping[u64],
+    h4: wrapping[u64],
+    h5: wrapping[u64],
+    h6: wrapping[u64],
+    h7: wrapping[u64],
+    buf: List[int],
+    total: int,
+    khi: List[int],
+    klo: List[int],
+}
+
+/// A fresh SHA-512 state — FIPS 180-4 §5.3.5's initial hash value ("the
+/// first sixty-four bits of the fractional parts of the square roots of
+/// the first eight prime numbers"). Total: no rows, no traps.
+/// ct: no secret is present yet; construction is input-independent.
+///
+/// ```wolf-doc-example
+/// var st = sha2.new512()
+/// sha2.update512(mut st, "abc".bytes())
+/// sha2.final512(take st).len == 64
+/// ```
+pub fn new512() -> Sha512 {
+    var khi = List[int]()
+    var klo = List[int]()
+    k512(mut khi, mut klo)
+    let a0: wrapping[u64] = 0x6a09e667f3bcc908
+    let a1: wrapping[u64] = 0xbb67ae8584caa73b
+    let a2: wrapping[u64] = 0x3c6ef372fe94f82b
+    let a3: wrapping[u64] = 0xa54ff53a5f1d36f1
+    let a4: wrapping[u64] = 0x510e527fade682d1
+    let a5: wrapping[u64] = 0x9b05688c2b3e6c1f
+    let a6: wrapping[u64] = 0x1f83d9abfb41bd6b
+    let a7: wrapping[u64] = 0x5be0cd19137e2179
+    Sha512 {
+        h0: a0,
+        h1: a1,
+        h2: a2,
+        h3: a3,
+        h4: a4,
+        h5: a5,
+        h6: a6,
+        h7: a7,
+        buf: List[int](),
+        total: 0,
+        khi: khi,
+        klo: klo,
+    }
+}
+
+/// One 1024-bit block — FIPS 180-4 §6.4.2: the same four steps as
+/// §6.2.2 over 64-bit words, eighty rounds, addition modulo 2^64
+/// (`wrapping[u64]`'s native width — no masks). Requires
+/// `st.buf.len == 128`.
+fn compress512(mut st: Sha512) {
+    var whi = List[int]()
+    var wlo = List[int]()
+    var t: int = 0
+    while t < 16 {
+        let off = t * 8
+        let wt = st.buf[off] as wrapping[u64] << 56 |
+            st.buf[off + 1] as wrapping[u64] << 48 |
+            st.buf[off + 2] as wrapping[u64] << 40 |
+            st.buf[off + 3] as wrapping[u64] << 32 |
+            st.buf[off + 4] as wrapping[u64] << 24 |
+            st.buf[off + 5] as wrapping[u64] << 16 |
+            st.buf[off + 6] as wrapping[u64] << 8 |
+            st.buf[off + 7] as wrapping[u64]
+        push_word_halves(mut whi, mut wlo, wt)
+        t = t + 1
+    }
+    while t < 80 {
+        let wm2 = whi[t - 2] as wrapping[u64] << 32 | wlo[t - 2] as wrapping[u64]
+        let wm7 = whi[t - 7] as wrapping[u64] << 32 | wlo[t - 7] as wrapping[u64]
+        let wm15 = whi[t - 15] as wrapping[u64] << 32 | wlo[t - 15] as wrapping[u64]
+        let wm16 = whi[t - 16] as wrapping[u64] << 32 | wlo[t - 16] as wrapping[u64]
+        let wt = ssig1_512(wm2) + wm7 + ssig0_512(wm15) + wm16
+        push_word_halves(mut whi, mut wlo, wt)
+        t = t + 1
+    }
+    var a = st.h0
+    var b = st.h1
+    var c = st.h2
+    var d = st.h3
+    var e = st.h4
+    var f = st.h5
+    var g = st.h6
+    var h = st.h7
+    t = 0
+    while t < 80 {
+        let kt = st.khi[t] as wrapping[u64] << 32 | st.klo[t] as wrapping[u64]
+        let wt = whi[t] as wrapping[u64] << 32 | wlo[t] as wrapping[u64]
+        let t1 = h + bsig1_512(e) + ch(e, f, g) + kt + wt
+        let t2 = bsig0_512(a) + maj(a, b, c)
+        h = g
+        g = f
+        f = e
+        e = d + t1
+        d = c
+        c = b
+        b = a
+        a = t1 + t2
+        t = t + 1
+    }
+    st.h0 = st.h0 + a
+    st.h1 = st.h1 + b
+    st.h2 = st.h2 + c
+    st.h3 = st.h3 + d
+    st.h4 = st.h4 + e
+    st.h5 = st.h5 + f
+    st.h6 = st.h6 + g
+    st.h7 = st.h7 + h
+    st.buf = List[int]()
+}
+
+/// Absorbs `data` into the running SHA-512 computation; 1024-bit
+/// blocks. Any chunking produces one digest. Traps `assert` on an
+/// element outside 0..255.
+/// ct: as `update256` — public-count branching only, plus the recorded
+/// ingestion-guard exception.
+pub fn update512(mut st: Sha512, data: List[int]) {
+    for byte_v in data {
+        require_byte(byte_v)
+        (mut st.buf).push(byte_v)
+        st.total = st.total + 1
+        if st.buf.len == 128 {
+            compress512(mut st)
+        }
+    }
+}
+
+/// Pads (FIPS 180-4 §5.1.2: one `0x80`, zeros to 112 mod 128, the bit
+/// length as a big-endian 128-bit word — the high word is the byte
+/// count's top three bits, exact for every representable length) and
+/// returns the 64 digest bytes. Consumes the state (`take`). Total.
+/// ct: padding branches on the buffered LENGTH (public).
+///
+/// ```wolf-doc-example
+/// var st = sha2.new512()
+/// sha2.update512(mut st, List[int]())
+/// sha2.to_hex(sha2.final512(take st)) == "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+/// ```
+pub fn final512(take st: Sha512) -> List[int] {
+    var s = st
+    let total_w = s.total as wrapping[u64]
+    let bits_hi = total_w >> 61
+    let bits_lo = total_w << 3
+    (mut s.buf).push(0x80)
+    if s.buf.len > 112 {
+        while s.buf.len < 128 {
+            (mut s.buf).push(0)
+        }
+        compress512(mut s)
+    }
+    while s.buf.len < 112 {
+        (mut s.buf).push(0)
+    }
+    push_word64_be(mut s.buf, bits_hi)
+    push_word64_be(mut s.buf, bits_lo)
+    compress512(mut s)
+    var out = List[int]()
+    push_word64_be(mut out, s.h0)
+    push_word64_be(mut out, s.h1)
+    push_word64_be(mut out, s.h2)
+    push_word64_be(mut out, s.h3)
+    push_word64_be(mut out, s.h4)
+    push_word64_be(mut out, s.h5)
+    push_word64_be(mut out, s.h6)
+    push_word64_be(mut out, s.h7)
+    out
+}
+
+/// The SHA-512 digest of `msg`, one shot. 64 bytes out. Traps `assert`
+/// on an element outside 0..255; total otherwise.
+/// ct: as the incremental trio.
+///
+/// ```wolf-doc-example
+/// sha2.to_hex(sha2.sum512("abc".bytes())) == "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
+/// ```
+pub fn sum512(msg: List[int]) -> List[int] {
+    var st = new512()
+    update512(mut st, msg)
+    final512(take st)
+}
+
+// ---------------------------------------------------------------------
+// SHA-384 (FIPS 180-4 §5.3.4, §6.5): the SHA-512 computation under its
+// own initial hash value, truncated to the left-most 384 bits (§7).
+// ---------------------------------------------------------------------
+
+/// An in-progress SHA-384 computation: a `Sha512` core under §5.3.4's
+/// initial value. Its own type so that a 384 stream cannot be finished
+/// as a 512 one (or the reverse) — the digests would silently differ in
+/// more than length. The inner state rides by value: the native rung
+/// refuses a `mut` FIELD-PATH argument when the base is itself a `mut`
+/// parameter ("`mut` places beyond local by-value bindings", F-0092 —
+/// the same path off a LOCAL binding lowers, measured both shapes at
+/// the sc16 pin), so `update384` copies the core out, advances it, and
+/// writes it back — semantics identical, one small-struct copy per call.
+pub struct Sha384 {
+    st: Sha512,
+}
+
+/// A fresh SHA-384 state — FIPS 180-4 §5.3.4's initial hash value ("the
+/// square roots of the ninth through sixteenth prime numbers"). Total.
+/// ct: no secret is present yet; construction is input-independent.
+///
+/// ```wolf-doc-example
+/// var st = sha2.new384()
+/// sha2.update384(mut st, "abc".bytes())
+/// sha2.final384(take st).len == 48
+/// ```
+pub fn new384() -> Sha384 {
+    var core = new512()
+    let a0: wrapping[u64] = 0xcbbb9d5dc1059ed8
+    let a1: wrapping[u64] = 0x629a292a367cd507
+    let a2: wrapping[u64] = 0x9159015a3070dd17
+    let a3: wrapping[u64] = 0x152fecd8f70e5939
+    let a4: wrapping[u64] = 0x67332667ffc00b31
+    let a5: wrapping[u64] = 0x8eb44a8768581511
+    let a6: wrapping[u64] = 0xdb0c2e0d64f98fa7
+    let a7: wrapping[u64] = 0x47b5481dbefa4fa4
+    core.h0 = a0
+    core.h1 = a1
+    core.h2 = a2
+    core.h3 = a3
+    core.h4 = a4
+    core.h5 = a5
+    core.h6 = a6
+    core.h7 = a7
+    Sha384 { st: core }
+}
+
+/// Absorbs `data` into the running SHA-384 computation. Traps `assert`
+/// on an element outside 0..255.
+/// ct: as `update512`.
+pub fn update384(mut st: Sha384, data: List[int]) {
+    var core = st.st
+    update512(mut core, data)
+    st.st = core
+}
+
+/// Pads exactly as SHA-512 and returns the LEFT-MOST 48 digest bytes
+/// (FIPS 180-4 §6.5 step 3 / §7 truncation). Consumes the state. Total.
+/// ct: as `final512`.
+pub fn final384(take st: Sha384) -> List[int] {
+    var core = st.st
+    let full = final512(take core)
+    var out = List[int]()
+    var i: int = 0
+    while i < 48 {
+        (mut out).push(full[i])
+        i = i + 1
+    }
+    out
+}
+
+/// The SHA-384 digest of `msg`, one shot. 48 bytes out. Traps `assert`
+/// on an element outside 0..255; total otherwise.
+/// ct: as the incremental trio.
+///
+/// ```wolf-doc-example
+/// sha2.to_hex(sha2.sum384("abc".bytes())) == "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7"
+/// ```
+pub fn sum384(msg: List[int]) -> List[int] {
+    var st = new384()
+    update384(mut st, msg)
+    final384(take st)
+}
+
+// ---------------------------------------------------------------------
+// HMAC (FIPS 198-1 / RFC 2104): H((K0 XOR opad) || H((K0 XOR ipad) || m))
+// ---------------------------------------------------------------------
+
+/// K0 per FIPS 198-1 §4 table, steps 1-3: a key longer than the block
+/// is hashed first; every key is then zero-padded to the block length.
+/// The XOR-with-pad walk is shared by the three HMAC entry points; the
+/// digest choice rides in as the already-reduced key.
+/// ct: pads and XORs every key byte unconditionally — the only
+/// key-dependent quantity in the control flow is the key's LENGTH
+/// (public per RFC 2104); no branch reads a key byte's value. The
+/// ingestion guard exception applies where the key is hashed.
+fn xor_pad(key0: List[int], block: int, pad: int) -> List[int] {
+    var out = List[int]()
+    for kb in key0 {
+        out = push_xored(take out, kb, pad)
+    }
+    var i = out.len
+    while i < block {
+        (mut out).push(pad)
+        i = i + 1
+    }
+    out
+}
+
+/// One byte XOR in the `wrapping[u64]` domain (bitwise `^` on plain
+/// `int` costs the checked lane, F-0026; on wrapping it is the module's
+/// ambient dialect). Returns the list to keep the caller's loop a
+/// single expression.
+fn push_xored(take out: List[int], b: int, pad: int) -> List[int] {
+    var xs = out
+    let x = (b as wrapping[u64] ^ pad as wrapping[u64]) & 0xff
+    (mut xs).push(x as int)
+    xs
+}
+
+/// HMAC-SHA-256 (FIPS 198-1; RFC 2104). Any key length; keys longer
+/// than the 64-byte block are reduced by one SHA-256 first (FIPS 198-1
+/// §4 step 2). 32 bytes out. Traps `assert` on a non-byte element in
+/// key or message; total otherwise.
+/// ct: see `xor_pad` — key-length-dependent control flow only; no
+/// branch or index reads a key byte. (The 0..255 ingestion guard is the
+/// module's recorded exception.)
+///
+/// ```wolf-doc-example
+/// sha2.to_hex(sha2.hmac256("key".bytes(), "The quick brown fox jumps over the lazy dog".bytes())) == "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+/// ```
+pub fn hmac256(key: List[int], msg: List[int]) -> List[int] {
+    var key0 = key
+    if key0.len > 64 {
+        key0 = sum256(key0)
+    }
+    let ipad = xor_pad(key0, 64, 0x36)
+    let opad = xor_pad(key0, 64, 0x5c)
+    var inner = new256()
+    update256(mut inner, ipad)
+    update256(mut inner, msg)
+    let inner_digest = final256(take inner)
+    var outer = new256()
+    update256(mut outer, opad)
+    update256(mut outer, inner_digest)
+    final256(take outer)
+}
+
+/// HMAC-SHA-384 (FIPS 198-1; RFC 2104). The block is SHA-384's 128
+/// bytes. 48 bytes out. Traps `assert` on a non-byte element; total
+/// otherwise.
+/// ct: as `hmac256`.
+pub fn hmac384(key: List[int], msg: List[int]) -> List[int] {
+    var key0 = key
+    if key0.len > 128 {
+        key0 = sum384(key0)
+    }
+    let ipad = xor_pad(key0, 128, 0x36)
+    let opad = xor_pad(key0, 128, 0x5c)
+    var inner = new384()
+    update384(mut inner, ipad)
+    update384(mut inner, msg)
+    let inner_digest = final384(take inner)
+    var outer = new384()
+    update384(mut outer, opad)
+    update384(mut outer, inner_digest)
+    final384(take outer)
+}
+
+/// HMAC-SHA-512 (FIPS 198-1; RFC 2104). The block is SHA-512's 128
+/// bytes. 64 bytes out. Traps `assert` on a non-byte element; total
+/// otherwise.
+/// ct: as `hmac256`.
+pub fn hmac512(key: List[int], msg: List[int]) -> List[int] {
+    var key0 = key
+    if key0.len > 128 {
+        key0 = sum512(key0)
+    }
+    let ipad = xor_pad(key0, 128, 0x36)
+    let opad = xor_pad(key0, 128, 0x5c)
+    var inner = new512()
+    update512(mut inner, ipad)
+    update512(mut inner, msg)
+    let inner_digest = final512(take inner)
+    var outer = new512()
+    update512(mut outer, opad)
+    update512(mut outer, inner_digest)
+    final512(take outer)
+}
+
+// ---------------------------------------------------------------------
+// HKDF (RFC 5869): Extract(salt, IKM) = HMAC(salt, IKM);
+// Expand(PRK, info, L) = T(1) || T(2) || ... clipped to L, where
+// T(i) = HMAC(PRK, T(i-1) || info || byte(i)).
+// ---------------------------------------------------------------------
+
+/// HKDF-Extract over HMAC-SHA-256 (RFC 5869 §2.2). An absent salt is
+/// spelled as the empty list — the RFC's "if not provided, ... a string
+/// of HashLen zeros" is HMAC's own zero-padding of an empty key, so the
+/// spellings agree by construction. 32-byte PRK out.
+/// ct: HMAC's obligations, unchanged.
+///
+/// ```wolf-doc-example
+/// sha2.hkdf256_extract(List[int](), "secret".bytes()).len == 32
+/// ```
+pub fn hkdf256_extract(salt: List[int], ikm: List[int]) -> List[int] {
+    hmac256(salt, ikm)
+}
+
+/// HKDF-Expand over HMAC-SHA-256 (RFC 5869 §2.3). Traps `assert` when
+/// `n` is negative or exceeds 255 * 32 (the RFC's hard cap: the counter
+/// is one byte) — the length is the caller's parameter, not data (§2's
+/// trap rule). `n == 0` is the empty output. `prk` must be at least one
+/// block's worth of entropy per the RFC; this module does not police
+/// entropy, only lengths.
+/// ct: the T(i) chain's shape depends on `n` and `info.len` (public);
+/// no branch reads a byte of `prk` or the running T.
+///
+/// ```wolf-doc-example
+/// let prk = sha2.hkdf256_extract("salt".bytes(), "ikm".bytes())
+/// sha2.hkdf256_expand(prk, "info".bytes(), 42).len == 42
+/// sha2.hkdf256_expand(prk, "info".bytes(), 0).len == 0
+/// ```
+pub fn hkdf256_expand(prk: List[int], info: List[int], n: int) -> List[int] {
+    if n < 0 {
+        assert(false, "sha2: hkdf length is negative")
+    }
+    if n > 255 * 32 {
+        assert(false, "sha2: hkdf length exceeds 255 * hash length")
+    }
+    var okm = List[int]()
+    var t = List[int]()
+    var i: int = 1
+    while okm.len < n {
+        var block = new256()
+        update256(mut block, xor_pad(prk, 64, 0x36))
+        update256(mut block, t)
+        update256(mut block, info)
+        block = counter_absorb256(take block, i)
+        t = finish_hmac256(prk, take block)
+        for b in t {
+            if okm.len < n {
+                (mut okm).push(b)
+            }
+        }
+        i = i + 1
+    }
+    okm
+}
+
+/// The one counter byte T(i) ends with (RFC 5869 §2.3). Split out so
+/// the expand loop reads as the RFC's equation.
+fn counter_absorb256(take block: Sha256, i: int) -> Sha256 {
+    var st = block
+    var one = List[int]()
+    (mut one).push(i % 256)
+    update256(mut st, one)
+    st
+}
+
+/// The outer half of the T(i) HMAC: finish the inner hash, then run the
+/// opad pass. `hmac256` cannot be reused directly because the inner
+/// hash absorbs three pieces incrementally.
+fn finish_hmac256(prk: List[int], take inner: Sha256) -> List[int] {
+    let inner_digest = final256(take inner)
+    var outer = new256()
+    update256(mut outer, xor_pad(prk, 64, 0x5c))
+    update256(mut outer, inner_digest)
+    final256(take outer)
+}
+
+/// HKDF over HMAC-SHA-256, extract-then-expand in one call (RFC 5869
+/// §2). Traps as `hkdf256_expand` on an out-of-range `n`.
+/// ct: the composition of the two halves' obligations.
+///
+/// ```wolf-doc-example
+/// sha2.hkdf256("salt".bytes(), "ikm".bytes(), "info".bytes(), 16).len == 16
+/// ```
+pub fn hkdf256(salt: List[int], ikm: List[int], info: List[int], n: int) -> List[int] {
+    let prk = hkdf256_extract(salt, ikm)
+    hkdf256_expand(prk, info, n)
+}
+
+/// HKDF-Extract over HMAC-SHA-384 (RFC 5869 §2.2). 48-byte PRK out.
+/// ct: HMAC's obligations, unchanged.
+pub fn hkdf384_extract(salt: List[int], ikm: List[int]) -> List[int] {
+    hmac384(salt, ikm)
+}
+
+/// HKDF-Expand over HMAC-SHA-384 (RFC 5869 §2.3); the cap is 255 * 48.
+/// Traps and totality as `hkdf256_expand`.
+/// ct: as `hkdf256_expand`.
+pub fn hkdf384_expand(prk: List[int], info: List[int], n: int) -> List[int] {
+    if n < 0 {
+        assert(false, "sha2: hkdf length is negative")
+    }
+    if n > 255 * 48 {
+        assert(false, "sha2: hkdf length exceeds 255 * hash length")
+    }
+    var okm = List[int]()
+    var t = List[int]()
+    var i: int = 1
+    while okm.len < n {
+        var chunk = List[int]()
+        for b in t {
+            (mut chunk).push(b)
+        }
+        for b in info {
+            (mut chunk).push(b)
+        }
+        (mut chunk).push(i % 256)
+        t = hmac384(prk, chunk)
+        for b in t {
+            if okm.len < n {
+                (mut okm).push(b)
+            }
+        }
+        i = i + 1
+    }
+    okm
+}
+
+/// HKDF over HMAC-SHA-384, extract-then-expand in one call.
+/// ct: the composition of the two halves' obligations.
+pub fn hkdf384(salt: List[int], ikm: List[int], info: List[int], n: int) -> List[int] {
+    let prk = hkdf384_extract(salt, ikm)
+    hkdf384_expand(prk, info, n)
+}
+
+/// HKDF-Extract over HMAC-SHA-512 (RFC 5869 §2.2). 64-byte PRK out.
+/// ct: HMAC's obligations, unchanged.
+pub fn hkdf512_extract(salt: List[int], ikm: List[int]) -> List[int] {
+    hmac512(salt, ikm)
+}
+
+/// HKDF-Expand over HMAC-SHA-512 (RFC 5869 §2.3); the cap is 255 * 64.
+/// Traps and totality as `hkdf256_expand`.
+/// ct: as `hkdf256_expand`.
+pub fn hkdf512_expand(prk: List[int], info: List[int], n: int) -> List[int] {
+    if n < 0 {
+        assert(false, "sha2: hkdf length is negative")
+    }
+    if n > 255 * 64 {
+        assert(false, "sha2: hkdf length exceeds 255 * hash length")
+    }
+    var okm = List[int]()
+    var t = List[int]()
+    var i: int = 1
+    while okm.len < n {
+        var chunk = List[int]()
+        for b in t {
+            (mut chunk).push(b)
+        }
+        for b in info {
+            (mut chunk).push(b)
+        }
+        (mut chunk).push(i % 256)
+        t = hmac512(prk, chunk)
+        for b in t {
+            if okm.len < n {
+                (mut okm).push(b)
+            }
+        }
+        i = i + 1
+    }
+    okm
+}
+
+/// HKDF over HMAC-SHA-512, extract-then-expand in one call.
+/// ct: the composition of the two halves' obligations.
+pub fn hkdf512(salt: List[int], ikm: List[int], info: List[int], n: int) -> List[int] {
+    let prk = hkdf512_extract(salt, ikm)
+    hkdf512_expand(prk, info, n)
+}
+
+// ---------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------
+
+/// `b` as lowercase hexadecimal, two digits per byte — this module's
+/// own rendering so its tests and examples import exactly one module
+/// (the `std.bytes.from_str` precedent); `std.hex.encode` is the facade
+/// spelling. Traps `assert` (via the slice) only on a non-byte element,
+/// which no digest this module returns can contain.
+/// ct: NOT constant-time — the alphabet slice is indexed by each byte's
+/// VALUE, a secret-dependent memory index. Render public values with
+/// it; a constant-time encoder is c28-tier work.
+///
+/// ```wolf-doc-example
+/// sha2.to_hex(sha2.sum256("abc".bytes()))[0..8] == "ba7816bf"
+/// sha2.to_hex(List[int]()) == ""
+/// ```
+pub fn to_hex(b: List[int]) -> str {
+    let alphabet = "0123456789abcdef"
+    var out = ""
+    for v in b {
+        require_byte(v)
+        let hi = v / 16
+        let lo = v % 16
+        let hd = alphabet[hi..hi + 1]
+        let ld = alphabet[lo..lo + 1]
+        out = "{out}{hd}{ld}"
+    }
+    out
+}
