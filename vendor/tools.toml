@@ -180,6 +180,46 @@ version = "0.1.0"
 # Built from a clean checkout of wolf-lang at the DATA pin (below,
 # vendor/upstream/PIN): cargo build --release -p wolf_driver -p wolf_rt.
 #
+# sc18 (06-crypto) bump: trunk `21b129e`, which IS trunk's tip at the bump
+# (the sc18 contract's floor: s111 — "the crypto probe pays back" — lands
+# the wrapping family on every lane). Built fresh from a clean scratch
+# clone at the sha (the sc16 stale-binary lesson). Ritual gates at the
+# sha, exit codes captured as they happened (F-0063):
+# `cargo run -p xtask -- ci` = 0 first attempt; `cargo test --workspace
+# --release` = 0 on the SECOND attempt — the first, on a cold cache,
+# failed one test (`conc_native::wolf_test_schedules_explores_a_native_body`,
+# "libwolf_rt.a not found next to the `wolf` binary": the schedule lane
+# wants the staticlib and a cold `cargo test` had not produced it;
+# `cargo build --release -p wolf_rt` first, then the full suite, 155
+# suites ok — an environment artifact recorded rather than hidden, not a
+# red tip). lupin is UNCHANGED at 0.1.13/02c1e88 for the FOURTH sprint:
+# is20 (the F-0093 program-age fix, wolf-interp#40/#41, 279s -> 3s
+# upstream) is MERGED at wolf-interp trunk ec4b9c4 but UNRELEASED, so
+# every `slow` row keeps its 0.1.13 measurement and flips at the release
+# that carries is20 — the sc18 contract's "re-measure post-is20" lands
+# then, and the fact is recorded here so the next bump finds it.
+# What the span moves here: s111 closes ALL FOUR of sc16's surface
+# findings, re-probed one four-line program at a time at this sha (each
+# probe also run under lupin for the third column):
+# - wrapping[u64] shifts/bitwise AND 2^63+ literals run on the CHECKED
+#   tier (F-0091 / wolf-lang#130 closed) — 41 wolfc ledger rows flip
+#   `unsupported` -> `run` (4 rand + 18 sha2 + 19 chacha20, measured by
+#   std-test before/after); the 9 big sha2 vector rows stay dark on a
+#   CHANGED mechanism (the checked tier's step/shadow-memory budgets —
+#   the ledger's sc18 bump note has the per-file measurements).
+# - `int as wrapping[u32]` lowers natively (F-0089/#131 closed).
+# - `List[wrapping[u64]]` lowers natively (F-0090/#132 closed).
+# - `f(mut param.field)` lowers natively (F-0092/#133 closed).
+#   (The sha2 workarounds those three forced — paired hi/lo tables,
+#   masked-u64 32-bit words, Sha384's copy dance — are retirement
+#   candidates; the sc18 ruling on each is in the module header and the
+#   status notes, not silently rewritten inside a bump.)
+# The anchors snapshot is byte-identical at 21b129e (346 anchors, zero
+# added in the s110->s111 span) — no re-vendor. `wolf --version` now
+# pairs with "lupin 0.1.13 ... pin c9da6d9" — that sha is lupin's own
+# commit in wolf-interp (F-0064's rule: report, never gate); the lupin
+# binary here self-identifies 0.1.13 at pin 02c1e88.
+#
 # sc16 (06-crypto) bump: trunk `87405ac`, which IS trunk's tip at the bump
 # (the sc16 contract's floor: "wolf-lang >= 87405ac" — D53 is ruled at this
 # sha and s109's row rulings land in it). Ritual gates at the sha, exit
@@ -588,4 +628,5 @@ version = "0.1.0"
 # the sc16 bump note above records trunk 87405ac and vendor/upstream/PIN
 # moved with it, but this key did not; corrected at sc17, where doctor's
 # "recorded pin" line surfaced the drift)
-pin = "87405aca88bbdd1d571e7b3ef8da638e64fbd57a"
+# pin = "87405aca88bbdd1d571e7b3ef8da638e64fbd57a"  (superseded, sc16/sc17 era)
+pin = "21b129e90c4589c0fc6b5698e0468e84edbd574d"

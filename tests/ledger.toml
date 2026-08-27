@@ -14,6 +14,33 @@
 # Every slow row is owed a re-measure at pin bumps; an interpreter perf
 # wave is its exit.
 #
+# THE sc18 PIN BUMP (wolf trunk 87405ac -> 21b129e, the s110/s111 span;
+# lupin UNCHANGED at 0.1.13 for the FOURTH sprint — is20's F-0093 fix is
+# merged upstream but unreleased, so every `slow` row keeps its 0.1.13
+# measurement) MOVED FORTY-ONE ROWS, all one column and one direction:
+# wolfc `unsupported` -> `run`, because s111 landed the wrapping family
+# on the checked tier (F-0091 / wolf-lang#130 closed — shifts, bitwise
+# and 2^63+ literals all execute at mem now, re-probed four lines at a
+# time at the sha). The flips: all 4 dark std.rand rows (the F-0026-era
+# posture at its oldest address), all 18 dark sha2 rows that fit the
+# tier's budgets, and all 19 dark chacha20 rows. What did NOT flip, and
+# why, stated so the next bump reads a mechanism rather than a mystery:
+# the 9 big sha2 vector rows (cavp long x3, monte x3, wycheproof full
+# x3) stay wolfc `unsupported` because the checked tier's REFUSAL
+# CHANGED KIND under them — the operator refusal is gone and what
+# answers now is a resource budget ("step budget exhausted" on monte/
+# full, "shadow-memory budget exhausted" on the long sets), the
+# miri-lite's own capacity posture, measured per-file at the bump. A
+# budget is not an operator gap: the same module's short files run on
+# the same lane, so the semantics are measured and `unsupported` here
+# records capacity. s111 also closed sc16's three NATIVE findings
+# (F-0089/#131 narrowing wrapping casts, F-0090/#132
+# List[wrapping[u64]], F-0092/#133 f(mut param.field)) — each re-probed
+# green at the sha; no current ledger row observed those shapes, so no
+# row moves on them (the sha2 workarounds they forced are retirement
+# candidates recorded in the sc18 status notes, not silently rewritten
+# in a bump commit).
+#
 # THE sc16 PIN BUMP (wolf trunk 1b149ba -> 87405ac, the s109/s110 span;
 # lupin UNCHANGED at 0.1.13 — a compiler-only bump again) MOVED ONE ROW:
 # `x/option_flatten/flatten_propagate` native `unsupported` -> `run`,
@@ -798,29 +825,30 @@ lupin = "run"
 wolfc = "run"
 native = "unsupported"
 
-# ---- sc04: std.rand. The output permutation uses `>>`, `^` and `&`,
-# which are `unsupported` in wolfc's checked tier ("this operator in
-# checked execution"), and `List` keeps the native rung out — so the
-# pinned stream is an interpreter-lane fact at this pin. ----
+# ---- sc04: std.rand. The output permutation uses `>>`, `^` and `&`
+# on wrapping values, which the checked tier refused from sc04 through
+# sc17 ("this operator in checked execution") — CLOSED at the sc18 pin
+# (s111, F-0091/#130): the four dark wolfc rows flipped to `run` with
+# no edit, thirteen sprints after the posture was first ledgered. ----
 
 [tests."rand/stream_pinned.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."rand/range_and_bool.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."rand/next_float_pinned.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."rand/shuffle_and_choose.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "unsupported"
 
 [tests."rand/choose_empty_miss.lu"]
@@ -1698,10 +1726,12 @@ wolfc = "run"
 native = "run"
 
 # ---- sc16: std.x.crypto.sha2 — the digest ladder's first rung (D53). ----
-# The module's lane shape is std.rand's, for the same mechanism at a new
-# width: the cores are wrapping[u64] shifts and bitwise mixes, which the
-# checked tier refuses at mem ("this operator in checked execution",
-# F-0091), while lupin and the native rung both execute every body. Two
+# The module's dark checked lane (the cores are wrapping[u64] shifts and
+# bitwise mixes, refused at mem sc16-sc17 — F-0091) LIT at the sc18 pin
+# bump: s111 lands the wrapping family on the checked tier and every
+# sha2 row inside the tier's budgets is three-lane now. The nine still-
+# dark wolfc rows below (long/monte/full) record the tier's RESOURCE
+# budgets, not an operator gap — see the sc18 bump note up top. Two
 # deliberate exceptions below: `non_byte_trap` traps at INGESTION, before
 # any wrapping op runs, so even the checked machine reaches it; and
 # `use_after_final_trap` is the mutate_while_iterating precedent — the
@@ -1710,12 +1740,12 @@ native = "run"
 
 [tests."x/crypto/sha2/known_answers.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/incremental_chunking.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/non_byte_trap.lu"]
@@ -1725,7 +1755,7 @@ native = "run"
 
 [tests."x/crypto/sha2/hkdf_expand_cap_trap.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/use_after_final_trap.lu"]
@@ -1749,52 +1779,52 @@ native = "fail(E1001)"
 
 [tests."x/crypto/sha2/cavp_sha256_short_p1.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha256_short_p2.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha384_short_p1.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha384_short_p2.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha384_short_p3.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha384_short_p4.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha512_short_p1.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha512_short_p2.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha512_short_p3.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha512_short_p4.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha256_long.lu"]
@@ -1829,17 +1859,17 @@ native = "run"
 
 [tests."x/crypto/sha2/wycheproof_hkdf256_smoke.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/wycheproof_hkdf384_smoke.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/wycheproof_hkdf512_smoke.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/wycheproof_hkdf256_full.lu"]
@@ -1859,40 +1889,38 @@ native = "run"
 
 [tests."x/crypto/sha2/rfc4231_hmac.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/rfc5869_hkdf.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 # ---- sc17: std.x.crypto.chacha20 — the cipher that needs no tables ----
-# (D53's second rung, RFC 8439). The lane shape refines sha2's: the
-# ChaCha core is wrapping[u64] rotations, which the checked tier refuses
-# at mem ("this operator in checked execution", F-0091/#130 — the
-# INHERITED dark-lane posture; s111 is fixing it concurrently and the
-# next pin bump flips sha2 and this module together). But the refusal is
-# DYNAMIC — per executed path, not per module — and Poly1305 here is
-# CHECKED-int arithmetic by construction (the sc17 probe delta), so
-# `rfc8439_a3_poly1305` is a THREE-LANE row inside a wrapping module,
-# and the four trap files run everywhere because every guard fires
-# before any keystream arithmetic. The two row files ride `error: tag`
-# out of main (the toolchain names the tag; exit 1).
+# (D53's second rung, RFC 8439). The dark checked lane sc17 inherited
+# (wrapping rotations refused at mem, F-0091/#130) LIT at the sc18 pin
+# bump exactly as this section predicted — "the next pin bump flips
+# sha2 and this module together" — and every chacha20 row is three-lane
+# on the wolfc column now (the AEAD wycheproof parts included: the
+# checked tier's budgets that keep sha2's big files dark are not
+# reached by 32-vector AEAD parts, measured at the bump). The two row
+# files ride `error: tag` out of main (the toolchain names the tag;
+# exit 1).
 
 [tests."x/crypto/chacha20/known_answers.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/rfc8439_a1_block.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/rfc8439_a2_cipher.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/rfc8439_a3_poly1305.lu"]
@@ -1902,22 +1930,22 @@ native = "run"
 
 [tests."x/crypto/chacha20/rfc8439_a4_poly_key.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/rfc8439_a5_aead.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/flipped_tag_row.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/truncated_box_row.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/key_len_trap.lu"]
@@ -1957,60 +1985,60 @@ native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_smoke.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_invalid_smoke.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p1.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p2.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p3.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p4.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p5.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p6.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p7.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p8.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_invalid_p1.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_invalid_p2.lu"]
 lupin = "slow"
-wolfc = "unsupported"
+wolfc = "run"
 native = "run"

@@ -28,8 +28,10 @@
 //! document is the authority.
 //!
 //! **The ChaCha word currency is `wrapping[u64]`, masked to 32 bits**
-//! (the sha2 discipline, F-0089: the native rung refuses the narrowing
-//! `int as wrapping[u32]` while the widening cast lowers everywhere).
+//! (the sha2 discipline, chosen when F-0089 kept the narrowing
+//! `int as wrapping[u32]` off the native rung; that refusal CLOSED at
+//! the sc18 pin — s111 / wolf-lang#131 — and the respell is sha2's
+//! recorded follow-on, shared by this module, never a bump side-effect).
 //! Every value entering a round is 32-bit-clean and every sum or
 //! rotation is masked before it is stored. Unlike SHA-2, ChaCha20 is
 //! LITTLE-endian at state load and keystream serialization (§2.3) —
@@ -46,19 +48,18 @@
 //! violated bound would be a trap the vectors catch, not a silent
 //! wrap. No `wrapping[T]` appears anywhere in the MAC.
 //!
-//! **Lanes, measured at these pins**: lupin RUNS and native RUNS; the
-//! checked tier answers `unsupported` at `mem` for any body reaching
-//! the ChaCha core — shifts and bitwise operators on `wrapping[T]`
-//! are outside its modelled surface ("this operator in checked
-//! execution", F-0091 / wolf-lang#130, the digest ladder's inherited
-//! dark-lane posture; wolf-lang s111 is fixing it concurrently and
-//! the next pin bump flips sha2 and this module in one motion). The
-//! nuance the probe delta measured, confirmed at the test level: the
-//! checked tier's refusal is DYNAMIC — it refuses the operator when
-//! the executed path reaches one — so Poly1305's checked-int
-//! arithmetic runs on ALL THREE lanes even inside this module
-//! (`tests/x/crypto/chacha20/rfc8439_a3_poly1305.lu` is a three-lane
-//! row), and only paths that reach the ChaCha core go dark.
+//! **Lanes, measured at the sc18 pin (wolf 21b129e)**: ALL THREE run
+//! every body. The checked tier's F-0091 operator refusal that kept
+//! any path reaching the ChaCha core dark from sc17's first commit
+//! closed with s111 (wolf-lang#130) — "the next pin bump flips sha2
+//! and this module in one motion", and it did: all 19 dark chacha20
+//! rows flipped `unsupported` -> `run` at the bump, the full
+//! Wycheproof parts included (the checked tier's resource budgets that
+//! keep sha2's biggest files dark are not reached by 32-vector AEAD
+//! parts, measured at the bump). The sc17 nuance stands as history:
+//! the refusal was DYNAMIC — per executed path — which is why
+//! Poly1305's checked-int arithmetic was three-lane a sprint before
+//! the rest of the module.
 //!
 //! **Byte sequences are `List[int]` with the documented 0..255
 //! element contract** (§11's interim, F-0035): an element outside
