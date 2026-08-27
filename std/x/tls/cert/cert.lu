@@ -1,0 +1,1542 @@
+//! member: true
+//!
+//! std.x.tls.cert — X.509 v3 certificate parsing and Ed25519 chain
+//! validation (RFC 5280 over X.690 DER). Stability tier: x — the THIRD
+//! rung of the stdc-tls campaign (sprint sc22), the rung that makes
+//! sc21's opaque Certificate bytes MEAN something: sc21 carries the DER
+//! and builds the §4.4.3 signed octets; this module parses the
+//! certificate, checks its signature with the issuer's Ed25519 key
+//! (sc18), and validates a chain against a trust anchor, a hostname and
+//! a SUPPLIED time.
+//!
+//! **The nursery banner (D31).** `std.x.tls.cert` is not `std.tls`: its
+//! path, names and behaviour may change or vanish in one sprint; no
+//! other std module may depend on it. Its reason and graduation trigger
+//! live in `std/x/README.md`. It depends on ONE sibling resident —
+//! `std.x.crypto.curve25519` (Ed25519 verify) — a resident-on-resident
+//! edge the graduation move to `std.tls`/`std.crypto` must resolve,
+//! named in the register beside the record/handshake/jose edges.
+//!
+//! **Built from the DOCUMENTS, not ported.** ITU-T X.690 (the DER
+//! encoding rules — §8.1 TLV structure and lengths, §8.3 INTEGER
+//! minimality, §8.19 OID subidentifiers, §10 the definite-form and
+//! minimal-length rules, §11.1 BOOLEAN, §11.5 DEFAULT-value absence,
+//! §11.6 SET-OF ordering) and RFC 5280 (the X.509/PKIX profile — §4.1
+//! the certificate structure, §4.1.2.2 serial numbers, §4.1.2.5 the
+//! UTCTime/GeneralizedTime split and the 2-digit-year window, §4.2 the
+//! extension rules, §6.1 path validation) plus RFC 8410 (Ed25519
+//! AlgorithmIdentifier: NO parameters, §3). Section numbers are cited
+//! at the rejection sites they license.
+//!
+//! ## The robustness contract (the sprint's flagship)
+//!
+//! Every length read from the input is VALIDATED against the remaining
+//! window before a single content byte is touched: a length that claims
+//! more bytes than remain, an indefinite length (X.690 §10.1 forbids it
+//! in DER), a non-minimal length encoding, a reserved length octet —
+//! each is a clean, named `der` rejection, never an out-of-bounds read
+//! and never a trap. wolf's checked arithmetic (X3) and region memory
+//! make the overrun STRUCTURALLY impossible; the decoder's job on top
+//! of that is to turn "impossible" into "rejected", because a server
+//! cannot abort on a bad input. The decoder is grammar-directed (it
+//! walks exactly the X.509 productions, and carries anything it does
+//! not model as opaque bytes), so there is NO unbounded recursion for a
+//! nesting bomb to exhaust: a deeply nested structure inside an unknown
+//! extension is never walked at all.
+//!
+//! ## The scope line (honest about the crypto ladder)
+//!
+//! Signature VALIDATION is Ed25519 only (sc18's `curve25519.verify`) —
+//! the D53 ladder has Ed25519/X25519, not RSA or ECDSA-P256. A
+//! certificate signed with any other algorithm PARSES structurally
+//! (the hardening win is algorithm-independent) and validation answers
+//! the named `unsupported_alg` rejection — NEVER a silent accept: an
+//! unverified signature reported as valid would be a correctness
+//! failure, and that honesty is this rung's load-bearing post. RSA and
+//! ECDSA validation arrive with their crypto rungs. NAMED RESIDUE
+//! (deliberately not half-built): revocation (CRL/OCSP — its own rung),
+//! RFC 6125 wildcard matching (`host_matches` is exact-label only),
+//! the CN-fallback for hostnames (deprecated; SAN is the only source
+//! here), name constraints and the policy machinery (RFC 5280 §4.2.1.10
+//! / §6.1's policy tree), and non-dNSName SAN forms (IP, URI, email are
+//! carried, not matched).
+//!
+//! ## ct: certificates are PUBLIC data
+//!
+//! Everything this module touches — the DER, the names, the validity
+//! dates, the public keys, the signatures — is public wire material.
+//! No secret is present anywhere in this module, so no function here
+//! carries a constant-time obligation (unlike the handshake's secrets
+//! or sc18's signing scalar; the sc18 rule: VERIFY is public data).
+//! Every `pub` fn states `ct: public data` so the posture is explicit
+//! rather than inferred. The 0..255 ingestion guard is the recorded
+//! value-dependent branch shared with the whole ladder (F-0035's real
+//! byte type retires it); it runs on public bytes here.
+//!
+//! ## Time is a SUPPLIED argument, never the wall clock
+//!
+//! Validity checking takes `now` as an argument in the compact form
+//! `yyyymmddhhmmss` (UTC, the `timestamp` helper builds it). Certificate
+//! times decode to the same form, so the comparison is plain integer
+//! order and every test is deterministic — nothing in this module reads
+//! a clock (it is capability-free: pure, comptime-refused only by its
+//! delegate curve25519 when a validation reaches a signature).
+//!
+//! ## The ws05-consumable seam (FROZEN)
+//!
+//! `validate_chain(chain, hostname, anchor, now) -> Cert ! {...}` is
+//! the seam wolf-wws ws05 consumes: `chain` is the peer's certificate
+//! chain as CONCATENATED DER, leaf first (exactly the `cert_data`
+//! entries of sc21's Certificate message, joined — DER is
+//! self-delimiting, `cert_end` finds each boundary); `hostname` is the
+//! SNI/target name; `anchor` is the trust anchor's DER (the pinned
+//! Ed25519 CA); `now` is the supplied validation time. The answer is
+//! the parsed LEAF (subject, SAN, validity, SPKI — the fields ws05
+//! reads) or a NAMED rejection: `der` (malformed encoding),
+//! `unsupported_alg`, `bad_signature`, `expired`, `not_yet_valid`,
+//! `name_mismatch`, `not_ca`, `issuer_mismatch`, `unknown_critical`.
+//! sc22 owns certificate meaning; sc21 owns the handshake flow that
+//! carries the bytes; ws05 owns the socket conversation. The seam is
+//! frozen at sc22; `std/x/README.md` records it.
+//!
+//! Byte sequences are `List[int]` with the 0..255 element contract
+//! (§11's interim, F-0035), the whole ladder's convention. Chain
+//! validation is iterative (no recursion, no per-chain allocation
+//! beyond the parsed certificates); the trust anchor is validated like
+//! any chain certificate (validity + extension discipline) — a
+//! deliberately STRICTER reading than RFC 5280 §6.1.1(d)'s
+//! anchor-as-input, stated here because the pinned local CA is a
+//! certificate this module can and does hold to the profile.
+
+use std.x.crypto.curve25519
+
+// ---------------------------------------------------------------------
+// Byte helpers — the 0..255 contract, sub-slices, equality. All public
+// data; the helpers are O(n) walks (the portable List shapes, F-0078).
+// ---------------------------------------------------------------------
+
+/// The 0..255 ingestion guard (§11's `List[int]` byte contract).
+/// ct: NOT free of value-dependent branches — the recorded ct exception
+/// shared verbatim with the ladder (it leaves with F-0035's real byte
+/// type). Runs only on public certificate bytes here.
+fn require_byte(v: int) {
+    if v < 0 {
+        assert(false, "tls.cert: element outside 0..255")
+    }
+    if v > 255 {
+        assert(false, "tls.cert: element outside 0..255")
+    }
+}
+
+/// The bytes of `b` from offset `from` (inclusive) to `to` (exclusive),
+/// as a fresh list. Offsets are the module's own (computed from
+/// validated lengths), so a violation would be a bug in std, not in the
+/// caller's data — hence the trap-on-contract posture via the checked
+/// walk (nothing here can actually go out of bounds: the walk is
+/// bounded by the list itself).
+fn sub(b: List[int], from: int, to: int) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    for v in b {
+        if i >= from {
+            if i < to {
+                require_byte(v)
+                (mut out).push(v)
+            }
+        }
+        i = i + 1
+    }
+    out
+}
+
+/// Byte-list equality. Public data; no constant-time obligation (names
+/// and encodings are public — the sc18 verify-is-public rule).
+fn bytes_eq(a: List[int], b: List[int]) -> bool {
+    if a.len != b.len {
+        return false
+    }
+    var i = 0
+    var same = true
+    while i < a.len {
+        if a[i] != b[i] {
+            same = false
+        }
+        i = i + 1
+    }
+    same
+}
+
+/// X.690 §11.6 SET-OF order: `a <= b` comparing encodings as octet
+/// strings, the shorter padded at its trailing end with zero octets.
+fn set_le(a: List[int], b: List[int]) -> bool {
+    var n = a.len
+    if b.len > n {
+        n = b.len
+    }
+    var i = 0
+    while i < n {
+        var x = 0
+        if i < a.len {
+            x = a[i]
+        }
+        var y = 0
+        if i < b.len {
+            y = b[i]
+        }
+        if x < y {
+            return true
+        }
+        if x > y {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+// ---------------------------------------------------------------------
+// The DER reader (X.690 §8.1/§10). A cursor over the input with a hard
+// window: `pos` may never pass `end`, and every composite narrows `end`
+// to its own content bound before its children parse. Every rejection
+// is the `der` mark — one tag, because a caller acts the same way on
+// every malformed encoding (§12's one-tag-per-actionable-mode rule);
+// WHICH clause failed is a diagnostic concern, and the conformance
+// tests pin each clause by construction.
+// ---------------------------------------------------------------------
+
+struct Rd {
+    b: List[int],
+    pos: int,
+    end: int,
+}
+
+struct Tlv {
+    tag: int,
+    cons: bool,
+    len: int,
+}
+
+/// One byte, advancing. Truncation (reading past the window) is the
+/// canonical `der` rejection — never an out-of-bounds read.
+fn rd_byte(mut r: Rd) -> int ! {der} {
+    if r.pos >= r.end {
+        return der
+    }
+    let v = r.b[r.pos]
+    if v < 0 {
+        return der
+    }
+    if v > 255 {
+        return der
+    }
+    r.pos = r.pos + 1
+    v
+}
+
+/// The TLV header at the cursor: identifier octet + definite length,
+/// both validated (X.690 §8.1). Rejects: a multi-byte tag number (0x1F
+/// low bits — X.509 uses none, §8.1.2.4 scoped out by profile), the
+/// indefinite length 0x80 (§10.1: DER is definite-form only), the
+/// reserved octet 0xFF (§8.1.3.5(c)), a length-of-length above 4 (no
+/// certificate approaches 2^31; anything larger cannot fit the window
+/// either), a non-minimal length (§10.1: the shortest form is
+/// mandatory — a long form whose value fits the short form, or a
+/// leading zero length octet), and a length exceeding the bytes that
+/// REMAIN in the window (the overrun class).
+fn rd_tag_len(mut r: Rd) -> Tlv ! {der} {
+    let t = rd_byte(mut r)?
+    if t % 32 == 31 {
+        return der
+    }
+    let cons = t / 32 % 2 == 1
+    let first = rd_byte(mut r)?
+    var length = 0
+    if first < 128 {
+        length = first
+    } else {
+        if first == 128 {
+            return der
+        }
+        if first == 255 {
+            return der
+        }
+        let n = first - 128
+        if n > 4 {
+            return der
+        }
+        var acc = 0
+        var i = 0
+        while i < n {
+            let d = rd_byte(mut r)?
+            if i == 0 {
+                if d == 0 {
+                    return der
+                }
+            }
+            acc = acc * 256 + d
+            i = i + 1
+        }
+        if acc < 128 {
+            return der
+        }
+        length = acc
+    }
+    if length > r.end - r.pos {
+        return der
+    }
+    Tlv { tag: t, cons: cons, len: length }
+}
+
+/// The TLV header, requiring the exact identifier octet `tag` (which
+/// encodes class, constructed bit and number at once, so a primitive
+/// SEQUENCE or a constructed INTEGER is rejected by the same equality).
+/// Returns the content length.
+fn rd_expect(mut r: Rd, tag: int) -> int ! {der} {
+    let t = rd_tag_len(mut r)?
+    if t.tag != tag {
+        return der
+    }
+    t.len
+}
+
+/// Skip `n` content bytes (already validated against the window by the
+/// header read that produced `n`).
+fn rd_skip(mut r: Rd, n: int) {
+    r.pos = r.pos + n
+}
+
+/// The content bytes of length `n` from the cursor, advancing.
+fn rd_take(mut r: Rd, n: int) -> List[int] {
+    let out = sub(r.b, r.pos, r.pos + n)
+    r.pos = r.pos + n
+    out
+}
+
+// ---------------------------------------------------------------------
+// DER value parsers — INTEGER, BOOLEAN, OID, BIT STRING, the string
+// types, the two Time types. Each enforces the DER clause it cites.
+// ---------------------------------------------------------------------
+
+/// INTEGER content minimality (X.690 §8.3.2): at least one octet; a
+/// leading 0x00 is legal only before a high bit, a leading 0xFF only
+/// before a clear one.
+fn int_minimal(bs: List[int]) -> bool {
+    if bs.len == 0 {
+        return false
+    }
+    if bs.len == 1 {
+        return true
+    }
+    let b0 = bs[0]
+    let b1 = bs[1]
+    if b0 == 0 {
+        if b1 < 128 {
+            return false
+        }
+    }
+    if b0 == 255 {
+        if b1 >= 128 {
+            return false
+        }
+    }
+    true
+}
+
+/// A small non-negative INTEGER as an `int` (the version field, the
+/// pathLenConstraint): content minimal, non-negative, at most 4 octets.
+fn rd_small_int(mut r: Rd) -> int ! {der} {
+    let n = rd_expect(mut r, 2)?
+    if n > 4 {
+        return der
+    }
+    let bs = rd_take(mut r, n)
+    if !int_minimal(bs) {
+        return der
+    }
+    if bs[0] >= 128 {
+        return der
+    }
+    var acc = 0
+    for v in bs {
+        acc = acc * 256 + v
+    }
+    acc
+}
+
+/// BOOLEAN (X.690 §8.2 + §11.1): one octet, and DER restricts TRUE to
+/// 0xFF exactly — 0x01 is BER and rejected.
+fn rd_boolean(mut r: Rd) -> bool ! {der} {
+    let n = rd_expect(mut r, 1)?
+    if n != 1 {
+        return der
+    }
+    let v = rd_byte(mut r)?
+    if v == 0 {
+        return false
+    }
+    if v == 255 {
+        return true
+    }
+    der
+}
+
+/// OBJECT IDENTIFIER content to dotted-decimal (X.690 §8.19): non-empty,
+/// each subidentifier base-128 with no 0x80 padding octet (§8.19.2's
+/// minimality), the final octet's continuation bit clear, and each arc
+/// capped well under `int` so the checked arithmetic can never trap on
+/// adversarial input — an oversized arc is a `der` rejection instead.
+fn rd_oid(mut r: Rd) -> str ! {der} {
+    let n = rd_expect(mut r, 6)?
+    if n == 0 {
+        return der
+    }
+    let bs = rd_take(mut r, n)
+    var out = ""
+    var acc = 0
+    var in_sub = false
+    var first_done = false
+    var i = 0
+    while i < bs.len {
+        let v = bs[i]
+        if !in_sub {
+            if v == 128 {
+                return der
+            }
+        }
+        if acc > 16777215 {
+            return der
+        }
+        acc = acc * 128 + v % 128
+        in_sub = v >= 128
+        if !in_sub {
+            if first_done {
+                out = "{out}.{acc}"
+            } else {
+                var root = 0
+                var second = acc
+                if acc >= 40 {
+                    root = 1
+                    second = acc - 40
+                }
+                if acc >= 80 {
+                    root = 2
+                    second = acc - 80
+                }
+                out = "{root}.{second}"
+                first_done = true
+            }
+            acc = 0
+        }
+        i = i + 1
+    }
+    if in_sub {
+        return der
+    }
+    out
+}
+
+/// PrintableString charset (X.680 §41.4): letters, digits, and the
+/// eleven permitted marks. Anything else rejects.
+fn printable_ok(bs: List[int]) -> bool {
+    var ok = true
+    for v in bs {
+        var this_ok = false
+        if v >= 65 {
+            if v <= 90 {
+                this_ok = true
+            }
+        }
+        if v >= 97 {
+            if v <= 122 {
+                this_ok = true
+            }
+        }
+        if v >= 48 {
+            if v <= 57 {
+                this_ok = true
+            }
+        }
+        if v == 32 {
+            this_ok = true
+        }
+        if v == 39 {
+            this_ok = true
+        }
+        if v >= 40 {
+            if v <= 41 {
+                this_ok = true
+            }
+        }
+        if v >= 43 {
+            if v <= 47 {
+                this_ok = true
+            }
+        }
+        if v == 58 {
+            this_ok = true
+        }
+        if v == 61 {
+            this_ok = true
+        }
+        if v == 63 {
+            this_ok = true
+        }
+        if !this_ok {
+            ok = false
+        }
+    }
+    ok
+}
+
+/// IA5String content: bytes 0..127 (ASCII), and for the names this
+/// module reads (dNSName) additionally non-NUL.
+fn ia5_ok(bs: List[int]) -> bool {
+    var ok = true
+    for v in bs {
+        if v > 127 {
+            ok = false
+        }
+        if v == 0 {
+            ok = false
+        }
+    }
+    ok
+}
+
+/// Two ASCII digits from `bs` at `i` as an int, or the miss.
+fn two_digits(bs: List[int], i: int) -> int ! {der} {
+    let a = bs[i]
+    let b = bs[i + 1]
+    if a < 48 {
+        return der
+    }
+    if a > 57 {
+        return der
+    }
+    if b < 48 {
+        return der
+    }
+    if b > 57 {
+        return der
+    }
+    (a - 48) * 10 + (b - 48)
+}
+
+/// Assemble and range-check a `yyyymmddhhmmss` timestamp from parsed
+/// fields (month 1..12, day 1..31, hour 0..23, minute/second 0..59 —
+/// the ranges RFC 5280's profile of ISO 8601 admits; leap seconds are
+/// not represented, per the UTCTime/GeneralizedTime DER restriction to
+/// second 0..59 this profile enforces).
+fn build_ts(y: int, mo: int, d: int, h: int, mi: int, s: int) -> int ! {der} {
+    if mo < 1 {
+        return der
+    }
+    if mo > 12 {
+        return der
+    }
+    if d < 1 {
+        return der
+    }
+    if d > 31 {
+        return der
+    }
+    if h > 23 {
+        return der
+    }
+    if mi > 59 {
+        return der
+    }
+    if s > 59 {
+        return der
+    }
+    let scale: int = 10000000000
+    let ymd = y * scale
+    ymd + mo * 100000000 + d * 1000000 + h * 10000 + mi * 100 + s
+}
+
+/// One RFC 5280 Time (§4.1.2.5): UTCTime `YYMMDDHHMMSSZ` (seconds
+/// mandatory, Z mandatory, §4.1.2.5.1; the 2-digit-year window: 50..99
+/// is 19xx, 00..49 is 20xx) or GeneralizedTime `YYYYMMDDHHMMSSZ`
+/// (§4.1.2.5.2: no fractional seconds, Z mandatory) — and the profile's
+/// split is enforced BOTH ways: dates through 2049 MUST be UTCTime, so
+/// a GeneralizedTime year before 2050 is a `der` rejection (§4.1.2.5).
+fn rd_time(mut r: Rd) -> int ! {der} {
+    let t = rd_tag_len(mut r)?
+    if t.tag == 23 {
+        if t.len != 13 {
+            return der
+        }
+        let bs = rd_take(mut r, 13)
+        if bs[12] != 90 {
+            return der
+        }
+        let yy = two_digits(bs, 0)?
+        var y = 2000 + yy
+        if yy >= 50 {
+            y = 1900 + yy
+        }
+        let mo = two_digits(bs, 2)?
+        let d = two_digits(bs, 4)?
+        let h = two_digits(bs, 6)?
+        let mi = two_digits(bs, 8)?
+        let s = two_digits(bs, 10)?
+        return build_ts(y, mo, d, h, mi, s)
+    }
+    if t.tag == 24 {
+        if t.len != 15 {
+            return der
+        }
+        let bs = rd_take(mut r, 15)
+        if bs[14] != 90 {
+            return der
+        }
+        let hi = two_digits(bs, 0)?
+        let lo = two_digits(bs, 2)?
+        let y = hi * 100 + lo
+        if y < 2050 {
+            return der
+        }
+        let mo = two_digits(bs, 4)?
+        let d = two_digits(bs, 6)?
+        let h = two_digits(bs, 8)?
+        let mi = two_digits(bs, 10)?
+        let s = two_digits(bs, 12)?
+        return build_ts(y, mo, d, h, mi, s)
+    }
+    der
+}
+
+// ---------------------------------------------------------------------
+// X.509 structure parsers (RFC 5280 §4.1) — AlgorithmIdentifier, Name,
+// SubjectPublicKeyInfo, the extensions.
+// ---------------------------------------------------------------------
+
+struct Alg {
+    dotted: str,
+    raw: List[int],
+}
+
+struct NameInfo {
+    raw: List[int],
+    cn: str,
+}
+
+struct Spki {
+    alg: str,
+    key: List[int],
+}
+
+struct Exts {
+    has_bc: bool,
+    is_ca: bool,
+    path_len: int,
+    key_usage: int,
+    has_san: bool,
+    san: List[str],
+    crit_unknown: str,
+}
+
+/// AlgorithmIdentifier: SEQUENCE { algorithm OID, parameters ANY
+/// OPTIONAL }. The raw encoding is captured for the §4.1.2.3 equality
+/// check (TBS `signature` must equal the outer `signatureAlgorithm`).
+/// RFC 8410 §3: the Ed25519 identifier MUST have absent parameters —
+/// present parameters (even NULL) reject. Other algorithms' parameters
+/// are carried opaquely (RSA's NULL, ECDSA's named curve).
+fn rd_alg(mut r: Rd) -> Alg ! {der} {
+    let start = r.pos
+    let n = rd_expect(mut r, 48)?
+    let stop = r.pos + n
+    let saved = r.end
+    r.end = stop
+    let dotted = rd_oid(mut r)?
+    if dotted == "1.3.101.112" {
+        if r.pos != stop {
+            return der
+        }
+    }
+    if r.pos < stop {
+        let p = rd_tag_len(mut r)?
+        rd_skip(mut r, p.len)
+    }
+    if r.pos != stop {
+        return der
+    }
+    r.end = saved
+    let raw = sub(r.b, start, stop)
+    Alg { dotted: dotted, raw: raw }
+}
+
+/// One AttributeTypeAndValue: SEQUENCE { type OID, value ANY }. The CN
+/// (2.5.4.3) value must be UTF8String or PrintableString (RFC 5280
+/// §4.1.2.4's profile for new certificates), validated and returned;
+/// every other attribute's value is carried opaquely (any single TLV).
+fn rd_atv(mut r: Rd) -> str ! {der} {
+    let n = rd_expect(mut r, 48)?
+    let stop = r.pos + n
+    let saved = r.end
+    r.end = stop
+    let attr = rd_oid(mut r)?
+    let vt = rd_tag_len(mut r)?
+    var cn = ""
+    if attr == "2.5.4.3" {
+        if vt.tag == 12 {
+            let bs = rd_take(mut r, vt.len)
+            let s = str_from_utf8(bs) else |_| {
+                return der
+            }
+            cn = s
+        } else {
+            if vt.tag != 19 {
+                return der
+            }
+            let bs = rd_take(mut r, vt.len)
+            if !printable_ok(bs) {
+                return der
+            }
+            let s = str_from_utf8(bs) else |_| {
+                return der
+            }
+            cn = s
+        }
+    } else {
+        rd_skip(mut r, vt.len)
+    }
+    if r.pos != stop {
+        return der
+    }
+    r.end = saved
+    cn
+}
+
+/// A Name (RFC 5280 §4.1.2.4): SEQUENCE OF RelativeDistinguishedName,
+/// each a SET OF AttributeTypeAndValue with at least one member, the
+/// members in X.690 §11.6 DER order (an unsorted SET rejects). The raw
+/// Name encoding is captured — name chaining (§6.1's issuer/subject
+/// linkage) compares these bytes exactly, the reading DER's canonical
+/// encodings license (the §7.1 caseIgnoreMatch machinery is named
+/// residue with the rest of the internationalized-name work).
+fn rd_name(mut r: Rd) -> NameInfo ! {der} {
+    let start = r.pos
+    let n = rd_expect(mut r, 48)?
+    let stop = r.pos + n
+    let saved = r.end
+    r.end = stop
+    var cn = ""
+    while r.pos < stop {
+        let rdn_len = rd_expect(mut r, 49)?
+        if rdn_len == 0 {
+            return der
+        }
+        let rdn_stop = r.pos + rdn_len
+        let rdn_saved = r.end
+        r.end = rdn_stop
+        var prev = List[int]()
+        var have_prev = false
+        while r.pos < rdn_stop {
+            let atv_start = r.pos
+            let got = rd_atv(mut r)?
+            if got != "" {
+                cn = got
+            }
+            let enc = sub(r.b, atv_start, r.pos)
+            if have_prev {
+                if !set_le(prev, enc) {
+                    return der
+                }
+            }
+            prev = enc
+            have_prev = true
+        }
+        r.end = rdn_saved
+    }
+    if r.pos != stop {
+        return der
+    }
+    r.end = saved
+    let raw = sub(r.b, start, stop)
+    NameInfo { raw: raw, cn: cn }
+}
+
+/// SubjectPublicKeyInfo (§4.1.2.7): SEQUENCE { AlgorithmIdentifier,
+/// subjectPublicKey BIT STRING }. The BIT STRING must have zero unused
+/// bits (every SPKI this profile reads is whole octets), and an
+/// Ed25519 key must be exactly 32 bytes (RFC 8410 §4).
+fn rd_spki(mut r: Rd) -> Spki ! {der} {
+    let n = rd_expect(mut r, 48)?
+    let stop = r.pos + n
+    let saved = r.end
+    r.end = stop
+    let alg = rd_alg(mut r)?
+    let bn = rd_expect(mut r, 3)?
+    if bn == 0 {
+        return der
+    }
+    let unused = rd_byte(mut r)?
+    if unused != 0 {
+        return der
+    }
+    let key = rd_take(mut r, bn - 1)
+    if alg.dotted == "1.3.101.112" {
+        if key.len != 32 {
+            return der
+        }
+    }
+    if r.pos != stop {
+        return der
+    }
+    r.end = saved
+    Spki { alg: alg.dotted, key: key }
+}
+
+/// basicConstraints (§4.2.1.9): SEQUENCE { cA BOOLEAN DEFAULT FALSE,
+/// pathLenConstraint INTEGER OPTIONAL }. DER's §11.5 rule makes an
+/// encoded FALSE a rejection (the default is expressed by ABSENCE), and
+/// the RFC forbids pathLenConstraint without cA TRUE.
+fn parse_bc(bs: List[int]) -> Exts ! {der} {
+    let bn0 = bs.len
+    var r = Rd { b: bs, pos: 0, end: bn0 }
+    let n = rd_expect(mut r, 48)?
+    let stop = r.pos + n
+    var is_ca = false
+    var path_len = 0 - 1
+    if r.pos < stop {
+        let t = rd_tag_len(mut r)?
+        if t.tag == 1 {
+            if t.len != 1 {
+                return der
+            }
+            let v = rd_byte(mut r)?
+            if v == 0 {
+                return der
+            }
+            if v != 255 {
+                return der
+            }
+            is_ca = true
+            if r.pos < stop {
+                path_len = rd_small_int(mut r)?
+            }
+        } else {
+            if t.tag != 2 {
+                return der
+            }
+            return der
+        }
+    }
+    if r.pos != stop {
+        return der
+    }
+    if r.pos != bn0 {
+        return der
+    }
+    Exts {
+        has_bc: true,
+        is_ca: is_ca,
+        path_len: path_len,
+        key_usage: 0 - 1,
+        has_san: false,
+        san: List[str](),
+        crit_unknown: "",
+    }
+}
+
+/// keyUsage (§4.2.1.3): a named-bit BIT STRING, at least one bit set,
+/// DER-trimmed (no trailing zero content octet, declared-unused bits
+/// zero). Decoded as an int where KeyUsage bit i contributes 2^i
+/// (digitalSignature = 1, keyCertSign = 32, cRLSign = 64, ...).
+fn parse_ku(bs: List[int]) -> int ! {der} {
+    let bn0 = bs.len
+    var r = Rd { b: bs, pos: 0, end: bn0 }
+    let n = rd_expect(mut r, 3)?
+    if n < 2 {
+        return der
+    }
+    let unused = rd_byte(mut r)?
+    if unused > 7 {
+        return der
+    }
+    let content = rd_take(mut r, n - 1)
+    if r.pos != bn0 {
+        return der
+    }
+    let last = content[content.len - 1]
+    if last == 0 {
+        return der
+    }
+    var mask = 1
+    var i = 0
+    while i < unused {
+        mask = mask * 2
+        i = i + 1
+    }
+    if last % mask != 0 {
+        return der
+    }
+    var flags = 0
+    var j = 0
+    for byte_v in content {
+        var bit = 0
+        var rest = byte_v
+        var place = 128
+        while bit < 8 {
+            var weight = 1
+            var k = 0
+            while k < j * 8 + bit {
+                weight = weight * 2
+                k = k + 1
+            }
+            if rest >= place {
+                rest = rest - place
+                flags = flags + weight
+            }
+            place = place / 2
+            bit = bit + 1
+        }
+        j = j + 1
+    }
+    if flags == 0 {
+        return der
+    }
+    flags
+}
+
+/// subjectAltName (§4.2.1.6): SEQUENCE OF GeneralName with at least one
+/// name. dNSName entries ([2] IA5String, ASCII, non-empty) are decoded;
+/// the other GeneralName forms (otherName, rfc822Name, dirName,
+/// uniformResourceIdentifier, iPAddress, registeredID, ...) are carried
+/// opaquely — present, unmatched (the residue line in the header).
+fn parse_san(bs: List[int]) -> List[str] ! {der} {
+    let bn0 = bs.len
+    var r = Rd { b: bs, pos: 0, end: bn0 }
+    let n = rd_expect(mut r, 48)?
+    if n == 0 {
+        return der
+    }
+    let stop = r.pos + n
+    var out = List[str]()
+    while r.pos < stop {
+        let t = rd_tag_len(mut r)?
+        let cls = t.tag / 64
+        if cls != 2 {
+            return der
+        }
+        let num = t.tag % 32
+        if num > 8 {
+            return der
+        }
+        if t.tag == 130 {
+            if t.len == 0 {
+                return der
+            }
+            let bs2 = rd_take(mut r, t.len)
+            if !ia5_ok(bs2) {
+                return der
+            }
+            let name = str_from_utf8(bs2) else |_| {
+                return der
+            }
+            (mut out).push(name)
+        } else {
+            rd_skip(mut r, t.len)
+        }
+    }
+    if r.pos != stop {
+        return der
+    }
+    if r.pos != bn0 {
+        return der
+    }
+    out
+}
+
+/// The [3] extensions block (§4.1.2.9 + §4.2): a non-empty SEQUENCE OF
+/// Extension `{ extnID OID, critical BOOLEAN DEFAULT FALSE, extnValue
+/// OCTET STRING }`. Enforced here: an explicitly encoded FALSE rejects
+/// (X.690 §11.5), a duplicate extnID rejects (§4.2: at most one
+/// instance of a particular extension), and the three recognized
+/// extensions parse fully. An UNRECOGNIZED extension is carried when
+/// non-critical and RECORDED when critical — `parse` succeeds either
+/// way (the structure is sound), and validation answers the RFC's
+/// mandated rejection (`unknown_critical`) so the parse/validate split
+/// survives real-world certificates.
+fn rd_exts(mut r: Rd) -> Exts ! {der} {
+    let outer = rd_expect(mut r, 163)?
+    let outer_stop = r.pos + outer
+    let outer_saved = r.end
+    r.end = outer_stop
+    let n = rd_expect(mut r, 48)?
+    if n == 0 {
+        return der
+    }
+    let stop = r.pos + n
+    var has_bc = false
+    var is_ca = false
+    var path_len = 0 - 1
+    var key_usage = 0 - 1
+    var has_san = false
+    var san = List[str]()
+    var crit_unknown = ""
+    var seen = List[str]()
+    while r.pos < stop {
+        let en = rd_expect(mut r, 48)?
+        let e_stop = r.pos + en
+        let e_saved = r.end
+        r.end = e_stop
+        let id = rd_oid(mut r)?
+        var dup = false
+        for s in seen {
+            if s == id {
+                dup = true
+            }
+        }
+        if dup {
+            return der
+        }
+        (mut seen).push(id)
+        var critical = false
+        let peek = r.pos
+        let t = rd_tag_len(mut r)?
+        if t.tag == 1 {
+            r.pos = peek
+            let c = rd_boolean(mut r)?
+            if !c {
+                return der
+            }
+            critical = true
+        } else {
+            r.pos = peek
+        }
+        let vn = rd_expect(mut r, 4)?
+        let inner = rd_take(mut r, vn)
+        if r.pos != e_stop {
+            return der
+        }
+        r.end = e_saved
+        if id == "2.5.29.19" {
+            let bc = parse_bc(inner)?
+            has_bc = true
+            is_ca = bc.is_ca
+            path_len = bc.path_len
+        } else if id == "2.5.29.15" {
+            key_usage = parse_ku(inner)?
+        } else if id == "2.5.29.17" {
+            san = parse_san(inner)?
+            has_san = true
+        } else if critical {
+            if crit_unknown == "" {
+                crit_unknown = id
+            }
+        }
+    }
+    if r.pos != stop {
+        return der
+    }
+    if r.pos != outer_stop {
+        return der
+    }
+    r.end = outer_saved
+    Exts {
+        has_bc: has_bc,
+        is_ca: is_ca,
+        path_len: path_len,
+        key_usage: key_usage,
+        has_san: has_san,
+        san: san,
+        crit_unknown: crit_unknown,
+    }
+}
+
+// ---------------------------------------------------------------------
+// The certificate (RFC 5280 §4.1) — the parsed value and the parser.
+// ---------------------------------------------------------------------
+
+/// A parsed X.509 certificate — the fields wolf-wws ws05 reads, plus
+/// the raw material validation needs (`tbs` is the exact DER of the
+/// TBSCertificate, the octets the signature is over; `issuer`/`subject`
+/// are the raw Name encodings, the chaining currency). Times are
+/// compact `yyyymmddhhmmss` UTC ints. `path_len` and `key_usage` are
+/// -1 when their extensions are absent; `crit_unknown` is the first
+/// unrecognized CRITICAL extnID ("" when none — validation rejects a
+/// non-empty one by name, RFC 5280 §4.2's rule). This pin has no
+/// private fields, so a forged Cert is constructible; every consumer
+/// here treats the fields as data and answers with rows, never traps.
+/// ct: public data throughout — a certificate carries no secret.
+pub struct Cert {
+    version: int,
+    serial: List[int],
+    sig_alg: str,
+    issuer: List[int],
+    issuer_cn: str,
+    subject: List[int],
+    subject_cn: str,
+    not_before: int,
+    not_after: int,
+    spki_alg: str,
+    spki_key: List[int],
+    has_bc: bool,
+    is_ca: bool,
+    path_len: int,
+    key_usage: int,
+    has_san: bool,
+    san: List[str],
+    crit_unknown: str,
+    tbs: List[int],
+    sig: List[int],
+}
+
+/// Parse ONE DER certificate occupying the whole of `bytes` (RFC 5280
+/// §4.1 over X.690 DER; trailing bytes reject). Structural validation
+/// only — signatures, dates and names are DECODED here and JUDGED in
+/// `validate_chain`, so a certificate signed with an algorithm outside
+/// the ladder still parses (the split the header states). Every
+/// malformed, truncated or non-DER encoding is the named `der`
+/// rejection — no input reads out of bounds and none traps (the
+/// robustness contract; the conformance suite in `tests/x/tls/cert/`
+/// pins each clause). Rejections enforced here include: every length
+/// class (indefinite, non-minimal, overrun, reserved), INTEGER and
+/// BOOLEAN minimality, OID subidentifier form, the version field
+/// (present must be v3; v1's DEFAULT must be absent, X.690 §11.5; v2
+/// rejects), serial positivity and the 20-octet cap (§4.1.2.2), the
+/// §4.1.2.3 TBS/outer algorithm equality, the §4.1.2.5 time rules
+/// (2-digit window, mandatory seconds and Z, the 2049/2050 split),
+/// DN SET-OF order (X.690 §11.6), CN string types (§4.1.2.4),
+/// SPKI form (zero unused bits; RFC 8410's no-params, 32-byte Ed25519
+/// key), the §4.1.2.8 unique-ID prohibition, and the §4.2 extension
+/// rules (non-empty, no duplicates, DEFAULT-FALSE absence,
+/// basicConstraints/keyUsage/subjectAltName inner form).
+/// ct: public data; no secret is present.
+pub fn parse(bytes: List[int]) -> Cert ! {der} {
+    for v in bytes {
+        require_byte(v)
+    }
+    let n0 = bytes.len
+    var r = Rd { b: bytes, pos: 0, end: n0 }
+    let outer = rd_expect(mut r, 48)?
+    let outer_stop = r.pos + outer
+    if outer_stop != n0 {
+        return der
+    }
+    let tbs_start = r.pos
+    let tn = rd_expect(mut r, 48)?
+    let tbs_stop = r.pos + tn
+    let saved = r.end
+    r.end = tbs_stop
+    var version = 1
+    let peek = r.pos
+    let first = rd_tag_len(mut r)?
+    if first.tag == 160 {
+        let v_stop = r.pos + first.len
+        let v = rd_small_int(mut r)?
+        if r.pos != v_stop {
+            return der
+        }
+        if v != 2 {
+            return der
+        }
+        version = 3
+    } else {
+        r.pos = peek
+    }
+    let sn = rd_expect(mut r, 2)?
+    if sn == 0 {
+        return der
+    }
+    if sn > 20 {
+        return der
+    }
+    let serial = rd_take(mut r, sn)
+    if !int_minimal(serial) {
+        return der
+    }
+    if serial[0] >= 128 {
+        return der
+    }
+    if serial.len == 1 {
+        if serial[0] == 0 {
+            return der
+        }
+    }
+    let tbs_alg = rd_alg(mut r)?
+    let issuer = rd_name(mut r)?
+    let vn = rd_expect(mut r, 48)?
+    let v_stop = r.pos + vn
+    let not_before = rd_time(mut r)?
+    let not_after = rd_time(mut r)?
+    if r.pos != v_stop {
+        return der
+    }
+    let subject = rd_name(mut r)?
+    let spki = rd_spki(mut r)?
+    var exts = Exts {
+        has_bc: false,
+        is_ca: false,
+        path_len: 0 - 1,
+        key_usage: 0 - 1,
+        has_san: false,
+        san: List[str](),
+        crit_unknown: "",
+    }
+    if r.pos < tbs_stop {
+        let peek2 = r.pos
+        let nxt = rd_tag_len(mut r)?
+        if nxt.tag == 129 {
+            return der
+        }
+        if nxt.tag == 130 {
+            return der
+        }
+        if nxt.tag != 163 {
+            return der
+        }
+        if version != 3 {
+            return der
+        }
+        r.pos = peek2
+        exts = rd_exts(mut r)?
+    }
+    if r.pos != tbs_stop {
+        return der
+    }
+    r.end = saved
+    let tbs = sub(r.b, tbs_start, tbs_stop)
+    let outer_alg = rd_alg(mut r)?
+    if !bytes_eq(outer_alg.raw, tbs_alg.raw) {
+        return der
+    }
+    let bn = rd_expect(mut r, 3)?
+    if bn == 0 {
+        return der
+    }
+    let unused = rd_byte(mut r)?
+    if unused != 0 {
+        return der
+    }
+    let sig = rd_take(mut r, bn - 1)
+    if r.pos != outer_stop {
+        return der
+    }
+    Cert {
+        version: version,
+        serial: serial,
+        sig_alg: tbs_alg.dotted,
+        issuer: issuer.raw,
+        issuer_cn: issuer.cn,
+        subject: subject.raw,
+        subject_cn: subject.cn,
+        not_before: not_before,
+        not_after: not_after,
+        spki_alg: spki.alg,
+        spki_key: spki.key,
+        has_bc: exts.has_bc,
+        is_ca: exts.is_ca,
+        path_len: exts.path_len,
+        key_usage: exts.key_usage,
+        has_san: exts.has_san,
+        san: exts.san,
+        crit_unknown: exts.crit_unknown,
+        tbs: tbs,
+        sig: sig,
+    }
+}
+
+/// Rewind width helper for a long-form header re-read (internal; the
+/// number of extra length octets a value of `len` occupied).
+fn peek_rewind(pos: int, length: int) -> int {
+    var extra = 0
+    var v = length
+    while v > 0 {
+        extra = extra + 1
+        v = v / 256
+    }
+    pos - extra
+}
+
+/// The end offset (exclusive) of the DER certificate starting at
+/// `offset` in `chain` — the boundary walker for CONCATENATED DER
+/// (sc21's certificate_list entries, joined). Validates the outer TLV
+/// header only; `parse` validates the body. Truncation and every
+/// malformed length reject `der`.
+/// ct: public data.
+pub fn cert_end(chain: List[int], offset: int) -> int ! {der} {
+    if offset < 0 {
+        return der
+    }
+    if offset >= chain.len {
+        return der
+    }
+    let n0 = chain.len
+    var r = Rd { b: chain, pos: offset, end: n0 }
+    let n = rd_expect(mut r, 48)?
+    r.pos + n
+}
+
+// ---------------------------------------------------------------------
+// Judgement helpers — algorithm names, hostname matching, timestamps.
+// ---------------------------------------------------------------------
+
+/// The Ed25519 algorithm OID (RFC 8410): the one signature algorithm
+/// this rung VALIDATES. Zero-argument functions stand in for `const`s
+/// (F-0025).
+/// ct: public data.
+pub fn oid_ed25519() -> str {
+    "1.3.101.112"
+}
+
+/// Classify a dotted algorithm OID: "ed25519" (1.3.101.112),
+/// "rsa" (the PKCS#1 arc — signature algorithms and rsaEncryption),
+/// "ecdsa" (the X9.62 arc — ECDSA signatures and id-ecPublicKey),
+/// "ed448" (1.3.101.113), else "unknown". Classification is for
+/// REPORTING; validation asks for Ed25519 exactly and answers
+/// `unsupported_alg` for everything else.
+/// ct: public data.
+pub fn alg_name(dotted: str) -> str {
+    if dotted == "1.3.101.112" {
+        return "ed25519"
+    }
+    if dotted == "1.3.101.113" {
+        return "ed448"
+    }
+    if dotted.starts_with("1.2.840.113549.1.1.") {
+        return "rsa"
+    }
+    if dotted.starts_with("1.2.840.10045.") {
+        return "ecdsa"
+    }
+    "unknown"
+}
+
+/// KeyUsage bit weight: digitalSignature (bit 0).
+/// ct: public data.
+pub fn ku_digital_signature() -> int {
+    1
+}
+
+/// KeyUsage bit weight: keyCertSign (bit 5) — the bit an issuing CA's
+/// keyUsage must assert (§4.2.1.3).
+/// ct: public data.
+pub fn ku_key_cert_sign() -> int {
+    32
+}
+
+/// Exact, case-insensitive DNS name match (DNS names compare
+/// case-insensitively; both sides are lowered). NO wildcard support:
+/// RFC 6125 §6.4.3 wildcard matching is named residue in the module
+/// header — a `*.` pattern here simply never matches a hostname, which
+/// fails CLOSED.
+/// ct: public data.
+pub fn host_matches(pattern: str, host: str) -> bool {
+    if pattern == "" {
+        return false
+    }
+    if host == "" {
+        return false
+    }
+    pattern.lower() == host.lower()
+}
+
+/// Build the compact `yyyymmddhhmmss` timestamp `validate_chain` and
+/// the Cert fields speak (UTC). Caller-contract violations trap
+/// `assert` (X3's posture: the caller could have checked the ranges);
+/// certificate DATA with bad ranges rejects `der` in the parser
+/// instead — §10's trap-where-the-caller-broke-it rule.
+/// ct: public data.
+pub fn timestamp(y: int, mo: int, d: int, h: int, mi: int, s: int) -> int {
+    assert(y >= 0, "tls.cert: year before 0")
+    assert(y <= 9999, "tls.cert: year after 9999")
+    assert(mo >= 1, "tls.cert: month outside 1..12")
+    assert(mo <= 12, "tls.cert: month outside 1..12")
+    assert(d >= 1, "tls.cert: day outside 1..31")
+    assert(d <= 31, "tls.cert: day outside 1..31")
+    assert(h >= 0, "tls.cert: hour outside 0..23")
+    assert(h <= 23, "tls.cert: hour outside 0..23")
+    assert(mi >= 0, "tls.cert: minute outside 0..59")
+    assert(mi <= 59, "tls.cert: minute outside 0..59")
+    assert(s >= 0, "tls.cert: second outside 0..59")
+    assert(s <= 59, "tls.cert: second outside 0..59")
+    let scale: int = 10000000000
+    y * scale + mo * 100000000 + d * 1000000 + h * 10000 + mi * 100 + s
+}
+
+// ---------------------------------------------------------------------
+// Signature validation (Ed25519, sc18) and chain validation (RFC 5280
+// §6.1, scoped to what Ed25519 chains exercise).
+// ---------------------------------------------------------------------
+
+/// Verify `child`'s signature over its TBSCertificate bytes with
+/// `issuer`'s Ed25519 key. `unsupported_alg` when the child's signature
+/// algorithm or the issuer's key algorithm is anything but Ed25519 —
+/// the NAMED honest rejection, never a silent accept (the header's
+/// scope line). `bad_signature` when the Ed25519 verification fails
+/// (sc18's `verify` also answers false for wrong-length keys or
+/// signatures and non-canonical encodings, so those are `bad_signature`
+/// too). Returns 1 on success (the accept_finished shape).
+/// ct: public data — an Ed25519 VERIFY handles no secret (the sc18
+/// rule); curve25519's own ct: lines govern its internals.
+pub fn verify_signed_by(child: Cert, issuer: Cert) -> int ! {unsupported_alg, bad_signature} {
+    if child.sig_alg != oid_ed25519() {
+        return unsupported_alg
+    }
+    if issuer.spki_alg != oid_ed25519() {
+        return unsupported_alg
+    }
+    if !curve25519.verify(issuer.spki_key, child.tbs, child.sig) {
+        return bad_signature
+    }
+    1
+}
+
+/// The per-certificate judgements shared by every chain position:
+/// an unrecognized CRITICAL extension rejects by name (RFC 5280 §4.2's
+/// MUST), and the validity window is checked against the SUPPLIED
+/// `now` (§4.1.2.5, §6.1.3(a)(2)) — `not_yet_valid` before the window,
+/// `expired` after it.
+fn check_cert_at(c: Cert, now: int) -> int ! {expired, not_yet_valid, unknown_critical} {
+    if c.crit_unknown != "" {
+        return unknown_critical
+    }
+    if now < c.not_before {
+        return not_yet_valid
+    }
+    if now > c.not_after {
+        return expired
+    }
+    1
+}
+
+/// The issuing-capability judgement (§6.1.4(k) + §4.2.1.3 + §4.2.1.9):
+/// an issuer must carry basicConstraints with cA TRUE; a present
+/// keyUsage must assert keyCertSign; and a present pathLenConstraint
+/// must admit `below` intermediate certificates beneath this issuer.
+/// All three failures are the `not_ca` rejection — "this certificate
+/// may not sign at this position", which is the one thing a caller can
+/// act on.
+fn check_issuer_at(c: Cert, below: int) -> int ! {not_ca} {
+    if !c.has_bc {
+        return not_ca
+    }
+    if !c.is_ca {
+        return not_ca
+    }
+    if c.key_usage >= 0 {
+        if c.key_usage / 32 % 2 != 1 {
+            return not_ca
+        }
+    }
+    if c.path_len >= 0 {
+        if below > c.path_len {
+            return not_ca
+        }
+    }
+    1
+}
+
+/// The leaf's hostname judgement: the target `hostname` must match a
+/// dNSName in the leaf's subjectAltName (exact, case-insensitive —
+/// `host_matches`). A leaf with NO SAN never matches (the CN fallback
+/// is deprecated and deliberately not implemented — named residue).
+fn check_hostname(c: Cert, hostname: str) -> int ! {name_mismatch} {
+    if !c.has_san {
+        return name_mismatch
+    }
+    var matched = false
+    for n in c.san {
+        if host_matches(n, hostname) {
+            matched = true
+        }
+    }
+    if !matched {
+        return name_mismatch
+    }
+    1
+}
+
+/// THE ws05 SEAM (frozen — the module header's contract): validate the
+/// peer's certificate chain against a trust anchor, a target hostname
+/// and a SUPPLIED time, returning the parsed LEAF on success.
+///
+/// `chain` is concatenated DER, LEAF FIRST (sc21's certificate_list
+/// cert_data entries joined; a single leaf is the common case).
+/// `anchor` is the trust anchor's DER (the pinned Ed25519 CA) — the
+/// chain may or may not include it; a self-signed tail chains to it
+/// either way. `now` is `timestamp(...)`-shaped UTC.
+///
+/// Checks, in order, each a NAMED rejection (RFC 5280 §6.1 scoped to
+/// what Ed25519 chains exercise): the encodings (`der`), every
+/// certificate's critical-extension discipline (`unknown_critical`) and
+/// validity window against `now` (`not_yet_valid`/`expired`), the
+/// leaf's SAN against `hostname` (`name_mismatch`), each link's
+/// issuer/subject name chaining by exact DER Name bytes
+/// (`issuer_mismatch`), each issuer's authority — basicConstraints cA,
+/// keyCertSign, pathLenConstraint (`not_ca`) — and each link's Ed25519
+/// signature (`bad_signature`; `unsupported_alg` for any signature or
+/// key algorithm outside the ladder, the honest scope line). The
+/// cheap structural checks run BEFORE any signature so a chain that
+/// fails on names or dates never pays a scalar multiplication.
+/// Revocation (CRL/OCSP) is NAMED RESIDUE: nothing here consults
+/// revocation state, and the header says so.
+/// ct: public data throughout (certificates carry no secret).
+pub fn validate_chain(chain: List[int], hostname: str, anchor: List[int], now: int) -> Cert ! {
+    der,
+    unsupported_alg,
+    bad_signature,
+    expired,
+    not_yet_valid,
+    name_mismatch,
+    not_ca,
+    issuer_mismatch,
+    unknown_critical,
+} {
+    if chain.len == 0 {
+        return der
+    }
+    let anchor_cert = parse(anchor)?
+    check_cert_at(anchor_cert, now)?
+    let leaf_stop = cert_end(chain, 0)?
+    let leaf = parse(sub(chain, 0, leaf_stop))?
+    check_cert_at(leaf, now)?
+    check_hostname(leaf, hostname)?
+    var child = parse(sub(chain, 0, leaf_stop))?
+    var pos = leaf_stop
+    var below = 0
+    while pos < chain.len {
+        let nxt = cert_end(chain, pos)?
+        let parent = parse(sub(chain, pos, nxt))?
+        check_cert_at(parent, now)?
+        if !bytes_eq(child.issuer, parent.subject) {
+            return issuer_mismatch
+        }
+        check_issuer_at(parent, below)?
+        verify_signed_by(child, parent)?
+        child = parent
+        below = below + 1
+        pos = nxt
+    }
+    if !bytes_eq(child.issuer, anchor_cert.subject) {
+        return issuer_mismatch
+    }
+    check_issuer_at(anchor_cert, below)?
+    verify_signed_by(child, anchor_cert)?
+    leaf
+}
+
+// ---------------------------------------------------------------------
+// Hex rendering — this module's own (the ladder precedent, so tests
+// and docs can import exactly one module). NOT constant-time; a
+// debug/vector convenience only.
+// ---------------------------------------------------------------------
+
+/// Lowercase hex of a byte list. ct: public data (and a rendering
+/// convenience only, never a secret-handling path).
+pub fn to_hex(b: List[int]) -> str {
+    let alphabet = "0123456789abcdef"
+    var out = ""
+    for v in b {
+        require_byte(v)
+        let hi = v / 16
+        let lo = v % 16
+        let hd = alphabet[hi..hi + 1]
+        let ld = alphabet[lo..lo + 1]
+        out = "{out}{hd}{ld}"
+    }
+    out
+}
