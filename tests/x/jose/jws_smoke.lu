@@ -1,0 +1,35 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.jose
+//!
+//! The JWS-EdDSA round trip, three-lane smoke: sign a short payload and
+//! verify it against the matching public key (RFC 8037's key, so no
+//! `public()` derivation is needed). One sign plus one verify is ~3
+//! scalar multiplications — the `ed25519_smoke` budget — so the sign/
+//! verify path stays three-lane, while the byte-exact RFC 8037 A.4/A.5
+//! vectors and the tampered-signature case ride the native lane in
+//! `jws_eddsa_vectors.lu` (lupin `slow` there). The two fast rejections
+//! cost no scalar multiplication: a wrong segment count is refused
+//! before any curve work.
+
+use std.hex
+use std.x.jose
+
+fn bs(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let sk = bs("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+    let pk = bs("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+
+    let jws = jose.jws_sign_compact(sk, "{{\"alg\":\"EdDSA\"}}", "hi".bytes())
+    // header.payload are fixed base64url; the signature segment follows.
+    assert(jws.starts_with("eyJhbGciOiJFZERTQSJ9.aGk."), "prefix")
+    assert(jose.jws_verify_compact(pk, jws), "roundtrip")
+
+    // Fast rejections (segment-count gate, no scalar multiplication).
+    assert(jose.jws_verify_compact(pk, "onlyonepart") == false, "oneseg")
+    assert(jose.jws_verify_compact(pk, "a.b.c.d") == false, "fourseg")
+    0
+}

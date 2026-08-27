@@ -1,0 +1,46 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.jose
+//!
+//! The ACME request envelope (RFC 8555 §6.2), the FROZEN fixture ws06
+//! (wws's `cert auto`) asserts against. Two protected-header shapes —
+//! the `jwk` form that inlines the account key for newAccount, and the
+//! `kid` form that names the account URL for every request thereafter —
+//! both byte-exact with `alg`/`nonce`/`url`. Then the signed body: the
+//! flattened-JWS JSON `{"protected":…,"payload":…,"signature":…}` for a
+//! POST-as-GET (RFC 8555 §6.3 — an EMPTY payload, whose base64url is the
+//! empty string), pinned byte-for-byte. EdDSA is deterministic, so this
+//! body is fixed for the fixed (key, header) input; the `nonce` in the
+//! header is the SERVER's anti-replay token (RFC 8555 §6.4), a different
+//! thing from any signature entropy (there is none). One signature is ~1
+//! scalar multiplication, so this stays three-lane.
+//!
+//! The seam: ws06 builds a header with `acme_protected_jwk`/
+//! `acme_protected_kid`, calls `acme_body`, and POSTs the result; sc19
+//! owns exactly the body, ws06 owns the conversation. This fixture is
+//! the contract between them.
+
+use std.hex
+use std.x.jose
+
+fn bs(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let sk = bs("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+    let pk = bs("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+
+    // The newAccount protected header: the account key inlined as a JWK.
+    assert(jose.acme_protected_jwk(pk, "aXk6", "https://acme.test/new-account") == "{{\"alg\":\"EdDSA\",\"jwk\":{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"}},\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-account\"}}", "jwk_header")
+
+    // Every request after newAccount: the account URL as `kid`.
+    assert(jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order") == "{{\"alg\":\"EdDSA\",\"kid\":\"https://acme.test/acct/1\",\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-order\"}}", "kid_header")
+
+    // The signed request body for a POST-as-GET (empty payload). Frozen:
+    // deterministic for the fixed key and header.
+    let header = jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order")
+    let body = jose.acme_body(sk, header, List[int]())
+    assert(body == "{{\"protected\":\"eyJhbGciOiJFZERTQSIsImtpZCI6Imh0dHBzOi8vYWNtZS50ZXN0L2FjY3QvMSIsIm5vbmNlIjoiYVhrNiIsInVybCI6Imh0dHBzOi8vYWNtZS50ZXN0L25ldy1vcmRlciJ9\",\"payload\":\"\",\"signature\":\"tgYAMT9F9jrpjliBpCdmd7S7fvVGXiiHMy698J6KBBIODoxsVlK5rSQmeyzruPzsFjaExkrCTkDZEywFiiR8BA\"}}", "body")
+    0
+}

@@ -3281,3 +3281,51 @@ kernel walk takes it in both copies; if first-wins, `std.json.parse`'s
 duplicate rule is restated where its header currently says "a Map
 assignment, not a policy". Either answer retires this finding; the corpus
 gains the one-line witness either way.
+
+## Retirements and movements at the sc19 pin
+
+**The pin is HELD at 21b129e; the re-measure moved ZERO rows.** The sc19
+contract's first act — "the pin bump to wolf-lang 21b129e or later
+(whatever trunk is at launch), re-vendor, flip any sc16/17/18 dark-lane
+rows" — resolves to a HOLD, stated as a mechanism rather than a
+non-event:
+
+- **The DATA pin is already 21b129e** (sc18 set it, `vendor/upstream/PIN`
+  and the `[wolf]` tool pin), which satisfies the contract's floor
+  ("21b129e or later"). Trunk has since advanced to **da8582d** (s112,
+  "the compiler keeps the secret" — the CONSTANT-TIME tier / c28: the
+  `#[consttime]` attribute, the WIR taint verifier, E1601-E1607, and two
+  objdump asm witnesses). The span's spec addition is the `ct.*` anchor
+  namespace (346 -> 360 anchors, +14, zero removed — a clean superset).
+
+- **No available binary conforms to da8582d in a way that keeps the
+  ledger green.** The s112 ct tier is verified by c28's OWN witnesses in
+  wolf-lang (the two flagship kernels, the seven E16xx refusals), NOT by
+  any std test lane — so it lights no sc16/17/18 dark row. lupin stays
+  0.1.13 (is20's F-0093 program-age fix remains MERGED-but-UNRELEASED, so
+  every `slow` row keeps its 0.1.13 measurement, curve and JOSE alike).
+  The 9 big sha2 vector rows stay `unsupported` on the checked tier's
+  step/shadow-memory budgets (mechanism unchanged). **Flipped rows: 0.**
+
+**The JOSE rung (sc19) filed NO new upstream finding, and that is the
+rung working as designed.** `std.x.jose` is pure PLUMBING over three
+existing primitives — sc18's `curve25519.sign`/`verify`, sc16's
+`sha2.sum256`, and sc05's `base64.url_encode`/`url_decode` (§5, no pad,
+reused not re-landed). It compiles and runs; the RFC 8037 A.4/A.5 (JWS),
+RFC 8037 A.3 + RFC 7638 §3.1 (thumbprint) and the base64url negatives are
+byte-exact on the reference lane. The one wolf-language friction — a JSON
+literal in wolf source doubles its braces (`{{`/`}}`) because `{` opens
+f-string interpolation in every literal — is DOCUMENTED grammar (the
+Candidate-A `{x}`-in-every-literal decision), not a defect; `std.x.jose`
+builds every JSON string with it, and the `acme_body`/thumbprint outputs
+prove it round-trips byte-exact.
+
+**One observation held for the NEXT pin bump to confirm-or-file** (not
+filed now, because it cannot yet be separated from a local build
+artifact): a `wolf` built from a working checkout at da8582d refused
+`std.x.crypto.curve25519` on the NATIVE rung with `unsupported — `mut`
+places beyond local by-value bindings`, where sc18's ledger runs that
+module natively at 21b129e. If a clean release build at the next pinned
+sha reproduces it, it is a native-lowering regression against the sc18
+measurement and gets an F-number and a filing then; recorded here so the
+next bump reads a lead rather than a surprise.

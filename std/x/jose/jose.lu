@@ -1,0 +1,373 @@
+//! member: true
+//!
+//! std.x.jose — the JOSE envelope ACME needs, over sc18's Ed25519:
+//! JWS signing/verification with EdDSA (RFC 7515 + RFC 8037), the
+//! Ed25519 public JWK and its RFC 7638 thumbprint (RFC 7517 + 7638),
+//! and the ACME request envelope (RFC 8555 §6.2). Stability tier: x —
+//! the D53 crypto ladder's FOURTH rung (campaign stdc-crypto, sprint
+//! sc19). This rung is PLUMBING, not new crypto: every signature is
+//! sc18's `std.x.crypto.curve25519.sign`/`verify`, every digest is
+//! sc16's `std.x.crypto.sha2.sum256`, and the base64url is sc05's
+//! `std.base64.url_encode`/`url_decode`. The human chose ACME over
+//! AES-GCM breadth: the pinned local test CA speaks Ed25519, so there
+//! is NO P-256 here (that stays a named D-question for the breadth
+//! rung).
+//!
+//! **The nursery banner (D31).** `std.x.jose` is not `std.jose`: its
+//! path, names and behaviour may change or vanish in one sprint; no
+//! other std module may depend on it. Its reason and graduation trigger
+//! live in `std/x/README.md`. It depends on TWO sibling residents —
+//! `std.x.crypto.curve25519` (the signature) and `std.x.crypto.sha2`
+//! (the thumbprint digest) — plus the facade (`std.base64`, `std.bytes`,
+//! `std.str`); a resident MAY depend on the facade, and the two
+//! resident-on-resident edges are ones the graduation move to `std.jose`
+//! /`std.crypto` must resolve, named in the register beside curve25519's
+//! own sha2 edge.
+//!
+//! ## The three byte-exact rules this module lives or dies on
+//!
+//! 1. **base64url is NOT base64** (RFC 4648 §5, not §4): the alphabet
+//!    ends `-_`, never `+/`, and JOSE carries NO padding. A base64
+//!    -standard reuse silently corrupts every signature and every
+//!    thumbprint, because the signing input and the hash input are the
+//!    *encoded* text. This module calls `std.base64.url_encode` (no pad)
+//!    and `std.base64.url_decode` (padding tolerated on the way in, the
+//!    §5 sentence) EXCLUSIVELY; `encode`/`decode` (the §4 padded pair)
+//!    never appear. The negatives in `tests/x/jose/base64url_jose.lu`
+//!    pin the alphabet and the no-pad rule.
+//!
+//! 2. **The signing input is over the BASE64URL STRINGS, not the raw
+//!    bytes** (RFC 7515 §5.1): the message Ed25519 signs is the ASCII
+//!    octets of `BASE64URL(protected) || '.' || BASE64URL(payload)`.
+//!    The classic JWS bug is signing the decoded payload; `signing_input`
+//!    builds the encoded form and `jws_sign_compact` signs *its* bytes.
+//!    RFC 8037 A.4's vector — signature `hgyY0il_…M0KAg` over the
+//!    signing input `eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc`
+//!    — is the pin.
+//!
+//! 3. **The JWK thumbprint is byte-exact, canonical, no-whitespace**
+//!    (RFC 7638 §3): SHA-256 over the required members in LEXICOGRAPHIC
+//!    order with no spaces and no newlines. For an OKP Ed25519 key the
+//!    required members are `crv`, `kty`, `x`, in that order, so the hash
+//!    input is exactly `{"crv":"Ed25519","kty":"OKP","x":"<x>"}`. This
+//!    module BUILDS that string directly (string interpolation) rather
+//!    than routing through `std.json`'s writer, for two measured reasons:
+//!    (a) `std.json` carries an enum and a `Map` that darken the compiler
+//!    lanes (F-0012/F-0029), and the thumbprint must stay on every lane
+//!    the digest reaches; (b) the three OKP member VALUES are a fixed
+//!    ASCII pair (`Ed25519`, `OKP`) and a base64url string, none of
+//!    which contains a character JSON escapes, so direct construction is
+//!    byte-identical to what any conforming writer emits. RFC 7638's own
+//!    RSA example and RFC 8037 A.3's OKP thumbprint
+//!    (`kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k`) are the pins.
+//!
+//! ## EdDSA is deterministic; the ACME `nonce` is a different thing
+//! Ed25519 signing (RFC 8032 §5.1.6, sc18) derives its per-signature
+//! nonce from the key and message by hashing — there is NO entropy input
+//! and NO randomness on this module's path. The ACME `nonce` header
+//! field (RFC 8555 §6.4) is an anti-replay token the SERVER issues and
+//! the client echoes; it is protocol state, not signature entropy. The
+//! two never touch. This module has no entropy story and needs none.
+//!
+//! ## ct: posture
+//! Signing touches the secret account key, so `jws_sign_compact`,
+//! `jws_flattened` and `acme_body` inherit sc18's `curve25519.sign` ct
+//! path verbatim (the recorded scalarmul-bit-gate and `floordiv`
+//! sign-correction obligations c28 verifies; no NEW secret handling is
+//! added here — the key flows straight into `sign`). Everything else is
+//! PUBLIC-DATA framing: the protected header, the payload, the JWK, the
+//! thumbprint and every base64url string are public by construction (a
+//! JWS is transmitted in the clear), and `jws_verify_compact` is public
+//! on all three operands exactly as `curve25519.verify` is. So the ct
+//! surface of this rung is precisely sc18's signing surface and nothing
+//! more; the JOSE framing carries no timing obligation.
+//!
+//! ## THE ws06 SEAM (RFC 8555 §6.2) — FROZEN for the `cert auto` track
+//! This sprint builds the ENVELOPE and its serialization, NOT the ACME
+//! protocol state machine (newNonce/newAccount/newOrder/challenge/
+//! finalize over the network is wws's ws06). The seam ws06 consumes is
+//! exactly this, and it does not move:
+//!
+//!   - ws06 OWNS: the HTTPS conversation, fetching `Replay-Nonce`, the
+//!     directory, the order/authorization/challenge/finalize flow, and
+//!     the account-key lifecycle.
+//!   - sc19 OWNS: given a secret key and the header fields, produce the
+//!     signed request BODY. Two calls:
+//!       1. build the protected header — `acme_protected_jwk(pubkey,
+//!          nonce, url)` for the newAccount request (the key is inlined
+//!          as a `jwk`), or `acme_protected_kid(kid, nonce, url)` for
+//!          every request thereafter (the account URL is the `kid`);
+//!       2. sign and serialize — `acme_body(secret, protected, payload)`
+//!          returns the flattened-JWS JSON `{"protected":…,"payload":…,
+//!          "signature":…}` that is the POST body. A POST-as-GET carries
+//!          an EMPTY payload (`List[int]()`), whose base64url is `""`,
+//!          per RFC 8555 §6.3.
+//!   - The account binding uses `jwk_thumbprint(pubkey)` (RFC 7638),
+//!     which ws06 places wherever the server's challenge demands it.
+//!
+//! ws06 supplies bytes and strings; sc19 returns a spec-shaped body.
+//! Neither reaches into the other. The fixture in
+//! `tests/x/jose/acme_envelope.lu` is the frozen shape ws06 asserts
+//! against.
+
+use std.base64
+use std.bytes
+use std.str
+use std.x.crypto.curve25519
+use std.x.crypto.sha2
+
+/// The hex DIGIT (lowercase) for a nibble 0..15. Private, for `esc`'s
+/// `\u00XX` control-character escapes.
+fn hexdigit(d: int) -> int {
+    if d < 10 {
+        48 + d
+    } else {
+        87 + d
+    }
+}
+
+/// JSON string-body escaping (RFC 8259 §7): the two mandatory
+/// characters (`"` and `\`), the five short control forms, and `\u00XX`
+/// for every other C0 control. Returns the escaped body WITHOUT the
+/// surrounding quotes. Private.
+///
+/// Total: it walks the input's bytes and rebuilds through
+/// `std.bytes.to_str`; every inserted byte is ASCII and every passed
+/// byte came from a valid `str`, so the result is always valid UTF-8 and
+/// the `utf8` row never fires (the `else` is unreachable, defaulted to
+/// the empty string rather than asserted so a caller cannot be trapped
+/// by a framing helper).
+///
+/// The ACME header fields this escapes — `nonce`, `url`, `kid` — are a
+/// base64url token and two https URLs in practice, none carrying a
+/// character that escapes; the escaper is here so a hostile or unusual
+/// field cannot break out of its JSON string, which is what "defensive"
+/// means for an envelope other people's servers fill in.
+fn esc(s: str) -> str {
+    var out = List[int]()
+    for b in s.bytes() {
+        if b == 34 {
+            (mut out).push(92)
+            (mut out).push(34)
+        } else if b == 92 {
+            (mut out).push(92)
+            (mut out).push(92)
+        } else if b == 8 {
+            (mut out).push(92)
+            (mut out).push(98)
+        } else if b == 9 {
+            (mut out).push(92)
+            (mut out).push(116)
+        } else if b == 10 {
+            (mut out).push(92)
+            (mut out).push(110)
+        } else if b == 12 {
+            (mut out).push(92)
+            (mut out).push(102)
+        } else if b == 13 {
+            (mut out).push(92)
+            (mut out).push(114)
+        } else if b < 32 {
+            (mut out).push(92)
+            (mut out).push(117)
+            (mut out).push(48)
+            (mut out).push(48)
+            (mut out).push(hexdigit(b / 16))
+            (mut out).push(hexdigit(b % 16))
+        } else {
+            (mut out).push(b)
+        }
+    }
+    bytes.to_str(out) else ""
+}
+
+/// The JWS Signing Input (RFC 7515 §5.1): `BASE64URL(UTF8(protected)) ||
+/// '.' || BASE64URL(payload)`. This is the octet string Ed25519 signs —
+/// over the ENCODED text, never the raw bytes (§2's classic-bug note).
+/// `protected` is the header JSON (its UTF-8 is encoded); `payload` is
+/// already a byte sequence and is encoded as-is.
+///
+/// ```wolf-doc-example
+/// let payload = "Example of Ed25519 signing".bytes()
+/// jose.signing_input("{{\"alg\":\"EdDSA\"}}", payload) == "eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc"
+/// ```
+pub fn signing_input(protected: str, payload: List[int]) -> str {
+    let p = base64.url_encode(protected.bytes())
+    let pl = base64.url_encode(payload)
+    "{p}.{pl}"
+}
+
+/// A JWS in Compact Serialization (RFC 7515 §7.1) with EdDSA (RFC 8037):
+/// `BASE64URL(protected) || '.' || BASE64URL(payload) || '.' ||
+/// BASE64URL(signature)`, the signature being Ed25519 over the signing
+/// input's ASCII bytes. `secret` is the 32-byte Ed25519 secret key;
+/// `protected` is the protected-header JSON (for a plain EdDSA JWS,
+/// `{"alg":"EdDSA"}`); `payload` is the message bytes.
+///
+/// Deterministic: the same key, header and payload always yield the same
+/// compact string (Ed25519 has no nonce input). Traps only where
+/// `curve25519.sign` does (a secret key that is not 32 bytes is a caller
+/// contract violation there).
+///
+/// ```wolf-doc-example
+/// let sk = "a 32-byte ed25519 secret key !!!".bytes()
+/// let jws = jose.jws_sign_compact(sk, "{{\"alg\":\"EdDSA\"}}", "hi".bytes())
+/// jws.starts_with("eyJhbGciOiJFZERTQSJ9.aGk.")
+/// ```
+pub fn jws_sign_compact(secret: List[int], protected: str, payload: List[int]) -> str {
+    let si = signing_input(protected, payload)
+    let sig = curve25519.sign(secret, si.bytes())
+    let sb = base64.url_encode(sig)
+    "{si}.{sb}"
+}
+
+/// Verify a compact JWS against an Ed25519 public key. `true` iff the
+/// string is three base64url segments joined by `.` whose last segment
+/// is a valid Ed25519 signature over the first two joined by `.`.
+///
+/// Public data on every operand (a JWS travels in the clear), so this is
+/// a BOOL and never traps on a bad token — a wrong segment count, a
+/// segment that is not base64url, a wrong-length key or signature, and a
+/// forged signature all answer `false`, exactly as `curve25519.verify`
+/// answers its own rejection cases (§2's rule: verify decides, it does
+/// not trap). It does NOT parse the header's `alg`: this module signs
+/// and verifies EdDSA-over-Ed25519 ONLY, so there is no algorithm agility
+/// to confuse — a token signed under any other algorithm simply fails the
+/// Ed25519 check.
+///
+/// ```wolf-doc-example
+/// jose.jws_verify_compact("x".bytes(), "not.a.jws") == false
+/// jose.jws_verify_compact("x".bytes(), "onlyonepart") == false
+/// ```
+pub fn jws_verify_compact(pubkey: List[int], compact: str) -> bool {
+    let parts = str.split(compact, ".")
+    if parts.len != 3 {
+        return false
+    }
+    let si = "{parts[0]}.{parts[1]}"
+    let sig = base64.url_decode(parts[2]) else |_| {
+        return false
+    }
+    curve25519.verify(pubkey, si.bytes(), sig)
+}
+
+/// A JWS in Flattened JSON Serialization (RFC 7515 §7.2.2) with EdDSA:
+/// the object `{"protected":"…","payload":"…","signature":"…"}`, each
+/// value a base64url string. This is the shape ACME's request body takes
+/// (RFC 8555 §6.2); `acme_body` is the ACME-named door to it. The three
+/// values are base64url and so need no JSON escaping.
+///
+/// ```wolf-doc-example
+/// let sk = "a 32-byte ed25519 secret key !!!".bytes()
+/// let flat = jose.jws_flattened(sk, "{{\"alg\":\"EdDSA\"}}", "hi".bytes())
+/// flat.starts_with("{{\"protected\":\"eyJhbGciOiJFZERTQSJ9\",\"payload\":\"aGk\",\"signature\":\"")
+/// flat.ends_with("\"}}")
+/// ```
+pub fn jws_flattened(secret: List[int], protected: str, payload: List[int]) -> str {
+    let p_b64 = base64.url_encode(protected.bytes())
+    let pl_b64 = base64.url_encode(payload)
+    let si = "{p_b64}.{pl_b64}"
+    let sig = curve25519.sign(secret, si.bytes())
+    let sb = base64.url_encode(sig)
+    "{{\"protected\":\"{p_b64}\",\"payload\":\"{pl_b64}\",\"signature\":\"{sb}\"}}"
+}
+
+/// The Ed25519 public key as an OKP JWK (RFC 8037 §2, RFC 7517):
+/// `{"kty":"OKP","crv":"Ed25519","x":"<BASE64URL(pubkey)>"}` — the member
+/// order of RFC 8037 A.2's own example. `pubkey` is the 32-byte Ed25519
+/// public key (`curve25519.public`'s output). This is the `jwk` ACME
+/// inlines in a newAccount request; its member order is free (a JWK is
+/// read by name), so it is NOT the canonical thumbprint form — use
+/// `jwk_thumbprint_input` for that.
+///
+/// ```wolf-doc-example
+/// let pk = "a 32-byte ed25519 public key !!!".bytes()
+/// jose.jwk_ed25519_public(pk) == "{{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"YSAzMi1ieXRlIGVkMjU1MTkgcHVibGljIGtleSAhISE\"}}"
+/// ```
+pub fn jwk_ed25519_public(pubkey: List[int]) -> str {
+    let x = base64.url_encode(pubkey)
+    "{{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"{x}\"}}"
+}
+
+/// The canonical thumbprint hash input (RFC 7638 §3) for an OKP Ed25519
+/// key: the required members `crv`, `kty`, `x` in lexicographic order,
+/// no whitespace — `{"crv":"Ed25519","kty":"OKP","x":"<x>"}`. This is
+/// exactly the string RFC 8037 A.3 hashes; it is exposed so a test can
+/// pin it byte-for-byte, and it is what `jwk_thumbprint` digests.
+///
+/// ```wolf-doc-example
+/// let pk = "a 32-byte ed25519 public key !!!".bytes()
+/// jose.jwk_thumbprint_input(pk) == "{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"YSAzMi1ieXRlIGVkMjU1MTkgcHVibGljIGtleSAhISE\"}}"
+/// ```
+pub fn jwk_thumbprint_input(pubkey: List[int]) -> str {
+    let x = base64.url_encode(pubkey)
+    "{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"{x}\"}}"
+}
+
+/// The RFC 7638 JWK Thumbprint of an OKP Ed25519 key: base64url (no pad)
+/// of SHA-256 over `jwk_thumbprint_input(pubkey)`. This is the account
+/// identifier ACME binds a key to; RFC 8037 A.3's own vector is
+/// `kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k`.
+///
+/// ```wolf-doc-example
+/// let pk = "a 32-byte ed25519 public key !!!".bytes()
+/// jose.jwk_thumbprint(pk).len == 43
+/// ```
+pub fn jwk_thumbprint(pubkey: List[int]) -> str {
+    let canon = jwk_thumbprint_input(pubkey)
+    let h = sha2.sum256(canon.bytes())
+    base64.url_encode(h)
+}
+
+/// The ACME protected header for a request that INLINES the account key
+/// (RFC 8555 §6.2, the newAccount case): `{"alg":"EdDSA","jwk":<jwk>,
+/// "nonce":"<nonce>","url":"<url>"}`. `pubkey` is the 32-byte Ed25519
+/// public key; `nonce` is the server's `Replay-Nonce`; `url` is the
+/// request target. The embedded `jwk` is the canonical OKP form (member
+/// order is free, so the canonical one is reused for determinism);
+/// `nonce` and `url` are JSON-escaped so an unusual field cannot break
+/// the frame.
+///
+/// ```wolf-doc-example
+/// let pk = "a 32-byte ed25519 public key !!!".bytes()
+/// jose.acme_protected_jwk(pk, "aXk6", "https://acme.test/new-account") == "{{\"alg\":\"EdDSA\",\"jwk\":{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"YSAzMi1ieXRlIGVkMjU1MTkgcHVibGljIGtleSAhISE\"}},\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-account\"}}"
+/// ```
+pub fn acme_protected_jwk(pubkey: List[int], nonce: str, url: str) -> str {
+    let jwk = jwk_thumbprint_input(pubkey)
+    let n = esc(nonce)
+    let u = esc(url)
+    "{{\"alg\":\"EdDSA\",\"jwk\":{jwk},\"nonce\":\"{n}\",\"url\":\"{u}\"}}"
+}
+
+/// The ACME protected header for a request that names the account by URL
+/// (RFC 8555 §6.2, every request after newAccount):
+/// `{"alg":"EdDSA","kid":"<kid>","nonce":"<nonce>","url":"<url>"}`. `kid`
+/// is the account URL the server returned; `nonce` and `url` as above.
+/// All three are JSON-escaped.
+///
+/// ```wolf-doc-example
+/// jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order") == "{{\"alg\":\"EdDSA\",\"kid\":\"https://acme.test/acct/1\",\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-order\"}}"
+/// ```
+pub fn acme_protected_kid(kid: str, nonce: str, url: str) -> str {
+    let k = esc(kid)
+    let n = esc(nonce)
+    let u = esc(url)
+    "{{\"alg\":\"EdDSA\",\"kid\":\"{k}\",\"nonce\":\"{n}\",\"url\":\"{u}\"}}"
+}
+
+/// The signed ACME request body (RFC 8555 §6.2): the flattened-JSON JWS
+/// over `protected` and `payload`, signed with the account key. This is
+/// `jws_flattened` under its ACME name — the door ws06 calls after
+/// building the header with `acme_protected_jwk`/`acme_protected_kid`. A
+/// POST-as-GET (RFC 8555 §6.3) passes an EMPTY `payload` (`List[int]()`),
+/// whose base64url is the empty string.
+///
+/// ```wolf-doc-example
+/// let sk = "a 32-byte ed25519 secret key !!!".bytes()
+/// let header = jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order")
+/// let body = jose.acme_body(sk, header, List[int]())
+/// body.contains("\"payload\":\"\"")
+/// ```
+pub fn acme_body(secret: List[int], protected: str, payload: List[int]) -> str {
+    jws_flattened(secret, protected, payload)
+}

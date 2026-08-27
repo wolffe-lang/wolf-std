@@ -2244,3 +2244,45 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# ---- sc19: the JOSE envelope (std.x.jose), over sc18's Ed25519 and
+# sc16's SHA-256. The framing is PUBLIC-DATA string work (base64url of
+# public header/payload, canonical JSON for the thumbprint), three-lane
+# by the same reasons base64 and sha2 are; only the sign/verify paths
+# carry a scalar multiplication and so inherit the curve module's lane
+# shape. base64url is std.base64's (§5, no pad), reused not re-landed.
+#
+# The two pure-framing files and the thumbprint file execute no scalar
+# multiplication and stay three-lane. `jws_smoke` is one sign + one
+# verify (~3 mults, the ed25519_smoke budget), three-lane. `acme_envelope`
+# is one signature (~1 mult), three-lane, and its body is the FROZEN
+# ws06 fixture. `jws_eddsa_vectors` (RFC 8037 A.4/A.5 byte-exact + a
+# tamper) is a sign and two verifies (~5 mults): 56s under lupin 0.1.13
+# against the 60s ceiling (measured), so `slow`, and `unsupported` on the
+# checked tier's step budget — the native lane runs it in full, exactly
+# as the curve module's own RFC vector file laned.
+
+[tests."x/jose/base64url_jose.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/jose/jwk_thumbprint.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/jose/jws_smoke.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/jose/jws_eddsa_vectors.lu"]
+lupin = "slow"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/jose/acme_envelope.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
