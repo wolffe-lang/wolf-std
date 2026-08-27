@@ -108,6 +108,21 @@ sha256 of the sc20 files, as retrieved:
 6564d1376d1ec744fc7a9993da15ebc1b9be361908b166091f47ef605c537fba  rfc/rfc8448.txt
 ```
 
+## Sources (authored 2026-08-27, sc22 — the certificate)
+
+- `pki/` — the sc22 Ed25519 test PKI: a self-signed root + leaf +
+  the negative battery (wrong-anchor, non-CA-signer, unknown-critical)
+  + an 18-variant malformed-encoding conformance set + an
+  openssl-generated RSA/ECDSA parse-only pair. AUTHORED by
+  `pki/gen_pki.py` (from-scratch RFC 8032 Ed25519 + hand-built X.690
+  DER, deterministic seeds) and CROSS-CHECKED with openssl 3.6.3
+  (`openssl verify` validates the chain; `openssl x509 -text`
+  re-parses every field) — the extractor+reference discipline,
+  inverted: no public X.509 corpus is shaped for an Ed25519-scoped
+  validator, so the reference authors and the independent tool checks.
+  Every file, clause map and omission is documented in
+  `pki/README.md`; sha256s in `pki/sha256sums.txt`.
+
 ## What is taken, what is omitted (named, never silent)
 
 - **CAVP short-message sets**: ALL vectors (65 + 129 + 129), run on

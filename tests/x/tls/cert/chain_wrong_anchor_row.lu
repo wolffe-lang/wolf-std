@@ -1,0 +1,39 @@
+//! check: run(exit=1, stdout="witness: leaf does not chain to the supplied anchor\nerror: issuer_mismatch")
+//! phase: run
+//! conforms: std.x.tls.cert, err.row, err.propagate, err.else
+//!
+//! WRONG TRUST ANCHOR, by name (RFC 5280 s6.1's name chaining): the
+//! valid pinned leaf against a DIFFERENT Ed25519 CA (other_root) —
+//! the leaf's issuer Name bytes do not equal the anchor's subject
+//! Name bytes, so the chain answers `issuer_mismatch` before any
+//! signature is attempted.
+
+use std.hex
+use std.x.tls.cert
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn rejects(chain: List[int], host: str, anchor: List[int], now: int) -> bool {
+    let c = cert.validate_chain(chain, host, anchor, now) else |_| {
+        return true
+    }
+    c.version < 0
+}
+
+fn main() -> !int {
+    let chain = bytes_of(
+        "3082013e3081f1a00302010202021337300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3236303130313030303030305a170d3237303130313030303030305a3017311530130603550403130c776f6c662e6578616d706c65302a300506032b6570032100b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3a356305430090603551d1304023000300b0603551d0f04040302078030290603551d1104223020820c776f6c662e6578616d706c6582107777772e776f6c662e6578616d706c65300f06092b0601040183b2030204020500300506032b6570034100b263c2d9ba14201bbbd2944f4909bb1668576c4c77a6cf4abfa604931b254ca9508e74a9b2b902b85a2ba7eae7782c98b9ea8a8755a4ffd4384e06ac6ccd510c",
+    )
+    let host = "wolf.example"
+    let anchor = bytes_of(
+        "308201173081caa003020102020107300506032b657030233121301f06035504030c18776f6c662d7374642073633232206f7468657220726f6f74301e170d3235303130313030303030305a170d3335313233313233353935395a30233121301f06035504030c18776f6c662d7374642073633232206f7468657220726f6f74302a300506032b65700321004bf7bada80524f7bcd39b9cf28e65b4f6aaf1ca2548ce0081dbfd4fc58af9e12a3233021300f0603551d130101ff040530030101ff300e0603551d0f0101ff040403020204300506032b65700341009e48e8262c3855393becb66e620680d99e3be9aff388f0a08477a2b22bb06e8fa382b249c02656ce1c1b8fbc05f9d0fe96292ba6d81d3dd9a07d2791c5d65907",
+    )
+    let now = cert.timestamp(2026, 8, 27, 12, 0, 0)
+    assert(rejects(chain, host, anchor, now), "the chain must reject")
+    print("witness: leaf does not chain to the supplied anchor")
+    let never = cert.validate_chain(chain, host, anchor, now)?
+    print("unreachable: {never.version}")
+    0
+}

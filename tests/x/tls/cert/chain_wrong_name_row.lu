@@ -1,0 +1,40 @@
+//! check: run(exit=1, stdout="witness: SAN covers neither the target hostname\nerror: name_mismatch")
+//! phase: run
+//! conforms: std.x.tls.cert, err.row, err.propagate, err.else
+//!
+//! WRONG NAME, by name (RFC 6125 exact matching over RFC 5280
+//! s4.2.1.6 SAN dNSNames): the leaf covers wolf.example and
+//! www.wolf.example; the target evil.example matches neither, and the
+//! CN fallback is deliberately NOT consulted (deprecated — named
+//! residue in the module header). No signature is verified: the name
+//! check precedes the scalar multiplication.
+
+use std.hex
+use std.x.tls.cert
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn rejects(chain: List[int], host: str, anchor: List[int], now: int) -> bool {
+    let c = cert.validate_chain(chain, host, anchor, now) else |_| {
+        return true
+    }
+    c.version < 0
+}
+
+fn main() -> !int {
+    let chain = bytes_of(
+        "3082013e3081f1a00302010202021337300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3236303130313030303030305a170d3237303130313030303030305a3017311530130603550403130c776f6c662e6578616d706c65302a300506032b6570032100b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3a356305430090603551d1304023000300b0603551d0f04040302078030290603551d1104223020820c776f6c662e6578616d706c6582107777772e776f6c662e6578616d706c65300f06092b0601040183b2030204020500300506032b6570034100b263c2d9ba14201bbbd2944f4909bb1668576c4c77a6cf4abfa604931b254ca9508e74a9b2b902b85a2ba7eae7782c98b9ea8a8755a4ffd4384e06ac6ccd510c",
+    )
+    let host = "evil.example"
+    let anchor = bytes_of(
+        "308201373081eaa003020102020101300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3235303130313030303030305a170d3335313233313233353935395a30223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74302a300506032b6570032100df29ea96435aa95c2b6f9176b5e2bc532916525aa49207b10e6b8e3e5bdefb08a345304330120603551d130101ff040830060101ff020101300e0603551d0f0101ff040403020106301d0603551d0e04160414783463495867e2affe02ec7ffbcf86216bc59be7300506032b6570034100573764a0bb4fd69a98281bc428deea50474f8e1e12e719c83310312ac790da36ff45bfc88ae586bdb5a03ed8537e922d80b07c7e4da3325af92f90efa2f68a07",
+    )
+    let now = cert.timestamp(2026, 8, 27, 12, 0, 0)
+    assert(rejects(chain, host, anchor, now), "the chain must reject")
+    print("witness: SAN covers neither the target hostname")
+    let never = cert.validate_chain(chain, host, anchor, now)?
+    print("unreachable: {never.version}")
+    0
+}

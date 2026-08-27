@@ -1,0 +1,23 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.tls.cert, conf.trap.set
+//!
+//! The 0..255 element contract (s11's interim, F-0035), held as a
+//! trap and shared verbatim with the whole ladder: a byte-sequence
+//! element outside 0..255 is a caller-contract violation (the caller
+//! could have checked), so parse traps `assert` at the ingestion
+//! guard before any decoding runs — distinct from every DATA fault,
+//! which is the `der` row.
+
+use std.x.tls.cert
+
+fn main() -> int {
+    var b = List[int]()
+    (mut b).push(48)
+    (mut b).push(300)
+    let c = cert.parse(b) else |_| {
+        return 1
+    }
+    print("unreachable: {c.version}")
+    0
+}

@@ -992,7 +992,7 @@ Four rules the payment settled.
 **§14 amendment (sc14): a wildcard handler is also right when the module
 cannot SEE the difference.** sc08's rule was that a wildcard claiming nothing
 is the right handler when a module cannot ACT on the difference between tags.
-F-0079 adds the harder half: under lupin a multi-arm `else |e| match e` over
+F-0079 adds the harder half **[F-0079 CLOSED at lupin 0.1.13 — wolf-interp#29's arm-selection pass; the register's sc22 closure note has the timeline. The amendment's two honest shapes remain good doctrine on their own merits]**: under lupin (0.1.12, the pin this was measured at) a multi-arm `else |e| match e` over
 a row raised ACROSS A MODULE BOUNDARY takes its first arm, silently, in both
 arm orders — the compiler rungs are correct, the interpreter is not, and it
 is F-0052 exactly, on the other machine, two sprints after that one closed.

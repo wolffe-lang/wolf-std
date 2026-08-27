@@ -1,0 +1,78 @@
+//! check: run(exit=0, stdout="mutations: truncated, indefinite, overrun, reserved, trailing, tiny, empty all reject der")
+//! phase: run
+//! conforms: std.x.tls.cert, err.row, err.else
+//!
+//! Runtime structural mutations of the pinned valid leaf — the length
+//! classes X.690 s8.1/s10.1 make THE hardened surface: truncation (10
+//! bytes dropped), the indefinite length 0x80 (forbidden in DER,
+//! s10.1), a length claiming 10 bytes more than remain (the overrun
+//! class — historically the OOB read in hand-written C decoders; here
+//! a named reject), the reserved length octet 0xFF (s8.1.3.5(c)),
+//! trailing garbage after a complete certificate, a 1-byte input and
+//! the empty input. The leaf's outer TLV header offsets (bytes 1..3)
+//! are stable by construction, so the mutations are surgical. Every
+//! case must answer the `der` row — never a trap, never a wrong parse.
+
+use std.hex
+use std.x.tls.cert
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn parses(b: List[int]) -> bool {
+    let c = cert.parse(b) else |_| {
+        return false
+    }
+    c.version > 0
+}
+
+fn keep_first(b: List[int], n: int) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    for v in b {
+        if i < n {
+            (mut out).push(v)
+        }
+        i = i + 1
+    }
+    out
+}
+
+fn set_byte(b: List[int], at: int, v: int) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    for x in b {
+        if i == at {
+            (mut out).push(v)
+        } else {
+            (mut out).push(x)
+        }
+        i = i + 1
+    }
+    out
+}
+
+fn main() -> int {
+    let leaf = bytes_of(
+        "3082013e3081f1a00302010202021337300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3236303130313030303030305a170d3237303130313030303030305a3017311530130603550403130c776f6c662e6578616d706c65302a300506032b6570032100b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3a356305430090603551d1304023000300b0603551d0f04040302078030290603551d1104223020820c776f6c662e6578616d706c6582107777772e776f6c662e6578616d706c65300f06092b0601040183b2030204020500300506032b6570034100b263c2d9ba14201bbbd2944f4909bb1668576c4c77a6cf4abfa604931b254ca9508e74a9b2b902b85a2ba7eae7782c98b9ea8a8755a4ffd4384e06ac6ccd510c",
+    )
+    assert(parses(leaf), "the unmutated leaf parses")
+    assert(!parses(keep_first(leaf, leaf.len - 10)), "truncated input rejects")
+    assert(!parses(set_byte(leaf, 1, 128)), "indefinite length rejects")
+    let hi = leaf[3]
+    assert(!parses(set_byte(leaf, 3, hi + 10)), "overrun length rejects")
+    assert(!parses(set_byte(leaf, 1, 255)), "reserved length octet rejects")
+    var trailing = List[int]()
+    for v in leaf {
+        (mut trailing).push(v)
+    }
+    (mut trailing).push(0)
+    assert(!parses(trailing), "trailing garbage rejects")
+    assert(!parses(keep_first(leaf, 1)), "one-byte input rejects")
+    assert(!parses(List[int]()), "empty input rejects")
+    print(
+        "mutations: truncated, indefinite, overrun, reserved, trailing, tiny, empty all reject der",
+    )
+    0
+}

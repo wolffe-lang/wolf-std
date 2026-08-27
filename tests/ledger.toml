@@ -2445,3 +2445,100 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# ---- sc22: std.x.tls.cert — X.509 v3 certificate parsing + Ed25519
+# chain validation (RFC 5280 over X.690 DER, RFC 8410), the stdc-tls
+# campaign's THIRD rung. All fifteen tests are THREE-LANE: the DER
+# decoder and the X.509 walk are checked-int arithmetic over List[int]
+# (no wrapping, no bitwise-on-int, no Map/trait/enum), and the only
+# crypto is sc18's curve25519.verify, whose checked-int field is
+# three-lane by construction. The verify-bearing files carry at most
+# TWO Ed25519 verifications each (chain_valid: the seam call twice;
+# chain_valid_with_root: one two-cert walk; chain_bad_signature_row:
+# the else-witness half + the riding half) — measured 9.7-9.9s per file
+# under this sandbox's lupin and inside the checked tier's step budget
+# (the sc18 ed25519_smoke class); every other file is sub-second on
+# every lane (the negatives reject BEFORE any scalar multiplication by
+# construction). No `slow` row. The conformance suite (18 authored
+# one-clause violations + 7 runtime mutations) and the negative battery
+# (expired/not_yet_valid/name_mismatch/issuer_mismatch/not_ca/
+# unknown_critical/bad_signature/unsupported_alg + the der ride-out)
+# each witness their tag by riding it out of main — the record naming
+# the tag, not this repository asserting its own reading. The
+# parse-but-named-unsupported split (RSA/ECDSA certs parse, validation
+# answers unsupported_alg) is unsupported_alg_row's stdout witness.
+
+[tests."x/tls/cert/parse_fields.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/der_conformance_suite.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/der_mutation_suite.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/der_reject_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/chain_valid.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/chain_valid_with_root.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/chain_expired_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/chain_not_yet_valid_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/chain_wrong_name_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/chain_wrong_anchor_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/chain_not_ca_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/chain_unknown_critical_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/chain_bad_signature_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/unsupported_alg_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/cert/non_byte_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"

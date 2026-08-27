@@ -3143,6 +3143,20 @@ right handler when the module cannot act on the difference" now has a
 second clause: it is also the right handler when the module cannot SEE the
 difference.
 
+**CLOSED at lupin 0.1.13 (wolf-interp#29, the is13 arm-selection pass,
+released 2026-08-15 against pin 02c1e88 — the RECORDED pin).** The row
+now travels with the raised value, so arm resolution asks the value
+which row it came from instead of the entry file's own declarations.
+`tests/json/parse_misses.lu` witnessed the fix where the bug lived, and
+sc22 re-confirmed it with a NINE-arm handler over
+`std.x.tls.cert.validate_chain`'s row — every tag answered correctly
+across the module boundary. What lagged was THIS REGISTER: the closure
+was upstream in the very release wolf-std pinned, the counterparty's
+changelog names the F-number, and two shipped files already relied on
+the fix while this entry still read as open (the sc12 changelog rule,
+missed for eight sprints and caught by the sc22 re-measure). The
+prose that survives it: the ride-the-tag-out-of-main witness stays the
+STRONGEST row evidence and every sc22 row test still uses it.
 
 ## F-0080 — the net tier has no byte-level read or write
 
@@ -3389,3 +3403,65 @@ decision, not a defect. Everything else is PLUMBING working as designed:
 the module is HKDF (sc16) + AEAD_CHACHA20_POLY1305 (sc17) + public
 framing, three-lane by construction, and the whole RFC 8448 §3 key
 schedule reproduces byte-for-byte.
+
+## Retirements and movements at the sc22 pin
+
+**The DATA pin BUMPS d99d81a -> 64a38f3; the bump itself moves ZERO
+ledger rows.** sc22's first act — "pin bump to current wolf-lang trunk
+(64a38f3+), re-vendor, flip dark rows" — resolves to a
+bump-with-no-flip plus TWO recorded leads and one loud provisioning
+observation:
+
+- **The bump is d99d81a -> 64a38f3** (`vendor/upstream/PIN` +
+  `vendor/upstream/anchors.json` re-vendored at trunk 64a38f3;
+  `sync-pin` green, snapshot-only per CI's normal state). The span is
+  s115: net_read_bytes/net_write_bytes (#137 — the byte path the record
+  layer's socket future needs), D56's `[type.numlit.cast.wrap]` clause
+  (#135 — wrapping-as-int traps), and the diverging-else fix (#139).
+  Anchor delta +1 (`type.numlit.cast.wrap`, 379 -> 380), zero removed.
+
+- **LEAD: #139 is F-0095's fix, and it is in the DATA pin but not in
+  any pinned binary.** The `wolf 0.1.0` binary conforms to c9da6d9,
+  151 commits BEFORE 64a38f3, so `x/tls/record/reject_tampered_row`'s
+  wolfc column stays `unsupported` until a binary bump. The next wolf
+  binary bump should re-measure that row first and close F-0095's
+  ledger half.
+
+- **CLOSED: F-0079 — and the closure was eight sprints old.** A
+  nine-arm `else |e| match e` over `std.x.tls.cert.validate_chain`'s
+  row discriminated every tag correctly under this lupin, which sent
+  sc22 to the counterparty's changelog: wolf-interp#29 was FIXED in
+  lupin 0.1.13 itself (the is13 arm-selection pass, released
+  2026-08-15 against 02c1e88 — the recorded pin), and
+  `tests/json/parse_misses.lu` had already witnessed the fix while the
+  register entry stayed open. Closed in the entry above with the
+  timeline; the Guide's sc14 entry and API-CONVENTIONS' sc14
+  amendment carry dated closure notes. sc22's tests never depended on
+  it: every row witness rides its tag out of `main`, which stays the
+  strongest shape regardless.
+
+- **PROVISIONING OBSERVATION (loud, not an F-number, the sc20
+  precedent's bigger sibling): this sandbox's binaries run 22 ledger
+  rows DEEPER than the recorded pins.** lupin runs the 10 `x/json`
+  rows (its own json reading — the is18 posture apparently closed on
+  a release), 4 `net` rows (sockets, the "no sockets by design"
+  posture), 2 `process` rows and 3 `cmp` rows; the native rung runs
+  the 3 `fmt/decimal` f64 rows. `lupin --version` still SAYS 0.1.13 /
+  pin da8582d while behaving beyond both, and doctor already flags the
+  recorded-pin mismatch (da8582d vs 02c1e88). The ledger KEEPS the
+  recorded-pin measurements — advancing 22 rows on an unidentifiable
+  binary would break the clean-clone 3-OS CI that provisions at the
+  recorded pins, and a posture flip (json, sockets, process on the
+  interpreter) is exactly the kind of claim that needs a release to
+  cite. The next DELIBERATE lupin/wolf binary bump inherits this list
+  as its expected flip set: 22 rows + the F-0095 row.
+
+**The certificate rung (sc22) files NO new upstream finding.** The
+language carried a 1500-line DER/X.509 module on the first try's
+shapes: the known MVS rule (read a field's `len` BEFORE moving the
+list into a struct literal — the sc16/sc18 E1001 class, three sites)
+and the known i32-literal rule (typed-int bindings around the
+14-digit timestamp arithmetic, sc04/sc18's) were the only language
+contact points, both already filed and both already in the Guide.
+The multi-arm-handler observation above is a re-measure lead on an
+EXISTING finding, not a new one.

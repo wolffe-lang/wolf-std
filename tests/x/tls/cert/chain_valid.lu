@@ -1,0 +1,46 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.tls.cert, std.x.crypto.curve25519
+//!
+//! THE ws05 SEAM, VALID: the pinned Ed25519 chain (leaf alone, the
+//! common TLS shape) validates against the pinned root anchor, the
+//! target hostname and a supplied `now` inside the leaf's window —
+//! one Ed25519 signature verification (sc18), name chaining by exact
+//! DER Name bytes, basicConstraints/keyUsage on the issuer, SAN
+//! matching on the leaf (RFC 5280 s6.1 scoped to what Ed25519 chains
+//! exercise). The returned value is the parsed LEAF, and the fields
+//! ws05 reads are asserted on it. Deterministic time: `now` is
+//! supplied (2026-08-27 12:00:00 UTC), never the wall clock.
+
+use std.hex
+use std.x.tls.cert
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let root = bytes_of(
+        "308201373081eaa003020102020101300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3235303130313030303030305a170d3335313233313233353935395a30223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74302a300506032b6570032100df29ea96435aa95c2b6f9176b5e2bc532916525aa49207b10e6b8e3e5bdefb08a345304330120603551d130101ff040830060101ff020101300e0603551d0f0101ff040403020106301d0603551d0e04160414783463495867e2affe02ec7ffbcf86216bc59be7300506032b6570034100573764a0bb4fd69a98281bc428deea50474f8e1e12e719c83310312ac790da36ff45bfc88ae586bdb5a03ed8537e922d80b07c7e4da3325af92f90efa2f68a07",
+    )
+    let leaf_der = bytes_of(
+        "3082013e3081f1a00302010202021337300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3236303130313030303030305a170d3237303130313030303030305a3017311530130603550403130c776f6c662e6578616d706c65302a300506032b6570032100b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3a356305430090603551d1304023000300b0603551d0f04040302078030290603551d1104223020820c776f6c662e6578616d706c6582107777772e776f6c662e6578616d706c65300f06092b0601040183b2030204020500300506032b6570034100b263c2d9ba14201bbbd2944f4909bb1668576c4c77a6cf4abfa604931b254ca9508e74a9b2b902b85a2ba7eae7782c98b9ea8a8755a4ffd4384e06ac6ccd510c",
+    )
+    let now = cert.timestamp(2026, 8, 27, 12, 0, 0)
+    let leaf = cert.validate_chain(leaf_der, "wolf.example", root, now) else |_| {
+        return 1
+    }
+    assert(leaf.subject_cn == "wolf.example", "validated leaf subject")
+    assert(leaf.has_san, "validated leaf has SAN")
+    assert(
+        cert.to_hex(leaf.spki_key) ==
+            "b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3",
+        "validated leaf key",
+    )
+    assert(leaf.not_after == cert.timestamp(2027, 1, 1, 0, 0, 0), "validated leaf notAfter")
+    let upper = cert.validate_chain(leaf_der, "WWW.WOLF.EXAMPLE", root, now) else |_| {
+        return 1
+    }
+    assert(upper.subject_cn == "wolf.example", "second SAN entry, case-insensitive")
+    0
+}
