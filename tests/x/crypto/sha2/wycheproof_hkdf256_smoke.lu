@@ -1,0 +1,88 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.sha2, arith.wrapping
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/hkdf_sha256_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 HKDF-SHA-256, the DIFFERENTIAL SMOKE SUBSET:
+//! the first 6 valid vectors with okm length <= 96 bytes
+//! (tcIds 1, 2, 3, 4, 5, 6) — small enough that the interpreter lane runs the
+//! file inside the rig's ceiling, so HKDF keeps a lupin column
+//! while the full 83 ride `..._full.lu` on the native lane.
+
+use std.hex
+use std.x.crypto.sha2
+
+fn okm_matches(ikm_hex: str, salt_hex: str, info_hex: str, n: int, want: str) -> bool {
+    let ikm = hex.decode(ikm_hex) else List[int]()
+    let salt = hex.decode(salt_hex) else List[int]()
+    let info = hex.decode(info_hex) else List[int]()
+    sha2.to_hex(sha2.hkdf256(salt, ikm, info, n)) == want
+}
+
+fn main() -> int {
+    assert(
+        okm_matches(
+            "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "000102030405060708090a0b0c",
+            "f0f1f2f3f4f5f6f7f8f9",
+            42,
+            "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865",
+        ),
+        "tc 1",
+    )
+    assert(
+        okm_matches(
+            "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            "",
+            "",
+            42,
+            "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8",
+        ),
+        "tc 2",
+    )
+    assert(
+        okm_matches(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+            "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+            "b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+            82,
+            "b11e398dc80327a1c8e7f78c596a49344f012eda2d4efad8a050cc4c19afa97c59045a99cac7827271cb41c65e590e09da3275600c2f09b8367793a9aca3db71cc30c58179ec3e87c14c01d5c1f3434f1d87",
+        ),
+        "tc 3",
+    )
+    assert(
+        okm_matches(
+            "24aeff2645e3e0f5494a9a102778c43a",
+            "",
+            "",
+            20,
+            "d4cca5e416c3d9eb58bd562e922691daff76aa4d",
+        ),
+        "tc 4",
+    )
+    assert(
+        okm_matches(
+            "a23632e18ec76b59b1c87008da3f8a7e",
+            "",
+            "",
+            42,
+            "976d1590926ac35e28d7f1a29fe98a1f787703a71cee3cb2c10acb9cc1b56c0f21b55d5de37755a79b12",
+        ),
+        "tc 5",
+    )
+    assert(
+        okm_matches(
+            "a4748031a14d3e6aafe42aa20c568f5f",
+            "",
+            "",
+            64,
+            "03f5db41f4484ec9468648c9f2a7f73ec18386008691b0555a7eec165e2f8cc72a6e74fffafbfb1ead00a89ff80ba00a266a70fcac07364110c6f5707f5096aa",
+        ),
+        "tc 6",
+    )
+    0
+}

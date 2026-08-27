@@ -2,7 +2,7 @@
 //! is00 corpus-overlay pattern). The two implementations diverge by
 //! design (lupin runs what wolfc refuses, and vice versa), so each test
 //! records what each implementation is expected to do *today*:
-//! `lupin = "run" | "unsupported"`,
+//! `lupin = "run" | "unsupported" | "slow"`,
 //! `wolfc = "run" | "unsupported" | "fail(E…)"`,
 //! `native = "run" | "unsupported" | "fail(E…)"` — the compiler's second
 //! rung (sc04: `conform-run --native`, s28's compile-link-execute), which
@@ -26,6 +26,19 @@ pub enum Expect {
     /// observed for the SAME program, same binary, same inputs, and any of
     /// them is accepted; anything else is red.
     ///
+    /// **The lane's semantics reach it, its SPEED does not** — spelled
+    /// `slow`, lupin-only (sc16, the digest ladder's honest-slow-skip).
+    /// The runner does not invoke the lane at all: the program is inside
+    /// the interpreter's modelled surface (the same module's short-vector
+    /// files are `run` there, which is what keeps the claim honest), but a
+    /// tree-walk of the full input blows the per-test ceiling by minutes,
+    /// and a red-on-timeout would record the machine's speed, not its
+    /// depth, while `unsupported` would be a lie about its semantics.
+    /// Every `std-test` run prints a slow ledger naming each skipped row,
+    /// so the entry is louder than a `run`, not quieter — and each row is
+    /// owed a re-measure at pin bumps (an interpreter perf wave is the
+    /// exit; F-0078's history is the precedent).
+    Slow,
     /// This is not a relaxation, it is a truthful record: at the sc07 pin
     /// two `str`-heavy tests get `run` or
     /// `unsupported — place projection outside the modelled surface` from
@@ -46,6 +59,7 @@ impl std::fmt::Display for Expect {
         match self {
             Expect::Run => write!(f, "run"),
             Expect::Unsupported => write!(f, "unsupported"),
+            Expect::Slow => write!(f, "slow"),
             Expect::Fail(c) => write!(f, "fail({c})"),
             Expect::Unstable(set) => write!(
                 f,
@@ -66,6 +80,10 @@ pub fn depth(e: &Expect) -> u8 {
         Expect::Unsupported => 0,
         Expect::Fail(_) => 1,
         Expect::Run => 2,
+        // A slow row claims run-depth semantics (its fast siblings prove
+        // it); the runner never observes the lane, so this depth is
+        // documentation rather than a gate.
+        Expect::Slow => 2,
         // An unstable row is as deep as its deepest outcome: a pin that
         // sometimes runs a program has at least that much capability, and
         // the gate must still catch a REGRESSION below the whole set.
@@ -128,7 +146,13 @@ pub fn parse(text: &str, what: &str) -> Result<Ledger, String> {
             {
                 return Err(format!(
                     "{what}:{line}: `fail(…)` is a wolfc expectation; lupin is \
-                     run | unsupported"
+                     run | unsupported | slow"
+                ));
+            }
+            if k != "lupin" && expect == Expect::Slow {
+                return Err(format!(
+                    "{what}:{line}: `slow` is a lupin expectation (the tree-walk's \
+                     speed, sc16); a compiled lane is measured or it is `unsupported`"
                 ));
             }
             *slot = Some(expect);
@@ -159,13 +183,14 @@ fn parse_expect(v: &str) -> Option<Expect> {
     match v {
         "run" => Some(Expect::Run),
         "unsupported" => Some(Expect::Unsupported),
+        "slow" => Some(Expect::Slow),
         _ if v.starts_with("unstable(") => {
             let inner = v.strip_prefix("unstable(")?.strip_suffix(')')?;
             let mut set = Vec::new();
             for part in inner.split('|') {
                 let e = parse_expect(part.trim())?;
-                if matches!(e, Expect::Unstable(_)) || set.contains(&e) {
-                    return None; // no nesting, no duplicates
+                if matches!(e, Expect::Unstable(_) | Expect::Slow) || set.contains(&e) {
+                    return None; // no nesting, no skips, no duplicates
                 }
                 set.push(e);
             }
@@ -221,6 +246,33 @@ mod tests {
         assert!(parse_expect("unstable(run|run)").is_none());
         assert!(parse_expect("unstable(run|unstable(run|unsupported))").is_none());
         assert!(parse_expect("unstable(run|fail(E0806))").is_some());
+    }
+
+    #[test]
+    fn slow_is_lupin_only_and_never_unstable() {
+        // The sc16 honest-slow-skip: `slow` parses for the interpreter
+        // lane, claims run-depth, and is refused everywhere else — a
+        // compiled lane is measured or it is `unsupported`, and an
+        // unstable set may not hide a skip.
+        let l = parse(
+            "[tests.\"a.lu\"]\nlupin = \"slow\"\nwolfc = \"unsupported\"\nnative = \"run\"\n",
+            "l",
+        )
+        .unwrap();
+        assert_eq!(l["a.lu"].lupin, Expect::Slow);
+        assert_eq!(l["a.lu"].lupin.to_string(), "slow");
+        assert_eq!(depth(&Expect::Slow), depth(&Expect::Run));
+        assert!(parse(
+            "[tests.\"a.lu\"]\nlupin = \"run\"\nwolfc = \"slow\"\nnative = \"run\"\n",
+            "l"
+        )
+        .is_err());
+        assert!(parse(
+            "[tests.\"a.lu\"]\nlupin = \"run\"\nwolfc = \"run\"\nnative = \"slow\"\n",
+            "l"
+        )
+        .is_err());
+        assert!(parse_expect("unstable(slow|run)").is_none());
     }
 
     #[test]

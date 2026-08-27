@@ -11,6 +11,7 @@ mod directive;
 mod doc_examples;
 mod doctor;
 mod exec;
+mod genvec;
 mod ledger;
 mod record;
 mod runner;
@@ -47,6 +48,9 @@ fn main() {
         Some("doc-examples") => doc_examples::doc_examples(),
         Some("ulp") => ulp::ulp(),
         Some("ledger-check") => runner::ledger_check(),
+        // sc16: regenerate the crypto vector tests from `vendor/vectors/`
+        // (`--check` verifies the committed files instead of writing).
+        Some("gen-vectors") => genvec::gen_vectors(args.iter().any(|a| a == "--check")),
         Some("doctor") => doctor::doctor(),
         Some("sync-pin") => sync_pin::sync_pin(),
         Some("ci") => ci(),
@@ -54,7 +58,7 @@ fn main() {
             eprintln!(
                 "usage: cargo xtask \
                  <std-test [--lint-conventions]|doc-examples|ulp|ledger-check\
-                 |doctor|sync-pin|ci>{}",
+                 |gen-vectors [--check]|doctor|sync-pin|ci>{}",
                 other.map(|o| format!(" (got `{o}`)")).unwrap_or_default()
             );
             std::process::exit(2);
@@ -112,6 +116,8 @@ fn ci() -> Result<(), String> {
     runner::ledger_check()?;
     banner("lint-conventions");
     runner::lint_conventions()?;
+    banner("gen-vectors --check");
+    genvec::gen_vectors(true)?;
     banner("std-test");
     runner::std_test()?;
     banner("doc-examples");

@@ -1,0 +1,235 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.sha2, arith.wrapping
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/cavp/SHA384ShortMsg.rsp` (provenance and source
+//! hashes: `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! NIST CAVP SHS byte-oriented short-message set for SHA-384,
+//! part 4 of 4 (30 vectors of the set's 129): 30 vectors here (Len = 792..1024 bits),
+//! each asserted through the one-shot `sum384` against its
+//! published digest.
+
+use std.hex
+use std.x.crypto.sha2
+
+fn digest_matches(msg_hex: str, want: str) -> bool {
+    let msg = hex.decode(msg_hex) else List[int]()
+    sha2.to_hex(sha2.sum384(msg)) == want
+}
+
+fn main() -> int {
+    assert(
+        digest_matches(
+            "ced0ec6500cb891e6433d104ba5b1c1ebca397f3a5eeeaa0f0561729621ea50d4ae7ff1d0827178dccd84e4ca06d9891a90adbb7a9f4994ac947cf6296e71d2f49b826d64b123a7bf86f339fa4679caddbdf19cfed7d0206aa5f527a6b0cc00f52aa2b",
+            "c2c2d7d65d0b9108648e3233d15fc4e4cb62ed8fee9cdd18ab44b8486e2100fbe45ddcf74f46c15eb77fb1c893c12202",
+        ),
+        "Len 792",
+    )
+    assert(
+        digest_matches(
+            "afa4a2c4fbaffe838dd149c78ea7851ea9396304b41806a093a90aae59c0c5bdb170cc9a7d22b90cbce52cc1b105108942df20c29ef3a913223b915e7ebc98ef135adefaa0f0a6441ea05920e868ce9d1ff6c8fe4dbec06a4849e5e55ad0627f9e09dfcb",
+            "cf6ef91d8567414f5c7f0b1f4ad09a976afc7c8327a382fca90f5a136b19be33100a664390a377f8d8a3015fb882125b",
+        ),
+        "Len 800",
+    )
+    assert(
+        digest_matches(
+            "00f65a485bfd381113d6e79bf9e0d5e518c891988c073ba198ac3a20f25c2c81619723e88a3c0ed3075075fbbafb6a7b61d3bc336a5e6d6f08d166c4861e6a3bdc2e49b2806b567e7e821a55cb674a6cd699f7dc61a7054a8ff3dec73eb667f59644346be2",
+            "809c6b5d41da7cd10df90b02b193ac7d40cf2e46c139e9dbd208a988da2b25002cdbad1db2ecc1322da20b7d054e5fe6",
+        ),
+        "Len 808",
+    )
+    assert(
+        digest_matches(
+            "b9ce382e1e82a873cc444248a3008c2cf64d18759057abe8f91c9d87f5dc83aa4eca0c51d30829b9a1d2712da1fac31f52942d77c9f20c2bf6d3751028d7d4f0d336d3dc92b27ec368caa4444b3180c1e37e98b58f25e647a9a6361f0b04cf78d17955766168",
+            "18cd10b3ea907b3770e8eb91c974666e2da2525afe7020b872b3ec6689e5e1cd0059dd4fd49ce44d75dc4c8430c322d6",
+        ),
+        "Len 816",
+    )
+    assert(
+        digest_matches(
+            "6778d82f3a98eecdfac55ddeebc52476a070094fbd65831801fdd60f837d80d23b90d472c5f4e5ca6273a50f40154ea8fb94013f6310ad18800433a1d379c84bdf799a99e8c7b676fbcd29cc2ed66552297de7a6e565179bb42b70d48299e0925a1d72ca2c792a",
+            "71f08d9333df5cb885fd23d6cbb1db84f9b55908d069df50fa4795cc713a18439bcab8daca078356f5c75a619f2f8782",
+        ),
+        "Len 824",
+    )
+    assert(
+        digest_matches(
+            "ba3a54a77d7c2b8ccec6d53136cd48827c87acdd1cd86ad1f56e862642ea2e1dcb4093f85d60f7bd77160738462e6c3fd3dd9d3a7c5cf7e2a1d60f489f84471902179f21f656ce0fff089278ea14441e04e7af71891622565f44c428044728fcc686212a32a5d809",
+            "3cc154f0542d8e3cacf9d79f231416816178a7ef2275fb257a48a2f763ffa2e15a33c27b970a416a057925aa0412d268",
+        ),
+        "Len 832",
+    )
+    assert(
+        digest_matches(
+            "7eec4f4f491b4eeaeb1cdbdb95e9511c2872372bf64a1f61cda1cd8032729c8beafd1edabf78036d80023c814ad8606106cb4e7f33f214c3e69c0f230e885474fd594f7f2444aa581e0c70ebf13073d89063eb81a43c5f608b2fc99fa1bcf5e2bfe62a6802e70c52ce",
+            "2f8c5682a07438043e55f0b7759fe7eea5d9bdfc8b0f89800ebcf777bc05a941ea7f3cac45d4659de0f505d814590b6b",
+        ),
+        "Len 840",
+    )
+    assert(
+        digest_matches(
+            "f3715b9e3ddd7862e15ee87aa23f1aaa0580591e55cff3fee9b49b42aa0c0cc8cfb8efa3eb96ffb72ab06b83d7b47b3d22a5772421cfc51214005150edf532af10138ad45758add459908601eccc3703e810002a2e4c6202e98d84281475d55d3de9f3d98809cce1f665",
+            "04e7d55b0eb4bc3d3a21cfd2941dbb4dc44706588967186b40da54902aeea97b262c97f75e37ebe3cd60a804e7b9feca",
+        ),
+        "Len 848",
+    )
+    assert(
+        digest_matches(
+            "dfd7d792e162bf7a889109550a0fc4c415232af0c0d72dcbc2595299e1a1c2aeae549f7970e994c15e0ab02f113d740d38c32a4d8ec079cd099d37d954ab7ef2800902cdf7c7a19fb14b3c98aaf4c6ad93fe9a9bc7a61229828e55ad4d6270d1bdbca9975d450f9be91e56",
+            "08e5ef57d0c2aa23edfc75cfae39e6bc1a43b5db08b2e27bc9823114edf760367db9cf3cd9c3779755f6d39e219b7079",
+        ),
+        "Len 856",
+    )
+    assert(
+        digest_matches(
+            "ffbc7c47f52e69f5c667f4ed578b46ff4592048f789081f3fb39321d0aa4627a6d4f261905649410a53a301c231fa787ae55c04f615a8f84196cecf2844d23007b44edd892649fc8ed10a2e855bf23fe8afd0b9edbb33296f5a7cf89f94634d9d1a2b8cac3b7f4e546f2329b",
+            "be10c7baf94608408a0accfbc8ce95e159d08d8ca75dd6c273f935947a7ec3463e10a58d3ceaa0b2198b0887a3a24a29",
+        ),
+        "Len 864",
+    )
+    assert(
+        digest_matches(
+            "a39f202d866e8e96765fbb53b6772537dec043322f4a7475247036d7495c987850cef2a46218d3fab36e3bcd595c0aca5e98b9db14fa484ca8c9772dfa3839f7ac3066727a50b0d5c933d82f82f1220720e8063f08bc283f199c8a4f85c70043df4fe55e751d0d71df36fa43d8",
+            "3b2664ccb555a1b1f3ec996860146ea75ef7f3bd62028a19c26f63339399f4275a07f3c064d34766ebe8e4dd532f6629",
+        ),
+        "Len 872",
+    )
+    assert(
+        digest_matches(
+            "b2c8261853e2218dfa135cb5387810352b8962e94e9fdc8695b41e7dba6ad122d14fdd0d2360dcc039ccce8b37fa0ead6ccc85bc26261d47cbaa78b925c6e380fef1856fed31dc616fe16b2039b1ac85cdee4ce04c0497998b41321868db08e35f358606585e0bb8c3da9a3be7a6",
+            "45b286f49fd05c45c921b7bfdbe2cb024441c372e07394dcccae0de834cd541f13a79dbb3e5078896e88438542bd2f12",
+        ),
+        "Len 880",
+    )
+    assert(
+        digest_matches(
+            "a04f390a9cc2effad05db80d9076a8d4b6cc8bba97b27b423670b290b8e69c2b187230011c1481ac88d090f39154659494db5e410851c6e8b2b8a93717cae76037e0881978124fe7e1a0929d8891491f4e99646cc94062dc82411fa66130eda46560e75b98048236439465125e737b",
+            "e7089d72945cef851e689b4409cfb63d135f0b5cdfb0dac6c3a292dd70371ab4b79da1997d7992906ac7213502662920",
+        ),
+        "Len 888",
+    )
+    assert(
+        digest_matches(
+            "f419494c3c6d0727b3395a483a2167182a7252f4fd099c2d4b71b053f94bb8b3adf3b51e8460cfec084ce9415c95798fbae4975c208c544645b54c44d2b97f2ecfce5c805be61f5ba1d35dcc07afdd51a87baa990506668cf710e18be9b0ebf943f366fa29c69f7a6616de72a3353b66",
+            "aead8688c58c6ba4e9cadb4756b465dce0fb06f1cfaa478197f2ea89414e47e9572034adfed160703c79b82b3fd7ab78",
+        ),
+        "Len 896",
+    )
+    assert(
+        digest_matches(
+            "aaf7584d53006cbf2d2040e51b7feebd2bbf1e9f6d817cd8062a6a9680e7f10464eefeb50b07cb46b14b9b3fcb2caa3b9ab664490115d5919456613bf172b58c5388fd52646a5783535b88212717ef605314b70b8a085024d4ab1fcbe2be74609e4cbdec0730fabd3cd77151d647a3767b",
+            "e6e79d8c61d0ea9fc70dd4dec1fa432849c3396e717b170badbd87a4c7974efc590ab8c1183a6232beff14534f004b02",
+        ),
+        "Len 904",
+    )
+    assert(
+        digest_matches(
+            "a467f77369730201f2812204fd63ad0d2757be580d937dfeb221a06b21ed3213531d936152a0c1f09f0ad5fed19fd11e80ad982c61203e86b2508279d91d99fa483e2e97a3d6a6ad2548a8da404dddb58344f4bdc1c9ea907088885e4f532d9c4c73cdfda43c3a9e4ce5a2809096593cfac1",
+            "5a7508c2cc096bf65a4d4d337aea22008edb9a3bae869f94e09fb526a52c3368e9b28576fb950f078b7e43b5562120e6",
+        ),
+        "Len 912",
+    )
+    assert(
+        digest_matches(
+            "01abc90e9180fc9bb8ea67a405073ed6848bf33048076566476c55836bcb19d3e55e9400c5cc657bc7a95f1d703c390f5a8687e7cd7fe9138ea3837bfcadad6258a3eb8d65121fa8319bfde532aec0e694961bddd2b673f284124be5781100f40381b6ff99db92ea9cc82a4372e53924dac398",
+            "96b209d7cb2c2033b38350744767fa5c253e1bfdb99fe8418bff83804df02248140fe3b77b0bfd4a79b51f70405a434b",
+        ),
+        "Len 920",
+    )
+    assert(
+        digest_matches(
+            "b555d99056362bfc2bac2a1bbb71ba112d644e50b82b015e5a1ce3d9cd5e90b8b74b08d32119baa62abae251fc0015e400051ada4ecafce3681e5de727c20d47f5cadc663d46ac682022ca396a4b7ed1c413e0b72bd7eec4a0dfdc2a2185abb5d99afd50940528ca75ad89daeb9a1b61e15747f0",
+            "abd39f79d72c6cd2e8e130f3603032fe3cef4177c3563930096df1f10b87e79cd4e2059cf1b9f8252184bb26f659a5da",
+        ),
+        "Len 928",
+    )
+    assert(
+        digest_matches(
+            "14fb01ae9d6015ecb3e56d6ecdfa4bc0533186adf8457f5e4a5c57c687895f3db395d06ae7ffbd67ec41452009550dfc1878eec0df2eeab09e8665f7e59f9148a86b2bc695b36521a55b2302f2e869aac83f14d6feafc9e587322c3c44f052ea1c0578884f84f56307bc6dde31ba48118a0f62b6fd",
+            "fc9b9a95a8ce1c157720cb63101a7594df24f4cc74baf735b0ccf6abb925478ad507cd048d30cde1c788806f43ed3a81",
+        ),
+        "Len 936",
+    )
+    assert(
+        digest_matches(
+            "11ae0cbfee7bb3df90ce585f09b9cf8ff5bea69a68eeb6c22553f8ed118c9a61e7b752cc2c94f38766e63e1b891dfa05b23347b617d42fde3ec17eea6e76d3cb640bf8fa46586fb9dd5c4d9bfee04c4649571b781709f848ad7081afb6e2c746f071a551251050fd5df72ee65248ecdc24f2cbe74ed5",
+            "3214b5feec925059149fa852e3ae285a6eb377df926504e2f824572a3aebd2050a20144e7bede7e7fe238ee83e69f72c",
+        ),
+        "Len 944",
+    )
+    assert(
+        digest_matches(
+            "a5c4a47a04f4714269d5d922ba4694060aa2df49193720c819fac93bb8787ec55a107ac9a6602f0045fd2cc8e66744bf863ced91eeabe60e7d2c1d80276ecf3bbe91f1757096cf589214f3569c2c48bd74be7f8befddb28395814780a47c180a58b0d0276a7e9873d682f473e27de7275c925ede23b6cc",
+            "6bd9e1303579d815f58e8c6c9855850133251778a632f7b312c4b3163b29b5ef6cb9511a08a31a237d9a7604afbfa056",
+        ),
+        "Len 952",
+    )
+    assert(
+        digest_matches(
+            "75264774af69ec7ee3125e205bd6d1cb8fdb22f7ea6dbe72d1f2c0f7e2205902796d75e379c79b11498615c21c9f52b8761a885eecc69d132b2b48c63bc074c3055ee5cc13f51d6c987e8188b030b837e8f754d40122b451f15b28cd2bdd576920e1de5806593a36d8e1e89b9ef3caefee5acd80b3e9c9d1",
+            "ffa9e4e856d06227c1ccb959be558309cc10633173f4b66ceb382923b52b9150acfb08a7393500477a6ee4425a827e76",
+        ),
+        "Len 960",
+    )
+    assert(
+        digest_matches(
+            "791a36d748695e62db5003a8ad367df1f051c1ac6a21d711823e8e069b546e3fa06ceeaae06de70a1de249e1dffd0d940edc6acac00c4c15504c02d4b0933658005423455f00023b01cdc5b681b6083379c24595518a47c654f5e1a10947df10c05a3d716b2a973faf98e1ee3b675816598bb8d4c2a3b06eb7",
+            "f8d33369680524ed6c6a716d4c502de3eac891f340f40e82e37501be1a90fb61d26e5daafe92bc6ef5ec0ae431168842",
+        ),
+        "Len 968",
+    )
+    assert(
+        digest_matches(
+            "74cd86bbed14d895301d8a54b2956b1c5cd1451eebab620b978d4ecef2cbdf7a14367381f5ee79281a773337740fb9f5853f4253c4b19f684341081d8f561b2ad773224151099588da90e04dddd565f67596c536d64c5b87e9480ad43601397507ad1b61ca0e349fb88f19feb48f770676fd562ee8259f50d0c9",
+            "73ee8d29c30821dcdfa4441639f037fb6ba3a9ca596dc43428043785756608f6207d80b7f78e573174fb9dfd42f0b8cd",
+        ),
+        "Len 976",
+    )
+    assert(
+        digest_matches(
+            "46612e1a4d016c41700a3b5ccb38323353bd8da5b9942c9c9212df40b4bee06be362a15dad62c8b2924d789168b2d325fe35bd5100e1e29f1ac0fa7a60a94c9eee5a70cccbc75ac214b1946a5679cb523b378d5c690751b7a7a3b80d413712feae7024ce71d6295a3d5d16515c3622a052eb862ebdab81ca7fe3a0",
+            "cac13a3784225be03d526f9abc1eb50a762e72c0e01172a15d578801089e5c9f26e53cc00ff755909453e2964d7df838",
+        ),
+        "Len 984",
+    )
+    assert(
+        digest_matches(
+            "1a857c1f105d068ceab0b1e12494890ec196362a48b0200a0d75d712b18fb14bec6bb5b68a33b7e0b4fdc5b77142c29c6d9151b9f884f59551f476e5256986a653d4a468f28141ed954721f2cd02054df0438738194545ed70234173ac4988b7d62812de4f2feada14f68e3b41bc9948d4139f4fb4da5939f26c0261",
+            "b75d92b5cd3772846f7b68064a3567ae43e5010099f2b649f35087e7592aeec176646fc8c2629288944261cd35b5fcba",
+        ),
+        "Len 992",
+    )
+    assert(
+        digest_matches(
+            "9d36818d0c5a008be7904d1917aa3eccb5ef4f38cecb8c4e63c4b2e9b4b091a3bf25b4ed0332445f894c2a4c258b749afa17fad03cdd41713a869f899ba9a085e73fa9474a58db7a950d3a2386b60f79495d8bf73e72acaffdbf65e1989ff9cc206ba8c46a368d8512bac7c7c191d713aca949d45df297b1b6594a1a33",
+            "a88da844579f3e3725d00daa8e1e287da4bfbb2d931ebe8d3b16021154be503341d6371d382ada744f86f5bbb56cdcfa",
+        ),
+        "Len 1000",
+    )
+    assert(
+        digest_matches(
+            "4ae50ed626ee60dc5ea556e3ce0d3c18b9e6225b5620814e8b9621acf8f939dd370ad9c7620d85e6d67a229f37f517d1b580acae8df0b5c9d29d756f6d5ebd3b63b554e556469b5b4f8e7113bad1559fb254ca827fcd00425d18b0be7f2b48c2544c48d90982ec624f490be65e893fa93ac9467f35a0a8e1b56d9a403748",
+            "f8cd943f429333c7c8d30a8576827f92c92ae18e0dbcae770601b79687bccf8c23e9e589dfeb45c3b9bcafdd545e45e7",
+        ),
+        "Len 1008",
+    )
+    assert(
+        digest_matches(
+            "dbed7612448d46cbe0a384d1c93233f02ffd1c984ba765299518656d3723b766c1658d4b1e7047cdc729459e366ef9349efc40cbd990f2a9a24db7a5045e1dea12dce8f9d9f2aaed933f93031e7b8959ac5e7bf6bbbdf30b48f7eb783f8fe292371a2f245c5c94b4acae160767a20ce7c0ea7723d97691d8eedda9efd1fe2d",
+            "fb531a1ed181c732311e56f4b56ed91dcacc0dd6bf1eb4a44be6f87dd7cb1ef9dfb0310f4a79eaaa3f32bf3914d8624e",
+        ),
+        "Len 1016",
+    )
+    assert(
+        digest_matches(
+            "3bf52cc5ee86b9a0190f390a5c0366a560b557000dbe5115fd9ee11630a62769011575f15881198f227876e8fe685a6939bc8b89fd48a34ec5e71e131462b2886794dffa68ccc6d564733e67ffef25e627c6f4b5460796e3bce67bf58ca6e8e555bc916a8531697ac948b90dc8616f25101db90b50c3d3dbc9e21e42ff387187",
+            "12b6cb35eda92ee37356ddee77781a17b3d90e563824a984faffc6fdd1693bd7626039635563cfc3b9a2b00f9c65eefd",
+        ),
+        "Len 1024",
+    )
+    0
+}
