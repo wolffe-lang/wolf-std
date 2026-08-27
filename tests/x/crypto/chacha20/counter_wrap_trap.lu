@@ -1,0 +1,23 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.crypto.chacha20, conf.trap.set
+//!
+//! RFC 8439 §2.4's length guard, held as a trap: the block counter is
+//! 32-bit, so a message may span at most 2^32 blocks from its starting
+//! counter — beyond that the counter wraps and keystream REPEATS,
+//! which is the two-time-pad failure. The >256 GiB message that hits
+//! the guard from counter 1 is theoretical, but `stream_xor` takes the
+//! caller's starting counter, so counter 2^32-1 plus a two-block
+//! message hits the same comparison cheaply. The guard runs before any
+//! keystream arithmetic, so every lane reaches the trap.
+
+use std.x.crypto.chacha20
+
+fn main() -> int {
+    let key = "wolf sc17: a 32-byte chacha key!".bytes()
+    let two_blocks = "x".repeat(65).bytes()
+    print("reached the call")
+    let ct = chacha20.stream_xor(key, 4294967295, "twelve bytes".bytes(), two_blocks)
+    print("unreachable: {ct.len}")
+    0
+}

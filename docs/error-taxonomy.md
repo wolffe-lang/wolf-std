@@ -254,3 +254,19 @@ arm rather than widening the signature. The same tag IS on `write_bytes` and
 `write_chunk`, where the list is the caller's. Whose data it is decides
 whether a tag is reachable, and the two functions sit four lines apart to
 make the difference readable.
+
+## sc17 (06-crypto): one mark from the AEAD surface
+
+`std.x.crypto.chacha20` ships exactly one row, on exactly one function,
+and the discipline around it is the module's whole error story:
+
+| tag | sites | payload | verdict |
+|---|---|---|---|
+| `tag` | 1 (`chacha20.open`) | none | conforming — a forged, modified or truncated box is the DATA's failure (§2: raise where the data broke, trap where the caller did), and it is ONE mark for every authentication failure on purpose: a caller cannot act differently on "too short" versus "wrong tag", and answering them apart would hand a forger an oracle (§12's one-tag-per-actionable-failure rule read in the direction where merging is the security property). No payload, ever: anything a payload could carry about WHY the tag failed is information the construction exists to withhold. The name was checked both ways per sc14's symmetric rule — no module, function, binding or prelude name collides. Witnessed by `flipped_tag_row.lu` and `truncated_box_row.lu` riding `error: tag` out of `main`, and 60 Wycheproof `ModifiedTag` vectors asserting the reject path |
+
+Everything else in the module is TOTAL or traps `assert` on a caller
+contract violation (key/nonce/counter shape, non-byte elements, the
+§2.4 counter-span guard) — the sc16 misuse spelling, held by four
+`_trap.lu` files that run on ALL THREE lanes because every guard fires
+before the first keystream operation. `seal` deliberately has NO row:
+sealing cannot fail on data, only on the caller's own inputs.

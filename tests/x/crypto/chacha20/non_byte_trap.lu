@@ -1,0 +1,27 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.crypto.chacha20, conf.trap.set
+//!
+//! §11's byte contract, held: an element outside 0..255 is a caller
+//! contract violation and traps `assert` at ingestion — a wrapping
+//! cast would otherwise key the cipher with a value the caller never
+//! meant. The bad element sits in the KEY, whose guard runs before any
+//! keystream arithmetic, so every lane reaches the trap (the sha2
+//! precedent). The print proves the trap fires at the bad element, not
+//! before.
+
+use std.x.crypto.chacha20
+
+fn main() -> int {
+    var key = List[int]()
+    var i: int = 0
+    while i < 31 {
+        (mut key).push(i)
+        i = i + 1
+    }
+    (mut key).push(256)
+    print("reached the call")
+    let ks = chacha20.block(key, 1, "twelve bytes".bytes())
+    print("unreachable: {ks.len}")
+    0
+}

@@ -1,0 +1,849 @@
+//! member: true
+//!
+//! std.x.crypto.chacha20 — ChaCha20, Poly1305 and the
+//! AEAD_CHACHA20_POLY1305 construction (RFC 8439). Stability tier: x —
+//! the D53 crypto ladder's second rung (campaign stdc-crypto, sprint
+//! sc17). This is the cipher that needs no tables: add-rotate-xor on
+//! public data-flow, no S-boxes, no secret-indexed loads, so its
+//! constant-time story is true by construction in portable code — which
+//! is why it lands before AES-GCM (that rung owes a D-question on
+//! hardware intrinsics vs bitslicing vs c28-verified masking; named in
+//! the sc17 contract, not smuggled here).
+//!
+//! **The nursery banner (D31).** `std.x.crypto.chacha20` is not
+//! `std.crypto`: its path, names and behaviour may change or vanish in
+//! one sprint; no other std module may depend on it (it may depend on
+//! the facade, and does: nothing — self-contained on purpose); its
+//! reason and graduation trigger live in `std/x/README.md`. Poly1305
+//! lives IN this module rather than beside it because a nursery
+//! resident may not depend on another resident — the graduation move
+//! splits them.
+//!
+//! **Implemented from the RFC 8439 DOCUMENT, not ported.** Every
+//! constant and every round below cites its section of RFC 8439 (June
+//! 2018), fetched into the planning repo's `refs/specs/rfc8439.txt`.
+//! The vectors (the RFC's complete set — §2.3.2, §2.4.2, §2.5.2,
+//! §2.6.2, §2.8.2, A.1–A.5 — plus the full Wycheproof
+//! `chacha20_poly1305_test.json`) catch transcription errors; the
+//! document is the authority.
+//!
+//! **The ChaCha word currency is `wrapping[u64]`, masked to 32 bits**
+//! (the sha2 discipline, F-0089: the native rung refuses the narrowing
+//! `int as wrapping[u32]` while the widening cast lowers everywhere).
+//! Every value entering a round is 32-bit-clean and every sum or
+//! rotation is masked before it is stored. Unlike SHA-2, ChaCha20 is
+//! LITTLE-endian at state load and keystream serialization (§2.3) —
+//! the `word32_le`/`push_word32_le` helpers are this module's own,
+//! not sha2's big-endian pair.
+//!
+//! **Poly1305 is CHECKED `int` arithmetic, all the way down** — the
+//! sc17 probe delta's finding. Five 26-bit limbs in 64-bit
+//! accumulators, carries spelled `/`/`%` (no bitwise operators on
+//! plain `int` — that spelling costs the checked lane, F-0026), the
+//! §2.5 clamp as `%`/`-` arithmetic, and the final conditional
+//! subtraction as an arithmetic select. The bound proof lives on
+//! `absorb`; because X3's checked arithmetic traps on any overflow, a
+//! violated bound would be a trap the vectors catch, not a silent
+//! wrap. No `wrapping[T]` appears anywhere in the MAC.
+//!
+//! **Lanes, measured at these pins**: lupin RUNS and native RUNS; the
+//! checked tier answers `unsupported` at `mem` for any body reaching
+//! the ChaCha core — shifts and bitwise operators on `wrapping[T]`
+//! are outside its modelled surface ("this operator in checked
+//! execution", F-0091 / wolf-lang#130, the digest ladder's inherited
+//! dark-lane posture; wolf-lang s111 is fixing it concurrently and
+//! the next pin bump flips sha2 and this module in one motion). The
+//! nuance the probe delta measured, confirmed at the test level: the
+//! checked tier's refusal is DYNAMIC — it refuses the operator when
+//! the executed path reaches one — so Poly1305's checked-int
+//! arithmetic runs on ALL THREE lanes even inside this module
+//! (`tests/x/crypto/chacha20/rfc8439_a3_poly1305.lu` is a three-lane
+//! row), and only paths that reach the ChaCha core go dark.
+//!
+//! **Byte sequences are `List[int]` with the documented 0..255
+//! element contract** (§11's interim, F-0035): an element outside
+//! 0..255 traps `assert` at ingestion. `to_hex` is this module's own
+//! hex rendering so its tests and doc examples import exactly one
+//! module (the sha2 precedent); `std.hex.encode` is the facade
+//! spelling.
+//!
+//! **Nonces are the CALLER's** — `seal`/`open` take an explicit
+//! 96-bit nonce and this module provides NO random-nonce surface (no
+//! entropy story exists yet; the D-question lives with the rung that
+//! needs it). Reusing a nonce under one key forfeits both
+//! confidentiality and integrity (§4); `seal`'s doc states the
+//! contract.
+//!
+//! **Error rows**: exactly one, `open`'s `{tag}` — a forged, modified
+//! or truncated box is the DATA's failure, so it raises (§2's rule).
+//! Everything else is total over its documented domain; key/nonce
+//! length misuse and non-byte elements are caller contract violations
+//! that trap `assert` (the sc16 spelling).
+//!
+//! **Constant-time obligations (D53's retrofit clause).** c28's
+//! compiler-enforced tier does not exist yet; until it does, every
+//! `pub` fn below carries a `ct:` line. The honest summary: the
+//! cipher and the MAC branch and index on PUBLIC quantities only
+//! (lengths, block counts, fixed offsets) — with ONE recorded
+//! exception, the 0..255 ingestion guard, which compares every input
+//! element (key bytes included) and is exactly the kind of
+//! value-dependent branch c28 will flag (it leaves with F-0035's real
+//! byte type). The tag comparison in `open` is the module's one
+//! load-bearing ct claim and is marked as c28's FIRST verification
+//! target. `to_hex` is NOT constant-time and says so.
+
+// ---------------------------------------------------------------------
+// Byte <-> word helpers (the endianness seam, written and tested first:
+// RFC 8439 §2.3 — little-endian words at state load and serialization,
+// the deliberate flip from sha2's big-endian pair).
+// ---------------------------------------------------------------------
+
+/// The low-32-bit mask, as a total zero-argument function (a module
+/// `const` costs an execution lane at these pins, F-0025/F-0026).
+fn mask32() -> wrapping[u64] {
+    0xffffffff
+}
+
+/// One little-endian 32-bit word from four bytes (RFC 8439 §2.3),
+/// carried in the low half of a `wrapping[u64]`.
+fn word32_le(b0: int, b1: int, b2: int, b3: int) -> wrapping[u64] {
+    b0 as wrapping[u64] |
+        b1 as wrapping[u64] << 8 |
+        b2 as wrapping[u64] << 16 |
+        b3 as wrapping[u64] << 24
+}
+
+/// Append the low 32 bits of `w` to `out`, little-endian (RFC 8439
+/// §2.3's serialization order).
+fn push_word32_le(mut out: List[int], w: wrapping[u64]) {
+    (mut out).push((w & 0xff) as int)
+    (mut out).push((w >> 8 & 0xff) as int)
+    (mut out).push((w >> 16 & 0xff) as int)
+    (mut out).push((w >> 24 & 0xff) as int)
+}
+
+/// One little-endian 32-bit read in the plain-int domain — Poly1305's
+/// half of the seam (the MAC is checked arithmetic throughout; see the
+/// module header).
+fn le32i(b0: int, b1: int, b2: int, b3: int) -> int {
+    b0 + b1 * 256 + b2 * 65536 + b3 * 16777216
+}
+
+/// One byte XOR in the `wrapping[u64]` domain (bitwise `^` on plain
+/// `int` costs the checked lane, F-0026).
+fn xor_byte(a: int, b: int) -> int {
+    ((a as wrapping[u64] ^ b as wrapping[u64]) & 0xff) as int
+}
+
+/// The 0..255 ingestion guard (§11's `List[int]` byte contract).
+/// ct: NOT free of value-dependent branches — this comparison pair
+/// runs on every input element (key bytes included) and is the
+/// module's one recorded ct exception (see the header; it leaves with
+/// F-0035's real byte type).
+fn require_byte(v: int) {
+    if v < 0 {
+        assert(false, "chacha20: element outside 0..255")
+    }
+    if v > 255 {
+        assert(false, "chacha20: element outside 0..255")
+    }
+}
+
+// ---------------------------------------------------------------------
+// RFC 8439 §2.1 — the quarter round: a += b; d ^= a; d <<<= 16; then
+// the 12, 8, 7 lines. Left-rotation is spelled (x << n | x >> (32 - n))
+// with literal shift amounts, masked back to 32 bits (a shift by a
+// plain-int BINDING is refused natively — sc16's measurement).
+// ---------------------------------------------------------------------
+
+fn rotl16(x: wrapping[u64]) -> wrapping[u64] {
+    (x << 16 | x >> 16) & mask32()
+}
+
+fn rotl12(x: wrapping[u64]) -> wrapping[u64] {
+    (x << 12 | x >> 20) & mask32()
+}
+
+fn rotl8(x: wrapping[u64]) -> wrapping[u64] {
+    (x << 8 | x >> 24) & mask32()
+}
+
+fn rotl7(x: wrapping[u64]) -> wrapping[u64] {
+    (x << 7 | x >> 25) & mask32()
+}
+
+/// The four cells a quarter round returns — wolf has no tuple of
+/// wrapping values that crosses every lane, so the QR hands back a
+/// one-shot struct the caller unpacks.
+struct Quad {
+    a: wrapping[u64],
+    b: wrapping[u64],
+    c: wrapping[u64],
+    d: wrapping[u64],
+}
+
+/// The ChaCha quarter round (RFC 8439 §2.1), on four 32-bit-clean
+/// words; §2.1.1's test vector drives the block-function vectors that
+/// pin this body (a wrong rotation fails every one of them).
+/// ct: add-rotate-xor only — no branch, no memory access at all.
+fn qr(a0: wrapping[u64], b0: wrapping[u64], c0: wrapping[u64], d0: wrapping[u64]) -> Quad {
+    var a = a0
+    var b = b0
+    var c = c0
+    var d = d0
+    a = a + b & mask32()
+    d = rotl16(d ^ a)
+    c = c + d & mask32()
+    b = rotl12(b ^ c)
+    a = a + b & mask32()
+    d = rotl8(d ^ a)
+    c = c + d & mask32()
+    b = rotl7(b ^ c)
+    Quad { a: a, b: b, c: c, d: d }
+}
+
+// ---------------------------------------------------------------------
+// RFC 8439 §2.3 — the ChaCha20 block function. State: the four
+// "expand 32-byte k" constants, eight key words, the block counter,
+// three nonce words — all little-endian; 10 double rounds (4 column +
+// 4 diagonal quarter rounds each); the initial state added back; the
+// result serialized little-endian.
+// ---------------------------------------------------------------------
+
+/// The eight key words, little-endian (§2.3 state words 4-11).
+/// Requires `key.len == 32` with byte elements (the pub entries
+/// guard).
+fn key_words(key: List[int]) -> List[int] {
+    var kw = List[int]()
+    var i: int = 0
+    while i < 32 {
+        (mut kw).push(word32_le(key[i], key[i + 1], key[i + 2], key[i + 3]) as int)
+        i = i + 4
+    }
+    kw
+}
+
+/// The three nonce words, little-endian (§2.3 state words 13-15).
+fn nonce_words(nonce: List[int]) -> List[int] {
+    var nw = List[int]()
+    var i: int = 0
+    while i < 12 {
+        (mut nw).push(word32_le(nonce[i], nonce[i + 1], nonce[i + 2], nonce[i + 3]) as int)
+        i = i + 4
+    }
+    nw
+}
+
+/// One 64-byte keystream block over prepared key/nonce words —
+/// RFC 8439 §2.3.1: state setup, 10 double rounds, the add-back, the
+/// little-endian serialization. §2.3's constants are the ASCII of
+/// "expand 32-byte k".
+fn keystream_block(kw: List[int], counter: int, nw: List[int]) -> List[int] {
+    let s0: wrapping[u64] = 0x61707865
+    let s1: wrapping[u64] = 0x3320646e
+    let s2: wrapping[u64] = 0x79622d32
+    let s3: wrapping[u64] = 0x6b206574
+    var x0 = s0
+    var x1 = s1
+    var x2 = s2
+    var x3 = s3
+    var x4 = kw[0] as wrapping[u64]
+    var x5 = kw[1] as wrapping[u64]
+    var x6 = kw[2] as wrapping[u64]
+    var x7 = kw[3] as wrapping[u64]
+    var x8 = kw[4] as wrapping[u64]
+    var x9 = kw[5] as wrapping[u64]
+    var x10 = kw[6] as wrapping[u64]
+    var x11 = kw[7] as wrapping[u64]
+    var x12 = counter as wrapping[u64]
+    var x13 = nw[0] as wrapping[u64]
+    var x14 = nw[1] as wrapping[u64]
+    var x15 = nw[2] as wrapping[u64]
+    var round: int = 0
+    while round < 10 {
+        let c1 = qr(x0, x4, x8, x12)
+        x0 = c1.a
+        x4 = c1.b
+        x8 = c1.c
+        x12 = c1.d
+        let c2 = qr(x1, x5, x9, x13)
+        x1 = c2.a
+        x5 = c2.b
+        x9 = c2.c
+        x13 = c2.d
+        let c3 = qr(x2, x6, x10, x14)
+        x2 = c3.a
+        x6 = c3.b
+        x10 = c3.c
+        x14 = c3.d
+        let c4 = qr(x3, x7, x11, x15)
+        x3 = c4.a
+        x7 = c4.b
+        x11 = c4.c
+        x15 = c4.d
+        let d1 = qr(x0, x5, x10, x15)
+        x0 = d1.a
+        x5 = d1.b
+        x10 = d1.c
+        x15 = d1.d
+        let d2 = qr(x1, x6, x11, x12)
+        x1 = d2.a
+        x6 = d2.b
+        x11 = d2.c
+        x12 = d2.d
+        let d3 = qr(x2, x7, x8, x13)
+        x2 = d3.a
+        x7 = d3.b
+        x8 = d3.c
+        x13 = d3.d
+        let d4 = qr(x3, x4, x9, x14)
+        x3 = d4.a
+        x4 = d4.b
+        x9 = d4.c
+        x14 = d4.d
+        round = round + 1
+    }
+    var out = List[int]()
+    push_word32_le(mut out, x0 + s0 & mask32())
+    push_word32_le(mut out, x1 + s1 & mask32())
+    push_word32_le(mut out, x2 + s2 & mask32())
+    push_word32_le(mut out, x3 + s3 & mask32())
+    push_word32_le(mut out, x4 + kw[0] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x5 + kw[1] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x6 + kw[2] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x7 + kw[3] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x8 + kw[4] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x9 + kw[5] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x10 + kw[6] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x11 + kw[7] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x12 + counter as wrapping[u64] & mask32())
+    push_word32_le(mut out, x13 + nw[0] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x14 + nw[1] as wrapping[u64] & mask32())
+    push_word32_le(mut out, x15 + nw[2] as wrapping[u64] & mask32())
+    out
+}
+
+/// The key/nonce/counter contract shared by every ChaCha entry point:
+/// a 256-bit key, a 96-bit nonce, a 32-bit block counter (RFC 8439
+/// §2.3). Violations trap `assert` — the caller could have checked
+/// (§2's trap rule).
+fn require_chacha_inputs(key: List[int], counter: int, nonce: List[int]) {
+    if !(key.len == 32) {
+        assert(false, "chacha20: the key is 32 bytes (RFC 8439 s2.3)")
+    }
+    if !(nonce.len == 12) {
+        assert(false, "chacha20: the nonce is 12 bytes (RFC 8439 s2.3)")
+    }
+    if counter < 0 {
+        assert(false, "chacha20: the block counter is 32-bit (RFC 8439 s2.3)")
+    }
+    if counter > 4294967295 {
+        assert(false, "chacha20: the block counter is 32-bit (RFC 8439 s2.3)")
+    }
+    for b in key {
+        require_byte(b)
+    }
+    for b in nonce {
+        require_byte(b)
+    }
+}
+
+/// The ChaCha20 block function (RFC 8439 §2.3): 64 keystream bytes
+/// for one (key, counter, nonce) triple. Traps `assert` on a key that
+/// is not 32 bytes, a nonce that is not 12, a counter outside
+/// 0..2^32-1, or a non-byte element; total otherwise.
+/// ct: constant-time by construction — the rounds are add-rotate-xor
+/// on 32-bit words with literal rotation amounts; every branch is a
+/// fixed loop bound and every index is a fixed offset or a loop
+/// counter, so no branch and no memory address depends on a secret.
+/// The one recorded exception is the 0..255 ingestion guard (module
+/// header).
+///
+/// ```wolf-doc-example
+/// let key = "wolf sc17: a 32-byte chacha key!".bytes()
+/// let nonce = "twelve bytes".bytes()
+/// chacha20.block(key, 1, nonce).len == 64
+/// chacha20.to_hex(chacha20.block(key, 1, nonce))[0..8] == "4f0949f3"
+/// ```
+pub fn block(key: List[int], counter: int, nonce: List[int]) -> List[int] {
+    require_chacha_inputs(key, counter, nonce)
+    keystream_block(key_words(key), counter, nonce_words(nonce))
+}
+
+/// The ChaCha20 stream cipher (RFC 8439 §2.4): XORs `data` with the
+/// keystream starting at block `counter`; its own inverse, so one
+/// function is both directions. Traps `assert` on the block-function
+/// contract violations, and on a message long enough that the 32-bit
+/// block counter would wrap — §2.4's note: the cipher is defined for
+/// at most 2^32 blocks from the starting counter (with counter 1
+/// that is ~256 GiB, theoretical; the guard is one comparison).
+/// ct: as `block` — the per-byte XOR touches every element
+/// unconditionally, the keystream index is `pos % 64` (public), and
+/// block boundaries depend on the LENGTH alone.
+///
+/// ```wolf-doc-example
+/// let key = "wolf sc17: a 32-byte chacha key!".bytes()
+/// let nonce = "twelve bytes".bytes()
+/// let ct = chacha20.stream_xor(key, 1, nonce, "attack at dawn".bytes())
+/// chacha20.to_hex(ct) == "2e7d3d92e359096f5c4660bbeed3"
+/// chacha20.to_hex(chacha20.stream_xor(key, 1, nonce, ct)) == "61747461636b206174206461776e"
+/// ```
+pub fn stream_xor(key: List[int], counter: int, nonce: List[int], data: List[int]) -> List[int] {
+    require_chacha_inputs(key, counter, nonce)
+    let blocks = (data.len + 63) / 64
+    if blocks > 0 {
+        if counter + blocks - 1 > 4294967295 {
+            assert(false, "chacha20: message spans past the 32-bit block counter (RFC 8439 s2.4)")
+        }
+    }
+    let kw = key_words(key)
+    let nw = nonce_words(nonce)
+    var out = List[int]()
+    var ks = List[int]()
+    var pos: int = 0
+    for m in data {
+        require_byte(m)
+        if pos % 64 == 0 {
+            ks = keystream_block(kw, counter + pos / 64, nw)
+        }
+        (mut out).push(xor_byte(m, ks[pos % 64]))
+        pos = pos + 1
+    }
+    out
+}
+
+// ---------------------------------------------------------------------
+// RFC 8439 §2.5 — Poly1305. The accumulator and clamped r ride as five
+// 26-bit limbs in checked-int 64-bit accumulators; s is the final
+// 128-bit addend. Everything below is plain checked arithmetic: carries
+// are `/`/`%` by 2^26, the clamp is `%`/`-` by powers of two, and the
+// final conditional subtraction is an arithmetic select — no bitwise
+// operator on plain `int` anywhere (F-0026), and no branch on a secret.
+// ---------------------------------------------------------------------
+
+/// An in-progress Poly1305 computation: the five accumulator limbs,
+/// the five clamped-r limbs, and 5*r for the reduction (§2.5's prime
+/// is 2^130 - 5, so the wrapped-around limbs re-enter times 5). Fields
+/// are the interim backing, never API; a forged state produces a wrong
+/// tag, never a trap.
+struct Poly {
+    h0: int,
+    h1: int,
+    h2: int,
+    h3: int,
+    h4: int,
+    r0: int,
+    r1: int,
+    r2: int,
+    r3: int,
+    r4: int,
+    m1: int,
+    m2: int,
+    m3: int,
+    m4: int,
+}
+
+/// One 16-byte-or-less block absorbed into the accumulator — RFC 8439
+/// §2.5.1: add the block plus its high bit, multiply by r, reduce mod
+/// 2^130 - 5. `chunk` arrives padded to 17 bytes with the 2^(8*len)
+/// byte already in place, so full and partial blocks are one code
+/// path.
+///
+/// THE BOUND PROOF (why checked arithmetic cannot trap here): h limbs
+/// are < 2^26 after every carry chain and n limbs are < 2^26 (n4 <
+/// 2^25), so h+n limbs are < 2^27. Clamped r limbs are < 2^26, so
+/// 5*r limbs are < 2^29 (they are < 2^28.4; call it 2^29). One
+/// product is then < 2^27 * 2^29 = 2^56, one column is at most five
+/// products plus a carry-in — under 21 * (2^27)(2^26) + 2^32 <
+/// 2^57.9 — and int_max is 2^63 - 1: 34x headroom, measured at
+/// 2^57.00 worst-case over the RFC vectors and 3000 random cases in
+/// the sc17 probe delta. X3 enforces the proof at every operation.
+fn absorb(mut st: Poly, chunk: List[int]) {
+    let n0 = le32i(chunk[0], chunk[1], chunk[2], chunk[3]) % 67108864
+    let n1 = le32i(chunk[3], chunk[4], chunk[5], chunk[6]) / 4 % 67108864
+    let n2 = le32i(chunk[6], chunk[7], chunk[8], chunk[9]) / 16 % 67108864
+    let n3 = le32i(chunk[9], chunk[10], chunk[11], chunk[12]) / 64 % 67108864
+    let n4 = le32i(chunk[13], chunk[14], chunk[15], chunk[16])
+    let h0 = st.h0 + n0
+    let h1 = st.h1 + n1
+    let h2 = st.h2 + n2
+    let h3 = st.h3 + n3
+    let h4 = st.h4 + n4
+    let d0 = h0 * st.r0 + h1 * st.m4 + h2 * st.m3 + h3 * st.m2 + h4 * st.m1
+    let d1 = h0 * st.r1 + h1 * st.r0 + h2 * st.m4 + h3 * st.m3 + h4 * st.m2
+    let d2 = h0 * st.r2 + h1 * st.r1 + h2 * st.r0 + h3 * st.m4 + h4 * st.m3
+    let d3 = h0 * st.r3 + h1 * st.r2 + h2 * st.r1 + h3 * st.r0 + h4 * st.m4
+    let d4 = h0 * st.r4 + h1 * st.r3 + h2 * st.r2 + h3 * st.r1 + h4 * st.r0
+    var c = d0 / 67108864
+    st.h0 = d0 % 67108864
+    let e1 = d1 + c
+    c = e1 / 67108864
+    st.h1 = e1 % 67108864
+    let e2 = d2 + c
+    c = e2 / 67108864
+    st.h2 = e2 % 67108864
+    let e3 = d3 + c
+    c = e3 / 67108864
+    st.h3 = e3 % 67108864
+    let e4 = d4 + c
+    c = e4 / 67108864
+    st.h4 = e4 % 67108864
+    let f0 = st.h0 + c * 5
+    st.h0 = f0 % 67108864
+    st.h1 = st.h1 + f0 / 67108864
+}
+
+/// The Poly1305 one-time authenticator (RFC 8439 §2.5): a 16-byte tag
+/// over `msg` under a 32-byte one-time key (r || s). The r half is
+/// clamped with §2.5's exact mask `0x0ffffffc0ffffffc0ffffffc0fffffff`
+/// — spelled byte-wise as arithmetic, and applied BEFORE the limb
+/// split, so no unclamped bit ever enters the schedule. Traps `assert`
+/// on a key that is not 32 bytes or a non-byte element; total
+/// otherwise. THE KEY IS ONE-TIME (§2.5): authenticating two messages
+/// under one r,s pair forfeits the MAC; the AEAD below derives a fresh
+/// key per nonce.
+/// ct: the limb schedule is fixed and data-independent — every block
+/// runs the same adds, multiplies and `/`/`%` carries; block
+/// boundaries depend on the LENGTH alone; the final conditional
+/// subtraction of p is an arithmetic select, not a branch. The 0..255
+/// ingestion guard is the recorded exception (module header).
+///
+/// ```wolf-doc-example
+/// let key = "wolf sc17: a 32-byte chacha key!".bytes()
+/// let mac = chacha20.poly1305(key, "a message worth authenticating".bytes())
+/// mac.len == 16
+/// chacha20.to_hex(mac) == "79a8154cdb15d6e6de56665337a5908c"
+/// ```
+pub fn poly1305(key: List[int], msg: List[int]) -> List[int] {
+    if !(key.len == 32) {
+        assert(false, "chacha20: the poly1305 key is 32 bytes (RFC 8439 s2.5)")
+    }
+    for b in key {
+        require_byte(b)
+    }
+    // §2.5 clamp, before limb-splitting: the top four bits of bytes
+    // 3, 7, 11, 15 clear (`% 16`) and the bottom two bits of bytes
+    // 4, 8, 12 clear (`- % 4`) — the mask 0x0ffffffc0ffffffc0ffffffc0fffffff
+    // read little-endian, byte by byte.
+    var rb = List[int]()
+    (mut rb).push(key[0])
+    (mut rb).push(key[1])
+    (mut rb).push(key[2])
+    (mut rb).push(key[3] % 16)
+    (mut rb).push(key[4] - key[4] % 4)
+    (mut rb).push(key[5])
+    (mut rb).push(key[6])
+    (mut rb).push(key[7] % 16)
+    (mut rb).push(key[8] - key[8] % 4)
+    (mut rb).push(key[9])
+    (mut rb).push(key[10])
+    (mut rb).push(key[11] % 16)
+    (mut rb).push(key[12] - key[12] % 4)
+    (mut rb).push(key[13])
+    (mut rb).push(key[14])
+    (mut rb).push(key[15] % 16)
+    let r0 = le32i(rb[0], rb[1], rb[2], rb[3]) % 67108864
+    let r1 = le32i(rb[3], rb[4], rb[5], rb[6]) / 4 % 67108864
+    let r2 = le32i(rb[6], rb[7], rb[8], rb[9]) / 16 % 67108864
+    let r3 = le32i(rb[9], rb[10], rb[11], rb[12]) / 64 % 67108864
+    let r4 = le32i(rb[12], rb[13], rb[14], rb[15]) / 256 % 67108864
+    var st = Poly {
+        h0: 0,
+        h1: 0,
+        h2: 0,
+        h3: 0,
+        h4: 0,
+        r0: r0,
+        r1: r1,
+        r2: r2,
+        r3: r3,
+        r4: r4,
+        m1: 5 * r1,
+        m2: 5 * r2,
+        m3: 5 * r3,
+        m4: 5 * r4,
+    }
+    var chunk = List[int]()
+    for m in msg {
+        require_byte(m)
+        (mut chunk).push(m)
+        if chunk.len == 16 {
+            (mut chunk).push(1)
+            absorb(mut st, chunk)
+            chunk = List[int]()
+        }
+    }
+    if chunk.len > 0 {
+        (mut chunk).push(1)
+        while chunk.len < 17 {
+            (mut chunk).push(0)
+        }
+        absorb(mut st, chunk)
+    }
+    // Full carry to canonical limb form (each < 2^26).
+    var h0 = st.h0
+    var h1 = st.h1
+    var h2 = st.h2
+    var h3 = st.h3
+    var h4 = st.h4
+    var c = h1 / 67108864
+    h1 = h1 % 67108864
+    h2 = h2 + c
+    c = h2 / 67108864
+    h2 = h2 % 67108864
+    h3 = h3 + c
+    c = h3 / 67108864
+    h3 = h3 % 67108864
+    h4 = h4 + c
+    c = h4 / 67108864
+    h4 = h4 % 67108864
+    h0 = h0 + c * 5
+    c = h0 / 67108864
+    h0 = h0 % 67108864
+    h1 = h1 + c
+    // If h >= 2^130 - 5, subtract p — computed as g = h + 5 with the
+    // carry out of limb 4 as the select bit, applied ARITHMETICALLY
+    // (over is 0 or 1; no branch reads the accumulator).
+    var g0 = h0 + 5
+    c = g0 / 67108864
+    g0 = g0 % 67108864
+    var g1 = h1 + c
+    c = g1 / 67108864
+    g1 = g1 % 67108864
+    var g2 = h2 + c
+    c = g2 / 67108864
+    g2 = g2 % 67108864
+    var g3 = h3 + c
+    c = g3 / 67108864
+    g3 = g3 % 67108864
+    var g4 = h4 + c
+    let over = g4 / 67108864
+    g4 = g4 % 67108864
+    h0 = h0 + over * (g0 - h0)
+    h1 = h1 + over * (g1 - h1)
+    h2 = h2 + over * (g2 - h2)
+    h3 = h3 + over * (g3 - h3)
+    h4 = h4 + over * (g4 - h4)
+    // h mod 2^128 as four 32-bit words (limb seams at 26/52/78/104).
+    let w0 = h0 + h1 % 64 * 67108864
+    let w1 = h1 / 64 + h2 % 4096 * 1048576
+    let w2 = h2 / 4096 + h3 % 262144 * 16384
+    let w3 = h3 / 262144 + h4 % 16777216 * 256
+    // tag = (h + s) mod 2^128, little-endian (§2.5.1's "add s" step;
+    // s is the key's second half, an ordinary 128-bit LE number).
+    let s0 = le32i(key[16], key[17], key[18], key[19])
+    let s1 = le32i(key[20], key[21], key[22], key[23])
+    let s2 = le32i(key[24], key[25], key[26], key[27])
+    let s3 = le32i(key[28], key[29], key[30], key[31])
+    var out = List[int]()
+    var t = w0 + s0
+    c = t / 4294967296
+    push_tag_word(mut out, t % 4294967296)
+    t = w1 + s1 + c
+    c = t / 4294967296
+    push_tag_word(mut out, t % 4294967296)
+    t = w2 + s2 + c
+    c = t / 4294967296
+    push_tag_word(mut out, t % 4294967296)
+    t = w3 + s3 + c
+    push_tag_word(mut out, t % 4294967296)
+    out
+}
+
+/// Four little-endian bytes of a 32-bit word, in the plain-int domain
+/// (Poly1305's serialization half of the endianness seam).
+fn push_tag_word(mut out: List[int], w: int) {
+    (mut out).push(w % 256)
+    (mut out).push(w / 256 % 256)
+    (mut out).push(w / 65536 % 256)
+    (mut out).push(w / 16777216 % 256)
+}
+
+// ---------------------------------------------------------------------
+// RFC 8439 §2.6 — the Poly1305 key derivation, and §2.8 — the AEAD.
+// ---------------------------------------------------------------------
+
+/// The per-nonce Poly1305 key (RFC 8439 §2.6): the first 32 bytes of
+/// the ChaCha20 block at counter ZERO — which is why the AEAD's
+/// encryption starts at counter one. Traps `assert` on the ChaCha
+/// input contract; total otherwise.
+/// ct: as `block`.
+///
+/// ```wolf-doc-example
+/// let key = "wolf sc17: a 32-byte chacha key!".bytes()
+/// chacha20.poly_key(key, "twelve bytes".bytes()).len == 32
+/// ```
+pub fn poly_key(key: List[int], nonce: List[int]) -> List[int] {
+    let ks = block(key, 0, nonce)
+    var out = List[int]()
+    var i: int = 0
+    while i < 32 {
+        (mut out).push(ks[i])
+        i = i + 1
+    }
+    out
+}
+
+/// §2.8's MAC transcript: aad, zero-padded to 16; ciphertext,
+/// zero-padded to 16; then the two lengths as 64-bit little-endian
+/// words. The pad-AAD-pad-lengths layout is the construction — a
+/// transcript ambiguity here is a forgery, which is what the
+/// Wycheproof invalid set patrols.
+fn mac_data(aad: List[int], ct: List[int]) -> List[int] {
+    var out = List[int]()
+    for b in aad {
+        require_byte(b)
+        (mut out).push(b)
+    }
+    while !(out.len % 16 == 0) {
+        (mut out).push(0)
+    }
+    for b in ct {
+        (mut out).push(b)
+    }
+    while !(out.len % 16 == 0) {
+        (mut out).push(0)
+    }
+    push_len64_le(mut out, aad.len)
+    push_len64_le(mut out, ct.len)
+    out
+}
+
+/// Eight little-endian bytes of a non-negative length (§2.8's length
+/// words; a wolf `List` length always fits).
+fn push_len64_le(mut out: List[int], n: int) {
+    var v = n
+    var k: int = 0
+    while k < 8 {
+        (mut out).push(v % 256)
+        v = v / 256
+        k = k + 1
+    }
+}
+
+/// AEAD_CHACHA20_POLY1305 seal (RFC 8439 §2.8): encrypts `plaintext`
+/// under (key, nonce) with the ciphertext starting at block counter 1,
+/// authenticates aad and ciphertext per the §2.8 transcript under the
+/// §2.6 per-nonce Poly1305 key, and returns ciphertext || 16-byte tag
+/// as one sequence. Traps `assert` on the ChaCha input contract or a
+/// non-byte element; total otherwise.
+/// THE NONCE IS THE CALLER'S CONTRACT: this module has no entropy
+/// surface and never generates one. A nonce must be UNIQUE per key —
+/// reuse hands an attacker the XOR of the plaintexts and the Poly1305
+/// key (§4 of the RFC), which forfeits both confidentiality and
+/// integrity. Counters and LFSRs are both acceptable per the RFC;
+/// whatever the scheme, it is the caller's.
+/// ct: the composition of `block`, `stream_xor` and `poly1305`'s
+/// obligations — public-length control flow only, plus the recorded
+/// ingestion-guard exception.
+///
+/// ```wolf-doc-example
+/// let key = "wolf sc17: a 32-byte chacha key!".bytes()
+/// let nonce = "twelve bytes".bytes()
+/// let boxed = chacha20.seal(key, nonce, "hdr".bytes(), "attack at dawn".bytes())
+/// boxed.len == 30
+/// chacha20.to_hex(boxed) == "2e7d3d92e359096f5c4660bbeed3c6e125ca300df002b2a92947a5deded4"
+/// ```
+pub fn seal(key: List[int], nonce: List[int], aad: List[int], plaintext: List[int]) -> List[int] {
+    let otk = poly_key(key, nonce)
+    let ct = stream_xor(key, 1, nonce, plaintext)
+    let t = poly1305(otk, mac_data(aad, ct))
+    var out = List[int]()
+    for b in ct {
+        (mut out).push(b)
+    }
+    for b in t {
+        (mut out).push(b)
+    }
+    out
+}
+
+/// AEAD_CHACHA20_POLY1305 open (RFC 8439 §2.8): verifies the tag over
+/// the §2.8 transcript, and ONLY on success decrypts and returns the
+/// plaintext. A box that is too short to carry a tag, or whose tag
+/// does not match, raises `tag` — the DATA failed, not the caller
+/// (§2's rule) — and NO PLAINTEXT IS COMPUTED on that path: the error
+/// row is the entire result, so a forged box can never leak a byte.
+/// Traps `assert` only on the caller's own inputs (key/nonce lengths,
+/// non-byte elements).
+/// ct: THE LOAD-BEARING CLAIM, and c28's FIRST VERIFICATION TARGET
+/// (D53). The tag comparison is a full-width accumulate-then-single-
+/// check: all sixteen byte pairs are XORed and OR-folded into one
+/// accumulator unconditionally, and exactly one comparison — against
+/// zero, after the fold — decides the outcome. Never byte-early-exit:
+/// a compare that returns at the first differing byte leaks the
+/// matching prefix length as time, which is remote-recoverable
+/// forgery, and c28's verifier is expected to prove this loop free of
+/// secret-dependent branches. Everything else is `seal`'s obligation
+/// set, plus the recorded ingestion-guard exception.
+///
+/// ```wolf-doc-example
+/// let key = "wolf sc17: a 32-byte chacha key!".bytes()
+/// let nonce = "twelve bytes".bytes()
+/// let boxed = chacha20.seal(key, nonce, "hdr".bytes(), "attack at dawn".bytes())
+/// let back = chacha20.open(key, nonce, "hdr".bytes(), boxed) else List[int]()
+/// chacha20.to_hex(back) == "61747461636b206174206461776e"
+/// let short = chacha20.open(key, nonce, "hdr".bytes(), "not16".bytes()) else List[int]()
+/// short.len == 0
+/// ```
+pub fn open(key: List[int], nonce: List[int], aad: List[int], boxed: List[int]) -> List[int] ! {tag} {
+    if boxed.len < 16 {
+        return tag
+    }
+    let split = boxed.len - 16
+    var ct = List[int]()
+    var got = List[int]()
+    var pos: int = 0
+    for b in boxed {
+        require_byte(b)
+        if pos < split {
+            (mut ct).push(b)
+        } else {
+            (mut got).push(b)
+        }
+        pos = pos + 1
+    }
+    let otk = poly_key(key, nonce)
+    let want = poly1305(otk, mac_data(aad, ct))
+    var acc: wrapping[u64] = 0
+    var i: int = 0
+    for wb in want {
+        acc = acc | wb as wrapping[u64] ^ got[i] as wrapping[u64]
+        i = i + 1
+    }
+    let ok = acc == 0
+    if !ok {
+        return tag
+    }
+    stream_xor(key, 1, nonce, ct)
+}
+
+// ---------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------
+
+/// `b` as lowercase hexadecimal, two digits per byte — this module's
+/// own rendering so its tests and examples import exactly one module
+/// (the sha2 precedent); `std.hex.encode` is the facade spelling.
+/// Traps `assert` only on a non-byte element.
+/// ct: NOT constant-time — the alphabet slice is indexed by each
+/// byte's VALUE, a secret-dependent memory index. Render public
+/// values with it; a constant-time encoder is c28-tier work.
+///
+/// ```wolf-doc-example
+/// chacha20.to_hex("abc".bytes()) == "616263"
+/// chacha20.to_hex(List[int]()) == ""
+/// ```
+pub fn to_hex(b: List[int]) -> str {
+    let alphabet = "0123456789abcdef"
+    var out = ""
+    for v in b {
+        require_byte(v)
+        let hi = v / 16
+        let lo = v % 16
+        let hd = alphabet[hi..hi + 1]
+        let ld = alphabet[lo..lo + 1]
+        out = "{out}{hd}{ld}"
+    }
+    out
+}

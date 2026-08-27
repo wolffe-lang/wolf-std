@@ -1,0 +1,56 @@
+//! check: run(exit=1, stdout="dropped-byte: handled\nerror: tag")
+//! phase: run
+//! conforms: std.x.crypto.chacha20, err.row, err.propagate, err.else
+//!
+//! Truncation is the OTHER way a box fails (Wycheproof's point): a
+//! box with its last byte dropped fails the full-width tag compare
+//! (the tag on the wire is now the last 15 real tag bytes plus one
+//! ciphertext byte), and a box too short to carry any tag at all —
+//! fewer than 16 bytes — is refused before a single Poly1305 block
+//! runs. Both are the DATA's failure and both answer the same `tag`
+//! row (§12: one tag per failure mode the caller can act on — and a
+//! caller cannot act differently on "too short" versus "wrong tag",
+//! while answering them apart would hand a forger an oracle). The
+//! dropped-byte half is handled with an `else`; the too-short half
+//! rides out of `main` for the record to name.
+
+use std.hex
+use std.x.crypto.chacha20
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> !int {
+    let key = bytes_of("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f")
+    let nonce = bytes_of("070000004041424344454647")
+    let aad = bytes_of("50515253c0c1c2c3c4c5c6c7")
+    let boxed = chacha20.
+        seal(
+        key,
+        nonce,
+        aad,
+        bytes_of(
+            "4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e",
+        ),
+    )
+    let n = boxed.len
+    var dropped = List[int]()
+    var pos: int = 0
+    for b in boxed {
+        if pos < n - 1 {
+            (mut dropped).push(b)
+        }
+        pos = pos + 1
+    }
+    var verdict = "not-handled"
+    let handled = chacha20.open(key, nonce, aad, dropped) else |_| {
+        verdict = "handled"
+        List[int]()
+    }
+    assert(handled.len == 0, "dropped byte yields zero plaintext")
+    print("dropped-byte: {verdict}")
+    let never = chacha20.open(key, nonce, aad, "no tag here".bytes())?
+    print("unreachable: {never.len}")
+    0
+}

@@ -22,6 +22,20 @@
 //! - RFC 4231 / RFC 5869 vector files are hand-written tests (the RFC
 //!   text is the vendored source), not generated — their hex is quoted
 //!   from `vendor/vectors/rfc/*.txt` with the test-case numbers cited.
+//! - Wycheproof v1 ChaCha20-Poly1305 (sc17,
+//!   `wycheproof/chacha20_poly1305_test.json`, into
+//!   `tests/x/crypto/chacha20/`): every `valid` vector (sealed AND
+//!   opened) and every `invalid` vector (open must answer the `tag`
+//!   row) — the invalid cases are the corpus's point: 60 modified
+//!   tags. The nine `InvalidNonceSize` vectors are omitted here
+//!   because the API answers a wrong-size nonce with a documented
+//!   `assert` trap, held by `tests/x/crypto/chacha20/nonce_len_trap.lu`.
+//!   The file has no `acceptable` results to decide; if a re-vendored
+//!   file grows one — or any flavour these rules have not named — the
+//!   generator hard-errors so the omission list cannot rot silently.
+//!   RFC 8439's own vectors are hand-written tests beside the
+//!   generated ones (`known_answers.lu`, `rfc8439_a*.lu`), hex quoted
+//!   from `vendor/vectors/rfc/rfc8439.txt`.
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -41,6 +55,22 @@ const SMOKE_MAX_OKM: u64 = 96;
 /// generated file, sized so the slowest part stays far under the rig's
 /// per-test ceiling on the interpreter lane.
 const SHORT_CHUNK: usize = 33;
+
+/// ChaCha20-Poly1305 chunking and smoke rules (sc17). The full set
+/// rides the native lane in chunks (the interpreter column is `slow`:
+/// 32 seal+open pairs measure 98s under lupin 0.1.13 against the rig's
+/// 60s ceiling — F-0093's program-age curve, re-measured for this
+/// module; the chunks are what flip back to `run` per-part when
+/// wolf-interp#41 lands). The smoke subsets keep a differential column:
+/// deterministic from the source — the first `AEAD_SMOKE_COUNT` valid
+/// vectors with msg <= `AEAD_SMOKE_MAX_MSG` and aad <=
+/// `AEAD_SMOKE_MAX_AAD` bytes, and the first `AEAD_SMOKE_COUNT`
+/// invalid (ModifiedTag) vectors.
+const AEAD_VALID_CHUNK: usize = 32;
+const AEAD_INVALID_CHUNK: usize = 30;
+const AEAD_SMOKE_COUNT: usize = 10;
+const AEAD_SMOKE_MAX_MSG: usize = 48;
+const AEAD_SMOKE_MAX_AAD: usize = 16;
 
 pub fn gen_vectors(check_only: bool) -> Result<(), String> {
     let repo = crate::repo_root();
@@ -131,6 +161,87 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
         let text = fmt(
             &show(&out),
             &emit_wycheproof(suffix, &all, false, cases.len()),
+        )?;
+        place(&out, &text, check_only, &mut drift, &mut written)?;
+    }
+
+    // ---- sc17: Wycheproof ChaCha20-Poly1305 (the AEAD rung). ----
+    {
+        let out_dir = repo.join("tests/x/crypto/chacha20");
+        let wp = vec_dir.join("wycheproof/chacha20_poly1305_test.json");
+        let corpus = parse_wycheproof_aead(&read(&wp)?, &show(&wp))?;
+        let vparts: Vec<&[AeadCase]> = corpus.valid.chunks(AEAD_VALID_CHUNK).collect();
+        for (i, part) in vparts.iter().enumerate() {
+            let out = out_dir.join(format!("wycheproof_valid_p{}.lu", i + 1));
+            let text = fmt(
+                &show(&out),
+                &emit_wycheproof_aead(
+                    part,
+                    true,
+                    i + 1,
+                    vparts.len(),
+                    corpus.valid.len(),
+                    corpus.nonce_omitted,
+                ),
+            )?;
+            place(&out, &text, check_only, &mut drift, &mut written)?;
+        }
+        let iparts: Vec<&[AeadCase]> = corpus.invalid.chunks(AEAD_INVALID_CHUNK).collect();
+        for (i, part) in iparts.iter().enumerate() {
+            let out = out_dir.join(format!("wycheproof_invalid_p{}.lu", i + 1));
+            let text = fmt(
+                &show(&out),
+                &emit_wycheproof_aead(
+                    part,
+                    false,
+                    i + 1,
+                    iparts.len(),
+                    corpus.invalid.len(),
+                    corpus.nonce_omitted,
+                ),
+            )?;
+            place(&out, &text, check_only, &mut drift, &mut written)?;
+        }
+        // The differential smoke subsets (see the constants above).
+        let vsmoke: Vec<AeadCase> = corpus
+            .valid
+            .iter()
+            .filter(|c| {
+                c.msg.len() / 2 <= AEAD_SMOKE_MAX_MSG && c.aad.len() / 2 <= AEAD_SMOKE_MAX_AAD
+            })
+            .take(AEAD_SMOKE_COUNT)
+            .cloned()
+            .collect();
+        let out = out_dir.join("wycheproof_valid_smoke.lu");
+        let text = fmt(
+            &show(&out),
+            &emit_wycheproof_aead(
+                &vsmoke,
+                true,
+                0,
+                0,
+                corpus.valid.len(),
+                corpus.nonce_omitted,
+            ),
+        )?;
+        place(&out, &text, check_only, &mut drift, &mut written)?;
+        let ismoke: Vec<AeadCase> = corpus
+            .invalid
+            .iter()
+            .take(AEAD_SMOKE_COUNT)
+            .cloned()
+            .collect();
+        let out = out_dir.join("wycheproof_invalid_smoke.lu");
+        let text = fmt(
+            &show(&out),
+            &emit_wycheproof_aead(
+                &ismoke,
+                false,
+                0,
+                0,
+                corpus.invalid.len(),
+                corpus.nonce_omitted,
+            ),
         )?;
         place(&out, &text, check_only, &mut drift, &mut written)?;
     }
@@ -271,6 +382,107 @@ fn parse_wycheproof(text: &str, what: &str) -> Result<Vec<WpCase>, String> {
         return Err(format!("{what}: no valid vectors parsed"));
     }
     Ok(out)
+}
+
+#[derive(Clone)]
+struct AeadCase {
+    tc_id: u64,
+    key: String,
+    iv: String,
+    aad: String,
+    msg: String,
+    ct: String,
+    tag: String,
+}
+
+struct AeadCorpus {
+    valid: Vec<AeadCase>,
+    invalid: Vec<AeadCase>,
+    /// `InvalidNonceSize` vectors omitted by name — the API answers a
+    /// wrong-size nonce with a documented trap (`nonce_len_trap.lu`).
+    nonce_omitted: usize,
+}
+
+/// The ChaCha20-Poly1305 rules (sc17): every `valid` case runs, every
+/// `invalid` case must be one of the two flavours this module has
+/// DECIDED — `ModifiedTag` at the standard 96-bit nonce (asserted: open
+/// answers the `tag` row) or `InvalidNonceSize` off it (omitted by
+/// name: the trap file holds it). Anything else — an `acceptable`
+/// result, an unknown flag, a flag at the wrong nonce size — is a hard
+/// error, so a re-vendored file cannot silently shrink or blur the
+/// coverage.
+fn parse_wycheproof_aead(text: &str, what: &str) -> Result<AeadCorpus, String> {
+    let v: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("{what}: bad json: {e}"))?;
+    let mut corpus = AeadCorpus {
+        valid: Vec::new(),
+        invalid: Vec::new(),
+        nonce_omitted: 0,
+    };
+    let groups = v["testGroups"]
+        .as_array()
+        .ok_or(format!("{what}: no testGroups"))?;
+    for g in groups {
+        let iv_size = g["ivSize"].as_u64().ok_or(format!("{what}: ivSize"))?;
+        for t in g["tests"].as_array().ok_or(format!("{what}: no tests"))? {
+            let tc = t["tcId"].as_u64().ok_or(format!("{what}: tcId"))?;
+            let result = t["result"].as_str().unwrap_or("");
+            let flags: Vec<&str> = t["flags"]
+                .as_array()
+                .map(|a| a.iter().filter_map(|f| f.as_str()).collect())
+                .unwrap_or_default();
+            let case = AeadCase {
+                tc_id: tc,
+                key: t["key"].as_str().unwrap_or_default().to_string(),
+                iv: t["iv"].as_str().unwrap_or_default().to_string(),
+                aad: t["aad"].as_str().unwrap_or_default().to_string(),
+                msg: t["msg"].as_str().unwrap_or_default().to_string(),
+                ct: t["ct"].as_str().unwrap_or_default().to_string(),
+                tag: t["tag"].as_str().unwrap_or_default().to_string(),
+            };
+            match result {
+                "valid" => {
+                    if iv_size != 96 {
+                        return Err(format!(
+                            "{what}: tcId {tc} is `valid` at ivSize {iv_size} — a shape \
+                             this generator has not decided; extend the rules"
+                        ));
+                    }
+                    corpus.valid.push(case);
+                }
+                "invalid" if flags == ["InvalidNonceSize"] => {
+                    if iv_size == 96 {
+                        return Err(format!(
+                            "{what}: tcId {tc} is InvalidNonceSize AT 96 bits — \
+                             contradictory; refusing to guess"
+                        ));
+                    }
+                    corpus.nonce_omitted += 1;
+                }
+                "invalid" if flags == ["ModifiedTag"] => {
+                    if iv_size != 96 {
+                        return Err(format!(
+                            "{what}: tcId {tc} is ModifiedTag at ivSize {iv_size} — \
+                             a shape this generator has not decided; extend the rules"
+                        ));
+                    }
+                    corpus.invalid.push(case);
+                }
+                other => {
+                    return Err(format!(
+                        "{what}: tcId {tc} is `{other}` with flags {flags:?} — an \
+                         expectation this generator has not decided (the vendored \
+                         file has no `acceptable` cases; a new flavour needs a \
+                         ruling here, not a guess); extend the rules"
+                    ));
+                }
+            }
+        }
+    }
+    if corpus.valid.is_empty() || corpus.invalid.is_empty() {
+        return Err(format!("{what}: suspiciously empty aead corpus"));
+    }
+    Ok(corpus)
 }
 
 // --------------------------------------------------------------- emission
@@ -448,6 +660,130 @@ fn emit_wycheproof(suffix: &str, cases: &[&WpCase], smoke: bool, total_valid: us
     s
 }
 
+fn emit_wycheproof_aead(
+    cases: &[AeadCase],
+    valid: bool,
+    part: usize,
+    parts: usize,
+    total: usize,
+    nonce_omitted: usize,
+) -> String {
+    let mut s = String::new();
+    let _ = write!(
+        s,
+        "//! check: run(exit=0)\n//! phase: run\n//! conforms: std.x.crypto.chacha20, arith.wrapping\n//!\n\
+         //! GENERATED — `cargo xtask gen-vectors`, from\n\
+         //! `vendor/vectors/wycheproof/chacha20_poly1305_test.json` (provenance:\n\
+         //! `vendor/vectors/README.md`). Do not edit by hand; ci's\n\
+         //! `gen-vectors --check` holds this file byte-identical to its source.\n//!\n"
+    );
+    if valid && part > 0 {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 ChaCha20-Poly1305, the VALID set, part {part} of\n\
+             //! {parts} ({n} vectors of the set's {total}): each case seals to the\n\
+             //! published ciphertext||tag AND opens back to the message —\n\
+             //! Ktv, pseudorandom, and the edge-case Poly1305/keystream\n\
+             //! constructions. The interpreter column is `slow` (the sc16\n\
+             //! ledger word): 32 seal+open pairs measure 98s under lupin\n\
+             //! 0.1.13 against the rig's 60s ceiling (F-0093's program-age\n\
+             //! curve), the `..._smoke.lu` subset keeps the differential\n\
+             //! column, and the chunking is what flips this file back to\n\
+             //! `run` when wolf-interp#41 lands.\n",
+            n = cases.len(),
+        );
+    } else if valid {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 ChaCha20-Poly1305, the DIFFERENTIAL SMOKE SUBSET\n\
+             //! of the valid set: the first {n} valid vectors with msg <= {mm}\n\
+             //! and aad <= {ma} bytes (of the set's {total}) — small enough that\n\
+             //! the interpreter runs the file inside the rig's ceiling, so the\n\
+             //! AEAD keeps a differential column while the full set rides the\n\
+             //! `..._p*.lu` parts on the native lane.\n",
+            n = cases.len(),
+            mm = AEAD_SMOKE_MAX_MSG,
+            ma = AEAD_SMOKE_MAX_AAD,
+        );
+    } else if part > 0 {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 ChaCha20-Poly1305, the INVALID set, part {part} of\n\
+             //! {parts} ({n} vectors of the set's {total}, every one a\n\
+             //! `ModifiedTag`: bit flips at every tag position, the flipped\n\
+             //! MSBs, the truncated-to-prefix shapes): `open` must answer the\n\
+             //! `tag` row — witnessed as a negative sentinel from the helper's\n\
+             //! handler — and hand back NO plaintext. The {omit} source\n\
+             //! `InvalidNonceSize` vectors are omitted by name: the API\n\
+             //! answers a wrong-size nonce with the documented `assert` trap\n\
+             //! held by `nonce_len_trap.lu`. The file has no `acceptable`\n\
+             //! cases to decide; the generator hard-errors if one appears.\n\
+             //! The interpreter column is `slow` (F-0093; 30 opens measure\n\
+             //! 29s under lupin 0.1.13); `..._invalid_smoke.lu` keeps the\n\
+             //! differential column.\n",
+            n = cases.len(),
+            omit = nonce_omitted,
+        );
+    } else {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 ChaCha20-Poly1305, the DIFFERENTIAL SMOKE SUBSET\n\
+             //! of the invalid set: the first {n} `ModifiedTag` vectors (of the\n\
+             //! set's {total}) — `open` must answer the `tag` row for every one,\n\
+             //! on the interpreter lane too, so the reject path stays\n\
+             //! differential while the full set rides the `..._p*.lu` parts on\n\
+             //! the native lane.\n",
+            n = cases.len(),
+        );
+    }
+    s.push_str("\nuse std.hex\nuse std.x.crypto.chacha20\n\n");
+    if valid {
+        let _ = write!(
+            s,
+            "fn aead_matches(key_hex: str, iv_hex: str, aad_hex: str, msg_hex: str, box_hex: str) -> bool {{\n\
+             \x20   let key = hex.decode(key_hex) else List[int]()\n\
+             \x20   let iv = hex.decode(iv_hex) else List[int]()\n\
+             \x20   let aad = hex.decode(aad_hex) else List[int]()\n\
+             \x20   let msg = hex.decode(msg_hex) else List[int]()\n\
+             \x20   let boxed = chacha20.seal(key, iv, aad, msg)\n\
+             \x20   if !(chacha20.to_hex(boxed) == box_hex) {{\n\
+             \x20       return false\n\
+             \x20   }}\n\
+             \x20   let opened = chacha20.open(key, iv, aad, boxed) else List[int]()\n\
+             \x20   chacha20.to_hex(opened) == msg_hex\n}}\n\nfn main() -> int {{\n"
+        );
+        for c in cases {
+            let _ = writeln!(
+                s,
+                "    assert(aead_matches(\"{}\", \"{}\", \"{}\", \"{}\", \"{}{}\"), \"tc {}\")",
+                c.key, c.iv, c.aad, c.msg, c.ct, c.tag, c.tc_id
+            );
+        }
+    } else {
+        let _ = write!(
+            s,
+            "fn open_verdict(key_hex: str, iv_hex: str, aad_hex: str, box_hex: str) -> int {{\n\
+             \x20   let key = hex.decode(key_hex) else List[int]()\n\
+             \x20   let iv = hex.decode(iv_hex) else List[int]()\n\
+             \x20   let aad = hex.decode(aad_hex) else List[int]()\n\
+             \x20   let boxed = hex.decode(box_hex) else List[int]()\n\
+             \x20   let opened = chacha20.open(key, iv, aad, boxed) else |_| {{\n\
+             \x20       return -1\n\
+             \x20   }}\n\
+             \x20   opened.len\n}}\n\nfn main() -> int {{\n"
+        );
+        for c in cases {
+            let _ = writeln!(
+                s,
+                "    assert(open_verdict(\"{}\", \"{}\", \"{}\", \"{}{}\") < 0, \"tc {}\")",
+                c.key, c.iv, c.aad, c.ct, c.tag, c.tc_id
+            );
+        }
+    }
+    s.push_str("    0\n}\n");
+    s
+}
+
 fn dashed(stem: &str) -> String {
     format!("SHA-{}", stem.trim_start_matches("SHA"))
 }
@@ -561,5 +897,55 @@ mod tests {
             {"tcId":3,"result":"invalid","flags":["EmptyOkm"],"ikm":"aa","salt":"","info":"","size":0,"okm":""}
         ]}]}"#;
         assert!(parse_wycheproof(bad, "t").is_err());
+    }
+
+    fn aead_json(entries: &str) -> String {
+        format!(r#"{{"testGroups":[{entries}]}}"#)
+    }
+
+    #[test]
+    fn aead_sorts_valid_modified_tag_and_nonce_omission() {
+        let text = aead_json(
+            r#"{"ivSize":96,"tests":[
+                {"tcId":1,"result":"valid","flags":["Ktv"],"key":"aa","iv":"bb","aad":"","msg":"cc","ct":"dd","tag":"ee"},
+                {"tcId":2,"result":"invalid","flags":["ModifiedTag"],"key":"aa","iv":"bb","aad":"","msg":"","ct":"dd","tag":"ff"}
+            ]},
+            {"ivSize":64,"tests":[
+                {"tcId":3,"result":"invalid","flags":["InvalidNonceSize"],"key":"aa","iv":"bb","aad":"","msg":"","ct":"","tag":"ee"}
+            ]}"#,
+        );
+        let c = parse_wycheproof_aead(&text, "t").unwrap();
+        assert_eq!(c.valid.len(), 1);
+        assert_eq!(c.valid[0].tc_id, 1);
+        assert_eq!(c.invalid.len(), 1);
+        assert_eq!(c.invalid[0].tc_id, 2);
+        assert_eq!(c.nonce_omitted, 1);
+    }
+
+    #[test]
+    fn aead_refuses_undecided_flavours() {
+        // An `acceptable` result is a hard error — "decided and
+        // documented" means a ruling in the parser, never a guess.
+        let acceptable = aead_json(
+            r#"{"ivSize":96,"tests":[
+                {"tcId":9,"result":"acceptable","flags":["SomeFlag"],"key":"aa","iv":"bb","aad":"","msg":"","ct":"","tag":"ee"}
+            ]}"#,
+        );
+        assert!(parse_wycheproof_aead(&acceptable, "t").is_err());
+        // An unknown invalid flag is a hard error.
+        let unknown = aead_json(
+            r#"{"ivSize":96,"tests":[
+                {"tcId":10,"result":"invalid","flags":["ZeroLengthIv"],"key":"aa","iv":"","aad":"","msg":"","ct":"","tag":"ee"}
+            ]}"#,
+        );
+        assert!(parse_wycheproof_aead(&unknown, "t").is_err());
+        // A valid case off the 96-bit nonce is a hard error too: the
+        // emitters would feed it into a trap.
+        let off_nonce = aead_json(
+            r#"{"ivSize":64,"tests":[
+                {"tcId":11,"result":"valid","flags":[],"key":"aa","iv":"bb","aad":"","msg":"","ct":"","tag":"ee"}
+            ]}"#,
+        );
+        assert!(parse_wycheproof_aead(&off_nonce, "t").is_err());
     }
 }
