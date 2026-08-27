@@ -1,0 +1,24 @@
+//! check: run(exit=1, stdout="witness: out-of-order rejected by name\nerror: unexpected_message")
+//! phase: run
+//! conforms: std.x.tls.handshake, err.row, err.propagate, err.else
+//!
+//! THE OUT-OF-ORDER WITNESS (§4.1 + §6.2): a client that has sent
+//! ClientHello expects ServerHello next; feeding it EncryptedExtensions
+//! first is an illegal flight, and `hs_step` answers the
+//! `unexpected_message` alert row — the reordered/dropped/illegal message
+//! is a NAMED alert, never a hang or a wrong key. Two halves (the
+//! row-test shape): an `else` proves the miss path is taken, then a `?`
+//! rides the alert out of `main` (`error: unexpected_message`, exit 1).
+//! The in-order flow is state_machine.lu.
+//!
+
+use std.x.tls.handshake as hs
+
+fn main() -> !int {
+    let c = hs.role_client()
+    let _fallback = hs.hs_step(c, 0, hs.hs_encrypted_extensions()) else 0 - 1
+    print("witness: out-of-order rejected by name")
+    let never = hs.hs_step(c, 0, hs.hs_encrypted_extensions())?
+    print("unreachable: {never}")
+    0
+}

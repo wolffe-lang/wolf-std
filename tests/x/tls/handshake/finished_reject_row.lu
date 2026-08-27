@@ -1,0 +1,32 @@
+//! check: run(exit=1, stdout="witness: finished rejected, zero exposure\nerror: decrypt_error")
+//! phase: run
+//! conforms: std.x.tls.handshake, err.row, err.propagate, err.else
+//!
+//! THE WRONG-FINISHED WITNESS (§4.4.4 + §6.2): the server's real
+//! verify_data with ONE byte flipped (last octet `18` -> `19`) fails the
+//! constant-time-shaped compare, and `accept_finished` answers the
+//! `decrypt_error` alert row — the handshake aborts by name with NO key
+//! material derived onward. Two halves (the sc07/sc20 row-test shape): an
+//! `else` proves the miss path is taken, then a `?` rides the alert out
+//! of `main` (`error: decrypt_error`, exit 1). The correct MAC is
+//! asserted in finished.lu; only the last byte differs here.
+//!
+
+use std.hex
+use std.x.tls.handshake as hs
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> !int {
+    let shs = bytes_of("b67b7d690cc16c4e75e54213cb2d37b4e9c912bcded9105d42befd59d391ad38")
+    let th_cv = bytes_of("edb7725fa7a3473b031ec8ef65a2485493900138a2b91291407d7951a06110ed")
+    let tampered = bytes_of("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0719")
+    assert(!hs.verify_finished(shs, th_cv, tampered), "tampered Finished must not verify")
+    let _fallback = hs.accept_finished(shs, th_cv, tampered) else 0 - 1
+    print("witness: finished rejected, zero exposure")
+    let never = hs.accept_finished(shs, th_cv, tampered)?
+    print("unreachable: {never}")
+    0
+}

@@ -1,0 +1,22 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.tls.handshake, conf.trap.set
+//!
+//! The ClientHello random is a fixed 32-byte field (§4.1.2): a random of
+//! any other length is a caller-contract violation, held as a trap on
+//! every lane (a wrong-length random is a construction bug, not a
+//! runtime error row). Twelve bytes here, one short of nothing legal.
+//!
+
+use std.x.tls.handshake as hs
+
+fn main() -> int {
+    var short = List[int]()
+    var i = 0
+    while i < 12 {
+        (mut short).push(0)
+        i = i + 1
+    }
+    let _ = hs.client_hello(short, List[int](), List[int](), List[int]())
+    0
+}

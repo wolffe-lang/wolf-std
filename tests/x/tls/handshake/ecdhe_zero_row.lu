@@ -1,0 +1,32 @@
+//! check: run(exit=1, stdout="witness: fallback empty\nerror: zero")
+//! phase: run
+//! conforms: std.x.tls.handshake, err.row, err.propagate, err.else
+//!
+//! THE REJECT-ON-ZERO WITNESS (RFC 8446 §7.4.2, sc18's {zero} row): an
+//! all-zero peer key_share drives X25519 to the all-zero shared secret,
+//! which a TLS 1.3 endpoint MUST abort on rather than feed the key
+//! schedule. `ecdhe_shared` surfaces sc18's rejection as its own `zero`
+//! row, no secret escaping. Two halves (the row-test shape): an `else`
+//! proves the miss path is taken and the fallback is empty, then a `?`
+//! rides `zero` out of `main` (`error: zero`, exit 1).
+//!
+
+use std.x.tls.handshake as hs
+
+fn main() -> !int {
+    let private = "alice's own 32-byte x25519 key!!".bytes()
+    var zero_peer = List[int]()
+    var i = 0
+    while i < 32 {
+        (mut zero_peer).push(0)
+        i = i + 1
+    }
+    let fallback = hs.ecdhe_shared(private, zero_peer) else List[int]()
+    print("witness: fallback empty")
+    if !(fallback.len == 0) {
+        print("LEAK: {fallback.len}")
+    }
+    let out = hs.ecdhe_shared(private, zero_peer)?
+    print("unreachable: {out.len}")
+    0
+}

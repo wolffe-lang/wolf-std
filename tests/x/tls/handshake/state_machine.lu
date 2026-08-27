@@ -1,0 +1,40 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.tls.handshake
+//!
+//! RFC 8448 §3 handshake state machine (§4.1): the ordered client flow
+//! (after ClientHello: ServerHello, EncryptedExtensions, Certificate,
+//! CertificateVerify, server Finished -> then send client Finished) and
+//! the server flow (ClientHello -> ... -> client Finished) drive the
+//! checked transition to completion in the trace's exact order. Positive
+//! flow here; the reordered/illegal reject is reordered_flight_row.lu.
+//!
+
+use std.x.tls.handshake as hs
+
+fn main() -> int {
+    // Client receives the server's flight, in order.
+    let c = hs.role_client()
+    let c1 = hs.hs_step(c, 0, hs.hs_server_hello()) else 0 - 1
+    assert(c1 == 1, "SH advances")
+    let c2 = hs.hs_step(c, c1, hs.hs_encrypted_extensions()) else 0 - 1
+    assert(c2 == 2, "EE advances")
+    let c3 = hs.hs_step(c, c2, hs.hs_certificate()) else 0 - 1
+    assert(c3 == 3, "Cert advances")
+    let c4 = hs.hs_step(c, c3, hs.hs_certificate_verify()) else 0 - 1
+    assert(c4 == 4, "CertVerify advances")
+    let c5 = hs.hs_step(c, c4, hs.hs_finished()) else 0 - 1
+    assert(c5 == 5, "server Finished advances")
+    assert(hs.hs_client_flight_complete(c5), "client flight complete")
+    assert(!hs.hs_client_flight_complete(c4), "not complete before server Finished")
+
+    // Server receives ClientHello then the client's Finished.
+    let s = hs.role_server()
+    let s1 = hs.hs_step(s, 0, hs.hs_client_hello()) else 0 - 1
+    assert(s1 == 1, "CH advances")
+    let s2 = hs.hs_step(s, s1, hs.hs_finished()) else 0 - 1
+    assert(s2 == 2, "client Finished advances")
+    assert(hs.hs_server_complete(s2), "server handshake complete")
+    assert(!hs.hs_server_complete(s1), "server not complete before client Finished")
+    0
+}

@@ -1,0 +1,805 @@
+//! member: true
+//!
+//! std.x.tls.handshake — the TLS 1.3 handshake (RFC 8446 §4 + §4.4 +
+//! §7.1). Stability tier: x — the SECOND rung of the stdc-tls campaign
+//! (sprint sc21), built on sc20's record layer (the FROZEN "given keys ->
+//! records" seam) and the D53 crypto ladder: sc18's X25519 for the key
+//! exchange, sc16's SHA-256/HMAC/HKDF for the transcript hash and the key
+//! schedule. This module owns the MESSAGE FLOW, the TRANSCRIPT HASH, the
+//! full KEY SCHEDULE (early -> handshake -> master), FINISHED, and the
+//! handshake STATE MACHINE; sc20 owns the record framing beneath it. It
+//! is testable in isolation against RFC 8448's published trace, the
+//! sc16-before-everything discipline.
+//!
+//! **The nursery banner (D31).** `std.x.tls.handshake` is not
+//! `std.tls`: its path, names and behaviour may change or vanish in one
+//! sprint; no other std module may depend on it. Its reason and
+//! graduation trigger live in `std/x/README.md`. It depends on THREE
+//! sibling residents — `std.x.tls.record` (the key-schedule primitives
+//! and the seam it produces keys for), `std.x.crypto.sha2` (SHA-256 +
+//! HMAC for the transcript and Finished) and `std.x.crypto.curve25519`
+//! (X25519 for the (EC)DHE shared secret) — resident-on-resident edges
+//! the graduation move to `std.tls`/`std.crypto` must resolve, named in
+//! the register beside record's and jose's own edges.
+//!
+//! **Built from the RFC DOCUMENTS, not ported.** RFC 8446 (August 2018)
+//! §4 (the handshake messages + extensions), §4.1 (the client/server
+//! flows), §4.4.1 (the transcript hash), §4.4.3 (the CertificateVerify
+//! signature content), §4.4.4 (Finished), §7.1 (the key schedule). RFC
+//! 8448 (January 2019) §3 (Simple 1-RTT Handshake) is the vector spine:
+//! every handshake message, every intermediate transcript hash, every
+//! secret, both Finished MACs — asserted byte-for-byte in
+//! `tests/x/tls/handshake/`.
+//!
+//! ## The three byte-exact rules this module lives or dies on
+//!
+//! 1. **The transcript hash is over the exact WIRE bytes of each
+//!    handshake message, INCLUDING the 4-byte handshake header
+//!    (`msg_type || uint24 length`), concatenated in order** (§4.4.1) —
+//!    NOT the 5-byte record header (that is sc20's layer, never hashed).
+//!    A single off-by-one in what is hashed and every secret downstream
+//!    is wrong; RFC 8448 catches it at the first Derive-Secret. This
+//!    module's `transcript_add`/`transcript_hash` accumulate exactly the
+//!    message bytes the builders emit.
+//!
+//! 2. **key_share carries raw X25519 point bytes** (§4.2.8, sc18) — the
+//!    32-byte public key on the wire, and the (EC)DHE shared secret is
+//!    `curve25519.x25519(private, peer_public)`, feeding the handshake
+//!    extract as IKM. A wrong endianness or a non-canonical point fails
+//!    the trace; the all-zero shared secret is rejected (sc18's {zero}
+//!    row, RFC 8446 §7.4.2).
+//!
+//! 3. **Finished is HMAC-SHA256(finished_key, Transcript-Hash)** (§4.4.4)
+//!    where `finished_key = HKDF-Expand-Label(BaseKey, "finished", "",
+//!    Hash.length)` (sc20's `record.finished_key`) and the transcript is
+//!    the running hash THROUGH the message before Finished (the server's
+//!    over CH..CertificateVerify, the client's over CH..server Finished).
+//!    The verify compares constant-time-shaped (`ct_eq`); a mismatch is
+//!    the caller's alert, no key material exposed.
+//!
+//! **Certificate is OPAQUE here (§4.4.2).** This sprint hashes and
+//! carries the Certificate message; it does NOT parse the ASN.1/X.509
+//! inside (that is sc22). `certificate` frames the message structure
+//! (certificate_request_context + a certificate_list of opaque
+//! CertificateEntry cert_data) around a DER blob it never inspects.
+//!
+//! **CertificateVerify: signature content BUILT, signature NOT verified
+//! here.** `certificate_verify` frames the message (SignatureScheme +
+//! opaque signature) and `certificate_verify_content` builds the §4.4.3
+//! signed octets (64 `0x20` bytes + the context string + `0x00` +
+//! Transcript-Hash) so sc22 can verify. The actual signature check is
+//! DEFERRED to sc22: RFC 8448's trace signs with rsa_pss_rsae_sha256
+//! (0x0804), and no RSA-PSS (nor the P-256 ECDSA the client-auth trace
+//! uses) exists in the D53 crypto ladder yet — only Ed25519/X25519. So
+//! NOTHING about peer identity is trusted at this rung; deriving the
+//! right keys and verifying Finished against RFC 8448 is the deliverable.
+//!
+//! **Do not rebuild the record framing.** sc20 owns seal/open and the
+//! key derivation (`record.extract`/`derive_secret`/`traffic_key`/
+//! `traffic_iv`/`finished_key`); this module produces the transcript
+//! hashes and shared secret those functions take as inputs, drives the
+//! flow, and hands sc20 the traffic keys. Byte sequences are `List[int]`
+//! with the 0..255 element contract (§11's interim, F-0035), the
+//! sha2/chacha20/record convention.
+//!
+//! **The ws05-consumable seam (FROZEN).** A completed handshake yields a
+//! `HandshakeResult`: the negotiated `cipher_suite`, the four traffic
+//! secrets (client/server handshake+application), the exporter and
+//! resumption master secrets — the negotiated params + secrets wolf-wws
+//! ws05 hands to sc20's record layer (`record.traffic_key`/`traffic_iv`
+//! turn each secret into an AEAD key/iv) to serve and consume TLS. sc21
+//! owns transcript hashes, the key schedule and the flow; ws05 owns the
+//! socket conversation; sc20 owns the record AEAD. The seam is frozen at
+//! sc21; `std/x/README.md` records it. (OpenSSL s_client/s_server interop
+//! is ws05's differential, not built here — RFC 8448 is this oracle.)
+//!
+//! **Constant-time obligations (D53's retrofit clause).** c28's
+//! compiler-enforced `#[consttime]` does not exist yet; until it does,
+//! every `pub` fn carries a `ct:` line. The honest summary: the message
+//! serialization, the transcript hash and the state machine branch and
+//! index only on PUBLIC quantities (message bytes, lengths, message
+//! types) — no secret is present. The key schedule and Finished handle
+//! SECRETS (the traffic secrets, the finished_key, the shared secret) and
+//! carry them through sc20's `record.*`, sc16's HMAC/HKDF and sc18's
+//! X25519, whose own `ct:` lines hold the wrapping-not-checked posture;
+//! this module adds no secret-dependent branch of its own. `ct_eq` is the
+//! Finished compare — accumulate-then-single-check, no early exit, a c28
+//! target (the sc17 `open`-tag discipline). The 0..255 ingestion guards
+//! are the recorded value-dependent branch shared with the ladder
+//! (F-0035's real byte type retires them).
+
+use std.x.tls.record
+use std.x.crypto.sha2
+use std.x.crypto.curve25519
+
+// ---------------------------------------------------------------------
+// Byte helpers — the 0..255 contract, big-endian length prefixes, and
+// concatenation. Byte extraction uses DIVISION/modulo (not bitwise
+// shifts) exactly as sc20's `record_header`/`hkdf_label` do: a shift by a
+// plain-`int` amount is refused natively (sc16's measurement), and these
+// lengths are public so no wrapping domain is needed.
+// ---------------------------------------------------------------------
+
+/// The 0..255 ingestion guard (§11's `List[int]` byte contract).
+/// ct: NOT free of value-dependent branches — the recorded ct exception
+/// shared verbatim with sha2/chacha20/record (it leaves with F-0035's
+/// real byte type). Runs only on public message bytes here.
+fn require_byte(v: int) {
+    if v < 0 {
+        assert(false, "tls.handshake: element outside 0..255")
+    }
+    if v > 255 {
+        assert(false, "tls.handshake: element outside 0..255")
+    }
+}
+
+/// Append every element of `src` onto `out`, guarding the 0..255
+/// contract.
+fn push_all(mut out: List[int], src: List[int]) {
+    for b in src {
+        require_byte(b)
+        (mut out).push(b)
+    }
+}
+
+/// A big-endian `uint16` as two bytes.
+fn u16(v: int) -> List[int] {
+    assert(v >= 0, "tls.handshake: negative uint16")
+    assert(v <= 65535, "tls.handshake: value exceeds uint16")
+    var out = List[int]()
+    (mut out).push(v / 256 % 256)
+    (mut out).push(v % 256)
+    out
+}
+
+/// A big-endian `uint24` as three bytes.
+fn u24(v: int) -> List[int] {
+    assert(v >= 0, "tls.handshake: negative uint24")
+    assert(v <= 16777215, "tls.handshake: value exceeds uint24")
+    var out = List[int]()
+    (mut out).push(v / 65536 % 256)
+    (mut out).push(v / 256 % 256)
+    (mut out).push(v % 256)
+    out
+}
+
+/// `data` prefixed with a single length byte (`opaque X<0..255>`).
+fn u8_prefixed(data: List[int]) -> List[int] {
+    let n = data.len
+    assert(n <= 255, "tls.handshake: u8-prefixed vector exceeds 255")
+    var out = List[int]()
+    (mut out).push(n)
+    push_all(mut out, data)
+    out
+}
+
+/// `data` prefixed with a big-endian `uint16` length (`opaque
+/// X<0..2^16-1>`).
+fn u16_prefixed(data: List[int]) -> List[int] {
+    var out = List[int]()
+    push_all(mut out, u16(data.len))
+    push_all(mut out, data)
+    out
+}
+
+/// `data` prefixed with a big-endian `uint24` length (`opaque
+/// X<0..2^24-1>`).
+fn u24_prefixed(data: List[int]) -> List[int] {
+    var out = List[int]()
+    push_all(mut out, u24(data.len))
+    push_all(mut out, data)
+    out
+}
+
+/// `a` followed by `b` — the byte-sequence concatenation the callers and
+/// the transcript build on.
+/// ct: public structure only.
+pub fn concat(a: List[int], b: List[int]) -> List[int] {
+    var out = List[int]()
+    push_all(mut out, a)
+    push_all(mut out, b)
+    out
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §4 — the handshake message header and the message types the
+// RFC 8448 §3 trace exercises.
+//
+//   struct {
+//       HandshakeType msg_type;
+//       uint24 length;
+//       ... body ...
+//   } Handshake;
+// ---------------------------------------------------------------------
+
+/// HandshakeType `client_hello` (1). Zero-argument functions stand in
+/// for `const`s (F-0025).
+pub fn hs_client_hello() -> int { 1 }
+/// HandshakeType `server_hello` (2).
+pub fn hs_server_hello() -> int { 2 }
+/// HandshakeType `encrypted_extensions` (8).
+pub fn hs_encrypted_extensions() -> int { 8 }
+/// HandshakeType `certificate` (11).
+pub fn hs_certificate() -> int { 11 }
+/// HandshakeType `certificate_verify` (15).
+pub fn hs_certificate_verify() -> int { 15 }
+/// HandshakeType `finished` (20).
+pub fn hs_finished() -> int { 20 }
+
+/// Frame a handshake message: `msg_type` byte, a big-endian `uint24`
+/// length of `body`, then `body` (§4). This is the exact wire message
+/// the transcript hashes (header included).
+/// ct: public structure only.
+pub fn handshake(msg_type: int, body: List[int]) -> List[int] {
+    require_byte(msg_type)
+    var out = List[int]()
+    (mut out).push(msg_type)
+    push_all(mut out, u24(body.len))
+    push_all(mut out, body)
+    out
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §4.2 — extensions. Each Extension is `extension_type (uint16)
+// || extension_data<0..2^16-1>`; the builders below emit exactly the
+// extensions the RFC 8448 §3 trace uses.
+// ---------------------------------------------------------------------
+
+/// One Extension: `extension_type` (uint16) then a uint16-length-prefixed
+/// `extension_data`.
+/// ct: public structure only.
+pub fn ext(extension_type: int, data: List[int]) -> List[int] {
+    var out = List[int]()
+    push_all(mut out, u16(extension_type))
+    push_all(mut out, u16_prefixed(data))
+    out
+}
+
+/// server_name (0), a single host_name (§3 of RFC 6066): a
+/// ServerNameList of one ServerName `{ NameType host_name(0), HostName
+/// opaque<1..2^16-1> }`.
+pub fn ext_server_name(host: str) -> List[int] {
+    var name = List[int]()
+    (mut name).push(0)
+    push_all(mut name, u16_prefixed(str_bytes(host)))
+    ext(0, u16_prefixed(name))
+}
+
+/// server_name (0) as the server's empty acknowledgement in
+/// EncryptedExtensions (§4.2.10): the extension_data is empty.
+pub fn ext_server_name_ack() -> List[int] {
+    ext(0, List[int]())
+}
+
+/// renegotiation_info (0xff01) with an empty renegotiated_connection
+/// (RFC 5746): a single zero length byte. TLS 1.3 carries it inertly.
+pub fn ext_renegotiation_info_empty() -> List[int] {
+    ext(65281, u8_prefixed(List[int]()))
+}
+
+/// supported_groups (0x000a, §4.2.7): a NamedGroupList, each group a
+/// big-endian uint16, uint16-length-prefixed.
+pub fn ext_supported_groups(groups: List[int]) -> List[int] {
+    var list = List[int]()
+    for g in groups {
+        push_all(mut list, u16(g))
+    }
+    ext(10, u16_prefixed(list))
+}
+
+/// session_ticket (0x0023, RFC 5077) with an empty ticket.
+pub fn ext_session_ticket_empty() -> List[int] {
+    ext(35, List[int]())
+}
+
+/// key_share (0x0033, §4.2.8) for a ClientHello: a KeyShareClientHello =
+/// a uint16-length-prefixed vector of one KeyShareEntry `{ NamedGroup
+/// x25519(0x001d), key_exchange opaque<1..2^16-1> = the 32 point bytes
+/// }`.
+/// ct: the point bytes are public.
+pub fn ext_key_share_client_x25519(pubkey: List[int]) -> List[int] {
+    var entry = List[int]()
+    push_all(mut entry, u16(29))
+    push_all(mut entry, u16_prefixed(pubkey))
+    ext(51, u16_prefixed(entry))
+}
+
+/// key_share (0x0033, §4.2.8) for a ServerHello: a KeyShareServerHello =
+/// a single KeyShareEntry (NO client_shares vector wrapper).
+/// ct: the point bytes are public.
+pub fn ext_key_share_server_x25519(pubkey: List[int]) -> List[int] {
+    var entry = List[int]()
+    push_all(mut entry, u16(29))
+    push_all(mut entry, u16_prefixed(pubkey))
+    ext(51, entry)
+}
+
+/// supported_versions (0x002b, §4.2.1) for a ClientHello: a
+/// uint8-length-prefixed list of ProtocolVersions, here the single
+/// TLS 1.3 (0x0304).
+pub fn ext_supported_versions_client() -> List[int] {
+    ext(43, u8_prefixed(u16(772)))
+}
+
+/// supported_versions (0x002b, §4.2.1) for a ServerHello: the single
+/// selected_version (0x0304), NOT length-prefixed.
+pub fn ext_supported_versions_server() -> List[int] {
+    ext(43, u16(772))
+}
+
+/// signature_algorithms (0x000d, §4.2.3): a SignatureSchemeList, each
+/// scheme a big-endian uint16, uint16-length-prefixed.
+pub fn ext_signature_algorithms(schemes: List[int]) -> List[int] {
+    var list = List[int]()
+    for s in schemes {
+        push_all(mut list, u16(s))
+    }
+    ext(13, u16_prefixed(list))
+}
+
+/// psk_key_exchange_modes (0x002d, §4.2.9): a uint8-length-prefixed list
+/// of PskKeyExchangeMode bytes (0x01 = psk_dhe_ke).
+pub fn ext_psk_key_exchange_modes(modes: List[int]) -> List[int] {
+    ext(45, u8_prefixed(modes))
+}
+
+/// record_size_limit (0x001c, RFC 8449): a single big-endian uint16.
+pub fn ext_record_size_limit(limit: int) -> List[int] {
+    ext(28, u16(limit))
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §4.1.2 / §4.1.3 / §4.3 / §4.4.2 / §4.4.3 / §4.4.4 — the
+// handshake messages. Each builder returns the COMPLETE wire message,
+// header included, ready for both the transcript and (via sc20) the
+// record layer.
+// ---------------------------------------------------------------------
+
+/// ClientHello (§4.1.2): legacy_version 0x0303, a 32-byte random, an
+/// opaque legacy_session_id<0..32>, a CipherSuite vector<2..2^16-2>
+/// (raw suite bytes, uint16-length-prefixed here), the single null
+/// legacy_compression_method, and the extensions vector<8..2^16-1>.
+/// `cipher_suites` and `extensions` are the concatenated inner bytes.
+/// ct: every field is public.
+pub fn client_hello(
+    random: List[int],
+    session_id: List[int],
+    cipher_suites: List[int],
+    extensions: List[int],
+) -> List[int] {
+    assert(random.len == 32, "tls.handshake: ClientHello random must be 32 bytes")
+    var body = List[int]()
+    push_all(mut body, u16(771))
+    push_all(mut body, random)
+    push_all(mut body, u8_prefixed(session_id))
+    push_all(mut body, u16_prefixed(cipher_suites))
+    push_all(mut body, u8_prefixed(one(0)))
+    push_all(mut body, u16_prefixed(extensions))
+    handshake(hs_client_hello(), body)
+}
+
+/// ServerHello (§4.1.3): legacy_version 0x0303, a 32-byte random, the
+/// echoed opaque legacy_session_id_echo<0..32>, the selected
+/// `cipher_suite` (uint16), the null legacy_compression_method, and the
+/// extensions vector<6..2^16-1>.
+/// ct: every field is public (the server random is not a secret).
+pub fn server_hello(
+    random: List[int],
+    session_id: List[int],
+    cipher_suite: int,
+    extensions: List[int],
+) -> List[int] {
+    assert(random.len == 32, "tls.handshake: ServerHello random must be 32 bytes")
+    var body = List[int]()
+    push_all(mut body, u16(771))
+    push_all(mut body, random)
+    push_all(mut body, u8_prefixed(session_id))
+    push_all(mut body, u16(cipher_suite))
+    (mut body).push(0)
+    push_all(mut body, u16_prefixed(extensions))
+    handshake(hs_server_hello(), body)
+}
+
+/// EncryptedExtensions (§4.3.1): the extensions vector<0..2^16-1>.
+/// `extensions` is the concatenated inner bytes.
+/// ct: public structure only.
+pub fn encrypted_extensions(extensions: List[int]) -> List[int] {
+    handshake(hs_encrypted_extensions(), u16_prefixed(extensions))
+}
+
+/// Certificate (§4.4.2) — OPAQUE cert bytes here (no ASN.1 parse): a
+/// certificate_request_context<0..255> then a certificate_list<0..2^24-1>
+/// of one CertificateEntry `{ cert_data opaque<1..2^24-1> = the DER blob,
+/// extensions Extension<0..2^16-1> = empty }`. `cert_der` is carried
+/// verbatim and never inspected (X.509 is sc22).
+/// ct: public structure; the DER is public.
+pub fn certificate(context: List[int], cert_der: List[int]) -> List[int] {
+    var entry = List[int]()
+    push_all(mut entry, u24_prefixed(cert_der))
+    push_all(mut entry, u16_prefixed(List[int]()))
+    var body = List[int]()
+    push_all(mut body, u8_prefixed(context))
+    push_all(mut body, u24_prefixed(entry))
+    handshake(hs_certificate(), body)
+}
+
+/// CertificateVerify (§4.4.3): the SignatureScheme `algorithm` (uint16)
+/// and the opaque `signature`<0..2^16-1>. The signature is CARRIED, not
+/// verified here (see the module header — RSA-PSS/ECDSA verification is
+/// sc22); `certificate_verify_content` builds the octets it is over.
+/// ct: public structure; the signature is public wire material.
+pub fn certificate_verify(algorithm: int, signature: List[int]) -> List[int] {
+    var body = List[int]()
+    push_all(mut body, u16(algorithm))
+    push_all(mut body, u16_prefixed(signature))
+    handshake(hs_certificate_verify(), body)
+}
+
+/// The octet string a CertificateVerify signature is computed over
+/// (§4.4.3): 64 `0x20` (space) octets, then the ASCII `context` string
+/// ("TLS 1.3, server CertificateVerify" or "...client..."), then a single
+/// `0x00` separator, then the Transcript-Hash up to but not including the
+/// CertificateVerify. Built here for sc22 to verify against a real
+/// public key; this rung does NOT verify the signature.
+/// ct: public content (transcript hash is public).
+pub fn certificate_verify_content(context: str, transcript_hash: List[int]) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    while i < 64 {
+        (mut out).push(32)
+        i = i + 1
+    }
+    push_all(mut out, str_bytes(context))
+    (mut out).push(0)
+    push_all(mut out, transcript_hash)
+    out
+}
+
+/// Finished (§4.4.4): the verify_data (an HMAC-SHA256 output, 32 bytes)
+/// framed as a handshake message. Use `finished_verify_data` to compute
+/// the verify_data.
+/// ct: the verify_data is derived from a secret via HMAC; the framing is
+/// public.
+pub fn finished_message(verify_data: List[int]) -> List[int] {
+    handshake(hs_finished(), verify_data)
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §4.4.1 — the transcript hash. A running SHA-256 over the
+// concatenated wire bytes of the handshake messages, in order, each with
+// its 4-byte handshake header. Modelled as the ordered concatenation
+// (`transcript_add`) whose SHA-256 (`transcript_hash`) is the
+// Transcript-Hash the key schedule and Finished consume. The 5-byte
+// RECORD header is sc20's layer and is NEVER part of this.
+// ---------------------------------------------------------------------
+
+/// A fresh, empty transcript.
+/// ct: no secret.
+pub fn transcript_new() -> List[int] {
+    List[int]()
+}
+
+/// Append one handshake message's exact wire bytes (header included) to
+/// the running transcript, in order (§4.4.1).
+/// ct: public message bytes only.
+pub fn transcript_add(mut acc: List[int], msg: List[int]) {
+    push_all(mut acc, msg)
+}
+
+/// The Transcript-Hash: SHA-256 of the accumulated handshake messages
+/// (§4.4.1). Feeds Derive-Secret (sc20's `record.derive_secret`) and
+/// Finished.
+/// ct: hashes public message bytes; the digest is public context.
+pub fn transcript_hash(acc: List[int]) -> List[int] {
+    sha2.sum256(acc)
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §7.1 — the full key schedule, completing sc20's primitives.
+// Every step is sc20's `record.extract`/`derive_secret` over sc16's HKDF;
+// this module names the §7.1 chain and supplies the X25519 shared secret.
+//
+//   early    = HKDF-Extract(0, PSK|0)
+//   dh       = X25519(private, peer_public)
+//   handshake= HKDF-Extract(Derive-Secret(early, "derived", ""), dh)
+//   master   = HKDF-Extract(Derive-Secret(handshake, "derived", ""), 0)
+// then the traffic secrets via Derive-Secret over the transcript hash.
+// ---------------------------------------------------------------------
+
+/// A list of `n` zero bytes (the extract salt/IKM where there is no PSK
+/// or where the salt is Hash.length zeros).
+fn zeros(n: int) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    while i < n {
+        (mut out).push(0)
+        i = i + 1
+    }
+    out
+}
+
+/// A single-element byte list (the null compression method, small
+/// literals).
+fn one(v: int) -> List[int] {
+    require_byte(v)
+    var out = List[int]()
+    (mut out).push(v)
+    out
+}
+
+/// The bytes of an ASCII `str`, guarding the byte contract.
+fn str_bytes(s: str) -> List[int] {
+    var out = List[int]()
+    for b in s.bytes() {
+        require_byte(b)
+        (mut out).push(b)
+    }
+    out
+}
+
+/// The (EC)DHE shared secret for the handshake extract (§7.4.2): the
+/// X25519 of your `private` scalar against the peer's `peer_public` point
+/// (sc18). Both parties reach the same value; the all-zero result is
+/// rejected (RFC 8446 §7.4.2 / sc18's {zero} row).
+/// ct: `private` is a secret scalar carried through curve25519's ladder
+/// (its `ct:` line holds the branch-free posture); the reject-on-zero is
+/// on the public output.
+pub fn ecdhe_shared(private: List[int], peer_public: List[int]) -> List[int] ! {zero} {
+    curve25519.x25519(private, peer_public) else |_| {
+        return zero
+    }
+}
+
+/// The early secret (§7.1): HKDF-Extract(0, 0) for the no-PSK handshake —
+/// salt and IKM both 32 zero bytes.
+/// ct: carried through record/sha2 HKDF.
+pub fn early_secret() -> List[int] {
+    record.extract(zeros(32), zeros(32))
+}
+
+/// The handshake secret (§7.1): HKDF-Extract with salt
+/// Derive-Secret(early, "derived", "") and IKM the (EC)DHE shared secret.
+/// `empty_hash` is SHA-256 of the empty string, the "derived" context.
+/// ct: `early`/`dh` are secret, carried through record/sha2.
+pub fn handshake_secret(early: List[int], dh: List[int]) -> List[int] {
+    let derived = record.derive_secret(early, "derived", sha2.sum256(List[int]()))
+    record.extract(derived, dh)
+}
+
+/// The master secret (§7.1): HKDF-Extract with salt
+/// Derive-Secret(handshake, "derived", "") and IKM 32 zero bytes.
+/// ct: `hs` is secret, carried through record/sha2.
+pub fn master_secret(hs: List[int]) -> List[int] {
+    let derived = record.derive_secret(hs, "derived", sha2.sum256(List[int]()))
+    record.extract(derived, zeros(32))
+}
+
+/// client_handshake_traffic_secret (§7.1): Derive-Secret(handshake,
+/// "c hs traffic", Transcript-Hash(ClientHello..ServerHello)).
+/// ct: `hs` is secret; the transcript hash is public.
+pub fn client_handshake_traffic(hs: List[int], th_ch_sh: List[int]) -> List[int] {
+    record.derive_secret(hs, "c hs traffic", th_ch_sh)
+}
+
+/// server_handshake_traffic_secret (§7.1): Derive-Secret(handshake,
+/// "s hs traffic", Transcript-Hash(ClientHello..ServerHello)).
+/// ct: `hs` is secret; the transcript hash is public.
+pub fn server_handshake_traffic(hs: List[int], th_ch_sh: List[int]) -> List[int] {
+    record.derive_secret(hs, "s hs traffic", th_ch_sh)
+}
+
+/// client_application_traffic_secret_0 (§7.1): Derive-Secret(master,
+/// "c ap traffic", Transcript-Hash(ClientHello..server Finished)).
+/// ct: `master` is secret; the transcript hash is public.
+pub fn client_application_traffic(master: List[int], th_sfin: List[int]) -> List[int] {
+    record.derive_secret(master, "c ap traffic", th_sfin)
+}
+
+/// server_application_traffic_secret_0 (§7.1): Derive-Secret(master,
+/// "s ap traffic", Transcript-Hash(ClientHello..server Finished)).
+/// ct: `master` is secret; the transcript hash is public.
+pub fn server_application_traffic(master: List[int], th_sfin: List[int]) -> List[int] {
+    record.derive_secret(master, "s ap traffic", th_sfin)
+}
+
+/// exporter_master_secret (§7.1): Derive-Secret(master, "exp master",
+/// Transcript-Hash(ClientHello..server Finished)).
+/// ct: `master` is secret; the transcript hash is public.
+pub fn exporter_master(master: List[int], th_sfin: List[int]) -> List[int] {
+    record.derive_secret(master, "exp master", th_sfin)
+}
+
+/// resumption_master_secret (§7.1): Derive-Secret(master, "res master",
+/// Transcript-Hash(ClientHello..client Finished)).
+/// ct: `master` is secret; the transcript hash is public.
+pub fn resumption_master(master: List[int], th_cfin: List[int]) -> List[int] {
+    record.derive_secret(master, "res master", th_cfin)
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §4.4.4 — Finished, and the constant-time-shaped compare.
+// ---------------------------------------------------------------------
+
+/// The Finished verify_data (§4.4.4): HMAC-SHA256(finished_key,
+/// Transcript-Hash), where finished_key = HKDF-Expand-Label(base_secret,
+/// "finished", "", 32) (sc20's `record.finished_key`). `base_secret` is
+/// the sender's handshake traffic secret (the server's for the server
+/// Finished, the client's for the client Finished). `transcript_hash` is
+/// the running hash THROUGH the message before this Finished.
+/// ct: `base_secret` is secret, carried through record/sha2 HMAC.
+pub fn finished_verify_data(base_secret: List[int], transcript_hash: List[int]) -> List[int] {
+    let fk = record.finished_key(base_secret)
+    sha2.hmac256(fk, transcript_hash)
+}
+
+/// The complete Finished handshake message for a sender: frame the
+/// verify_data computed from `base_secret` over `transcript_hash`.
+/// ct: as `finished_verify_data`.
+pub fn finished_for(base_secret: List[int], transcript_hash: List[int]) -> List[int] {
+    finished_message(finished_verify_data(base_secret, transcript_hash))
+}
+
+/// Constant-time-shaped byte equality (§4.4.4's compare, sc17's tag
+/// discipline): fold every position's difference into an accumulator and
+/// test ONCE at the end — no early exit on the first mismatch, no
+/// secret-dependent branch. Unequal lengths answer false without reading
+/// (a public, structural fact).
+/// ct: THE compare — accumulate-then-single-check, a c28 verification
+/// target. Loop bound and indices are public (the 32-byte digest length);
+/// the per-byte XOR touches secret-derived MAC bytes without branching.
+pub fn ct_eq(a: List[int], b: List[int]) -> bool {
+    if a.len != b.len {
+        return false
+    }
+    var diff = 0
+    var i = 0
+    while i < a.len {
+        let x = a[i]
+        let y = b[i]
+        require_byte(x)
+        require_byte(y)
+        diff = ((diff as wrapping[u64]) | (x as wrapping[u64] ^ y as wrapping[u64])) as int
+        i = i + 1
+    }
+    diff == 0
+}
+
+/// Verify a peer's Finished (§4.4.4): recompute the expected verify_data
+/// from `base_secret` (the peer's handshake traffic secret) over
+/// `transcript_hash` and compare it constant-time-shaped to `received`.
+/// A false answer is the caller's `decrypt_error`/handshake-abort alert;
+/// no key material is exposed on the miss (the recompute leaks nothing the
+/// peer did not already send).
+/// ct: recompute is `finished_verify_data`; compare is `ct_eq`.
+pub fn verify_finished(base_secret: List[int], transcript_hash: List[int], received: List[int]) -> bool {
+    ct_eq(finished_verify_data(base_secret, transcript_hash), received)
+}
+
+/// Accept a peer's Finished or raise the handshake-abort alert (§4.4.4 +
+/// §6.2): return 1 when the constant-time compare holds, otherwise the
+/// `decrypt_error` row — a wrong Finished aborts the handshake with the
+/// named alert and NO key material exposed (the recompute reveals nothing
+/// the peer did not already send; nothing derived-onward is returned on
+/// the miss). The state machine and the record layer continue their
+/// smuggling/confusion discipline through this named reject.
+/// ct: as `verify_finished`.
+pub fn accept_finished(base_secret: List[int], transcript_hash: List[int], received: List[int]) -> int ! {decrypt_error} {
+    if verify_finished(base_secret, transcript_hash, received) {
+        return 1
+    }
+    decrypt_error
+}
+
+// ---------------------------------------------------------------------
+// RFC 8446 §4.1 — the handshake state machine. The ordered flows are
+// modelled as a pure transition over a (role, stage) pair: `hs_step`
+// advances on the message the flow expects next and raises the
+// `unexpected_message` alert row (§6.2) on anything else — an
+// out-of-order, dropped or illegal message is a NAMED alert, never a hang
+// or a wrong key. The machine tracks what each role legally RECEIVES.
+// ---------------------------------------------------------------------
+
+/// The client role (0) — sends ClientHello, then receives the server's
+/// flight (ServerHello, EncryptedExtensions, Certificate,
+/// CertificateVerify, Finished), then sends its own Finished.
+pub fn role_client() -> int { 0 }
+
+/// The server role (1) — receives ClientHello, sends its flight, then
+/// receives the client's Finished.
+pub fn role_server() -> int { 1 }
+
+/// The handshake message type the given `role` legally receives at
+/// `stage`, or -1 when the flow expects no further message (the flight is
+/// complete). §4.1's ordered flows.
+/// ct: public role/stage only.
+pub fn hs_expected(role: int, stage: int) -> int {
+    if role == role_client() {
+        if stage == 0 { return hs_server_hello() }
+        if stage == 1 { return hs_encrypted_extensions() }
+        if stage == 2 { return hs_certificate() }
+        if stage == 3 { return hs_certificate_verify() }
+        if stage == 4 { return hs_finished() }
+        return 0 - 1
+    }
+    if stage == 0 { return hs_client_hello() }
+    if stage == 1 { return hs_finished() }
+    0 - 1
+}
+
+/// Drive one received message through the state machine (§4.1): if
+/// `msg_type` is the message the flow expects next for `role` at `stage`,
+/// return the next stage; otherwise raise `unexpected_message` (§6.2) —
+/// the reordered/dropped/illegal-message reject, by name. `stage` starts
+/// at 0 (the client after sending ClientHello / the server before
+/// receiving it).
+/// ct: branches on public message type and stage only.
+pub fn hs_step(role: int, stage: int, msg_type: int) -> int ! {unexpected_message} {
+    let want = hs_expected(role, stage)
+    if want < 0 {
+        return unexpected_message
+    }
+    if msg_type != want {
+        return unexpected_message
+    }
+    stage + 1
+}
+
+/// Whether the client has received the full server flight (its own
+/// Finished is next to SEND): stage 5 after ServerHello..server Finished.
+/// ct: public.
+pub fn hs_client_flight_complete(stage: int) -> bool {
+    stage >= 5
+}
+
+/// Whether the server has received the client's Finished — the handshake
+/// is complete: stage 2 after ClientHello and client Finished.
+/// ct: public.
+pub fn hs_server_complete(stage: int) -> bool {
+    stage >= 2
+}
+
+// ---------------------------------------------------------------------
+// The FROZEN ws05-consumable seam — a completed handshake's negotiated
+// params + traffic secrets. ws05 hands these to sc20's record layer
+// (`record.traffic_key`/`record.traffic_iv` per secret) to serve/consume
+// application data. See the module header.
+// ---------------------------------------------------------------------
+
+/// The negotiated result of a completed handshake (the ws05 seam): the
+/// selected `cipher_suite`, the client/server handshake and application
+/// traffic secrets, and the exporter/resumption master secrets. sc20's
+/// `record.traffic_key(secret, key_len)` and `record.traffic_iv(secret)`
+/// turn each traffic secret into the AEAD key/iv the record layer seals
+/// and opens under.
+/// ct: the secrets are carried; this is a value container only.
+pub struct HandshakeResult {
+    cipher_suite: int,
+    client_handshake_secret: List[int],
+    server_handshake_secret: List[int],
+    client_application_secret: List[int],
+    server_application_secret: List[int],
+    exporter_master_secret: List[int],
+    resumption_master_secret: List[int],
+}
+
+// ---------------------------------------------------------------------
+// Hex rendering — this module's own (the sha2/chacha20/record precedent,
+// so its tests and doc examples import exactly one module). NOT
+// constant-time; a debug/vector convenience only.
+// ---------------------------------------------------------------------
+
+/// Lowercase hex of a byte list. ct: NOT constant-time (a rendering
+/// convenience for tests and vectors, never a secret-handling path).
+pub fn to_hex(b: List[int]) -> str {
+    let alphabet = "0123456789abcdef"
+    var out = ""
+    for v in b {
+        require_byte(v)
+        let hi = v / 16
+        let lo = v % 16
+        let hd = alphabet[hi..hi + 1]
+        let ld = alphabet[lo..lo + 1]
+        out = "{out}{hd}{ld}"
+    }
+    out
+}
