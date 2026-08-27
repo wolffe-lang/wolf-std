@@ -1,0 +1,62 @@
+//! check: run(exit=1, stdout="witness: rsa and ecdsa parse structurally\nwitness: validation names the unsupported algorithm\nerror: unsupported_alg")
+//! phase: run
+//! conforms: std.x.tls.cert, err.row, err.propagate, err.else
+//!
+//! THE PARSE-BUT-NAMED-UNSUPPORTED SPLIT (the sprint's load-bearing
+//! honesty): real-world-shaped RSA-2048/sha256WithRSAEncryption and
+//! ECDSA-P256/ecdsa-with-SHA256 certificates (openssl-generated,
+//! vendor/vectors/pki) PARSE structurally — version, serial, DNs,
+//! validity, SPKI, SAN, the multi-byte lengths of an RSA modulus, the
+//! NULL RSA parameters and named-curve EC parameters all walk the
+//! same hardened decoder — and chain validation answers the NAMED
+//! `unsupported_alg` rejection, NEVER a silent accept: the D53 ladder
+//! has Ed25519/X25519, not RSA/P-256, and an unverified signature
+//! reported valid would be a correctness failure. The rejection rides
+//! out of main so the record names it.
+
+use std.hex
+use std.x.tls.cert
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn rejects(chain: List[int], host: str, anchor: List[int], now: int) -> bool {
+    let c = cert.validate_chain(chain, host, anchor, now) else |_| {
+        return true
+    }
+    c.version < 0
+}
+
+fn main() -> !int {
+    let rsa = bytes_of(
+        "308203343082021ca00302010202142c91c5dbc6aa4d013e1eccbaef08cecf23e807f5300d06092a864886f70d01010b0500301b3119301706035504030c107273612e776f6c662e6578616d706c65301e170d3236303832373132323930325a170d3237303832373132323930325a301b3119301706035504030c107273612e776f6c662e6578616d706c6530820122300d06092a864886f70d01010105000382010f003082010a0282010100d4ca271dc77df072f6753f26a351f4ffb3e1f30de6b2d52f07eac0733329c44bba5fb8d8fe4e9d3aabdb186be1875e9ac7b1ffc5a3ebf0eefc100f181731bd5b1cb44f1dfebcf15662ea42c4947a06073b5781db348221e4ad794e8e1c3e4974a4ed9a9d68e40a15d567e0d616a98c0f4c17d1e3a219b39545684a65eafbfcfac1d391e722fc9dd1e5a00426774f44c3cfd665a7612639ebc875072bbac4b596941b9cf1dc7e872879a2e2b29ba4d589766ba6835270330e35df254b4eab220841b907169609773499ff1734054cd1c3c71f55be8880d3bd75a0bf62247ff16851492b158cb44707119c051c1987de0538403feca0bd225106e695133ebe72eb0203010001a370306e301d0603551d0e04160414fc52d935449c6491d420bedea55169c7502b2d34301f0603551d23041830168014fc52d935449c6491d420bedea55169c7502b2d34300f0603551d130101ff040530030101ff301b0603551d110414301282107273612e776f6c662e6578616d706c65300d06092a864886f70d01010b050003820101009ef401425c39f39c63737ab6173f45df8bce332ea4efc13dd561ec9b557dc92c47a7f6f6531c798482295ff75ed6ae977fcca9f8eb5312e7390f831d5632129b865ed31c073eaefdab88faeb2d8694fc886955c4c858aaedbfb06af461f9990cc4e41b9bc3fcc7e4a98642d255994153f3e8a4eb0546790f3c88a7d3b293b1e045d154845e216a708d42f00cfcb8c9ab848f09ffa630d2d1f84a90ef096d753c25f16d2418a00508a5ce380a2915d7e963c61f596a5cf707b4430ef699dfccb9daa95923d08067ee8442f2d554b9604cfdc7f878ab3c4ebe141bf330cdbbcdbc590d1b6ffacfb34d557a002e13ecaa2f98747eb593f9a1ba8ba4c9de2f2836a4",
+    )
+    let ecdsa = bytes_of(
+        "308201af30820154a0030201020214740cdfa4c8e3db375b3bf304e3f76556f2fc35a1300a06082a8648ce3d040302301d311b301906035504030c1265636473612e776f6c662e6578616d706c65301e170d3236303832373132323930325a170d3237303832373132323930325a301d311b301906035504030c1265636473612e776f6c662e6578616d706c653059301306072a8648ce3d020106082a8648ce3d03010703420004fc53bced13903902d293f716083815447e1ada582249395ebac44c44ef06b9fd55026df310ac4dd98d0048e3f22150f038bdec71768a87456de64a00171bfdd9a3723070301d0603551d0e0416041435ee311235bc6546e5fb2eca0ed5aa2066788df4301f0603551d2304183016801435ee311235bc6546e5fb2eca0ed5aa2066788df4300f0603551d130101ff040530030101ff301d0603551d1104163014821265636473612e776f6c662e6578616d706c65300a06082a8648ce3d04030203490030460221009a31986bc666c74ef3e8c91871a43fd1b59946c72ff6e320559c71ded7528c01022100de70e4ddebde9db7ccf2a1cbde2097ba48ce18dfeead1fa25d9cb03cbd0b1a3f",
+    )
+    let now = cert.timestamp(2026, 10, 1, 0, 0, 0)
+    let rc = cert.parse(rsa) else |_| {
+        return 2
+    }
+    assert(rc.subject_cn == "rsa.wolf.example", "rsa subject CN parsed")
+    assert(cert.alg_name(rc.sig_alg) == "rsa", "rsa signature algorithm classified")
+    assert(cert.alg_name(rc.spki_alg) == "rsa", "rsa SPKI classified")
+    assert(rc.has_san, "rsa SAN parsed")
+    let ec = cert.parse(ecdsa) else |_| {
+        return 2
+    }
+    assert(ec.subject_cn == "ecdsa.wolf.example", "ecdsa subject CN parsed")
+    assert(cert.alg_name(ec.sig_alg) == "ecdsa", "ecdsa signature algorithm classified")
+    assert(cert.alg_name(ec.spki_alg) == "ecdsa", "ecdsa SPKI classified")
+    print("witness: rsa and ecdsa parse structurally")
+    assert(rejects(rsa, "rsa.wolf.example", rsa, now), "rsa chain must name unsupported_alg")
+    assert(
+        rejects(ecdsa, "ecdsa.wolf.example", ecdsa, now),
+        "ecdsa chain must name unsupported_alg",
+    )
+    print("witness: validation names the unsupported algorithm")
+    let never = cert.validate_chain(rsa, "rsa.wolf.example", rsa, now)?
+    print("unreachable: {never.version}")
+    0
+}

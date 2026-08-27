@@ -1,0 +1,96 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.tls.cert
+//!
+//! RFC 5280 §4.1 field extraction, pinned against the authored test
+//! PKI (vendor/vectors/pki, authored by a from-scratch RFC 8032 +
+//! X.690 reference, cross-checked by openssl 3.6.3 — provenance in its
+//! README). Every field the ws05 seam reads is asserted exactly: the
+//! leaf's version/serial/algorithm/DN CNs (PrintableString subject,
+//! UTF8String issuer)/UTCTime validity (compact yyyymmddhhmmss)/Ed25519
+//! SPKI/basicConstraints CA:FALSE/keyUsage digitalSignature/SAN
+//! dNSNames — with the unknown NON-critical extension carried and NOT
+//! recorded as critical (§4.2's carry-and-ignore half); the root's
+//! CA:TRUE + pathLen 1 + keyCertSign|cRLSign (96) + self-signed name
+//! equality (issuer bytes == subject bytes, the §6.1 chaining
+//! currency). Pure helpers (alg_name, host_matches, timestamp,
+//! oid_ed25519, ku weights) are pinned beside them.
+
+use std.hex
+use std.x.tls.cert
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let leaf = cert.
+        parse(
+        bytes_of(
+            "3082013e3081f1a00302010202021337300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3236303130313030303030305a170d3237303130313030303030305a3017311530130603550403130c776f6c662e6578616d706c65302a300506032b6570032100b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3a356305430090603551d1304023000300b0603551d0f04040302078030290603551d1104223020820c776f6c662e6578616d706c6582107777772e776f6c662e6578616d706c65300f06092b0601040183b2030204020500300506032b6570034100b263c2d9ba14201bbbd2944f4909bb1668576c4c77a6cf4abfa604931b254ca9508e74a9b2b902b85a2ba7eae7782c98b9ea8a8755a4ffd4384e06ac6ccd510c",
+        ),
+    ) else |_| {
+        return 1
+    }
+    assert(leaf.version == 3, "leaf v3")
+    assert(cert.to_hex(leaf.serial) == "1337", "leaf serial 0x1337")
+    assert(leaf.sig_alg == cert.oid_ed25519(), "leaf sig alg ed25519")
+    assert(cert.alg_name(leaf.sig_alg) == "ed25519", "alg_name ed25519")
+    assert(leaf.issuer_cn == "wolf-std sc22 test root", "leaf issuer CN")
+    assert(leaf.subject_cn == "wolf.example", "leaf subject CN")
+    assert(leaf.not_before == cert.timestamp(2026, 1, 1, 0, 0, 0), "leaf notBefore")
+    assert(leaf.not_after == cert.timestamp(2027, 1, 1, 0, 0, 0), "leaf notAfter")
+    assert(leaf.spki_alg == cert.oid_ed25519(), "leaf spki ed25519")
+    assert(
+        cert.to_hex(leaf.spki_key) ==
+            "b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3",
+        "leaf key bytes",
+    )
+    assert(leaf.has_bc, "leaf has basicConstraints")
+    assert(!leaf.is_ca, "leaf CA FALSE")
+    assert(leaf.path_len == 0 - 1, "leaf no pathLen")
+    assert(leaf.key_usage == cert.ku_digital_signature(), "leaf KU digitalSignature")
+    assert(leaf.has_san, "leaf has SAN")
+    var sans = ""
+    for n in leaf.san {
+        sans = "{sans}{n};"
+    }
+    assert(sans == "wolf.example;www.wolf.example;", "leaf SAN dNSNames")
+    assert(leaf.crit_unknown == "", "unknown NON-critical ext carried, not recorded")
+    assert(leaf.sig.len == 64, "ed25519 signature is 64 bytes")
+    let root = cert.
+        parse(
+        bytes_of(
+            "308201373081eaa003020102020101300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3235303130313030303030305a170d3335313233313233353935395a30223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74302a300506032b6570032100df29ea96435aa95c2b6f9176b5e2bc532916525aa49207b10e6b8e3e5bdefb08a345304330120603551d130101ff040830060101ff020101300e0603551d0f0101ff040403020106301d0603551d0e04160414783463495867e2affe02ec7ffbcf86216bc59be7300506032b6570034100573764a0bb4fd69a98281bc428deea50474f8e1e12e719c83310312ac790da36ff45bfc88ae586bdb5a03ed8537e922d80b07c7e4da3325af92f90efa2f68a07",
+        ),
+    ) else |_| {
+        return 1
+    }
+    assert(root.version == 3, "root v3")
+    assert(cert.to_hex(root.serial) == "01", "root serial 1")
+    assert(root.subject_cn == "wolf-std sc22 test root", "root subject CN (UTF8String)")
+    assert(root.is_ca, "root CA TRUE")
+    assert(root.path_len == 1, "root pathLen 1")
+    assert(root.key_usage == 96, "root KU keyCertSign|cRLSign")
+    assert(!root.has_san, "root has no SAN")
+    assert(
+        cert.to_hex(root.issuer) == cert.to_hex(root.subject),
+        "self-signed: issuer == subject bytes",
+    )
+    assert(
+        cert.to_hex(leaf.issuer) == cert.to_hex(root.subject),
+        "leaf issuer == root subject bytes",
+    )
+    assert(root.not_before == cert.timestamp(2025, 1, 1, 0, 0, 0), "root notBefore")
+    assert(root.not_after == cert.timestamp(2035, 12, 31, 23, 59, 59), "root notAfter")
+    assert(cert.host_matches("wolf.example", "WOLF.Example"), "host match is case-insensitive")
+    assert(!cert.host_matches("wolf.example", "evil.example"), "host mismatch")
+    assert(
+        !cert.host_matches("*.wolf.example", "www.wolf.example"),
+        "wildcards fail CLOSED (RFC 6125 residue)",
+    )
+    assert(cert.alg_name("1.2.840.113549.1.1.11") == "rsa", "alg_name rsa")
+    assert(cert.alg_name("1.2.840.10045.4.3.2") == "ecdsa", "alg_name ecdsa")
+    assert(cert.alg_name("2.999.1") == "unknown", "alg_name unknown")
+    0
+}
