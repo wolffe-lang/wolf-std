@@ -2190,3 +2190,47 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# ---- sc18: Ed25519 (RFC 8032), over sha2's SHA-512 through the module
+# boundary. Verify is public-data and cofactorless (S < L strict); sign
+# is deterministic (no entropy). A scalar multiplication is ~4-8s under
+# lupin 0.1.13, so the full RFC and Wycheproof sets ride the native lane
+# (`slow` under lupin, checked step-budget past a few mults) while the
+# hand smoke (public + verify of TEST 1, ~11s) and a 1-valid+1-invalid
+# Wycheproof smoke (~18s) keep sign/verify three-lane. All checked int,
+# no wrapping.
+
+[tests."x/crypto/curve25519/ed25519_smoke.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/curve25519/ed25519_rfc8032_s71.lu"]
+lupin = "slow"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/curve25519/wycheproof_ed25519_smoke.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/curve25519/wycheproof_ed25519_p1.lu"]
+lupin = "slow"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/curve25519/wycheproof_ed25519_p2.lu"]
+lupin = "slow"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/curve25519/wycheproof_ed25519_p3.lu"]
+lupin = "slow"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/curve25519/wycheproof_ed25519_p4.lu"]
+lupin = "slow"
+wolfc = "unsupported"
+native = "run"
