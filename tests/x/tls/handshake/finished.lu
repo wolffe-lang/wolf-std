@@ -1,0 +1,48 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.tls.handshake, arith.wrapping
+//!
+//! RFC 8448 §3 Finished (§4.4.4): the finished_key (sc20's
+//! HKDF-Expand-Label "finished") and the verify_data
+//! HMAC-SHA256(finished_key, Transcript-Hash) for BOTH roles. The server
+//! Finished MACs over Transcript-Hash(CH..CertVerify); the client
+//! Finished over Transcript-Hash(CH..serverFin). Both verify_data values
+//! are asserted, the framed Finished messages match the trace, and the
+//! constant-time-shaped verify accepts the correct MACs.
+//!
+
+use std.hex
+use std.x.tls.handshake as hs
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let shs = bytes_of("b67b7d690cc16c4e75e54213cb2d37b4e9c912bcded9105d42befd59d391ad38")
+    let chs = bytes_of("b3eddb126e067f35a780b3abf45e2d8f3b1a950738f52e9600746a0e27a55a21")
+    let th_cv = bytes_of("edb7725fa7a3473b031ec8ef65a2485493900138a2b91291407d7951a06110ed")
+    let th_sf = bytes_of("9608102a0f1ccc6db6250b7b7e417b1a000eaada3daae4777a7686c9ff83df13")
+
+    // finished_key (sc20 seam) matches the trace.
+    assert(record.to_hex(record.finished_key(shs)) == "008d3b66f816ea559f96b537e885c31fc068bf492c652f01f288a1d8cdc19fc8", "server finished_key")
+    assert(record.to_hex(record.finished_key(chs)) == "b80ad01015fb2f0bd65ff7d4da5d6bf83f84821d1f87fdc7d3c75b5a7b42d9c4", "client finished_key")
+
+    // verify_data.
+    let sv = hs.finished_verify_data(shs, th_cv)
+    assert(hs.to_hex(sv) == "9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718", "server verify_data")
+    let cvd = hs.finished_verify_data(chs, th_sf)
+    assert(hs.to_hex(cvd) == "a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61", "client verify_data")
+
+    // framed messages match the trace.
+    assert(hs.to_hex(hs.finished_for(shs, th_cv)) == "140000209b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718", "server Finished message")
+    assert(hs.to_hex(hs.finished_for(chs, th_sf)) == "14000020a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61", "client Finished message")
+
+    // constant-time verify accepts the peer's correct Finished.
+    assert(hs.verify_finished(shs, th_cv, bytes_of("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718")), "verify server Finished")
+    assert(hs.verify_finished(chs, th_sf, bytes_of("a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61")), "verify client Finished")
+    let ok = hs.accept_finished(shs, th_cv, bytes_of("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718")) else 0 - 1
+    assert(ok == 1, "accept server Finished")
+    0
+}

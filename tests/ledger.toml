@@ -2368,3 +2368,80 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# ---- sc21: std.x.tls.handshake — the TLS 1.3 handshake (RFC 8446 §4 +
+# §4.4 + §7.1), the stdc-tls campaign's SECOND rung. All ten tests are
+# THREE-LANE by construction: the module is plumbing over sc16's SHA-256/
+# HMAC (transcript + Finished), sc18's X25519 (the (EC)DHE shared secret)
+# and sc20's key schedule + `finished_key` — it adds only public message
+# serialization, the transcript accumulator, the pure state-machine
+# transition and a constant-time-shaped compare (`ct_eq`), no wrapping
+# arithmetic of its own on the int-plain path beyond `ct_eq`'s XOR fold in
+# `wrapping[u64]` (the sc20 spelling), so the F-0091-era checked refusals
+# never bite. Every vector is RFC 8448 §3 (every handshake message
+# byte-for-byte, every intermediate transcript hash, the full early ->
+# handshake -> master schedule with the X25519 agreement, both Finished
+# MACs) asserted through the module. No file carries `slow`: the two
+# X25519-bearing files are the heaviest under lupin 0.1.13 (key_schedule
+# ~5.0s with both agreement directions, ecdhe_zero_row ~3.9s — a ladder is
+# 2.5-6.5s at 0.1.13, F-0093), every other file is sub-second, all far
+# under the 60s ceiling. CertificateVerify's signature is CARRIED not
+# verified (RSA-PSS/ECDSA is sc22); the Certificate is opaque DER framed,
+# never parsed. The negatives are hand-built guards: an out-of-order
+# flight -> the `unexpected_message` row, a tampered Finished -> the
+# `decrypt_error` row (zero exposure), an all-zero key_share -> sc18's
+# `zero` row, plus the two contract traps (non-byte element, wrong-length
+# random). The env crypto-drift the sc19/sc20 status notes name did NOT
+# bite this rung in the provisioning here — all three lanes were observed
+# green locally; clean-clone 3-OS CI remains the gate for the compiled
+# columns.
+
+[tests."x/tls/handshake/message_bytes.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/handshake/transcript_hash.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/handshake/key_schedule.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/handshake/finished.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/handshake/finished_reject_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/handshake/state_machine.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/handshake/reordered_flight_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/handshake/ecdhe_zero_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/handshake/non_byte_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/handshake/bad_random_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
