@@ -2042,3 +2042,37 @@ native = "run"
 lupin = "slow"
 wolfc = "run"
 native = "run"
+
+# ---- sc18: std.x.crypto.curve25519 — the curve and the signature ----
+# (D53's third rung, RFC 7748 + RFC 8032). The field is checked `int`
+# in ten ~25.5-bit limbs (no wrapping anywhere — the sc18 probe delta's
+# verdict), so it is THREE-LANE by construction: the checked tier that
+# kept sha2/chacha20 dark until the s111 pin runs this module's field
+# and X25519 in full, subject only to its step budget on the biggest
+# programs. The 1000-iteration chain is the one such program: native
+# runs it in ~2.3s, the checked tier exhausts its step budget
+# ("step budget exhausted", the sha2-long mechanism), and lupin at
+# 0.1.13 exceeds its 50M-evaluation-step budget at ~87s (is20's F-0093
+# fix is merged upstream, UNRELEASED — the chain flips off `slow` at
+# the lupin release that carries it, contract's "re-measure post-is20"
+# owed then). Everything else is three-lane.
+
+[tests."x/crypto/curve25519/field_identities.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/curve25519/x25519_rfc7748_s52.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/curve25519/x25519_rfc7748_s61_dh.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/curve25519/x25519_rfc7748_chain.lu"]
+lupin = "slow"
+wolfc = "unsupported"
+native = "run"

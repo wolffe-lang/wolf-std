@@ -1,0 +1,22 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! RFC 7748 §6.1's Diffie-Hellman: Alice and Bob derive the same shared
+//! secret from each other's public keys, and it matches the RFC's
+//! published K. Hex quoted from `vendor/vectors/rfc/rfc7748.txt`.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn main() -> int {
+    let a = hex.decode("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a") else List[int]()
+    let b = hex.decode("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb") else List[int]()
+    let pub_a = curve25519.x25519_base(a)
+    let pub_b = curve25519.x25519_base(b)
+    let ka = curve25519.x25519(a, pub_b) else List[int]()
+    let kb = curve25519.x25519(b, pub_a) else List[int]()
+    assert(curve25519.to_hex(ka) == "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742", "K alice")
+    assert(curve25519.to_hex(kb) == "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742", "K bob")
+    0
+}

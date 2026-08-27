@@ -1,0 +1,18 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! The field mod 2^255 - 19 proven ALONE, before any curve vector — the
+//! contract's field-first discipline. `field_self_test` runs the
+//! algebraic identities (additive inverse, multiply commutativity/
+//! associativity, distributivity, square-as-self-multiply, the Fermat
+//! inverse a·a⁻¹=1, the a24 constant, the byte round trip) over sample
+//! elements and answers true iff every one holds. Three-lane: the field
+//! is checked `int`, no wrapping, so the checked tier runs it too.
+
+use std.x.crypto.curve25519
+
+fn main() -> int {
+    assert(curve25519.field_self_test(), "field identities")
+    0
+}
