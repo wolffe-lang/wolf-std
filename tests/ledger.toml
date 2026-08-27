@@ -2234,3 +2234,13 @@ native = "run"
 lupin = "slow"
 wolfc = "unsupported"
 native = "run"
+
+# Ed25519 verify's rejection contract as a fast three-lane witness: the
+# cheap rejects (key/sig length, S >= L malleability) short-circuit
+# before any scalar multiplication, so verify answering a bool (never a
+# trap) on malformed caller data is provable on every lane.
+
+[tests."x/crypto/curve25519/ed25519_verify_rejects.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
