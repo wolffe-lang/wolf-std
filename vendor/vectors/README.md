@@ -1,10 +1,12 @@
-# vendor/vectors — the crypto vector corpora (sc16, D53's first rung)
+# vendor/vectors — the crypto vector corpora (sc16/sc17, D53's ladder)
 
 Public test vectors, vendored VERBATIM with provenance, consumed by
 `cargo xtask gen-vectors` (which emits the committed
-`tests/x/crypto/sha2/cavp_*` and `wycheproof_*` files and is
-drift-checked in ci) and quoted by the hand-written
-`tests/x/crypto/sha2/rfc4231_hmac.lu` / `rfc5869_hkdf.lu`. Never edit a
+`tests/x/crypto/sha2/cavp_*`/`wycheproof_*` and
+`tests/x/crypto/chacha20/wycheproof_*` files and is drift-checked in
+ci) and quoted by the hand-written
+`tests/x/crypto/sha2/rfc4231_hmac.lu` / `rfc5869_hkdf.lu` and
+`tests/x/crypto/chacha20/known_answers.lu` / `rfc8439_a*.lu`. Never edit a
 vendored file; re-vendor from the source and re-run the generator, each
 in its own commit. The spec documents themselves (FIPS 180-4, FIPS
 198-1, the RFC texts, the CAVP zip) are fetched into the planning repo's
@@ -23,6 +25,16 @@ is exactly the vector data the rig consumes.
 - `rfc/rfc4231.txt`, `rfc/rfc5869.txt` — the RFC Editor's canonical
   texts (`https://www.rfc-editor.org/rfc/`).
 
+## Sources (retrieved 2026-08-26, sc17 — the AEAD rung)
+
+- `rfc/rfc8439.txt` — the RFC Editor's canonical text
+  (`https://www.rfc-editor.org/rfc/rfc8439.txt`), the implementation
+  authority for `std.x.crypto.chacha20` and the source its hand-written
+  vector tests quote.
+- `wycheproof/chacha20_poly1305_test.json` — Project Wycheproof (C2SP),
+  `testvectors_v1` at
+  `https://github.com/C2SP/wycheproof/blob/master/testvectors_v1/`.
+
 sha256 of every vendored file, as retrieved:
 
 ```
@@ -40,6 +52,8 @@ bb2b462a38b251cb52a2aede706d6d4b62b26864f4e80c95497507ddb07c5f1e  wycheproof/hkd
 bb9a21f4e86041caf5d7792b030349f8ff289087f195b2fbc0fc0afc39deca6f  wycheproof/hkdf_sha512_test.json
 72178527ce93500e730bc8eb182b857e583096d652b64ece0879c52ba1df973b  rfc/rfc4231.txt
 7a40eb3835b35fc947eb12a2ed614db079d43b26e50dbc537c31fba16397089c  rfc/rfc5869.txt
+25bef70fbf7a07ff45c2fe4cb7c6ce954eac687413d8610603268b4e4415324c  rfc/rfc8439.txt
+fe61d25f90e1bde4461d00eafe61049e5f29bd999f36b766df9cda90906ad53d  wycheproof/chacha20_poly1305_test.json
 ```
 
 ## What is taken, what is omitted (named, never silent)
@@ -71,7 +85,35 @@ bb9a21f4e86041caf5d7792b030349f8ff289087f195b2fbc0fc0afc39deca6f  wycheproof/hkd
   omitted: SHA-224 is outside the ladder.
 - **RFC 5869**: the three SHA-256 cases (A.1-A.3), PRK and OKM both
   asserted. A.4-A.7 are omitted: HMAC-SHA-1.
+- **RFC 8439 (sc17)**: the COMPLETE published set, 28 vectors, all
+  asserted in the hand-written `tests/x/crypto/chacha20/` files: the
+  five Section-2 worked examples (§2.3.2 block, §2.4.2 cipher both
+  directions, §2.5.2 Poly1305, §2.6.2 key generation, §2.8.2 AEAD
+  seal+open), A.1 block (5), A.2 encryption (3, each also
+  round-tripped), A.3 Poly1305 (11, the reduction edge cases included),
+  A.4 key generation (3), A.5 AEAD decryption (1, also re-sealed).
+  §2.1.1/§2.2.1's quarter-round vectors are held transitively: a wrong
+  rotation fails every block vector (the QR is not `pub`).
+- **Wycheproof ChaCha20-Poly1305 (sc17)**: all 325 vectors accounted
+  for, none silently. 256 `valid` (each SEALED to the published
+  ciphertext||tag and OPENED back, 8 generated part files), 60
+  `invalid` — every one `ModifiedTag` — asserted to answer the `tag`
+  row (2 generated part files), and the 9 `InvalidNonceSize` vectors
+  (nonce lengths 0/8/11/13/14/16/20/24/32 bytes) omitted by name
+  because the API answers a wrong-size nonce with the documented
+  `assert` trap held by `nonce_len_trap.lu` (the sc16 SizeTooLarge
+  precedent). The file contains NO `acceptable` results — there was
+  nothing to decide — and the generator hard-errors if a re-vendored
+  file grows one or any other undecided flavour. Two deterministic
+  smoke subsets (10 valid + 10 invalid) keep the interpreter's
+  differential column while the part files ride the native lane
+  (lupin `slow`, F-0093).
 
-Total: 1210 vectors vendored and asserted (all green on the native
-lane; 365 of them — the short sets, the RFC files and the per-digest
-Wycheproof smoke subsets — differential under the interpreter).
+Totals: sc16 — 1210 vectors vendored and asserted (all green on the
+native lane; 365 of them — the short sets, the RFC files and the
+per-digest Wycheproof smoke subsets — differential under the
+interpreter). sc17 — 344 assertions from 353 accounted-for vendored
+vectors (28 RFC 8439 + 256 valid + 60 invalid Wycheproof, all green on
+the native lane, +9 trap-omissions named above; the 28 RFC vectors and
+the 20 smoke-subset vectors are differential under the interpreter,
+and the Poly1305 file is three-lane — the checked tier runs it too).
