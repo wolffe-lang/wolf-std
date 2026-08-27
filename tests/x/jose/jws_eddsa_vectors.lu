@@ -1,0 +1,47 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.jose
+//!
+//! RFC 8037 A.4/A.5, BYTE-EXACT. The protected header `{"alg":"EdDSA"}`,
+//! the payload `Example of Ed25519 signing`, the signing input taken
+//! over the BASE64URL strings (RFC 7515 §5.1 — NOT the raw bytes, the
+//! classic JWS bug), the complete compact serialization ending in the
+//! exact signature `hgyY0il_…M0KAg`, and A.5 verification. A tampered
+//! signature (its first base64url character flipped `h`->`I`, which
+//! changes a MEANINGFUL byte, not an ignored trailing bit) verifies
+//! FALSE.
+//!
+//! A sign and two verifies is ~5 scalar multiplications: ~56s under
+//! lupin 0.1.13 against the rig's 60s ceiling (measured), so this rides
+//! the native lane and is `slow` under the interpreter (its logic is the
+//! same the three-lane `jws_smoke` proves; only the tree-walk time is
+//! over budget). The checked tier answers `unsupported` on its
+//! step budget past a few multiplications, exactly as the curve module's
+//! own RFC vector file does.
+
+use std.hex
+use std.x.jose
+
+fn bs(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let sk = bs("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+    let pk = bs("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+    let payload = "Example of Ed25519 signing".bytes()
+
+    // RFC 8037 A.4 — the signing input is over the ENCODED segments.
+    assert(jose.signing_input("{{\"alg\":\"EdDSA\"}}", payload) == "eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc", "si")
+
+    // RFC 8037 A.4 — the complete compact JWS, signature included.
+    let jws = jose.jws_sign_compact(sk, "{{\"alg\":\"EdDSA\"}}", payload)
+    assert(jws == "eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc.hgyY0il_MGCjP0JzlnLWG1PPOt7-09PGcvMg3AIbQR6dWbhijcNR4ki4iylGjg5BhVsPt9g7sVvpAr_MuM0KAg", "jws")
+
+    // RFC 8037 A.5 — it verifies against the A.2 public key.
+    assert(jose.jws_verify_compact(pk, jws), "verify")
+
+    // A flipped signature byte verifies false (first sig char h -> I).
+    assert(jose.jws_verify_compact(pk, "eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc.IgyY0il_MGCjP0JzlnLWG1PPOt7-09PGcvMg3AIbQR6dWbhijcNR4ki4iylGjg5BhVsPt9g7sVvpAr_MuM0KAg") == false, "tamper")
+    0
+}

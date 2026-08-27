@@ -1,0 +1,48 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.jose
+//!
+//! The Ed25519 JWK and its RFC 7638 thumbprint, BYTE-EXACT. RFC 8037 A.2
+//! is the OKP public JWK; A.3 fixes the canonical member ordering
+//! (`crv` < `kty` < `x`, no whitespace) and its SHA-256 thumbprint
+//! `kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k`. If the canonical bytes
+//! are wrong by one character the thumbprint is wrong and the ACME
+//! account will not bind — so the input string is pinned too, not just
+//! the hash. RFC 7638 §3.1's own RSA example pins the canonicalization
+//! PIPELINE (canonical string -> SHA-256 -> base64url) against a
+//! multi-member key where the lexicographic order `e` < `kty` < `n` is
+//! the whole point.
+
+use std.hex
+use std.base64
+use std.x.crypto.sha2
+use std.x.jose
+
+fn bs(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let pk = bs("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+
+    // RFC 8037 A.2 — the public JWK in the RFC's own member order.
+    assert(jose.jwk_ed25519_public(pk) == "{{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"}}", "jwk")
+
+    // RFC 8037 A.3 — the canonical thumbprint hash input, byte-exact.
+    assert(jose.jwk_thumbprint_input(pk) == "{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"}}", "canon")
+
+    // RFC 8037 A.3 — the thumbprint itself.
+    assert(jose.jwk_thumbprint(pk) == "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k", "tp")
+    // A thumbprint is base64url of a SHA-256 digest: 32 bytes, no pad,
+    // 43 characters.
+    assert(jose.jwk_thumbprint(pk).len == 43, "tp_len")
+
+    // RFC 7638 §3.1 — the RSA worked example. jose builds OKP
+    // thumbprints, but the canonical-string -> SHA-256 -> base64url
+    // pipeline is the same, and this exercises it over the RFC's own
+    // canonical bytes (a three-member key, lexicographically ordered)
+    // hashed directly through sc16's SHA-256 and sc05's base64url.
+    let rsa = "{{\"e\":\"AQAB\",\"kty\":\"RSA\",\"n\":\"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw\"}}"
+    assert(base64.url_encode(sha2.sum256(rsa.bytes())) == "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs", "rfc7638")
+    0
+}

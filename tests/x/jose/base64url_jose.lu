@@ -1,0 +1,50 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.base64, std.x.jose
+//!
+//! base64url (RFC 4648 §5) as JOSE uses it — the workhorse the whole
+//! rung stands on. The alphabet ends `-_`, NOT `+/`, and JOSE carries no
+//! padding on the way out; a base64-standard reuse silently corrupts
+//! every JWS signature and every thumbprint (the sc19 pitfall), so the
+//! two alphabets are pinned apart here with negatives, both directions.
+//! RFC 8037 A.2's `x` value is the encode vector — the Ed25519 public
+//! key's 32 bytes base64url to `11qYAY…PcHURo` — and `jose.signing_input`
+//! shows the same encoder in its JOSE seat.
+
+use std.hex
+use std.base64
+use std.x.jose
+
+fn bs(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    // RFC 8037 A.2: the Ed25519 public key base64urls to the JWK `x`.
+    let pk = bs("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+    assert(base64.url_encode(pk) == "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo", "x")
+
+    // No padding out (JOSE takes RFC 4648 §5's padding sentence), and it
+    // round-trips — the two bytes whose STANDARD encoding uses `+` and `/`.
+    var two = List[int]()
+    (mut two).push(255)
+    (mut two).push(239)
+    assert(base64.url_encode(two) == "_-8", "nopad")
+    let rt = base64.url_decode(base64.url_encode(two)) else List[int]()
+    assert(rt.len == 2, "rt")
+
+    // The alphabets are kept strictly apart. A `+/` input to the URL
+    // decoder is a miss, never a silent success; a `-_` input to the
+    // standard decoder likewise. This is the negative that a base64
+    // -standard reuse would fail — and a signature built on it would be
+    // silently wrong.
+    assert((base64.url_decode("/+8=") else List[int]()).len == 0, "urlrej")
+    assert((base64.decode("_-8=") else List[int]()).len == 0, "stdrej")
+
+    // The empty sequence is the empty string: a JWS with an empty payload
+    // (ACME POST-as-GET) has an empty middle segment.
+    var empty = List[int]()
+    assert(base64.url_encode(empty) == "", "empty")
+    assert(jose.signing_input("{{\"alg\":\"EdDSA\"}}", empty) == "eyJhbGciOiJFZERTQSJ9.", "si_empty")
+    0
+}
