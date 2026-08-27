@@ -1184,4 +1184,43 @@ mod tests {
         );
         assert!(parse_wycheproof_aead(&off_nonce, "t").is_err());
     }
+
+    fn xdh_json(entries: &str) -> String {
+        format!(r#"{{"testGroups":[{{"tests":[{entries}]}}]}}"#)
+    }
+
+    #[test]
+    fn xdh_partitions_on_zero_shared_and_cross_checks_the_flag() {
+        let text = xdh_json(
+            r#"
+            {"tcId":1,"result":"valid","flags":["Normal"],"private":"aa","public":"bb","shared":"1234"},
+            {"tcId":2,"result":"acceptable","flags":["Twist"],"private":"cc","public":"dd","shared":"5678"},
+            {"tcId":3,"result":"acceptable","flags":["ZeroSharedSecret"],"private":"ee","public":"ff","shared":"0000000000000000000000000000000000000000000000000000000000000000"}
+            "#,
+        );
+        let c = parse_wycheproof_xdh(&text, "t").unwrap();
+        assert_eq!(c.shared.len(), 2);
+        assert_eq!(c.zero.len(), 1);
+        assert_eq!(c.zero[0].tc_id, 3);
+    }
+
+    #[test]
+    fn xdh_refuses_flag_value_disagreement_and_unknown_result() {
+        // A ZeroSharedSecret flag whose shared value is NOT all-zero is a
+        // hard error — the security partition cannot rot.
+        let lying_flag = xdh_json(
+            r#"{"tcId":9,"result":"acceptable","flags":["ZeroSharedSecret"],"private":"aa","public":"bb","shared":"1234"}"#,
+        );
+        assert!(parse_wycheproof_xdh(&lying_flag, "t").is_err());
+        // An all-zero shared value WITHOUT the flag is equally a hard error.
+        let silent_zero = xdh_json(
+            r#"{"tcId":10,"result":"valid","flags":["Normal"],"private":"aa","public":"bb","shared":"0000000000000000000000000000000000000000000000000000000000000000"}"#,
+        );
+        assert!(parse_wycheproof_xdh(&silent_zero, "t").is_err());
+        // Any result other than valid/acceptable is undecided -> hard error.
+        let unknown = xdh_json(
+            r#"{"tcId":11,"result":"invalid","flags":["X"],"private":"aa","public":"bb","shared":"12"}"#,
+        );
+        assert!(parse_wycheproof_xdh(&unknown, "t").is_err());
+    }
 }
