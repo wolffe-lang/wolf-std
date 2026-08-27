@@ -3143,6 +3143,20 @@ right handler when the module cannot act on the difference" now has a
 second clause: it is also the right handler when the module cannot SEE the
 difference.
 
+**CLOSED at lupin 0.1.13 (wolf-interp#29, the is13 arm-selection pass,
+released 2026-08-15 against pin 02c1e88 — the RECORDED pin).** The row
+now travels with the raised value, so arm resolution asks the value
+which row it came from instead of the entry file's own declarations.
+`tests/json/parse_misses.lu` witnessed the fix where the bug lived, and
+sc22 re-confirmed it with a NINE-arm handler over
+`std.x.tls.cert.validate_chain`'s row — every tag answered correctly
+across the module boundary. What lagged was THIS REGISTER: the closure
+was upstream in the very release wolf-std pinned, the counterparty's
+changelog names the F-number, and two shipped files already relied on
+the fix while this entry still read as open (the sc12 changelog rule,
+missed for eight sprints and caught by the sc22 re-measure). The
+prose that survives it: the ride-the-tag-out-of-main witness stays the
+STRONGEST row evidence and every sc22 row test still uses it.
 
 ## F-0080 — the net tier has no byte-level read or write
 
@@ -3413,16 +3427,18 @@ observation:
   binary bump should re-measure that row first and close F-0095's
   ledger half.
 
-- **LEAD: F-0079 (a multi-arm handler cannot discriminate an imported
-  module's tags under lupin) did NOT reproduce in this sandbox.** A
+- **CLOSED: F-0079 — and the closure was eight sprints old.** A
   nine-arm `else |e| match e` over `std.x.tls.cert.validate_chain`'s
-  row — raised across the module boundary — answered every tag
-  correctly under this environment's lupin during sc22 development.
-  The recorded pin (0.1.13/02c1e88) is where F-0079 lives and this
-  binary is NOT that pin (see below), so the finding stays OPEN;
-  re-measure it at the next lupin bump and retire it there if it
-  holds. sc22's shipped tests do not depend on either outcome: every
-  row witness rides its tag out of `main`, the lane-safe shape.
+  row discriminated every tag correctly under this lupin, which sent
+  sc22 to the counterparty's changelog: wolf-interp#29 was FIXED in
+  lupin 0.1.13 itself (the is13 arm-selection pass, released
+  2026-08-15 against 02c1e88 — the recorded pin), and
+  `tests/json/parse_misses.lu` had already witnessed the fix while the
+  register entry stayed open. Closed in the entry above with the
+  timeline; the Guide's sc14 entry and API-CONVENTIONS' sc14
+  amendment carry dated closure notes. sc22's tests never depended on
+  it: every row witness rides its tag out of `main`, which stays the
+  strongest shape regardless.
 
 - **PROVISIONING OBSERVATION (loud, not an F-number, the sc20
   precedent's bigger sibling): this sandbox's binaries run 22 ledger
@@ -3438,8 +3454,7 @@ observation:
   recorded pins, and a posture flip (json, sockets, process on the
   interpreter) is exactly the kind of claim that needs a release to
   cite. The next DELIBERATE lupin/wolf binary bump inherits this list
-  as its expected flip set: 22 rows + the F-0095 row + the F-0079
-  re-measure.
+  as its expected flip set: 22 rows + the F-0095 row.
 
 **The certificate rung (sc22) files NO new upstream finding.** The
 language carried a 1500-line DER/X.509 module on the first try's
