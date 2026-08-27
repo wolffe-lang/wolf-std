@@ -287,7 +287,12 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
         )?;
         place(&out, &text, check_only, &mut drift, &mut written)?;
         // Differential smoke subsets (deterministic: the first N of each).
-        let ssmoke: Vec<XdhCase> = corpus.shared.iter().take(XDH_SMOKE_COUNT).cloned().collect();
+        let ssmoke: Vec<XdhCase> = corpus
+            .shared
+            .iter()
+            .take(XDH_SMOKE_COUNT)
+            .cloned()
+            .collect();
         let out = out_dir.join("wycheproof_x25519_shared_smoke.lu");
         let text = fmt(
             &show(&out),
@@ -331,7 +336,10 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                 .cloned(),
         );
         let out = out_dir.join("wycheproof_ed25519_smoke.lu");
-        let text = fmt(&show(&out), &emit_wycheproof_eddsa(&smoke, 0, 0, cases.len()))?;
+        let text = fmt(
+            &show(&out),
+            &emit_wycheproof_eddsa(&smoke, 0, 0, cases.len()),
+        )?;
         place(&out, &text, check_only, &mut drift, &mut written)?;
     }
 
@@ -1116,12 +1124,7 @@ fn emit_wycheproof_xdh(
     s
 }
 
-fn emit_wycheproof_eddsa(
-    cases: &[EddsaCase],
-    part: usize,
-    parts: usize,
-    total: usize,
-) -> String {
+fn emit_wycheproof_eddsa(cases: &[EddsaCase], part: usize, parts: usize, total: usize) -> String {
     let mut s = String::new();
     let _ = write!(
         s,
