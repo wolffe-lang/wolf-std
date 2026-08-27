@@ -1,0 +1,35 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! Ed25519 verify's REJECTION contract, held as a fast three-lane
+//! witness: verify answers a bool and never traps on the caller's data
+//! (§2's rule — a signature and a key are the caller's to check, not a
+//! contract they promised). The cheap rejects (wrong key length, wrong
+//! signature length, S >= L malleability) short-circuit before any
+//! scalar multiplication, so this file stays fast on every lane while
+//! the Wycheproof suite exercises the point-arithmetic rejects at scale.
+//! S = L exactly (the malleability boundary) is built from the order.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let pk = bytes_of("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+    let good = bytes_of("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b")
+    // a 31-byte key is not a key: false, no trap
+    let short_pk = bytes_of("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f7075")
+    assert(!curve25519.verify(short_pk, List[int](), good), "short key")
+    // a 63-byte signature is not a signature: false, no trap
+    let short_sig = bytes_of("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a10")
+    assert(!curve25519.verify(pk, List[int](), short_sig), "short sig")
+    // S = L exactly is >= L: the malleability reject (§5.1.7 strict S < L)
+    // R (first 32 bytes) kept, S half replaced with L in little-endian.
+    let mal = bytes_of("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e06522490155edd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010")
+    assert(!curve25519.verify(pk, List[int](), mal), "S == L")
+    0
+}

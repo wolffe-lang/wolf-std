@@ -56,6 +56,33 @@ bb9a21f4e86041caf5d7792b030349f8ff289087f195b2fbc0fc0afc39deca6f  wycheproof/hkd
 fe61d25f90e1bde4461d00eafe61049e5f29bd999f36b766df9cda90906ad53d  wycheproof/chacha20_poly1305_test.json
 ```
 
+## Sources (retrieved 2026-08-26, sc18 — the curve and the signature)
+
+- `rfc/rfc7748.txt`, `rfc/rfc8032.txt` — the RFC Editor's canonical
+  texts (`https://www.rfc-editor.org/rfc/`): the implementation
+  authorities for `std.x.crypto.curve25519` (X25519 and Ed25519) and
+  the source its hand-written vector tests quote. RFC 8446 §7.4.2 (the
+  reject-on-zero requirement the module cites) is fetched to the
+  planning repo's `refs/specs/` but not vendored here: it contributes a
+  cited RULE, not vector data.
+- `wycheproof/x25519_test.json`, `wycheproof/ed25519_test.json` —
+  Project Wycheproof (C2SP), `testvectors_v1` at
+  `https://github.com/C2SP/wycheproof/blob/master/testvectors_v1/`.
+  NAMING NOTE: the sc18 contract calls the second file
+  `eddsa_test.json`, which is its LEGACY-directory name; in
+  `testvectors_v1` the Ed25519 file is `ed25519_test.json` (the legacy
+  path 404s from raw.githubusercontent). The v1 file is the one
+  vendored, its `schema` field still says `eddsa_verify_schema_v1.json`.
+
+sha256 of the sc18 files, as retrieved:
+
+```
+279ca0ecc5e92e2962e27b846986aeb74729d9dd34bd4a04a362f80dcb596ad3  rfc/rfc7748.txt
+ed63657ff389301282b169b0abde9b5dd2c7e4d524fdfa5da6ff3094fc93c4c3  rfc/rfc8032.txt
+35c3f5231cf25cc640b524d403461deee9e49441d5d915a3a25b2c8ff5adbe7d  wycheproof/x25519_test.json
+752d2ea7d7c6cf4736381b6cbacb61f8182b126ab7cd9b058f00c50084975536  wycheproof/ed25519_test.json
+```
+
 ## What is taken, what is omitted (named, never silent)
 
 - **CAVP short-message sets**: ALL vectors (65 + 129 + 129), run on
@@ -108,6 +135,43 @@ fe61d25f90e1bde4461d00eafe61049e5f29bd999f36b766df9cda90906ad53d  wycheproof/cha
   smoke subsets (10 valid + 10 invalid) keep the interpreter's
   differential column while the part files ride the native lane
   (lupin `slow`, F-0093).
+
+- **RFC 7748 (sc18)**: the complete published X25519 set, asserted in
+  the hand-written `tests/x/crypto/curve25519/` files: the two §5.2
+  one-shot vectors, the §5.2 iteration chain at 1 and 1,000 iterations
+  (the 1,000,000-iteration checkpoint is omitted by name: it is 1000x
+  the chain the rig already runs against a 60s per-test ceiling, and
+  it gates no code path the 1,000 chain does not), and
+  the §6.1 Diffie-Hellman exchange (both public keys, both directions
+  of the shared secret). §5's decode masks and clamping are cited at
+  the code that implements them.
+- **RFC 8032 (sc18)**: all five §7.1 Ed25519 test vectors (TEST 1,
+  TEST 2, TEST 3, TEST 1024 — the 1023-byte message — and TEST
+  SHA(abc)): public key derived from the secret, signature asserted
+  byte-for-byte, and every signature verified. Ed25519ctx/Ed25519ph
+  (§7.2/§7.3) are omitted by name: the variants are outside the sc18
+  contract (no TLS 1.3 or ACME consumer needs them; they join the
+  ladder when a consumer names them).
+- **Wycheproof X25519 (sc18)**: all 518 vectors accounted for, none
+  silently, every flag DECIDED: 264 `valid` (shared secret asserted
+  byte-for-byte), 223 `acceptable` with a nonzero shared secret
+  (asserted byte-for-byte the same way — their flags are `Twist`,
+  `NonCanonicalPublic`, `SpecialPublicKey` and friends, and RFC 7748
+  requires masking the high bit and does not require twist or
+  canonicity rejection, so the ladder's answer is the conformant one),
+  and 31 `acceptable` flagged `ZeroSharedSecret` (small-order/
+  low-order public keys), for which `x25519` must answer the `zero`
+  row — the RFC 8446 §7.4.2 abort, pinned as this module's behaviour.
+  The `ZeroSharedSecret` flag exactly characterizes the all-zero
+  outputs in the vendored file (verified at vendoring time), and the
+  generator hard-errors on any result/flag combination these rules
+  have not named.
+- **Wycheproof Ed25519 (sc18)**: all 151 vectors accounted for: 88
+  `valid` (verify answers true) and 63 `invalid` (verify answers
+  false — wrong-length signatures, truncated/garbage encodings, S >= L
+  malleability, swapped halves, all decided by the single cofactorless
+  verify with strict S < L and canonical decompression). The generator
+  hard-errors on any other result flavour.
 
 Totals: sc16 — 1210 vectors vendored and asserted (all green on the
 native lane; 365 of them — the short sets, the RFC files and the

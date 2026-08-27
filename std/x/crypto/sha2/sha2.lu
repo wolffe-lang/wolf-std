@@ -21,12 +21,16 @@
 //!
 //! **The word currency is `wrapping[u64]`, for both cores.** SHA-256's
 //! 32-bit words are carried in the low half of a `wrapping[u64]` and
-//! masked after every add and rotation, because the native rung refuses
-//! `int as wrapping[u32]` (a NARROWING cast — "range-check semantics,
-//! s27" — F-0089) while the widening `int as wrapping[u64]` lowers
-//! everywhere. The mask discipline: every value entering a round is
-//! 32-bit-clean, and every sum or rotation is masked before it is
+//! masked after every add and rotation — the spelling sc16 chose when
+//! the native rung refused the narrowing `int as wrapping[u32]`
+//! (F-0089, CLOSED at the sc18 pin: s111 / wolf-lang#131 lowers it).
+//! The mask discipline stands as written: every value entering a round
+//! is 32-bit-clean, and every sum or rotation is masked before it is
 //! stored. SHA-512's words are the full `wrapping[u64]` and need none.
+//! Respelling the 256 core over `wrapping[u32]` is the recorded
+//! follow-on, not this sprint's edit (the sc18 bump ruling: the diff
+//! rewrites the storage layer, so it is a deliberate change with the
+//! 1210-vector gate around it, never a bump side-effect).
 //!
 //! **Schedule words and round constants are stored as `int`.** A 32-bit
 //! word always fits an `int`. A 64-bit word does NOT (`as int` is a
@@ -34,19 +38,27 @@
 //! `overflow`, measured at these pins), so every 64-bit table in this
 //! module is a PAIR of `List[int]` — high and low 32-bit halves — split
 //! by `push_word_halves` from the verbatim FIPS literal and recombined
-//! at the use site. `List[wrapping[u64]]` would spell it directly and is
-//! refused by the native rung ("prelude container instantiation
-//! (generic data)", F-0090).
+//! at the use site. `List[wrapping[u64]]` would spell it directly; the
+//! native refusal that forced the pairing (F-0090) CLOSED at the sc18
+//! pin (s111 / wolf-lang#132), and the direct spelling is the same
+//! recorded follow-on as the 256 core's respell — the paired halves
+//! stay until a sprint retires them deliberately.
 //!
-//! **Lanes, measured at these pins**: lupin RUNS and native RUNS; the
-//! checked tier answers `unsupported` at `mem` — shifts and bitwise
-//! operators on `wrapping[T]` are outside its modelled surface ("this
-//! operator in checked execution", F-0091, std.rand's four-sprint
-//! precedent) and a `wrapping[u64]` literal above 2^63 - 1 is refused
-//! as "this literal shape" even before the operators. Long-vector and
-//! Monte Carlo tests additionally record the interpreter lane as `slow`
-//! (the sc16 ledger word): semantically in-lane, skipped at the rig's
-//! per-test ceiling, re-measured at pin bumps.
+//! **Lanes, measured at the sc18 pin (wolf 21b129e)**: ALL THREE run
+//! the cores now. The checked tier's F-0091 operator refusal — the
+//! module's dark lane from sc16, "this operator in checked execution"
+//! on every wrapping shift/bitwise op — closed with s111
+//! (wolf-lang#130), and 18 sha2 rows flipped `unsupported` -> `run` at
+//! the bump. What remains dark there is CAPACITY, not semantics: the
+//! long-message, Monte Carlo and full-Wycheproof files exhaust the
+//! checked tier's step/shadow-memory budgets ("step budget exhausted" /
+//! "shadow-memory budget exhausted", measured per file at the bump), so
+//! those nine rows keep `unsupported` with the mechanism named in the
+//! ledger. Long-vector and Monte Carlo tests additionally record the
+//! interpreter lane as `slow` (the sc16 ledger word): semantically
+//! in-lane, skipped at the rig's per-test ceiling, re-measured at pin
+//! bumps (is20's fix is merged upstream, unreleased — the flip waits on
+//! the lupin release that carries it).
 //!
 //! **Byte sequences are `List[int]` with the documented 0..255 element
 //! contract** (§11's interim, F-0035): an element outside 0..255 traps
@@ -753,12 +765,11 @@ pub fn sum512(msg: List[int]) -> List[int] {
 /// An in-progress SHA-384 computation: a `Sha512` core under §5.3.4's
 /// initial value. Its own type so that a 384 stream cannot be finished
 /// as a 512 one (or the reverse) — the digests would silently differ in
-/// more than length. The inner state rides by value: the native rung
-/// refuses a `mut` FIELD-PATH argument when the base is itself a `mut`
-/// parameter ("`mut` places beyond local by-value bindings", F-0092 —
-/// the same path off a LOCAL binding lowers, measured both shapes at
-/// the sc16 pin), so `update384` copies the core out, advances it, and
-/// writes it back — semantics identical, one small-struct copy per call.
+/// more than length. `update384` passes `mut st.st` straight through:
+/// the F-0092 refusal that made sc16 copy the core out and back (a
+/// `mut` field path off a `mut` parameter refused natively) closed at
+/// the sc18 pin (s111 / wolf-lang#133, the shape re-probed on all
+/// three lanes at 21b129e), and the copy dance retired with it.
 pub struct Sha384 {
     st: Sha512,
 }
@@ -797,9 +808,7 @@ pub fn new384() -> Sha384 {
 /// on an element outside 0..255.
 /// ct: as `update512`.
 pub fn update384(mut st: Sha384, data: List[int]) {
-    var core = st.st
-    update512(mut core, data)
-    st.st = core
+    update512(mut st.st, data)
 }
 
 /// Pads exactly as SHA-512 and returns the LEFT-MOST 48 digest bytes

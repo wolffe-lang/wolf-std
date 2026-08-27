@@ -1,0 +1,70 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/x25519_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 X25519, the DIFFERENTIAL SMOKE SUBSET of the
+//! zero set: the first 5 `ZeroSharedSecret` vectors (of
+//! 31) — `x25519` raises the `zero` row for every one, on
+//! the interpreter lane too, so the reject path stays three-lane
+//! while the full set rides `..._zero.lu` on the native lane.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn zero_verdict(priv_hex: str, pub_hex: str) -> int {
+    let sk = hex.decode(priv_hex) else List[int]()
+    let pk = hex.decode(pub_hex) else List[int]()
+    let out = curve25519.x25519(sk, pk) else |_| {
+        return -1
+    }
+    out.len
+}
+
+fn main() -> int {
+    assert(
+        zero_verdict(
+            "88227494038f2bb811d47805bcdf04a2ac585ada7f2f23389bfd4658f9ddd45e",
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        ) <
+            0,
+        "tc 32",
+    )
+    assert(
+        zero_verdict(
+            "48232e8972b61c7e61930eb9450b5070eae1c670475685541f0476217e48184f",
+            "0100000000000000000000000000000000000000000000000000000000000000",
+        ) <
+            0,
+        "tc 33",
+    )
+    assert(
+        zero_verdict(
+            "e0f978dfcd3a8f1a5093418de54136a584c20b7b349afdf6c0520886f95b1272",
+            "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+        ) <
+            0,
+        "tc 63",
+    )
+    assert(
+        zero_verdict(
+            "387355d995616090503aafad49da01fb3dc3eda962704eaee6b86f9e20c92579",
+            "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+        ) <
+            0,
+        "tc 64",
+    )
+    assert(
+        zero_verdict(
+            "c8fe0df92ae68a03023fc0c9adb9557d31be7feed0d3ab36c558143daf4dbb40",
+            "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ) <
+            0,
+        "tc 65",
+    )
+    0
+}

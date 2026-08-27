@@ -1,0 +1,33 @@
+//! check: run(exit=1, stdout="witness: fallback empty\nerror: zero")
+//! phase: run
+//! conforms: std.x.crypto.curve25519, err.row, err.propagate, err.else
+//!
+//! THE REJECT-ON-ZERO WITNESS: a small-order public key (here the
+//! all-zero u-coordinate) drives X25519 to the all-zero shared secret,
+//! and RFC 8446 §7.4.2 requires a TLS 1.3 endpoint to ABORT rather than
+//! use it. The `zero` row is how the module answers, and NO secret
+//! escapes on that path. Two halves (the sc07 row-test shape): an
+//! `else` proves the miss path is taken and the fallback the caller
+//! sees is EMPTY, and a final `?` rides `zero` out of `main` so the
+//! toolchain names it (`error: zero`, exit 1). Wycheproof's
+//! ZeroSharedSecret set patrols this at scale; this is its witness.
+
+use std.x.crypto.curve25519
+
+fn main() -> !int {
+    let scalar = "alice's own 32-byte x25519 key!!".bytes()
+    var zero_u = List[int]()
+    var i: int = 0
+    while i < 32 {
+        (mut zero_u).push(0)
+        i = i + 1
+    }
+    let fallback = curve25519.x25519(scalar, zero_u) else List[int]()
+    print("witness: fallback empty")
+    if !(fallback.len == 0) {
+        print("LEAK: {fallback.len}")
+    }
+    let out = curve25519.x25519(scalar, zero_u)?
+    print("unreachable: {out.len}")
+    0
+}

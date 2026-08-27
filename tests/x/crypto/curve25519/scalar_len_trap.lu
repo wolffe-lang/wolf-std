@@ -1,0 +1,20 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.crypto.curve25519, conf.trap.set
+//!
+//! The scalar contract, held as a trap: RFC 7748 §5's X25519 scalar is
+//! 256 bits, the length is the caller's parameter, and a 16-byte scalar
+//! is a contract violation (§2's trap rule) — silently zero-padding one
+//! would be computing over a scalar the caller never chose. The guard
+//! runs before the ladder, so every lane reaches the trap.
+
+use std.x.crypto.curve25519
+
+fn main() -> int {
+    let short = "sixteen bytes ok".bytes()
+    let u = "a 32-byte curve25519 u-coord!!!!".bytes()
+    print("reached the call")
+    let out = curve25519.x25519(short, u) else List[int]()
+    print("unreachable: {out.len}")
+    0
+}

@@ -1,0 +1,392 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/ed25519_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 Ed25519 verify, part 2 of 4 (40 of the
+//! set's 151: 10 valid + 30 invalid): `verify` must answer
+//! true for every valid vector and FALSE for every invalid one —
+//! the invalid set is the point (wrong lengths, non-canonical
+//! encodings, S >= L malleability, swapped/garbage signatures), and
+//! the single cofactorless verify with strict S < L decides them
+//! all. The interpreter column is `slow` (verify is two scalar
+//! mults, ~7-8s under lupin 0.1.13, F-0093); the smoke file keeps
+//! the differential column.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn verify_is(pub_hex: str, msg_hex: str, sig_hex: str, want: bool) -> bool {
+    let pk = hex.decode(pub_hex) else List[int]()
+    let msg = hex.decode(msg_hex) else List[int]()
+    let sig = hex.decode(sig_hex) else List[int]()
+    curve25519.verify(pk, msg, sig) == want
+}
+
+fn main() -> int {
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "54657374333437",
+            "b0928b46e99fbbad3f5cb502d2cd309d94a7e86cfd4d84b1fcf4cea18075a9c36993c0582dba1e9e519fae5a8654f454201ae0c3cb397c37b8f4f8eef18400",
+            false,
+        ),
+        "tc 41",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "647c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2b1d125e5538f38afbcc1c84e489521083041d24bc6240767029da063271a1ff0c",
+            false,
+        ),
+        "tc 42",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "677c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2bc108ca4b87a49c9ed2cf383aecad8f54a962b2899da891e12004d7993a627e01",
+            false,
+        ),
+        "tc 43",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "617c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2b9ce23fc6213ed5b87912e9bbf92f5e2c780eae26d15c50a112d1e97d2ea33c06",
+            false,
+        ),
+        "tc 44",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "e57c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2bbb3eb51cd98dddb235a5f46f2bded6af184a58d09cce928bda43f41d69118a03",
+            false,
+        ),
+        "tc 45",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657d1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2bcd237dda9a116501f67a5705a854b9adc304f34720803a91b324f2c13e0f5a09",
+            false,
+        ),
+        "tc 46",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1592402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2b6b167bbdc0d881cc04d28905552c1876f3709851abc5007376940cc8a435c300",
+            false,
+        ),
+        "tc 47",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1412402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2b7fd2ac7da14afffcceeb13f2a0d6b887941cb1a5eb57a52f3cb131a16cce7b0e",
+            false,
+        ),
+        "tc 48",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492412ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2b7373ba13ebbef99cd2a8ead55ce735c987d85a35320925a8e871702dc7c5c40d",
+            false,
+        ),
+        "tc 49",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab54e03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2bd35bd331c03f0855504ca1cab87b83c36a028425a3cf007ede4f4254c261cb00",
+            false,
+        ),
+        "tc 50",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab5ce02e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2bcb35101f73cf467deac8c1a03b6c3dc35af544132734b7e57ab20c89b2e4750d",
+            false,
+        ),
+        "tc 51",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab5ce03e2c3a7f2384d051b9cf3570f1207fc78c1bcc98c281c2bb58d2e8878290bff8d3355fdd4ea381924ee578752354eb6dee678ab4011c301",
+            false,
+        ),
+        "tc 52",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab5ce03e2c3a7f0384d851b9cf3570f1207fc78c1bcc98c281c2bb978c866187ffb1cc7b29a0b4045aefc08768df65717194ff0c6e63f4dea0d02",
+            false,
+        ),
+        "tc 53",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281d2b0576ecf8eaf675f00f3dfbe19f75b83b7607a6c96414f6821af920a2498d0305",
+            false,
+        ),
+        "tc 54",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c289c2be5241a345c7b5428054c74b7c382fa10d4a5f1e8f8b79a71d3fdea2254f1ff0e",
+            false,
+        ),
+        "tc 55",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c2a63950c85cd6dc96364e768de50ff7732b538f8a0b1615d799190ab600849230e",
+            false,
+        ),
+        "tc 56",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c0b543bd3da0a56a8c9c152f59c9fec12f31fa66434d48b817b30d90cb4efa8b501",
+            false,
+        ),
+        "tc 57",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281c6b8da07efd07a6dafb015ed6a32fe136319a972ffbc341f3a0beae97ccf8136505",
+            false,
+        ),
+        "tc 58",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "657c1492402ab5ce03e2c3a7f0384d051b9cf3570f1207fc78c1bcc98c281cab227aedf259f910f0f3a759a335062665217925d019173b88917eae294f75d40f",
+            false,
+        ),
+        "tc 59",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "0000000000000000000000000000000000000000000000000000000000000000e0b8e7770d51c7a36375d006c5bffd6af43ff54aaf47e4330dc118c71d61ec02",
+            false,
+        ),
+        "tc 60",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff463a1908382e7eb7693acef9884f7cf931a215e0791876be22c631a59881fd0e",
+            false,
+        ),
+        "tc 61",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "313233343030",
+            "9a83eb6dbfd54a31fc1d3c580fc7b2fae4630ca8f0edf803873e433673d7e3d40e94254586cb6188c5386c3febed477cb9a6cb29e3979adc4cb27cf5278fb70a",
+            false,
+        ),
+        "tc 62",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "54657374",
+            "7c38e026f29e14aabd059a0f2db8b0cd783040609a8be684db12f82a27774ab067654bce3832c2d76f8f6f5dafc08d9339d4eef676573336a5c51eb6f946b31d",
+            false,
+        ),
+        "tc 63",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "54657374",
+            "7c38e026f29e14aabd059a0f2db8b0cd783040609a8be684db12f82a27774ab05439412b5395d42f462c67008eba6ca839d4eef676573336a5c51eb6f946b32d",
+            false,
+        ),
+        "tc 64",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "54657374",
+            "7c38e026f29e14aabd059a0f2db8b0cd783040609a8be684db12f82a27774ab02ee12ce5875bf9dff26556464bae2ad239d4eef676573336a5c51eb6f946b34d",
+            false,
+        ),
+        "tc 65",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "54657374",
+            "7c38e026f29e14aabd059a0f2db8b0cd783040609a8be684db12f82a27774ab0e2300459f1e742404cd934d2c595a6253ad4eef676573336a5c51eb6f946b38d",
+            false,
+        ),
+        "tc 66",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "54657374",
+            "7c38e026f29e14aabd059a0f2db8b0cd783040609a8be684db12f82a27774ab07a9155711ecfaf7f99f277bad0c6ae7e39d4eef676573336a5c51eb6f946b32d",
+            false,
+        ),
+        "tc 67",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "54657374",
+            "7c38e026f29e14aabd059a0f2db8b0cd783040609a8be684db12f82a27774ab07a9155711ecfaf7f99f277bad0c6ae7e39d4eef676573336a5c51eb6f946b34d",
+            false,
+        ),
+        "tc 68",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "54657374",
+            "7c38e026f29e14aabd059a0f2db8b0cd783040609a8be684db12f82a27774ab07a9155711ecfaf7f99f277bad0c6ae7e39d4eef676573336a5c51eb6f946b38d",
+            false,
+        ),
+        "tc 69",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "54657374",
+            "7c38e026f29e14aabd059a0f2db8b0cd783040609a8be684db12f82a27774ab0679155711ecfaf7f99f277bad0c6ae7e39d4eef676573336a5c51eb6f946b38d",
+            false,
+        ),
+        "tc 70",
+    )
+    assert(
+        verify_is(
+            "a12c2beb77265f2aac953b5009349d94155a03ada416aad451319480e983ca4c",
+            "",
+            "5056325d2ab440bf30bbf0f7173199aa8b4e6fbc091cf3eb6bc6cf87cd73d992ffc216c85e4ab5b8a0bbc7e9a6e9f8d33b7f6e5ac0ffdc22d9fcaf784af84302",
+            true,
+        ),
+        "tc 71",
+    )
+    assert(
+        verify_is(
+            "a12c2beb77265f2aac953b5009349d94155a03ada416aad451319480e983ca4c",
+            "78",
+            "481fafbf4364d7b682475282f517a3ac0538c9a6b6a562e99a3d8e5afb4f90a559b056b9f07af023905753b02d95eb329a35c77f154b79abbcd291615ce42f02",
+            true,
+        ),
+        "tc 72",
+    )
+    assert(
+        verify_is(
+            "a12c2beb77265f2aac953b5009349d94155a03ada416aad451319480e983ca4c",
+            "54657374",
+            "8a9bb4c465a3863abc9fd0dd35d80bb28f7d33d37d74679802d63f82b20da114b8d765a1206b3e9ad7cf2b2d8d778bb8651f1fa992db293c0039eacb6161480f",
+            true,
+        ),
+        "tc 73",
+    )
+    assert(
+        verify_is(
+            "a12c2beb77265f2aac953b5009349d94155a03ada416aad451319480e983ca4c",
+            "48656c6c6f",
+            "d839c20abfda1fd429531831c64f813f84b913e9928540310cf060b44c3dbf9457d44a7721fdc0d67724ff81cb450dd39b10cfb65db15dda4b8bf09d26bd3801",
+            true,
+        ),
+        "tc 74",
+    )
+    assert(
+        verify_is(
+            "a12c2beb77265f2aac953b5009349d94155a03ada416aad451319480e983ca4c",
+            "313233343030",
+            "9bbb1052dcfa8ad2715c2eb716ae4f1902dea353d42ee09fd4c0b4fcb8b52b5219e2200016e1199d0061891c263e31b0bc3b55673c19610c4e0fa5408004160b",
+            true,
+        ),
+        "tc 75",
+    )
+    assert(
+        verify_is(
+            "a12c2beb77265f2aac953b5009349d94155a03ada416aad451319480e983ca4c",
+            "000000000000000000000000",
+            "f63b5c0667c7897fc283296416f7f60e84bbde9cbd832e56be463ed9f568069702b17a2f7c341ebf590706a6388ac76ac613c1675ec0f2c7118f2573422a500b",
+            true,
+        ),
+        "tc 76",
+    )
+    assert(
+        verify_is(
+            "a12c2beb77265f2aac953b5009349d94155a03ada416aad451319480e983ca4c",
+            "6161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+            "1bc44d7001e6b5b9090fef34b2ca480f9786bbefa7d279353e5881e8dfb91b803ccd46500e270ef0109bfd741037558832120bc2a4f20fbe7b5fb3c3aaf23e08",
+            true,
+        ),
+        "tc 77",
+    )
+    assert(
+        verify_is(
+            "a12c2beb77265f2aac953b5009349d94155a03ada416aad451319480e983ca4c",
+            "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60",
+            "ea8e22143b02372e76e99aece3ed36aec529768a27e2bb49bdc135d44378061e1f62d1ac518f33ebf37b2ee8cc6dde68a4bd7d4a2f4d6cb77f015f71ca9fc30d",
+            true,
+        ),
+        "tc 78",
+    )
+    assert(
+        verify_is(
+            "a12c2beb77265f2aac953b5009349d94155a03ada416aad451319480e983ca4c",
+            "ffffffffffffffffffffffffffffffff",
+            "8acd679e1a914fc45d5fa83d3021f0509c805c8d271df54e52f43cfbd00cb6222bf81d58fe1de2de378df67ee9f453786626961fe50a9b05f12b6f0899ebdd0a",
+            true,
+        ),
+        "tc 79",
+    )
+    assert(
+        verify_is(
+            "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+            "",
+            "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
+            true,
+        ),
+        "tc 80",
+    )
+    0
+}

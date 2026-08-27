@@ -1,0 +1,68 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/x25519_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 X25519, the DIFFERENTIAL SMOKE SUBSET of the
+//! shared set: the first 5 vectors (of 487) — small enough
+//! that the interpreter runs the file inside the ceiling, so
+//! X25519 keeps a three-lane column while the full set rides the
+//! `..._p*.lu` parts on the native lane.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn shared_matches(priv_hex: str, pub_hex: str, want: str) -> bool {
+    let sk = hex.decode(priv_hex) else List[int]()
+    let pk = hex.decode(pub_hex) else List[int]()
+    let out = curve25519.x25519(sk, pk) else List[int]()
+    curve25519.to_hex(out) == want
+}
+
+fn main() -> int {
+    assert(
+        shared_matches(
+            "c8a9d5a91091ad851c668b0736c1c9a02936c0d3ad62670858088047ba057475",
+            "504a36999f489cd2fdbc08baff3d88fa00569ba986cba22548ffde80f9806829",
+            "436a2c040cf45fea9b29a0cb81b1f41458f863d0d61b453d0a982720d6d61320",
+        ),
+        "tc 1",
+    )
+    assert(
+        shared_matches(
+            "d85d8c061a50804ac488ad774ac716c3f5ba714b2712e048491379a500211958",
+            "63aa40c6e38346c5caf23a6df0a5e6c80889a08647e551b3563449befcfc9733",
+            "279df67a7c4611db4708a0e8282b195e5ac0ed6f4b2f292c6fbd0acac30d1332",
+        ),
+        "tc 2",
+    )
+    assert(
+        shared_matches(
+            "c8b45bfd32e55325d9fd648cb302848039000b390e44d521e58aab3b29a6964b",
+            "0f83c36fded9d32fadf4efa3ae93a90bb5cfa66893bc412c43fa7287dbb99779",
+            "4bc7e01e7d83d6cf67632bf90033487a5fc29eba5328890ea7b1026d23b9a45f",
+        ),
+        "tc 3",
+    )
+    assert(
+        shared_matches(
+            "f876e34bcbe1f47fbc0fddfd7c1e1aa53d57bfe0f66d243067b424bb6210be51",
+            "0b8211a2b6049097f6871c6c052d3c5fc1ba17da9e32ae458403b05bb283092a",
+            "119d37ed4b109cbd6418b1f28dea83c836c844715cdf98a3a8c362191debd514",
+        ),
+        "tc 4",
+    )
+    assert(
+        shared_matches(
+            "006ac1f3a653a4cdb1d37bba94738f8b957a57beb24d646e994dc29a276aad45",
+            "343ac20a3b9c6a27b1008176509ad30735856ec1c8d8fcae13912d08d152f46c",
+            "cc4873aed3fcee4b3aaea7f0d20716b4276359081f634b7bea4b705bfc8a4d3e",
+        ),
+        "tc 5",
+    )
+    0
+}

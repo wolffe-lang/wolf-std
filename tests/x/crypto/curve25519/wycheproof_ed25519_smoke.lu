@@ -1,0 +1,46 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/ed25519_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 Ed25519 verify, the DIFFERENTIAL SMOKE SUBSET:
+//! 1 valid and 1 invalid vectors (of the set's 151) — small
+//! enough that the interpreter runs the file inside the ceiling, so
+//! sign/verify keeps a three-lane column while the full set rides
+//! the `..._p*.lu` parts on the native lane.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn verify_is(pub_hex: str, msg_hex: str, sig_hex: str, want: bool) -> bool {
+    let pk = hex.decode(pub_hex) else List[int]()
+    let msg = hex.decode(msg_hex) else List[int]()
+    let sig = hex.decode(sig_hex) else List[int]()
+    curve25519.verify(pk, msg, sig) == want
+}
+
+fn main() -> int {
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "",
+            "d4fbdb52bfa726b44d1786a8c0d171c3e62ca83c9e5bbe63de0bb2483f8fd6cc1429ab72cafc41ab56af02ff8fcc43b99bfe4c7ae940f60f38ebaa9d311c4007",
+            true,
+        ),
+        "tc 1",
+    )
+    assert(
+        verify_is(
+            "7d4d0e7f6153a69b6242b522abbee685fda4420f8834b108c3bdae369ef549fa",
+            "3f",
+            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            false,
+        ),
+        "tc 10",
+    )
+    0
+}

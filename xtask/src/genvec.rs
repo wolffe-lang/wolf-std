@@ -72,6 +72,26 @@ const AEAD_SMOKE_COUNT: usize = 10;
 const AEAD_SMOKE_MAX_MSG: usize = 48;
 const AEAD_SMOKE_MAX_AAD: usize = 16;
 
+/// X25519 chunking and smoke rules (sc18). Each x25519 call is a full
+/// Montgomery ladder (~6.5s under lupin 0.1.13 — 255 field-heavy ladder
+/// steps on a tree-walk), so the full shared set rides the native lane
+/// in chunks (`slow` under lupin, the F-0093 program-age curve) while a
+/// tiny deterministic smoke (5 vectors, ~33s) keeps the interpreter's
+/// differential column under the 60s ceiling. The `zero`-row set
+/// (small-order public keys, reject-on-zero per RFC 8446 §7.4.2) is the
+/// security core and is kept whole on the native lane.
+const XDH_SHARED_CHUNK: usize = 40;
+const XDH_SMOKE_COUNT: usize = 5;
+
+/// Ed25519 verify chunking and smoke rules (sc18). Verify is two scalar
+/// multiplications (~7-8s under lupin 0.1.13), so the full set rides the
+/// native lane in chunks (`slow` under lupin) while a tiny mixed smoke
+/// (a few valid AND a few invalid) keeps the interpreter's differential
+/// column under the ceiling.
+const EDDSA_CHUNK: usize = 40;
+const EDDSA_SMOKE_VALID: usize = 1;
+const EDDSA_SMOKE_INVALID: usize = 1;
+
 pub fn gen_vectors(check_only: bool) -> Result<(), String> {
     let repo = crate::repo_root();
     let vec_dir = repo.join("vendor/vectors");
@@ -242,6 +262,83 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                 corpus.invalid.len(),
                 corpus.nonce_omitted,
             ),
+        )?;
+        place(&out, &text, check_only, &mut drift, &mut written)?;
+    }
+
+    // ---- sc18: Wycheproof X25519 (the curve rung). ----
+    {
+        let out_dir = repo.join("tests/x/crypto/curve25519");
+        let wp = vec_dir.join("wycheproof/x25519_test.json");
+        let corpus = parse_wycheproof_xdh(&read(&wp)?, &show(&wp))?;
+        let sparts: Vec<&[XdhCase]> = corpus.shared.chunks(XDH_SHARED_CHUNK).collect();
+        for (i, part) in sparts.iter().enumerate() {
+            let out = out_dir.join(format!("wycheproof_x25519_shared_p{}.lu", i + 1));
+            let text = fmt(
+                &show(&out),
+                &emit_wycheproof_xdh(part, true, i + 1, sparts.len(), corpus.shared.len()),
+            )?;
+            place(&out, &text, check_only, &mut drift, &mut written)?;
+        }
+        let out = out_dir.join("wycheproof_x25519_zero.lu");
+        let text = fmt(
+            &show(&out),
+            &emit_wycheproof_xdh(&corpus.zero, false, 1, 1, corpus.zero.len()),
+        )?;
+        place(&out, &text, check_only, &mut drift, &mut written)?;
+        // Differential smoke subsets (deterministic: the first N of each).
+        let ssmoke: Vec<XdhCase> = corpus
+            .shared
+            .iter()
+            .take(XDH_SMOKE_COUNT)
+            .cloned()
+            .collect();
+        let out = out_dir.join("wycheproof_x25519_shared_smoke.lu");
+        let text = fmt(
+            &show(&out),
+            &emit_wycheproof_xdh(&ssmoke, true, 0, 0, corpus.shared.len()),
+        )?;
+        place(&out, &text, check_only, &mut drift, &mut written)?;
+        let zsmoke: Vec<XdhCase> = corpus.zero.iter().take(XDH_SMOKE_COUNT).cloned().collect();
+        let out = out_dir.join("wycheproof_x25519_zero_smoke.lu");
+        let text = fmt(
+            &show(&out),
+            &emit_wycheproof_xdh(&zsmoke, false, 0, 0, corpus.zero.len()),
+        )?;
+        place(&out, &text, check_only, &mut drift, &mut written)?;
+    }
+
+    // ---- sc18: Wycheproof Ed25519 (the signature rung). ----
+    {
+        let out_dir = repo.join("tests/x/crypto/curve25519");
+        let wp = vec_dir.join("wycheproof/ed25519_test.json");
+        let cases = parse_wycheproof_eddsa(&read(&wp)?, &show(&wp))?;
+        let parts: Vec<&[EddsaCase]> = cases.chunks(EDDSA_CHUNK).collect();
+        for (i, part) in parts.iter().enumerate() {
+            let out = out_dir.join(format!("wycheproof_ed25519_p{}.lu", i + 1));
+            let text = fmt(
+                &show(&out),
+                &emit_wycheproof_eddsa(part, i + 1, parts.len(), cases.len()),
+            )?;
+            place(&out, &text, check_only, &mut drift, &mut written)?;
+        }
+        let mut smoke: Vec<EddsaCase> = cases
+            .iter()
+            .filter(|c| c.valid)
+            .take(EDDSA_SMOKE_VALID)
+            .cloned()
+            .collect();
+        smoke.extend(
+            cases
+                .iter()
+                .filter(|c| !c.valid)
+                .take(EDDSA_SMOKE_INVALID)
+                .cloned(),
+        );
+        let out = out_dir.join("wycheproof_ed25519_smoke.lu");
+        let text = fmt(
+            &show(&out),
+            &emit_wycheproof_eddsa(&smoke, 0, 0, cases.len()),
         )?;
         place(&out, &text, check_only, &mut drift, &mut written)?;
     }
@@ -483,6 +580,142 @@ fn parse_wycheproof_aead(text: &str, what: &str) -> Result<AeadCorpus, String> {
         return Err(format!("{what}: suspiciously empty aead corpus"));
     }
     Ok(corpus)
+}
+
+#[derive(Clone)]
+struct XdhCase {
+    tc_id: u64,
+    private: String,
+    public: String,
+    shared: String,
+}
+
+struct XdhCorpus {
+    /// `valid`/`acceptable` cases with a NONZERO shared secret — the
+    /// shared secret is asserted byte-for-byte (a wrong-flag twist or
+    /// non-canonical public key is still a conformant computation under
+    /// RFC 7748, which masks the high bit and requires no rejection).
+    shared: Vec<XdhCase>,
+    /// `acceptable` cases flagged `ZeroSharedSecret` — the public key is
+    /// small-order, so `x25519` must raise the `zero` row (RFC 8446
+    /// §7.4.2's abort). The vendored file's `shared` for these is all
+    /// zero, verified here.
+    zero: Vec<XdhCase>,
+}
+
+/// The X25519 rules (sc18): every vector is `valid` or `acceptable`
+/// (the file has no `invalid`), and the split is by the
+/// `ZeroSharedSecret` flag — which the parser cross-checks against the
+/// actual shared value (a flagged case whose `shared` is not all-zero,
+/// or an unflagged case whose `shared` IS all-zero, is a hard error, so
+/// the security-critical partition cannot rot). Any other result is a
+/// hard error.
+fn parse_wycheproof_xdh(text: &str, what: &str) -> Result<XdhCorpus, String> {
+    let v: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("{what}: bad json: {e}"))?;
+    let mut corpus = XdhCorpus {
+        shared: Vec::new(),
+        zero: Vec::new(),
+    };
+    let groups = v["testGroups"]
+        .as_array()
+        .ok_or(format!("{what}: no testGroups"))?;
+    for gp in groups {
+        for t in gp["tests"].as_array().ok_or(format!("{what}: no tests"))? {
+            let tc = t["tcId"].as_u64().ok_or(format!("{what}: tcId"))?;
+            let result = t["result"].as_str().unwrap_or("");
+            if result != "valid" && result != "acceptable" {
+                return Err(format!(
+                    "{what}: tcId {tc} is `{result}` — the X25519 file is all \
+                     valid/acceptable; a new result needs a ruling here"
+                ));
+            }
+            let flags: Vec<&str> = t["flags"]
+                .as_array()
+                .map(|a| a.iter().filter_map(|f| f.as_str()).collect())
+                .unwrap_or_default();
+            let shared = t["shared"].as_str().unwrap_or_default().to_string();
+            let is_zero_flag = flags.contains(&"ZeroSharedSecret");
+            let is_zero_val = !shared.is_empty() && shared.chars().all(|c| c == '0');
+            if is_zero_flag != is_zero_val {
+                return Err(format!(
+                    "{what}: tcId {tc} — the ZeroSharedSecret flag ({is_zero_flag}) \
+                     and the all-zero shared value ({is_zero_val}) disagree; refusing \
+                     to guess the partition"
+                ));
+            }
+            let case = XdhCase {
+                tc_id: tc,
+                private: t["private"].as_str().unwrap_or_default().to_string(),
+                public: t["public"].as_str().unwrap_or_default().to_string(),
+                shared,
+            };
+            if is_zero_flag {
+                corpus.zero.push(case);
+            } else {
+                corpus.shared.push(case);
+            }
+        }
+    }
+    if corpus.shared.is_empty() || corpus.zero.is_empty() {
+        return Err(format!("{what}: suspiciously empty x25519 corpus"));
+    }
+    Ok(corpus)
+}
+
+#[derive(Clone)]
+struct EddsaCase {
+    tc_id: u64,
+    public: String,
+    msg: String,
+    sig: String,
+    valid: bool,
+}
+
+/// The Ed25519 rules (sc18): every vector is `valid` or `invalid` (the
+/// file has no `acceptable`), and the public key is the GROUP's
+/// `publicKey.pk`. `valid` -> verify must answer true; `invalid` ->
+/// verify must answer false (a wrong length, non-canonical encoding,
+/// S >= L malleability, or a bad point all decide to false). Any other
+/// result is a hard error so a re-vendored file cannot blur coverage.
+fn parse_wycheproof_eddsa(text: &str, what: &str) -> Result<Vec<EddsaCase>, String> {
+    let v: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("{what}: bad json: {e}"))?;
+    let mut out = Vec::new();
+    let groups = v["testGroups"]
+        .as_array()
+        .ok_or(format!("{what}: no testGroups"))?;
+    for gp in groups {
+        let pk = gp["publicKey"]["pk"]
+            .as_str()
+            .ok_or(format!("{what}: group has no publicKey.pk"))?
+            .to_string();
+        for t in gp["tests"].as_array().ok_or(format!("{what}: no tests"))? {
+            let tc = t["tcId"].as_u64().ok_or(format!("{what}: tcId"))?;
+            let result = t["result"].as_str().unwrap_or("");
+            let valid = match result {
+                "valid" => true,
+                "invalid" => false,
+                other => {
+                    return Err(format!(
+                        "{what}: tcId {tc} is `{other}` — the Ed25519 file is \
+                         valid/invalid only; a new result needs a ruling here"
+                    ));
+                }
+            };
+            out.push(EddsaCase {
+                tc_id: tc,
+                public: pk.clone(),
+                msg: t["msg"].as_str().unwrap_or_default().to_string(),
+                sig: t["sig"].as_str().unwrap_or_default().to_string(),
+                valid,
+            });
+        }
+    }
+    if out.is_empty() {
+        return Err(format!("{what}: no eddsa vectors parsed"));
+    }
+    Ok(out)
 }
 
 // --------------------------------------------------------------- emission
@@ -784,6 +1017,173 @@ fn emit_wycheproof_aead(
     s
 }
 
+fn emit_wycheproof_xdh(
+    cases: &[XdhCase],
+    shared: bool,
+    part: usize,
+    parts: usize,
+    total: usize,
+) -> String {
+    let mut s = String::new();
+    let _ = write!(
+        s,
+        "//! check: run(exit=0)\n//! phase: run\n//! conforms: std.x.crypto.curve25519, arith.checked\n//!\n\
+         //! GENERATED — `cargo xtask gen-vectors`, from\n\
+         //! `vendor/vectors/wycheproof/x25519_test.json` (provenance:\n\
+         //! `vendor/vectors/README.md`). Do not edit by hand; ci's\n\
+         //! `gen-vectors --check` holds this file byte-identical to its source.\n//!\n"
+    );
+    if shared && part > 0 {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 X25519, the SHARED set, part {part} of {parts}\n\
+             //! ({n} vectors of the set's {total}): every `valid` and nonzero\n\
+             //! `acceptable` vector — the shared secret is asserted byte-for-\n\
+             //! byte. The `acceptable` twist and non-canonical-public cases are\n\
+             //! here because RFC 7748 masks the high bit and requires no twist\n\
+             //! or canonicity rejection, so the ladder's answer is conformant.\n\
+             //! The interpreter column is `slow` (the sc16 word): each vector\n\
+             //! is a full ladder (~6.5s under lupin 0.1.13, F-0093's curve\n\
+             //! makes a {n}-call program blow the ceiling), the shared_smoke\n\
+             //! file keeps the differential column, and the chunk flips back\n\
+             //! to `run` when a lupin release carries is20.\n",
+            n = cases.len(),
+        );
+    } else if shared {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 X25519, the DIFFERENTIAL SMOKE SUBSET of the\n\
+             //! shared set: the first {n} vectors (of {total}) — small enough\n\
+             //! that the interpreter runs the file inside the ceiling, so\n\
+             //! X25519 keeps a three-lane column while the full set rides the\n\
+             //! `..._p*.lu` parts on the native lane.\n",
+            n = cases.len(),
+        );
+    } else if part > 0 {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 X25519, the ZERO-SHARED-SECRET set: all {n}\n\
+             //! `acceptable` vectors flagged `ZeroSharedSecret` — small-order\n\
+             //! public keys for which `x25519` must raise the `zero` row\n\
+             //! (RFC 8446 §7.4.2 requires a TLS 1.3 endpoint to abort rather\n\
+             //! than use a predictable secret). This is the module's security\n\
+             //! core, kept WHOLE, and the reject is witnessed as a negative\n\
+             //! sentinel from the helper's `zero` handler. The interpreter\n\
+             //! column is `slow` (F-0093); `..._zero_smoke.lu` keeps it\n\
+             //! differential.\n",
+            n = cases.len(),
+        );
+    } else {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 X25519, the DIFFERENTIAL SMOKE SUBSET of the\n\
+             //! zero set: the first {n} `ZeroSharedSecret` vectors (of\n\
+             //! {total}) — `x25519` raises the `zero` row for every one, on\n\
+             //! the interpreter lane too, so the reject path stays three-lane\n\
+             //! while the full set rides `..._zero.lu` on the native lane.\n",
+            n = cases.len(),
+        );
+    }
+    s.push_str("\nuse std.hex\nuse std.x.crypto.curve25519\n\n");
+    if shared {
+        let _ = write!(
+            s,
+            "fn shared_matches(priv_hex: str, pub_hex: str, want: str) -> bool {{\n\
+             \x20   let sk = hex.decode(priv_hex) else List[int]()\n\
+             \x20   let pk = hex.decode(pub_hex) else List[int]()\n\
+             \x20   let out = curve25519.x25519(sk, pk) else List[int]()\n\
+             \x20   curve25519.to_hex(out) == want\n}}\n\nfn main() -> int {{\n"
+        );
+        for c in cases {
+            let _ = writeln!(
+                s,
+                "    assert(shared_matches(\"{}\", \"{}\", \"{}\"), \"tc {}\")",
+                c.private, c.public, c.shared, c.tc_id
+            );
+        }
+    } else {
+        let _ = write!(
+            s,
+            "fn zero_verdict(priv_hex: str, pub_hex: str) -> int {{\n\
+             \x20   let sk = hex.decode(priv_hex) else List[int]()\n\
+             \x20   let pk = hex.decode(pub_hex) else List[int]()\n\
+             \x20   let out = curve25519.x25519(sk, pk) else |_| {{\n\
+             \x20       return -1\n\
+             \x20   }}\n\
+             \x20   out.len\n}}\n\nfn main() -> int {{\n"
+        );
+        for c in cases {
+            let _ = writeln!(
+                s,
+                "    assert(zero_verdict(\"{}\", \"{}\") < 0, \"tc {}\")",
+                c.private, c.public, c.tc_id
+            );
+        }
+    }
+    s.push_str("    0\n}\n");
+    s
+}
+
+fn emit_wycheproof_eddsa(cases: &[EddsaCase], part: usize, parts: usize, total: usize) -> String {
+    let mut s = String::new();
+    let _ = write!(
+        s,
+        "//! check: run(exit=0)\n//! phase: run\n//! conforms: std.x.crypto.curve25519, arith.checked\n//!\n\
+         //! GENERATED — `cargo xtask gen-vectors`, from\n\
+         //! `vendor/vectors/wycheproof/ed25519_test.json` (provenance:\n\
+         //! `vendor/vectors/README.md`). Do not edit by hand; ci's\n\
+         //! `gen-vectors --check` holds this file byte-identical to its source.\n//!\n"
+    );
+    let nvalid = cases.iter().filter(|c| c.valid).count();
+    let ninvalid = cases.len() - nvalid;
+    if part > 0 {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 Ed25519 verify, part {part} of {parts} ({n} of the\n\
+             //! set's {total}: {nv} valid + {ni} invalid): `verify` must answer\n\
+             //! true for every valid vector and FALSE for every invalid one —\n\
+             //! the invalid set is the point (wrong lengths, non-canonical\n\
+             //! encodings, S >= L malleability, swapped/garbage signatures), and\n\
+             //! the single cofactorless verify with strict S < L decides them\n\
+             //! all. The interpreter column is `slow` (verify is two scalar\n\
+             //! mults, ~7-8s under lupin 0.1.13, F-0093); the smoke file keeps\n\
+             //! the differential column.\n",
+            n = cases.len(),
+            nv = nvalid,
+            ni = ninvalid,
+        );
+    } else {
+        let _ = write!(
+            s,
+            "//! Wycheproof v1 Ed25519 verify, the DIFFERENTIAL SMOKE SUBSET:\n\
+             //! {nv} valid and {ni} invalid vectors (of the set's {total}) — small\n\
+             //! enough that the interpreter runs the file inside the ceiling, so\n\
+             //! sign/verify keeps a three-lane column while the full set rides\n\
+             //! the `..._p*.lu` parts on the native lane.\n",
+            nv = nvalid,
+            ni = ninvalid,
+        );
+    }
+    s.push_str("\nuse std.hex\nuse std.x.crypto.curve25519\n\n");
+    let _ = write!(
+        s,
+        "fn verify_is(pub_hex: str, msg_hex: str, sig_hex: str, want: bool) -> bool {{\n\
+         \x20   let pk = hex.decode(pub_hex) else List[int]()\n\
+         \x20   let msg = hex.decode(msg_hex) else List[int]()\n\
+         \x20   let sig = hex.decode(sig_hex) else List[int]()\n\
+         \x20   curve25519.verify(pk, msg, sig) == want\n}}\n\nfn main() -> int {{\n"
+    );
+    for c in cases {
+        let _ = writeln!(
+            s,
+            "    assert(verify_is(\"{}\", \"{}\", \"{}\", {}), \"tc {}\")",
+            c.public, c.msg, c.sig, c.valid, c.tc_id
+        );
+    }
+    s.push_str("    0\n}\n");
+    s
+}
+
 fn dashed(stem: &str) -> String {
     format!("SHA-{}", stem.trim_start_matches("SHA"))
 }
@@ -947,5 +1347,60 @@ mod tests {
             ]}"#,
         );
         assert!(parse_wycheproof_aead(&off_nonce, "t").is_err());
+    }
+
+    fn xdh_json(entries: &str) -> String {
+        format!(r#"{{"testGroups":[{{"tests":[{entries}]}}]}}"#)
+    }
+
+    #[test]
+    fn xdh_partitions_on_zero_shared_and_cross_checks_the_flag() {
+        let text = xdh_json(
+            r#"
+            {"tcId":1,"result":"valid","flags":["Normal"],"private":"aa","public":"bb","shared":"1234"},
+            {"tcId":2,"result":"acceptable","flags":["Twist"],"private":"cc","public":"dd","shared":"5678"},
+            {"tcId":3,"result":"acceptable","flags":["ZeroSharedSecret"],"private":"ee","public":"ff","shared":"0000000000000000000000000000000000000000000000000000000000000000"}
+            "#,
+        );
+        let c = parse_wycheproof_xdh(&text, "t").unwrap();
+        assert_eq!(c.shared.len(), 2);
+        assert_eq!(c.zero.len(), 1);
+        assert_eq!(c.zero[0].tc_id, 3);
+    }
+
+    #[test]
+    fn eddsa_partitions_valid_invalid_and_refuses_acceptable() {
+        let text = r#"{"testGroups":[{"publicKey":{"pk":"aabb"},"tests":[
+            {"tcId":1,"result":"valid","msg":"","sig":"11"},
+            {"tcId":2,"result":"invalid","msg":"72","sig":"22"}
+        ]}]}"#;
+        let c = parse_wycheproof_eddsa(text, "t").unwrap();
+        assert_eq!(c.len(), 2);
+        assert!(c[0].valid && c[0].public == "aabb");
+        assert!(!c[1].valid);
+        let bad = r#"{"testGroups":[{"publicKey":{"pk":"aa"},"tests":[
+            {"tcId":3,"result":"acceptable","msg":"","sig":"11"}
+        ]}]}"#;
+        assert!(parse_wycheproof_eddsa(bad, "t").is_err());
+    }
+
+    #[test]
+    fn xdh_refuses_flag_value_disagreement_and_unknown_result() {
+        // A ZeroSharedSecret flag whose shared value is NOT all-zero is a
+        // hard error — the security partition cannot rot.
+        let lying_flag = xdh_json(
+            r#"{"tcId":9,"result":"acceptable","flags":["ZeroSharedSecret"],"private":"aa","public":"bb","shared":"1234"}"#,
+        );
+        assert!(parse_wycheproof_xdh(&lying_flag, "t").is_err());
+        // An all-zero shared value WITHOUT the flag is equally a hard error.
+        let silent_zero = xdh_json(
+            r#"{"tcId":10,"result":"valid","flags":["Normal"],"private":"aa","public":"bb","shared":"0000000000000000000000000000000000000000000000000000000000000000"}"#,
+        );
+        assert!(parse_wycheproof_xdh(&silent_zero, "t").is_err());
+        // Any result other than valid/acceptable is undecided -> hard error.
+        let unknown = xdh_json(
+            r#"{"tcId":11,"result":"invalid","flags":["X"],"private":"aa","public":"bb","shared":"12"}"#,
+        );
+        assert!(parse_wycheproof_xdh(&unknown, "t").is_err());
     }
 }

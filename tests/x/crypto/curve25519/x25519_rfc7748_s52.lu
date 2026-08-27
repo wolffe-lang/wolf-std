@@ -1,0 +1,31 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! RFC 7748 §5.2's two one-shot X25519 test vectors (the scalar and
+//! u-coordinate given, the output verified) and the module's
+//! base-point key generation against §6.1's public keys. Hex quoted
+//! from `vendor/vectors/rfc/rfc7748.txt`.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn dh(scalar_hex: str, u_hex: str) -> str {
+    let scalar = hex.decode(scalar_hex) else List[int]()
+    let u = hex.decode(u_hex) else List[int]()
+    let out = curve25519.x25519(scalar, u) else List[int]()
+    curve25519.to_hex(out)
+}
+
+fn main() -> int {
+    // §5.2 vector 1
+    assert(dh("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4", "e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c") == "c3da55379de9c6908e94ea4df28d084f32eccf03491c71f754b4075577a28552", "s52 v1")
+    // §5.2 vector 2
+    assert(dh("4b66e9d4d1b4673c5ad22691957d6af5c11b6421e0ea01d42ca4169e7918ba0d", "e5210f12786811d3f4b7959d0538ae2c31dbe7106fc03c3efc4cd549c715a493") == "95cbde9476e8907d7aade45cb4b873f88b595a68799fa152e6f8f7647aac7957", "s52 v2")
+    // §6.1 public keys (base-point multiplication)
+    let a = hex.decode("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a") else List[int]()
+    assert(curve25519.to_hex(curve25519.x25519_base(a)) == "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a", "s61 pubA")
+    let b = hex.decode("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb") else List[int]()
+    assert(curve25519.to_hex(curve25519.x25519_base(b)) == "de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f", "s61 pubB")
+    0
+}

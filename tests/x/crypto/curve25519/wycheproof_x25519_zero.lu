@@ -1,0 +1,282 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/x25519_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 X25519, the ZERO-SHARED-SECRET set: all 31
+//! `acceptable` vectors flagged `ZeroSharedSecret` — small-order
+//! public keys for which `x25519` must raise the `zero` row
+//! (RFC 8446 §7.4.2 requires a TLS 1.3 endpoint to abort rather
+//! than use a predictable secret). This is the module's security
+//! core, kept WHOLE, and the reject is witnessed as a negative
+//! sentinel from the helper's `zero` handler. The interpreter
+//! column is `slow` (F-0093); `..._zero_smoke.lu` keeps it
+//! differential.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn zero_verdict(priv_hex: str, pub_hex: str) -> int {
+    let sk = hex.decode(priv_hex) else List[int]()
+    let pk = hex.decode(pub_hex) else List[int]()
+    let out = curve25519.x25519(sk, pk) else |_| {
+        return -1
+    }
+    out.len
+}
+
+fn main() -> int {
+    assert(
+        zero_verdict(
+            "88227494038f2bb811d47805bcdf04a2ac585ada7f2f23389bfd4658f9ddd45e",
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        ) <
+            0,
+        "tc 32",
+    )
+    assert(
+        zero_verdict(
+            "48232e8972b61c7e61930eb9450b5070eae1c670475685541f0476217e48184f",
+            "0100000000000000000000000000000000000000000000000000000000000000",
+        ) <
+            0,
+        "tc 33",
+    )
+    assert(
+        zero_verdict(
+            "e0f978dfcd3a8f1a5093418de54136a584c20b7b349afdf6c0520886f95b1272",
+            "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+        ) <
+            0,
+        "tc 63",
+    )
+    assert(
+        zero_verdict(
+            "387355d995616090503aafad49da01fb3dc3eda962704eaee6b86f9e20c92579",
+            "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+        ) <
+            0,
+        "tc 64",
+    )
+    assert(
+        zero_verdict(
+            "c8fe0df92ae68a03023fc0c9adb9557d31be7feed0d3ab36c558143daf4dbb40",
+            "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ) <
+            0,
+        "tc 65",
+    )
+    assert(
+        zero_verdict(
+            "c8d74acde5934e64b9895d5ff7afbffd7f704f7dfccff7ac28fa62a1e6410347",
+            "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b880",
+        ) <
+            0,
+        "tc 66",
+    )
+    assert(
+        zero_verdict(
+            "b85649d5120e01e8ccaf7b2fb8d81b62e8ad6f3d5c0553fdde1906cb9d79c050",
+            "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f11d7",
+        ) <
+            0,
+        "tc 67",
+    )
+    assert(
+        zero_verdict(
+            "2064b2f4c9dc97ec7cf58932fdfa3265ba6ea4d11f0259b8efc8afb35db88c48",
+            "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        ) <
+            0,
+        "tc 68",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        ) <
+            0,
+        "tc 69",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "0100000000000000000000000000000000000000000000000000000000000000",
+        ) <
+            0,
+        "tc 70",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ) <
+            0,
+        "tc 71",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+        ) <
+            0,
+        "tc 72",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+        ) <
+            0,
+        "tc 73",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ) <
+            0,
+        "tc 74",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ) <
+            0,
+        "tc 75",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "0000000000000000000000000000000000000000000000000000000000000080",
+        ) <
+            0,
+        "tc 76",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "0100000000000000000000000000000000000000000000000000000000000080",
+        ) <
+            0,
+        "tc 77",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        ) <
+            0,
+        "tc 78",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f11d7",
+        ) <
+            0,
+        "tc 79",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b880",
+        ) <
+            0,
+        "tc 80",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        ) <
+            0,
+        "tc 81",
+    )
+    assert(
+        zero_verdict(
+            "786a33a4f7af297a20e7642925932bf509e7070fa1bc36986af1eb13f4f50b55",
+            "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        ) <
+            0,
+        "tc 82",
+    )
+    assert(
+        zero_verdict(
+            "40ff586e73d61f0960dc2d763ac19e98225f1194f6fe43d5dd97ad55b3d35961",
+            "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ) <
+            0,
+        "tc 83",
+    )
+    assert(
+        zero_verdict(
+            "7887889bac4c629a101d3724f2ed8b98d936fde79e1a1f77d86779626bf8f263",
+            "0000000000000000000000000000000000000000000000000000000000000080",
+        ) <
+            0,
+        "tc 84",
+    )
+    assert(
+        zero_verdict(
+            "584fceaebae944bfe93b2e0d0a575f706ce5ada1da2b1311c3b421f9186c7a6f",
+            "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ) <
+            0,
+        "tc 85",
+    )
+    assert(
+        zero_verdict(
+            "e07971ee820e48b0b266d8be3cdbbb5e900a43f59ee8535c6572418615de4962",
+            "0100000000000000000000000000000000000000000000000000000000000080",
+        ) <
+            0,
+        "tc 86",
+    )
+    assert(
+        zero_verdict(
+            "c8d07c46bbfb827753b92c70e49583ce8bfa44641a7382258ea903d6a832c96b",
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        ) <
+            0,
+        "tc 117",
+    )
+    assert(
+        zero_verdict(
+            "90b7ef237a055f348dcb4c4364a59d7d31edc7ab78f2ca254e2c810975c3f543",
+            "0100000000000000000000000000000000000000000000000000000000000000",
+        ) <
+            0,
+        "tc 118",
+    )
+    assert(
+        zero_verdict(
+            "18630f93598637c35da623a74559cf944374a559114c7937811041fc8605564a",
+            "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ) <
+            0,
+        "tc 154",
+    )
+    assert(
+        zero_verdict(
+            "5891c9272cf9a197735b701e5715268d36d7436b7e351a3e997a0862e4807d4d",
+            "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+        ) <
+            0,
+        "tc 165",
+    )
+    assert(
+        zero_verdict(
+            "c0f9c60aea73731d92ab5ed9f4cea122f9a6eb2577bda72f94948fea4d4cc65d",
+            "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+        ) <
+            0,
+        "tc 166",
+    )
+    0
+}

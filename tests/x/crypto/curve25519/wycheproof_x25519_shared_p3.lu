@@ -1,0 +1,354 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/x25519_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 X25519, the SHARED set, part 3 of 13
+//! (40 vectors of the set's 487): every `valid` and nonzero
+//! `acceptable` vector — the shared secret is asserted byte-for-
+//! byte. The `acceptable` twist and non-canonical-public cases are
+//! here because RFC 7748 masks the high bit and requires no twist
+//! or canonicity rejection, so the ladder's answer is conformant.
+//! The interpreter column is `slow` (the sc16 word): each vector
+//! is a full ladder (~6.5s under lupin 0.1.13, F-0093's curve
+//! makes a 40-call program blow the ceiling), the shared_smoke
+//! file keeps the differential column, and the chunk flips back
+//! to `run` when a lupin release carries is20.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn shared_matches(priv_hex: str, pub_hex: str, want: str) -> bool {
+    let sk = hex.decode(priv_hex) else List[int]()
+    let pk = hex.decode(pub_hex) else List[int]()
+    let out = curve25519.x25519(sk, pk) else List[int]()
+    curve25519.to_hex(out) == want
+}
+
+fn main() -> int {
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "98730bc03e29e8b057fb1d20ef8c0bffc822485d3db7f45f4e3cc2c3c6d1d14c",
+            "fcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3f",
+        ),
+        "tc 107",
+    )
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "97b4fff682df7f096cd1756569e252db482d45406a3198a1aff282a5da474c49",
+            "f9ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3f",
+        ),
+        "tc 108",
+    )
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "317781b0163bae74accc06c0d44ef9a911a22b0d37faf7726621591f9343ea2f",
+            "f3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3f",
+        ),
+        "tc 109",
+    )
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "7e26f8f24cb590027f9d1bc49b0e1a242c7d8f43624d3e8fab28ee08e02cb45e",
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff03",
+        ),
+        "tc 110",
+    )
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "e96d2780e5469a74620ab5aa2f62151d140c473320dbe1b028f1a48f8e76f95f",
+            "e5ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ),
+        "tc 111",
+    )
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "8d612c5831aa64b057300e7e310f3aa332af34066fefcab2b089c9592878f832",
+            "e3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ),
+        "tc 112",
+    )
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "8d44108d05d940d3dfe5647ea7a87be24d0d036c9f0a95a2386b839e7b7bf145",
+            "ddffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ),
+        "tc 113",
+    )
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "21a35d5db1b6237c739b56345a930aeee373cdcfb4701266782a8ac594913b29",
+            "dbffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        ),
+        "tc 114",
+    )
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "3e5efb63c352ce942762482bc9337a5d35ba55664743ac5e93d11f957336cb10",
+            "0000000000000000000000000000000000000000000000000000000000000002",
+        ),
+        "tc 115",
+    )
+    assert(
+        shared_matches(
+            "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+            "8e41f05ea3c76572be104ad8788e970863c6e2ca3daae64d1c2f46decfffa571",
+            "0000000000000000000000000000000000000000000000000000000000008000",
+        ),
+        "tc 116",
+    )
+    assert(
+        shared_matches(
+            "e0a8be63315c4f0f0a3fee607f44d30a55be63f09561d9af93e0a1c9cf0ed751",
+            "0200000000000000000000000000000000000000000000000000000000000000",
+            "0c50ac2bfb6815b47d0734c5981379882a24a2de6166853c735329d978baee4d",
+        ),
+        "tc 119",
+    )
+    assert(
+        shared_matches(
+            "0840a8af5bc4c48da8850e973d7e14220f45c192cea4020d377eecd25c7c3643",
+            "1200000000000000000000000000000000000000000000000000000000000000",
+            "77557137a2a2a651c49627a9b239ac1f2bf78b8a3e72168ccecc10a51fc5ae66",
+        ),
+        "tc 120",
+    )
+    assert(
+        shared_matches(
+            "0092229c753a71284d0853909470ad847ab62f439ea51482fb41d30cc3b44743",
+            "1400000000000000000000000000000000000000000000000000000000000000",
+            "c88e719ae5c2248b5f90da346a92ae214f44a5d129fd4e9c26cf6a0da1efe077",
+        ),
+        "tc 121",
+    )
+    assert(
+        shared_matches(
+            "b8da2bd2d7cf25a3e54e5f87ee15911effb9ff86baec4076d56c8e953670bf5b",
+            "0000000000000000000000000080000000000000000000000000000000000000",
+            "4bf6789c7ea036f973cde0af02d6fdb9b64a0b957022111439570fad7d7a453f",
+        ),
+        "tc 122",
+    )
+    assert(
+        shared_matches(
+            "684cd420af41abb3d10c61e773238cf729c2155f941ac27e15f4c37f49b29576",
+            "ffffffffffffffffffffffffffff000000000000000000000000000000000000",
+            "bcac235ae15cc7148372e11f9315e3bc76ceb904b3d2a8246bd9d9be2082bb62",
+        ),
+        "tc 123",
+    )
+    assert(
+        shared_matches(
+            "38cfacaa4460796b4de434bdd6739f0d043671f97fa829517511e6b47aa93474",
+            "0100000000000000000000000000010000000000000000000000000000000000",
+            "5dd7d16fff25cc5fdf9e03c3157cb0a235cea17d618f36e6f13461567edeb943",
+        ),
+        "tc 124",
+    )
+    assert(
+        shared_matches(
+            "30832e8cb627ac195f77b1105258e4bb18b99a5ed944404bfacb3a039fbdb14b",
+            "0000000000000000000000000000000000000000000000000000004000000000",
+            "2816fd031d51d6750f9225ede950625cca47441ca97e43092650396991afcb6d",
+        ),
+        "tc 125",
+    )
+    assert(
+        shared_matches(
+            "d818fd6971e546447f361d33d3dbb3eadcf02fb28f246f1d5107b9073a93cd4f",
+            "0000000000000000000000000000000000000000000000000000008000000000",
+            "7ed8f2d5424e7ebb3edbdf4abe455447e5a48b658e64abd06c218f33bd151f64",
+        ),
+        "tc 126",
+    )
+    assert(
+        shared_matches(
+            "1021cd8682bdc3f5da9100adff5b2230b3acd836b3a455db8352a2c27e69d17e",
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000",
+            "e8620ed5ca89c72c5ea5503e6dcd01131cd5e875c30e13d5dc619ce28ec7d559",
+        ),
+        "tc 127",
+    )
+    assert(
+        shared_matches(
+            "20e4c9247102292655d6765d7d84c6fce5309b8004045daea6d7d7dcad462871",
+            "0100000000000000000000000000000000000000000000000000000001000000",
+            "ceadb264379dcadd6e3bb8ad24dd653d2a609dd703d41da6caf3ad00f001862c",
+        ),
+        "tc 128",
+    )
+    assert(
+        shared_matches(
+            "90b150d462de512056d5bd55173074969b496f262fb6916b733f6263a8078971",
+            "a8b9c7372118a53a9de9eaf0868e3b1a3d88e81cb2e407ff7125e9f5c5088715",
+            "f86cc7bf1be49574fc97a074282e9bb5cd238e002bc8e9a7b8552b2d60eccb52",
+        ),
+        "tc 129",
+    )
+    assert(
+        shared_matches(
+            "9887286b3261c8d857a16f6db21277f75d88d4e861b3ebe7596699047e816668",
+            "aab9c7372118a53a9de9eaf0868e3b1a3d88e81cb2e407ff7125e9f5c5088715",
+            "ccbb8fd9dee165a398b2dbd7c8396f81736c1b3da36b35fbec8f326f38f92767",
+        ),
+        "tc 130",
+    )
+    assert(
+        shared_matches(
+            "20ca2c85cc8762e96b7047bf15c71c050ffe0ed1616040a953ae32a1297ad871",
+            "585007a5930d77623cf29756038ca197d3ebfd9e4c80a69585efe0274092c115",
+            "46add6f48ffff461777d4f89b6fdf1155aa051a96387d45f3e5e371a236b6e52",
+        ),
+        "tc 131",
+    )
+    assert(
+        shared_matches(
+            "d027656605b10bf18dea28bc52546f9f1f08cef06cafd200fc84f87dbb4ebe46",
+            "fbffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f",
+            "1adbe32207e21f71e1af53884d2a2276481e298e557f4dacb3720f2458e3082d",
+        ),
+        "tc 132",
+    )
+    assert(
+        shared_matches(
+            "4867a83ee9d01b7510840867db1af6a6049bdbb056b74443f70c358e162c8867",
+            "0000000000000000000000000000000000000000000000000000000000000020",
+            "e12cc58fbeb70a5e35c861c33710be6516a6a92e52376060211b2487db542b4f",
+        ),
+        "tc 133",
+    )
+    assert(
+        shared_matches(
+            "a015970a8add940fca5b1b5d23875397d547d8d494fcb314f2045a67a2d12c4b",
+            "afa00e4a271beec478e42fad0618432fa7d7fb3d99004d2b0bdfc14f8024832b",
+            "421bed1b26da1e9adbeada1f32b91a0fb4ced0f1110e0a4a88e735a19ee4571e",
+        ),
+        "tc 134",
+    )
+    assert(
+        shared_matches(
+            "4058cb6b9aaba02a338aaa392dbc10039e26e9e444117e758e24c5d8b232ea5e",
+            "b1a00e4a271beec478e42fad0618432fa7d7fb3d99004d2b0bdfc14f8024832b",
+            "d7b47463e2f4ca9a1a7deea098da8e74ac3b4a109083d997259b12992e7e7e06",
+        ),
+        "tc 135",
+    )
+    assert(
+        shared_matches(
+            "b876b05daff0530b139d9e11250563418077178246c5fa7005ba00e9b6647763",
+            "fbffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff2f",
+            "686eb910a937211b9147c8a051a1197906818fdc626668eb5f5d394afd86d41b",
+        ),
+        "tc 136",
+    )
+    assert(
+        shared_matches(
+            "d87fd6aa5d8deef6dee9619a56846a0829620590f2da40835d8e251597e39078",
+            "22231c64ef73ad62318b8a87bc38e272e1bb8bf1a60d7c00476d0b059d7b3c35",
+            "09559733b35bcc6bb8ac574b5abe3a4d8841deff051c294a07487e3eec3c5558",
+        ),
+        "tc 137",
+    )
+    assert(
+        shared_matches(
+            "90036321b63751f7622aa93da34d85e59ce81009ac5b9a068921d83bc4715b57",
+            "f6ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3f",
+            "f7d5cbcf39eb722b01ed20c85563ebb81d076511aead4ccc429027866b9fd270",
+        ),
+        "tc 138",
+    )
+    assert(
+        shared_matches(
+            "a06781fd4c4a0874e00e72ba131b9dd87a83b2904e294de176e8a9af1f695d67",
+            "f7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3f",
+            "e995ad6a1ec6c5ab32922cff9d204721704673143c4a11deaa203f3c81989b3f",
+        ),
+        "tc 139",
+    )
+    assert(
+        shared_matches(
+            "b822d72d8b68bdb4fbf67e56a61d672b2c7747e94479fe5ae4072d0accdd6571",
+            "feffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3f",
+            "32b6dabe01d13867f3b5b0892fefd80dca666f2edc5afb43cd0baf703c3e6926",
+        ),
+        "tc 140",
+    )
+    assert(
+        shared_matches(
+            "d08ce1237e248d02cdf619d20bea5848ade4f6ffd171b8dee8793fc67c459640",
+            "0000000000000000000000000000000000000000000000000000000000000040",
+            "a93d83fc9ea0f6cb0cc8b631da600019b76cbb2ec57222f2e42dd540e3da850b",
+        ),
+        "tc 141",
+    )
+    assert(
+        shared_matches(
+            "180ae3c928514cfb9edd06e7dc1d5d066160e967445a5c58e4463b69ed205e6d",
+            "cbdce39b108c529dce74757843c71d8d1e44740e59f283ffb892f4fa6284c34a",
+            "017cbfa2b38e9ef3297a339ecce1a917bdcf7e910036086a41d1e22d04241870",
+        ),
+        "tc 142",
+    )
+    assert(
+        shared_matches(
+            "e881d806a110560cd8fee899d59c0249f1233a4322c41aa369c7a2a99f5b5962",
+            "3c5ff1b5d8e4113b871bd052f9e7bcd0582804c266ffb2d4f4203eb07fdb7c54",
+            "71133905b8a57ea8c38de0ecf213699a75b096c2df21f07f7e9eb03e9fa53f5c",
+        ),
+        "tc 143",
+    )
+    assert(
+        shared_matches(
+            "08e410e1d7e8b9411236af4a35d6b62a5d8931478e4c62197cfafb491467b162",
+            "3e5ff1b5d8e4113b871bd052f9e7bcd0582804c266ffb2d4f4203eb07fdb7c54",
+            "3dc7b70e110766b2bf525252ebed98a100b2e532dc69544464da1bbab8625f6d",
+        ),
+        "tc 144",
+    )
+    assert(
+        shared_matches(
+            "e02fdf7e0ee3d55b4440f01432dd253c949793bc04da44ddece83e54c8c39b40",
+            "f2ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff5f",
+            "e317e5cc438b5f79ead5533ac7c45519a117b31033cc2140b19edf8572011240",
+        ),
+        "tc 145",
+    )
+    assert(
+        shared_matches(
+            "f05d18f68ef7a5865c14db3a9c255fdf2dabea2aa36581e94f68b727b582867b",
+            "f6ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff5f",
+            "d86810516aeddc18061036f599a9eb84d1c6146b0f543652dd4526743ba42c04",
+        ),
+        "tc 146",
+    )
+    assert(
+        shared_matches(
+            "00c103578d5c079d7bcc22c1c31e787c1b15c57fcb493fdafefa20371cfc746b",
+            "95aff85a6cf2889dc30d68a9fc735e682c140261b37f596a7a101fd8bf6d3e6a",
+            "dfa988a477003be125b95ccbf2223d97729577d25e1d6e89e3da0afabdd0ae71",
+        ),
+        "tc 147",
+    )
+    assert(
+        shared_matches(
+            "7005bb927485c435642b424a3dde014bcf76345e5be64ae6e9b24db39e1cdb51",
+            "434638c8dee75ac56216150f7971c4e5c27717e34d1bf8008eda160a3af7786a",
+            "d450af45b8ed5fe140cc5263ffb7b52e66736899a8b872b6e28552129819b25b",
+        ),
+        "tc 148",
+    )
+    0
+}

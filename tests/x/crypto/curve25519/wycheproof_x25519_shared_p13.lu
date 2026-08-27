@@ -1,0 +1,90 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from
+//! `vendor/vectors/wycheproof/x25519_test.json` (provenance:
+//! `vendor/vectors/README.md`). Do not edit by hand; ci's
+//! `gen-vectors --check` holds this file byte-identical to its source.
+//!
+//! Wycheproof v1 X25519, the SHARED set, part 13 of 13
+//! (7 vectors of the set's 487): every `valid` and nonzero
+//! `acceptable` vector — the shared secret is asserted byte-for-
+//! byte. The `acceptable` twist and non-canonical-public cases are
+//! here because RFC 7748 masks the high bit and requires no twist
+//! or canonicity rejection, so the ladder's answer is conformant.
+//! The interpreter column is `slow` (the sc16 word): each vector
+//! is a full ladder (~6.5s under lupin 0.1.13, F-0093's curve
+//! makes a 7-call program blow the ceiling), the shared_smoke
+//! file keeps the differential column, and the chunk flips back
+//! to `run` when a lupin release carries is20.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn shared_matches(priv_hex: str, pub_hex: str, want: str) -> bool {
+    let sk = hex.decode(priv_hex) else List[int]()
+    let pk = hex.decode(pub_hex) else List[int]()
+    let out = curve25519.x25519(sk, pk) else List[int]()
+    curve25519.to_hex(out) == want
+}
+
+fn main() -> int {
+    assert(
+        shared_matches(
+            "58083dd261ad91eff952322ec824c682ffffffffffffffffffffffffffffff5f",
+            "2eae5ec3dd494e9f2d37d258f873a8e6e9d0dbd1e383ef64d98bb91b3e0be035",
+            "2eae5ec3dd494e9f2d37d258f873a8e6e9d0dbd1e383ef64d98bb91b3e0be035",
+        ),
+        "tc 512",
+    )
+    assert(
+        shared_matches(
+            "4855555555555555555555555555555555555555555555555555555555555555",
+            "3e3e7708ef72a6dd78d858025089765b1c30a19715ac19e8d917067d208e0666",
+            "63ef7d1c586476ec78bb7f747e321e01102166bf967a9ea9ba9741f49d439510",
+        ),
+        "tc 513",
+    )
+    assert(
+        shared_matches(
+            "4855555555555555555555555555555555555555555555555555555555555555",
+            "9f40bb30f68ab67b1c4b8b664982fdab04ff385cd850deac732f7fb705e6013a",
+            "8b98ef4d6bf30df7f88e58d51505d37ed6845a969fe598747c033dcd08014065",
+        ),
+        "tc 514",
+    )
+    assert(
+        shared_matches(
+            "4855555555555555555555555555555555555555555555555555555555555555",
+            "be3b3edeffaf83c54ae526379b23dd79f1cb41446e3687fef347eb9b5f0dc308",
+            "cfa83e098829fe82fd4c14355f70829015219942c01e2b85bdd9ac4889ec2921",
+        ),
+        "tc 515",
+    )
+    assert(
+        shared_matches(
+            "b8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa6a",
+            "3e3e7708ef72a6dd78d858025089765b1c30a19715ac19e8d917067d208e0666",
+            "4782036d6b136ca44a2fd7674d8afb0169943230ac8eab5160a212376c06d778",
+        ),
+        "tc 516",
+    )
+    assert(
+        shared_matches(
+            "b8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa6a",
+            "9f40bb30f68ab67b1c4b8b664982fdab04ff385cd850deac732f7fb705e6013a",
+            "65fc1e7453a3f8c7ebcd577ade4b8efe1035efc181ab3bdb2fcc7484cbcf1e4e",
+        ),
+        "tc 517",
+    )
+    assert(
+        shared_matches(
+            "b8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa6a",
+            "be3b3edeffaf83c54ae526379b23dd79f1cb41446e3687fef347eb9b5f0dc308",
+            "e3c649beae7cc4a0698d519a0a61932ee5493cbb590dbe14db0274cc8611f914",
+        ),
+        "tc 518",
+    )
+    0
+}

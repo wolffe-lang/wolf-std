@@ -1,0 +1,29 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, arith.checked
+//!
+//! RFC 7748 §5.2's iteration chain: starting from k = u = 9, repeatedly
+//! set (k, u) = (x25519(k, u), k). The result after 1 iteration and
+//! after 1,000 are the RFC's published checkpoints. The 1,000,000th is
+//! omitted by name (1000x this file for no new code path — see
+//! vendor/vectors/README.md). Hex from `vendor/vectors/rfc/rfc7748.txt`.
+
+use std.hex
+use std.x.crypto.curve25519
+
+fn main() -> int {
+    var k = hex.decode("0900000000000000000000000000000000000000000000000000000000000000") else List[int]()
+    var u = hex.decode("0900000000000000000000000000000000000000000000000000000000000000") else List[int]()
+    var i: int = 0
+    while i < 1000 {
+        let next = curve25519.x25519(k, u) else List[int]()
+        u = copy k
+        k = next
+        if i == 0 {
+            assert(curve25519.to_hex(k) == "422c8e7a6227d7bca1350b3e2bb7279f7897b87bb6854b783c60e80311ae3079", "iter 1")
+        }
+        i = i + 1
+    }
+    assert(curve25519.to_hex(k) == "684cf59ba83309552800ef566f2f4d3c1c3887c49360e3875f2eb94d99532c51", "iter 1000")
+    0
+}
