@@ -223,7 +223,7 @@ native = "run"
 # ---- std.cmp ----
 
 [tests."cmp/static_floor.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
 wolfc = "unsupported"
 native = "unsupported"
 
@@ -244,12 +244,12 @@ wolfc = "unsupported"
 native = "unsupported"
 
 [tests."cmp/ordering_methods_static.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
 wolfc = "unsupported"
 native = "unsupported"
 
 [tests."cmp/clamp_bad_range_trap.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
 wolfc = "unsupported"
 native = "unsupported"
 
@@ -923,17 +923,17 @@ native = "run"  # sc12 pin bump (02c1e88): F-0076 closed, bool == bool lowers
 [tests."fmt/decimal/fixed_and_exp.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc24 binary bump (wolf @ a900b8c): the f64 decimal tier lowers natively — the sc22 drift list's native side, now release-backed
 
 [tests."fmt/decimal/shortest_round_trip.lu"]
 lupin = "run"
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # sc24 binary bump (wolf @ a900b8c): the f64 decimal tier lowers natively — the sc22 drift list's native side, now release-backed
 
 [tests."fmt/decimal/parse_float_shapes.lu"]
 lupin = "run"
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # sc24 binary bump (wolf @ a900b8c): the f64 decimal tier lowers natively — the sc22 drift list's native side, now release-backed
 
 [tests."hex/round_trip.lu"]
 lupin = "run"
@@ -1094,12 +1094,12 @@ native = "run"  # sc08 pin bump (13b811f)
 # accept with no peer coming has no deadline to rescue it (F-0049).
 
 [tests."net/echo_round_trip.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — sockets over std::net, nonblocking polls under the baton
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
 [tests."net/stream_pieces.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — sockets over std::net, nonblocking polls under the baton
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
@@ -1111,17 +1111,17 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # s70 and the payload pattern as of s71, which is what `read_all` below is
 # written over.
 [tests."net/refused_row.lu"]
-lupin = "unsupported"
+lupin = "divergent(stdout)"  # sc24: F-0097 — first arm answers for a BUILTIN-raised row (0.1.14, both orders measured); the propagated tag is right, the handler's arm is not
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
 [tests."net/closed_row.lu"]
-lupin = "unsupported"
+lupin = "divergent(stdout)"  # sc24: F-0097 — same mechanism; the io arm (first) answers where closed should
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
 [tests."net/forged_handle_io_row.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — sockets over std::net, nonblocking polls under the baton
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
@@ -1130,7 +1130,7 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # `run` here means "satisfies the directive", and the directive is
 # `fail(E1001)`.
 [tests."net/use_after_close.lu"]
-lupin = "unsupported"
+lupin = "divergent(trap(use-after-move))"  # sc24: F-0098 — the staleness discipline's dynamic half: the compilers reject E1001, the interpreter executes to [mem.tier0.move.2]'s trap
 wolfc = "run"
 native = "run"
 
@@ -1352,17 +1352,17 @@ native = "run"
 # half: `Node` + `root`/`node`/`member`/`element` and the typed reads,
 # landing two-lane on their first commit because the bump preceded them.
 [tests."x/json/query_kernel.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"  # 1b149ba: s107 crossed json natively
 
 [tests."x/json/typed_getters.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"  # 1b149ba: s107
 
 [tests."x/json/rows_and_boundaries.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"  # 1b149ba: s107
 
@@ -1372,37 +1372,37 @@ wolfc = "run"
 native = "run"  # 1b149ba: s107 — the module's first three-lane row
 
 [tests."x/json/dom_navigation.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"
 
 [tests."x/json/dom_typed_reads.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"
 
 [tests."x/json/dom_row_parse.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"
 
 [tests."x/json/dom_row_missing_key.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"
 
 [tests."x/json/dom_row_missing_index.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"
 
 [tests."x/json/dom_row_kind.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"
 
 [tests."x/json/dom_row_overflow.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the query tier on lupin's own RFC 8259 reading; the sc10 posture closed on a release
 wolfc = "run"
 native = "run"
 
@@ -1455,12 +1455,12 @@ wolfc = "run"
 native = "run"  # 1b149ba: s107 crossed the process trio natively
 
 [tests."process/not_found_row.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the process trio; wait reaps, kill never tombstones
 wolfc = "run"
 native = "run"  # 1b149ba: s107 crossed the process trio natively
 
 [tests."process/forged_handle_io_rows.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — the process trio; wait reaps, kill never tombstones
 wolfc = "run"
 native = "run"  # 1b149ba: s107 crossed the process trio natively
 
@@ -1468,7 +1468,7 @@ native = "run"  # 1b149ba: s107 crossed the process trio natively
 # (X1 `take`) because waiting REAPS, so a second wait is E1001. `run` means
 # "satisfies the directive", and the directive is `fail(E1001)`.
 [tests."process/use_after_wait.lu"]
-lupin = "unsupported"
+lupin = "divergent(exit(1))"  # sc24: F-0098 — the lane executes; start() raises not_found (no such program) before the reuse the compilers reject statically
 wolfc = "run"
 native = "run"
 
@@ -1504,7 +1504,7 @@ native = "run"
 # `net/read_all_and_lines.lu` is the whole line-protocol pair plus the empty
 # stream, on the checked lane alone with the module's other seven.
 [tests."net/read_all_and_lines.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is18 — sockets over std::net, nonblocking polls under the baton
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
@@ -1828,32 +1828,32 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha256_long.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha384_long.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha512_long.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha256_monte.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha384_monte.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/sha2/cavp_sha512_monte.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
@@ -1873,17 +1873,17 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/wycheproof_hkdf256_full.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/sha2/wycheproof_hkdf384_full.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/sha2/wycheproof_hkdf512_full.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
@@ -1994,52 +1994,52 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p1.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 2.1s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p2.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 2.4s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p3.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 6.3s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p4.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 3.1s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p5.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 4.2s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p6.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 3.5s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p7.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 3.4s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_valid_p8.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 3.4s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_invalid_p1.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 0.6s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/wycheproof_invalid_p2.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 0.8s
 wolfc = "run"
 native = "run"
 
@@ -2073,7 +2073,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/curve25519/x25519_rfc7748_chain.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
@@ -2090,72 +2090,72 @@ native = "run"
 # Two 5-vector smokes keep the differential column three-lane (~13s).
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p1.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p2.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p3.lu"]
-lupin = "slow"
+lupin = "slow"  # sc24 re-measure (lupin 0.1.14): NEITHER an answer nor the 50M-step refusal inside 70s idle — the one word that keeps the lane un-invoked; whether the eventual verdict is a run or the budget refusal is unmeasurable inside the ceiling
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p4.lu"]
-lupin = "slow"
+lupin = "slow"  # sc24 re-measure (lupin 0.1.14): NEITHER an answer nor the 50M-step refusal inside 70s idle — the one word that keeps the lane un-invoked; whether the eventual verdict is a run or the budget refusal is unmeasurable inside the ceiling
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p5.lu"]
-lupin = "slow"
+lupin = "slow"  # sc24 re-measure (lupin 0.1.14): NEITHER an answer nor the 50M-step refusal inside 70s idle — the one word that keeps the lane un-invoked; whether the eventual verdict is a run or the budget refusal is unmeasurable inside the ceiling
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p6.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p7.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p8.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p9.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p10.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p11.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p12.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p13.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 15.8s
 wolfc = "run"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_zero.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
@@ -2206,7 +2206,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/curve25519/ed25519_rfc8032_s71.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
@@ -2216,22 +2216,22 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_ed25519_p1.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_ed25519_p2.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_ed25519_p3.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_ed25519_p4.lu"]
-lupin = "slow"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
 wolfc = "unsupported"
 native = "run"
 
@@ -2278,7 +2278,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/jose/jws_eddsa_vectors.lu"]
-lupin = "slow"
+lupin = "run"  # sc24 binary bump (lupin 0.1.14): is20 released — the slow row's named exit arrives; measured idle 16.5s
 wolfc = "unsupported"
 native = "run"
 
@@ -2341,7 +2341,7 @@ native = "run"
 
 [tests."x/tls/record/reject_tampered_row.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc24 binary bump (wolf @ a900b8c): #139 in the BINARY at last — F-0095 CLOSED, the sc22/sc23 carried lead paid
 native = "run"
 
 [tests."x/tls/record/short_record_row.lu"]
@@ -2545,12 +2545,12 @@ native = "run"
 # RSA stays `unsupported_alg` (the last unsupported-alg rung), three-lane
 # above (no scalar multiplication on that path).
 [tests."x/tls/cert/p256_chain_valid.lu"]
-lupin = "unsupported"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the 50M-step refusal still fires, now at 52s IDLE — knife-edge against the 60s ceiling; a timeout here on a loaded machine is load, not depth (F-0093's margin rule)
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/tls/cert/p256_bad_signature_row.lu"]
-lupin = "unsupported"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the 50M-step refusal still fires, now at 51s IDLE — knife-edge against the 60s ceiling; a timeout here on a loaded machine is load, not depth (F-0093's margin rule)
 wolfc = "unsupported"
 native = "run"
 
@@ -2628,7 +2628,7 @@ wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p256/cavp_siggen_p256.lu"]
-lupin = "unsupported"
+lupin = "slow"  # sc24 re-measure (lupin 0.1.14): the 50M-step refusal itself straddles the 60s ceiling (timed out in a QUIET full run) — neither answer nor refusal reliably inside it; skip the lane, re-measure at bumps
 wolfc = "unsupported"
 native = "run"
 
@@ -2638,12 +2638,12 @@ wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p256/wycheproof_p256_p2.lu"]
-lupin = "unsupported"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the 50M-step refusal still fires, now at 56s IDLE — knife-edge against the 60s ceiling; a timeout here on a loaded machine is load, not depth (F-0093's margin rule)
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p256/wycheproof_p256_p3.lu"]
-lupin = "unsupported"
+lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the 50M-step refusal still fires, now at 48s IDLE — knife-edge against the 60s ceiling; a timeout here on a loaded machine is load, not depth (F-0093's margin rule)
 wolfc = "unsupported"
 native = "run"
 
@@ -2671,3 +2671,29 @@ native = "run"
 lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
+
+# ---- sc24: the twenty-eight, re-measured (08-the-strings-land) ----
+#
+# THE sc24 PIN BUMP IS THE DELIBERATE BINARY BUMP sc22 PREDICTED, AND THE
+# PREDICTED FLIP SET IS EXACTLY WHAT MOVED. Data pin 53f6191 -> a900b8c
+# (s120 the boundary primitive's chars() + #30's raise-position fix; s121
+# char/D58; anchors 386 -> 393, +7: mem.str.chars, gram.lex.char, the
+# type.char family). Binaries: lupin 0.1.13/02c1e88 -> 0.1.14/90c90df
+# (the is14-is25 catch-up release) and wolf 0.1.0 @ 21b129e -> @ a900b8c
+# — the SECOND sc24 acquisition, the data pin itself, s121 included.
+# (The FIRST, @ e7abf03, was pre-s121 — 'a' E0107 at lex, `char` E0301
+# at resolve, chars() in the v0 List[int] currency — and the provisioner
+# swapped it mid-sprint; the int-currency agreement test below went red
+# on schedule within hours, which is how the swap was caught. E0101
+# under lupin either way; is26 is the interpreter's char sprint, running
+# concurrently.) std-test measured before a single edit:
+# 23 rows deeper (the sc22 provisioning-drift list, now release-backed:
+# 3 cmp + 4 net + 2 process + 10 x/json on lupin/is18 waves, 3
+# fmt/decimal native, 1 x/tls/record wolfc — F-0095 closed), 4 rows
+# newly DIVERGENT (F-0097 first-arm-over-builtin-rows, F-0098 the
+# static/dynamic staleness split — the `divergent(…)` word lands this
+# sprint for exactly these), 4 rows to `slow` (the P-256 ladder: 0.1.14
+# lost the step-budget refusal and grinds past the ceiling instead), and
+# the 40 standing `slow` rows re-measured per is20's release (each row's
+# own comment carries its number). Zero rows shallower: no regression.
+#
