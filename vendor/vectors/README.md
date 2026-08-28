@@ -123,6 +123,40 @@ sha256 of the sc20 files, as retrieved:
   Every file, clause map and omission is documented in
   `pki/README.md`; sha256s in `pki/sha256sums.txt`.
 
+## Sources (retrieved 2026-08-27, sc23 — the Weierstrass curve)
+
+- `rfc/rfc6979.txt` — the RFC Editor's canonical text
+  (`https://www.rfc-editor.org/rfc/rfc6979.txt`), "Deterministic Usage
+  of DSA and ECDSA": the implementation authority for
+  `std.x.crypto.p256`'s deterministic nonces and the source of the
+  A.2.5 (P-256, SHA-256) vectors its hand-written test quotes.
+- `wycheproof/ecdsa_secp256r1_sha256_test.json` — Project Wycheproof
+  (C2SP), `testvectors_v1` at
+  `https://github.com/C2SP/wycheproof/blob/master/testvectors_v1/`.
+- `cavp/SigVer.rsp`, `cavp/SigGen.txt` — NIST CAVP FIPS 186-4 ECDSA
+  test vectors, from
+  `https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/dss/186-4ecdsatestvectors.zip`
+  (archive dated 2020-01-14; the two files carry every curve/hash
+  pairing — the generator consumes exactly the `[P-256,SHA-256]`
+  sections, the rest is omitted by name below).
+
+sha256 of the sc23 files, as retrieved:
+
+```
+456e8f17558fdbd206f968b96fc6f1b4a71ea331ab30ad17f711ab3adaa7d701  rfc/rfc6979.txt
+182db4f3e230f6f9fa9f800d2a614dede30284b8e8438bbfe1171905402e9332  wycheproof/ecdsa_secp256r1_sha256_test.json
+e9841c3d12e323042751460d0b8ef4bc59c2640105ec7da4852775f80ab10191  cavp/SigVer.rsp
+95d0a19c03f6d2dc16e9e18fd5c3318e1952e0bc88a45127c996c35b4a15f4e2  cavp/SigGen.txt
+```
+
+Every sc23 vector was reproduced by a from-scratch big-int Python
+reference (P-256 + FIPS 186-5 ECDSA + RFC 6979 + strict-DER signature
+parsing) BEFORE vendoring: RFC 6979 A.2.5 `k`/`r`/`s` byte-exact, all
+15 CAVP SigGen `(R,S)` regenerated from the published `(d, k)`, all 15
+CAVP SigVer P/F verdicts, and all 484 Wycheproof verdicts — so a
+transcription error and an implementation error cannot agree (the
+sc17/sc18 discipline).
+
 ## What is taken, what is omitted (named, never silent)
 
 - **CAVP short-message sets**: ALL vectors (65 + 129 + 129), run on
@@ -236,6 +270,32 @@ sha256 of the sc20 files, as retrieved:
   D-question. Nothing about the trace is consumed silently: the
   extractor warns on any block whose parsed length disagrees with its
   header.
+
+- **RFC 6979 (sc23)**: the A.2.5 P-256/SHA-256 vectors — the private
+  key's public key (Ux, Uy) and both signatures ("sample", "test"),
+  `k`, `r` and `s` asserted byte-exact in the hand-written
+  `tests/x/crypto/p256/rfc6979_p256.lu`. The other-hash columns
+  (SHA-1/224/384/512) and the other curves of A.2 are omitted by name:
+  ES256 is SHA-256 and the ladder's curve is P-256 (a second hash
+  joins when a consumer names it).
+- **CAVP ECDSA (sc23)**: the `[P-256,SHA-256]` sections whole — all 15
+  SigVer cases (P/F verdicts, the R/S/Q/Msg tamper classes) and all 15
+  SigGen cases. SigGen's published `(R,S)` were made with the file's
+  own random `k`, and std's sign is RFC 6979 deterministic (a
+  DIFFERENT, equally valid `k`), so the generator asserts SigGen
+  through VERIFY (Q against Msg/R/S — 15 more verify vectors) while
+  the sign path is pinned byte-exact by RFC 6979 and round-tripped
+  sign->verify; the reference reproduced all 15 `(R,S)` from the
+  published `(d, k)` at vendoring time, so the file's self-consistency
+  is checked even though std never uses a caller-supplied nonce. All
+  other curve/hash sections are omitted by name (outside the ladder).
+- **Wycheproof ECDSA secp256r1/SHA-256 (sc23)**: all 484 vectors
+  accounted for, none silently: 174 `valid` and 310 `invalid` (the
+  DER manipulations, r/s = 0 / = n / > n, the point-duplication and
+  arithmetic-edge classes, wrong hashes), every one decided by the
+  single strict-DER + FIPS 186-5 verify; the generator hard-errors on
+  any result flavour other than valid/invalid, so a re-vendored file
+  cannot grow an undecided case.
 
 Totals: sc16 — 1210 vectors vendored and asserted (all green on the
 native lane; 365 of them — the short sets, the RFC files and the
