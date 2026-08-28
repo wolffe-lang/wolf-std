@@ -3465,3 +3465,101 @@ and the known i32-literal rule (typed-int bindings around the
 contact points, both already filed and both already in the Guide.
 The multi-arm-handler observation above is a re-measure lead on an
 EXISTING finding, not a new one.
+
+## Retirements and movements at the sc23 pin
+
+**The DATA pin BUMPS 64a38f3 -> 53f6191; the bump moves ZERO ledger
+rows.** sc23's first act — "pin bump to current wolf-lang trunk
+(53f6191+, s118 os_random + s119 codegen), re-vendor, flip dark rows" —
+is a bump-with-no-flip (the binaries are unchanged: lupin 0.1.13, wolf
+0.1.0), plus one carried lead and the persisting provisioning drift:
+
+- **The bump is 64a38f3 -> 53f6191** (`vendor/upstream/PIN` +
+  `anchors.json` re-vendored at trunk 53f6191; `sync-pin` green,
+  snapshot-only). The span is s116-s119: s118's `os_random`
+  (getrandom/getentropy/BCryptGenRandom, no fallback — the sanctioned
+  entropy source sc23's RFC-6979 choice deliberately does NOT need) and
+  s119's codegen fixes (the versioning pass's stale CFG, token-linearity,
+  element-stride alignment). Anchor delta +6 (the `os.random`* family:
+  os.random / .checked / .fill / .platform / .sole / .trap), 380 -> 386,
+  zero removed.
+
+- **LEAD, CARRIED: F-0095 is unmoved.** #139's fix is in the DATA pin
+  (has been since 64a38f3) but not in the pinned `wolf 0.1.0` binary, so
+  `x/tls/record/reject_tampered_row`'s wolfc column stays `unsupported`
+  until a BINARY bump. Unchanged by a data-only pin move.
+
+- **PROVISIONING DRIFT persists, unchanged (the sc22 set).** This
+  sandbox's binaries still run the same ~22-26 rows deeper than the
+  recorded pins (json/net/process/cmp on lupin; the f64 fmt/decimal rows
+  on native), and `lupin --version` still says 0.1.13/da8582d while
+  doctor flags da8582d vs the recorded 02c1e88. A data-only pin bump
+  touches none of it. The ledger KEEPS the recorded-pin measurements;
+  clean-clone 3-OS CI at the recorded pins is the authoritative gate for
+  the compiled lanes (the sc19-22 precedent — stated, not chased). The
+  next DELIBERATE binary bump inherits this list as its flip set.
+
+**The Weierstrass rung (sc23) files NO new upstream language finding.**
+The 2560-line P-256/ECDSA module rode entirely on shapes already filed
+and already in the Guide: the sc04 i32-literal rule (every field/scalar
+constant is a TYPED-`int` binding so a 16-bit limb literal cannot default
+to i32 and trap two multiplies later — sc18's exact lesson, applied to
+sixteen-limb constants), and the sc18 split-read-then-write rule for
+in-place list mutation (`let v = x[i] + c` then `x[i] = v`, in the
+Montgomery CIOS inner loops). The checked-`int`, no-`wrapping`,
+no-bitwise-on-`int` discipline (F-0026's spelling) carried the whole
+field. Three sc23 OBSERVATIONS, none a new upstream bug:
+
+- **A table-free P-256 scalar multiplication exceeds BOTH non-native
+  step budgets — the sc23 lane headline, and the real distinction from
+  curve25519.** One `scalar_mul` is 256 iterations of a COMPLETE-formula
+  double AND a complete-formula add AND an arithmetic select (the design
+  ruling's table-free ladder) — roughly 256 x 30 field multiplies, each
+  a 16x16 schoolbook. That is ~2x the interpreter cost of curve25519's
+  Montgomery-ladder STEP and it runs a full double-and-add every bit, so
+  a single P-256 scalar mult (a) returns lupin's `unsupported: did not
+  terminate within 50000000 evaluation steps` and (b) exhausts the
+  checked tier's step budget at `mem`. curve25519's single ladder fits
+  lupin at ~2.5-6.5s (F-0093's curve, `slow`); P-256's does NOT fit at
+  all — so every sign/verify/vector file here is NATIVE-ONLY
+  (`unsupported`, a step-budget verdict, NOT `slow` — `slow` is a
+  wall-clock timeout of a program that WOULD finish; lupin actively
+  refuses this one). The three-lane column is the FIELD / DER codec /
+  early-reject / trap files, whose executed paths never reach a ladder
+  (the sc17 per-executed-path rule). This is inherent cost, not a bug:
+  the ruling chose provably-constant-time over fast, and the honest
+  price is a native-only differential. Recorded in the ledger's sc23
+  section and every vector file header.
+
+- **`let byte` shadows the builtin type name `byte` (W0304) — a latent
+  rename debt, invisible to the rig today.** wolfc warns `W0304: this
+  `let` binding shadows the built-in type name `byte`` on `let byte =
+  k[i / 8]` — the bit-selector spelling `std.x.crypto.curve25519` also
+  uses (sc18, unflagged) and `std.x.crypto.p256` inherited. The rig sees
+  ENTRY-file warnings only (F-0053), and a std MODULE body's warnings are
+  invisible from here, so neither module's row moves and CI is green. The
+  day F-0053's open half closes (the rig reads module-body warnings),
+  both curve modules owe a rename (`let byte` -> `let kb`/`let eb`). Not
+  filed as a new number: it is F-0053's known blind spot, and the fix is
+  a mechanical rename in two files when the rig can see it.
+
+- **`wolf fmt` STILL splits a dotted call under a `//` comment (F-0016,
+  the crypto campaign's recurring tax).** A `// class` comment directly
+  above `if p256.verify_der(...)` made fmt emit `if p256.` newline
+  `verify_der(...)`. The dodge is now reflex: the DER/early-reject test
+  batteries hold their bad-input classes in a TABLE (a `List` walked in a
+  loop) with the class list in the file header, so no comment sits above
+  a dotted call. F-0016 unmoved, six-plus sprints running.
+
+**A methodology note worth keeping (not a finding).** Half a debugging
+hour was lost to a DEGENERATE lupin parse error — `E0201: expected }`,
+found identifier `z` at 15..16` — that appears IDENTICALLY for a bare
+`fn main() -> int { 0 }` and for `continue`/`loop`/`break`. It is not a
+language gap (all three keywords RUN correctly under lupin in a clean
+package root, measured): it was the PACKAGE ROOT. `lupin conform-run`
+eagerly parses every `.lu` sibling of the entry file (the package =
+directory rule, D32), and a scratch directory full of broken probe
+files makes lupin report the FIRST sibling's failure against the entry's
+name with a bogus span. The rig never sees this because it stages one
+clean directory per test. Lesson, old: probe in a clean directory, one
+`.lu` at a time — never in a shared scratch dir.
