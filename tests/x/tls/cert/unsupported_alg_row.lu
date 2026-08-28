@@ -1,18 +1,20 @@
-//! check: run(exit=1, stdout="witness: rsa and ecdsa parse structurally\nwitness: validation names the unsupported algorithm\nerror: unsupported_alg")
+//! check: run(exit=1, stdout="witness: rsa and ecdsa parse structurally\nwitness: rsa validation names the unsupported algorithm\nerror: unsupported_alg")
 //! phase: run
 //! conforms: std.x.tls.cert, err.row, err.propagate, err.else
 //!
-//! THE PARSE-BUT-NAMED-UNSUPPORTED SPLIT (the sprint's load-bearing
-//! honesty): real-world-shaped RSA-2048/sha256WithRSAEncryption and
-//! ECDSA-P256/ecdsa-with-SHA256 certificates (openssl-generated,
-//! vendor/vectors/pki) PARSE structurally — version, serial, DNs,
-//! validity, SPKI, SAN, the multi-byte lengths of an RSA modulus, the
-//! NULL RSA parameters and named-curve EC parameters all walk the
-//! same hardened decoder — and chain validation answers the NAMED
-//! `unsupported_alg` rejection, NEVER a silent accept: the D53 ladder
-//! has Ed25519/X25519, not RSA/P-256, and an unverified signature
-//! reported valid would be a correctness failure. The rejection rides
-//! out of main so the record names it.
+//! THE PARSE-BUT-NAMED-UNSUPPORTED SPLIT, at the sc23 pin (RSA is the
+//! last `unsupported_alg` rung): real-world-shaped RSA-2048/
+//! sha256WithRSAEncryption and ECDSA-P256/ecdsa-with-SHA256
+//! certificates (openssl-generated, vendor/vectors/pki) both PARSE
+//! structurally — version, serial, DNs, validity, SPKI, SAN, the
+//! multi-byte RSA modulus, the NULL RSA parameters and the named-curve
+//! EC parameters all walk the same hardened decoder. RSA chain
+//! validation answers the NAMED `unsupported_alg` rejection, NEVER a
+//! silent accept (RSA has no crypto rung yet). ECDSA-P256 NOW VALIDATES
+//! (sc23's p256.verify_der) — witnessed in `p256_chain_valid.lu` and
+//! `p256_bad_signature_row.lu`; here it is only shown to PARSE. RSA's
+//! rejection rides out of main so the record names it. Three-lane: RSA
+//! validation is `unsupported_alg` before any scalar multiplication.
 
 use std.hex
 use std.x.tls.cert
@@ -51,11 +53,7 @@ fn main() -> !int {
     assert(cert.alg_name(ec.spki_alg) == "ecdsa", "ecdsa SPKI classified")
     print("witness: rsa and ecdsa parse structurally")
     assert(rejects(rsa, "rsa.wolf.example", rsa, now), "rsa chain must name unsupported_alg")
-    assert(
-        rejects(ecdsa, "ecdsa.wolf.example", ecdsa, now),
-        "ecdsa chain must name unsupported_alg",
-    )
-    print("witness: validation names the unsupported algorithm")
+    print("witness: rsa validation names the unsupported algorithm")
     let never = cert.validate_chain(rsa, "rsa.wolf.example", rsa, now)?
     print("unreachable: {never.version}")
     0

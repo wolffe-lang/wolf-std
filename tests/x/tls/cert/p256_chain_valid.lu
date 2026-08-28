@@ -1,0 +1,46 @@
+//! check: run(exit=0, stdout="witness: P-256 (ECDSA) certificate validates through sc22")
+//! phase: run
+//! conforms: std.x.tls.cert, std.x.crypto.p256
+//!
+//! THE sc23 INTEGRATION WITNESS (the sprint's flagship): an ECDSA-P256
+//! certificate — the algorithm real-world CAs issue — VALIDATES through
+//! sc22's chain validator, where sc22 answered `unsupported_alg`. The
+//! self-signed prime256v1 / ecdsa-with-SHA256 cert (openssl-generated,
+//! `vendor/vectors/pki/ecdsa.hex`, `openssl verify` OK) is used as leaf
+//! and trust anchor; `validate_chain` runs sc23's `p256.verify_der`
+//! over the TBS bytes and returns the parsed leaf. NATIVE-ONLY: the
+//! verification is two table-free P-256 ladders, past lupin's 50M step
+//! budget and the checked tier's (the ledger records both
+//! `unsupported`).
+
+use std.hex
+use std.x.tls.cert
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let ec = bytes_of(
+        "308201af30820154a0030201020214740cdfa4c8e3db375b3bf304e3f76556f2fc35a1300a06082a8648ce3d040302301d311b301906035504030c1265636473612e776f6c662e6578616d706c65301e170d3236303832373132323930325a170d3237303832373132323930325a301d311b301906035504030c1265636473612e776f6c662e6578616d706c653059301306072a8648ce3d020106082a8648ce3d03010703420004fc53bced13903902d293f716083815447e1ada582249395ebac44c44ef06b9fd55026df310ac4dd98d0048e3f22150f038bdec71768a87456de64a00171bfdd9a3723070301d0603551d0e0416041435ee311235bc6546e5fb2eca0ed5aa2066788df4301f0603551d2304183016801435ee311235bc6546e5fb2eca0ed5aa2066788df4300f0603551d130101ff040530030101ff301d0603551d1104163014821265636473612e776f6c662e6578616d706c65300a06082a8648ce3d04030203490030460221009a31986bc666c74ef3e8c91871a43fd1b59946c72ff6e320559c71ded7528c01022100de70e4ddebde9db7ccf2a1cbde2097ba48ce18dfeead1fa25d9cb03cbd0b1a3f",
+    )
+    let now = cert.timestamp(2026, 10, 1, 0, 0, 0)
+    let leaf = cert.validate_chain(ec, "ecdsa.wolf.example", ec, now) else |_| {
+        print("P-256 chain rejected (should validate)")
+        return 1
+    }
+    if !(leaf.subject_cn == "ecdsa.wolf.example") {
+        print("wrong subject: {leaf.subject_cn}")
+        return 1
+    }
+    if !leaf.has_san {
+        print("SAN missing")
+        return 1
+    }
+    if !(cert.alg_name(leaf.sig_alg) == "ecdsa") {
+        print("wrong sig alg classification")
+        return 1
+    }
+    print("witness: P-256 (ECDSA) certificate validates through sc22")
+    0
+}

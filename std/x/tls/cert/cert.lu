@@ -12,10 +12,11 @@
 //! **The nursery banner (D31).** `std.x.tls.cert` is not `std.tls`: its
 //! path, names and behaviour may change or vanish in one sprint; no
 //! other std module may depend on it. Its reason and graduation trigger
-//! live in `std/x/README.md`. It depends on ONE sibling resident —
-//! `std.x.crypto.curve25519` (Ed25519 verify) — a resident-on-resident
-//! edge the graduation move to `std.tls`/`std.crypto` must resolve,
-//! named in the register beside the record/handshake/jose edges.
+//! live in `std/x/README.md`. It depends on TWO sibling residents —
+//! `std.x.crypto.curve25519` (Ed25519 verify) and `std.x.crypto.p256`
+//! (ECDSA-P256 verify, sc23) — resident-on-resident edges the
+//! graduation move to `std.tls`/`std.crypto` must resolve, named in the
+//! register beside the record/handshake/jose edges.
 //!
 //! **Built from the DOCUMENTS, not ported.** ITU-T X.690 (the DER
 //! encoding rules — §8.1 TLV structure and lengths, §8.3 INTEGER
@@ -46,14 +47,15 @@
 //!
 //! ## The scope line (honest about the crypto ladder)
 //!
-//! Signature VALIDATION is Ed25519 only (sc18's `curve25519.verify`) —
-//! the D53 ladder has Ed25519/X25519, not RSA or ECDSA-P256. A
-//! certificate signed with any other algorithm PARSES structurally
-//! (the hardening win is algorithm-independent) and validation answers
-//! the named `unsupported_alg` rejection — NEVER a silent accept: an
-//! unverified signature reported as valid would be a correctness
-//! failure, and that honesty is this rung's load-bearing post. RSA and
-//! ECDSA validation arrive with their crypto rungs. NAMED RESIDUE
+//! Signature VALIDATION is Ed25519 (sc18's `curve25519.verify`) and, as
+//! of sc23, ECDSA-P256 (`p256.verify_der` — ecdsa-with-SHA256 over a
+//! prime256v1 key, the algorithm real-world CAs issue). A certificate
+//! signed with any OTHER algorithm PARSES structurally (the hardening
+//! win is algorithm-independent) and validation answers the named
+//! `unsupported_alg` rejection — NEVER a silent accept: an unverified
+//! signature reported as valid would be a correctness failure, and that
+//! honesty is this rung's load-bearing post. RSA is the last
+//! `unsupported_alg` rung (its crypto rung is unbuilt). NAMED RESIDUE
 //! (deliberately not half-built): revocation (CRL/OCSP — its own rung),
 //! RFC 6125 wildcard matching (`host_matches` is exact-label only),
 //! the CN-fallback for hostnames (deprecated; SAN is the only source
@@ -109,6 +111,7 @@
 //! certificate this module can and does hold to the profile.
 
 use std.x.crypto.curve25519
+use std.x.crypto.p256
 
 // ---------------------------------------------------------------------
 // Byte helpers — the 0..255 contract, sub-slices, equality. All public
@@ -1282,6 +1285,20 @@ pub fn oid_ed25519() -> str {
     "1.3.101.112"
 }
 
+/// The ecdsa-with-SHA256 signature algorithm OID (X9.62 / RFC 5480 —
+/// the ES256 certificate signature). ct: public data.
+pub fn oid_ecdsa_sha256() -> str {
+    "1.2.840.10045.4.3.2"
+}
+
+/// The id-ecPublicKey OID (X9.62 — an EC subjectPublicKey). The curve
+/// itself rides in the SPKI parameters; this rung validates P-256 (a
+/// 65-byte uncompressed point), and p256's on-curve check refuses any
+/// key that is not a P-256 point. ct: public data.
+pub fn oid_ec_public_key() -> str {
+    "1.2.840.10045.2.1"
+}
+
 /// Classify a dotted algorithm OID: "ed25519" (1.3.101.112),
 /// "rsa" (the PKCS#1 arc — signature algorithms and rsaEncryption),
 /// "ecdsa" (the X9.62 arc — ECDSA signatures and id-ecPublicKey),
@@ -1373,16 +1390,36 @@ pub fn timestamp(y: int, mo: int, d: int, h: int, mi: int, s: int) -> int {
 /// ct: public data — an Ed25519 VERIFY handles no secret (the sc18
 /// rule); curve25519's own ct: lines govern its internals.
 pub fn verify_signed_by(child: Cert, issuer: Cert) -> int ! {unsupported_alg, bad_signature} {
-    if child.sig_alg != oid_ed25519() {
-        return unsupported_alg
+    if child.sig_alg == oid_ed25519() {
+        if issuer.spki_alg != oid_ed25519() {
+            return unsupported_alg
+        }
+        if !curve25519.verify(issuer.spki_key, child.tbs, child.sig) {
+            return bad_signature
+        }
+        return 1
     }
-    if issuer.spki_alg != oid_ed25519() {
-        return unsupported_alg
+    if child.sig_alg == oid_ecdsa_sha256() {
+        if issuer.spki_alg != oid_ec_public_key() {
+            return unsupported_alg
+        }
+        // A P-256 uncompressed point is 65 bytes; any other length is a
+        // curve this rung does not validate (P-384/P-521 are their own
+        // rungs, `unsupported_alg`). p256.verify_der SHA-256's the TBS,
+        // parses the DER (r, s) strictly, and — SEC1 §3.2.2 — refuses a
+        // key that is not a point on P-256 (a false `bad_signature`, not
+        // a false accept: the invalid-curve class the on-curve check
+        // closes). sc23 makes this a real verification; RSA stays
+        // `unsupported_alg` (its own rung).
+        if issuer.spki_key.len != 65 {
+            return unsupported_alg
+        }
+        if !p256.verify_der(issuer.spki_key, child.tbs, child.sig) {
+            return bad_signature
+        }
+        return 1
     }
-    if !curve25519.verify(issuer.spki_key, child.tbs, child.sig) {
-        return bad_signature
-    }
-    1
+    unsupported_alg
 }
 
 /// The per-certificate judgements shared by every chain position:

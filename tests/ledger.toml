@@ -2538,6 +2538,22 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# sc23: ECDSA-P256 chain validation is wired in (p256.verify_der over
+# the TBS). A valid P-256 cert VALIDATES and a bad-signature one rejects
+# `bad_signature` — both native-only (two table-free P-256 ladders past
+# lupin's 50M step budget and the checked tier's; the sc23 p256 note).
+# RSA stays `unsupported_alg` (the last unsupported-alg rung), three-lane
+# above (no scalar multiplication on that path).
+[tests."x/tls/cert/p256_chain_valid.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/tls/cert/p256_bad_signature_row.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
 [tests."x/tls/cert/non_byte_trap.lu"]
 lupin = "run"
 wolfc = "run"
