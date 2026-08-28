@@ -24,7 +24,7 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0015 | 2026-08-11 | wolfc checked tier: the row RAISE path inside an imported module's function is `unsupported — module items in checked execution` — the same call runs when it yields a value, and the same body inlined into the entry file runs both ways. Every `! {None}` miss test in std.list/x.deque_int is `unsupported` for this reason alone | wolf-lang s23/s31 | [filed: wolf-lang#13](https://github.com/wolffe-lang/wolf-lang/issues/13) |
 | F-0016 | 2026-08-11 | `wolf fmt` splits a dotted call at the dot when a `//` comment line precedes it (`xs.push(1)` becomes `xs.` + newline + `push(1)`), idempotently — fmt is law (D34), so its output is the style, and this one is a defect | wolf-lang fmt owner | [filed: wolf-lang#14](https://github.com/wolffe-lang/wolf-lang/issues/14) |
 | F-0017 | 2026-08-11 | lupin still accepts `let` reassignment after wolf-lang#2 closed compiler-side (wolfc now says E0410 with a `var` fix-it): the interpreter half of the divergence is open | wolf-interp | [filed: wolf-interp#8](https://github.com/wolffe-lang/wolf-interp/issues/8) |
-| F-0018 | 2026-08-12 | (sc03 Targets 1–4) **The boundary primitive is missing**: no recoverable slice (`str.get`), no byte accessor, no `chars()`/`char` type — so no scan can advance past a code point of unknown length, and 28 of sc03's 64 functions are unwritable rather than merely unimplemented; plus `^n` resolving nowhere, `str` methods `unsupported` in wolfc, `str + str` diverging | wolf-lang s37 (core types) owners | [filed: wolf-lang#17](https://github.com/wolffe-lang/wolf-lang/issues/17) |
+| F-0018 | 2026-08-12 | (sc03 Targets 1–4) **The boundary primitive is missing**: no recoverable slice (`str.get`), no byte accessor, no `chars()`/`char` type — so no scan can advance past a code point of unknown length, and 28 of sc03's 64 functions are unwritable rather than merely unimplemented; plus `^n` resolving nowhere, `str` methods `unsupported` in wolfc, `str + str` diverging | wolf-lang s37 (core types) owners | [filed: wolf-lang#17](https://github.com/wolffe-lang/wolf-lang/issues/17) — **#17 CLOSED at s120/s121 and sc24 RE-MEASURED every clause, twice — the sprint spanned TWO wolf acquisitions**: 21 of the 28 were already shipped (sc09–sc13); `^n` HEALED on all three lanes (its one residue is F-0096); and after the mid-sprint s121-carrying wolf (@ a900b8c) landed, sc24 SHIPPED three more — `str.to_list_chars`, `strbuf.push(c: char)`, `unicode.code(c: char)`, wolf-lane rows (lupin's char tier is is26, ledgered by lane) — for **24 of 28 shipped**. The 4-item residue: `chars` (the pair — needs tuple lists, `List[(int, int)]` still `unsupported` at resolve on the wolf rungs), `strbuf.in(r)` (region placement), `reserve` (capacity/SSO), `graphemes` (segmentation tier). See "the sc24 re-measure" below |
 | F-0019 | 2026-08-12 | (sc03 Target 4) **Decision request — the unicode tables budget**: where category/case/normalization/segmentation data lives (std recommends penumbra or `std/x`, never core), with the evidence that lupin's `lower`/`upper` ALREADY do simple Unicode case mapping and `trim`/`words` already use Unicode `White_Space` — so std had to carry a 25-entry table to agree with the builtin | wolf-lang spec/std owners | [filed: wolf-lang#18](https://github.com/wolffe-lang/wolf-lang/issues/18) |
 | F-0020 | 2026-08-12 | `assert(cond, msg)` traps `assert` even when `cond` HOLDS (wolfc 12ae8c2) — the two-argument intrinsic wolf-lang#9 just landed ignores its condition; the one-argument form is correct; contradicts `[conf.trap.assert]`'s "silent and effect-free when the condition holds" | wolf-lang (the #9 implementation) | [filed: wolf-lang#19](https://github.com/wolffe-lang/wolf-lang/issues/19) |
 | F-0021 | 2026-08-12 | lupin: a method call on a SLICE EXPRESSION over a binding (`d[0..1].upper()`) is `unsupported` at resolve ("does not denote a place at run time") while the same shape over a literal runs — every std.str body binds the slice first | wolf-interp | [filed: wolf-interp#10](https://github.com/wolffe-lang/wolf-interp/issues/10) |
@@ -41,8 +41,8 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0032 | 2026-08-13 | lupin's `as` accepts an UNKNOWN target type silently: `s as int` and `s as nonsense` both pass the value through unchanged with no diagnostic, while `n as f64` converts correctly — a typo in a cast is invisible, and so is a cast the machine has no rule for | wolf-interp | [filed: wolf-interp#17](https://github.com/wolffe-lang/wolf-interp/issues/17) |
 | F-0033 | 2026-08-13 | (sc05 Target 1) **spec §7.4 does not exist**: `FORMAT_SPEC` is in the grammar with its semantics an explicit IOU, so every question a formatter must answer is unanswered — what each spec means per builtin type, what a malformed or type-mismatched spec does, and how a USER type formats. Candidate section text filed with a running reference implementation (`std.fmt`, whose functions are the spec's worked examples) plus the **`Show` proposal** (`fmt(self, spec) -> str`) and the s38 dispatch hook it needs | wolf-lang spec owners + s38 | [filed: wolf-lang#28](https://github.com/wolffe-lang/wolf-lang/issues/28) |
 | F-0034 | 2026-08-13 | The module namespace is FLAT at the last path segment: `std.fmt.float` cannot import `std.math.float` (lupin: "this import completes a cycle: `float` → `float`", E0303) and cannot be imported beside it (wolfc: E0306 — while lupin silently binds one of the two and drops the other). Two facades may never grow a same-named leaf, so §10's "the float family lives in its own module" pattern is unrepeatable; sc05's module is `std.fmt.decimal` because of it | wolf-lang resolve owners + wolf-interp | [filed: wolf-lang#29](https://github.com/wolffe-lang/wolf-lang/issues/29) |
-| F-0035 | 2026-08-13 | (sc05 Targets 3-4) **The encoders have no byte type**: `std.bytes` is still 0/9 (F-0018 re-tested, unchanged), so `std.hex` and `std.base64` ship over `List[int]` with a documented 0..255 element contract — and `hex.encode(str)`, the commonest use of a hex encoder anywhere, cannot exist because nothing reads a `str`'s bytes. The same root blocks `json.parse`, `json.unescape`, `fmt.truncate_to`, and forces `json.escape`'s one refusal | wolf-lang s37 core types | [filed: wolf-lang#17](https://github.com/wolffe-lang/wolf-lang/issues/17) (sc05 evidence on F-0018's issue) |
-| F-0036 | 2026-08-13 | **Silent wrong answer**: a row tag that shares a name with anything in the value namespace at the raise site resolves to that THING instead of raising — `-> int ! {tagmod}` inside module `tagmod` hands the caller the module value, `else` never fires and no diagnostic appears. Found three ways in one sprint (`std.hex` raising `hex`, `std.json`'s `kind` function versus its `kind` tag, and `std.fmt.decimal` nearly raising `range` beside `std.range`) | wolf-lang resolve + wolf-interp | [filed: wolf-lang#30](https://github.com/wolffe-lang/wolf-lang/issues/30) |
+| F-0035 | 2026-08-13 | (sc05 Targets 3-4) **The encoders have no byte type**: `std.bytes` is still 0/9 (F-0018 re-tested, unchanged), so `std.hex` and `std.base64` ship over `List[int]` with a documented 0..255 element contract — and `hex.encode(str)`, the commonest use of a hex encoder anywhere, cannot exist because nothing reads a `str`'s bytes. The same root blocks `json.parse`, `json.unescape`, `fmt.truncate_to`, and forces `json.escape`'s one refusal | wolf-lang s37 core types | [filed: wolf-lang#17](https://github.com/wolffe-lang/wolf-lang/issues/17) (sc05 evidence on F-0018's issue) — **sc24 re-measure: stale in the reader's favour and now corrected**: `std.bytes` has been 9/9 since sc09 (+`to_str` sc13, +`is_utf8` beyond the contract), `hex.encode_str` and `fmt.truncate_to` shipped sc10, `json.parse`/`unescape`/`escape`-totality and `hex.decode_str` shipped sc14 — every knock-on this finding names was cashed before sc24, and #17 is closed. CLOSED with F-0018 |
+| F-0036 | 2026-08-13 | **Silent wrong answer**: a row tag that shares a name with anything in the value namespace at the raise site resolves to that THING instead of raising — `-> int ! {tagmod}` inside module `tagmod` hands the caller the module value, `else` never fires and no diagnostic appears. Found three ways in one sprint (`std.hex` raising `hex`, `std.json`'s `kind` function versus its `kind` tag, and `std.fmt.decimal` nearly raising `range` beside `std.range`) | wolf-lang resolve + wolf-interp | [filed: wolf-lang#30](https://github.com/wolffe-lang/wolf-lang/issues/30) — wolfc half closed at the sc07 pin; **the lupin half HEALED, measured at 0.1.14 (sc24)**: both collision shapes (tag-vs-module and tag-vs-function, the exact reproducers above) raise correctly and `else` fires. CLOSED; the both-direction naming grep stands down after eleven sprints |
 | F-0037 | 2026-08-13 | **Silent wrong answer**: a function whose return type is an ENUM and whose signature carries an error row takes the MISS path on every call — `fn id(v: Value) -> Value ! {none} { v }` raises instead of returning `v`, in one line, with no diagnostic. Blocks `json.get` and `json.at`, which were written, tested and withdrawn to reviewed contracts; until it closes, no std accessor may return an enum through a row | wolf-interp (row/enum value representation) | [filed: wolf-interp#16](https://github.com/wolffe-lang/wolf-interp/issues/16) |
 | F-0038 | 2026-08-13 | **Absence has no literal**: a row VALUE cannot be written as an expression — `none` resolves at a raise site and nowhere else, so `f(none)` is `unsupported` — which means no doc example can call a row-taking function and `std.option`'s six ship with prose examples instead of fenced ones | wolf-lang s15/resolve owners + wolf-interp | [filed: wolf-lang#38](https://github.com/wolffe-lang/wolf-lang/issues/38) |
 | F-0039 | 2026-08-13 | **Nested rows diverge**: `T ! {none} ! {none}` parses and EXECUTES in lupin and is `fail(E0201)` at parse in wolfc, in both return and parameter position — the grammar's `type` production admits one `!`. `std.option.flatten` is the only helper whose type needs two, so it ships from the nursery to keep the module's other four out of a rejection | wolf-lang s03 grammar + s37 | [filed: wolf-lang#34](https://github.com/wolffe-lang/wolf-lang/issues/34) |
@@ -103,7 +103,11 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0092 | 2026-08-26 | **CLOSED at the sc18 pin (s111, wolf-lang#133)** — the shape lowers natively at 21b129e, re-probed at the sha, and `update384` delegates `mut st.st` directly again (the copy dance retired in the bump commit; the diff was one line, the mechanical bar the contract set). The original finding: **the native rung refuses `f(mut param.field)` — a `mut` field path whose base is itself a `mut` parameter** ("`mut` places beyond local by-value bindings"), while the same path off a LOCAL binding lowers at 87405ac (both shapes probed; the local half healed across the sc16 bump, the parameter half did not). Costs `Sha384` its one-line delegation to the `Sha512` core: `update384` copies the core out, advances it, writes it back — semantics X1 already licenses directly, ~330 elements deep-copied per call, measured ~1.9x on the interpreter against SHA-512 on the same core | wolf-lang | [filed: wolf-lang#133](https://github.com/wolffe-lang/wolf-lang/issues/133); sc16 |
 | F-0093 | 2026-08-26 | **under lupin, per-iteration cost grows with program AGE**: the same 129 CAVP SHA-384 short vectors cost ~27s as four programs and ~132s as one (16 alone: 0.69s; first 64: 10.6s) — total quadratic in vector count, not message-length scaling, and `region { }` scoping per vector measures identical. Distinct from F-0074/F-0078's per-operation costs: no per-op fix moves a curve keyed to how much the program has already run. Sized this sprint's suites: the CAVP short sets are chunked 2/4/4 to keep the differential lane inside the ceiling, and the long/Monte suites are `slow`-skipped there (the sc16 ledger word). **sc17 re-measure (the AEAD rung, 0.1.13)**: the curve holds at new constants — 32 ChaCha20-Poly1305 seal+open pairs 98s in one program, 30 opens 29s, a 10-case smoke 2.1s — so the Wycheproof AEAD parts are chunked 32/30 with `slow` and smoke subsets from the start, and each part flips back per-part at the fixing bump (evidence commented on the issue). **sc18 re-measure (the curve rung, 0.1.13, is20 still unreleased)**: the curve is heavier per program than the digests — one X25519 Montgomery ladder is ~2.5-6.5s, one Ed25519 verify ~7-8s, so the differential lupin column shrank to a 5-vector X25519 smoke (~13s) and a 1-valid+1-invalid Ed smoke (~18s); the 1000-iteration chain, the 40-vector Wycheproof parts and the RFC 8032 §7.1 set are native + `slow`, and the checked tier additionally exhausts its STEP budget past a few ladders (a capacity refusal, the sha2-long mechanism, not F-0091's operator gap — that one closed at this pin). is20's fix (merged wolf-interp ec4b9c4, unreleased) is the exit for every curve `slow` row | wolf-interp | [filed: wolf-interp#41](https://github.com/wolffe-lang/wolf-interp/issues/41); sc16, the honest-slow-skip's mechanism; sc17 evidence appended |
 | F-0094 | 2026-08-27 | **the AES-GCM/ChaCha reconciliation for RFC 8448 (a std design decision, not an upstream defect)**: RFC 8448 §3 is the TLS 1.3 record layer's vector spine, but its records are AES-128-GCM (cipher suite TLS_AES_128_GCM_SHA256), while the MTI AEAD this ladder ships is ChaCha20-Poly1305 (§9.1; AES-GCM is a later rung's D-question, out of the sc20 contract). Resolution: the key schedule, the per-record nonce, the record header and the additional-data are all AEAD-INDEPENDENT and are asserted against RFC 8448 byte-for-byte (16-byte AES keys included — `hkdf_label`/`expand_label`/`derive_secret`/`traffic_key`/`traffic_iv` reproduce every §3 secret, `info` dump and traffic key); only the sealed ciphertext+tag needs the actual cipher, and that byte-match uses ChaCha20-Poly1305 fixtures derived from RFC 8448's REAL server-handshake-traffic secret (a 32-byte `"key"` Expand-Label where the trace takes 16 — same derivation, different length), generated and pinned by the independent reference (the sc17 discipline). The trace stays the spine; the cipher stays the MTI. Not filed upstream — this is a vendoring/scope note, recorded so the split is not mistaken for missing coverage | wolf-std (sc20) | docs/findings.md + `vendor/vectors/README.md` (RFC 8448 take/omit); the AES-GCM record rung retires it by adding the second cipher |
-| F-0095 | 2026-08-27 | **the checked mem tier refuses `for x in <List bound through a DIVERGING `else`>` on the reject path** — "unsupported — iteration outside ranges and List". `let inner = chacha20.open(...) else \|_\| { return tag }` then `for b in inner { ... }` runs on the checked tier when the open SUCCEEDS (the valid-record path is three-lane, `chacha_records.lu`), but a program whose executed path makes the open FAIL — the tamper-reject witness `reject_tampered_row.lu` — is `unsupported` at `mem`: after a diverging `else` the tier's abstract value for `inner` is not a modelled List, so the downstream iteration is refused. Per-executed-path, not module-wide (the sc17 dynamic-refusal shape): the module's `open` body is identical in both tests, only the taken path differs. Costs the tamper witness its checked column (`wolfc = "unsupported"`, native runs it); the valid open carries the lane. A decrypt-then-walk reject witness over any AEAD inherits it | wolf-lang | [filed: wolf-lang#139](https://github.com/wolffe-lang/wolf-lang/issues/139); the checked tier should model a List bound through a diverging `else` as the callee's success type; sc20 |
+| F-0095 | 2026-08-27 | **the checked mem tier refuses `for x in <List bound through a DIVERGING `else`>` on the reject path** — "unsupported — iteration outside ranges and List". `let inner = chacha20.open(...) else \|_\| { return tag }` then `for b in inner { ... }` runs on the checked tier when the open SUCCEEDS (the valid-record path is three-lane, `chacha_records.lu`), but a program whose executed path makes the open FAIL — the tamper-reject witness `reject_tampered_row.lu` — is `unsupported` at `mem`: after a diverging `else` the tier's abstract value for `inner` is not a modelled List, so the downstream iteration is refused. Per-executed-path, not module-wide (the sc17 dynamic-refusal shape): the module's `open` body is identical in both tests, only the taken path differs. Costs the tamper witness its checked column (`wolfc = "unsupported"`, native runs it); the valid open carries the lane. A decrypt-then-walk reject witness over any AEAD inherits it | wolf-lang | [filed: wolf-lang#139](https://github.com/wolffe-lang/wolf-lang/issues/139); the checked tier should model a List bound through a diverging `else` as the callee's success type; sc20 — **CLOSED at the sc24 BINARY bump**: #139's fix reached the pinned wolf (@ e7abf03) and `reject_tampered_row`'s wolfc column flipped `unsupported` -> `run`, exactly the flip the sc22/sc23 carried lead predicted |
+| F-0096 | 2026-08-28 | **`get` refuses an end-relative endpoint at resolve on both compiler rungs** — `s.get(0..^1)` is `unsupported` at resolve under wolfc AND native while `s[..^1]` slices on the same binaries and `[mem.str.get]`'s own sentence says `^n` resolves exactly as in `s[a..b]` before the domain question; lupin 0.1.14 runs it (hit bit-identical, `^n`-into-a-code-point the `none` miss). The one incomplete corner of `^n`'s sc24 healing; held as `tests/str/end_relative_get.lu` (`run/unsupported/unsupported`) | wolf-lang | [filed: wolf-lang#164](https://github.com/wolffe-lang/wolf-lang/issues/164); sc24 |
+| F-0097 | 2026-08-28 | **Silent wrong answer: a multi-arm `else`-match over a BUILTIN-raised row takes its FIRST ARM under lupin 0.1.14** — measured in both arm orders over `net_connect`'s `refused` (`-1` with `refused` first, `-9` with `io` first, same call); the propagated tag out of `main` is RIGHT (`error: refused`), which is what caught it. F-0052/F-0079's mechanism at a THIRD address (entry-file raises healed s70; module raises healed 0.1.13/#29; a builtin's row is in neither place the checker consults, so every arm binds). Newly observable: 0.1.14 is the first lupin with net/process tiers. Costs `net/closed_row` + `net/refused_row` their lupin stdout; ledgered `divergent(stdout)` (the sc24 word) so the fix reads as a red | wolf-interp | [filed: wolf-interp#47](https://github.com/wolffe-lang/wolf-interp/issues/47); sc24 |
+| F-0098 | 2026-08-28 | **take-mode reuse is a STATIC `fail(E1001)` on both compiler rungs and EXECUTES under lupin 0.1.14** — `net/use_after_close` runs to `trap(use-after-move)` (`[mem.tier0.move.2]`, the trap map's own dynamic answer) and `process/use_after_wait` never reaches the reuse (`start` honestly raises `not_found` first, `error: not_found` exit 1). Whether take-reuse joins lupin's static set (the E1007 precedent) or the dynamic trap is the reference is the counterparty's ruling to make; the two rows carry `divergent(trap(use-after-move))` / `divergent(exit(1))` until it lands | wolf-interp | [filed: wolf-interp#48](https://github.com/wolffe-lang/wolf-interp/issues/48); sc24 |
+| F-0099 | 2026-08-28 | **`[conf.anchor.ns]` does not admit `type` (nor `ct`/`diag`/`os`) while `spec-extract` publishes their anchors** — the s115/#120 class again, four documents later: `[type.char]` is in the registry the clause calls authoritative and a conforming test may not cite it by the clause's own letter. Surfaced by sc24's char-surface tests (`conforms: type.char` refused by this rig, which mirrors the letter); the same investigation caught this rig's own registry lagging `pkg` by nine sprints (fixed here). The reserved-forward `ty` now points at a name nothing will use — named in the filing for the same decision | wolf-lang spec | [filed: wolf-lang#165](https://github.com/wolffe-lang/wolf-lang/issues/165); sc24 |
 
 
 ## F-0001 — the std search path
@@ -3563,3 +3567,160 @@ files makes lupin report the FIRST sibling's failure against the entry's
 name with a bogus span. The rig never sees this because it stages one
 clean directory per test. Lesson, old: probe in a clean directory, one
 `.lu` at a time — never in a shared scratch dir.
+
+## Retirements and movements at the sc24 pin — the twenty-eight, re-measured
+
+**The DATA pin BUMPS 53f6191 -> a900b8c and this is the DELIBERATE
+BINARY BUMP sc22 predicted — measured across TWO wolf acquisitions,
+because the provisioner swapped the binary mid-sprint**: lupin
+0.1.13/02c1e88 -> **0.1.14**/90c90df (r02, the is14–is25 catch-up
+release) and wolf 0.1.0 @ 21b129e -> first **@ e7abf03** (s120 + s122,
+PRE-s121: `chars()` in the v0 `List[int]` currency, `'a'` E0107 at lex,
+`char` E0301 at resolve) -> then **@ a900b8c**, the data pin itself,
+carrying the whole of s121 (verified behaviorally: `'é'` lexes, `c as
+int` total, `55296 as char` traps `overflow`, `{c}` prints the
+character, `chars()` yields `List[char]` across module boundaries). The
+swap was CAUGHT by the sprint's own claim-holding: the agreement test
+written in the first binary's int currency went red within hours, which
+is the designed signal arriving at the shortest interval it ever has.
+Anchor delta +7
+(`mem.str.chars`, `gram.lex.char`, the five-clause `type.char` family),
+386 -> 393, zero removed. std-test measured the whole 359-row ledger
+before a single edit: **23 rows deeper, 0 shallower** — the sc22
+provisioning-drift list arriving release-backed, exactly as that note
+predicted (3 `cmp` + 4 `net` + 2 `process` + 10 `x/json` lupin rows on
+the is14–is18 waves; 3 `fmt/decimal` native rows; and
+`x/tls/record/reject_tampered_row` wolfc, which is **F-0095 CLOSED** —
+#139's fix finally in a pinned binary). Four net/process rows moved to
+the new `divergent(…)` word (F-0097/F-0098 below). Four P-256 rows
+(wycheproof_p256_p2/p3, the two tls/cert P-256 rows) timed out in that
+FIRST run and re-measured to their old `unsupported` on a quiet
+machine: 0.1.14's 50M-step refusal still fires, now at 48-56s idle —
+knife-edge against the 60s ceiling, so a timeout there on a loaded
+machine is load, not depth (F-0093's margin rule, sharpened).
+
+**THE RE-MEASURED INVENTORY — the sprint contract's first-act number.**
+F-0018's 28 unwritable functions, probed from wolf-std's side at THESE
+binaries (not the data pin's text, not s120's compiler-side estimate of
+23-then-25):
+
+- **21 of 28 are SHIPPED, GREEN, and were before sc24 opened** —
+  `std.str`'s twelve scanners (`find`, `rfind`, `count`, `split`,
+  `split_once`, `rsplit_once`, `ends_with`, `strip_suffix`, `replace`,
+  `replacen`, `get`, `bytes`; sc09, all three lanes) and all nine of
+  `std.bytes` (sc09; `to_str` sc13; plus `is_utf8` beyond the
+  contract). The findings' text ("std.bytes 0/9", "hex.encode(str)
+  impossible") was ELEVEN SPRINTS stale when sc24's contract quoted it,
+  which is exactly the class of error the contract's own first act
+  exists to catch — in both directions.
+- **At the FIRST acquisition, 0 of the remaining 7 were writable** —
+  against the compiler-side estimate that the char tier's four are: D58
+  ruled the type, the data pin carried it, and no pinned binary
+  executed it (zero executing lanes is zero evidence, and a char-typed
+  body would have cost `std.unicode`/`std.strbuf` their wolfc columns
+  besides). **At the SECOND acquisition three of the four became
+  writable and sc24 SHIPPED them the same day**: `str.to_list_chars ->
+  List[char]` (a delegation to `s.chars()`), `strbuf.push(c: char)`
+  (the `{c}`-interpolation body — the appended bytes are the scalar's
+  UTF-8 encoding by `[type.char.interp]`), and `unicode.code(c: char)
+  -> int` (`c as int`, total by `[type.char.cast]`). Wolf-lane rows,
+  lupin honestly `unsupported` until is26 (every char in the tests and
+  examples is spelled through `.chars()` so that lane's refusal stays
+  the clean method refusal — `'` does not lex there). No int-shaped
+  char helper anywhere: `code`/`from_code` are the only places a number
+  and a code point trade places, and D58's not-an-integer ruling is
+  enforced by construction. **The honest final number: 24 of 28
+  shipped / 4 blocked** — against s120+s121's compiler-side 25.
+- The 4, each with its owner: `chars` (the `(offset, char)` pair) —
+  tuple lists (`List[(int, int)]` re-measured `unsupported` at resolve
+  on both wolf rungs, at BOTH acquisitions); `strbuf.in(r)` — region
+  placement over a std type (wolf-lang, the s37 `.in(r)` pattern);
+  `strbuf.reserve(n)` — the capacity/SSO builder decision (wolf-lang
+  D24; a no-op hint would be a lie); `graphemes` — segmentation
+  tables, a later tier by contract and by the #18 ruling (committed
+  generated wolf source when it comes), and sc24 deliberately does not
+  start it. The FULL `std.unicode` retype (`from_code -> char`,
+  char-typed predicates) is deliberately NOT residue on the char type:
+  it waits for is26 so the flip costs no lane, and the module header
+  records the reviewed final signatures (§14's debt clause, armed on
+  the is26 release).
+
+**F-0035's nine and every knock-on it names were already cashed** —
+`std.bytes` 9/9 (above), `hex.encode_str` + `fmt.truncate_to` (sc10),
+`json.parse` + `json.unescape` + `escape`'s totality + `hex.decode_str`
+(sc14). Each retirement is recorded in its own sprint's section; what
+sc24 adds is the correction of BOTH findings' register rows, because a
+finding that is stale in the reader's favour is still stale.
+
+**What sc24 could and did write against the s120 primitive**:
+
+- **`^n` end-relative indexing HEALED on all three lanes** — F-0018's
+  last living clause, dead: every from-end form (`s[..^1]`, `s[^2..]`,
+  `s[^5..^1]`, `s[..^0]`, astral fixtures) slices byte-counted from the
+  end, and a `^n` into a code point traps `bounds` identically
+  everywhere. Held by `tests/str/end_relative_slice.lu` +
+  `end_relative_split_codepoint_trap.lu` (both 3-lane green). The one
+  residue is **F-0096**: `get(0..^1)` is `unsupported` at resolve on
+  both wolf rungs against `[mem.str.get]`'s own sentence, while lupin
+  runs it — filed (wolf-lang#164), held by
+  `tests/str/end_relative_get.lu`.
+- **The scalar tier held to std's own decoder**:
+  `tests/str/chars_builtin_agree.lu` compares `str.to_list_chars` (the
+  landed delegation) element-by-element against `str.code_points`
+  (sc09's one-pass state machine) through the total `c as int` bridge,
+  plus the `[mem.str.chars]` width-walk identity — two independent
+  UTF-8 readings that must agree, the `bytes.is_utf8` pattern one tier
+  up. The file's own history IS the sprint's: written first in the v0
+  int currency with a header promising to go red at the s121 binary, it
+  went red MID-SPRINT when that binary arrived, and the rewrite is the
+  claim-holding mechanism paying out at the shortest interval on
+  record. `tests/strbuf/push_char.lu` and `tests/unicode/char_code.lu`
+  carry the other two landings (byte-honest round-trips; the
+  `from_code`/`code` inverse loop).
+
+**F-0036 is CLOSED, and the closure was measured before it was
+believed.** Both reproducer shapes (a tag sharing a module's name, a
+tag sharing a function's name) raise correctly under lupin 0.1.14 with
+`else` firing — the wolfc half closed at sc07 (#30), and the r02
+catch-up carried the interpreter half without naming it. Eleven sprints
+of both-direction naming greps stand down.
+
+**Two NEW divergences, both surfaced by lupin's first net/process
+release, both filed the day they were measured, both ledgered under the
+sc24 `divergent(…)` word** (the rig's third lupin-only word; the
+F-0048/sc16 precedent of extending the grammar when reality demands a
+new sentence):
+
+- **F-0097** (wolf-interp#47): a multi-arm handler over a
+  BUILTIN-raised row takes its first arm — F-0052/F-0079's mechanism at
+  a third address, measured in both arm orders; the tag ridden out of
+  `main` is correct, which is what caught it (the sc14 rule paying out
+  again: when two observers disagree, bisect the observers).
+- **F-0098** (wolf-interp#48): take-mode reuse is static `fail(E1001)`
+  on the compiler rungs and EXECUTES under lupin — to
+  `trap(use-after-move)` where the reuse is reached, to the honest row
+  path where execution diverts first.
+
+**The `slow` block, re-measured per is20's release promise** (the
+ledger's own debt: "an interpreter perf wave is its exit"), and the
+answer is MIXED — all 40 rows measured one at a time, idle:
+
+- **12 rows COMPLETE and flip `slow` -> `run`** — the ten chacha20
+  Wycheproof part files (0.6-6.3s each, against 29-98s at 0.1.13:
+  is20's prune fix arriving, F-0093's exit for exactly the family sc17
+  priced), plus `x25519_shared_p13` (15.8s) and
+  `x/jose/jws_eddsa_vectors` (16.5s). Twelve lupin rows gained in one
+  release wave.
+- **25 rows return lupin's own `unsupported: the program did not
+  terminate within 50000000 evaluation steps`** and flip `slow` ->
+  `unsupported`: the nine sha2 long/monte/hkdf-full sets and fifteen
+  curve25519 ladder files plus the rfc7748 chain — the sc23 P-256
+  verdict arriving for the block. A step-budget refusal is the
+  machine's word where `slow` was this rig's word for a wall-clock
+  skip; depth goes DOWN on paper and honesty goes up. The next lupin
+  release that raises or retires the evaluation-step budget inherits
+  these 25 as its expected flip set.
+- **3 rows stay `slow`** (`x25519_shared_p3/p4/p5`): neither an answer
+  nor the refusal arrives inside 70s idle — the one word that keeps the
+  lane un-invoked, with the caveat in the row comment.
+
