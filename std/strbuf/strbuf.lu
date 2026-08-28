@@ -24,16 +24,21 @@
 //! s37's builtin spelling, and `strbuf.new()` is the module spelling
 //! available today. That delta is recorded in the campaign closeout.
 //!
-//! THREE OF THE ELEVEN ARE NOT HERE, each for a stated reason:
+//! TWO OF THE ELEVEN ARE NOT HERE, each for a stated reason — and
+//! `push(c: char)` LEFT this list at sc24: D58 ruled the type
+//! (`[type.char]`, the sc24 data pin) and the sc24 wolf pair executes
+//! it, so the one-line body (`{c}` interpolation, which prints THE
+//! CHARACTER per `[type.char.interp]`) is code below. Its lanes are the
+//! wolf rungs; lupin's char tier is is26, running concurrently, and its
+//! rows are ledgered by lane rather than claimed. The sprint's first
+//! wolf acquisition (@ e7abf03) was pre-s121 and refused the type —
+//! the mid-sprint re-acquisition is what made this writable, and every
+//! sentence here was re-measured against the binary that gets pinned.
 //!
 //! - `strbuf.in(r)` — the region-explicit constructor (API-CONVENTIONS §5,
 //!   the s37 `.in(r)` pattern). Placement syntax over a std type is
 //!   compiler plumbing this pin does not have; the ambient-region
 //!   constructor below is D10's default and needs no annotation.
-//! - `push(c: char)` — there is no `char` type at this pin: `'a'` does not
-//!   lex (E0101 lupin / E0107 wolfc) and no expression produces a code
-//!   point. Filed as F-0018; `push_str` covers every one-code-point case
-//!   through a one-code-point `str`.
 //! - `reserve(n)` — API-CONVENTIONS §8's rule ("no capacity API without a
 //!   capacity") applies verbatim: a `str`-backed buffer has no capacity to
 //!   reserve, and a documented no-op would be a lie. It lands with the SSO
@@ -90,6 +95,35 @@ pub fn len(b: StrBuf) -> int {
 /// ```
 pub fn push_str(mut b: StrBuf, s: str) {
     b.s = "{b.s}{s}"
+}
+
+/// Appends one code point — the sc03 contract's `push(c)`, code at last
+/// (sc24), over D58's `char` (`[type.char]`: a Unicode scalar value,
+/// ordered, NOT an integer). The body is `{c}` interpolation, which
+/// `[type.char.interp]` rules to print THE CHARACTER — so the appended
+/// bytes are exactly `c`'s UTF-8 encoding, 1 to 4 of them, and the
+/// buffer's UTF-8 validity is preserved by construction: no `int` ever
+/// touches this path, and a non-scalar cannot exist as a `char` at all
+/// (the D56 cast already trapped it). O(len(b)) with the interim
+/// backing, amortized O(1) once the SSO builder lands. Total: no error
+/// row, no traps beyond allocation.
+///
+/// LANES: both wolf rungs execute this; lupin 0.1.14 has no `char`
+/// (`'` does not lex there — E0101; the interpreter's char tier is
+/// is26, running concurrently), so char-carrying tests and the example
+/// below are honest `unsupported` on that lane until the release that
+/// carries it. The example spells its `char`s through `"é🐺".chars()`
+/// rather than literals so the refusal stays the METHOD's (a clean
+/// `unsupported`), not a lex error.
+///
+/// ```wolf-doc-example
+/// var b = strbuf.new()
+/// for c in "é🐺".chars() { strbuf.push(mut b, c) }
+/// strbuf.to_str(b) == "é🐺"
+/// strbuf.len(b) == 6
+/// ```
+pub fn push(mut b: StrBuf, c: char) {
+    b.s = "{b.s}{c}"
 }
 
 /// Inserts `s` at byte offset `off`, shifting everything at or after `off`

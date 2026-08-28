@@ -1,0 +1,35 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: mem.str.get, str.slice
+//!
+//! `get` with a from-end endpoint — the one place `^n`'s sc24 healing is
+//! INCOMPLETE, held as a ledger row so the divergence cannot be forgotten
+//! (F-0096, filed upstream). `[mem.str.get]`'s own sentence is "end-relative
+//! endpoints (`^n`) and open ends resolve exactly as in `s[a..b]` before
+//! the domain question is asked"; at the sc24 binaries lupin 0.1.14 does
+//! exactly that (this file runs there), while both wolf rungs answer
+//! `unsupported` at resolve for a `^n` inside the range `get` consumes —
+//! the same endpoints the same binaries resolve in the direct slice one
+//! file over. The wolfc/native columns of this row flip to `run` at the
+//! binary bump that closes F-0096, and that flip is the closure evidence.
+//!
+//! std.str's two-offset wrapper is deliberately NOT under test: it takes
+//! `int` offsets, so `^n` cannot reach it (a from-end endpoint is range
+//! syntax, not a value — F-0030's "a range is barely a value" boundary).
+//! What a caller of the WRAPPER writes today is a forward offset computed
+//! from `len`, and that is lane-portable; this file pins the builtin's own
+//! range position, where the grammar puts `^n`.
+
+fn main() -> !int {
+    let s = "héllo"
+    // A hit through a from-end endpoint is bit-identical to the forward
+    // spelling of the same boundary.
+    if (s.get(0..^1) else "?") == "héll" {} else { return 1 }
+    if (s.get(1..^1) else "?") == "éll" {} else { return 2 }
+    if (s.get(^2..^0) else "?") == "lo" {} else { return 3 }
+    // The domain question is asked AFTER ^n resolves: ^4 is byte 2,
+    // inside é, so the recoverable form answers `none` where the checked
+    // slice faults — get's whole contract, unchanged by the spelling.
+    if (s.get(^4..^0) else "MISS") == "MISS" {} else { return 4 }
+    0
+}

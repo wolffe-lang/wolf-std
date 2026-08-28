@@ -2,7 +2,7 @@
 //! is00 corpus-overlay pattern). The two implementations diverge by
 //! design (lupin runs what wolfc refuses, and vice versa), so each test
 //! records what each implementation is expected to do *today*:
-//! `lupin = "run" | "unsupported" | "slow"`,
+//! `lupin = "run" | "unsupported" | "slow" | "divergent(…)"`,
 //! `wolfc = "run" | "unsupported" | "fail(E…)"`,
 //! `native = "run" | "unsupported" | "fail(E…)"` — the compiler's second
 //! rung (sc04: `conform-run --native`, s28's compile-link-execute), which
@@ -39,6 +39,30 @@ pub enum Expect {
     /// owed a re-measure at pin bumps (an interpreter perf wave is the
     /// exit; F-0078's history is the precedent).
     Slow,
+    /// **The lane EXECUTES the program and its honest observation cannot
+    /// satisfy the directive** — spelled `divergent(trap(kind))`,
+    /// `divergent(exit(N))` or `divergent(stdout)`, lupin-only (sc24, the
+    /// first release whose interpreter carries the net/process tiers).
+    /// Two shapes forced the word, both filed upstream the day they were
+    /// measured: a handler over a BUILTIN-raised row takes its first arm
+    /// under lupin 0.1.14 (F-0097 — the F-0079 mechanism at a third
+    /// address), which costs two net row-witnesses their stdout; and the
+    /// take-mode staleness discipline is STATIC on the compiler lanes
+    /// (fail(E1001)) while the interpreter executes the same program to
+    /// its honest dynamic outcome (F-0098 — trap(use-after-move), or the
+    /// row path when execution diverts before the reuse). A directive
+    /// speaks one expectation for three lanes, so a lane whose truthful
+    /// answer differs needs its own word: `run` would be false,
+    /// `unsupported` would lie about semantics, and a red would drown the
+    /// signal that catches the NEXT change. The runner invokes the lane,
+    /// demands EXACTLY the named observation (anything else is red — a
+    /// heal shows up as a red the day it lands, and the flip to `run` is
+    /// deliberate), keeps the record out of the cross-lane differ (the
+    /// divergence is already filed; re-reporting it every run is noise),
+    /// and prints a divergence ledger naming every such row, so the entry
+    /// is louder than a `run`, not quieter. Each row's comment cites its
+    /// finding.
+    Divergent(DivObs),
     /// This is not a relaxation, it is a truthful record: at the sc07 pin
     /// two `str`-heavy tests get `run` or
     /// `unsupported — place projection outside the modelled surface` from
@@ -52,6 +76,31 @@ pub enum Expect {
     /// quieter: `std-test` prints an instability ledger and names the finding
     /// every run.
     Unstable(Vec<Expect>),
+}
+
+/// The exact observation a `divergent(…)` row expects from its lane.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DivObs {
+    /// The directive's exit code is reached and the stdout hash is NOT the
+    /// directive's — the wrong-answer shape (F-0097's two rows).
+    Stdout,
+    /// The program runs to exactly this exit where the directive expects a
+    /// static rejection (F-0098's row whose execution diverts before the
+    /// reuse the compilers reject).
+    Exit(i64),
+    /// The program traps with exactly this kind where the directive
+    /// expects a static rejection (F-0098's dynamic half).
+    Trap(String),
+}
+
+impl std::fmt::Display for DivObs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DivObs::Stdout => write!(f, "stdout"),
+            DivObs::Exit(n) => write!(f, "exit({n})"),
+            DivObs::Trap(k) => write!(f, "trap({k})"),
+        }
+    }
 }
 
 impl std::fmt::Display for Expect {
@@ -69,6 +118,7 @@ impl std::fmt::Display for Expect {
                     .collect::<Vec<_>>()
                     .join("|")
             ),
+            Expect::Divergent(obs) => write!(f, "divergent({obs})"),
         }
     }
 }
@@ -88,6 +138,10 @@ pub fn depth(e: &Expect) -> u8 {
         // sometimes runs a program has at least that much capability, and
         // the gate must still catch a REGRESSION below the whole set.
         Expect::Unstable(set) => set.iter().map(depth).max().unwrap_or(0),
+        // A divergent lane EXECUTES the program (run-depth reach); what it
+        // answers is wrong or differently-shaped, which the runner checks
+        // exactly. Documentation rather than a gate, like `slow`.
+        Expect::Divergent(_) => 2,
     }
 }
 
@@ -146,13 +200,20 @@ pub fn parse(text: &str, what: &str) -> Result<Ledger, String> {
             {
                 return Err(format!(
                     "{what}:{line}: `fail(…)` is a wolfc expectation; lupin is \
-                     run | unsupported | slow"
+                     run | unsupported | slow | divergent(…)"
                 ));
             }
             if k != "lupin" && expect == Expect::Slow {
                 return Err(format!(
                     "{what}:{line}: `slow` is a lupin expectation (the tree-walk's \
                      speed, sc16); a compiled lane is measured or it is `unsupported`"
+                ));
+            }
+            if k != "lupin" && matches!(expect, Expect::Divergent(_)) {
+                return Err(format!(
+                    "{what}:{line}: `divergent(…)` is a lupin expectation (sc24); \
+                     the compiler lanes' answers define the directive, so a \
+                     divergence there is a red to investigate, never a row"
                 ));
             }
             *slot = Some(expect);
@@ -189,12 +250,18 @@ fn parse_expect(v: &str) -> Option<Expect> {
             let mut set = Vec::new();
             for part in inner.split('|') {
                 let e = parse_expect(part.trim())?;
-                if matches!(e, Expect::Unstable(_) | Expect::Slow) || set.contains(&e) {
-                    return None; // no nesting, no skips, no duplicates
+                if matches!(e, Expect::Unstable(_) | Expect::Slow | Expect::Divergent(_))
+                    || set.contains(&e)
+                {
+                    return None; // no nesting, no skips, no filed divergences, no duplicates
                 }
                 set.push(e);
             }
             (set.len() >= 2).then_some(Expect::Unstable(set))
+        }
+        _ if v.starts_with("divergent(") => {
+            let inner = v.strip_prefix("divergent(")?.strip_suffix(')')?;
+            parse_div_obs(inner).map(Expect::Divergent)
         }
         _ => {
             let code = v.strip_prefix("fail(")?.strip_suffix(')')?;
@@ -204,6 +271,27 @@ fn parse_expect(v: &str) -> Option<Expect> {
             ok.then(|| Expect::Fail(code.to_string()))
         }
     }
+}
+
+/// The inner of `divergent(…)`: `stdout`, `exit(N)`, or `trap(kind)` —
+/// trap kinds are the toolchain's own names ([conf.trap.set] plus the
+/// interpreter's dynamic-move kind): lowercase words and dashes, never
+/// empty.
+fn parse_div_obs(inner: &str) -> Option<DivObs> {
+    if inner == "stdout" {
+        return Some(DivObs::Stdout);
+    }
+    if let Some(n) = inner
+        .strip_prefix("exit(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        return Some(DivObs::Exit(n.parse().ok()?));
+    }
+    let k = inner.strip_prefix("trap(")?.strip_suffix(')')?;
+    (!k.is_empty()
+        && k.chars()
+            .all(|c| c.is_ascii_lowercase() || c == '-' || c == '_'))
+    .then(|| DivObs::Trap(k.to_string()))
 }
 
 #[cfg(test)]
@@ -273,6 +361,55 @@ mod tests {
         )
         .is_err());
         assert!(parse_expect("unstable(slow|run)").is_none());
+    }
+
+    #[test]
+    fn divergent_is_lupin_only_and_exact() {
+        // The sc24 word: the lane executes, its honest observation cannot
+        // satisfy the directive, and the row demands EXACTLY the named
+        // observation (F-0097/F-0098's four rows).
+        let l = parse(
+            "[tests.\"a.lu\"]\nlupin = \"divergent(stdout)\"\nwolfc = \"run\"\nnative = \"run\"\n",
+            "l",
+        )
+        .unwrap();
+        assert_eq!(l["a.lu"].lupin, Expect::Divergent(DivObs::Stdout));
+        assert_eq!(l["a.lu"].lupin.to_string(), "divergent(stdout)");
+        assert_eq!(
+            parse_expect("divergent(trap(use-after-move))"),
+            Some(Expect::Divergent(DivObs::Trap("use-after-move".into())))
+        );
+        assert_eq!(
+            parse_expect("divergent(exit(1))"),
+            Some(Expect::Divergent(DivObs::Exit(1)))
+        );
+        // Run-depth reach, documentation not gate (the `slow` pattern).
+        assert_eq!(
+            depth(&Expect::Divergent(DivObs::Stdout)),
+            depth(&Expect::Run)
+        );
+        // A divergent row is never satisfied by a normal observation: the
+        // runner's special path is the only acceptance, so a heal reads as
+        // a red and the flip to `run` is deliberate.
+        assert!(!satisfies(&Expect::Divergent(DivObs::Stdout), &Expect::Run));
+        // Lupin-only: the compiler lanes' answers define the directive.
+        assert!(parse(
+            "[tests.\"a.lu\"]\nlupin = \"run\"\nwolfc = \"divergent(stdout)\"\nnative = \"run\"\n",
+            "l"
+        )
+        .is_err());
+        assert!(parse(
+            "[tests.\"a.lu\"]\nlupin = \"run\"\nwolfc = \"run\"\nnative = \"divergent(exit(1))\"\n",
+            "l"
+        )
+        .is_err());
+        // Malformed inners and smuggling attempts.
+        assert!(parse_expect("divergent()").is_none());
+        assert!(parse_expect("divergent(run)").is_none());
+        assert!(parse_expect("divergent(trap())").is_none());
+        assert!(parse_expect("divergent(trap(Bounds))").is_none());
+        assert!(parse_expect("divergent(exit(x))").is_none());
+        assert!(parse_expect("unstable(run|divergent(stdout))").is_none());
     }
 
     #[test]

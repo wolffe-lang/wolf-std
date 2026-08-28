@@ -1,0 +1,58 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.unicode, mem.str.chars
+//!
+//! `unicode.code(c: char) -> int` — the sc03 contract's `char.code`,
+//! landed at sc24: the total projection (`c as int`,
+//! `[type.char.cast]` — no row, no trap, because a `char` IS a scalar
+//! value by construction under D58) and the one sanctioned bridge from
+//! the typed scalar into the `int` currency this module's classifiers
+//! speak. The fixture walks mixed widths and checks each projection
+//! against the standard's numbers, then closes the loop with
+//! `from_code` — the validating inverse: `from_code(code(c))` is a hit
+//! that answers the same scalar, for every `c` a `str` can hold.
+//!
+//! Every `char` is spelled through `.chars()` rather than a literal, so
+//! lupin's refusal stays the clean method `unsupported` (no `chars()`,
+//! no `char`, no `'` token there until is26 — ledgered by lane). This
+//! file imports std.unicode alone: `str.is_ascii` and
+//! `unicode.is_ascii` share a name by design (sc09's shared-name rule),
+//! so a unicode test never imports std.str.
+
+use std.unicode
+
+fn main() -> !int {
+    var k = 0
+    for c in "Aé中🐺".chars() {
+        var want = 0
+        if k == 0 {
+            want = 65
+        } else if k == 1 {
+            want = 233
+        } else if k == 2 {
+            want = 20013
+        } else {
+            want = 128058
+        }
+        let n = unicode.code(c)
+        if n == want {} else { return 1 }
+        // The inverse direction: the validating constructor accepts every
+        // value the projection can produce, and answers the same scalar.
+        if (unicode.from_code(n) else 0 - 1) == n {} else { return 2 }
+        // And the classifier currency composes: utf8_len over the
+        // projected scalar gives the width the fixture was built from.
+        let w = unicode.utf8_len(n) else 0
+        var wantw = 1
+        if k == 1 {
+            wantw = 2
+        } else if k == 2 {
+            wantw = 3
+        } else if k == 3 {
+            wantw = 4
+        }
+        if w == wantw {} else { return 3 }
+        k = k + 1
+    }
+    if k == 4 {} else { return 4 }
+    0
+}

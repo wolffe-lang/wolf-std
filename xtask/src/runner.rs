@@ -261,6 +261,7 @@ pub fn std_test() -> Result<(), String> {
     let mut conservatism: Vec<String> = Vec::new();
     let mut unstable: Vec<String> = Vec::new();
     let mut slow_skips: Vec<String> = Vec::new();
+    let mut divergent_rows: Vec<String> = Vec::new();
     let mut divergences: Vec<serde_json::Value> = Vec::new();
     let mut ran = 0usize;
 
@@ -332,6 +333,50 @@ pub fn std_test() -> Result<(), String> {
                     rec.warnings.join("\n    ")
                 ));
             }
+            // A `divergent(…)` row (sc24): the lane executes and its honest
+            // observation is a FILED divergence from the directive. Demand
+            // exactly the named observation — anything else (a heal
+            // included) is red, so the flip to `run` is deliberate — and
+            // keep the record out of the cross-lane differ: the divergence
+            // is already filed, and re-reporting it every run would bury
+            // the differ's real signal.
+            if let Expect::Divergent(obs) = want_pre {
+                let matched = match obs {
+                    ledger::DivObs::Trap(k) => {
+                        matches!(&rec.verdict, Verdict::Trap(got) if got == k)
+                    }
+                    ledger::DivObs::Exit(n) => {
+                        matches!(&rec.verdict, Verdict::Exit(got) if got == n)
+                    }
+                    ledger::DivObs::Stdout => match (&rec.verdict, &check) {
+                        (
+                            Verdict::Exit(got),
+                            Check::Run {
+                                exit: ExitExpect::Code(want),
+                                stdout: Some(expected),
+                            },
+                        ) => got == want && !record::stdout_matches(&rec, expected),
+                        _ => false,
+                    },
+                };
+                if matched {
+                    divergent_rows.push(format!(
+                        "divergent({}): {test} — observed the filed divergence \
+                         ({obs}); flips to `run` at the release that closes its \
+                         finding (sc24)",
+                        imp.ledger_name()
+                    ));
+                } else {
+                    reds.push(format!(
+                        "tests/{test} [{}]: ledger says `divergent({obs})`, \
+                         observed `{}` — the divergence moved (a heal or a new \
+                         shape); re-measure and flip the row deliberately",
+                        imp.ledger_name(),
+                        rec.verdict
+                    ));
+                }
+                continue;
+            }
             let achieved = match classify(&rec, &check) {
                 Ok(a) => a,
                 Err(mismatch) => {
@@ -397,6 +442,11 @@ pub fn std_test() -> Result<(), String> {
                     // A `slow` row is skipped before invocation, so no
                     // observation can carry it either.
                     Expect::Slow => unreachable!("a slow lane is never invoked"),
+                    // A `divergent(…)` row is accepted (or reddened) on its
+                    // own path above and never reaches this match.
+                    Expect::Divergent(_) => {
+                        unreachable!("a divergent row is handled before classify")
+                    }
                 }
             }
         }
@@ -447,16 +497,21 @@ pub fn std_test() -> Result<(), String> {
     }
     println!(
         "std-test: {ran} test(s); forward tags: {forward_tags}; \
-         conservatism ledger: {} entr{}; unstable rows: {}; slow skips: {}",
+         conservatism ledger: {} entr{}; unstable rows: {}; slow skips: {}; \
+         divergent rows: {}",
         conservatism.len(),
         if conservatism.len() == 1 { "y" } else { "ies" },
         unstable.len(),
-        slow_skips.len()
+        slow_skips.len(),
+        divergent_rows.len()
     );
     for line in &unstable {
         println!("  {line}");
     }
     for line in &slow_skips {
+        println!("  {line}");
+    }
+    for line in &divergent_rows {
         println!("  {line}");
     }
     for line in &conservatism {

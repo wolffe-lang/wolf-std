@@ -14,6 +14,45 @@
 # moving upstreams); the nightly lane watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.14 (sc24 bump, from 0.1.13) — r02, the is14-is25 CATCH-UP release
+# (its changelog is honest about the gap: twelve sprints, eight
+# re-vendors, one entry). Conformance pin `90c90df` (wolf-lang trunk,
+# merge s116) — BEHIND this repo's data pin a900b8c (s120/s121), which
+# is the honest normal: the interpreter's char tier is is26, running
+# concurrently, so THIS release has NO `chars()` ("`str` has no method
+# `chars`"), NO `char` and no `'` token at all (E0101 at lex).
+#
+# What the bump changes for this repo, measured by std-test over the
+# whole 359-row ledger before a single sc24 edit (23 rows deeper, 0
+# shallower — the sc22 provisioning-drift list arriving release-backed):
+# - the is18 crossing: SOCKETS (4 net rows), the PROCESS trio (2 rows)
+#   and lupin's own RFC 8259 json reading (10 x/json rows) all flip
+#   `unsupported` -> `run` — three POSTURES closed on a release, the
+#   "a posture closes on a decision" distinction sc10 recorded;
+# - the is14-17 dispatch waves (trait defaults #32, prim impls #34)
+#   flip the 3 dark cmp rows;
+# - TWO NEW DIVERGENCES, first observable in the first release that has
+#   the tiers at all, both filed the day they were measured and both
+#   ledgered under the sc24 `divergent(…)` word: F-0097 (wolf-interp#47,
+#   a handler over a BUILTIN-raised row takes its first arm — F-0079's
+#   mechanism at a third address, both arm orders measured) and F-0098
+#   (wolf-interp#48, take-mode reuse executes here where both compiler
+#   rungs reject it E1001);
+# - F-0036's lupin half is HEALED (both raise-position collision shapes
+#   re-measured correct; the register row closes after eleven sprints);
+# - the `slow` block re-measured per is20's release (the ledger's own
+#   debt): MIXED — the chacha20 wycheproof parts now COMPLETE (flip to
+#   `run`; is20's 279s->3s prune fix arriving), the sha2 long/monte/
+#   hkdf-full and most curve25519 ladder parts return lupin's own
+#   `unsupported: did not terminate within 50000000 evaluation steps`
+#   (flip to `unsupported` — the machine's word, sc23's P-256 verdict
+#   arriving for the block), and a few ladder parts produce NEITHER an
+#   answer nor the refusal inside the ceiling (stay `slow`). Per-row
+#   outcomes in the ledger's sc24 comments. Several refusals land near
+#   the 60s wall (p256_p2: 56s idle), so F-0093's margin rule applies:
+#   run the rig on a quiet machine and read a timeout there as load.
+#
+# The sc13-bump note, kept for the history it records:
 # 0.1.13 (sc13-file bump, from 0.1.12). Its own conformance pin is
 # `02c1e88` — the compiler sha this repository held one sprint ago, the
 # THIRD bump running with that pattern.
@@ -38,8 +77,8 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.13"
-pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
+version = "0.1.14"
+pin = "90c90df91dc314f9d0ae322d387dd10be046c828"
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
@@ -177,8 +216,41 @@ pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
 version = "0.1.0"
-# Built from a clean checkout of wolf-lang at the DATA pin (below,
-# vendor/upstream/PIN): cargo build --release -p wolf_driver -p wolf_rt.
+# sc24 bump, SECOND acquisition: @ `a900b8c` — THE DATA PIN ITSELF
+# (merge s121). `--version` names no pin (pre-M1) and says "paired with
+# lupin 0.1.14 … pin 90c90df"; the sha is recorded from acquisition and
+# VERIFIED BEHAVIORALLY: s121's whole surface executes on both rungs —
+# `'é'` lexes, `char` types, `c as int` is total, `65 as char` prints A,
+# `55296 as char` traps `overflow` (D56's twins), `{c}` prints the
+# character, and `s.chars()` yields `List[char]` that crosses a std
+# module boundary in parameter, return and `List` positions (probed).
+#
+# THE SPRINT MEASURED TWO WOLF BINARIES, and the record keeps both
+# because the difference is the sc24 story. The FIRST acquisition
+# (@ e7abf03, merge s122, built 23:23 — pre-s121) carried s120 without
+# the type: `chars()` spoke the v0 `List[int]` currency, `'a'` was
+# E0107 at lex, `char` E0301 at resolve, and the whole char surface was
+# unwritable at zero executing lanes. The provisioner delivered THIS
+# binary mid-sprint (built 01:34, after a900b8c at 23:39); the
+# int-currency agreement test went red on schedule within hours of
+# being written, and the re-measure was redone against the binary that
+# is pinned here. What the sc24 wolf pair moves, measured:
+# - the char surface LANDS: `str.to_list_chars`, `strbuf.push(c: char)`,
+#   `unicode.code(c: char)` — wolf-lane rows (lupin's char tier is
+#   is26, running concurrently; ledgered by lane);
+# - the 3 fmt/decimal NATIVE rows flip `unsupported` -> `run` (the f64
+#   decimal tier lowers natively — the sc22 drift list's native side);
+# - `x/tls/record/reject_tampered_row` wolfc flips `unsupported` ->
+#   `run`: #139's fix is finally in a pinned binary, F-0095 CLOSED —
+#   the sc22/sc23 carried lead paid on the date the notes predicted;
+# - STILL REFUSED at both acquisitions, re-probed at this one:
+#   `get(a..^n)` `unsupported` at resolve against [mem.str.get]'s own
+#   sentence (F-0096 / wolf-lang#164, filed this sprint);
+#   `List[(int, int)]` at resolve (the `chars` pair's other blocker);
+#   `for c in "abc"` (the s121-named question); `str + str` (E0409, #5).
+#
+# Built from a clean checkout of wolf-lang at `a900b8c` (the data
+# pin): cargo build --release -p wolf_driver -p wolf_rt.
 #
 # sc18 (06-crypto) bump: trunk `21b129e`, which IS trunk's tip at the bump
 # (the sc18 contract's floor: s111 — "the crypto probe pays back" — lands
@@ -629,4 +701,6 @@ version = "0.1.0"
 # moved with it, but this key did not; corrected at sc17, where doctor's
 # "recorded pin" line surfaced the drift)
 # pin = "87405aca88bbdd1d571e7b3ef8da638e64fbd57a"  (superseded, sc16/sc17 era)
-pin = "21b129e90c4589c0fc6b5698e0468e84edbd574d"
+# pin = "21b129e90c4589c0fc6b5698e0468e84edbd574d"  (superseded, sc18-sc23 era)
+# pin = "e7abf0354daea50df13a86f7e95962d29ee9cbf3"  (superseded mid-sc24 — the pre-s121 first acquisition)
+pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"
