@@ -92,6 +92,17 @@ const EDDSA_CHUNK: usize = 40;
 const EDDSA_SMOKE_VALID: usize = 1;
 const EDDSA_SMOKE_INVALID: usize = 1;
 
+/// ECDSA-P256 chunking (sc23). A P-256 verify is TWO table-free
+/// complete-formula scalar multiplications, which exceed lupin's 50M
+/// evaluation-step budget AND the checked tier's step budget — so
+/// every vector file is NATIVE-ONLY (lupin/wolfc `unsupported`, not
+/// `slow`: the interpreter returns a step-budget verdict rather than
+/// timing out). The three-lane differential is carried by the
+/// hand-written field / DER / early-reject files, whose executed paths
+/// never reach a scalar multiplication. 64 cases per part keeps each
+/// native program's runtime moderate.
+const ECDSA_CHUNK: usize = 64;
+
 pub fn gen_vectors(check_only: bool) -> Result<(), String> {
     let repo = crate::repo_root();
     let vec_dir = repo.join("vendor/vectors");
@@ -341,6 +352,34 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
             &emit_wycheproof_eddsa(&smoke, 0, 0, cases.len()),
         )?;
         place(&out, &text, check_only, &mut drift, &mut written)?;
+    }
+
+    // ---- sc23: ECDSA-P256 — CAVP SigVer/SigGen + Wycheproof. ----
+    {
+        let out_dir = repo.join("tests/x/crypto/p256");
+        let sv = vec_dir.join("cavp/SigVer.rsp");
+        let ver = parse_cavp_sigver(&read(&sv)?, &show(&sv))?;
+        let out = out_dir.join("cavp_sigver_p256.lu");
+        let text = fmt(&show(&out), &emit_cavp_sigver(&ver))?;
+        place(&out, &text, check_only, &mut drift, &mut written)?;
+
+        let sg = vec_dir.join("cavp/SigGen.txt");
+        let gen = parse_cavp_siggen(&read(&sg)?, &show(&sg))?;
+        let out = out_dir.join("cavp_siggen_p256.lu");
+        let text = fmt(&show(&out), &emit_cavp_siggen(&gen))?;
+        place(&out, &text, check_only, &mut drift, &mut written)?;
+
+        let wp = vec_dir.join("wycheproof/ecdsa_secp256r1_sha256_test.json");
+        let cases = parse_wycheproof_ecdsa(&read(&wp)?, &show(&wp))?;
+        let parts: Vec<&[WpEcdsaCase]> = cases.chunks(ECDSA_CHUNK).collect();
+        for (i, part) in parts.iter().enumerate() {
+            let out = out_dir.join(format!("wycheproof_p256_p{}.lu", i + 1));
+            let text = fmt(
+                &show(&out),
+                &emit_wycheproof_ecdsa(part, i + 1, parts.len(), cases.len()),
+            )?;
+            place(&out, &text, check_only, &mut drift, &mut written)?;
+        }
     }
 
     if !drift.is_empty() {
@@ -716,6 +755,302 @@ fn parse_wycheproof_eddsa(text: &str, what: &str) -> Result<Vec<EddsaCase>, Stri
         return Err(format!("{what}: no eddsa vectors parsed"));
     }
     Ok(out)
+}
+
+// ------------------------------------------------------- sc23: ECDSA-P256
+
+/// One CAVP SigVer P-256 case: a public key (Qx || Qy), a message, an
+/// (r, s) signature and the expected pass/fail verdict.
+struct EcdsaVerCase {
+    qx: String,
+    qy: String,
+    msg: String,
+    r: String,
+    s: String,
+    valid: bool,
+}
+
+/// Parse the `[P-256,SHA-256]` section of CAVP `SigVer.rsp` — the block
+/// runs from that header to the next `[` bracket. Each record is
+/// Msg/Qx/Qy/R/S/Result, Result `P` (pass) or `F` (fail). Any other
+/// hash/curve section is ignored; a malformed record is a hard error.
+fn parse_cavp_sigver(text: &str, what: &str) -> Result<Vec<EcdsaVerCase>, String> {
+    let sec = section(text, "[P-256,SHA-256]", what)?;
+    let mut out = Vec::new();
+    let mut cur: std::collections::HashMap<&str, String> = std::collections::HashMap::new();
+    for line in sec.lines() {
+        let line = line.trim();
+        if let Some((k, v)) = line.split_once(" = ") {
+            cur.insert(k.trim(), v.trim().to_string());
+        } else if let Some(rest) = line.strip_prefix("Result = ") {
+            let _ = rest;
+        }
+        if line.starts_with("Result = ") {
+            let res = line.trim_start_matches("Result = ");
+            let valid = res.starts_with('P');
+            out.push(EcdsaVerCase {
+                qx: field(&cur, "Qx", what)?,
+                qy: field(&cur, "Qy", what)?,
+                msg: field(&cur, "Msg", what)?,
+                r: field(&cur, "R", what)?,
+                s: field(&cur, "S", what)?,
+                valid,
+            });
+            cur.clear();
+        }
+    }
+    if out.is_empty() {
+        return Err(format!("{what}: no P-256 SigVer records parsed"));
+    }
+    Ok(out)
+}
+
+/// One CAVP SigGen P-256 case: the key (Qx || Qy), the message, and the
+/// signature (r, s) the generator produced with its own random nonce.
+struct EcdsaGenCase {
+    qx: String,
+    qy: String,
+    msg: String,
+    r: String,
+    s: String,
+}
+
+/// Parse the `[P-256,SHA-256]` section of CAVP `SigGen.txt`. Each record
+/// is Msg/d/Qx/Qy/k/R/S; std's sign is RFC 6979 (a different, equally
+/// valid nonce), so these are asserted through VERIFY (Q against
+/// Msg/R/S — the signature the file publishes must verify), not
+/// regenerated. A malformed record is a hard error.
+fn parse_cavp_siggen(text: &str, what: &str) -> Result<Vec<EcdsaGenCase>, String> {
+    let sec = section(text, "[P-256,SHA-256]", what)?;
+    let mut out = Vec::new();
+    let mut cur: std::collections::HashMap<&str, String> = std::collections::HashMap::new();
+    for line in sec.lines() {
+        let line = line.trim();
+        if let Some((k, v)) = line.split_once(" = ") {
+            cur.insert(k.trim(), v.trim().to_string());
+        }
+        if line.starts_with("S = ") {
+            out.push(EcdsaGenCase {
+                qx: field(&cur, "Qx", what)?,
+                qy: field(&cur, "Qy", what)?,
+                msg: field(&cur, "Msg", what)?,
+                r: field(&cur, "R", what)?,
+                s: field(&cur, "S", what)?,
+            });
+            cur.clear();
+        }
+    }
+    if out.is_empty() {
+        return Err(format!("{what}: no P-256 SigGen records parsed"));
+    }
+    Ok(out)
+}
+
+/// One Wycheproof ECDSA case: the group's uncompressed public key, the
+/// message, the DER signature and the verdict.
+struct WpEcdsaCase {
+    tc_id: u64,
+    pubkey: String,
+    msg: String,
+    sig: String,
+    valid: bool,
+}
+
+/// The Wycheproof ECDSA rules (sc23): each group carries an uncompressed
+/// public key (`publicKey.uncompressed`); every test is `valid` or
+/// `invalid` (this file has no `acceptable`), and `verify_der` must
+/// answer true / false respectively — the DER manipulations, r/s edge
+/// values, invalid-curve points and malleability cases all decided by
+/// the strict-DER + FIPS 186-5 verify. Any other result is a hard error.
+fn parse_wycheproof_ecdsa(text: &str, what: &str) -> Result<Vec<WpEcdsaCase>, String> {
+    let v: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("{what}: bad json: {e}"))?;
+    let mut out = Vec::new();
+    let groups = v["testGroups"]
+        .as_array()
+        .ok_or(format!("{what}: no testGroups"))?;
+    for gp in groups {
+        let pk = gp["publicKey"]["uncompressed"]
+            .as_str()
+            .ok_or(format!("{what}: group has no publicKey.uncompressed"))?
+            .to_string();
+        for t in gp["tests"].as_array().ok_or(format!("{what}: no tests"))? {
+            let tc = t["tcId"].as_u64().ok_or(format!("{what}: tcId"))?;
+            let result = t["result"].as_str().unwrap_or("");
+            let valid = match result {
+                "valid" => true,
+                "invalid" => false,
+                other => {
+                    return Err(format!(
+                        "{what}: tcId {tc} is `{other}` — the ECDSA file is \
+                         valid/invalid only; a new result needs a ruling here"
+                    ));
+                }
+            };
+            out.push(WpEcdsaCase {
+                tc_id: tc,
+                pubkey: pk.clone(),
+                msg: t["msg"].as_str().unwrap_or_default().to_string(),
+                sig: t["sig"].as_str().unwrap_or_default().to_string(),
+                valid,
+            });
+        }
+    }
+    if out.is_empty() {
+        return Err(format!("{what}: no ECDSA vectors parsed"));
+    }
+    Ok(out)
+}
+
+/// The substring from the first line equal to `header` up to the next
+/// line beginning with `[` (a CAVP `.rsp`/`.txt` section).
+fn section<'a>(text: &'a str, header: &str, what: &str) -> Result<&'a str, String> {
+    let start = text
+        .find(header)
+        .ok_or(format!("{what}: no `{header}` section"))?
+        + header.len();
+    let rest = &text[start..];
+    let end = rest
+        .match_indices('[')
+        .map(|(i, _)| i)
+        .find(|&i| rest[..i].ends_with('\n') || rest[..i].trim_end().ends_with('\n'))
+        .unwrap_or(rest.len());
+    Ok(&rest[..end])
+}
+
+fn field(
+    m: &std::collections::HashMap<&str, String>,
+    k: &str,
+    what: &str,
+) -> Result<String, String> {
+    m.get(k)
+        .cloned()
+        .ok_or(format!("{what}: record missing `{k}`"))
+}
+
+/// Pad a hex string to 64 chars (32 bytes) — CAVP prints r/s without
+/// leading zeros; the raw signature is fixed-width r || s.
+fn pad64(h: &str) -> String {
+    format!("{:0>64}", h)
+}
+
+const ECDSA_HDR: &str = "//! check: run(exit=0)\n//! phase: run\n\
+    //! conforms: std.x.crypto.p256, arith.checked\n//!\n\
+    //! GENERATED — `cargo xtask gen-vectors`, from the vendored source\n\
+    //! named below (provenance: `vendor/vectors/README.md`). Do not edit\n\
+    //! by hand; ci's `gen-vectors --check` holds this file byte-identical\n\
+    //! to its source. NATIVE-ONLY: a P-256 verify is two table-free\n\
+    //! complete-formula scalar multiplications, past lupin's 50M step\n\
+    //! budget and the checked tier's step budget (the ledger records\n\
+    //! both `unsupported`); the three-lane differential is the\n\
+    //! hand-written field / DER / early-reject files.\n//!\n";
+
+fn emit_cavp_sigver(cases: &[EcdsaVerCase]) -> String {
+    let mut s = String::new();
+    s.push_str(ECDSA_HDR);
+    let np = cases.iter().filter(|c| c.valid).count();
+    let nf = cases.len() - np;
+    let _ = write!(
+        s,
+        "//! NIST CAVP FIPS 186-4 ECDSA SigVer, [P-256,SHA-256] — all {} cases\n\
+         //! ({np} pass + {nf} fail). `verify` must answer true for every P and\n\
+         //! FALSE for every F (the R/S/Q/Msg tamper classes the file names).\n\
+         //! Source: `vendor/vectors/cavp/SigVer.rsp`.\n",
+        cases.len()
+    );
+    s.push_str("\nuse std.hex\nuse std.x.crypto.p256\n\n");
+    s.push_str(
+        "fn vrf(qx: str, qy: str, msg: str, r: str, s: str, want: bool) -> bool {\n\
+         \x20   let pk = hex.decode(\"04{qx}{qy}\") else List[int]()\n\
+         \x20   let sig = hex.decode(\"{r}{s}\") else List[int]()\n\
+         \x20   p256.verify(pk, hex.decode(msg) else List[int](), sig) == want\n}\n\n\
+         fn main() -> int {\n",
+    );
+    for (i, c) in cases.iter().enumerate() {
+        let _ = writeln!(
+            s,
+            "    assert(vrf(\"{}\", \"{}\", \"{}\", \"{}\", \"{}\", {}), \"sigver {i}\")",
+            c.qx,
+            c.qy,
+            c.msg,
+            pad64(&c.r),
+            pad64(&c.s),
+            c.valid
+        );
+    }
+    s.push_str("    0\n}\n");
+    s
+}
+
+fn emit_cavp_siggen(cases: &[EcdsaGenCase]) -> String {
+    let mut s = String::new();
+    s.push_str(ECDSA_HDR);
+    let _ = write!(
+        s,
+        "//! NIST CAVP FIPS 186-4 ECDSA SigGen, [P-256,SHA-256] — all {} cases,\n\
+         //! asserted THROUGH VERIFY. The file's (R,S) were produced with its\n\
+         //! own random nonce; std's sign is RFC 6979 deterministic (a\n\
+         //! different, equally valid nonce), so the published signature is\n\
+         //! checked by verifying it against the key and message (the sign\n\
+         //! path is pinned byte-exact by RFC 6979 in `rfc6979_p256.lu`).\n\
+         //! Source: `vendor/vectors/cavp/SigGen.txt`.\n",
+        cases.len()
+    );
+    s.push_str("\nuse std.hex\nuse std.x.crypto.p256\n\n");
+    s.push_str(
+        "fn vrf(qx: str, qy: str, msg: str, r: str, s: str) -> bool {\n\
+         \x20   let pk = hex.decode(\"04{qx}{qy}\") else List[int]()\n\
+         \x20   let sig = hex.decode(\"{r}{s}\") else List[int]()\n\
+         \x20   p256.verify(pk, hex.decode(msg) else List[int](), sig)\n}\n\n\
+         fn main() -> int {\n",
+    );
+    for (i, c) in cases.iter().enumerate() {
+        let _ = writeln!(
+            s,
+            "    assert(vrf(\"{}\", \"{}\", \"{}\", \"{}\", \"{}\"), \"siggen {i}\")",
+            c.qx,
+            c.qy,
+            c.msg,
+            pad64(&c.r),
+            pad64(&c.s)
+        );
+    }
+    s.push_str("    0\n}\n");
+    s
+}
+
+fn emit_wycheproof_ecdsa(cases: &[WpEcdsaCase], part: usize, parts: usize, total: usize) -> String {
+    let mut s = String::new();
+    s.push_str(ECDSA_HDR);
+    let nv = cases.iter().filter(|c| c.valid).count();
+    let ni = cases.len() - nv;
+    let _ = write!(
+        s,
+        "//! Wycheproof v1 ecdsa_secp256r1_sha256 verify, part {part} of {parts}\n\
+         //! ({} of the set's {total}: {nv} valid + {ni} invalid): `verify_der`\n\
+         //! must answer true for every valid vector and FALSE for every\n\
+         //! invalid one — the DER manipulations, r/s = 0 / = n / > n, the\n\
+         //! invalid-curve points and the malleability cases are the point.\n\
+         //! Source: `vendor/vectors/wycheproof/ecdsa_secp256r1_sha256_test.json`.\n",
+        cases.len()
+    );
+    s.push_str("\nuse std.hex\nuse std.x.crypto.p256\n\n");
+    s.push_str(
+        "fn vd(pk: str, msg: str, der: str, want: bool) -> bool {\n\
+         \x20   let key = hex.decode(pk) else List[int]()\n\
+         \x20   let m = hex.decode(msg) else List[int]()\n\
+         \x20   let d = hex.decode(der) else List[int]()\n\
+         \x20   p256.verify_der(key, m, d) == want\n}\n\nfn main() -> int {\n",
+    );
+    for c in cases {
+        let _ = writeln!(
+            s,
+            "    assert(vd(\"{}\", \"{}\", \"{}\", {}), \"tc {}\")",
+            c.pubkey, c.msg, c.sig, c.valid, c.tc_id
+        );
+    }
+    s.push_str("    0\n}\n");
+    s
 }
 
 // --------------------------------------------------------------- emission

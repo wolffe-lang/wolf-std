@@ -1,0 +1,609 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.p256, arith.checked
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from the vendored source
+//! named below (provenance: `vendor/vectors/README.md`). Do not edit
+//! by hand; ci's `gen-vectors --check` holds this file byte-identical
+//! to its source. NATIVE-ONLY: a P-256 verify is two table-free
+//! complete-formula scalar multiplications, past lupin's 50M step
+//! budget and the checked tier's step budget (the ledger records
+//! both `unsupported`); the three-lane differential is the
+//! hand-written field / DER / early-reject files.
+//!
+//! Wycheproof v1 ecdsa_secp256r1_sha256 verify, part 6 of 8
+//! (64 of the set's 484: 60 valid + 4 invalid): `verify_der`
+//! must answer true for every valid vector and FALSE for every
+//! invalid one — the DER manipulations, r/s = 0 / = n / > n, the
+//! invalid-curve points and the malleability cases are the point.
+//! Source: `vendor/vectors/wycheproof/ecdsa_secp256r1_sha256_test.json`.
+
+use std.hex
+use std.x.crypto.p256
+
+fn vd(pk: str, msg: str, der: str, want: bool) -> bool {
+    let key = hex.decode(pk) else List[int]()
+    let m = hex.decode(msg) else List[int]()
+    let d = hex.decode(der) else List[int]()
+    p256.verify_der(key, m, d) == want
+}
+
+fn main() -> int {
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "3130343738353830313238",
+            "304502206554e49f82a855204328ac94913bf01bbe84437a355a0a37c0dee3cf81aa7728022100aea00de2507ddaf5c94e1e126980d3df16250a2eaebc8be486effe7f22b4f929",
+            true,
+        ),
+        "tc 321",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "3130353336323835353638",
+            "3046022100a54c5062648339d2bff06f71c88216c26c6e19b4d80a8c602990ac82707efdfc022100e99bbe7fcfafae3e69fd016777517aa01056317f467ad09aff09be73c9731b0d",
+            true,
+        ),
+        "tc 322",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "393533393034313035",
+            "3045022100975bd7157a8d363b309f1f444012b1a1d23096593133e71b4ca8b059cff37eaf02207faa7a28b1c822baa241793f2abc930bd4c69840fe090f2aacc46786bf919622",
+            true,
+        ),
+        "tc 323",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "393738383438303339",
+            "304402205694a6f84b8f875c276afd2ebcfe4d61de9ec90305afb1357b95b3e0da43885e02200dffad9ffd0b757d8051dec02ebdf70d8ee2dc5c7870c0823b6ccc7c679cbaa4",
+            true,
+        ),
+        "tc 324",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "33363130363732343432",
+            "3045022100a0c30e8026fdb2b4b4968a27d16a6d08f7098f1a98d21620d7454ba9790f1ba602205e470453a8a399f15baf463f9deceb53acc5ca64459149688bd2760c65424339",
+            true,
+        ),
+        "tc 325",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "31303534323430373035",
+            "30440220614ea84acf736527dd73602cd4bb4eea1dfebebd5ad8aca52aa0228cf7b99a880220737cc85f5f2d2f60d1b8183f3ed490e4de14368e96a9482c2a4dd193195c902f",
+            true,
+        ),
+        "tc 326",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "35313734343438313937",
+            "3045022100bead6734ebe44b810d3fb2ea00b1732945377338febfd439a8d74dfbd0f942fa02206bb18eae36616a7d3cad35919fd21a8af4bbe7a10f73b3e036a46b103ef56e2a",
+            true,
+        ),
+        "tc 327",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "31393637353631323531",
+            "30440220499625479e161dacd4db9d9ce64854c98d922cbf212703e9654fae182df9bad2022042c177cf37b8193a0131108d97819edd9439936028864ac195b64fca76d9d693",
+            true,
+        ),
+        "tc 328",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "33343437323533333433",
+            "3045022008f16b8093a8fb4d66a2c8065b541b3d31e3bfe694f6b89c50fb1aaa6ff6c9b20221009d6455e2d5d1779748573b611cb95d4a21f967410399b39b535ba3e5af81ca2e",
+            true,
+        ),
+        "tc 329",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "333638323634333138",
+            "3046022100be26231b6191658a19dd72ddb99ed8f8c579b6938d19bce8eed8dc2b338cb5f8022100e1d9a32ee56cffed37f0f22b2dcb57d5c943c14f79694a03b9c5e96952575c89",
+            true,
+        ),
+        "tc 330",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "33323631313938363038",
+            "3045022015e76880898316b16204ac920a02d58045f36a229d4aa4f812638c455abe0443022100e74d357d3fcb5c8c5337bd6aba4178b455ca10e226e13f9638196506a1939123",
+            true,
+        ),
+        "tc 331",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "39363738373831303934",
+            "30440220352ecb53f8df2c503a45f9846fc28d1d31e6307d3ddbffc1132315cc07f16dad02201348dfa9c482c558e1d05c5242ca1c39436726ecd28258b1899792887dd0a3c6",
+            true,
+        ),
+        "tc 332",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "34393538383233383233",
+            "304402204a40801a7e606ba78a0da9882ab23c7677b8642349ed3d652c5bfa5f2a9558fb02203a49b64848d682ef7f605f2832f7384bdc24ed2925825bf8ea77dc5981725782",
+            true,
+        ),
+        "tc 333",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "383234363337383337",
+            "3045022100eacc5e1a8304a74d2be412b078924b3bb3511bac855c05c9e5e9e44df3d61e9602207451cd8e18d6ed1885dd827714847f96ec4bb0ed4c36ce9808db8f714204f6d1",
+            true,
+        ),
+        "tc 334",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "3131303230383333373736",
+            "304502202f7a5e9e5771d424f30f67fdab61e8ce4f8cd1214882adb65f7de94c31577052022100ac4e69808345809b44acb0b2bd889175fb75dd050c5a449ab9528f8f78daa10c",
+            true,
+        ),
+        "tc 335",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "313333383731363438",
+            "3045022100ffcda40f792ce4d93e7e0f0e95e1a2147dddd7f6487621c30a03d710b3300219022079938b55f8a17f7ed7ba9ade8f2065a1fa77618f0b67add8d58c422c2453a49a",
+            true,
+        ),
+        "tc 336",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "333232313434313632",
+            "304602210081f2359c4faba6b53d3e8c8c3fcc16a948350f7ab3a588b28c17603a431e39a8022100cd6f6a5cc3b55ead0ff695d06c6860b509e46d99fccefb9f7f9e101857f74300",
+            true,
+        ),
+        "tc 337",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "3130363836363535353436",
+            "3045022100dfc8bf520445cbb8ee1596fb073ea283ea130251a6fdffa5c3f5f2aaf75ca8080220048e33efce147c9dd92823640e338e68bfd7d0dc7a4905b3a7ac711e577e90e7",
+            true,
+        ),
+        "tc 338",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "3632313535323436",
+            "3046022100ad019f74c6941d20efda70b46c53db166503a0e393e932f688227688ba6a576202210093320eb7ca0710255346bdbb3102cdcf7964ef2e0988e712bc05efe16c199345",
+            true,
+        ),
+        "tc 339",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "37303330383138373734",
+            "3046022100ac8096842e8add68c34e78ce11dd71e4b54316bd3ebf7fffdeb7bd5a3ebc1883022100f5ca2f4f23d674502d4caf85d187215d36e3ce9f0ce219709f21a3aac003b7a8",
+            true,
+        ),
+        "tc 340",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "35393234353233373434",
+            "30440220677b2d3a59b18a5ff939b70ea002250889ddcd7b7b9d776854b4943693fb92f702206b4ba856ade7677bf30307b21f3ccda35d2f63aee81efd0bab6972cc0795db55",
+            true,
+        ),
+        "tc 341",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "31343935353836363231",
+            "30450220479e1ded14bcaed0379ba8e1b73d3115d84d31d4b7c30e1f05e1fc0d5957cfb0022100918f79e35b3d89487cf634a4f05b2e0c30857ca879f97c771e877027355b2443",
+            true,
+        ),
+        "tc 342",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "34303035333134343036",
+            "3044022043dfccd0edb9e280d9a58f01164d55c3d711e14b12ac5cf3b64840ead512a0a302201dbe33fa8ba84533cd5c4934365b3442ca1174899b78ef9a3199f49584389772",
+            true,
+        ),
+        "tc 343",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "33303936343537353132",
+            "304402205b09ab637bd4caf0f4c7c7e4bca592fea20e9087c259d26a38bb4085f0bbff11022045b7eb467b6748af618e9d80d6fdcd6aa24964e5a13f885bca8101de08eb0d75",
+            true,
+        ),
+        "tc 344",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "32373834303235363230",
+            "304502205e9b1c5a028070df5728c5c8af9b74e0667afa570a6cfa0114a5039ed15ee06f022100b1360907e2d9785ead362bb8d7bd661b6c29eeffd3c5037744edaeb9ad990c20",
+            true,
+        ),
+        "tc 345",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "32363138373837343138",
+            "304502200671a0a85c2b72d54a2fb0990e34538b4890050f5a5712f6d1a7a5fb8578f32e022100db1846bab6b7361479ab9c3285ca41291808f27fd5bd4fdac720e5854713694c",
+            true,
+        ),
+        "tc 346",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "31363432363235323632",
+            "304402207673f8526748446477dbbb0590a45492c5d7d69859d301abbaedb35b2095103a02203dc70ddf9c6b524d886bed9e6af02e0e4dec0d417a414fed3807ef4422913d7c",
+            true,
+        ),
+        "tc 347",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "36383234313839343336",
+            "304402207f085441070ecd2bb21285089ebb1aa6450d1a06c36d3ff39dfd657a796d12b50220249712012029870a2459d18d47da9aa492a5e6cb4b2d8dafa9e4c5c54a2b9a8b",
+            true,
+        ),
+        "tc 348",
+    )
+    assert(
+        vd(
+            "042927b10512bae3eddcfe467828128bad2903269919f7086069c8c4df6c732838c7787964eaac00e5921fb1498a60f4606766b3d9685001558d1a974e7341513e",
+            "343834323435343235",
+            "3046022100914c67fb61dd1e27c867398ea7322d5ab76df04bc5aa6683a8e0f30a5d287348022100fa07474031481dda4953e3ac1959ee8cea7e66ec412b38d6c96d28f6d37304ea",
+            true,
+        ),
+        "tc 349",
+    )
+    assert(
+        vd(
+            "040ad99500288d466940031d72a9f5445a4d43784640855bf0a69874d2de5fe103c5011e6ef2c42dcd50d5d3d29f99ae6eba2c80c9244f4c5422f0979ff0c3ba5e",
+            "313233343030",
+            "303502104319055358e8617b0c46353d039cdaab022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63254e",
+            true,
+        ),
+        "tc 350",
+    )
+    assert(
+        vd(
+            "040ad99500288d466940031d72a9f5445a4d43784640855bf0a69874d2de5fe103c5011e6ef2c42dcd50d5d3d29f99ae6eba2c80c9244f4c5422f0979ff0c3ba5e",
+            "313233343030",
+            "3046022100ffffffff00000001000000000000000000000000fffffffffffffffffffffffc022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63254e",
+            false,
+        ),
+        "tc 351",
+    )
+    assert(
+        vd(
+            "04ab05fd9d0de26b9ce6f4819652d9fc69193d0aa398f0fba8013e09c58220455419235271228c786759095d12b75af0692dd4103f19f6a8c32f49435a1e9b8d45",
+            "313233343030",
+            "3046022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63254f022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc63254e",
+            true,
+        ),
+        "tc 352",
+    )
+    assert(
+        vd(
+            "0480984f39a1ff38a86a68aa4201b6be5dfbfecf876219710b07badf6fdd4c6c5611feb97390d9826e7a06dfb41871c940d74415ed3cac2089f1445019bb55ed95",
+            "313233343030",
+            "304502207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd022100909135bdb6799286170f5ead2de4f6511453fe50914f3df2de54a36383df8dd4",
+            true,
+        ),
+        "tc 353",
+    )
+    assert(
+        vd(
+            "044201b4272944201c3294f5baa9a3232b6dd687495fcc19a70a95bc602b4f7c0595c37eba9ee8171c1bb5ac6feaf753bc36f463e3aef16629572c0c0a8fb0800e",
+            "313233343030",
+            "304402207ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd022027b4577ca009376f71303fd5dd227dcef5deb773ad5f5a84360644669ca249a5",
+            true,
+        ),
+        "tc 354",
+    )
+    assert(
+        vd(
+            "04a71af64de5126a4a4e02b7922d66ce9415ce88a4c9d25514d91082c8725ac9575d47723c8fbe580bb369fec9c2665d8e30a435b9932645482e7c9f11e872296b",
+            "313233343030",
+            "3006020105020101",
+            true,
+        ),
+        "tc 355",
+    )
+    assert(
+        vd(
+            "046627cec4f0731ea23fc2931f90ebe5b7572f597d20df08fc2b31ee8ef16b15726170ed77d8d0a14fc5c9c3c4c9be7f0d3ee18f709bb275eaf2073e258fe694a5",
+            "313233343030",
+            "3006020105020103",
+            true,
+        ),
+        "tc 356",
+    )
+    assert(
+        vd(
+            "045a7c8825e85691cce1f5e7544c54e73f14afc010cb731343262ca7ec5a77f5bfef6edf62a4497c1bd7b147fb6c3d22af3c39bfce95f30e13a16d3d7b2812f813",
+            "313233343030",
+            "3006020105020105",
+            true,
+        ),
+        "tc 357",
+    )
+    assert(
+        vd(
+            "04cbe0c29132cd738364fedd603152990c048e5e2fff996d883fa6caca7978c73770af6a8ce44cb41224b2603606f4c04d188e80bff7cc31ad5189d4ab0d70e8c1",
+            "313233343030",
+            "3006020105020106",
+            true,
+        ),
+        "tc 358",
+    )
+    assert(
+        vd(
+            "042ef747671c97d9c7f9cb2f6a30d678c3d84757ba241ef7183d51a29f52d87c2ea8fb2ea635b761baefc1c4ded2099281b844e13e044c328553bbbafa337d8a76",
+            "313233343030",
+            "3006020106020101",
+            true,
+        ),
+        "tc 359",
+    )
+    assert(
+        vd(
+            "04931cc49cda4d87d25b1601c56c3b83b4f45e44971998f2d3e7d3c55152214edf058dc140abbba42fc1ddbf30dab8eb9b46ee7338b3f7ee96242bf45e1df5e995",
+            "313233343030",
+            "3006020106020103",
+            true,
+        ),
+        "tc 360",
+    )
+    assert(
+        vd(
+            "04899a4af61867e3f3c190dbb48f8bc9fc74b70a467a4a1f06477b3af2f39ab8ed47ac000f9ea8a3034939bf48ad5d061a69fc8495ae4df2dbec7effa03a0062b3",
+            "313233343030",
+            "3006020106020106",
+            true,
+        ),
+        "tc 361",
+    )
+    assert(
+        vd(
+            "04d03eb09913cc20c6a8d0070f0d8d2a7f63527fafa44117fce6bd1ef2aa4ae3c46d5df3f45ac58fa334c6d102381b3120b7a2455600dcaff3d1a845514f12bf46",
+            "313233343030",
+            "3006020106020107",
+            true,
+        ),
+        "tc 362",
+    )
+    assert(
+        vd(
+            "04d03eb09913cc20c6a8d0070f0d8d2a7f63527fafa44117fce6bd1ef2aa4ae3c46d5df3f45ac58fa334c6d102381b3120b7a2455600dcaff3d1a845514f12bf46",
+            "313233343030",
+            "3026022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632557020107",
+            false,
+        ),
+        "tc 363",
+    )
+    assert(
+        vd(
+            "043a72476291571193b4d109b2c37b59f2807e8fe9cffd804eacded903e77ca0da592dbc74fee0ca7508cc7bc282b0c51a143286ff53c60131668e7a0929e4ed04",
+            "313233343030",
+            "3026020106022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc75fbd8",
+            false,
+        ),
+        "tc 364",
+    )
+    assert(
+        vd(
+            "04d0f73792203716afd4be4329faa48d269f15313ebbba379d7783c97bf3e890d9971f4a3206605bec21782bf5e275c714417e8f566549e6bc68690d2363c89cc1",
+            "313233343030",
+            "3027020201000221008f1e3c7862c58b16bb76eddbb76eddbb516af4f63f2d74d76e0d28c9bb75ea88",
+            true,
+        ),
+        "tc 365",
+    )
+    assert(
+        vd(
+            "044838b2be35a6276a80ef9e228140f9d9b96ce83b7a254f71ccdebbb8054ce05ffa9cbc123c919b19e00238198d04069043bd660a828814051fcb8aac738a6c6b",
+            "313233343030",
+            "302c02072d9b4d347952d6022100ef3043e7329581dbb3974497710ab11505ee1c87ff907beebadd195a0ffe6d7a",
+            true,
+        ),
+        "tc 366",
+    )
+    assert(
+        vd(
+            "047393983ca30a520bbc4783dc9960746aab444ef520c0a8e771119aa4e74b0f64e9d7be1ab01a0bf626e709863e6a486dbaf32793afccf774e2c6cd27b1857526",
+            "313233343030",
+            "3032020d1033e67e37b32b445580bf4eff0221008b748b74000000008b748b748b748b7466e769ad4a16d3dcd87129b8e91d1b4d",
+            true,
+        ),
+        "tc 367",
+    )
+    assert(
+        vd(
+            "045ac331a1103fe966697379f356a937f350588a05477e308851b8a502d5dfcdc5fe9993df4b57939b2b8da095bf6d794265204cfe03be995a02e65d408c871c0b",
+            "313233343030",
+            "302702020100022100ef9f6ba4d97c09d03178fa20b4aaad83be3cf9cb824a879fec3270fc4b81ef5b",
+            true,
+        ),
+        "tc 368",
+    )
+    assert(
+        vd(
+            "041d209be8de2de877095a399d3904c74cc458d926e27bb8e58e5eae5767c41509dd59e04c214f7b18dce351fc2a549893a6860e80163f38cc60a4f2c9d040d8c9",
+            "313233343030",
+            "3032020d062522bbd3ecbe7c39e93e7c25022100ef9f6ba4d97c09d03178fa20b4aaad83be3cf9cb824a879fec3270fc4b81ef5b",
+            true,
+        ),
+        "tc 369",
+    )
+    assert(
+        vd(
+            "04083539fbee44625e3acaafa2fcb41349392cef0633a1b8fabecee0c133b10e99915c1ebe7bf00df8535196770a58047ae2a402f26326bb7d41d4d7616337911e",
+            "313233343030",
+            "3045022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc6324d50220555555550000000055555555555555553ef7a8e48d07df81a693439654210c70",
+            true,
+        ),
+        "tc 370",
+    )
+    assert(
+        vd(
+            "04e075effd9607d08d5f34e3652f64cfa3bd6d20c58d0a232f058491260ab212a4cc61760ac8b0680c1b644c03cc628ba9dc4a3c0561368489c692bd40f43aa3ca",
+            "313233343030",
+            "30160209009c44febf31c3594f020900839ed28247c2b06b",
+            true,
+        ),
+        "tc 371",
+    )
+    assert(
+        vd(
+            "04cffb758c3073ea3c08efd9f7f17a85b6ae385c5a140c146ad5f1f5a826718bc8dfdc6bebc894144c6d418ac5d97339726ad2ae925df868426e5628e9f4e62342",
+            "313233343030",
+            "301e020d09df8b682430beef6f5fd7c7cd020d0fd0a62e13778f4222a0d61c8a",
+            true,
+        ),
+        "tc 372",
+    )
+    assert(
+        vd(
+            "04b98740e69e61a325d5f772e3b5c4f67fb7150b16a9afeca9ddc4afcbb6fa0549c446e814138e4ebc82dbf86a390056d4595dcf45e381fef217a4597d7bd51498",
+            "313233343030",
+            "30260211008a598e563a89f526c32ebec8de26367c02110084f633e2042630e99dd0f1e16f7a04bf",
+            true,
+        ),
+        "tc 373",
+    )
+    assert(
+        vd(
+            "0484536a270c3932bb2084732adf2c768efc6d3977e5220229ea9a44888b8f9d7b1766398cdac2fc8000017b29a7ba15a58f196037f35f7008ed4286ddff00fd46",
+            "313233343030",
+            "302e021500aa6eeb5823f7fa31b466bb473797f0d0314c0bdf021500e2977c479e6d25703cebbc6bd561938cc9d1bfb9",
+            true,
+        ),
+        "tc 374",
+    )
+    assert(
+        vd(
+            "048aeb368a7027a4d64abdea37390c0c1d6a26f399e2d9734de1eb3d0e1937387405bd13834715e1dbae9b875cf07bd55e1b6691c7f7536aef3b19bf7a4adf576d",
+            "313233343030",
+            "30250220555555550000000055555555555555553ef7a8e48d07df81a693439654210c70020101",
+            true,
+        ),
+        "tc 375",
+    )
+    assert(
+        vd(
+            "048aeb368a7027a4d64abdea37390c0c1d6a26f399e2d9734de1eb3d0e1937387405bd13834715e1dbae9b875cf07bd55e1b6691c7f7536aef3b19bf7a4adf576d",
+            "313233343030",
+            "30250220555555550000000055555555555555553ef7a8e48d07df81a693439654210c70020100",
+            false,
+        ),
+        "tc 376",
+    )
+    assert(
+        vd(
+            "0461722eaba731c697c7a9ba4d0afdbb5713d8aa12b0eab601bb33dbaf792c5adc272cd993b2b663aba5b3a26c101182ff178684945e83879e71598b95fe647dfc",
+            "313233343030",
+            "30440220555555550000000055555555555555553ef7a8e48d07df81a693439654210c70022002f676969f451a8ccafa4c4f09791810e6d632dbd60b1d5540f3284fbe1889b0",
+            true,
+        ),
+        "tc 377",
+    )
+    assert(
+        vd(
+            "04c4c91981e720e20d7e478ff19d09b95a98f58c0f469b72801a8ce844a347316594afcd4188182e7779889b3258d0368ece1e66797fe7c648c6f0b9e26bd71871",
+            "313233343030",
+            "30440220555555550000000055555555555555553ef7a8e48d07df81a693439654210c7002204e260962e33362ef0046126d2d5a4edc6947ab20e19b8ec19cf79e5908b6e628",
+            true,
+        ),
+        "tc 378",
+    )
+    assert(
+        vd(
+            "04d58d47bf49bc8f416641f6f760fcbca80aa52a814e56a5fa40bab44fd6f6317216deaa84d45d8e0e29cc9ecf5653f8ee6444750813becae8deb42b04ba07a634",
+            "313233343030",
+            "30440220555555550000000055555555555555553ef7a8e48d07df81a693439654210c700220077ed0d8f20f697d8fc591ac64dd5219c7932122b4f9b9ec6441e44a0092cf21",
+            true,
+        ),
+        "tc 379",
+    )
+    assert(
+        vd(
+            "0491e305822e5e44f3fdb616e2ef42cd98f241b86e9f68815bc4dba6a945e4eefb3c5937e2ac1d9466f6d65e49b35fc8d75ffc22e1fe2f32af42f5fa3c26f9b4b0",
+            "313233343030",
+            "30440220555555550000000055555555555555553ef7a8e48d07df81a693439654210c7002203e0292a67e181c6c0105ee35e956e78e9bdd033c6e71ae57884039a245e4175f",
+            true,
+        ),
+        "tc 380",
+    )
+    assert(
+        vd(
+            "0424a0bc4d16dbbd40d2fd81a7c3f8d8ec741607d5bb406a0611cc60d0e683bd46b575cad039c15f7f3dffcfc007b4b0f743c871ecc76a504a32672fd84526d861",
+            "313233343030",
+            "30440220555555550000000055555555555555553ef7a8e48d07df81a693439654210c70022013d22b06d6b8f5d97e0c64962b4a3bae30f668ca6217ef5b35d799f159e23ebe",
+            true,
+        ),
+        "tc 381",
+    )
+    assert(
+        vd(
+            "04d24dd06745cafb39186d22a92aa0e58169a79ab69488628a9da5ed3ef747269b7e9209d98faeb95355948adae61d5291c6015d3ee9513486d886fb05cbd25c6a",
+            "313233343030",
+            "30440220555555550000000055555555555555553ef7a8e48d07df81a693439654210c7002204523ce342e4994bb8968bf6613f60c06c86111f15a3a389309e72cd447d5dd99",
+            true,
+        ),
+        "tc 382",
+    )
+    assert(
+        vd(
+            "048200f148e7eab1581bcd1e23946f8a9b8191d9641f9560341721f9d3fec3d63ece795669e0481e035de8623d716a6984d0a4809d6c65519443ee55260f7f3dcb",
+            "313233343030",
+            "30440220555555550000000055555555555555553ef7a8e48d07df81a693439654210c70022037d765be3c9c78189ad30edb5097a4db670de11686d01420e37039d4677f4809",
+            true,
+        ),
+        "tc 383",
+    )
+    assert(
+        vd(
+            "04a8a69c5ed33b150ce8d37ac197070ed894c05d47258a80c9041d92486622024de85997c9666b60a393568efede8f4ca0167c1e10f626e62fc1b8c8e9c6ba6ed7",
+            "313233343030",
+            "30440220555555550000000055555555555555553ef7a8e48d07df81a693439654210c70022044237823b54e0c74c2bf5f759d9ac5f8cb897d537ffa92effd4f0bb6c9acd860",
+            true,
+        ),
+        "tc 384",
+    )
+    0
+}
