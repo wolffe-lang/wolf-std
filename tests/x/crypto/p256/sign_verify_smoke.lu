@@ -1,0 +1,62 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.p256, arith.checked
+//!
+//! THE SIGN/VERIFY ROUND TRIP, and the negative: a fresh key signs a
+//! message, its own public key verifies it, a FLIPPED signature byte is
+//! rejected, and the DER round trip (`signature_der` -> `verify_der`)
+//! agrees with the raw path. NATIVE-ONLY (sign is one ladder, verify
+//! two — past lupin/checked step budgets). The full group-order proof
+//! ([n]G = O) is `self_test`; the vector suites are the CAVP/Wycheproof
+//! part files.
+
+use std.x.crypto.p256
+
+fn main() -> int {
+    let d = "a 32-byte p256 private key !!!!!".bytes()
+    let msg = "the quick brown fox".bytes()
+    let pk = p256.public_key(d)
+    if !(pk.len == 65) {
+        print("public key not 65 bytes")
+        return 1
+    }
+    let sig = p256.sign(d, msg)
+    if !(sig.len == 64) {
+        print("signature not 64 bytes")
+        return 1
+    }
+    if !p256.verify(pk, msg, sig) {
+        print("round-trip verify failed")
+        return 1
+    }
+    // a flipped last byte must be rejected
+    var bad = List[int]()
+    var i = 0
+    for v in sig {
+        (mut bad).push(v)
+        i = i + 1
+    }
+    bad[63] = (bad[63] + 1) % 256
+    if p256.verify(pk, msg, bad) {
+        print("tampered signature accepted")
+        return 1
+    }
+    // a different message must be rejected
+    if p256.verify(pk, "a different message".bytes(), sig) {
+        print("wrong-message signature accepted")
+        return 1
+    }
+    // the DER round trip agrees
+    let der = p256.signature_der(sig)
+    if !p256.verify_der(pk, msg, der) {
+        print("der round-trip verify failed")
+        return 1
+    }
+    // the full group-order self-test ([n]G = O)
+    if !p256.self_test() {
+        print("self_test failed")
+        return 1
+    }
+    print("sign/verify smoke ok")
+    0
+}

@@ -1,0 +1,86 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.p256, arith.checked
+//!
+//! THE EARLY-REJECT WITNESSES, THREE-LANE (the sc17 per-executed-path
+//! lesson): `verify` answers FALSE — never a trap, and BEFORE any
+//! scalar multiplication — for the rejections that decide before the
+//! verification equation, so their executed path never reaches a
+//! ladder and runs on all three lanes. THE INVALID-CURVE REJECTION
+//! (SEC1 §3.2.2, mandatory — the real attack class Wycheproof
+//! patrols): an attacker-supplied point OFF the curve is refused at
+//! `decode_point`. Also the FIPS 186-5 §6.4.2 range gates: a
+//! wrong-length key/signature, r or s = 0, and r or s >= n. The cases
+//! are held in a TABLE of (key, der) pairs so `wolf fmt` cannot split a
+//! dotted call under a comment (F-0016). The full Wycheproof invalid
+//! set (including the cases that reach the equation) rides the native
+//! lane in `wycheproof_p256_p*.lu`.
+
+use std.hex
+use std.x.crypto.p256
+
+fn b(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+// An off-curve point (x=1, y=1: 1 != 1 - 3 + b).
+fn offkey() -> str {
+    "0400000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001"
+}
+
+// The base point G (a valid on-curve key) for the r/s range gates.
+fn gkey() -> str {
+    "046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5"
+}
+
+fn main() -> int {
+    let msg = "x".bytes()
+    // key hex, der hex — each must reject before any scalar mult
+    var keys = List[str]()
+    var ders = List[str]()
+    // off-curve point, well-formed r=s=1 DER (rejects at on-curve check)
+    (mut keys).push(offkey())
+    (mut ders).push("3006020101020101")
+    // r = 0
+    (mut keys).push(gkey())
+    (mut ders).push("3006020100020101")
+    // s = 0
+    (mut keys).push(gkey())
+    (mut ders).push("3006020101020100")
+    // r = n  (>= n rejected)
+    (mut keys).push(gkey())
+    (mut ders).
+        push("3026022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551020101")
+    // s = n
+    (mut keys).push(gkey())
+    (mut ders).
+        push("3026020101022100ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551")
+    var i = 0
+    let count = keys.len
+    while i < count {
+        let key = b(keys[i])
+        let der = b(ders[i])
+        if p256.verify_der(key, msg, der) {
+            print("early-reject case {i} accepted")
+            return 1
+        }
+        i = i + 1
+    }
+    // wrong-length key and signature (raw verify path)
+    let shortkey = b("0401020304")
+    let anysig = b(
+        "00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001",
+    )
+    if p256.verify(shortkey, msg, anysig) {
+        print("short key accepted")
+        return 1
+    }
+    let goodkey = b(gkey())
+    let shortsig = b("0102")
+    if p256.verify(goodkey, msg, shortsig) {
+        print("short sig accepted")
+        return 1
+    }
+    print("early rejects ok")
+    0
+}

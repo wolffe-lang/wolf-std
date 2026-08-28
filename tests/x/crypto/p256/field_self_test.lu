@@ -1,0 +1,27 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.p256, arith.checked
+//!
+//! THE FIELD-FIRST WITNESS (the sprint's discipline): the P-256 field's
+//! algebraic identities and the cheap curve laws, proven ALONE before
+//! any ECDSA path observes them — additive inverse, multiply
+//! commutativity/associativity, distributivity, squaring, the Fermat
+//! inverse, the byte round trip, G on the curve, and complete-add ==
+//! complete-double on [2]G. No 256-iteration scalar multiplication, so
+//! it fits the checked tier's step budget and lupin's evaluation budget
+//! — THREE-LANE. The Solinas reduction is pinned three ways: here (the
+//! identities a bad fold breaks), the authoring-time Python bound-
+//! harness (3000 random + adversarial products vs big-int, where the
+//! 2^35.4 column and 2^48.0 carry bounds were measured — module
+//! header), and the native CAVP/Wycheproof suites (thousands of known
+//! products through `verify`).
+
+use std.x.crypto.p256
+
+fn main() -> int {
+    if !p256.field_self_test() {
+        print("field_self_test FAILED")
+        return 1
+    }
+    0
+}

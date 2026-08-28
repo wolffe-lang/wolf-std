@@ -1,0 +1,92 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.p256, arith.checked
+//!
+//! THE DER CODEC, THREE-LANE: `signature_der` (raw r||s -> strict DER
+//! SEQUENCE{INTEGER, INTEGER}) and `parse_der` (the inverse, strict).
+//! Neither touches the field, so both run on ALL THREE lanes. The
+//! encode round-trips a real signature to its known DER bytes, and the
+//! strict-DER REJECTIONS (X.690) are the point sc22 leans on — a
+//! malformed signature must not slip through to a scalar multiplication.
+//! Bad encodings are held in a TABLE (never a comment directly above a
+//! dotted call, so `wolf fmt` cannot split it — F-0016). The table's
+//! classes, in order: wrong outer tag; outer length one too long;
+//! trailing garbage; non-minimal INTEGER (leading 0x00, next high bit
+//! clear); negative INTEGER (high bit set, no pad); empty INTEGER;
+//! magnitude > 32 octets; missing s. Known bytes from the RFC 6979
+//! A.2.5 "sample" signature.
+
+use std.hex
+use std.x.crypto.p256
+
+fn b(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn bad_ders() -> List[str] {
+    var out = List[str]()
+    (mut out).
+        push(
+        "3146022100efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716022100f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8",
+    )
+    (mut out).
+        push(
+        "3047022100efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716022100f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8",
+    )
+    (mut out).
+        push(
+        "3046022100efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716022100f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda800",
+    )
+    (mut out).
+        push("30280203001234022100f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8")
+    (mut out).
+        push("302702028001022100f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8")
+    (mut out).push("30250200022100f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8")
+    (mut out).
+        push(
+        "304602217f1111111111111111111111111111111111111111111111111111111111111111022100f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8",
+    )
+    (mut out).push("3023022100efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716")
+    out
+}
+
+fn dummy_key() -> List[int] {
+    var k = List[int]()
+    (mut k).push(4)
+    var i = 0
+    while i < 64 {
+        (mut k).push(1)
+        i = i + 1
+    }
+    k
+}
+
+fn main() -> int {
+    let raw = b(
+        "efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8",
+    )
+    let want_der = "3046022100efd48b2aacb6a8fd1140dd9cd45e81d69d2c877b56aaf991c34d0ea84eaf3716022100f7cb1c942d657c41d436c7a1b6e29f65f3e900dbb9aff4064dc4ab2f843acda8"
+    let der = p256.signature_der(raw)
+    if !(p256.to_hex(der) == want_der) {
+        print("der encode mismatch: {p256.to_hex(der)}")
+        return 1
+    }
+    let raw2 = b(
+        "000000000000000000000000000000000000000000000000000000000000027e000000000000000000000000000000000000000000000000000000000000005a",
+    )
+    if !(p256.to_hex(p256.signature_der(raw2)) == "30070202027e02015a") {
+        print("der encode (small) mismatch")
+        return 1
+    }
+    let key = dummy_key()
+    let msg = "x".bytes()
+    for h in bad_ders() {
+        let d = b(h)
+        if p256.verify_der(key, msg, d) {
+            print("malformed DER accepted: {h}")
+            return 1
+        }
+    }
+    print("der reject ok")
+    0
+}

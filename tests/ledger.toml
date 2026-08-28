@@ -2542,3 +2542,116 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# ---- sc23: std.x.crypto.p256 — the Weierstrass curve (NIST P-256) and
+# ECDSA (FIPS 186-5 / SEC1 / SP 800-186 / RFC 6979). The field is
+# checked `int` in sixteen 16-bit Solinas limbs; the scalar field mod n
+# is base-2^16 Montgomery; both are NO-wrapping, so the FIELD is
+# three-lane. The distinction from sc18: a P-256 scalar multiplication
+# is a TABLE-FREE ladder over the COMPLETE (RCB) formulas — ~2x heavier
+# per step than curve25519's Montgomery ladder AND it does a
+# double-AND-add every iteration — so ONE scalar mult exceeds lupin's
+# 50M evaluation-step budget and the checked tier's step budget. Every
+# scalar-mul-bearing file is therefore NATIVE-ONLY (lupin/wolfc
+# `unsupported`, a step-budget verdict — NOT `slow`, which is a
+# wall-clock timeout of a program that would finish; the interpreter
+# actively refuses here). The three-lane differential is the field /
+# DER / early-reject / trap files, whose executed paths never reach a
+# ladder (the sc17 per-executed-path rule). Native runs everything (a
+# 64-vector Wycheproof part is ~0.5s of compiled code).
+
+# Three-lane: the field identities, the pure DER codec, the early
+# rejections (invalid-curve + r/s range, before the equation), and the
+# two contract traps (guards fire before the ladder).
+[tests."x/crypto/p256/field_self_test.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/p256/der_codec.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/p256/verify_reject_early.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/p256/non_byte_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/p256/private_key_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# Native-only: the sign/verify paths (one/two table-free ladders each,
+# past both non-native step budgets). RFC 6979 A.2.5 pins the sign path
+# byte-exact; the smoke round-trips sign->verify and runs the full
+# group-order self-test ([n]G = O).
+[tests."x/crypto/p256/rfc6979_p256.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/sign_verify_smoke.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+# Native-only vector suites (generated): CAVP FIPS 186-4 SigVer (15 P/F)
+# and SigGen (15 via verify), and Wycheproof ecdsa_secp256r1_sha256
+# (484, 8 parts — invalid-curve, edge r/s, DER manipulation,
+# malleability).
+[tests."x/crypto/p256/cavp_sigver_p256.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/cavp_siggen_p256.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/wycheproof_p256_p1.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/wycheproof_p256_p2.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/wycheproof_p256_p3.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/wycheproof_p256_p4.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/wycheproof_p256_p5.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/wycheproof_p256_p6.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/wycheproof_p256_p7.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p256/wycheproof_p256_p8.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"

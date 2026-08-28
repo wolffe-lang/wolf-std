@@ -1,0 +1,65 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.p256, arith.checked
+//!
+//! RFC 6979 DETERMINISTIC ECDSA, A.2.5 (P-256, SHA-256) — the vectors
+//! that pin the whole sign path byte-exact. For the private key of
+//! A.2.5, both messages ("sample", "test") derive the SAME deterministic
+//! signature every time, drawing NO entropy: `sign` reproduces the
+//! RFC's published (r, s) exactly, and `verify` accepts it. This is the
+//! justification for the design ruling's LEAN (deterministic nonces, no
+//! reuse hazard, no os capability, byte-exact testable). NATIVE-ONLY: a
+//! sign is one table-free ladder and a verify is two, past lupin's 50M
+//! step budget and the checked tier's — the field/DER/early-reject
+//! files carry the three-lane column. Hex from `vendor/vectors/rfc/
+//! rfc6979.txt`.
+
+use std.hex
+use std.x.crypto.p256
+
+fn b(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> int {
+    let d = b("C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721")
+    // A.2.5's public key U = (Ux, Uy), uncompressed.
+    let ux = "60FED4BA255A9D31C961EB74C6356D68C049B8923B61FA6CE669622E60F29FB6"
+    let uy = "7903FE1008B8BC99A41AE9E95628BC64F2F1B20C2D7E9F5177A3C294D4462299"
+    let pk = p256.public_key(d)
+    if !(p256.to_hex(pk).upper() == "04{ux}{uy}") {
+        print("public key mismatch: {p256.to_hex(pk)}")
+        return 1
+    }
+    // message "sample": the RFC's k, r, s.
+    let sig1 = p256.sign(d, "sample".bytes())
+    let r1 = "EFD48B2AACB6A8FD1140DD9CD45E81D69D2C877B56AAF991C34D0EA84EAF3716"
+    let s1 = "F7CB1C942D657C41D436C7A1B6E29F65F3E900DBB9AFF4064DC4AB2F843ACDA8"
+    if !(p256.to_hex(sig1).upper() == "{r1}{s1}") {
+        print("sample signature mismatch: {p256.to_hex(sig1)}")
+        return 1
+    }
+    if !p256.verify(pk, "sample".bytes(), sig1) {
+        print("sample verify failed")
+        return 1
+    }
+    // message "test".
+    let sig2 = p256.sign(d, "test".bytes())
+    let r2 = "F1ABB023518351CD71D881567B1EA663ED3EFCF6C5132B354F28D3B0B7D38367"
+    let s2 = "019F4113742A2B14BD25926B49C649155F267E60D3814B4C0CC84250E46F0083"
+    if !(p256.to_hex(sig2).upper() == "{r2}{s2}") {
+        print("test signature mismatch: {p256.to_hex(sig2)}")
+        return 1
+    }
+    if !p256.verify(pk, "test".bytes(), sig2) {
+        print("test verify failed")
+        return 1
+    }
+    // determinism: signing "sample" again gives byte-identical output.
+    if !(p256.to_hex(p256.sign(d, "sample".bytes())) == p256.to_hex(sig1)) {
+        print("nonce not deterministic")
+        return 1
+    }
+    print("rfc6979 A.2.5 ok")
+    0
+}

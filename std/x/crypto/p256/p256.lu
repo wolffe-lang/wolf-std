@@ -2232,10 +2232,11 @@ fn is_zero_bytes(b: List[int]) -> bool {
 /// drives the table-free ladder (`scalar_mul`, c28's target); the
 /// derived public key is public.
 ///
-/// ```wolf-doc-example
-/// let d = "a 32-byte p256 private key !!!!!".bytes()
-/// p256.public_key(d).len == 65
-/// ```
+/// Example (native lane — a scalar multiplication is a table-free
+/// ladder past lupin's step budget, so this is prose not a fenced
+/// block; the pinned witnesses are `rfc6979_p256.lu` and
+/// `sign_verify_smoke.lu`): `p256.public_key(d)` returns 65 bytes for a
+/// 32-byte private key `d` in [1, n).
 pub fn public_key(d: List[int]) -> List[int] {
     require_private(d)
     let q = scalar_mul(d, pt_base())
@@ -2291,13 +2292,10 @@ fn require_private(d: List[int]) {
 /// enumerated obligations are the ladder, `fe_select`, and the noted
 /// exceptions in the module header. No randomness, so no reuse hazard.
 ///
-/// ```wolf-doc-example
-/// let d = "a 32-byte p256 private key !!!!!".bytes()
-/// let msg = "sign me".bytes()
-/// let sig = p256.sign(d, msg)
-/// sig.len == 64
-/// p256.verify(p256.public_key(d), msg, sig)
-/// ```
+/// Example (native lane, prose — the sign path is a table-free ladder
+/// past lupin's step budget; pinned byte-exact in `rfc6979_p256.lu`):
+/// `p256.sign(d, msg)` returns a 64-byte r || s that
+/// `p256.verify(p256.public_key(d), msg, sig)` accepts.
 pub fn sign(d: List[int], message: List[int]) -> List[int] {
     require_private(d)
     for m in message {
@@ -2395,12 +2393,10 @@ fn rfc6979_nonce_salted(x: List[int], h1: List[int], salt: int) -> List[int] {
 /// public, so no branch here protects a secret and this function
 /// carries no constant-time obligation (the sc18 rule).
 ///
-/// ```wolf-doc-example
-/// let d = "a 32-byte p256 private key !!!!!".bytes()
-/// let msg = "verify me".bytes()
-/// let sig = p256.sign(d, msg)
-/// p256.verify(p256.public_key(d), msg, sig)
-/// ```
+/// Example (native lane, prose — a verify is two table-free ladders
+/// past lupin's step budget; pinned by the CAVP/Wycheproof suites and
+/// `sign_verify_smoke.lu`): `p256.verify(p256.public_key(d), msg,
+/// p256.sign(d, msg))` is true; a flipped signature byte is false.
 pub fn verify(pubkey: List[int], message: List[int], sig: List[int]) -> bool {
     if !(pubkey.len == 65) {
         return false
@@ -2633,13 +2629,11 @@ fn left_pad32(mag: List[int]) -> List[int] {
 /// a malformed encoding answers FALSE (never a trap), by the same rule
 /// as `verify`. ct: public data.
 ///
-/// ```wolf-doc-example
-/// let d = "a 32-byte p256 private key !!!!!".bytes()
-/// let msg = "es256 over der".bytes()
-/// let raw = p256.sign(d, msg)
-/// let der = p256.signature_der(raw)
-/// p256.verify_der(p256.public_key(d), msg, der)
-/// ```
+/// Example (native lane, prose — a verify is two table-free ladders
+/// past lupin's step budget; the strict-DER rejections are pinned
+/// three-lane in `der_codec.lu`): `p256.verify_der(pk, msg,
+/// p256.signature_der(p256.sign(d, msg)))` is true, and a malformed
+/// DER signature is false, never a trap.
 pub fn verify_der(pubkey: List[int], message: List[int], der: List[int]) -> bool {
     let parsed = parse_der(der)
     if !parsed.ok {

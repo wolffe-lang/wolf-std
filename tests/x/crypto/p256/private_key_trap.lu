@@ -1,0 +1,24 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.crypto.p256, arith.checked
+//!
+//! THE PRIVATE-KEY CONTRACT (FIPS 186-5 §6.2.1): a private key must be
+//! 32 bytes in [1, n). A wrong LENGTH is a caller contract violation,
+//! so `public_key` traps `assert` — before any scalar multiplication,
+//! so it fires on all three lanes. (The zero and >= n range violations
+//! trap the same way; this file witnesses the length guard, one trap
+//! per file per §13.)
+
+use std.x.crypto.p256
+
+fn main() -> int {
+    var d = List[int]()
+    var i = 0
+    while i < 16 {
+        (mut d).push(7)
+        i = i + 1
+    }
+    let pk = p256.public_key(d)
+    print("unreachable: {pk.len}")
+    0
+}
