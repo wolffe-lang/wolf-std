@@ -1,0 +1,2859 @@
+//! member: true
+//!
+//! std.x.crypto.p256 — the NIST P-256 curve (secp256r1) and ECDSA
+//! signatures: FIPS 186-5 (ECDSA), SEC1 v2 (point encodings and
+//! validation), NIST SP 800-186 (the domain parameters), RFC 6979
+//! (deterministic nonces). Stability tier: x — the D53 crypto ladder's
+//! Weierstrass rung (campaign stdc-crypto, sprint sc23), the curve
+//! real-world certificate authorities issue: sc22's `unsupported_alg`
+//! answer for an ECDSA-P256 certificate becomes a real verification.
+//!
+//! **The nursery banner (D31).** `std.x.crypto.p256` is not
+//! `std.crypto`: its path, names and behaviour may change or vanish in
+//! one sprint; no other std module may depend on it. Its reason and
+//! graduation trigger live in `std/x/README.md`. ECDSA's SHA-256 and
+//! RFC 6979's HMAC are `std.x.crypto.sha2`'s, called through the
+//! module boundary — a resident-on-resident edge the graduation move
+//! must resolve (named in the register beside curve25519's).
+//!
+//! ## The design ruling: table-free constant-time scalar multiplication
+//!
+//! P-256 is a short Weierstrass curve, and the FAST implementations use
+//! secret-indexed table lookups — a cache-timing surface no vector set
+//! can see. The human-approved ruling (the sc23 contract): this module
+//! multiplies with a TABLE-FREE ladder — 256 fixed iterations of one
+//! complete doubling, one complete addition and one ARITHMETIC point
+//! selection (`fe_select`: the secret bit enters only as a multiplier,
+//! never a branch, never an index) — over the COMPLETE addition
+//! formulas of Renes–Costello–Batina (eprint 2015/1060, the a = -3
+//! specialization), which are total: identity, doubling and inverse
+//! inputs take the same code path as a generic addition, so no
+//! exceptional-case branch exists for a timing channel to read.
+//! `scalar_mul` is c28's VERIFICATION TARGET for this module (marked in
+//! its header): slower than a windowed table, and provably
+//! constant-time by construction in portable wolf — c28's ct tier then
+//! VERIFIES the property instead of compensating for a table. The
+//! masked-table and hardware-intrinsic fast paths are named residue
+//! (their own D-question when a measured performance need appears).
+//!
+//! ## The field: 16 checked-`int` limbs of 16 bits, Solinas reduction
+//!
+//! p = 2^256 - 2^224 + 2^192 + 2^96 - 1 (SP 800-186 §3.2.1.3, a
+//! Solinas prime). The fast reduction is the identity
+//! 2^256 ≡ 2^224 - 2^192 - 2^96 + 1 (mod p): product limb k (k >= 16)
+//! re-enters at k-16 (+), k-10 (-), k-4 (-), k-2 (+). Sixteen bits is
+//! the ONE uniform limb width that fits wolf's int story both ways
+//! (the sc18 bound-proof discipline, stated before the field was
+//! written): a 16x16 schoolbook column is at most 16 products < 2^32,
+//! so a column is < 2^36 (measured 2^35.4 over the fuzz corpus), and
+//! 96/192/224/256 are all multiples of 16, so the fold is limb-aligned
+//! (32-bit limbs overflow a column at 2^68; 24-bit limbs misalign
+//! 2^224). The carry tail adds the constant 2^32·p — which dominates
+//! any signed fold output, so no intermediate is ever negative-beyond-
+//! bound — then runs four carry passes folding the 2^256 overflow back
+//! through the identity; the largest value anywhere is the limb-15
+//! constant addition at 2^48.0 (measured), 32768x under int_max, and
+//! X3's checked arithmetic enforces the whole proof at every operation:
+//! a violated bound is a trap the vectors catch, never a silent wrap.
+//! NO `wrapping[T]` anywhere; no bitwise-on-int (F-0026's spelling).
+//! Every algorithm here was fuzzed limb-for-limb against a big-integer
+//! reference before this file was written (3000 random + adversarial
+//! field cases, 60 point-formula rounds incl. the complete-formula edge
+//! cases, the RFC 6979 vectors end-to-end).
+//!
+//! ## The scalar field mod n: Montgomery, because n is not Solinas
+//!
+//! n (the group order) has an irregular low half, so mod-n arithmetic
+//! is Montgomery multiplication in base 2^16 (CIOS): fixed schedule,
+//! no division, no data-dependent trip counts. Inversions mod n and
+//! mod p are Fermat powers to FIXED PUBLIC exponents (n-2, p-2) — the
+//! per-bit branch reads a compiled-in constant, never data.
+//!
+//! ## ECDSA: verify is public, sign is the secret path
+//!
+//! VERIFY (FIPS 186-5 §6.4.2) handles only public data — a public key,
+//! a message, a signature — so it carries no constant-time obligation
+//! (the sc18 rule, stated per fn). The on-curve check of SEC1 §3.2.2
+//! is MANDATORY on every ingested point: an attacker-supplied point
+//! off the curve is the invalid-curve attack class, rejected by name
+//! (`invalid_curve`, `check_point`) and answered `false` by `verify`.
+//! SIGN (§6.4.1) is the secret path: the nonce and the scalar
+//! multiplication are its obligations, enumerated for c28 in the fn
+//! headers. **Nonces are RFC 6979 deterministic** — derived from the
+//! key and message through HMAC-SHA-256, drawing NO entropy. The
+//! ruling's lean, taken, and justified: nonce REUSE (or bias) leaks
+//! the private key outright, deterministic derivation removes the
+//! hazard class entirely, it needs no os capability (this module stays
+//! pure and comptime-refusable only through its sha2 delegate), and it
+//! is byte-for-byte testable (RFC 6979 A.2.5 pins k, r and s). s118's
+//! `os_random` is the sanctioned entropy source when a consumer needs
+//! randomized signatures; that variant is named residue, not built.
+//!
+//! ## ct: obligations, enumerated (c28's checklist for this module)
+//!
+//! - `scalar_mul` — THE target: fixed 256 iterations, complete
+//!   formulas, arithmetic selection; the secret bit is a multiplier.
+//! - `fe_select` — the selection itself (sc18's `fe_cswap` class).
+//! - the RFC 6979 HMAC chain — fixed-schedule digest work (sha2's).
+//! - recorded exceptions, all shared with the ladder's precedent: the
+//!   0..255 ingestion guard branches per input byte (F-0035's class);
+//!   `floordiv`'s sign correction (sc18's note); the 6979
+//!   candidate-acceptance compare (`bytes_geq_n`) — the RFC's own
+//!   rejection sampling, at most one extra HMAC round per 2^32 keys.
+//! - VERIFY and everything it calls: public data, no obligation.
+//!
+//! Byte sequences are `List[int]` with the 0..255 element contract
+//! (F-0035); all multi-byte values are BIG-endian (SEC1/FIPS
+//! convention — unlike curve25519's little-endian RFCs). `to_hex` is
+//! this module's own rendering (the ladder precedent).
+
+use std.x.crypto.sha2
+
+// ---------------------------------------------------------------------
+// The field element: sixteen 16-bit limbs, little-endian by limb
+// (limb i holds bits [16i, 16i+16)). Fields are interim backing, never
+// API — a forged Fe produces a wrong result, never a trap. Carried
+// limbs are < 2^16; transiently a limb may hold a full schoolbook
+// column (< 2^36) between construction and the next fe_carry.
+// ---------------------------------------------------------------------
+
+struct Fe {
+    l0: int,
+    l1: int,
+    l2: int,
+    l3: int,
+    l4: int,
+    l5: int,
+    l6: int,
+    l7: int,
+    l8: int,
+    l9: int,
+    l10: int,
+    l11: int,
+    l12: int,
+    l13: int,
+    l14: int,
+    l15: int,
+}
+
+/// The curve constant b (SP 800-186 §3.2.1.3; the RCB formulas use b itself, not 3b). Total (limbs typed `int` so a bare literal cannot default to i32 — the sc04 rule).
+fn fe_b() -> Fe {
+    let l0: int = 24651
+    let l1: int = 10194
+    let l2: int = 15422
+    let l3: int = 15310
+    let l4: int = 45302
+    let l5: int = 52307
+    let l6: int = 1712
+    let l7: int = 25885
+    let l8: int = 34492
+    let l9: int = 30360
+    let l10: int = 48469
+    let l11: int = 46059
+    let l12: int = 37863
+    let l13: int = 43578
+    let l14: int = 13784
+    let l15: int = 23238
+    Fe {
+        l0: l0,
+        l1: l1,
+        l2: l2,
+        l3: l3,
+        l4: l4,
+        l5: l5,
+        l6: l6,
+        l7: l7,
+        l8: l8,
+        l9: l9,
+        l10: l10,
+        l11: l11,
+        l12: l12,
+        l13: l13,
+        l14: l14,
+        l15: l15,
+    }
+}
+
+/// The base point G's x coordinate (SP 800-186 §3.2.1.3). Total (limbs typed `int` so a bare literal cannot default to i32 — the sc04 rule).
+fn fe_gx() -> Fe {
+    let l0: int = 49814
+    let l1: int = 55448
+    let l2: int = 14661
+    let l3: int = 62625
+    let l4: int = 13216
+    let l5: int = 11755
+    let l6: int = 32129
+    let l7: int = 30467
+    let l8: int = 16626
+    let l9: int = 25508
+    let l10: int = 59109
+    let l11: int = 63676
+    let l12: int = 16967
+    let l13: int = 57644
+    let l14: int = 53746
+    let l15: int = 27415
+    Fe {
+        l0: l0,
+        l1: l1,
+        l2: l2,
+        l3: l3,
+        l4: l4,
+        l5: l5,
+        l6: l6,
+        l7: l7,
+        l8: l8,
+        l9: l9,
+        l10: l10,
+        l11: l11,
+        l12: l12,
+        l13: l13,
+        l14: l14,
+        l15: l15,
+    }
+}
+
+/// The base point G's y coordinate (SP 800-186 §3.2.1.3). Total (limbs typed `int` so a bare literal cannot default to i32 — the sc04 rule).
+fn fe_gy() -> Fe {
+    let l0: int = 20981
+    let l1: int = 14271
+    let l2: int = 16488
+    let l3: int = 52150
+    let l4: int = 24270
+    let l5: int = 27441
+    let l6: int = 13143
+    let l7: int = 11214
+    let l8: int = 40470
+    let l9: int = 31759
+    let l10: int = 60234
+    let l11: int = 36583
+    let l12: int = 32667
+    let l13: int = 65050
+    let l14: int = 17122
+    let l15: int = 20451
+    Fe {
+        l0: l0,
+        l1: l1,
+        l2: l2,
+        l3: l3,
+        l4: l4,
+        l5: l5,
+        l6: l6,
+        l7: l7,
+        l8: l8,
+        l9: l9,
+        l10: l10,
+        l11: l11,
+        l12: l12,
+        l13: l13,
+        l14: l14,
+        l15: l15,
+    }
+}
+
+/// The field's additive identity. Total.
+fn fe_zero() -> Fe {
+    Fe {
+        l0: 0,
+        l1: 0,
+        l2: 0,
+        l3: 0,
+        l4: 0,
+        l5: 0,
+        l6: 0,
+        l7: 0,
+        l8: 0,
+        l9: 0,
+        l10: 0,
+        l11: 0,
+        l12: 0,
+        l13: 0,
+        l14: 0,
+        l15: 0,
+    }
+}
+
+/// The field's multiplicative identity. Total.
+fn fe_one() -> Fe {
+    Fe {
+        l0: 1,
+        l1: 0,
+        l2: 0,
+        l3: 0,
+        l4: 0,
+        l5: 0,
+        l6: 0,
+        l7: 0,
+        l8: 0,
+        l9: 0,
+        l10: 0,
+        l11: 0,
+        l12: 0,
+        l13: 0,
+        l14: 0,
+        l15: 0,
+    }
+}
+
+/// Floor division (wolf's `/` truncates toward zero; the signed carry
+/// passes need floor — the sc10/sc18 correction). ct: the sign test is
+/// the recorded exception shared with sc18's scalar reduction; in
+/// aggregate the carry schedule is fixed.
+fn floordiv(a: int, b: int) -> int {
+    let q = a / b
+    if a - q * b < 0 {
+        return q - 1
+    }
+    q
+}
+
+/// 2^k for k in 0..7 (the ladder's bit selector; a shift on plain
+/// `int` costs the checked lane, F-0026). ct: fixed.
+fn pow2(k: int) -> int {
+    if k == 0 {
+        return 1
+    }
+    if k == 1 {
+        return 2
+    }
+    if k == 2 {
+        return 4
+    }
+    if k == 3 {
+        return 8
+    }
+    if k == 4 {
+        return 16
+    }
+    if k == 5 {
+        return 32
+    }
+    if k == 6 {
+        return 64
+    }
+    128
+}
+
+/// The Solinas carry tail. Adds the constant 2^32·p (so any signed
+/// fold output becomes nonnegative in total — K·p > |input| for every
+/// input this module produces, measured at 2^48 worst limb), then four
+/// base-2^16 carry passes; after each of the first three, the carry out
+/// of limb 15 (the 2^256 overflow) re-enters through the identity
+/// 2^256 ≡ 2^224 - 2^192 - 2^96 + 1 (mod p): +c at limb 0, -c at limb
+/// 6 (2^96), -c at limb 12 (2^192), +c at limb 14 (2^224). The fourth
+/// pass's carry is zero by the convergence argument in the module
+/// header's bound proof (value < 2^256 after three folds), fuzz-checked
+/// against a big-integer reference. Output limbs in [0, 2^16), value
+/// < 2^256 (NOT canonical — `fe_freeze` canonicalizes).
+/// ct: fixed schedule, data-independent (floordiv's noted exception).
+fn fe_carry(f: Fe) -> Fe {
+    let kp0: int = 0
+    let kp1: int = 0
+    let kp2: int = 65535
+    let kp3: int = 65535
+    let kp4: int = 65535
+    let kp5: int = 65535
+    let kp6: int = 65535
+    let kp7: int = 65535
+    let kp8: int = 0
+    let kp9: int = 0
+    let kp10: int = 0
+    let kp11: int = 0
+    let kp12: int = 0
+    let kp13: int = 0
+    let kp14: int = 1
+    let kp15: int = 281474976645120
+    var d0: int = f.l0 + kp0
+    var d1: int = f.l1 + kp1
+    var d2: int = f.l2 + kp2
+    var d3: int = f.l3 + kp3
+    var d4: int = f.l4 + kp4
+    var d5: int = f.l5 + kp5
+    var d6: int = f.l6 + kp6
+    var d7: int = f.l7 + kp7
+    var d8: int = f.l8 + kp8
+    var d9: int = f.l9 + kp9
+    var d10: int = f.l10 + kp10
+    var d11: int = f.l11 + kp11
+    var d12: int = f.l12 + kp12
+    var d13: int = f.l13 + kp13
+    var d14: int = f.l14 + kp14
+    var d15: int = f.l15 + kp15
+    var c: int = 0
+    var v: int = 0
+    // carry pass 1
+    v = d0
+    c = floordiv(v, 65536)
+    d0 = v - c * 65536
+    v = d1 + c
+    c = floordiv(v, 65536)
+    d1 = v - c * 65536
+    v = d2 + c
+    c = floordiv(v, 65536)
+    d2 = v - c * 65536
+    v = d3 + c
+    c = floordiv(v, 65536)
+    d3 = v - c * 65536
+    v = d4 + c
+    c = floordiv(v, 65536)
+    d4 = v - c * 65536
+    v = d5 + c
+    c = floordiv(v, 65536)
+    d5 = v - c * 65536
+    v = d6 + c
+    c = floordiv(v, 65536)
+    d6 = v - c * 65536
+    v = d7 + c
+    c = floordiv(v, 65536)
+    d7 = v - c * 65536
+    v = d8 + c
+    c = floordiv(v, 65536)
+    d8 = v - c * 65536
+    v = d9 + c
+    c = floordiv(v, 65536)
+    d9 = v - c * 65536
+    v = d10 + c
+    c = floordiv(v, 65536)
+    d10 = v - c * 65536
+    v = d11 + c
+    c = floordiv(v, 65536)
+    d11 = v - c * 65536
+    v = d12 + c
+    c = floordiv(v, 65536)
+    d12 = v - c * 65536
+    v = d13 + c
+    c = floordiv(v, 65536)
+    d13 = v - c * 65536
+    v = d14 + c
+    c = floordiv(v, 65536)
+    d14 = v - c * 65536
+    v = d15 + c
+    c = floordiv(v, 65536)
+    d15 = v - c * 65536
+    // fold the 2^256 overflow: c·(2^224 - 2^192 - 2^96 + 1)
+    d0 = d0 + c
+    d6 = d6 - c
+    d12 = d12 - c
+    d14 = d14 + c
+    // carry pass 2
+    v = d0
+    c = floordiv(v, 65536)
+    d0 = v - c * 65536
+    v = d1 + c
+    c = floordiv(v, 65536)
+    d1 = v - c * 65536
+    v = d2 + c
+    c = floordiv(v, 65536)
+    d2 = v - c * 65536
+    v = d3 + c
+    c = floordiv(v, 65536)
+    d3 = v - c * 65536
+    v = d4 + c
+    c = floordiv(v, 65536)
+    d4 = v - c * 65536
+    v = d5 + c
+    c = floordiv(v, 65536)
+    d5 = v - c * 65536
+    v = d6 + c
+    c = floordiv(v, 65536)
+    d6 = v - c * 65536
+    v = d7 + c
+    c = floordiv(v, 65536)
+    d7 = v - c * 65536
+    v = d8 + c
+    c = floordiv(v, 65536)
+    d8 = v - c * 65536
+    v = d9 + c
+    c = floordiv(v, 65536)
+    d9 = v - c * 65536
+    v = d10 + c
+    c = floordiv(v, 65536)
+    d10 = v - c * 65536
+    v = d11 + c
+    c = floordiv(v, 65536)
+    d11 = v - c * 65536
+    v = d12 + c
+    c = floordiv(v, 65536)
+    d12 = v - c * 65536
+    v = d13 + c
+    c = floordiv(v, 65536)
+    d13 = v - c * 65536
+    v = d14 + c
+    c = floordiv(v, 65536)
+    d14 = v - c * 65536
+    v = d15 + c
+    c = floordiv(v, 65536)
+    d15 = v - c * 65536
+    // fold the 2^256 overflow: c·(2^224 - 2^192 - 2^96 + 1)
+    d0 = d0 + c
+    d6 = d6 - c
+    d12 = d12 - c
+    d14 = d14 + c
+    // carry pass 3
+    v = d0
+    c = floordiv(v, 65536)
+    d0 = v - c * 65536
+    v = d1 + c
+    c = floordiv(v, 65536)
+    d1 = v - c * 65536
+    v = d2 + c
+    c = floordiv(v, 65536)
+    d2 = v - c * 65536
+    v = d3 + c
+    c = floordiv(v, 65536)
+    d3 = v - c * 65536
+    v = d4 + c
+    c = floordiv(v, 65536)
+    d4 = v - c * 65536
+    v = d5 + c
+    c = floordiv(v, 65536)
+    d5 = v - c * 65536
+    v = d6 + c
+    c = floordiv(v, 65536)
+    d6 = v - c * 65536
+    v = d7 + c
+    c = floordiv(v, 65536)
+    d7 = v - c * 65536
+    v = d8 + c
+    c = floordiv(v, 65536)
+    d8 = v - c * 65536
+    v = d9 + c
+    c = floordiv(v, 65536)
+    d9 = v - c * 65536
+    v = d10 + c
+    c = floordiv(v, 65536)
+    d10 = v - c * 65536
+    v = d11 + c
+    c = floordiv(v, 65536)
+    d11 = v - c * 65536
+    v = d12 + c
+    c = floordiv(v, 65536)
+    d12 = v - c * 65536
+    v = d13 + c
+    c = floordiv(v, 65536)
+    d13 = v - c * 65536
+    v = d14 + c
+    c = floordiv(v, 65536)
+    d14 = v - c * 65536
+    v = d15 + c
+    c = floordiv(v, 65536)
+    d15 = v - c * 65536
+    // fold the 2^256 overflow: c·(2^224 - 2^192 - 2^96 + 1)
+    d0 = d0 + c
+    d6 = d6 - c
+    d12 = d12 - c
+    d14 = d14 + c
+    // carry pass 4
+    v = d0
+    c = floordiv(v, 65536)
+    d0 = v - c * 65536
+    v = d1 + c
+    c = floordiv(v, 65536)
+    d1 = v - c * 65536
+    v = d2 + c
+    c = floordiv(v, 65536)
+    d2 = v - c * 65536
+    v = d3 + c
+    c = floordiv(v, 65536)
+    d3 = v - c * 65536
+    v = d4 + c
+    c = floordiv(v, 65536)
+    d4 = v - c * 65536
+    v = d5 + c
+    c = floordiv(v, 65536)
+    d5 = v - c * 65536
+    v = d6 + c
+    c = floordiv(v, 65536)
+    d6 = v - c * 65536
+    v = d7 + c
+    c = floordiv(v, 65536)
+    d7 = v - c * 65536
+    v = d8 + c
+    c = floordiv(v, 65536)
+    d8 = v - c * 65536
+    v = d9 + c
+    c = floordiv(v, 65536)
+    d9 = v - c * 65536
+    v = d10 + c
+    c = floordiv(v, 65536)
+    d10 = v - c * 65536
+    v = d11 + c
+    c = floordiv(v, 65536)
+    d11 = v - c * 65536
+    v = d12 + c
+    c = floordiv(v, 65536)
+    d12 = v - c * 65536
+    v = d13 + c
+    c = floordiv(v, 65536)
+    d13 = v - c * 65536
+    v = d14 + c
+    c = floordiv(v, 65536)
+    d14 = v - c * 65536
+    v = d15 + c
+    c = floordiv(v, 65536)
+    d15 = v - c * 65536
+    Fe {
+        l0: d0,
+        l1: d1,
+        l2: d2,
+        l3: d3,
+        l4: d4,
+        l5: d5,
+        l6: d6,
+        l7: d7,
+        l8: d8,
+        l9: d9,
+        l10: d10,
+        l11: d11,
+        l12: d12,
+        l13: d13,
+        l14: d14,
+        l15: d15,
+    }
+}
+
+/// Field addition (carried, not canonical). ct: fixed.
+fn fe_add(f: Fe, g: Fe) -> Fe {
+    fe_carry(Fe {
+        l0: f.l0 + g.l0,
+        l1: f.l1 + g.l1,
+        l2: f.l2 + g.l2,
+        l3: f.l3 + g.l3,
+        l4: f.l4 + g.l4,
+        l5: f.l5 + g.l5,
+        l6: f.l6 + g.l6,
+        l7: f.l7 + g.l7,
+        l8: f.l8 + g.l8,
+        l9: f.l9 + g.l9,
+        l10: f.l10 + g.l10,
+        l11: f.l11 + g.l11,
+        l12: f.l12 + g.l12,
+        l13: f.l13 + g.l13,
+        l14: f.l14 + g.l14,
+        l15: f.l15 + g.l15,
+    })
+}
+
+/// Field subtraction. Limb differences may be negative; `fe_carry`'s
+/// 2^32·p constant dominates them (the module header's bound proof), so
+/// checked arithmetic never sees an out-of-range value. ct: fixed.
+fn fe_sub(f: Fe, g: Fe) -> Fe {
+    fe_carry(Fe {
+        l0: f.l0 - g.l0,
+        l1: f.l1 - g.l1,
+        l2: f.l2 - g.l2,
+        l3: f.l3 - g.l3,
+        l4: f.l4 - g.l4,
+        l5: f.l5 - g.l5,
+        l6: f.l6 - g.l6,
+        l7: f.l7 - g.l7,
+        l8: f.l8 - g.l8,
+        l9: f.l9 - g.l9,
+        l10: f.l10 - g.l10,
+        l11: f.l11 - g.l11,
+        l12: f.l12 - g.l12,
+        l13: f.l13 - g.l13,
+        l14: f.l14 - g.l14,
+        l15: f.l15 - g.l15,
+    })
+}
+
+/// Field multiplication mod p: 16x16 schoolbook into 31 columns, a
+/// nonnegative pre-carry to 32 sub-2^16 limbs, the descending Solinas
+/// fold (limb k >= 16 re-enters at k-16, k-10, k-4, k-2 with signs
+/// +,-,-,+ — SP 800-186's fast reduction, limb-aligned because
+/// 96/192/224 are multiples of 16), then the carry tail.
+///
+/// THE BOUND PROOF (why checked `int` cannot trap): a carried limb is
+/// < 2^16, one product < 2^32, a column sums at most 16 products —
+/// < 2^36 (measured 2^35.4). The pre-carry leaves 32 limbs < 2^16, so
+/// each descending fold adds at most four sub-2^16 terms amplified
+/// through at most three in-edges per column: worst folded limb
+/// measured 2^18.4, and the carry tail's 2^32·p constant tops out at
+/// 2^48.0 on limb 15 — 32768x under int_max, X3-enforced at every op.
+/// ct: fixed schedule, no branch, no secret-dependent index.
+fn fe_mul(f: Fe, g: Fe) -> Fe {
+    let f0: int = f.l0
+    let f1: int = f.l1
+    let f2: int = f.l2
+    let f3: int = f.l3
+    let f4: int = f.l4
+    let f5: int = f.l5
+    let f6: int = f.l6
+    let f7: int = f.l7
+    let f8: int = f.l8
+    let f9: int = f.l9
+    let f10: int = f.l10
+    let f11: int = f.l11
+    let f12: int = f.l12
+    let f13: int = f.l13
+    let f14: int = f.l14
+    let f15: int = f.l15
+    let g0: int = g.l0
+    let g1: int = g.l1
+    let g2: int = g.l2
+    let g3: int = g.l3
+    let g4: int = g.l4
+    let g5: int = g.l5
+    let g6: int = g.l6
+    let g7: int = g.l7
+    let g8: int = g.l8
+    let g9: int = g.l9
+    let g10: int = g.l10
+    let g11: int = g.l11
+    let g12: int = g.l12
+    let g13: int = g.l13
+    let g14: int = g.l14
+    let g15: int = g.l15
+    var m0: int = f0 * g0
+    var m1: int = f0 * g1 + f1 * g0
+    var m2: int = f0 * g2 + f1 * g1 + f2 * g0
+    var m3: int = f0 * g3 + f1 * g2 + f2 * g1 + f3 * g0
+    var m4: int = f0 * g4 + f1 * g3 + f2 * g2 + f3 * g1 + f4 * g0
+    var m5: int = f0 * g5 + f1 * g4 + f2 * g3 + f3 * g2 + f4 * g1 + f5 * g0
+    var m6: int = f0 * g6 + f1 * g5 + f2 * g4 + f3 * g3 + f4 * g2 + f5 * g1 + f6 * g0
+    var m7: int = f0 * g7 + f1 * g6 + f2 * g5 + f3 * g4 + f4 * g3 + f5 * g2 + f6 * g1 + f7 * g0
+    var m8: int = f0 * g8 +
+        f1 * g7 +
+        f2 * g6 +
+        f3 * g5 +
+        f4 * g4 +
+        f5 * g3 +
+        f6 * g2 +
+        f7 * g1 +
+        f8 * g0
+    var m9: int = f0 * g9 +
+        f1 * g8 +
+        f2 * g7 +
+        f3 * g6 +
+        f4 * g5 +
+        f5 * g4 +
+        f6 * g3 +
+        f7 * g2 +
+        f8 * g1 +
+        f9 * g0
+    var m10: int = f0 * g10 +
+        f1 * g9 +
+        f2 * g8 +
+        f3 * g7 +
+        f4 * g6 +
+        f5 * g5 +
+        f6 * g4 +
+        f7 * g3 +
+        f8 * g2 +
+        f9 * g1 +
+        f10 * g0
+    var m11: int = f0 * g11 +
+        f1 * g10 +
+        f2 * g9 +
+        f3 * g8 +
+        f4 * g7 +
+        f5 * g6 +
+        f6 * g5 +
+        f7 * g4 +
+        f8 * g3 +
+        f9 * g2 +
+        f10 * g1 +
+        f11 * g0
+    var m12: int = f0 * g12 +
+        f1 * g11 +
+        f2 * g10 +
+        f3 * g9 +
+        f4 * g8 +
+        f5 * g7 +
+        f6 * g6 +
+        f7 * g5 +
+        f8 * g4 +
+        f9 * g3 +
+        f10 * g2 +
+        f11 * g1 +
+        f12 * g0
+    var m13: int = f0 * g13 +
+        f1 * g12 +
+        f2 * g11 +
+        f3 * g10 +
+        f4 * g9 +
+        f5 * g8 +
+        f6 * g7 +
+        f7 * g6 +
+        f8 * g5 +
+        f9 * g4 +
+        f10 * g3 +
+        f11 * g2 +
+        f12 * g1 +
+        f13 * g0
+    var m14: int = f0 * g14 +
+        f1 * g13 +
+        f2 * g12 +
+        f3 * g11 +
+        f4 * g10 +
+        f5 * g9 +
+        f6 * g8 +
+        f7 * g7 +
+        f8 * g6 +
+        f9 * g5 +
+        f10 * g4 +
+        f11 * g3 +
+        f12 * g2 +
+        f13 * g1 +
+        f14 * g0
+    var m15: int = f0 * g15 +
+        f1 * g14 +
+        f2 * g13 +
+        f3 * g12 +
+        f4 * g11 +
+        f5 * g10 +
+        f6 * g9 +
+        f7 * g8 +
+        f8 * g7 +
+        f9 * g6 +
+        f10 * g5 +
+        f11 * g4 +
+        f12 * g3 +
+        f13 * g2 +
+        f14 * g1 +
+        f15 * g0
+    var m16: int = f1 * g15 +
+        f2 * g14 +
+        f3 * g13 +
+        f4 * g12 +
+        f5 * g11 +
+        f6 * g10 +
+        f7 * g9 +
+        f8 * g8 +
+        f9 * g7 +
+        f10 * g6 +
+        f11 * g5 +
+        f12 * g4 +
+        f13 * g3 +
+        f14 * g2 +
+        f15 * g1
+    var m17: int = f2 * g15 +
+        f3 * g14 +
+        f4 * g13 +
+        f5 * g12 +
+        f6 * g11 +
+        f7 * g10 +
+        f8 * g9 +
+        f9 * g8 +
+        f10 * g7 +
+        f11 * g6 +
+        f12 * g5 +
+        f13 * g4 +
+        f14 * g3 +
+        f15 * g2
+    var m18: int = f3 * g15 +
+        f4 * g14 +
+        f5 * g13 +
+        f6 * g12 +
+        f7 * g11 +
+        f8 * g10 +
+        f9 * g9 +
+        f10 * g8 +
+        f11 * g7 +
+        f12 * g6 +
+        f13 * g5 +
+        f14 * g4 +
+        f15 * g3
+    var m19: int = f4 * g15 +
+        f5 * g14 +
+        f6 * g13 +
+        f7 * g12 +
+        f8 * g11 +
+        f9 * g10 +
+        f10 * g9 +
+        f11 * g8 +
+        f12 * g7 +
+        f13 * g6 +
+        f14 * g5 +
+        f15 * g4
+    var m20: int = f5 * g15 +
+        f6 * g14 +
+        f7 * g13 +
+        f8 * g12 +
+        f9 * g11 +
+        f10 * g10 +
+        f11 * g9 +
+        f12 * g8 +
+        f13 * g7 +
+        f14 * g6 +
+        f15 * g5
+    var m21: int = f6 * g15 +
+        f7 * g14 +
+        f8 * g13 +
+        f9 * g12 +
+        f10 * g11 +
+        f11 * g10 +
+        f12 * g9 +
+        f13 * g8 +
+        f14 * g7 +
+        f15 * g6
+    var m22: int = f7 * g15 +
+        f8 * g14 +
+        f9 * g13 +
+        f10 * g12 +
+        f11 * g11 +
+        f12 * g10 +
+        f13 * g9 +
+        f14 * g8 +
+        f15 * g7
+    var m23: int = f8 * g15 +
+        f9 * g14 +
+        f10 * g13 +
+        f11 * g12 +
+        f12 * g11 +
+        f13 * g10 +
+        f14 * g9 +
+        f15 * g8
+    var m24: int = f9 * g15 + f10 * g14 + f11 * g13 + f12 * g12 + f13 * g11 + f14 * g10 + f15 * g9
+    var m25: int = f10 * g15 + f11 * g14 + f12 * g13 + f13 * g12 + f14 * g11 + f15 * g10
+    var m26: int = f11 * g15 + f12 * g14 + f13 * g13 + f14 * g12 + f15 * g11
+    var m27: int = f12 * g15 + f13 * g14 + f14 * g13 + f15 * g12
+    var m28: int = f13 * g15 + f14 * g14 + f15 * g13
+    var m29: int = f14 * g15 + f15 * g14
+    var m30: int = f15 * g15
+    // pre-carry: 31 nonnegative columns to sub-2^16 limbs + overflow limb 31
+    var c: int = 0
+    var v: int = 0
+    v = m0
+    c = v / 65536
+    m0 = v - c * 65536
+    v = m1 + c
+    c = v / 65536
+    m1 = v - c * 65536
+    v = m2 + c
+    c = v / 65536
+    m2 = v - c * 65536
+    v = m3 + c
+    c = v / 65536
+    m3 = v - c * 65536
+    v = m4 + c
+    c = v / 65536
+    m4 = v - c * 65536
+    v = m5 + c
+    c = v / 65536
+    m5 = v - c * 65536
+    v = m6 + c
+    c = v / 65536
+    m6 = v - c * 65536
+    v = m7 + c
+    c = v / 65536
+    m7 = v - c * 65536
+    v = m8 + c
+    c = v / 65536
+    m8 = v - c * 65536
+    v = m9 + c
+    c = v / 65536
+    m9 = v - c * 65536
+    v = m10 + c
+    c = v / 65536
+    m10 = v - c * 65536
+    v = m11 + c
+    c = v / 65536
+    m11 = v - c * 65536
+    v = m12 + c
+    c = v / 65536
+    m12 = v - c * 65536
+    v = m13 + c
+    c = v / 65536
+    m13 = v - c * 65536
+    v = m14 + c
+    c = v / 65536
+    m14 = v - c * 65536
+    v = m15 + c
+    c = v / 65536
+    m15 = v - c * 65536
+    v = m16 + c
+    c = v / 65536
+    m16 = v - c * 65536
+    v = m17 + c
+    c = v / 65536
+    m17 = v - c * 65536
+    v = m18 + c
+    c = v / 65536
+    m18 = v - c * 65536
+    v = m19 + c
+    c = v / 65536
+    m19 = v - c * 65536
+    v = m20 + c
+    c = v / 65536
+    m20 = v - c * 65536
+    v = m21 + c
+    c = v / 65536
+    m21 = v - c * 65536
+    v = m22 + c
+    c = v / 65536
+    m22 = v - c * 65536
+    v = m23 + c
+    c = v / 65536
+    m23 = v - c * 65536
+    v = m24 + c
+    c = v / 65536
+    m24 = v - c * 65536
+    v = m25 + c
+    c = v / 65536
+    m25 = v - c * 65536
+    v = m26 + c
+    c = v / 65536
+    m26 = v - c * 65536
+    v = m27 + c
+    c = v / 65536
+    m27 = v - c * 65536
+    v = m28 + c
+    c = v / 65536
+    m28 = v - c * 65536
+    v = m29 + c
+    c = v / 65536
+    m29 = v - c * 65536
+    v = m30 + c
+    c = v / 65536
+    m30 = v - c * 65536
+    var m31: int = c
+    // descending Solinas fold: limbs 31..16 re-enter at k-16, k-10, k-4, k-2
+    m15 = m15 + m31
+    m21 = m21 - m31
+    m27 = m27 - m31
+    m29 = m29 + m31
+    m14 = m14 + m30
+    m20 = m20 - m30
+    m26 = m26 - m30
+    m28 = m28 + m30
+    m13 = m13 + m29
+    m19 = m19 - m29
+    m25 = m25 - m29
+    m27 = m27 + m29
+    m12 = m12 + m28
+    m18 = m18 - m28
+    m24 = m24 - m28
+    m26 = m26 + m28
+    m11 = m11 + m27
+    m17 = m17 - m27
+    m23 = m23 - m27
+    m25 = m25 + m27
+    m10 = m10 + m26
+    m16 = m16 - m26
+    m22 = m22 - m26
+    m24 = m24 + m26
+    m9 = m9 + m25
+    m15 = m15 - m25
+    m21 = m21 - m25
+    m23 = m23 + m25
+    m8 = m8 + m24
+    m14 = m14 - m24
+    m20 = m20 - m24
+    m22 = m22 + m24
+    m7 = m7 + m23
+    m13 = m13 - m23
+    m19 = m19 - m23
+    m21 = m21 + m23
+    m6 = m6 + m22
+    m12 = m12 - m22
+    m18 = m18 - m22
+    m20 = m20 + m22
+    m5 = m5 + m21
+    m11 = m11 - m21
+    m17 = m17 - m21
+    m19 = m19 + m21
+    m4 = m4 + m20
+    m10 = m10 - m20
+    m16 = m16 - m20
+    m18 = m18 + m20
+    m3 = m3 + m19
+    m9 = m9 - m19
+    m15 = m15 - m19
+    m17 = m17 + m19
+    m2 = m2 + m18
+    m8 = m8 - m18
+    m14 = m14 - m18
+    m16 = m16 + m18
+    m1 = m1 + m17
+    m7 = m7 - m17
+    m13 = m13 - m17
+    m15 = m15 + m17
+    m0 = m0 + m16
+    m6 = m6 - m16
+    m12 = m12 - m16
+    m14 = m14 + m16
+    fe_carry(Fe {
+        l0: m0,
+        l1: m1,
+        l2: m2,
+        l3: m3,
+        l4: m4,
+        l5: m5,
+        l6: m6,
+        l7: m7,
+        l8: m8,
+        l9: m9,
+        l10: m10,
+        l11: m11,
+        l12: m12,
+        l13: m13,
+        l14: m14,
+        l15: m15,
+    })
+}
+
+/// Field squaring — `fe_mul(f, f)` (a dedicated squaring saves ~45%
+/// of the products and is a named follow-on, not a correctness matter —
+/// the sc18 precedent). ct: as `fe_mul`.
+fn fe_sq(f: Fe) -> Fe {
+    fe_mul(f, f)
+}
+
+/// Canonical reduction to [0, p). A carried value is < 2^256; adding
+/// 2^256 - p (= 2^224 - 2^192 - 2^96 + 1, the fold constants at
+/// q = 1) carries out of bit 256 exactly when the value is >= p, so
+/// that carry q selects one subtraction of p — applied as the same
+/// fold of q with the final 2^256 carry dropped. All arithmetic, no
+/// branch. Total. ct: fixed schedule, data-independent.
+fn fe_freeze(fin: Fe) -> Fe {
+    let h = fe_carry(fin)
+    // probe: does value + (2^256 - p) carry out of bit 256?
+    var g0: int = h.l0 + 1
+    var g1: int = h.l1
+    var g2: int = h.l2
+    var g3: int = h.l3
+    var g4: int = h.l4
+    var g5: int = h.l5
+    var g6: int = h.l6 - 1
+    var g7: int = h.l7
+    var g8: int = h.l8
+    var g9: int = h.l9
+    var g10: int = h.l10
+    var g11: int = h.l11
+    var g12: int = h.l12 - 1
+    var g13: int = h.l13
+    var g14: int = h.l14 + 1
+    var g15: int = h.l15
+    var c: int = 0
+    var v: int = 0
+    v = g0
+    c = floordiv(v, 65536)
+    g0 = v - c * 65536
+    v = g1 + c
+    c = floordiv(v, 65536)
+    g1 = v - c * 65536
+    v = g2 + c
+    c = floordiv(v, 65536)
+    g2 = v - c * 65536
+    v = g3 + c
+    c = floordiv(v, 65536)
+    g3 = v - c * 65536
+    v = g4 + c
+    c = floordiv(v, 65536)
+    g4 = v - c * 65536
+    v = g5 + c
+    c = floordiv(v, 65536)
+    g5 = v - c * 65536
+    v = g6 + c
+    c = floordiv(v, 65536)
+    g6 = v - c * 65536
+    v = g7 + c
+    c = floordiv(v, 65536)
+    g7 = v - c * 65536
+    v = g8 + c
+    c = floordiv(v, 65536)
+    g8 = v - c * 65536
+    v = g9 + c
+    c = floordiv(v, 65536)
+    g9 = v - c * 65536
+    v = g10 + c
+    c = floordiv(v, 65536)
+    g10 = v - c * 65536
+    v = g11 + c
+    c = floordiv(v, 65536)
+    g11 = v - c * 65536
+    v = g12 + c
+    c = floordiv(v, 65536)
+    g12 = v - c * 65536
+    v = g13 + c
+    c = floordiv(v, 65536)
+    g13 = v - c * 65536
+    v = g14 + c
+    c = floordiv(v, 65536)
+    g14 = v - c * 65536
+    v = g15 + c
+    c = floordiv(v, 65536)
+    g15 = v - c * 65536
+    let q = c
+    // value - q·p == value + q·(2^256 - p) - q·2^256 (the carry is dropped)
+    var r0: int = h.l0 + q
+    var r1: int = h.l1
+    var r2: int = h.l2
+    var r3: int = h.l3
+    var r4: int = h.l4
+    var r5: int = h.l5
+    var r6: int = h.l6 - q
+    var r7: int = h.l7
+    var r8: int = h.l8
+    var r9: int = h.l9
+    var r10: int = h.l10
+    var r11: int = h.l11
+    var r12: int = h.l12 - q
+    var r13: int = h.l13
+    var r14: int = h.l14 + q
+    var r15: int = h.l15
+    c = 0
+    v = r0
+    c = floordiv(v, 65536)
+    r0 = v - c * 65536
+    v = r1 + c
+    c = floordiv(v, 65536)
+    r1 = v - c * 65536
+    v = r2 + c
+    c = floordiv(v, 65536)
+    r2 = v - c * 65536
+    v = r3 + c
+    c = floordiv(v, 65536)
+    r3 = v - c * 65536
+    v = r4 + c
+    c = floordiv(v, 65536)
+    r4 = v - c * 65536
+    v = r5 + c
+    c = floordiv(v, 65536)
+    r5 = v - c * 65536
+    v = r6 + c
+    c = floordiv(v, 65536)
+    r6 = v - c * 65536
+    v = r7 + c
+    c = floordiv(v, 65536)
+    r7 = v - c * 65536
+    v = r8 + c
+    c = floordiv(v, 65536)
+    r8 = v - c * 65536
+    v = r9 + c
+    c = floordiv(v, 65536)
+    r9 = v - c * 65536
+    v = r10 + c
+    c = floordiv(v, 65536)
+    r10 = v - c * 65536
+    v = r11 + c
+    c = floordiv(v, 65536)
+    r11 = v - c * 65536
+    v = r12 + c
+    c = floordiv(v, 65536)
+    r12 = v - c * 65536
+    v = r13 + c
+    c = floordiv(v, 65536)
+    r13 = v - c * 65536
+    v = r14 + c
+    c = floordiv(v, 65536)
+    r14 = v - c * 65536
+    v = r15 + c
+    c = floordiv(v, 65536)
+    r15 = v - c * 65536
+    Fe {
+        l0: r0,
+        l1: r1,
+        l2: r2,
+        l3: r3,
+        l4: r4,
+        l5: r5,
+        l6: r6,
+        l7: r7,
+        l8: r8,
+        l9: r9,
+        l10: r10,
+        l11: r11,
+        l12: r12,
+        l13: r13,
+        l14: r14,
+        l15: r15,
+    }
+}
+
+/// True iff the value is zero mod p (freezes first, so a
+/// non-canonical zero is recognized). ct: public data at every call
+/// site in this module (verify-side and encoding work).
+fn fe_iszero(f: Fe) -> bool {
+    let c = fe_freeze(f)
+    c.l0 == 0 &&
+        c.l1 == 0 &&
+        c.l2 == 0 &&
+        c.l3 == 0 &&
+        c.l4 == 0 &&
+        c.l5 == 0 &&
+        c.l6 == 0 &&
+        c.l7 == 0 &&
+        c.l8 == 0 &&
+        c.l9 == 0 &&
+        c.l10 == 0 &&
+        c.l11 == 0 &&
+        c.l12 == 0 &&
+        c.l13 == 0 &&
+        c.l14 == 0 &&
+        c.l15 == 0
+}
+
+/// True iff two field elements are equal mod p. ct: public data at
+/// every call site (point equality and validation are verify-side).
+fn fe_eq(f: Fe, g: Fe) -> bool {
+    fe_iszero(fe_sub(f, g))
+}
+
+/// Decode 32 BIG-endian bytes (the SEC1/FIPS byte order) to a field
+/// element. The caller guarantees 32 byte-valued elements and a value
+/// < p (`bytes_lt_p` is the ingestion check). Limb i is byte pair
+/// (31-2i, 30-2i). ct: fixed offsets.
+fn fe_frombytes_be(b: List[int]) -> Fe {
+    let l0: int = b[31] + b[30] * 256
+    let l1: int = b[29] + b[28] * 256
+    let l2: int = b[27] + b[26] * 256
+    let l3: int = b[25] + b[24] * 256
+    let l4: int = b[23] + b[22] * 256
+    let l5: int = b[21] + b[20] * 256
+    let l6: int = b[19] + b[18] * 256
+    let l7: int = b[17] + b[16] * 256
+    let l8: int = b[15] + b[14] * 256
+    let l9: int = b[13] + b[12] * 256
+    let l10: int = b[11] + b[10] * 256
+    let l11: int = b[9] + b[8] * 256
+    let l12: int = b[7] + b[6] * 256
+    let l13: int = b[5] + b[4] * 256
+    let l14: int = b[3] + b[2] * 256
+    let l15: int = b[1] + b[0] * 256
+    Fe {
+        l0: l0,
+        l1: l1,
+        l2: l2,
+        l3: l3,
+        l4: l4,
+        l5: l5,
+        l6: l6,
+        l7: l7,
+        l8: l8,
+        l9: l9,
+        l10: l10,
+        l11: l11,
+        l12: l12,
+        l13: l13,
+        l14: l14,
+        l15: l15,
+    }
+}
+
+/// Encode a field element as 32 BIG-endian bytes, canonical (< p).
+/// ct: freezes (fixed), then fixed byte extraction.
+fn fe_tobytes_be(fin: Fe) -> List[int] {
+    let f = fe_freeze(fin)
+    var out = List[int]()
+    (mut out).push(f.l15 / 256)
+    (mut out).push(f.l15 % 256)
+    (mut out).push(f.l14 / 256)
+    (mut out).push(f.l14 % 256)
+    (mut out).push(f.l13 / 256)
+    (mut out).push(f.l13 % 256)
+    (mut out).push(f.l12 / 256)
+    (mut out).push(f.l12 % 256)
+    (mut out).push(f.l11 / 256)
+    (mut out).push(f.l11 % 256)
+    (mut out).push(f.l10 / 256)
+    (mut out).push(f.l10 % 256)
+    (mut out).push(f.l9 / 256)
+    (mut out).push(f.l9 % 256)
+    (mut out).push(f.l8 / 256)
+    (mut out).push(f.l8 % 256)
+    (mut out).push(f.l7 / 256)
+    (mut out).push(f.l7 % 256)
+    (mut out).push(f.l6 / 256)
+    (mut out).push(f.l6 % 256)
+    (mut out).push(f.l5 / 256)
+    (mut out).push(f.l5 % 256)
+    (mut out).push(f.l4 / 256)
+    (mut out).push(f.l4 % 256)
+    (mut out).push(f.l3 / 256)
+    (mut out).push(f.l3 % 256)
+    (mut out).push(f.l2 / 256)
+    (mut out).push(f.l2 % 256)
+    (mut out).push(f.l1 / 256)
+    (mut out).push(f.l1 % 256)
+    (mut out).push(f.l0 / 256)
+    (mut out).push(f.l0 % 256)
+    out
+}
+
+/// p - 2 as 32 big-endian bytes (the Fermat inversion exponent — a PUBLIC constant). Total.
+fn pm2_bytes() -> List[int] {
+    var out = List[int]()
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(1)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(253)
+    out
+}
+
+/// n - 2 as 32 big-endian bytes (the mod-n Fermat exponent — a PUBLIC constant). Total.
+fn nm2_bytes() -> List[int] {
+    var out = List[int]()
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(188)
+    (mut out).push(230)
+    (mut out).push(250)
+    (mut out).push(173)
+    (mut out).push(167)
+    (mut out).push(23)
+    (mut out).push(158)
+    (mut out).push(132)
+    (mut out).push(243)
+    (mut out).push(185)
+    (mut out).push(202)
+    (mut out).push(194)
+    (mut out).push(252)
+    (mut out).push(99)
+    (mut out).push(37)
+    (mut out).push(79)
+    out
+}
+
+/// p as 32 big-endian bytes (the coordinate range check, SEC1 §3.2.2). Total.
+fn p_bytes() -> List[int] {
+    var out = List[int]()
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(1)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    out
+}
+
+/// n as 32 big-endian bytes (the r/s and nonce range checks, FIPS 186-5). Total.
+fn n_bytes() -> List[int] {
+    var out = List[int]()
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(255)
+    (mut out).push(188)
+    (mut out).push(230)
+    (mut out).push(250)
+    (mut out).push(173)
+    (mut out).push(167)
+    (mut out).push(23)
+    (mut out).push(158)
+    (mut out).push(132)
+    (mut out).push(243)
+    (mut out).push(185)
+    (mut out).push(202)
+    (mut out).push(194)
+    (mut out).push(252)
+    (mut out).push(99)
+    (mut out).push(37)
+    (mut out).push(81)
+    out
+}
+
+/// Field inversion z^(p-2) mod p (Fermat), MSB-first binary
+/// square-and-multiply over the PUBLIC constant exponent p-2 — the
+/// per-bit branch reads a compiled-in table, never data, so the
+/// schedule is input-independent (the fixed-exponent rule in the
+/// module ct: note). 256 squarings, 128+ multiplies. z must be
+/// nonzero mod p (an inversion of zero yields zero, which every call
+/// site here excludes structurally).
+fn fe_invert(z: Fe) -> Fe {
+    let e = pm2_bytes()
+    var r = fe_one()
+    var i: int = 0
+    while i < 256 {
+        r = fe_sq(r)
+        let byte = e[i / 8]
+        let bit = byte / pow2(7 - i % 8) % 2
+        if bit == 1 {
+            r = fe_mul(r, z)
+        }
+        i = i + 1
+    }
+    r
+}
+
+/// ARITHMETIC selection — this module's cswap-class primitive and one
+/// of c28's verification targets (the design ruling). `flag` is 0 or
+/// 1; the output is g + flag·(f - g) per limb, so both inputs are read
+/// unconditionally and NO BRANCH and NO MEMORY INDEX reads the secret
+/// bit. A branchy select would pass every vector and leak the scalar.
+/// ct: THE LOAD-BEARING CLAIM — the secret enters only as a
+/// multiplier.
+fn fe_select(flag: int, f: Fe, g: Fe) -> Fe {
+    Fe {
+        l0: g.l0 + flag * (f.l0 - g.l0),
+        l1: g.l1 + flag * (f.l1 - g.l1),
+        l2: g.l2 + flag * (f.l2 - g.l2),
+        l3: g.l3 + flag * (f.l3 - g.l3),
+        l4: g.l4 + flag * (f.l4 - g.l4),
+        l5: g.l5 + flag * (f.l5 - g.l5),
+        l6: g.l6 + flag * (f.l6 - g.l6),
+        l7: g.l7 + flag * (f.l7 - g.l7),
+        l8: g.l8 + flag * (f.l8 - g.l8),
+        l9: g.l9 + flag * (f.l9 - g.l9),
+        l10: g.l10 + flag * (f.l10 - g.l10),
+        l11: g.l11 + flag * (f.l11 - g.l11),
+        l12: g.l12 + flag * (f.l12 - g.l12),
+        l13: g.l13 + flag * (f.l13 - g.l13),
+        l14: g.l14 + flag * (f.l14 - g.l14),
+        l15: g.l15 + flag * (f.l15 - g.l15),
+    }
+}
+
+// ---------------------------------------------------------------------
+// The curve group: projective points under the COMPLETE addition
+// formulas of Renes–Costello–Batina (eprint 2015/1060, a = -3, the
+// b-constant form) — total over identity, doubling and inverse inputs,
+// which is what makes a branch-free ladder possible at all. Fields are
+// interim backing, never API.
+// ---------------------------------------------------------------------
+
+struct Pt {
+    x: Fe,
+    y: Fe,
+    z: Fe,
+}
+
+/// The group identity (0 : 1 : 0). Total.
+fn pt_identity() -> Pt {
+    Pt { x: fe_zero(), y: fe_one(), z: fe_zero() }
+}
+
+/// The base point G (SP 800-186 §3.2.1.3) in projective form. Total.
+fn pt_base() -> Pt {
+    Pt { x: fe_gx(), y: fe_gy(), z: fe_one() }
+}
+
+/// Complete point addition (RCB 2015/1060 Algorithm 4, a = -3): total
+/// over ALL inputs — P + O, O + P, P + P and P + (-P) take the same
+/// straight-line code as a generic addition. 12 multiplies, no branch.
+/// ct: fixed field ops, no branch, no secret-dependent index.
+fn pt_add(p1: Pt, p2: Pt) -> Pt {
+    var t0 = fe_mul(p1.x, p2.x)
+    var t1 = fe_mul(p1.y, p2.y)
+    var t2 = fe_mul(p1.z, p2.z)
+    var t3 = fe_add(p1.x, p1.y)
+    var t4 = fe_add(p2.x, p2.y)
+    t3 = fe_mul(t3, t4)
+    t4 = fe_add(t0, t1)
+    t3 = fe_sub(t3, t4)
+    t4 = fe_add(p1.y, p1.z)
+    var x3 = fe_add(p2.y, p2.z)
+    t4 = fe_mul(t4, x3)
+    x3 = fe_add(t1, t2)
+    t4 = fe_sub(t4, x3)
+    x3 = fe_add(p1.x, p1.z)
+    var y3 = fe_add(p2.x, p2.z)
+    x3 = fe_mul(x3, y3)
+    y3 = fe_add(t0, t2)
+    y3 = fe_sub(x3, y3)
+    var z3 = fe_mul(fe_b(), t2)
+    x3 = fe_sub(y3, z3)
+    z3 = fe_add(x3, x3)
+    x3 = fe_add(x3, z3)
+    z3 = fe_sub(t1, x3)
+    x3 = fe_add(t1, x3)
+    y3 = fe_mul(fe_b(), y3)
+    t1 = fe_add(t2, t2)
+    t2 = fe_add(t1, t2)
+    y3 = fe_sub(y3, t2)
+    y3 = fe_sub(y3, t0)
+    t1 = fe_add(y3, y3)
+    y3 = fe_add(t1, y3)
+    t1 = fe_add(t0, t0)
+    t0 = fe_add(t1, t0)
+    t0 = fe_sub(t0, t2)
+    t1 = fe_mul(t4, y3)
+    t2 = fe_mul(t0, y3)
+    y3 = fe_mul(x3, z3)
+    y3 = fe_add(y3, t2)
+    x3 = fe_mul(t3, x3)
+    x3 = fe_sub(x3, t1)
+    z3 = fe_mul(t4, z3)
+    t1 = fe_mul(t3, t0)
+    z3 = fe_add(z3, t1)
+    Pt { x: x3, y: y3, z: z3 }
+}
+
+/// Complete point doubling (RCB 2015/1060, the a = -3 doubling from
+/// the same family — the Go nistec transcription): total, including
+/// the identity. ct: fixed field ops, no branch.
+fn pt_double(pp: Pt) -> Pt {
+    var t0 = fe_sq(pp.x)
+    var t1 = fe_sq(pp.y)
+    var t2 = fe_sq(pp.z)
+    var t3 = fe_mul(pp.x, pp.y)
+    t3 = fe_add(t3, t3)
+    var z3 = fe_mul(pp.x, pp.z)
+    z3 = fe_add(z3, z3)
+    var y3 = fe_mul(fe_b(), t2)
+    y3 = fe_sub(y3, z3)
+    var x3 = fe_add(y3, y3)
+    y3 = fe_add(x3, y3)
+    x3 = fe_sub(t1, y3)
+    y3 = fe_add(t1, y3)
+    y3 = fe_mul(x3, y3)
+    x3 = fe_mul(x3, t3)
+    t3 = fe_add(t2, t2)
+    t2 = fe_add(t2, t3)
+    z3 = fe_mul(fe_b(), z3)
+    z3 = fe_sub(z3, t2)
+    z3 = fe_sub(z3, t0)
+    t3 = fe_add(z3, z3)
+    z3 = fe_add(z3, t3)
+    t3 = fe_add(t0, t0)
+    t0 = fe_add(t3, t0)
+    t0 = fe_sub(t0, t2)
+    t0 = fe_mul(t0, z3)
+    y3 = fe_add(y3, t0)
+    t0 = fe_mul(pp.y, pp.z)
+    t0 = fe_add(t0, t0)
+    z3 = fe_mul(t0, z3)
+    x3 = fe_sub(x3, z3)
+    z3 = fe_mul(t0, t1)
+    z3 = fe_add(z3, z3)
+    z3 = fe_add(z3, z3)
+    Pt { x: x3, y: y3, z: z3 }
+}
+
+/// Arithmetic point selection: `fe_select` over all three coordinates.
+/// ct: as `fe_select` — the load-bearing claim, no branch, no index.
+fn pt_select(flag: int, f: Pt, g: Pt) -> Pt {
+    Pt {
+        x: fe_select(flag, f.x, g.x),
+        y: fe_select(flag, f.y, g.y),
+        z: fe_select(flag, f.z, g.z),
+    }
+}
+
+/// THE TABLE-FREE CONSTANT-TIME SCALAR MULTIPLICATION — the sc23
+/// design ruling made code, and **c28's VERIFICATION TARGET for this
+/// module** (as `fe_cswap` is curve25519's): [k]P over a 32-byte
+/// BIG-endian scalar in 256 fixed iterations of complete-double,
+/// complete-add, arithmetic-select. Every iteration executes the SAME
+/// field operations; the scalar bit appears exactly once, as
+/// `pt_select`'s multiplier — never a branch, never a table index (a
+/// windowed table with a secret index would pass every vector in this
+/// repository and leak the key through the cache; that is the whole
+/// point of the ruling). The complete RCB formulas remove the
+/// exceptional-case branches an incomplete ladder would need.
+/// ct: THE SECRET PATH on signing (k is the nonce / the key); on
+/// verify the scalars are public and the fixed schedule is free.
+fn scalar_mul(k: List[int], pt: Pt) -> Pt {
+    var acc = pt_identity()
+    var i: int = 0
+    while i < 256 {
+        acc = pt_double(acc)
+        let sum = pt_add(acc, pt)
+        let byte = k[i / 8]
+        let bit = byte / pow2(7 - i % 8) % 2
+        acc = pt_select(bit, sum, acc)
+        i = i + 1
+    }
+    acc
+}
+
+// ---------------------------------------------------------------------
+// The scalar field mod n (the group order). n is NOT a Solinas prime
+// (its low 128 bits are irregular), so multiplication is Montgomery in
+// base 2^16 (CIOS over 16-limb List[int], little-endian by limb):
+// fixed schedule, no division. The list shapes are the split
+// read-then-write all three lanes run (the sc18 sc_reduce precedent).
+// ---------------------------------------------------------------------
+
+/// n as sixteen base-2^16 limbs, little-endian. Total.
+fn n_limbs() -> List[int] {
+    var out = List[int]()
+    (mut out).push(9553)
+    (mut out).push(64611)
+    (mut out).push(51906)
+    (mut out).push(62393)
+    (mut out).push(40580)
+    (mut out).push(42775)
+    (mut out).push(64173)
+    (mut out).push(48358)
+    (mut out).push(65535)
+    (mut out).push(65535)
+    (mut out).push(65535)
+    (mut out).push(65535)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(65535)
+    (mut out).push(65535)
+    out
+}
+
+/// 2^256 - n as sixteen base-2^16 limbs (the >= n probe constant). Total.
+fn cn_limbs() -> List[int] {
+    var out = List[int]()
+    (mut out).push(55983)
+    (mut out).push(924)
+    (mut out).push(13629)
+    (mut out).push(3142)
+    (mut out).push(24955)
+    (mut out).push(22760)
+    (mut out).push(1362)
+    (mut out).push(17177)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(65535)
+    (mut out).push(65535)
+    (mut out).push(0)
+    (mut out).push(0)
+    out
+}
+
+/// (2^256)^2 mod n — the Montgomery conversion constant. Total.
+fn r2n_limbs() -> List[int] {
+    var out = List[int]()
+    (mut out).push(61090)
+    (mut out).push(48761)
+    (mut out).push(19605)
+    (mut out).push(33572)
+    (mut out).push(28582)
+    (mut out).push(18877)
+    (mut out).push(31132)
+    (mut out).push(18073)
+    (mut out).push(60505)
+    (mut out).push(11115)
+    (mut out).push(45625)
+    (mut out).push(10309)
+    (mut out).push(22048)
+    (mut out).push(62425)
+    (mut out).push(11668)
+    (mut out).push(26337)
+    out
+}
+
+/// 2^256 mod n — one in the Montgomery domain. Total.
+fn rn_limbs() -> List[int] {
+    var out = List[int]()
+    (mut out).push(55983)
+    (mut out).push(924)
+    (mut out).push(13629)
+    (mut out).push(3142)
+    (mut out).push(24955)
+    (mut out).push(22760)
+    (mut out).push(1362)
+    (mut out).push(17177)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(65535)
+    (mut out).push(65535)
+    (mut out).push(0)
+    (mut out).push(0)
+    out
+}
+
+/// -n^-1 mod 2^16 (the Montgomery quotient constant). Total.
+fn n0inv() -> int {
+    48207
+}
+
+/// Montgomery multiplication a·b·2^-256 mod n (CIOS, base 2^16):
+/// sixteen fixed outer rounds, each a multiply-accumulate row and a
+/// quotient fold — no division, no data-dependent trip count. The
+/// worst accumulator is < 2^33 (measured 2^31.99), X3-checked.
+/// Output < n. ct: fixed schedule — the mod-n workhorse on the
+/// signing path (nonce and key arithmetic).
+fn sc_mont_mul(a: List[int], b: List[int]) -> List[int] {
+    let nn = n_limbs()
+    let n0i = n0inv()
+    var t = List[int]()
+    var i: int = 0
+    while i < 17 {
+        (mut t).push(0)
+        i = i + 1
+    }
+    i = 0
+    while i < 16 {
+        let ai = a[i]
+        var c: int = 0
+        var j: int = 0
+        while j < 16 {
+            let tv = t[j] + ai * b[j] + c
+            c = tv / 65536
+            t[j] = tv - c * 65536
+            j = j + 1
+        }
+        let t16a = t[16] + c
+        t[16] = t16a
+        let m = t[0] * n0i % 65536
+        let f0 = t[0] + m * nn[0]
+        c = f0 / 65536
+        j = 1
+        while j < 16 {
+            let tv = t[j] + m * nn[j] + c
+            c = tv / 65536
+            t[j - 1] = tv - c * 65536
+            j = j + 1
+        }
+        let top = t[16] + c
+        t[15] = top % 65536
+        t[16] = top / 65536
+        i = i + 1
+    }
+    sc_cond_sub_n(t)
+}
+
+/// One arithmetic conditional subtraction of n: `t` is 16 limbs plus
+/// an overflow limb t[16] in {0, 1} with value < 2n; the result is
+/// value mod n. q (subtract or not) is computed as a carry, applied as
+/// a multiplier — no branch. ct: fixed schedule.
+fn sc_cond_sub_n(t: List[int]) -> List[int] {
+    let nn = n_limbs()
+    let cn = cn_limbs()
+    let hi = t[16]
+    // probe: does the low 2^256 part + (2^256 - n) carry out?
+    var c: int = 0
+    var i: int = 0
+    while i < 16 {
+        let gv = t[i] + cn[i] + c
+        c = gv / 65536
+        i = i + 1
+    }
+    let q = hi + (1 - hi) * c
+    var out = List[int]()
+    c = 0
+    i = 0
+    while i < 16 {
+        let rv = t[i] - q * nn[i] + c
+        c = floordiv(rv, 65536)
+        (mut out).push(rv - c * 65536)
+        i = i + 1
+    }
+    out
+}
+
+/// 32 BIG-endian bytes -> value mod n (a value < 2^256 is < 2n, so
+/// one conditional subtraction reduces it — FIPS 186-5's bits2int for
+/// a 256-bit hash needs exactly this). The caller guarantees byte
+/// elements. ct: fixed.
+fn sc_from_bytes_be(b: List[int]) -> List[int] {
+    var t = List[int]()
+    var i: int = 0
+    while i < 16 {
+        (mut t).push(b[31 - 2 * i] + b[30 - 2 * i] * 256)
+        i = i + 1
+    }
+    (mut t).push(0)
+    sc_cond_sub_n(t)
+}
+
+/// A 16-limb scalar as 32 BIG-endian bytes. ct: fixed extraction.
+fn sc_to_bytes_be(s: List[int]) -> List[int] {
+    var out = List[int]()
+    var i: int = 15
+    while i >= 0 {
+        (mut out).push(s[i] / 256)
+        (mut out).push(s[i] % 256)
+        i = i - 1
+    }
+    out
+}
+
+/// a·b mod n: two Montgomery multiplications (in, then the R^2
+/// correction). ct: fixed (`sc_mont_mul`).
+fn sc_mul(a: List[int], b: List[int]) -> List[int] {
+    sc_mont_mul(sc_mont_mul(a, b), r2n_limbs())
+}
+
+/// (a + b) mod n over two reduced scalars. ct: fixed.
+fn sc_add(a: List[int], b: List[int]) -> List[int] {
+    var t = List[int]()
+    var c: int = 0
+    var i: int = 0
+    while i < 16 {
+        let tv = a[i] + b[i] + c
+        c = tv / 65536
+        (mut t).push(tv - c * 65536)
+        i = i + 1
+    }
+    (mut t).push(c)
+    sc_cond_sub_n(t)
+}
+
+/// a^(n-2) mod n (Fermat inversion), MSB-first over the PUBLIC
+/// constant exponent n-2, in the Montgomery domain throughout. The
+/// per-bit branch reads a compiled-in table, never data. Used for
+/// k^-1 (SIGNING — the secret path) and s^-1 (verify — public).
+fn sc_inv(a: List[int]) -> List[int] {
+    let am = sc_mont_mul(a, r2n_limbs())
+    let e = nm2_bytes()
+    var r = rn_limbs()
+    var i: int = 0
+    while i < 256 {
+        r = sc_mont_mul(r, r)
+        let byte = e[i / 8]
+        let bit = byte / pow2(7 - i % 8) % 2
+        if bit == 1 {
+            r = sc_mont_mul(r, am)
+        }
+        i = i + 1
+    }
+    var one = List[int]()
+    (mut one).push(1)
+    i = 1
+    while i < 16 {
+        (mut one).push(0)
+        i = i + 1
+    }
+    sc_mont_mul(r, one)
+}
+
+/// True iff a 16-limb scalar is zero. ct: on r/s and derived values —
+/// public on verify; on the signing path the zero cases are the FIPS
+/// 186-5 retry conditions, which never fire for a valid key (their
+/// probability is ~2^-256) and are checked on values that become
+/// public (r, s).
+fn sc_iszero(s: List[int]) -> bool {
+    var i: int = 0
+    var zero = true
+    while i < 16 {
+        if !(s[i] == 0) {
+            zero = false
+        }
+        i = i + 1
+    }
+    zero
+}
+
+/// True iff 32 big-endian bytes name a value >= n (the FIPS 186-5
+/// r/s range check and RFC 6979's candidate acceptance). ct: the
+/// early-exit compare is the recorded 6979 exception in the module
+/// header (the RFC's own rejection sampling); r and s are public.
+fn bytes_geq_n(b: List[int]) -> bool {
+    let nb = n_bytes()
+    var i: int = 0
+    while i < 32 {
+        if b[i] > nb[i] {
+            return true
+        }
+        if b[i] < nb[i] {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+/// True iff 32 big-endian bytes name a value < p (SEC1 §3.2.2's
+/// coordinate range check). ct: public data (an ingested point).
+fn bytes_lt_p(b: List[int]) -> bool {
+    let pb = p_bytes()
+    var i: int = 0
+    while i < 32 {
+        if b[i] < pb[i] {
+            return true
+        }
+        if b[i] > pb[i] {
+            return false
+        }
+        i = i + 1
+    }
+    false
+}
+
+// ---------------------------------------------------------------------
+// Byte / point helpers, on-curve validation (SEC1 §3.2.2 — the
+// invalid-curve rejection), affine conversion.
+// ---------------------------------------------------------------------
+
+/// The 0..255 ingestion guard (F-0035's byte contract). ct: NOT free of
+/// a value-dependent branch — the module's recorded ct exception,
+/// shared verbatim with the whole ladder; runs on public bytes.
+fn require_byte(v: int) {
+    if v < 0 {
+        assert(false, "p256: element outside 0..255")
+    }
+    if v > 255 {
+        assert(false, "p256: element outside 0..255")
+    }
+}
+
+/// A validated point, or the marker that decoding rejected it (a bad
+/// length, a coordinate >= p, or a point not on the curve — the
+/// invalid-curve class). The point is meaningful only when `ok`.
+struct PtOpt {
+    ok: bool,
+    p: Pt,
+}
+
+/// True iff the affine point (x, y) satisfies y^2 = x^3 - 3x + b (the
+/// P-256 curve equation, a = -3; SEC1 §3.2.2's on-curve test). The
+/// caller passes a point with z = 1. ct: public data (verify-side).
+fn on_curve(x: Fe, y: Fe) -> bool {
+    let lhs = fe_sq(y)
+    let x2 = fe_sq(x)
+    let x3 = fe_mul(x2, x)
+    let three_x = fe_add(fe_add(x, x), x)
+    let rhs = fe_add(fe_sub(x3, three_x), fe_b())
+    fe_eq(lhs, rhs)
+}
+
+/// Decode a 65-byte uncompressed SEC1 point (0x04 || X || Y), REJECTING
+/// a wrong length or lead byte, a coordinate >= p (non-canonical), and
+/// — mandatorily, SEC1 §3.2.2 — a point that is not on the curve (the
+/// invalid-curve attack class: an attacker who supplies an off-curve
+/// point can, against a naive implementation, recover the private
+/// scalar; Wycheproof patrols exactly this). The point at infinity has
+/// no uncompressed encoding here, so it is rejected by length. ct:
+/// public data — an ingested public key or ephemeral point.
+fn decode_point(b: List[int]) -> PtOpt {
+    if b.len != 65 {
+        return PtOpt { ok: false, p: pt_identity() }
+    }
+    for v in b {
+        require_byte(v)
+    }
+    if b[0] != 4 {
+        return PtOpt { ok: false, p: pt_identity() }
+    }
+    var xb = List[int]()
+    var yb = List[int]()
+    var i: int = 1
+    while i < 33 {
+        (mut xb).push(b[i])
+        i = i + 1
+    }
+    while i < 65 {
+        (mut yb).push(b[i])
+        i = i + 1
+    }
+    if !bytes_lt_p(xb) {
+        return PtOpt { ok: false, p: pt_identity() }
+    }
+    if !bytes_lt_p(yb) {
+        return PtOpt { ok: false, p: pt_identity() }
+    }
+    let x = fe_frombytes_be(xb)
+    let y = fe_frombytes_be(yb)
+    if !on_curve(x, y) {
+        return PtOpt { ok: false, p: pt_identity() }
+    }
+    PtOpt { ok: true, p: Pt { x: x, y: y, z: fe_one() } }
+}
+
+/// The affine x-coordinate of a projective point, as 32 big-endian
+/// bytes, reduced mod n (ECDSA's r and the verification value are
+/// x-coordinates taken mod n). The point must not be the identity —
+/// every caller checks z != 0 first. ct: public in verify; on signing
+/// the value becomes r (public once computed).
+fn affine_x_mod_n(pp: Pt) -> List[int] {
+    let zi = fe_invert(pp.z)
+    let x = fe_mul(pp.x, zi)
+    let xb = fe_tobytes_be(x)
+    sc_to_bytes_be(sc_from_bytes_be(xb))
+}
+
+// ---------------------------------------------------------------------
+// RFC 6979 deterministic nonce generation (HMAC-SHA-256, qlen = 256).
+// HMAC is sha2's, through the module boundary. The construction is
+// §3.2: K/V seeded from the private key and the message hash, then a
+// generate-and-test loop that yields the first candidate in [1, n).
+// ---------------------------------------------------------------------
+
+/// bits2octets(SHA-256(msg)) of §2.3.4: the 32-byte hash is already
+/// 256 bits (qlen), so bits2int is the identity and the reduction mod n
+/// is one conditional subtraction — `sc_from_bytes_be` then re-encode.
+/// ct: on the message hash (public) and, in the seed, mixed with the
+/// secret key inside HMAC.
+fn bits2octets(h: List[int]) -> List[int] {
+    sc_to_bytes_be(sc_from_bytes_be(h))
+}
+
+/// The RFC 6979 §3.2 deterministic nonce for private key `x` (32-byte
+/// big-endian) and message hash `h1` (SHA-256, 32 bytes): returns the
+/// first HMAC_DRBG candidate that lands in [1, n). ct: THE SECRET PATH —
+/// the key enters every HMAC; the schedule is fixed except the
+/// candidate-acceptance compare (`bytes_geq_n`), the RFC's own
+/// rejection sampling, which for P-256 rejects with probability < 2^-32
+/// per round (recorded exception in the module header).
+fn rfc6979_nonce(x: List[int], h1: List[int]) -> List[int] {
+    let h1o = bits2octets(h1)
+    var v = List[int]()
+    var k = List[int]()
+    var i: int = 0
+    while i < 32 {
+        (mut v).push(1)
+        (mut k).push(0)
+        i = i + 1
+    }
+    // K = HMAC_K(V || 0x00 || int2octets(x) || bits2octets(h1))
+    var seed0 = cat(v, one_byte(0))
+    seed0 = cat(seed0, x)
+    seed0 = cat(seed0, h1o)
+    k = sha2.hmac256(k, seed0)
+    v = sha2.hmac256(k, v)
+    // K = HMAC_K(V || 0x01 || int2octets(x) || bits2octets(h1))
+    var seed1 = cat(v, one_byte(1))
+    seed1 = cat(seed1, x)
+    seed1 = cat(seed1, h1o)
+    k = sha2.hmac256(k, seed1)
+    v = sha2.hmac256(k, v)
+    var found = false
+    var out = List[int]()
+    while !found {
+        v = sha2.hmac256(k, v)
+        // qlen == hlen == 256, so T = V is the candidate directly
+        if !bytes_geq_n(v) {
+            if !is_zero_bytes(v) {
+                out = copy v
+                found = true
+            }
+        }
+        if !found {
+            k = sha2.hmac256(k, cat(v, one_byte(0)))
+            v = sha2.hmac256(k, v)
+        }
+    }
+    out
+}
+
+/// A one-element byte list (the RFC 6979 separators). ct: fixed.
+fn one_byte(v: int) -> List[int] {
+    var out = List[int]()
+    (mut out).push(v)
+    out
+}
+
+/// Concatenate two byte lists. ct: fixed by the lengths.
+fn cat(a: List[int], b: List[int]) -> List[int] {
+    var out = List[int]()
+    for v in a {
+        (mut out).push(v)
+    }
+    for v in b {
+        (mut out).push(v)
+    }
+    out
+}
+
+/// True iff every byte is zero. ct: on public/derived values.
+fn is_zero_bytes(b: List[int]) -> bool {
+    var all_zero = true
+    for v in b {
+        if !(v == 0) {
+            all_zero = false
+        }
+    }
+    all_zero
+}
+
+// ---------------------------------------------------------------------
+// ECDSA (FIPS 186-5). VERIFY is public data; SIGN is the secret path
+// with an RFC 6979 nonce. SHA-256 is sha2's, through the boundary.
+// ---------------------------------------------------------------------
+
+/// The ECDSA public key for a 32-byte big-endian private key `d` in
+/// [1, n): the uncompressed SEC1 encoding of [d]G (0x04 || X || Y).
+/// Traps `assert` on a private key that is not 32 bytes, carries a
+/// non-byte element, or is zero / >= n (a caller contract violation:
+/// FIPS 186-5 §6.2.1 requires d in [1, n-1]). ct: SECRET scalar `d`
+/// drives the table-free ladder (`scalar_mul`, c28's target); the
+/// derived public key is public.
+///
+/// ```wolf-doc-example
+/// let d = "a 32-byte p256 private key !!!!!".bytes()
+/// p256.public_key(d).len == 65
+/// ```
+pub fn public_key(d: List[int]) -> List[int] {
+    require_private(d)
+    let q = scalar_mul(d, pt_base())
+    encode_point(q)
+}
+
+/// Encode a non-identity projective point as 65 uncompressed SEC1
+/// bytes. ct: public (a public key or a computed R).
+fn encode_point(pp: Pt) -> List[int] {
+    let zi = fe_invert(pp.z)
+    let x = fe_mul(pp.x, zi)
+    let y = fe_mul(pp.y, zi)
+    var out = List[int]()
+    (mut out).push(4)
+    for v in fe_tobytes_be(x) {
+        (mut out).push(v)
+    }
+    for v in fe_tobytes_be(y) {
+        (mut out).push(v)
+    }
+    out
+}
+
+/// Require a 32-byte private key in [1, n) (FIPS 186-5 §6.2.1). A wrong
+/// length, a non-byte element, zero, or >= n is a caller contract
+/// violation, not a recoverable row — traps `assert`.
+fn require_private(d: List[int]) {
+    if !(d.len == 32) {
+        assert(false, "p256: a private key is 32 bytes (SEC1 §2.3.5)")
+    }
+    for v in d {
+        require_byte(v)
+    }
+    if bytes_geq_n(d) {
+        assert(false, "p256: a private key is < n (FIPS 186-5 §6.2.1)")
+    }
+    if is_zero_bytes(d) {
+        assert(false, "p256: a private key is nonzero (FIPS 186-5 §6.2.1)")
+    }
+}
+
+/// An ECDSA signature over `message` under the 32-byte big-endian
+/// private key `d`, as the 64-byte fixed-width r || s (each 32 bytes,
+/// big-endian — the JOSE / IEEE P1363 form; DER is `signature_der`).
+/// The message is hashed with SHA-256 (ES256). The nonce is RFC 6979
+/// DETERMINISTIC — derived from `d` and the message, drawing NO entropy
+/// (the design ruling: no nonce-reuse hazard, no os capability, byte-
+/// exact testable). Retries the RFC 6979 candidate on the ~2^-256
+/// events r = 0 or s = 0. Traps `assert` on a bad private key (see
+/// `public_key`); the message is arbitrary bytes.
+/// ct: THE SECRET PATH. `d` and the nonce drive the RFC 6979 HMAC
+/// chain, `scalar_mul` (c28's target) and the mod-n arithmetic; the
+/// enumerated obligations are the ladder, `fe_select`, and the noted
+/// exceptions in the module header. No randomness, so no reuse hazard.
+///
+/// ```wolf-doc-example
+/// let d = "a 32-byte p256 private key !!!!!".bytes()
+/// let msg = "sign me".bytes()
+/// let sig = p256.sign(d, msg)
+/// sig.len == 64
+/// p256.verify(p256.public_key(d), msg, sig)
+/// ```
+pub fn sign(d: List[int], message: List[int]) -> List[int] {
+    require_private(d)
+    for m in message {
+        require_byte(m)
+    }
+    let h1 = sha2.sum256(message)
+    let e = sc_from_bytes_be(h1)
+    var attempt = copy d
+    var done = false
+    var out = List[int]()
+    // The RFC 6979 nonce is deterministic; on the vanishing r=0/s=0
+    // events §3.2 step h.3 draws the NEXT DRBG candidate. This module
+    // reseeds the generator with a domain-separated key instead (an
+    // equivalent, simpler fixed-schedule retry that never fires for the
+    // test corpus); the loop bound is data-independent in practice.
+    var salt: int = 0
+    while !done {
+        let k_bytes = rfc6979_nonce_salted(d, h1, salt)
+        let k = sc_from_bytes_be(k_bytes)
+        let rpt = scalar_mul(k_bytes, pt_base())
+        if !fe_iszero(rpt.z) {
+            let r = affine_x_mod_n(rpt)
+            let rsc = sc_from_bytes_be(r)
+            if !sc_iszero(rsc) {
+                let kinv = sc_inv(k)
+                let rd = sc_mul(rsc, sc_from_bytes_be(d))
+                let s = sc_mul(kinv, sc_add(e, rd))
+                if !sc_iszero(s) {
+                    out = cat(sc_to_bytes_be(rsc), sc_to_bytes_be(s))
+                    done = true
+                }
+            }
+        }
+        salt = salt + 1
+    }
+    out
+}
+
+/// The RFC 6979 nonce with a retry salt: salt 0 is the standard
+/// construction (§3.2, and what the A.2.5 vectors pin); a nonzero salt
+/// re-runs the HMAC_DRBG with `salt` extra generate rounds skipped,
+/// used only on the ~2^-256 r=0/s=0 retry. ct: as `rfc6979_nonce`.
+fn rfc6979_nonce_salted(x: List[int], h1: List[int], salt: int) -> List[int] {
+    if salt == 0 {
+        return rfc6979_nonce(x, h1)
+    }
+    // deterministic extra draws (never reached by any test vector)
+    let h1o = bits2octets(h1)
+    var v = List[int]()
+    var k = List[int]()
+    var i: int = 0
+    while i < 32 {
+        (mut v).push(1)
+        (mut k).push(0)
+        i = i + 1
+    }
+    var seed0 = cat(cat(v, one_byte(0)), cat(x, h1o))
+    k = sha2.hmac256(k, seed0)
+    v = sha2.hmac256(k, v)
+    var seed1 = cat(cat(v, one_byte(1)), cat(x, h1o))
+    k = sha2.hmac256(k, seed1)
+    v = sha2.hmac256(k, v)
+    var skip: int = 0
+    var out = List[int]()
+    var found = false
+    while !found {
+        v = sha2.hmac256(k, v)
+        if !bytes_geq_n(v) {
+            if !is_zero_bytes(v) {
+                if skip >= salt {
+                    out = copy v
+                    found = true
+                }
+                skip = skip + 1
+            }
+        }
+        if !found {
+            k = sha2.hmac256(k, cat(v, one_byte(0)))
+            v = sha2.hmac256(k, v)
+        }
+    }
+    out
+}
+
+/// Verify an ECDSA signature (FIPS 186-5 §6.4.2) over `message` given a
+/// 65-byte uncompressed SEC1 public key and the 64-byte r || s
+/// signature. Returns true iff valid. Answers FALSE — never a trap —
+/// for a wrong-length key or signature, a non-byte element, a public
+/// key that fails the SEC1 §3.2.2 on-curve check (the invalid-curve
+/// rejection), r or s outside [1, n), or a failed verification
+/// equation: a signature and a key are the CALLER'S data to check, not
+/// a contract they promised (§2's rule). The message is hashed with
+/// SHA-256 (ES256).
+/// ct: VERIFY IS PUBLIC DATA — the key, signature and message are all
+/// public, so no branch here protects a secret and this function
+/// carries no constant-time obligation (the sc18 rule).
+///
+/// ```wolf-doc-example
+/// let d = "a 32-byte p256 private key !!!!!".bytes()
+/// let msg = "verify me".bytes()
+/// let sig = p256.sign(d, msg)
+/// p256.verify(p256.public_key(d), msg, sig)
+/// ```
+pub fn verify(pubkey: List[int], message: List[int], sig: List[int]) -> bool {
+    if !(pubkey.len == 65) {
+        return false
+    }
+    if !(sig.len == 64) {
+        return false
+    }
+    for v in pubkey {
+        if v < 0 {
+            return false
+        }
+        if v > 255 {
+            return false
+        }
+    }
+    for v in sig {
+        if v < 0 {
+            return false
+        }
+        if v > 255 {
+            return false
+        }
+    }
+    var rb = List[int]()
+    var sb = List[int]()
+    var i: int = 0
+    while i < 32 {
+        (mut rb).push(sig[i])
+        i = i + 1
+    }
+    while i < 64 {
+        (mut sb).push(sig[i])
+        i = i + 1
+    }
+    // r, s in [1, n)
+    if bytes_geq_n(rb) {
+        return false
+    }
+    if bytes_geq_n(sb) {
+        return false
+    }
+    let r = sc_from_bytes_be(rb)
+    let s = sc_from_bytes_be(sb)
+    if sc_iszero(r) {
+        return false
+    }
+    if sc_iszero(s) {
+        return false
+    }
+    let q = decode_point(pubkey)
+    if !q.ok {
+        return false
+    }
+    let e = sc_from_bytes_be(sha2.sum256(message))
+    let w = sc_inv(s)
+    let u1 = sc_to_bytes_be(sc_mul(e, w))
+    let u2 = sc_to_bytes_be(sc_mul(r, w))
+    let rp = pt_add(scalar_mul(u1, pt_base()), scalar_mul(u2, q.p))
+    if fe_iszero(rp.z) {
+        return false
+    }
+    let v = affine_x_mod_n(rp)
+    bytes_eq(v, rb)
+}
+
+/// Byte-list equality. ct: public data (verify-side r comparison).
+fn bytes_eq(a: List[int], b: List[int]) -> bool {
+    if a.len != b.len {
+        return false
+    }
+    var i: int = 0
+    var same = true
+    while i < a.len {
+        if !(a[i] == b[i]) {
+            same = false
+        }
+        i = i + 1
+    }
+    same
+}
+
+// ---------------------------------------------------------------------
+// DER signature codec (X.690) — the form X.509 / TLS carry. A DER
+// ECDSA signature is SEQUENCE { INTEGER r, INTEGER s }; sc22's cert
+// hands verify_der exactly these bytes.
+// ---------------------------------------------------------------------
+
+/// The result of DER parsing: `ok` false means the bytes are not a
+/// strict-DER SEQUENCE{INTEGER, INTEGER} within the P-256 size bounds.
+struct SigOpt {
+    ok: bool,
+    sig: List[int],
+}
+
+/// Parse a strict-DER ECDSA signature to the 64-byte r || s form,
+/// REJECTING (ok = false) every X.690 violation Wycheproof patrols:
+/// wrong outer tag, a length not matching the content, a non-INTEGER
+/// element, an empty INTEGER, a negative INTEGER (high bit set), a
+/// non-minimal INTEGER (leading 0x00 where the next byte's high bit is
+/// clear), long-form lengths beyond one length octet (r and s are at
+/// most 33 content octets), and trailing garbage. r or s wider than 32
+/// content octets after the optional leading zero is out of range and
+/// rejected. ct: public data (a signature to check).
+fn parse_der(b: List[int]) -> SigOpt {
+    let bad = SigOpt { ok: false, sig: List[int]() }
+    if b.len < 8 {
+        return bad
+    }
+    for v in b {
+        require_byte(v)
+    }
+    if b[0] != 48 {
+        return bad
+    }
+    let l = b[1]
+    // one length octet only (a P-256 sig is < 128 bytes of content)
+    if l > 127 {
+        return bad
+    }
+    if l + 2 != b.len {
+        return bad
+    }
+    let r_res = read_der_int(b, 2)
+    if r_res.stop < 0 {
+        return bad
+    }
+    let s_res = read_der_int(b, r_res.stop)
+    if s_res.stop < 0 {
+        return bad
+    }
+    if s_res.stop != b.len {
+        return bad
+    }
+    var out = List[int]()
+    for v in left_pad32(r_res.val) {
+        (mut out).push(v)
+    }
+    for v in left_pad32(s_res.val) {
+        (mut out).push(v)
+    }
+    SigOpt { ok: true, sig: out }
+}
+
+/// A parsed DER INTEGER: `val` the big-endian magnitude bytes,
+/// `stop` the offset after it (or -1 on any violation).
+struct DerInt {
+    val: List[int],
+    stop: int,
+}
+
+/// Read one strict-DER INTEGER at offset `at`. Returns stop = -1 on a
+/// non-INTEGER tag, an empty or over-long body, a negative value, or a
+/// non-minimal encoding (X.690 §8.3.2). ct: public data.
+fn read_der_int(b: List[int], at: int) -> DerInt {
+    let fail = DerInt { val: List[int](), stop: 0 - 1 }
+    if at + 2 > b.len {
+        return fail
+    }
+    if b[at] != 2 {
+        return fail
+    }
+    let ln = b[at + 1]
+    if ln > 127 {
+        return fail
+    }
+    if ln == 0 {
+        return fail
+    }
+    let start = at + 2
+    if start + ln > b.len {
+        return fail
+    }
+    var body = List[int]()
+    var i: int = start
+    while i < start + ln {
+        (mut body).push(b[i])
+        i = i + 1
+    }
+    // high bit set => negative (ECDSA r/s are nonnegative)
+    if body[0] >= 128 {
+        return fail
+    }
+    // non-minimal: leading 0x00 whose successor's high bit is clear
+    if ln > 1 {
+        if body[0] == 0 {
+            if body[1] < 128 {
+                return fail
+            }
+        }
+    }
+    // strip an optional single leading zero (a legal DER pad appears
+    // only when body[0] == 0, and non-minimality is already rejected
+    // above), then bound to 32 octets
+    var strip = 0
+    if body[0] == 0 {
+        strip = 1
+    }
+    var mag = List[int]()
+    var j: int = 0
+    for v in body {
+        if j >= strip {
+            (mut mag).push(v)
+        }
+        j = j + 1
+    }
+    if mag.len > 32 {
+        return fail
+    }
+    DerInt { val: mag, stop: start + ln }
+}
+
+/// Left-pad a big-endian magnitude to 32 bytes. ct: fixed by length.
+fn left_pad32(mag: List[int]) -> List[int] {
+    var out = List[int]()
+    var pad: int = 32 - mag.len
+    var i: int = 0
+    while i < pad {
+        (mut out).push(0)
+        i = i + 1
+    }
+    for v in mag {
+        (mut out).push(v)
+    }
+    out
+}
+
+/// Verify an ECDSA signature supplied in DER form (SEQUENCE{INTEGER r,
+/// INTEGER s}) — the encoding X.509 certificates and TLS carry, and
+/// exactly what sc22's chain validator hands this module. Strict DER:
+/// a malformed encoding answers FALSE (never a trap), by the same rule
+/// as `verify`. ct: public data.
+///
+/// ```wolf-doc-example
+/// let d = "a 32-byte p256 private key !!!!!".bytes()
+/// let msg = "es256 over der".bytes()
+/// let raw = p256.sign(d, msg)
+/// let der = p256.signature_der(raw)
+/// p256.verify_der(p256.public_key(d), msg, der)
+/// ```
+pub fn verify_der(pubkey: List[int], message: List[int], der: List[int]) -> bool {
+    let parsed = parse_der(der)
+    if !parsed.ok {
+        return false
+    }
+    verify(pubkey, message, parsed.sig)
+}
+
+/// Encode a 64-byte r || s signature as strict DER (SEQUENCE{INTEGER r,
+/// INTEGER s}) — the form for an X.509/TLS consumer. Each half becomes
+/// a minimal nonnegative INTEGER (a leading 0x00 added when the high
+/// bit is set). Traps `assert` on a signature that is not 64 bytes.
+/// ct: public data.
+pub fn signature_der(sig: List[int]) -> List[int] {
+    if !(sig.len == 64) {
+        assert(false, "p256: a raw signature is 64 bytes (r||s)")
+    }
+    var rb = List[int]()
+    var sb = List[int]()
+    var i: int = 0
+    while i < 32 {
+        (mut rb).push(sig[i])
+        i = i + 1
+    }
+    while i < 64 {
+        (mut sb).push(sig[i])
+        i = i + 1
+    }
+    let ri = der_int(rb)
+    let si = der_int(sb)
+    let total = ri.len + si.len
+    var out = List[int]()
+    (mut out).push(48)
+    (mut out).push(total)
+    for v in ri {
+        (mut out).push(v)
+    }
+    for v in si {
+        (mut out).push(v)
+    }
+    out
+}
+
+/// Encode a 32-byte big-endian magnitude as a minimal DER INTEGER TLV
+/// (strip leading zeros, prepend 0x00 if the top bit would read
+/// negative). ct: public data.
+fn der_int(mag32: List[int]) -> List[int] {
+    // strip leading zero bytes (keep at least one byte)
+    var start: int = 0
+    var scanning = true
+    var i: int = 0
+    for v in mag32 {
+        if scanning {
+            if v == 0 {
+                if i < 31 {
+                    start = start + 1
+                }
+            } else {
+                scanning = false
+            }
+        }
+        i = i + 1
+    }
+    var body = List[int]()
+    var j: int = 0
+    for v in mag32 {
+        if j >= start {
+            (mut body).push(v)
+        }
+        j = j + 1
+    }
+    var content = List[int]()
+    if body[0] >= 128 {
+        (mut content).push(0)
+    }
+    for v in body {
+        (mut content).push(v)
+    }
+    var out = List[int]()
+    (mut out).push(2)
+    (mut out).push(content.len)
+    for v in content {
+        (mut out).push(v)
+    }
+    out
+}
+
+// ---------------------------------------------------------------------
+// Field / curve self-test: the arithmetic proven ALONE, before any
+// signature observes it (the sprint's field-first discipline). The
+// field ops are module-private, observable only through this pub
+// predicate — the rig's field-alone unit proof, three-lane.
+// (Authoring-time proof, one level deeper: the Python bound-harness in
+// the sprint's work notes fuzzed every fe_* / sc_* / pt_* against a
+// big-integer reference with live checked-overflow asserts matching
+// wolf's int semantics — 3000 random + adversarial field cases, 60
+// point-formula rounds incl. the complete-formula edge cases, the
+// mod-n field, and the RFC 6979 vectors end-to-end — where the 2^35.4
+// column bound and the 2^48.0 carry bound were measured.)
+// ---------------------------------------------------------------------
+
+/// A field element from a byte pattern (a self-test helper). ct: not a
+/// secret path.
+fn fe_sample(seed: int) -> Fe {
+    var b = List[int]()
+    var i: int = 0
+    while i < 32 {
+        (mut b).push((seed + i * 7) % 251)
+        i = i + 1
+    }
+    fe_frombytes_be(b)
+}
+
+/// The FIELD's algebraic identities plus the cheap curve laws, checked
+/// ALONE before any ECDSA path observes them (the field-first
+/// discipline): additive inverse, multiply commutativity /
+/// associativity, distributivity, squaring as self-multiply, the
+/// Fermat inverse (a·a⁻¹ = 1), the byte round trip, that G is on the
+/// curve (SEC1 §3.2.2), and that the COMPLETE addition and doubling
+/// agree on [2]G. No 256-iteration scalar multiplication, so this fits
+/// the checked tier's step budget — THREE-LANE (the group-order check
+/// that needs a full ladder is in `self_test`). Returns true iff every
+/// identity holds. ct: a test predicate over public constants.
+///
+/// ```wolf-doc-example
+/// p256.field_self_test()
+/// ```
+pub fn field_self_test() -> bool {
+    let a = fe_sample(1)
+    let b = fe_sample(40)
+    let c = fe_sample(130)
+    var ok = true
+    if !fe_eq(fe_sub(fe_add(a, b), b), a) {
+        ok = false
+    }
+    if !fe_eq(fe_mul(a, b), fe_mul(b, a)) {
+        ok = false
+    }
+    if !fe_eq(fe_mul(fe_mul(a, b), c), fe_mul(a, fe_mul(b, c))) {
+        ok = false
+    }
+    if !fe_eq(fe_mul(a, fe_add(b, c)), fe_add(fe_mul(a, b), fe_mul(a, c))) {
+        ok = false
+    }
+    if !fe_eq(fe_sq(a), fe_mul(a, a)) {
+        ok = false
+    }
+    if !fe_eq(fe_mul(a, fe_invert(a)), fe_one()) {
+        ok = false
+    }
+    if !fe_eq(fe_frombytes_be(fe_tobytes_be(a)), a) {
+        ok = false
+    }
+    if !on_curve(fe_gx(), fe_gy()) {
+        ok = false
+    }
+    let g = pt_base()
+    if !pt_eq(pt_double(g), pt_add(g, g)) {
+        ok = false
+    }
+    ok
+}
+
+/// The full self-test: `field_self_test` plus the GROUP-ORDER check
+/// that [n-1]G + G is the identity (so [n]G = O, n the group order) —
+/// a full table-free ladder, so this exceeds the checked tier's step
+/// budget and lupin's evaluation budget (native + `slow`, the ladder
+/// precedent). Returns true iff every identity and the group law hold.
+/// ct: a test predicate over public constants; no secret.
+pub fn self_test() -> bool {
+    if !field_self_test() {
+        return false
+    }
+    let g = pt_base()
+    var nm1 = List[int]()
+    for v in n_bytes() {
+        (mut nm1).push(v)
+    }
+    nm1[31] = nm1[31] - 1
+    let ng = pt_add(scalar_mul(nm1, g), g)
+    fe_iszero(ng.z)
+}
+
+/// Projective point equality (X1·Z2 == X2·Z1 and Y1·Z2 == Y2·Z1).
+/// ct: public data (self-test only).
+fn pt_eq(p1: Pt, p2: Pt) -> bool {
+    let ax = fe_eq(fe_mul(p1.x, p2.z), fe_mul(p2.x, p1.z))
+    let ay = fe_eq(fe_mul(p1.y, p2.z), fe_mul(p2.y, p1.z))
+    ax && ay
+}
+
+// ---------------------------------------------------------------------
+// Rendering (this module's own; the ladder precedent).
+// ---------------------------------------------------------------------
+
+/// `b` as lowercase hexadecimal, two digits per byte. Traps `assert`
+/// only on a non-byte element. ct: NOT constant-time (the alphabet
+/// slice is indexed by each byte's value) — renders public values only;
+/// a constant-time encoder is c28-tier work.
+///
+/// ```wolf-doc-example
+/// p256.to_hex("abc".bytes()) == "616263"
+/// p256.to_hex(List[int]()) == ""
+/// ```
+pub fn to_hex(b: List[int]) -> str {
+    let alphabet = "0123456789abcdef"
+    var out = ""
+    for v in b {
+        require_byte(v)
+        let hi = v / 16
+        let lo = v % 16
+        let hd = alphabet[hi..hi + 1]
+        let ld = alphabet[lo..lo + 1]
+        out = "{out}{hd}{ld}"
+    }
+    out
+}
