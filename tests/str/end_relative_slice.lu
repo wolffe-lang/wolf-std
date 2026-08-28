@@ -1,0 +1,52 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: str.slice, std.str
+//!
+//! `^n` end-relative indexing — F-0018's LAST living clause, re-measured
+//! HEALED at the sc24 pins (lupin 0.1.14, wolf @ a900b8c). For twelve
+//! sprints `s[..^1]` resolved in neither implementation and std.str's
+//! header documented the redirect as aspirational; at these binaries every
+//! from-end form the grammar names (`[gram.expr]` note: s[^1], s[^13..],
+//! s[..^1]) slices on all three lanes, byte-counted from the end exactly
+//! as D25's forward offsets are byte-counted from the start.
+//!
+//! What this file pins: the from-end offset is BYTES, not code points —
+//! `"héllo"[^5..^1]` starts inside nothing only because 5 bytes back IS
+//! é's boundary — and `^0` is the end itself, so `s[..^0]` is the whole
+//! string. The trap half (a `^n` that lands inside a code point faults
+//! `bounds` like any other split) is its own file,
+//! `end_relative_split_codepoint_trap.lu`, per §13. The `get(a..^n)`
+//! divergence — lupin runs it, both wolf rungs refuse at resolve against
+//! `[mem.str.get]`'s own sentence — is `end_relative_get.lu` and F-0096.
+//!
+//! No import beyond std.str's presence in sibling files is needed: the
+//! surface under test is the language's own slicing, the
+//! `slice_oob_traps.lu` precedent. std.str is imported and exercised so
+//! the entry file earns its import (E0305) and the header's redirect
+//! ("slice `s[..n]` or ask `get`") is witnessed beside the thing it
+//! redirects to.
+
+use std.str
+
+fn main() -> !int {
+    let s = "héllo"
+    // Suffix, prefix, both-ends, and the whole-string identity.
+    if s[..^1] == "héll" {} else { return 1 }
+    if s[^2..] == "lo" {} else { return 2 }
+    if s[^5..^1] == "éll" {} else { return 3 }
+    if s[..^0] == "héllo" {} else { return 4 }
+    // ^n agrees with the forward spelling of the same byte offset.
+    if s[..^1] == s[0..5] {} else { return 5 }
+    if s[^2..] == s[4..6] {} else { return 6 }
+    // A 4-byte code point: ^1 cuts the ASCII tail, ^5 the wolf's start.
+    let w = "🐺!"
+    if w[..^1] == "🐺" {} else { return 7 }
+    if w[^5..] == "🐺!" {} else { return 8 }
+    // The empty string has exactly one boundary, and ^0 names it.
+    let e = ""
+    if e[..^0] == "" {} else { return 9 }
+    // std.str's get answers the same offsets, spelled forward: the two
+    // currencies name one boundary set.
+    if (str.get(s, 0, 5) else "?") == s[..^1] {} else { return 10 }
+    0
+}

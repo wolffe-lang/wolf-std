@@ -1,0 +1,48 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.strbuf, mem.str.chars
+//!
+//! `strbuf.push(c: char)` — the sc03 contract's `push(c)`, landed at
+//! sc24 over D58's `char`. The body is `{c}` interpolation, which
+//! `[type.char.interp]` rules to print THE CHARACTER, so a push appends
+//! exactly the scalar's UTF-8 bytes: 1 for ASCII, 2 for é, 4 for 🐺 —
+//! `len` (bytes, the honest unit) says so below, and the round-trip
+//! through `to_str` says the characters arrived whole. Every `char`
+//! here is spelled through `.chars()` rather than a literal, so lupin's
+//! refusal stays the clean method `unsupported` (that lane has no
+//! `chars()` and no `char` until is26 — ledgered by lane, not claimed;
+//! `'` does not even lex there, which is why no literal appears in this
+//! file).
+//!
+//! Interleaving with `push_str` is deliberate: the two appends share
+//! one buffer and one contract, and a builder that treated them
+//! differently would show it in the bytes.
+
+use std.strbuf
+
+fn main() -> !int {
+    var b = strbuf.new()
+    for c in "é🐺".chars() {
+        strbuf.push(mut b, c)
+    }
+    if strbuf.to_str(b) == "é🐺" {} else { return 1 }
+    if strbuf.len(b) == 6 {} else { return 2 }
+    strbuf.push_str(mut b, "!")
+    for c in "a".chars() {
+        strbuf.push(mut b, c)
+    }
+    if strbuf.to_str(b) == "é🐺!a" {} else { return 3 }
+    if strbuf.len(b) == 8 {} else { return 4 }
+    // A push onto a fresh builder is the one-code-point case push_str
+    // covered through a one-code-point str for eleven sprints; the two
+    // spellings must agree byte for byte.
+    var lone = strbuf.new()
+    for c in "中".chars() {
+        strbuf.push(mut lone, c)
+    }
+    var twin = strbuf.new()
+    strbuf.push_str(mut twin, "中")
+    if strbuf.to_str(lone) == strbuf.to_str(twin) {} else { return 5 }
+    if strbuf.len(lone) == 3 {} else { return 6 }
+    0
+}

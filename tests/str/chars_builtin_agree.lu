@@ -1,0 +1,79 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: mem.str.chars, std.str
+//!
+//! The scalar tier against std's own decoder — two independent readings
+//! of UTF-8 that must agree element by element, the `bytes.is_utf8`
+//! pattern applied one tier up. `str.to_list_chars` (sc24, a delegation
+//! to the builtin `s.chars()`) yields D58's `char`s; `str.code_points`
+//! (sc09) is std's one-pass state machine over the byte view, in the
+//! `int` currency. `c as int` — total by `[type.char.cast]` — is the
+//! bridge, and every element must match, in order, along with the
+//! `[mem.str.chars]` width-walk identity: offsets computed from the
+//! scalars land exactly where std's lead-byte reader said the code
+//! points start.
+//!
+//! A history note this file EARNED during its own sprint: it was first
+//! written against a pre-s121 wolf whose `chars()` spoke the v0
+//! `List[int]` currency, with a header promising to go red at the
+//! binary that ruled the type. The provisioner delivered that binary
+//! MID-SPRINT (the second sc24 wolf acquisition), the int-currency
+//! version went red on schedule within hours, and this is the rewrite
+//! the red demanded — the claim-holding mechanism working at the
+//! shortest interval it ever has.
+//!
+//! lupin 0.1.14 has no `chars()` and no `char` (the interpreter's char
+//! tier is is26, running concurrently), so the lupin column is honestly
+//! `unsupported` — the clean method refusal, reached before any cast —
+//! and flips on the release that carries is26.
+
+use std.str
+
+fn main() -> !int {
+    // Mixed widths: 1-byte a, 2-byte é, 3-byte 中, 4-byte 🐺 — s120's own
+    // witness fixture (chars_walk.lu).
+    let s = "aé中🐺"
+    let want = str.code_points(s)
+    let got = str.to_list_chars(s)
+    if got.len == want.len {} else { return 1 }
+    if got.len == 4 {} else { return 2 }
+    var i = 0
+    for c in got {
+        if c as int == want[i] {} else { return 3 }
+        i = i + 1
+    }
+    // The scalar values themselves, against the standard's numbers.
+    if want[0] == 97 {} else { return 4 }
+    if want[1] == 233 {} else { return 5 }
+    if want[2] == 20013 {} else { return 6 }
+    if want[3] == 128058 {} else { return 7 }
+    // The width identity ([mem.str.chars]): the byte extent of a yielded
+    // scalar is a function of its value, and a cursor advanced by those
+    // widths visits exactly the boundaries std's own char_offsets found
+    // by reading lead bytes.
+    let offs = str.char_offsets(s)
+    var at = 0
+    var k = 0
+    for c in s.chars() {
+        if at == offs[k] {} else { return 8 }
+        let n = c as int
+        if n < 128 {
+            at = at + 1
+        } else if n < 2048 {
+            at = at + 2
+        } else if n < 65536 {
+            at = at + 3
+        } else {
+            at = at + 4
+        }
+        k = k + 1
+    }
+    if at == str.len(s) {} else { return 9 }
+    // The empty string yields nothing; chars().len is the code-point
+    // count, s.len the byte count, and they split exactly as the clause
+    // says.
+    if str.to_list_chars("").len == 0 {} else { return 10 }
+    if s.chars().len == 4 {} else { return 11 }
+    if str.len(s) == 10 {} else { return 12 }
+    0
+}

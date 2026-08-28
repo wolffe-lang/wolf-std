@@ -21,22 +21,34 @@
 //! **THE INTERIM CURRENCY IS `int`, AND IT IS THE WHOLE STORY OF THIS
 //! MODULE'S SIGNATURES.** The sprint contract writes these functions over
 //! a `char` type — `char.code`, `is_ascii_digit(c: char)`,
-//! `utf8_len(char)`. There is no `char` type at this pin: `'a'` does not
-//! lex (E0101 in lupin, E0107 in wolfc), no `chars()` view exists to
-//! produce one, and no expression in the language has type `char`. So the
-//! interim spells a code point the way `char.code` would report it — a
-//! Unicode scalar value as `int` — which keeps every predicate's MEANING
-//! exactly the contract's and makes the whole set total and testable
-//! today. The reviewed final signatures are recorded per function; the
-//! flip is a signature change with identical bodies, in the same commit as
-//! the pin that lands `char` (F-0018).
-//!
-//! One of the contract's ten is therefore not here at all:
-//!
-//! - `char.code` — the `char`-to-`int` projection. With the interim
-//!   currency it would be the identity function, which is not a surface
-//!   worth shipping and would have to be deleted rather than migrated. It
-//!   lands with `char`, and `from_code` below is already its inverse.
+//! `utf8_len(char)`. The LANGUAGE has that type now — D58
+//! (`[type.char]`, the sc24 data pin a900b8c) rules `char` a Unicode
+//! scalar value: `0..=0x10FFFF` minus the surrogate gap, ordered by
+//! scalar value, NOT an integer, `char as int` total, `int as char`
+//! trapping on a non-scalar (measured: `trap(overflow)` on both wolf
+//! rungs at U+D800), `s.chars()` yielding `List[char]`
+//! (`[mem.str.chars]`). The sc24 wolf pair EXECUTES it, and the
+//! contract's tenth function — `code(c: char) -> int`, the projection —
+//! is code below at last, on the two wolf lanes. What has NOT flipped,
+//! deliberately: the nine `int`-typed members. lupin 0.1.14 has no
+//! `char` at all (`'` does not lex there, E0101 — the interpreter's
+//! char tier is is26, running concurrently), and this module's
+//! classification set is three-lane green in the `int` currency that
+//! `str.code_points` feeds it; retyping the set today would trade the
+//! module's executing interpreter lane for a signature, which is §14's
+//! honesty rule read in the lane direction. So: the interim spells a
+//! code point the way `code` reports it — a Unicode scalar value as
+//! `int` — and the FULL flip (`from_code -> char ! {none}`, `utf8_len`
+//! total over `char`, char-typed predicates) is owed in the sprint
+//! after the lupin release that carries is26, when it costs no lane.
+//! The reviewed final signatures are recorded per function. What the
+//! flip must NOT do is reintroduce arithmetic on the typed scalar
+//! through a helper: under D58 `from_code`/`code` are the only places a
+//! number and a code point trade places, and the predicates compare —
+//! they never compute. (The sprint's own first wolf acquisition was
+//! pre-s121 and refused the type; the mid-sprint re-acquisition is what
+//! made `code` writable, and every claim here was re-measured against
+//! the binary that gets pinned.)
 //!
 //! Absence is spelled `none`, which is the convention's own spelling and
 //! no longer an interim: F-0003 died at the sc05 pins and the rename
@@ -65,6 +77,37 @@ fn max_code() -> int {
 /// (unicode.from_code(55296) else 0 - 1) == 0 - 1
 /// (unicode.from_code(57343) else 0 - 1) == 0 - 1
 /// ```
+// (The char-typed surface begins here — sc24, over D58's ruling.)
+
+/// The Unicode scalar value of `c`, as an `int` — the sc03 contract's
+/// `char.code`, code at last (sc24). The body is `c as int`, which
+/// `[type.char.cast]` rules TOTAL: every `char` is a scalar value by
+/// construction (D58 — the surrogate gap and the range cap are enforced
+/// where a number tries to become a `char`, not here), so this
+/// projection has no row and can never trap. It is the one sanctioned
+/// bridge from the typed scalar back into the `int` currency the rest
+/// of this module still speaks — and with `from_code` it brackets the
+/// ONLY two places in std where a number and a code point trade places:
+/// the predicates below compare, they never compute, and D58's
+/// not-an-integer ruling is why no `char`-arithmetic helper will ever
+/// sit beside them.
+///
+/// LANES: both wolf rungs execute this; lupin 0.1.14 has no `char` at
+/// all (the interpreter's char tier is is26, running concurrently), so
+/// char-carrying tests and the example are honest `unsupported` there
+/// until the release that carries it. The example spells its `char`s
+/// through `.chars()` rather than literals so lupin's refusal stays the
+/// clean method `unsupported`, never a lex error.
+///
+/// ```wolf-doc-example
+/// var total = 0
+/// for c in "Aé".chars() { total = total + unicode.code(c) }
+/// total == 298
+/// ```
+pub fn code(c: char) -> int {
+    c as int
+}
+
 pub fn from_code(n: int) -> int ! {none} {
     if n < 0 {
         return none

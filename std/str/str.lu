@@ -32,9 +32,20 @@
 //! offsets and `char_offsets` yields them. To reach the first code point,
 //! slice (`s[..n]`) or ask `get` for a range it may refuse. `^n`
 //! end-relative indexing (`s[..^1]`) is the language's spelling for the
-//! other end and does not resolve in either implementation at this pin
-//! (F-0018's last living clause); there is deliberately no std function
-//! that papers over it.
+//! other end, and it RESOLVES ON ALL THREE LANES as of the sc24 pins
+//! (lupin 0.1.14, wolf @ a900b8c;
+//! re-measured at both sc24 wolf acquisitions) — F-0018's last living
+//! clause, healed:
+//! every from-end form slices byte-counted from the end, and one that
+//! lands inside a code point traps `bounds` like any other split
+//! (`tests/str/end_relative_slice.lu` and its trap twin hold both
+//! claims). The one residue is the RANGE `get` consumes: `s.get(0..^1)`
+//! runs under lupin and is `unsupported` at resolve on both wolf rungs,
+//! against `[mem.str.get]`'s own sentence that end-relative endpoints
+//! resolve exactly as in `s[a..b]` (F-0096, filed;
+//! `tests/str/end_relative_get.lu` is the row that flips at its
+//! closure). There is deliberately no std function that papers over
+//! either spelling.
 //!
 //! **THE BOUNDARY PRIMITIVE LANDED, AND THIS MODULE IS WHAT IT BOUGHT.**
 //! For five sprints fifteen of this module's functions were reviewed
@@ -46,26 +57,32 @@
 //! `split`/`count`/`ends_with`/`strip_suffix`/`replace` and the byte view
 //! `s.bytes() -> List[int]`, and all three lanes execute them (wolfc at
 //! s37, lupin at 0.1.5, native at #40). Twelve of the fifteen are code
-//! below. What remains is exactly what needs a type wolf does not have:
+//! below — THIRTEEN as of sc24: D58 ruled the `char` type
+//! (`[type.char]`, a Unicode scalar value — ordered, NOT an integer)
+//! and the sc24 wolf pair executes it, so `to_list_chars` is code at
+//! last, on the two wolf lanes (lupin's char tier is is26, running
+//! concurrently — its rows are ledgered by lane, not claimed). The
+//! sprint's own first measurement is worth a sentence here: the FIRST
+//! sc24 wolf acquisition (@ e7abf03) carried s120 without s121, spoke
+//! `chars()` in the v0 `List[int]` currency, and refused `'a'` at lex —
+//! a mid-sprint re-acquisition brought s121, and every claim in this
+//! header was re-measured against the binary that will be pinned.
+//! What remains is two:
 //!
 //! ```text
 //! chars(s: str) -> List[(int, char)]
-//!     Code points with their byte offsets. Blocked twice over: no `char`
-//!     type exists, and wolfc does not type a `List` of tuples at all
-//!     (`List[(int, int)]` is `unsupported`), so even the interim
-//!     currency cannot carry the pair. `char_offsets` below is the offset
-//!     half and `code_points` the value half; the day `char` lands they
-//!     fuse into this one function and the `Iter` protocol (F-0008)
-//!     decides whether it yields or allocates.
-//! to_list_chars(s: str) -> List[char]
-//!     The code points alone. `code_points` below IS this function in
-//!     `std.unicode`'s interim currency — a Unicode scalar value as
-//!     `int` — and the flip is a signature change with an identical body.
+//!     Code points with their byte offsets. The value half is ruled and
+//!     executable (D58; `to_list_chars` below); the PAIR still needs a
+//!     `List` of tuples on the wolf rungs (`List[(int, int)]`
+//!     re-measured `unsupported` at resolve at BOTH sc24 wolf
+//!     acquisitions). `char_offsets` below is the offset half; the day
+//!     tuple lists land they fuse into this one function.
 //! graphemes(s: str) -> List[str]
 //!     Extended grapheme clusters, as slices of `s`. A std call and never
-//!     the default unit (D24). Needs segmentation TABLES, which is the
-//!     filed budget decision (F-0018) and not a primitive gap: nothing
-//!     about this pin's `str` brings it closer.
+//!     the default unit (D24). Needs segmentation TABLES — a later tier
+//!     (the #18 ruling put the data in committed generated wolf source
+//!     when it comes) and not a primitive gap: nothing about this pin's
+//!     `str` brings it closer, and sc24 deliberately does not start it.
 //! ```
 //!
 //! **THE BYTE VIEW IS A VIEW NOW, AND FOUR BODIES HERE ARE WRITTEN AGAINST
@@ -995,6 +1012,37 @@ pub fn code_points(s: str) -> List[int] {
         }
     }
     out
+}
+
+/// The code points of `s` as CHARS, in order — the sc03 contract's
+/// `to_list_chars`, code at last (sc24): a delegation to the language's
+/// `s.chars()` (`[mem.str.chars]`, s120/s121), which yields the Unicode
+/// scalar values `List[char]`-typed under D58's ruling — a scalar value,
+/// ordered by scalar value, NOT an integer. `code_points` above is this
+/// function in the pre-D58 `int` currency and the two agree element for
+/// element (`unicode.code(c)` is the bridge; the agreement is a test,
+/// `tests/str/chars_builtin_agree.lu`, held as two independent UTF-8
+/// readings — the builtin's and std's own decoder's). Total over every
+/// `str`: a `str` is valid UTF-8 by construction (D24), so no element
+/// can fall outside `char`'s domain — which is exactly why the clause
+/// can promise the type. Allocates the output list. No error row, no
+/// traps beyond allocation.
+///
+/// LANES, stated honestly (the sc24 rule: a zero-lane surface is zero
+/// evidence, and a by-lane surface says so): both wolf rungs execute
+/// this; lupin 0.1.14 has no `chars()` and no `char` — the interpreter's
+/// char tier is is26, running concurrently — so the lupin column of
+/// every test and the example below is `unsupported` until the release
+/// that carries it (the doc-example waiver names it).
+///
+/// ```wolf-doc-example
+/// let cs = str.to_list_chars("aé🐺")
+/// cs.len == 3
+/// let e = str.to_list_chars("")
+/// e.len == 0
+/// ```
+pub fn to_list_chars(s: str) -> List[char] {
+    s.chars()
 }
 
 /// Whether every code point in `s` is ASCII (below U+0080) — the cheap
