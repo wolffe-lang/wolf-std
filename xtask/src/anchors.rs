@@ -10,7 +10,15 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 /// Registered namespaces and owners, spec/05 `[conf.anchor.ns]`.
-pub const REGISTERED_NS: &[&str] = &["gram", "mem", "conc", "abi", "conf", "proto"];
+// `pkg` was admitted by the clause's own letter at s115 (#120 — the
+// extractor emitted 08-package.md's anchors before the clause admitted
+// the namespace, and the append reconciled them); this list lagged the
+// spec by nine sprints and sc24 caught it chasing the SAME class one
+// document over: 10-types.md's `type.*` anchors (s121) are in the
+// snapshot while [conf.anchor.ns] does not admit `type` — filed as
+// F-0099 rather than added here, because this rig mirrors the clause's
+// LETTER, not the extractor's output.
+pub const REGISTERED_NS: &[&str] = &["gram", "mem", "conc", "abi", "conf", "proto", "pkg"];
 
 /// Reserved forward namespaces, same clause.
 pub const FORWARD_NS: &[&str] = &[
