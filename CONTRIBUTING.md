@@ -42,13 +42,29 @@ and pinned data only** (the ls00 honesty):
 ## The ledger ritual
 
 `tests/ledger.toml` records what each implementation achieves on each
-test *today*. `lupin` is `run` or `unsupported`; `wolfc` and `native`
-add `fail(E…)`; and where a pin answers the SAME program two ways there
-is `unstable(run|unsupported)`. That last spelling exists because sc07's
-pin needed it (F-0048), and nothing uses it at the sc08 pin. The finding
-closed, the two rows that carried it were re-measured deterministic (14
-consecutive runs each) and narrowed back to `run`. It stays available
-and it stays shocking.
+test *today*. `lupin` is `run` or `unsupported` (plus two lupin-only
+words below); `wolfc` and `native` add `fail(E…)`; and where a pin
+answers the SAME program two ways there is `unstable(run|unsupported)`.
+That last spelling exists because sc07's pin needed it (F-0048), and
+nothing uses it at the sc08 pin. The finding closed, the two rows that
+carried it were re-measured deterministic (14 consecutive runs each)
+and narrowed back to `run`. It stays available and it stays shocking.
+
+Two more lupin-only words, each a dated necessity rather than a
+relaxation, each printed loudly by every `std-test` run. `slow` (sc16):
+the lane's SEMANTICS reach the program — its fast siblings are `run` —
+but a tree-walk of the full input blows the 60s ceiling; the lane is
+skipped, named, and owed a re-measure at every pin bump.
+`divergent(stdout)` / `divergent(exit(N))` / `divergent(trap(kind))`
+(sc24): the lane EXECUTES the program and its honest observation cannot
+satisfy the directive — the first lupin release carrying the
+net/process tiers surfaced two such shapes, a filed wrong answer
+(F-0097: a handler over a builtin-raised row takes its first arm, both
+orders measured) and a filed static/dynamic split (F-0098: the
+compilers reject take-mode reuse as E1001, the interpreter executes it
+to its honest dynamic outcome). The runner demands EXACTLY the named
+observation, so a heal reads as a red and the flip to `run` is
+deliberate; each row's comment cites its finding.
 
 The rig fails CI when reality is deeper OR shallower than the ledger.
 Advancing an entry (an upstream pin bump taught a tool a new trick) is
@@ -133,6 +149,21 @@ that rots.
   them: a name no host has, an empty argv, a forged handle. The
   exit-code path rests on the toolchain's own unix-gated tests, which
   the module header says out loud.
+
+**Re-measured at the sc24 pin (lupin 0.1.14, the is14-is25 catch-up
+release): three of the postures above CLOSED ON A RELEASE.** The
+interpreter now opens real sockets (is18 — 4 `net` rows flip to `run`;
+"no `net_*` builtins by design" is history), runs the process trio
+(is18 — `wait` reaps, `kill` never tombstones; 2 rows flip), and reads
+json on its own RFC 8259 reading (is18 — the "declines rather than risk
+a second, guessed reading" posture withdrawn upstream; 10 `x/json` rows
+flip). The paragraphs above are kept as the history they are, with this
+note as their sunset: `net` and `x/json` are two-lane now (native still
+refuses both tiers by name), `process` is checked+lupin. The first
+release with those tiers also surfaced two lupin divergences the ledger
+carries as `divergent(…)` rows (F-0097, F-0098 — see the ledger ritual
+above), and F-0049's no-deadline caveat is unchanged: dial-then-accept,
+loopback, port 0, forever.
 
 For doc examples the same honesty is a `CAPABILITY_MODULES` list in the
 extractor (`fs`, `io`, `net`, `time`, `env`, `process`, `x.json`). An
