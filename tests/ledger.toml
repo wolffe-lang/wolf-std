@@ -663,6 +663,15 @@ native = "run"  # sc08 pin bump (13b811f)
 # both implementations execute the ASCII classification. The row-raising
 # pair is `unsupported` under wolfc for F-0015's reason alone. ----
 
+# Both files RETYPED at sc25 (std.unicode's char flip): the predicates
+# take char and compare against char literals, from_code answers char,
+# utf8_len is total. lupin + wolfc re-measured over the retyped files at
+# the sc25 pins (0.1.15/is26 + wolf @ a900b8c); the native column is
+# CARRIED, not re-measured — the lane is dark on nomad-1 until s59-apple
+# — on the strength of sc24's behavioral verification that the whole
+# s121 char surface (literals, escapes, order, casts) executes on both
+# wolf rungs. s59-apple's arrival owes these rows their first native
+# re-measure.
 [tests."unicode/ascii_predicates.lu"]
 lupin = "run"
 wolfc = "run"
@@ -1111,12 +1120,12 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # s70 and the payload pattern as of s71, which is what `read_all` below is
 # written over.
 [tests."net/refused_row.lu"]
-lupin = "divergent(stdout)"  # sc24: F-0097 — first arm answers for a BUILTIN-raised row (0.1.14, both orders measured); the propagated tag is right, the handler's arm is not
+lupin = "divergent(stdout)"  # sc24: F-0097 — first arm answers for a BUILTIN-raised row (0.1.14, both orders measured); the propagated tag is right, the handler's arm is not. sc25 re-measure (0.1.15): UNHEALED, byte-identical ("handled: -9\n" then "error: refused"); wolf-interp#47 commented with the measurement
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
 [tests."net/closed_row.lu"]
-lupin = "divergent(stdout)"  # sc24: F-0097 — same mechanism; the io arm (first) answers where closed should
+lupin = "divergent(stdout)"  # sc24: F-0097 — same mechanism; the io arm (first) answers where closed should. sc25 re-measure (0.1.15): UNHEALED, byte-identical ("peer-gone: not-firedio-arm"); wolf-interp#47 commented
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
@@ -1130,7 +1139,7 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # `run` here means "satisfies the directive", and the directive is
 # `fail(E1001)`.
 [tests."net/use_after_close.lu"]
-lupin = "divergent(trap(use-after-move))"  # sc24: F-0098 — the staleness discipline's dynamic half: the compilers reject E1001, the interpreter executes to [mem.tier0.move.2]'s trap
+lupin = "divergent(trap(use-after-move))"  # sc24: F-0098 — the staleness discipline's dynamic half: the compilers reject E1001, the interpreter executes to [mem.tier0.move.2]'s trap. sc25 re-measure (0.1.15): UNHEALED, same trap, same clause; wolf-interp#48 commented
 wolfc = "run"
 native = "run"
 
@@ -1468,7 +1477,7 @@ native = "run"  # 1b149ba: s107 crossed the process trio natively
 # (X1 `take`) because waiting REAPS, so a second wait is E1001. `run` means
 # "satisfies the directive", and the directive is `fail(E1001)`.
 [tests."process/use_after_wait.lu"]
-lupin = "divergent(exit(1))"  # sc24: F-0098 — the lane executes; start() raises not_found (no such program) before the reuse the compilers reject statically
+lupin = "divergent(exit(1))"  # sc24: F-0098 — the lane executes; start() raises not_found (no such program) before the reuse the compilers reject statically. sc25 re-measure (0.1.15): UNHEALED, "error: not_found" exit 1; wolf-interp#48 commented
 wolfc = "run"
 native = "run"
 
@@ -2100,17 +2109,17 @@ wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p3.lu"]
-lupin = "slow"  # sc24 re-measure (lupin 0.1.14): NEITHER an answer nor the 50M-step refusal inside 70s idle — the one word that keeps the lane un-invoked; whether the eventual verdict is a run or the budget refusal is unmeasurable inside the ceiling
+lupin = "unsupported"  # sc25 re-measure (lupin 0.1.15, nomad-1/arm64): the 50M-step refusal arrives 19.7s idle — the sc24 "neither inside 70s" was the sc24 rig's wall clock, not this program's depth; the budget is the machine-independent word and it now lands well inside the ceiling
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p4.lu"]
-lupin = "slow"  # sc24 re-measure (lupin 0.1.14): NEITHER an answer nor the 50M-step refusal inside 70s idle — the one word that keeps the lane un-invoked; whether the eventual verdict is a run or the budget refusal is unmeasurable inside the ceiling
+lupin = "unsupported"  # sc25 re-measure (lupin 0.1.15, nomad-1/arm64): the 50M-step refusal arrives 19.3s idle — see p3's comment; slow -> the machine's own word
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/curve25519/wycheproof_x25519_shared_p5.lu"]
-lupin = "slow"  # sc24 re-measure (lupin 0.1.14): NEITHER an answer nor the 50M-step refusal inside 70s idle — the one word that keeps the lane un-invoked; whether the eventual verdict is a run or the budget refusal is unmeasurable inside the ceiling
+lupin = "unsupported"  # sc25 re-measure (lupin 0.1.15, nomad-1/arm64): the 50M-step refusal arrives 19.6s idle — see p3's comment; slow -> the machine's own word
 wolfc = "unsupported"
 native = "run"
 
@@ -2628,7 +2637,7 @@ wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p256/cavp_siggen_p256.lu"]
-lupin = "slow"  # sc24 re-measure (lupin 0.1.14): the 50M-step refusal itself straddles the 60s ceiling (timed out in a QUIET full run) — neither answer nor refusal reliably inside it; skip the lane, re-measure at bumps
+lupin = "unsupported"  # sc25 re-measure (lupin 0.1.15, nomad-1/arm64): the 50M-step refusal arrives 20.4s idle — the sc24 straddle was that rig's wall clock; the budget refusal is the row's honest word here
 wolfc = "unsupported"
 native = "run"
 
@@ -2725,9 +2734,12 @@ wolfc = "unsupported"
 native = "unsupported"
 
 [tests."str/chars_builtin_agree.lu"]
-# lupin 0.1.14 has no chars() at all (is26 pending); the wolf rungs run
-# the s120 v0 currency this file deliberately speaks.
-lupin = "unsupported"
+# sc25 binary bump (lupin 0.1.15, the is26 scalar release): chars()
+# exists on the interpreter now, so the two independent UTF-8 readings
+# — the builtin's and std's code_points — finally compare CROSS-MACHINE,
+# which is what this file was written for. Was `unsupported` at 0.1.14
+# ("`str` has no method `chars`", is26 pending).
+lupin = "run"
 wolfc = "run"
 native = "run"
 
@@ -2735,17 +2747,49 @@ native = "run"
 # a900b8c — the provisioner delivered the s121-carrying pair mid-sprint;
 # the first acquisition @ e7abf03 was pre-s121 and the int-currency
 # chars_builtin_agree went red on schedule within hours of being
-# written). lupin's char tier is is26, running concurrently: every char
-# value in these files is spelled through `.chars()` so that lane's
-# refusal stays the clean method `unsupported`, and the lupin columns
-# flip at the release that carries is26.
+# written). lupin's char tier was is26, running concurrently: sc24
+# spelled every char value in these files through `.chars()` so that
+# lane's refusal stayed the clean method `unsupported`, and the lupin
+# columns flipped below at sc25 — the release that carries is26
+# (0.1.15), exactly as this comment promised.
 
 [tests."strbuf/push_char.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc25 binary bump (lupin 0.1.15/is26): char and {c} interpolation execute; was `unsupported` at 0.1.14
 wolfc = "run"
 native = "run"
 
 [tests."unicode/char_code.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc25 binary bump (lupin 0.1.15/is26): char, chars() and the total `c as int` execute; was `unsupported` at 0.1.14
 wolfc = "run"
 native = "run"
+
+# ---- sc25: the waivers die (08-the-strings-land closes) ----
+#
+# THE sc25 BUMP IS ONE MOVING PART: lupin 0.1.14/90c90df -> 0.1.15 —
+# THE SCALAR RELEASE (is26, one sprint behind s121/D58) — at pin
+# a900b8c, which is the data pin AND the wolf binary's sha, so all
+# three pins name one wolf-lang commit for the first time. The wolf
+# binary does not move (nothing in the release notes forces it). Built
+# on nomad-1 (macOS arm64) from the release TAG v0.1.15 per D57; the
+# native lane is DARK on this host (libwolf_rt.a parked until
+# s59-apple), so native columns are NOT re-measured this sprint — they
+# keep their recorded linux-lane values throughout.
+#
+# std-test over the untouched 365-row ledger, before a single sc25
+# edit: 3 rows deeper, 0 shallower — EXACTLY the flip set the sc24
+# comments predicted (chars_builtin_agree, push_char, char_code: lupin
+# `unsupported` -> `run`, flipped above with dated comments). The 4
+# `divergent(…)` rows re-measured UNHEALED one at a time (F-0097 and
+# F-0098 byte-identical at 0.1.15 — the release that would heal them
+# reads as a red here, and none arrived; both upstream issues commented
+# with the measurement). The 25 step-budget `unsupported` rows answer
+# the same 50M-step refusal (the release notes predicted zero
+# interpreter motion in that block and zero is what measured). The one
+# DELTA against the contract's prediction is the 4 `slow` rows, and the
+# mover is the RIG, not the release: on this arm64 machine the 50M-step
+# refusal arrives 19.3-20.4s idle where the sc24 (linux-lane) rig got
+# neither an answer nor the refusal inside 70s — all four flip `slow`
+# -> `unsupported` on the machine's own word, at their rows above.
+# Motion count: 7 kind-changes on the lupin column (3 deeper to `run`,
+# 4 `slow` -> the honest refusal), 0 on wolfc, 0 on native (dark,
+# carried), 0 shallower.
