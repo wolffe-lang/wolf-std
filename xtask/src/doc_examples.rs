@@ -113,30 +113,22 @@ const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "process
 ///
 /// **THREE ENTRIES at the sc24 pin, one debt with one name shared by
 /// all: is26.** The char surface landed on the wolf lanes (D58,
-/// `[type.char]`) while lupin 0.1.14 has no `chars()` and no `char` —
-/// the interpreter's char tier is is26, running concurrently — so the
-/// three char-surface examples run on two lanes and are honestly
-/// `unsupported` on the third. Each needle keys the CALL whose refusal
-/// is waived (`.chars()` is the producing call in the strbuf/unicode
-/// examples; `to_list_chars` in std.str's). All three die in the same
-/// commit as the re-measure at the lupin release that carries is26.
-const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[
-    (
-        "str",
-        "to_list_chars",
-        "is26 pending - lupin 0.1.14 has no chars()/char",
-    ),
-    (
-        "strbuf",
-        ".chars()",
-        "is26 pending - lupin 0.1.14 has no chars()/char",
-    ),
-    (
-        "unicode",
-        ".chars()",
-        "is26 pending - lupin 0.1.14 has no chars()/char",
-    ),
-];
+/// `[type.char]`) while lupin 0.1.14 had no `chars()` and no `char` —
+/// the interpreter's char tier was is26, running concurrently — so the
+/// three char-surface examples ran on two lanes and were honestly
+/// `unsupported` on the third. Each needle keyed the CALL whose refusal
+/// was waived.
+///
+/// **EMPTY AGAIN at the sc25 pin, on schedule.** lupin 0.1.15 — the
+/// is26 scalar release — runs all three char-surface examples
+/// (re-measured under `doc-examples` at the bump before the entries
+/// left), so the sc24 set died in the same commit as the measurement,
+/// exactly as its own doc promised. That is the mechanism working a
+/// second time (sc13 armed it, sc14 emptied it, sc24 re-armed it), and
+/// the mechanism itself deliberately stays: a std surface will land on
+/// the wolf lanes ahead of a lupin release again, and the next entry
+/// costs a finding name, not plumbing.
+const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[];
 
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
@@ -585,14 +577,15 @@ mod tests {
     #[test]
     fn a_tier_waiver_names_one_call_and_not_a_module() {
         // sc13 added the mechanism with one entry; sc14 emptied it, because
-        // lupin 0.1.12 resolves `str_from_utf8` (F-0075 closed). The test
-        // keeps BOTH halves: the list is empty now, and the matcher it is
-        // read through still keys on the CALL rather than on the module, so
-        // the next entry cannot quietly excuse a whole module.
-        // sc24 re-armed the list: the char surface runs on the wolf lanes
-        // and lupin's char tier is is26, so three examples carry a waiver
-        // that dies at the release carrying it. Every entry must name its
-        // debt, and no needle may be so broad it excuses a whole module.
+        // lupin 0.1.12 resolves `str_from_utf8` (F-0075 closed). sc24
+        // re-armed it with the three char-surface examples (the wolf lanes
+        // ran D58's char, lupin's char tier was is26); sc25 emptied it
+        // again, because lupin 0.1.15 — the is26 release — runs all three
+        // (re-measured at the bump). The test keeps BOTH halves: the list
+        // is empty now, and the matcher it is read through still keys on
+        // the CALL rather than on the module, so the next entry cannot
+        // quietly excuse a whole module. Every entry must name its debt,
+        // and no needle may be so broad it excuses a whole module.
         for (m, needle, finding) in LUPIN_TIER_WAIVERS {
             assert!(
                 finding.contains("is26") || finding.contains("F-0"),
@@ -603,12 +596,11 @@ mod tests {
                 "a needle keys a CALL, never a module ({m}: {needle})"
             );
         }
-        assert_eq!(
-            LUPIN_TIER_WAIVERS.len(),
-            3,
-            "the sc24 set is exactly the three char-surface examples; \
-             adding a fourth needs its own finding, and the three die at \
-             the lupin release that carries is26"
+        assert!(
+            LUPIN_TIER_WAIVERS.is_empty(),
+            "the sc24 char-surface waivers died at the sc25 bump (lupin \
+             0.1.15 carries is26); a new entry needs its own finding and \
+             dies at the release that resolves it"
         );
         let waived = |module: &str, line: &str| {
             LUPIN_TIER_WAIVERS

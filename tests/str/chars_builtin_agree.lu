@@ -22,10 +22,13 @@
 //! the red demanded — the claim-holding mechanism working at the
 //! shortest interval it ever has.
 //!
-//! lupin 0.1.14 has no `chars()` and no `char` (the interpreter's char
-//! tier is is26, running concurrently), so the lupin column is honestly
-//! `unsupported` — the clean method refusal, reached before any cast —
-//! and flips on the release that carries is26.
+//! Three-lane as of sc25: lupin 0.1.15 (is26, the scalar release) runs
+//! `chars()` and `char`, so the two independent readings finally
+//! compare CROSS-MACHINE — the interpreter's builtin against std's
+//! decoder — which is the comparison this file was written to hold.
+//! The lupin column was honestly `unsupported` for exactly one sprint
+//! (0.1.14: the clean method refusal, reached before any cast) and
+//! flipped at the release its header promised.
 
 use std.str
 

@@ -28,12 +28,13 @@
 //! `push(c: char)` LEFT this list at sc24: D58 ruled the type
 //! (`[type.char]`, the sc24 data pin) and the sc24 wolf pair executes
 //! it, so the one-line body (`{c}` interpolation, which prints THE
-//! CHARACTER per `[type.char.interp]`) is code below. Its lanes are the
-//! wolf rungs; lupin's char tier is is26, running concurrently, and its
-//! rows are ledgered by lane rather than claimed. The sprint's first
-//! wolf acquisition (@ e7abf03) was pre-s121 and refused the type —
-//! the mid-sprint re-acquisition is what made this writable, and every
-//! sentence here was re-measured against the binary that gets pinned.
+//! CHARACTER per `[type.char.interp]`) is code below — on every
+//! executing lane as of sc25: lupin 0.1.15 (is26, the scalar release)
+//! runs `char`, and the row that sc24 ledgered by lane flipped at that
+//! release as promised. The sc24 history stays worth a sentence: the
+//! sprint's first wolf acquisition (@ e7abf03) was pre-s121 and refused
+//! the type — the mid-sprint re-acquisition is what made this writable,
+//! and every sentence here was re-measured against the binary pinned.
 //!
 //! - `strbuf.in(r)` — the region-explicit constructor (API-CONVENTIONS §5,
 //!   the s37 `.in(r)` pattern). Placement syntax over a std type is
@@ -108,13 +109,11 @@ pub fn push_str(mut b: StrBuf, s: str) {
 /// backing, amortized O(1) once the SSO builder lands. Total: no error
 /// row, no traps beyond allocation.
 ///
-/// LANES: both wolf rungs execute this; lupin 0.1.14 has no `char`
-/// (`'` does not lex there — E0101; the interpreter's char tier is
-/// is26, running concurrently), so char-carrying tests and the example
-/// below are honest `unsupported` on that lane until the release that
-/// carries it. The example spells its `char`s through `"é🐺".chars()`
-/// rather than literals so the refusal stays the METHOD's (a clean
-/// `unsupported`), not a lex error.
+/// LANES: every executing lane runs this as of the sc25 pins — both
+/// wolf rungs since s121, lupin since 0.1.15 (is26, the scalar
+/// release; sc24's one-sprint `unsupported` there closed on it). The
+/// example keeps its `"é🐺".chars()` spelling because the walk is the
+/// natural producer here, not as the lex-dodge it was under 0.1.14.
 ///
 /// ```wolf-doc-example
 /// var b = strbuf.new()
