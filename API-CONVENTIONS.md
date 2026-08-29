@@ -323,13 +323,24 @@ while the boundary primitive was missing.
   rule, then: guard where the lanes disagree, file it, and delete the guard
   the day the toolchain rules. The filing is what makes the second half
   happen.**
-- **A code point is an `int` until `char` exists, and the interim is
-  `std.unicode`'s.** `str.code_points`, `char_offsets` and `char_count` ship
-  in the same currency `std.unicode` chose for its classifiers, so the two
-  modules compose today and flip together the day `char` lands. None of the
-  three is named `chars`: the blocked contract keeps its name, and the
-  interim faces take descriptive ones, so nothing has to be renamed when the
-  real one arrives.
+- **A code point is a `char` (sc25; D58 `[type.char]`), and the doors
+  are two.** `char` landed at the sc24 data pin, executed wolf-side at
+  sc24 and everywhere at sc25 (lupin 0.1.15/is26), and `std.unicode`
+  flipped whole at that release: `from_code(n: int) -> char ! {none}`
+  and `code(c: char) -> int` are the ONLY places in std where a number
+  and a code point trade places; the classifiers take `char` and
+  COMPARE against `char` literals — never compute — and `utf8_len` is
+  total over `char`. No arithmetic on the scalar anywhere is the review
+  gate. What deliberately did NOT flip: `str.code_points`,
+  `char_offsets` and `char_count` keep the `int`/byte-offset currency —
+  `code_points` is std's own UTF-8 reading, held against the builtin
+  `chars()` by `tests/str/chars_builtin_agree.lu` (two independent
+  decoders that must agree; a retype onto `chars()`'s currency would
+  make that a tautology), and the offset trio's currency is byte
+  offsets, which were never code points. Their descriptive names (the
+  sc03 rule: the blocked contract keeps its name) stay correct: none of
+  them is `chars`, and `chars` — the `(offset, char)` pair — still
+  waits on tuple lists.
 - **Byte width is `List[int]` and monomorphic beats generic.**
   `std.bytes`' `len`/`is_empty`/`at`/`find`/`starts_with`/`ends_with`
   duplicate `std.list` names by design: `std.list`'s are generic and
