@@ -273,6 +273,39 @@ pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"
 
 [wolf]
 version = "0.1.0"
+# sc26 bump: @ `c1ca543` (trunk, merge s126) — THE NATIVE LANE COMES
+# HOME. Binary + data pin move TOGETHER to this one wolf-lang sha
+# (lupin stays 0.1.15 @ a900b8c: the one-moving-part rule; 0.1.16/is27
+# exists and is a later sprint's bump). Built in ../wolf-lang at the
+# sha (clean checkout, trunk == origin/trunk == c1ca543):
+# `cargo build --release -p wolf_driver -p wolf_rt`; wolf installed to
+# ~/.local/bin/ and **libwolf_rt.a UN-PARKED** — s59-apple is in the
+# span, so the staticlib lives beside the binary ON THIS MACHINE TOO
+# (parked to ~/.local/lib 2026-08-28 at the first nomad-1 gauntlet,
+# un-parked same day; bootstrap.sh's non-linux park case retired in the
+# planning repo). `--version` still names no pin (pre-s66) and pairs
+# "lupin 0.1.15 … pin a900b8c" — recorded from acquisition and VERIFIED
+# BEHAVIORALLY by the s125 witness: `wolf run` on an oob index prints
+# the TWO-LINE trap report (`wolf-trap: bounds` then `  at file:3:5`,
+# exit 134) where a pre-s125 binary prints line one only. The span
+# a900b8c..c1ca543 carries s59 (apple native tier — the acquisition's
+# point), s125 (sited trap reports, [conf.trap.report]/[conf.trap.render]),
+# s127 (the RELEASE tier on macOS — not a lane this rig observes) and
+# s126 (D61 `#![index(0|1)]` per-scope indexing — zero-cost-when-absent,
+# and std/ + tests/ carry NO `#![` marker, grepped at the bump, so no
+# row observes it). Anchors snapshot regen: 393 -> 397 (+5/-1, NOT the
+# contract's "+2"): +[conf.trap.report] +[conf.trap.render] (s125),
+# +[gram.attr.index] +[gram.expr.index.origin] (s126),
+# +[conf.directive.standalone] (D59, in the span), and -[gram.lex.ident]
+# — an upstream REGEN DEFECT, not a retirement: the anchor's heading is
+# still in 01-grammar.md, but s126's shebang prose added bare literal
+# `[` runs that make xtask's bracket scanner swallow the definition
+# (F-0100 / wolf-lang#170, filed the day it was measured; no rig test
+# cites the anchor, so nothing here breaks). [gram.lex.shebang]'s s126
+# amendment is prose-only — invisible in the id->file registry, zero
+# registry delta.
+#
+# The sc24 note, kept for the history it records:
 # sc24 bump, SECOND acquisition: @ `a900b8c` — THE DATA PIN ITSELF
 # (merge s121). `--version` names no pin (pre-M1) and says "paired with
 # lupin 0.1.14 … pin 90c90df"; the sha is recorded from acquisition and
@@ -760,4 +793,5 @@ version = "0.1.0"
 # pin = "87405aca88bbdd1d571e7b3ef8da638e64fbd57a"  (superseded, sc16/sc17 era)
 # pin = "21b129e90c4589c0fc6b5698e0468e84edbd574d"  (superseded, sc18-sc23 era)
 # pin = "e7abf0354daea50df13a86f7e95962d29ee9cbf3"  (superseded mid-sc24 — the pre-s121 first acquisition)
-pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"
+# pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc24/sc25 era — the data-pin-itself acquisition)
+pin = "c1ca543cb5abf334b70c38b13204170973dc4e23"
