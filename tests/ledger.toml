@@ -14,6 +14,37 @@
 # Every slow row is owed a re-measure at pin bumps; an interpreter perf
 # wave is its exit.
 #
+# THE sc26 PIN BUMP (wolf trunk a900b8c -> c1ca543, the s59-apple +
+# s122-s127 span; lupin UNCHANGED at 0.1.15 — the one-moving-part rule;
+# 0.1.16/is27 exists and is a later sprint's bump) is the NATIVE LANE
+# COMING HOME: the staticlib un-parks (s59 lights macOS/aarch64) and the
+# native and wolfc columns are OBSERVED ON THIS MACHINE for the first
+# time — every recorded value was a linux-lane measurement until now.
+# The full 365-row untouched-ledger gauntlet, three lanes lit, idle:
+# ONE row deeper, ZERO shallower, ZERO cross-lane divergences, zero
+# directive mismatches, zero timeouts. 364 rows are silent macOS
+# confirmation of the linux record — the sc19 env-crypto-drift class
+# produced NOTHING here, and no platform divergence exists to file. The
+# one mover: `testing/near_and_ulps` wolfc `unsupported` -> `run` — the
+# checked tier at a900b8c refused `this literal shape in checked
+# execution` spanning order_key's `-9223372036854775808` (measured
+# against both binaries at the bump; the s123 numeric-literal wave is
+# the span's owner); at c1ca543 the row runs to its directive. The 4
+# `divergent(...)` rows (F-0097/F-0098) observed exactly as filed —
+# lupin did not move, so they could not. F-0096 re-probed: UNHEALED at
+# c1ca543 (`unsupported — open-ended or end-relative ranges (slicing)`
+# on both rungs, the finding's own reproducer; wolf-lang#164 commented
+# with the re-measure), so `str/end_relative_get` stands. s125's trap
+# site line is invisible to this file by design (the rig reads
+# conform-run VERDICTS, never raw stderr) — verified anyway on a
+# ledgered trap row: `wolf run` on str/slice_oob_traps prints the
+# two-line report (`wolf-trap: bounds` then `  at <file>:13:5`), exit
+# 134, verdict undisturbed. s126 is a no-op over this corpus, verified
+# by the letter: zero `#![` markers and zero `#!` lines in std/ or
+# tests/. Native wall clocks measured per-row on this rig for the first
+# time (the knife-edge duty): NOTHING within 20% of the 60s ceiling —
+# see the sc26 note in docs/findings.md for the numbers.
+#
 # THE sc18 PIN BUMP (wolf trunk 87405ac -> 21b129e, the s110/s111 span;
 # lupin UNCHANGED at 0.1.13 for the FOURTH sprint — is20's F-0093 fix is
 # merged upstream but unreleased, so every `slow` row keeps its 0.1.13
@@ -301,8 +332,8 @@ native = "run"
 
 [tests."testing/near_and_ulps.lu"]
 lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
+wolfc = "run"  # sc26 pin bump (wolf @ c1ca543): the checked tier executes order_key's INT_MIN literal — at a900b8c it refused `unsupported — this literal shape in checked execution` spanning `-9223372036854775808` in std/testing (measured against BOTH binaries at the bump); the s123 numeric-literal wave (E0415/width defaulting) is the span's owner. The ONE row the sc26 bump moves.
+native = "unsupported"  # still refused at c1ca543, sentence evolved: `match over this scrutinee type` in std/testing (was c08's interpolation-in-fail); verdict unchanged, re-measured at the bump
 
 [tests."testing/near_far_trap.lu"]
 lupin = "run"

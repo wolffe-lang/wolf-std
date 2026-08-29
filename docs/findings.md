@@ -108,6 +108,7 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0097 | 2026-08-28 | **Silent wrong answer: a multi-arm `else`-match over a BUILTIN-raised row takes its FIRST ARM under lupin 0.1.14** — measured in both arm orders over `net_connect`'s `refused` (`-1` with `refused` first, `-9` with `io` first, same call); the propagated tag out of `main` is RIGHT (`error: refused`), which is what caught it. F-0052/F-0079's mechanism at a THIRD address (entry-file raises healed s70; module raises healed 0.1.13/#29; a builtin's row is in neither place the checker consults, so every arm binds). Newly observable: 0.1.14 is the first lupin with net/process tiers. Costs `net/closed_row` + `net/refused_row` their lupin stdout; ledgered `divergent(stdout)` (the sc24 word) so the fix reads as a red | wolf-interp | [filed: wolf-interp#47](https://github.com/wolffe-lang/wolf-interp/issues/47); sc24 |
 | F-0098 | 2026-08-28 | **take-mode reuse is a STATIC `fail(E1001)` on both compiler rungs and EXECUTES under lupin 0.1.14** — `net/use_after_close` runs to `trap(use-after-move)` (`[mem.tier0.move.2]`, the trap map's own dynamic answer) and `process/use_after_wait` never reaches the reuse (`start` honestly raises `not_found` first, `error: not_found` exit 1). Whether take-reuse joins lupin's static set (the E1007 precedent) or the dynamic trap is the reference is the counterparty's ruling to make; the two rows carry `divergent(trap(use-after-move))` / `divergent(exit(1))` until it lands | wolf-interp | [filed: wolf-interp#48](https://github.com/wolffe-lang/wolf-interp/issues/48); sc24 |
 | F-0099 | 2026-08-28 | **`[conf.anchor.ns]` does not admit `type` (nor `ct`/`diag`/`os`) while `spec-extract` publishes their anchors** — the s115/#120 class again, four documents later: `[type.char]` is in the registry the clause calls authoritative and a conforming test may not cite it by the clause's own letter. Surfaced by sc24's char-surface tests (`conforms: type.char` refused by this rig, which mirrors the letter); the same investigation caught this rig's own registry lagging `pkg` by nine sprints (fixed here). The reserved-forward `ty` now points at a name nothing will use — named in the filing for the same decision | wolf-lang spec | [filed: wolf-lang#165](https://github.com/wolffe-lang/wolf-lang/issues/165); sc24 |
+| F-0100 | 2026-08-28 | **`spec-extract`'s anchor scanner swallows a still-normative anchor: `gram.lex.ident` fell out of anchors.json at the s126 regen** — the scanner pairs each `[` with the NEXT `]` and resumes past it, and s126's amended `[gram.lex.shebang]` prose introduces bare literal `[` runs (`` `[` ``, `` `#[` ``, `` `#![` ``): the `[` of `` `#[` `` pairs with the `]` of the `### 1.3 Identifiers [gram.lex.ident]` heading below it, the span swallows the anchor's only occurrence, and the registry the spec calls authoritative ([conf.anchor.index]) silently disagrees with the spec's own text. `link_check` cannot catch it (it tests `contains`, still true). Measured at the sc26 bump: registry 393 -> 397 is +5/-1 where the clean delta is +5/0. No wolf-std test cites the anchor, so nothing reds here; the snapshot is re-vendored byte-faithful with the defect named in the bump record | wolf-lang spec/xtask | [filed: wolf-lang#170](https://github.com/wolffe-lang/wolf-lang/issues/170); sc26 |
 
 
 ## F-0001 — the std search path
@@ -3806,3 +3807,100 @@ sprint that consumes no F-number is itself worth recording: the char
 debt economy closed with the waivers, on the release its records
 predicted, with the measured list matching the predicted list to the
 row.
+
+## Retirements and movements at the sc26 pin — the native lane comes home
+
+**The wolf binary and the data pin move TOGETHER to trunk `c1ca543`
+(s59-apple + s122-s127); lupin stays 0.1.15 @ a900b8c — the
+one-moving-part rule (0.1.16/is27 exists and is a later sprint's
+bump).** Built in ../wolf-lang at the sha (`cargo build --release -p
+wolf_driver -p wolf_rt`); `--version` still names no pin (pre-s66), so
+the sha is recorded from acquisition and VERIFIED BEHAVIORALLY by the
+s125 witness: `wolf run` on an out-of-bounds index prints the TWO-LINE
+trap report — `wolf-trap: bounds` then `  at file:line:col` — exit 134,
+where a pre-s125 binary prints line one only.
+
+**The deliberate un-parking.** libwolf_rt.a moves from ~/.local/lib
+(parked 2026-08-28 at the first nomad-1 gauntlet, when a lit native
+lane on a pre-s59 binary redded every native `run` row with an honest
+host refusal) to ~/.local/bin beside the binary — un-parked the SAME
+DAY, after s59-apple landed in the pin. bootstrap.sh's non-linux park
+case is retired in the planning repo (`4e7bf6e`), with the comment
+dating the park's one-day life. Doctor: native rung LIT on this host
+for the first time.
+
+**The untouched-ledger drift, measured over all 365 rows with THREE
+lanes lit on nomad-1 before a single sc26 edit: 1 row deeper, 0
+shallower, 0 cross-lane divergences, 0 directive mismatches, 0
+timeouts.** The headline is the 364 rows that did NOT move: every
+native and wolfc column — linux-lane measurements until today — is
+silently confirmed on macOS/arm64, the whole crypto tier included. The
+sc19 env-crypto-drift class produced nothing; no platform divergence
+exists to file. The one mover is `testing/near_and_ulps` wolfc
+`unsupported` -> `run`, and its mechanism is measured against BOTH
+binaries (the a900b8c driver rebuilt for exactly this): the old
+checked tier refused `unsupported — this literal shape in checked
+execution` spanning `order_key`'s `-9223372036854775808` INT_MIN
+literal in std/testing; the s123 numeric-literal wave (E0415, width
+defaulting) owns the span, and at c1ca543 the row runs to its
+directive. Its native column stays `unsupported` on an EVOLVED
+sentence (`match over this scrutinee type`, was c08's
+interpolation-in-fail) — verdict unchanged, wording noted on the row.
+
+**F-0096 re-probed at c1ca543: UNHEALED.** `s.get(0..^1)` still
+answers `unsupported — open-ended or end-relative ranges (slicing)` at
+resolve on BOTH rungs — now measured on the macOS rungs' own machinery
+rather than carried from linux — while `s[..^1]` runs three-lane in
+the same gauntlet. wolf-lang#164 commented with the re-measure the day
+it was taken; `str/end_relative_get` stands `run/unsupported/
+unsupported` and the register row stays open from our side.
+
+**The 4 `divergent(…)` rows observed exactly as filed** (F-0097
+first-arm-over-builtin-rows, F-0098 take-mode reuse) — lupin did not
+move this sprint, so they could not, and the runner's designed red at
+the eventual heal is undisturbed.
+
+**Trap rows and the s125 second line: tolerance is structural, and it
+was verified anyway.** The rig reads conform-run VERDICTS, never raw
+stderr, so the site line cannot move a row — and zero mismatches in
+the gauntlet is the proof at scale. One ledgered trap row verified
+raw: `wolf run` on `str/slice_oob_traps.lu` prints
+`wolf-trap: bounds` / `  at <staged path>:13:5`, exit 134.
+
+**s126 is a no-op over this corpus, verified by the letter:** zero
+`#![` markers and zero `#!`-initial lines in std/ and tests/ (both
+grepped at the bump), so D61's zero-cost-when-absent claim is not
+merely believed here — no row can observe the origin marker or the
+narrowed shebang.
+
+**The anchors regen measured 393 -> 397 (+5/-1), NOT the predicted
+"+2", and the -1 is an upstream defect (F-0100, wolf-lang#170, filed
+the day it was measured).** Added: [conf.trap.report] and
+[conf.trap.render] (s125), [gram.attr.index] and
+[gram.expr.index.origin] (s126), [conf.directive.standalone] (D59, in
+the span). Removed: [gram.lex.ident] — NOT a retirement: the heading
+is still in 01-grammar.md, but s126's shebang prose added bare literal
+`[` runs and spec-extract's bracket scanner pairs `[` with the next
+`]`, so the span from `` `#[` `` swallows the anchor's only
+occurrence. [gram.lex.shebang]'s amendment is prose-only and invisible
+in the id->file registry. No rig test cites the lost anchor, so the
+snapshot is re-vendored byte-faithful with the defect named.
+
+**Knife-edge, re-scoped per-rig: the native lane's wall clocks are
+measured on this rig for the first time, and NOTHING is near a
+ceiling.** All 160 native-`run` x/ rows timed one at a time, idle,
+full `conform-run --native` (compile + link + execute per row): the
+slowest is 1.40s (`p256/wycheproof_p256_p7`) against the 60s per-test
+ceiling — 2.3% of it, a 43x margin — and the whole 160-row pass totals
+79s. Zero margin notes are owed on any native row on this rig; the
+lupin knife-edge story is unchanged from sc25 (that lane did not
+move). The wolfc checked tier's budget-refusal grinds remain the slow
+part of a full gauntlet (~50 min for the 365-row three-lane pass on
+this rig, idle) — a rig fact recorded for the next operator, not a
+ledger word.
+
+**One F-number consumed (F-0100), one issue commented (#164), no row
+regressed.** The sprint's measurement thesis held: lighting a third
+lane on a new platform moved NOTHING the records did not predict,
+except one row whose mechanism was hunted down and named, and one
+registry defect the delta measurement itself surfaced.
