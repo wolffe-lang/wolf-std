@@ -18,97 +18,66 @@
 //! be welded to the compiler does not carry megabytes of derived data.
 //! Report 07's nursery clock applies to whichever nursery takes them.
 //!
-//! **THE INTERIM CURRENCY IS `int`, AND IT IS THE WHOLE STORY OF THIS
-//! MODULE'S SIGNATURES.** The sprint contract writes these functions over
-//! a `char` type — `char.code`, `is_ascii_digit(c: char)`,
-//! `utf8_len(char)`. The LANGUAGE has that type now — D58
-//! (`[type.char]`, the sc24 data pin a900b8c) rules `char` a Unicode
-//! scalar value: `0..=0x10FFFF` minus the surrogate gap, ordered by
-//! scalar value, NOT an integer, `char as int` total, `int as char`
-//! trapping on a non-scalar (measured: `trap(overflow)` on both wolf
-//! rungs at U+D800), `s.chars()` yielding `List[char]`
-//! (`[mem.str.chars]`). The sc24 wolf pair EXECUTES it, and the
-//! contract's tenth function — `code(c: char) -> int`, the projection —
-//! is code below at last, on the two wolf lanes. What has NOT flipped,
-//! deliberately: the nine `int`-typed members. lupin 0.1.14 has no
-//! `char` at all (`'` does not lex there, E0101 — the interpreter's
-//! char tier is is26, running concurrently), and this module's
-//! classification set is three-lane green in the `int` currency that
-//! `str.code_points` feeds it; retyping the set today would trade the
-//! module's executing interpreter lane for a signature, which is §14's
-//! honesty rule read in the lane direction. So: the interim spells a
-//! code point the way `code` reports it — a Unicode scalar value as
-//! `int` — and the FULL flip (`from_code -> char ! {none}`, `utf8_len`
-//! total over `char`, char-typed predicates) is owed in the sprint
-//! after the lupin release that carries is26, when it costs no lane.
-//! The reviewed final signatures are recorded per function. What the
-//! flip must NOT do is reintroduce arithmetic on the typed scalar
-//! through a helper: under D58 `from_code`/`code` are the only places a
-//! number and a code point trade places, and the predicates compare —
-//! they never compute. (The sprint's own first wolf acquisition was
-//! pre-s121 and refused the type; the mid-sprint re-acquisition is what
-//! made `code` writable, and every claim here was re-measured against
-//! the binary that gets pinned.)
+//! **THE CURRENCY IS `char` NOW (sc25), AND THE INT INTERIM IS GONE.**
+//! From sc03 to sc24 this module spelled a code point as an `int`
+//! because no pinned binary had a `char`; D58 ruled the type at the
+//! sc24 data pin (`[type.char]`: a Unicode scalar value, `0..=0x10FFFF`
+//! minus the surrogate gap, ordered by scalar value, NOT an integer)
+//! and the sc24 wolf pair executed it — but lupin 0.1.14 did not
+//! (`'` refused at lex; the interpreter's char tier was is26, running
+//! concurrently), so sc24 shipped only `code` and recorded the reviewed
+//! char-typed signatures per function rather than trading the module's
+//! executing interpreter lane for them. lupin 0.1.15 — the is26 scalar
+//! release — closed that gap, and this is the recorded flip, at the
+//! sprint it was owed to: every signature below is char-typed, the flip
+//! cost no lane (re-measured on both executing lanes at the sc25 pins;
+//! the native column keeps its recorded values under the nomad-1
+//! posture, the s121 surface having been verified on both wolf rungs at
+//! sc24), and the reviewed-final-signature notes retired into the
+//! signatures themselves.
+//!
+//! **D58's rule is this module's law: no arithmetic on the scalar,
+//! anywhere.** `code` and `from_code` bracket the ONLY two places in
+//! std where a number and a code point trade places — `c as int` (total
+//! by `[type.char.cast]`) and the validated `n as char` (every trap row
+//! of the raw cast is a `none` here, so the cast can never trap). The
+//! predicates COMPARE `c` against `char` literals under
+//! `[type.char.order]` — they never compute, and no helper that does
+//! will ever sit beside them. `utf8_len` is TOTAL now: its `{none}` row
+//! existed only because the interim's `int` could hold a non-scalar,
+//! and a non-scalar cannot exist as a `char` at all.
 //!
 //! Absence is spelled `none`, which is the convention's own spelling and
 //! no longer an interim: F-0003 died at the sc05 pins and the rename
 //! landed tree-wide at sc06. This header described the interim for six
 //! sprints after it was gone.
 
-/// The largest Unicode scalar value, U+10FFFF. Private: the bound belongs
-/// to the standard, and callers ask `from_code` instead of comparing.
+/// The largest Unicode scalar value, U+10FFFF, as the raw `int` that
+/// `from_code` validates. Private: the bound belongs to the standard, and
+/// callers ask `from_code` instead of comparing.
 fn max_code() -> int {
     1114111
 }
 
 /// `n` as a Unicode scalar value; `none` when `n` is not one — negative,
 /// above U+10FFFF, or in the surrogate range U+D800..U+DFFF, which UTF-8
-/// may never encode. This is the validating constructor: the one place a
-/// number becomes a code point.
-///
-/// Reviewed final signature: `from_code(n: int) -> char ! {none}`.
-///
-/// ```wolf-doc-example
-/// (unicode.from_code(65) else 0 - 1) == 65
-/// (unicode.from_code(0) else 0 - 1) == 0
-/// (unicode.from_code(1114111) else 0 - 1) == 1114111
-/// (unicode.from_code(1114112) else 0 - 1) == 0 - 1
-/// (unicode.from_code(0 - 1) else 0 - 2) == 0 - 2
-/// (unicode.from_code(55296) else 0 - 1) == 0 - 1
-/// (unicode.from_code(57343) else 0 - 1) == 0 - 1
-/// ```
-// (The char-typed surface begins here — sc24, over D58's ruling.)
-
-/// The Unicode scalar value of `c`, as an `int` — the sc03 contract's
-/// `char.code`, code at last (sc24). The body is `c as int`, which
-/// `[type.char.cast]` rules TOTAL: every `char` is a scalar value by
-/// construction (D58 — the surrogate gap and the range cap are enforced
-/// where a number tries to become a `char`, not here), so this
-/// projection has no row and can never trap. It is the one sanctioned
-/// bridge from the typed scalar back into the `int` currency the rest
-/// of this module still speaks — and with `from_code` it brackets the
-/// ONLY two places in std where a number and a code point trade places:
-/// the predicates below compare, they never compute, and D58's
-/// not-an-integer ruling is why no `char`-arithmetic helper will ever
-/// sit beside them.
-///
-/// LANES: both wolf rungs execute this; lupin 0.1.14 has no `char` at
-/// all (the interpreter's char tier is is26, running concurrently), so
-/// char-carrying tests and the example are honest `unsupported` there
-/// until the release that carries it. The example spells its `char`s
-/// through `.chars()` rather than literals so lupin's refusal stays the
-/// clean method `unsupported`, never a lex error.
+/// may never encode. This is the validating constructor: the one place in
+/// std a number becomes a code point, and the recoverable face of the
+/// D56 cast — `int as char` TRAPS `overflow` on exactly the shapes this
+/// function answers `none` for (`[type.char.cast]`), so the cast in the
+/// body runs only on values it has already admitted and can never trap.
 ///
 /// ```wolf-doc-example
-/// var total = 0
-/// for c in "Aé".chars() { total = total + unicode.code(c) }
-/// total == 298
+/// (unicode.from_code(65) else '?') == 'A'
+/// (unicode.from_code(233) else '?') == 'é'
+/// (unicode.from_code(128058) else '?') == '🐺'
+/// (unicode.from_code(1114111) else '?') == '\u{10FFFF}'
+/// (unicode.from_code(1114112) else '?') == '?'
+/// (unicode.from_code(0 - 1) else '?') == '?'
+/// (unicode.from_code(55296) else '?') == '?'
+/// (unicode.from_code(57343) else '?') == '?'
 /// ```
-pub fn code(c: char) -> int {
-    c as int
-}
-
-pub fn from_code(n: int) -> int ! {none} {
+pub fn from_code(n: int) -> char ! {none} {
     if n < 0 {
         return none
     }
@@ -120,164 +89,166 @@ pub fn from_code(n: int) -> int ! {none} {
             return none
         }
     }
-    n
+    n as char
 }
 
-/// The number of bytes `c` occupies in UTF-8 — 1, 2, 3 or 4; `none` when
-/// `c` is not a scalar value (`from_code`'s rules). Under the final
-/// `char`-typed signature this function is TOTAL and the row disappears:
-/// the row exists only because the interim's `int` can hold a non-scalar.
-///
-/// Reviewed final signature: `utf8_len(c: char) -> int`.
+/// The Unicode scalar value of `c`, as an `int` — the sc03 contract's
+/// `char.code`, code since sc24. The body is `c as int`, which
+/// `[type.char.cast]` rules TOTAL: every `char` is a scalar value by
+/// construction (D58 — the surrogate gap and the range cap are enforced
+/// where a number tries to become a `char`, not here), so this
+/// projection has no row and can never trap. With `from_code` it
+/// brackets the only two places in std where a number and a code point
+/// trade places; the predicates below compare, they never compute.
 ///
 /// ```wolf-doc-example
-/// (unicode.utf8_len(65) else 0) == 1
-/// (unicode.utf8_len(127) else 0) == 1
-/// (unicode.utf8_len(128) else 0) == 2
-/// (unicode.utf8_len(233) else 0) == 2
-/// (unicode.utf8_len(2047) else 0) == 2
-/// (unicode.utf8_len(2048) else 0) == 3
-/// (unicode.utf8_len(65535) else 0) == 3
-/// (unicode.utf8_len(65536) else 0) == 4
-/// (unicode.utf8_len(128058) else 0) == 4
-/// (unicode.utf8_len(1114112) else 0) == 0
+/// var total = 0
+/// for c in "Aé".chars() { total = total + unicode.code(c) }
+/// total == 298
+/// unicode.code('A') == 65
+/// unicode.code('🐺') == 128058
 /// ```
-pub fn utf8_len(c: int) -> int ! {none} {
-    let code = from_code(c)?
-    if code <= 127 {
+pub fn code(c: char) -> int {
+    c as int
+}
+
+/// The number of bytes `c` occupies in UTF-8 — 1, 2, 3 or 4. TOTAL now
+/// (sc25): the `{none}` row the int interim carried existed only because
+/// an `int` can hold a non-scalar, and a non-scalar cannot exist as a
+/// `char` (D58). The class boundaries are compared as `char` literals
+/// under the scalar order (`[type.char.order]`) — never computed.
+///
+/// ```wolf-doc-example
+/// unicode.utf8_len('A') == 1
+/// unicode.utf8_len('\u{7F}') == 1
+/// unicode.utf8_len('é') == 2
+/// unicode.utf8_len('\u{7FF}') == 2
+/// unicode.utf8_len('中') == 3
+/// unicode.utf8_len('\u{FFFF}') == 3
+/// unicode.utf8_len('🐺') == 4
+/// unicode.utf8_len('\u{10FFFF}') == 4
+/// ```
+pub fn utf8_len(c: char) -> int {
+    if c <= '\u{7F}' {
         return 1
     }
-    if code <= 2047 {
+    if c <= '\u{7FF}' {
         return 2
     }
-    if code <= 65535 {
+    if c <= '\u{FFFF}' {
         return 3
     }
     4
 }
 
-/// Whether `c` is an ASCII code point, U+0000..U+007F. Total: no error
-/// row, no traps — a non-scalar `int` is simply not ASCII.
-///
-/// Reviewed final signature: `is_ascii(c: char) -> bool`.
+/// Whether `c` is an ASCII character, U+0000..U+007F. Total, and one
+/// comparison now: the negative guard the int interim carried has no
+/// value to guard against — a `char` below `'\0'` does not exist.
 ///
 /// ```wolf-doc-example
-/// unicode.is_ascii(65) == true
-/// unicode.is_ascii(0) == true
-/// unicode.is_ascii(127) == true
-/// unicode.is_ascii(128) == false
-/// unicode.is_ascii(128058) == false
+/// unicode.is_ascii('A') == true
+/// unicode.is_ascii('\0') == true
+/// unicode.is_ascii('\u{7F}') == true
+/// unicode.is_ascii('\u{80}') == false
+/// unicode.is_ascii('é') == false
+/// unicode.is_ascii('🐺') == false
 /// ```
-pub fn is_ascii(c: int) -> bool {
-    if c < 0 {
-        return false
-    }
-    c <= 127
+pub fn is_ascii(c: char) -> bool {
+    c <= '\u{7F}'
 }
 
 /// Whether `c` is an ASCII letter, `A`..`Z` or `a`..`z`. ASCII-true, as
 /// the name says: a Unicode letter outside ASCII answers false, and
 /// unicode-true classification is the filed table decision. Total.
 ///
-/// Reviewed final signature: `is_ascii_alpha(c: char) -> bool`.
-///
 /// ```wolf-doc-example
-/// unicode.is_ascii_alpha(65) == true
-/// unicode.is_ascii_alpha(122) == true
-/// unicode.is_ascii_alpha(48) == false
-/// unicode.is_ascii_alpha(233) == false
+/// unicode.is_ascii_alpha('A') == true
+/// unicode.is_ascii_alpha('z') == true
+/// unicode.is_ascii_alpha('0') == false
+/// unicode.is_ascii_alpha('é') == false
 /// ```
-pub fn is_ascii_alpha(c: int) -> bool {
+pub fn is_ascii_alpha(c: char) -> bool {
     is_ascii_upper(c) || is_ascii_lower(c)
 }
 
 /// Whether `c` is an ASCII decimal digit, `0`..`9`. Total.
 ///
-/// Reviewed final signature: `is_ascii_digit(c: char) -> bool`.
-///
 /// ```wolf-doc-example
-/// unicode.is_ascii_digit(48) == true
-/// unicode.is_ascii_digit(57) == true
-/// unicode.is_ascii_digit(47) == false
-/// unicode.is_ascii_digit(65) == false
+/// unicode.is_ascii_digit('0') == true
+/// unicode.is_ascii_digit('9') == true
+/// unicode.is_ascii_digit('/') == false
+/// unicode.is_ascii_digit('A') == false
 /// ```
-pub fn is_ascii_digit(c: int) -> bool {
-    if c < 48 {
+pub fn is_ascii_digit(c: char) -> bool {
+    if c < '0' {
         return false
     }
-    c <= 57
+    c <= '9'
 }
 
 /// Whether `c` is an ASCII letter or digit. Total.
 ///
-/// Reviewed final signature: `is_ascii_alnum(c: char) -> bool`.
-///
 /// ```wolf-doc-example
-/// unicode.is_ascii_alnum(65) == true
-/// unicode.is_ascii_alnum(48) == true
-/// unicode.is_ascii_alnum(95) == false
+/// unicode.is_ascii_alnum('A') == true
+/// unicode.is_ascii_alnum('0') == true
+/// unicode.is_ascii_alnum('_') == false
 /// ```
-pub fn is_ascii_alnum(c: int) -> bool {
+pub fn is_ascii_alnum(c: char) -> bool {
     is_ascii_alpha(c) || is_ascii_digit(c)
 }
 
-/// Whether `c` is ASCII whitespace: tab (9), line feed (10), vertical tab
-/// (11), form feed (12), carriage return (13) or space (32). Total.
+/// Whether `c` is ASCII whitespace: tab (`'\t'`), line feed (`'\n'`),
+/// vertical tab (U+000B), form feed (U+000C), carriage return (`'\r'`)
+/// or space. Total.
 ///
 /// This is deliberately NARROWER than the whitespace `std.str.trim` and
 /// `std.str.words` use, which is Unicode `White_Space` (the builtin's set,
 /// pinned by a test there). The names are the difference: `is_ascii_space`
 /// promises ASCII and delivers ASCII.
 ///
-/// Reviewed final signature: `is_ascii_space(c: char) -> bool`.
-///
 /// ```wolf-doc-example
-/// unicode.is_ascii_space(32) == true
-/// unicode.is_ascii_space(9) == true
-/// unicode.is_ascii_space(13) == true
-/// unicode.is_ascii_space(65) == false
-/// unicode.is_ascii_space(160) == false
+/// unicode.is_ascii_space(' ') == true
+/// unicode.is_ascii_space('\t') == true
+/// unicode.is_ascii_space('\r') == true
+/// unicode.is_ascii_space('A') == false
+/// unicode.is_ascii_space('\u{A0}') == false
 /// ```
-pub fn is_ascii_space(c: int) -> bool {
-    if c == 32 {
+pub fn is_ascii_space(c: char) -> bool {
+    if c == ' ' {
         return true
     }
-    if c < 9 {
+    if c < '\t' {
         return false
     }
-    c <= 13
+    c <= '\r'
 }
 
 /// Whether `c` is an ASCII uppercase letter, `A`..`Z`. Total.
 ///
-/// Reviewed final signature: `is_ascii_upper(c: char) -> bool`.
-///
 /// ```wolf-doc-example
-/// unicode.is_ascii_upper(65) == true
-/// unicode.is_ascii_upper(90) == true
-/// unicode.is_ascii_upper(97) == false
-/// unicode.is_ascii_upper(201) == false
+/// unicode.is_ascii_upper('A') == true
+/// unicode.is_ascii_upper('Z') == true
+/// unicode.is_ascii_upper('a') == false
+/// unicode.is_ascii_upper('É') == false
 /// ```
-pub fn is_ascii_upper(c: int) -> bool {
-    if c < 65 {
+pub fn is_ascii_upper(c: char) -> bool {
+    if c < 'A' {
         return false
     }
-    c <= 90
+    c <= 'Z'
 }
 
 /// Whether `c` is an ASCII lowercase letter, `a`..`z`. Total.
 ///
-/// Reviewed final signature: `is_ascii_lower(c: char) -> bool`.
-///
 /// ```wolf-doc-example
-/// unicode.is_ascii_lower(97) == true
-/// unicode.is_ascii_lower(122) == true
-/// unicode.is_ascii_lower(65) == false
-/// unicode.is_ascii_lower(233) == false
+/// unicode.is_ascii_lower('a') == true
+/// unicode.is_ascii_lower('z') == true
+/// unicode.is_ascii_lower('A') == false
+/// unicode.is_ascii_lower('é') == false
 /// ```
-pub fn is_ascii_lower(c: int) -> bool {
-    if c < 97 {
+pub fn is_ascii_lower(c: char) -> bool {
+    if c < 'a' {
         return false
     }
-    c <= 122
+    c <= 'z'
 }

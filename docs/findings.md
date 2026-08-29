@@ -101,7 +101,7 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0090 | 2026-08-26 | **CLOSED at the sc18 pin (s111, wolf-lang#132)** — `List[wrapping[u64]]` builds, pushes and reads natively at 21b129e, re-probed at the sha; the paired hi/lo tables stay as the same recorded follow-on. The original finding: **the native rung refuses `List[wrapping[u64]]` at resolve** ("this prelude container instantiation (generic data)") — and a 64-bit word cannot ride `List[int]` either, because `as int` is CHECKED everywhere and a value with the top bit set traps `overflow`. So SHA-512's eighty-word schedule and its K table are each a PAIR of `List[int]` halves, split from the verbatim FIPS literals and recombined at every use (`khi[t] as wrapping[u64] << 32 \| klo[t] as wrapping[u64]`, four recombinations per round). The ask is monomorphic: `List` of a fixed 8-byte scalar, no generic-data machinery | wolf-lang | [filed: wolf-lang#132](https://github.com/wolffe-lang/wolf-lang/issues/132); sc16, the digest ladder |
 | F-0091 | 2026-08-26 | **CLOSED at the sc18 pin (s111, wolf-lang#130)** — shifts, bitwise ops and 2^63+ literals all execute at mem at 21b129e; 41 wolfc rows flipped `unsupported` -> `run` in the bump commit (4 rand + 18 sha2 + 19 chacha20), and the nine still-dark sha2 rows record the tier's step/shadow-memory BUDGETS, a different mechanism, named in the ledger. The original finding: **the checked tier refuses every shift and bitwise operator on `wrapping[T]`** ("this operator in checked execution"; `+`/`*` run) and refuses a `wrapping[u64]` literal above 2^63 - 1 earlier still ("this literal shape") — std.rand's four-sprint-old lane posture, now load-bearing: there is no spelling of SHA-2 without rotations, so the whole digest ladder (module + 1210 vendored vector assertions) is lupin+native with the checked column dark. D53 wants c28's ct tier exercised over exactly these kernels, and a lane that cannot run a rotation cannot ever check one. The filing quotes the round function | wolf-lang | [filed: wolf-lang#130](https://github.com/wolffe-lang/wolf-lang/issues/130); sc16, the digest ladder's named lane cost |
 | F-0092 | 2026-08-26 | **CLOSED at the sc18 pin (s111, wolf-lang#133)** — the shape lowers natively at 21b129e, re-probed at the sha, and `update384` delegates `mut st.st` directly again (the copy dance retired in the bump commit; the diff was one line, the mechanical bar the contract set). The original finding: **the native rung refuses `f(mut param.field)` — a `mut` field path whose base is itself a `mut` parameter** ("`mut` places beyond local by-value bindings"), while the same path off a LOCAL binding lowers at 87405ac (both shapes probed; the local half healed across the sc16 bump, the parameter half did not). Costs `Sha384` its one-line delegation to the `Sha512` core: `update384` copies the core out, advances it, writes it back — semantics X1 already licenses directly, ~330 elements deep-copied per call, measured ~1.9x on the interpreter against SHA-512 on the same core | wolf-lang | [filed: wolf-lang#133](https://github.com/wolffe-lang/wolf-lang/issues/133); sc16 |
-| F-0093 | 2026-08-26 | **under lupin, per-iteration cost grows with program AGE**: the same 129 CAVP SHA-384 short vectors cost ~27s as four programs and ~132s as one (16 alone: 0.69s; first 64: 10.6s) — total quadratic in vector count, not message-length scaling, and `region { }` scoping per vector measures identical. Distinct from F-0074/F-0078's per-operation costs: no per-op fix moves a curve keyed to how much the program has already run. Sized this sprint's suites: the CAVP short sets are chunked 2/4/4 to keep the differential lane inside the ceiling, and the long/Monte suites are `slow`-skipped there (the sc16 ledger word). **sc17 re-measure (the AEAD rung, 0.1.13)**: the curve holds at new constants — 32 ChaCha20-Poly1305 seal+open pairs 98s in one program, 30 opens 29s, a 10-case smoke 2.1s — so the Wycheproof AEAD parts are chunked 32/30 with `slow` and smoke subsets from the start, and each part flips back per-part at the fixing bump (evidence commented on the issue). **sc18 re-measure (the curve rung, 0.1.13, is20 still unreleased)**: the curve is heavier per program than the digests — one X25519 Montgomery ladder is ~2.5-6.5s, one Ed25519 verify ~7-8s, so the differential lupin column shrank to a 5-vector X25519 smoke (~13s) and a 1-valid+1-invalid Ed smoke (~18s); the 1000-iteration chain, the 40-vector Wycheproof parts and the RFC 8032 §7.1 set are native + `slow`, and the checked tier additionally exhausts its STEP budget past a few ladders (a capacity refusal, the sha2-long mechanism, not F-0091's operator gap — that one closed at this pin). is20's fix (merged wolf-interp ec4b9c4, unreleased) is the exit for every curve `slow` row | wolf-interp | [filed: wolf-interp#41](https://github.com/wolffe-lang/wolf-interp/issues/41); sc16, the honest-slow-skip's mechanism; sc17 evidence appended |
+| F-0093 | 2026-08-26 | **under lupin, per-iteration cost grows with program AGE**: the same 129 CAVP SHA-384 short vectors cost ~27s as four programs and ~132s as one (16 alone: 0.69s; first 64: 10.6s) — total quadratic in vector count, not message-length scaling, and `region { }` scoping per vector measures identical. Distinct from F-0074/F-0078's per-operation costs: no per-op fix moves a curve keyed to how much the program has already run. Sized this sprint's suites: the CAVP short sets are chunked 2/4/4 to keep the differential lane inside the ceiling, and the long/Monte suites are `slow`-skipped there (the sc16 ledger word). **sc17 re-measure (the AEAD rung, 0.1.13)**: the curve holds at new constants — 32 ChaCha20-Poly1305 seal+open pairs 98s in one program, 30 opens 29s, a 10-case smoke 2.1s — so the Wycheproof AEAD parts are chunked 32/30 with `slow` and smoke subsets from the start, and each part flips back per-part at the fixing bump (evidence commented on the issue). **sc18 re-measure (the curve rung, 0.1.13, is20 still unreleased)**: the curve is heavier per program than the digests — one X25519 Montgomery ladder is ~2.5-6.5s, one Ed25519 verify ~7-8s, so the differential lupin column shrank to a 5-vector X25519 smoke (~13s) and a 1-valid+1-invalid Ed smoke (~18s); the 1000-iteration chain, the 40-vector Wycheproof parts and the RFC 8032 §7.1 set are native + `slow`, and the checked tier additionally exhausts its STEP budget past a few ladders (a capacity refusal, the sha2-long mechanism, not F-0091's operator gap — that one closed at this pin). is20's fix (merged wolf-interp ec4b9c4, unreleased) is the exit for every curve `slow` row | wolf-interp | [filed: wolf-interp#41](https://github.com/wolffe-lang/wolf-interp/issues/41); sc16, the honest-slow-skip's mechanism; sc17 evidence appended; **sc25**: the 4 rows still carrying `slow` after the sc24 re-measure produced the 50M-step refusal at 19.3-20.4s idle on nomad-1/arm64 (the sc24 rig's wall clock, not depth — no perf commit in v0.1.14..v0.1.15) and moved to `unsupported`; the `slow` word retires at this pin with zero carriers, evidence appended to the closed #41 |
 | F-0094 | 2026-08-27 | **the AES-GCM/ChaCha reconciliation for RFC 8448 (a std design decision, not an upstream defect)**: RFC 8448 §3 is the TLS 1.3 record layer's vector spine, but its records are AES-128-GCM (cipher suite TLS_AES_128_GCM_SHA256), while the MTI AEAD this ladder ships is ChaCha20-Poly1305 (§9.1; AES-GCM is a later rung's D-question, out of the sc20 contract). Resolution: the key schedule, the per-record nonce, the record header and the additional-data are all AEAD-INDEPENDENT and are asserted against RFC 8448 byte-for-byte (16-byte AES keys included — `hkdf_label`/`expand_label`/`derive_secret`/`traffic_key`/`traffic_iv` reproduce every §3 secret, `info` dump and traffic key); only the sealed ciphertext+tag needs the actual cipher, and that byte-match uses ChaCha20-Poly1305 fixtures derived from RFC 8448's REAL server-handshake-traffic secret (a 32-byte `"key"` Expand-Label where the trace takes 16 — same derivation, different length), generated and pinned by the independent reference (the sc17 discipline). The trace stays the spine; the cipher stays the MTI. Not filed upstream — this is a vendoring/scope note, recorded so the split is not mistaken for missing coverage | wolf-std (sc20) | docs/findings.md + `vendor/vectors/README.md` (RFC 8448 take/omit); the AES-GCM record rung retires it by adding the second cipher |
 | F-0095 | 2026-08-27 | **the checked mem tier refuses `for x in <List bound through a DIVERGING `else`>` on the reject path** — "unsupported — iteration outside ranges and List". `let inner = chacha20.open(...) else \|_\| { return tag }` then `for b in inner { ... }` runs on the checked tier when the open SUCCEEDS (the valid-record path is three-lane, `chacha_records.lu`), but a program whose executed path makes the open FAIL — the tamper-reject witness `reject_tampered_row.lu` — is `unsupported` at `mem`: after a diverging `else` the tier's abstract value for `inner` is not a modelled List, so the downstream iteration is refused. Per-executed-path, not module-wide (the sc17 dynamic-refusal shape): the module's `open` body is identical in both tests, only the taken path differs. Costs the tamper witness its checked column (`wolfc = "unsupported"`, native runs it); the valid open carries the lane. A decrypt-then-walk reject witness over any AEAD inherits it | wolf-lang | [filed: wolf-lang#139](https://github.com/wolffe-lang/wolf-lang/issues/139); the checked tier should model a List bound through a diverging `else` as the callee's success type; sc20 — **CLOSED at the sc24 BINARY bump**: #139's fix reached the pinned wolf (@ e7abf03) and `reject_tampered_row`'s wolfc column flipped `unsupported` -> `run`, exactly the flip the sc22/sc23 carried lead predicted |
 | F-0096 | 2026-08-28 | **`get` refuses an end-relative endpoint at resolve on both compiler rungs** — `s.get(0..^1)` is `unsupported` at resolve under wolfc AND native while `s[..^1]` slices on the same binaries and `[mem.str.get]`'s own sentence says `^n` resolves exactly as in `s[a..b]` before the domain question; lupin 0.1.14 runs it (hit bit-identical, `^n`-into-a-code-point the `none` miss). The one incomplete corner of `^n`'s sc24 healing; held as `tests/str/end_relative_get.lu` (`run/unsupported/unsupported`) | wolf-lang | [filed: wolf-lang#164](https://github.com/wolffe-lang/wolf-lang/issues/164); sc24 |
@@ -3724,3 +3724,85 @@ answer is MIXED — all 40 rows measured one at a time, idle:
   nor the refusal arrives inside 70s idle — the one word that keeps the
   lane un-invoked, with the caveat in the row comment.
 
+## Retirements and movements at the sc25 pin — the waivers die
+
+**The BINARY pin bumps lupin 0.1.14/90c90df -> 0.1.15 @ a900b8c — THE
+SCALAR RELEASE (is26, one sprint behind s121/D58) — and nothing else
+moves: the wolf binary stays the sc24 second acquisition @ a900b8c
+(the release notes force nothing), the data pin is unchanged, and for
+the first time all three pins name ONE wolf-lang sha.** Acquired on
+nomad-1 (macOS arm64) by building the release TAG v0.1.15 (= d907302)
+per D57 — the binary answers the bare `lupin 0.1.15 … pin a900b8c`,
+which is D57 doing exactly what it was ruled to do after the r02 gap.
+The native lane is DARK on this host (the staticlib is parked until
+s59-apple), so every native column keeps its recorded linux-lane value
+and the two-lane posture is stated wherever it matters.
+
+**The untouched-ledger drift, measured before a single sc25 edit: 3
+rows deeper, 0 shallower — EXACTLY the flip set the sc24 records
+predicted, zero deltas in the std-test run.**
+`str/chars_builtin_agree` (the two independent UTF-8 readings — std's
+`code_points` against the builtin's `chars()` — compare cross-machine
+at last, which is what the file was written for),
+`strbuf/push_char`, `unicode/char_code`: lupin `unsupported` -> `run`.
+The 3 `LUPIN_TIER_WAIVERS` died in the same motion, their count-pin
+test moved 3 -> 0 in the same commit, and the mechanism itself stays
+armed (third arming will come; sc13's plumbing, sc14's first emptying,
+sc24's re-arming, sc25's second emptying — each on schedule).
+
+**The full std.unicode retype landed, and the review gate held.** The
+reviewed final signatures sc24 wrote into the module header are the
+module now: `from_code(n: int) -> char ! {none}` (the validated
+`n as char` — every trap row of the raw cast is a `none` here),
+char-typed predicates that COMPARE against `char` literals and never
+compute, `utf8_len` total over `char` (its `{none}` row existed only
+because an `int` can hold a non-scalar). Grepped before and after:
+`as char` appears at exactly ONE executable site in std/ (`from_code`),
+`c as int` at one (`code`) plus the deliberate bridge in
+`chars_builtin_agree`, no arithmetic on the scalar anywhere in std/ or
+tests/, and no caller of the int-interim surface survives.
+API-CONVENTIONS §9's interim clause is rewritten to the ruled state,
+with the deliberate non-flip stated: `str.code_points` KEEPS the `int`
+currency as std's independent second reading (retyping it onto
+`chars()` would make the agreement test a tautology), and the offset
+trio's currency was always byte offsets. Re-measured on both executing
+lanes at the pins; the native column is carried on sc24's
+both-rungs verification of the whole s121 surface, owed its first
+macOS re-measure at s59-apple.
+
+**The 4 `divergent(…)` rows are UNHEALED at 0.1.15 — re-measured one
+at a time, byte-identical to the sc24 filings, and both upstream
+issues commented the day of the measurement** (wolf-interp#47:
+`refused_row` still answers the io arm — `handled: -9` then the
+correct propagated `error: refused` — and `closed_row` likewise;
+wolf-interp#48: `use_after_close` still executes to
+`trap(use-after-move)` at `[mem.tier0.move.2]`, `use_after_wait` still
+diverts at `start()` to `error: not_found` exit 1). The rows stand
+with dated comments; the runner still reads the eventual heal as a
+red, which is the design.
+
+**The step-budget blocks, re-measured release-notes-first, and the one
+DELTA of the sprint is a rig fact rather than a release fact.** The
+v0.1.14..v0.1.15 span contains no perf or budget commit, so the
+predicted interpreter motion was zero — and the interpreter's motion
+IS zero: all 25 50M-step `unsupported` rows answer the same refusal
+sentence at the same budget. But the 4 `slow` rows moved anyway,
+because the WALL CLOCK was never the interpreter's: on nomad-1 (arm64)
+the same refusal arrives at 19.3-20.4s idle where the sc24 rig got
+neither an answer nor the refusal inside 70s (its knife-edge P-256
+refusals sat at 48-56s against the 60s ceiling; this rig's sit near
+20s). All four flip `slow` -> `unsupported` on the machine's own word
+— depth on paper goes down, honesty goes up, the sc24 pattern at a new
+address — and the evidence is appended to wolf-interp#41 (closed; the
+append is the sc17 practice). F-0093's margin rule survives re-scoped:
+knife-edge is a PER-RIG fact, and a loaded run's timeout is load on
+any rig.
+
+**No new finding was filed at this pin.** Nothing 0.1.15 does
+contradicts a clause this rig observes — the release's one spec
+tension (`[gram.lex.char]`'s prose-only `\u` digit cap) is the
+counterparty's own CHOICES-register entry, filed from its side. A
+sprint that consumes no F-number is itself worth recording: the char
+debt economy closed with the waivers, on the release its records
+predicted, with the measured list matching the predicted list to the
+row.

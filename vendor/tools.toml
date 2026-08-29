@@ -14,6 +14,62 @@
 # moving upstreams); the nightly lane watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.15 (sc25 bump, from 0.1.14) — THE SCALAR RELEASE (is26, one sprint
+# behind s121/D58): char literals lex ([gram.lex.char], the string escape
+# set plus \'), `char` is a value ordered by scalar and NOT an integer
+# (arithmetic/mixed-compare/adoption refused by name), `char as int`
+# total / `int as char` traps `overflow` on the D56 twins, `chars()`
+# yields `List[char]` with the width identity, `{c}` prints the
+# character. Conformance pin `a900b8c` — THE DATA PIN ITSELF, so for the
+# first time both binaries and the data pin name ONE wolf-lang sha (the
+# sc24 two-upstream drift is zero this sprint).
+#
+# ACQUISITION (nomad-1, macOS arm64): built from the release TAG
+# v0.1.15 (= d907302 in wolf-interp) with `cargo build --release`, per
+# D57 — an off-tag build refuses to claim the release and prints
+# `+dev.<commit>`; this binary answers the bare
+# `lupin 0.1.15 (wolf-interp, reference interpreter at pin a900b8c)`.
+# 0.1.15 is the first release cut on macOS arm64 (its own changelog's
+# portability note). The wolf binary does NOT move this sprint — the
+# release notes force nothing (a pure char release) — so `wolf` stays
+# the sc24 second acquisition @ a900b8c: one moving part.
+#
+# What the bump changes for this repo, measured by std-test over the
+# whole 365-row ledger before a single sc25 edit (3 rows deeper, 0
+# shallower — EXACTLY the predicted flip set; the one delta against the
+# contract's prediction is the slow block, last item below, and the
+# mover there is the rig rather than the release):
+# - the 3 char-surface rows flip `unsupported` -> `run`:
+#   `str/chars_builtin_agree` (the two-readings agreement finally
+#   compares cross-machine — std's code_points vs the builtin's chars(),
+#   through the total `c as int` bridge), `strbuf/push_char`,
+#   `unicode/char_code`. The 3 LUPIN_TIER_WAIVERS die with them (their
+#   examples run three-deep now; the count-pin test goes 3 -> 0 in the
+#   waiver commit).
+# - the 4 `divergent(…)` rows are UNHEALED, re-measured one at a time:
+#   F-0097 (wolf-interp#47) still takes the first arm over a
+#   builtin-raised row (both net rows, same stdout as 0.1.14) and
+#   F-0098 (wolf-interp#48) still executes take-mode reuse
+#   (use_after_close to [mem.tier0.move.2]'s trap, use_after_wait to
+#   `error: not_found` exit 1). The rows stand; both issues commented
+#   with the 0.1.15 measurement the day it was taken.
+# - the step-budget blocks, re-measured per the contract (release notes
+#   first: v0.1.14..v0.1.15 contains NO perf or budget commit, so the
+#   expected interpreter motion was zero — and the INTERPRETER's motion
+#   IS zero: the 25 50M-step `unsupported` rows still refuse with the
+#   machine's own sentence, same budget, same words). What DID move is
+#   the RIG: sc24's wall-clock numbers were the linux lane's, and on
+#   nomad-1 (arm64) the same refusals land ~20s idle where that rig took
+#   48-56s. That retires the `slow` word for the 4 rows that carried it:
+#   all four (x25519_shared_p3/p4/p5, cavp_siggen_p256) now produce the
+#   50M-step refusal at 19.5-20.4s idle — measured one at a time — where
+#   the sc24 rig got NEITHER an answer nor the refusal inside 70s. They
+#   flip `slow` -> `unsupported` on the machine's own word; the step
+#   budget is the machine-independent constant, the wall clock never
+#   was. F-0093's knife-edge margin rule stands, re-scoped: it is a
+#   per-rig fact, and on this rig the margin is comfortable.
+#
+# The sc24-bump note, kept for the history it records:
 # 0.1.14 (sc24 bump, from 0.1.13) — r02, the is14-is25 CATCH-UP release
 # (its changelog is honest about the gap: twelve sprints, eight
 # re-vendors, one entry). Conformance pin `90c90df` (wolf-lang trunk,
@@ -77,8 +133,9 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.14"
-pin = "90c90df91dc314f9d0ae322d387dd10be046c828"
+version = "0.1.15"
+# pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
+pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:

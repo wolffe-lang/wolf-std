@@ -6,18 +6,22 @@
 //! landed at sc24: the total projection (`c as int`,
 //! `[type.char.cast]` — no row, no trap, because a `char` IS a scalar
 //! value by construction under D58) and the one sanctioned bridge from
-//! the typed scalar into the `int` currency this module's classifiers
-//! speak. The fixture walks mixed widths and checks each projection
-//! against the standard's numbers, then closes the loop with
-//! `from_code` — the validating inverse: `from_code(code(c))` is a hit
-//! that answers the same scalar, for every `c` a `str` can hold.
+//! the typed scalar into the `int` currency. The fixture walks mixed
+//! widths and checks each projection against the standard's numbers,
+//! then closes the loop with `from_code` — the validating inverse,
+//! `-> char ! {none}` since the sc25 retype: `from_code(code(c))` is a
+//! hit that answers the SAME `char` (scalar identity, compared as
+//! `char`), for every `c` a `str` can hold — and with `utf8_len`, total
+//! over `char` since the same retype, which must answer the width the
+//! fixture was built from.
 //!
-//! Every `char` is spelled through `.chars()` rather than a literal, so
-//! lupin's refusal stays the clean method `unsupported` (no `chars()`,
-//! no `char`, no `'` token there until is26 — ledgered by lane). This
-//! file imports std.unicode alone: `str.is_ascii` and
-//! `unicode.is_ascii` share a name by design (sc09's shared-name rule),
-//! so a unicode test never imports std.str.
+//! The `.chars()` walk is the point of the file (the builtin producer
+//! feeding std's bridge), so it stays the fixture's spelling; lupin
+//! runs it as of 0.1.15 (is26, the scalar release — the sc24 header
+//! sentence about `'` not lexing there is history). This file imports
+//! std.unicode alone: `str.is_ascii` and `unicode.is_ascii` share a
+//! name by design (sc09's shared-name rule), so a unicode test never
+//! imports std.str.
 
 use std.unicode
 
@@ -37,11 +41,13 @@ fn main() -> !int {
         let n = unicode.code(c)
         if n == want {} else { return 1 }
         // The inverse direction: the validating constructor accepts every
-        // value the projection can produce, and answers the same scalar.
-        if (unicode.from_code(n) else 0 - 1) == n {} else { return 2 }
-        // And the classifier currency composes: utf8_len over the
-        // projected scalar gives the width the fixture was built from.
-        let w = unicode.utf8_len(n) else 0
+        // value the projection can produce, and answers the same scalar —
+        // compared as the `char` it now is (sc25).
+        if (unicode.from_code(n) else '?') == c {} else { return 2 }
+        // And the width composes over the scalar itself: utf8_len is
+        // total on `char`, and gives the width the fixture was built
+        // from.
+        let w = unicode.utf8_len(c)
         var wantw = 1
         if k == 1 {
             wantw = 2

@@ -2,11 +2,17 @@
 //! phase: run
 //! conforms: std.unicode
 //!
-//! `from_code` is the validating constructor — the one place a number
-//! becomes a code point — and `utf8_len` is the encoded width. Every
-//! boundary of the four UTF-8 length classes is checked, plus all three
-//! ways to not be a scalar value: negative, above U+10FFFF, and inside the
-//! surrogate range U+D800..U+DFFF that UTF-8 may never encode.
+//! `from_code` is the validating constructor — the one place in std a
+//! number becomes a code point, now `-> char ! {none}` (sc25, the
+//! retype) — and `utf8_len` is the encoded width, TOTAL over `char`
+//! because a non-scalar cannot exist as one (the `{none}` row left with
+//! the int interim). Every hit is compared against the literal spelling
+//! of the same scalar (`==` is scalar identity, `[type.char.order]`);
+//! all three ways to not be a scalar value — negative, above U+10FFFF,
+//! and the surrogate range U+D800..U+DFFF that UTF-8 may never encode —
+//! are `none` misses, measured at both gap edges. The raw cast's trap
+//! (`int as char`, `[type.char.cast]`) is what those misses shield
+//! callers from; the trap itself is the language's test, not std's.
 //!
 //! The widths agree with what the language's own `str.len` reports for a
 //! literal of that code point — the cross-check that keeps the table
@@ -15,32 +21,37 @@
 use std.unicode
 
 fn main() -> !int {
-    if (unicode.from_code(65) else 0 - 1) == 65 {} else { return 1 }
-    if (unicode.from_code(0) else 0 - 1) == 0 {} else { return 2 }
-    if (unicode.from_code(1114111) else 0 - 1) == 1114111 {} else { return 3 }
-    if (unicode.from_code(1114112) else 0 - 1) == 0 - 1 {} else { return 4 }
-    if (unicode.from_code(0 - 1) else 0 - 2) == 0 - 2 {} else { return 5 }
-    if (unicode.from_code(55295) else 0 - 1) == 55295 {} else { return 6 }
-    if (unicode.from_code(55296) else 0 - 1) == 0 - 1 {} else { return 7 }
-    if (unicode.from_code(57343) else 0 - 1) == 0 - 1 {} else { return 8 }
-    if (unicode.from_code(57344) else 0 - 1) == 57344 {} else { return 9 }
-    // The four width classes, at both ends of each.
-    if (unicode.utf8_len(0) else 0) == 1 {} else { return 10 }
-    if (unicode.utf8_len(127) else 0) == 1 {} else { return 11 }
-    if (unicode.utf8_len(128) else 0) == 2 {} else { return 12 }
-    if (unicode.utf8_len(2047) else 0) == 2 {} else { return 13 }
-    if (unicode.utf8_len(2048) else 0) == 3 {} else { return 14 }
-    if (unicode.utf8_len(65535) else 0) == 3 {} else { return 15 }
-    if (unicode.utf8_len(65536) else 0) == 4 {} else { return 16 }
-    if (unicode.utf8_len(1114111) else 0) == 4 {} else { return 17 }
-    // Non-scalars have no width.
-    if (unicode.utf8_len(1114112) else 0) == 0 {} else { return 18 }
-    if (unicode.utf8_len(55296) else 0) == 0 {} else { return 19 }
+    // Hits, compared against the literal spelling of the same scalar —
+    // the floor, the ceiling, and both edges of the surrogate gap.
+    if (unicode.from_code(65) else '?') == 'A' {} else { return 1 }
+    if (unicode.from_code(0) else '?') == '\0' {} else { return 2 }
+    if (unicode.from_code(1114111) else '?') == '\u{10FFFF}' {} else { return 3 }
+    if (unicode.from_code(55295) else '?') == '\u{D7FF}' {} else { return 4 }
+    if (unicode.from_code(57344) else '?') == '\u{E000}' {} else { return 5 }
+    if (unicode.from_code(233) else '?') == 'é' {} else { return 6 }
+    // Misses: the marker survives only when the row fires.
+    if (unicode.from_code(1114112) else '?') == '?' {} else { return 7 }
+    if (unicode.from_code(0 - 1) else '?') == '?' {} else { return 8 }
+    if (unicode.from_code(55296) else '?') == '?' {} else { return 9 }
+    if (unicode.from_code(57343) else '?') == '?' {} else { return 10 }
+    // The four width classes, at both ends of each, boundaries spelled
+    // as escapes where they do not print.
+    if unicode.utf8_len('\0') == 1 {} else { return 11 }
+    if unicode.utf8_len('\u{7F}') == 1 {} else { return 12 }
+    if unicode.utf8_len('\u{80}') == 2 {} else { return 13 }
+    if unicode.utf8_len('\u{7FF}') == 2 {} else { return 14 }
+    if unicode.utf8_len('\u{800}') == 3 {} else { return 15 }
+    if unicode.utf8_len('\u{FFFF}') == 3 {} else { return 16 }
+    if unicode.utf8_len('\u{10000}') == 4 {} else { return 17 }
+    if unicode.utf8_len('\u{10FFFF}') == 4 {} else { return 18 }
     // Cross-check against the language's byte length for the same code
     // points, written as literals.
-    if (unicode.utf8_len(233) else 0) == "é".len {} else { return 20 }
-    if (unicode.utf8_len(5760) else 0) == "\u{1680}".len {} else { return 21 }
-    if (unicode.utf8_len(128058) else 0) == "🐺".len {} else { return 22 }
-    if (unicode.utf8_len(65) else 0) == "A".len {} else { return 23 }
+    if unicode.utf8_len('é') == "é".len {} else { return 19 }
+    if unicode.utf8_len('\u{1680}') == "\u{1680}".len {} else { return 20 }
+    if unicode.utf8_len('🐺') == "🐺".len {} else { return 21 }
+    if unicode.utf8_len('A') == "A".len {} else { return 22 }
+    // And the constructor composes with the width: a scalar built from
+    // its number has the width its literal has.
+    if unicode.utf8_len(unicode.from_code(128058) else '?') == 4 {} else { return 23 }
     0
 }

@@ -2,62 +2,90 @@
 //! phase: run
 //! conforms: std.unicode
 //!
-//! The ASCII-true classification, exhaustively at the boundaries of every
-//! range plus the code points just outside them — the only way a predicate
-//! table earns trust. The currency is a Unicode scalar value as `int`: the
-//! interim std.unicode's header explains (no `char` type exists at this
-//! pin), with the reviewed `char`-typed signatures recorded per function.
+//! The ASCII-true classification set over D58's `char` (sc25 — the
+//! retype the module header carried as reviewed signatures since sc24,
+//! executed the sprint after lupin's is26 release made it cost no
+//! lane). Every predicate COMPARES its argument against `char` literals
+//! under the scalar order (`[type.char.order]`) — none computes — and
+//! every boundary of every class is probed from both sides, spelled as
+//! the character itself where it prints and as a `\u{…}` escape where
+//! it does not ([gram.lex.char]'s escape set). The int interim's
+//! negative-argument probes are gone WITH the interim: a `char` below
+//! `'\0'` cannot exist, so the border they guarded is now the type's.
 //!
-//! The names promise ASCII and the assertions hold them to it: É (201) and
-//! the ideographic space (12288) are letters and whitespace in Unicode and
-//! answer false here.
+//! `str.is_ascii` and `unicode.is_ascii` share a name by design (sc09's
+//! shared-name rule), so a unicode test never imports std.str.
 
 use std.unicode
 
 fn main() -> !int {
-    // is_ascii: 0..127
-    if unicode.is_ascii(0) {} else { return 1 }
-    if unicode.is_ascii(127) {} else { return 2 }
-    if unicode.is_ascii(128) { return 3 }
-    if unicode.is_ascii(0 - 1) { return 4 }
-    if unicode.is_ascii(128058) { return 5 }
-    // digits: 48..57
-    if unicode.is_ascii_digit(48) {} else { return 6 }
-    if unicode.is_ascii_digit(57) {} else { return 7 }
-    if unicode.is_ascii_digit(47) { return 8 }
-    if unicode.is_ascii_digit(58) { return 9 }
-    // upper: 65..90, lower: 97..122
-    if unicode.is_ascii_upper(65) {} else { return 10 }
-    if unicode.is_ascii_upper(90) {} else { return 11 }
-    if unicode.is_ascii_upper(64) { return 12 }
-    if unicode.is_ascii_upper(91) { return 13 }
-    if unicode.is_ascii_lower(97) {} else { return 14 }
-    if unicode.is_ascii_lower(122) {} else { return 15 }
-    if unicode.is_ascii_lower(96) { return 16 }
-    if unicode.is_ascii_lower(123) { return 17 }
-    // alpha is the union of the two cases, and nothing else.
-    if unicode.is_ascii_alpha(65) {} else { return 18 }
-    if unicode.is_ascii_alpha(97) {} else { return 19 }
-    if unicode.is_ascii_alpha(48) { return 20 }
-    if unicode.is_ascii_alpha(95) { return 21 }
-    if unicode.is_ascii_alpha(201) { return 22 }
-    // alnum is alpha plus digits.
-    if unicode.is_ascii_alnum(48) {} else { return 23 }
-    if unicode.is_ascii_alnum(122) {} else { return 24 }
-    if unicode.is_ascii_alnum(95) { return 25 }
-    // space: 9..13 and 32 — and NOT the Unicode whitespace std.str.trim
-    // strips, which is the difference the two names carry.
-    if unicode.is_ascii_space(9) {} else { return 26 }
-    if unicode.is_ascii_space(10) {} else { return 27 }
-    if unicode.is_ascii_space(11) {} else { return 28 }
-    if unicode.is_ascii_space(12) {} else { return 29 }
-    if unicode.is_ascii_space(13) {} else { return 30 }
-    if unicode.is_ascii_space(32) {} else { return 31 }
-    if unicode.is_ascii_space(8) { return 32 }
-    if unicode.is_ascii_space(14) { return 33 }
-    if unicode.is_ascii_space(31) { return 34 }
-    if unicode.is_ascii_space(33) { return 35 }
-    if unicode.is_ascii_space(160) { return 36 }
-    if unicode.is_ascii_space(12288) { return 37 }
+    if unicode.is_ascii('\0') {} else { return 1 }
+    if unicode.is_ascii('A') {} else { return 2 }
+    if unicode.is_ascii('\u{7F}') {} else { return 3 }
+    if unicode.is_ascii('\u{80}') { return 4 }
+    if unicode.is_ascii('é') { return 5 }
+    if unicode.is_ascii('🐺') { return 6 }
+
+    if unicode.is_ascii_digit('0') {} else { return 7 }
+    if unicode.is_ascii_digit('9') {} else { return 8 }
+    if unicode.is_ascii_digit('/') { return 9 }
+    if unicode.is_ascii_digit(':') { return 10 }
+
+    if unicode.is_ascii_upper('A') {} else { return 11 }
+    if unicode.is_ascii_upper('Z') {} else { return 12 }
+    if unicode.is_ascii_upper('@') { return 13 }
+    if unicode.is_ascii_upper('[') { return 14 }
+
+    if unicode.is_ascii_lower('a') {} else { return 15 }
+    if unicode.is_ascii_lower('z') {} else { return 16 }
+    if unicode.is_ascii_lower('`') { return 17 }
+    if unicode.is_ascii_lower('{') { return 18 }
+
+    if unicode.is_ascii_alpha('A') {} else { return 19 }
+    if unicode.is_ascii_alpha('a') {} else { return 20 }
+    if unicode.is_ascii_alpha('0') { return 21 }
+    if unicode.is_ascii_alpha('_') { return 22 }
+    if unicode.is_ascii_alpha('É') { return 23 }
+
+    if unicode.is_ascii_alnum('0') {} else { return 24 }
+    if unicode.is_ascii_alnum('z') {} else { return 25 }
+    if unicode.is_ascii_alnum('_') { return 26 }
+
+    // The six ASCII whitespace characters, and the borders on every side:
+    // backspace (8) below the control run, shift-out (14) above it,
+    // unit separator (31) and bang (33) around the space, and the two
+    // classic Unicode traps — NBSP (U+00A0) and the ideographic space
+    // (U+3000) — that an ASCII-true predicate must refuse.
+    if unicode.is_ascii_space('\t') {} else { return 27 }
+    if unicode.is_ascii_space('\n') {} else { return 28 }
+    if unicode.is_ascii_space('\u{B}') {} else { return 29 }
+    if unicode.is_ascii_space('\u{C}') {} else { return 30 }
+    if unicode.is_ascii_space('\r') {} else { return 31 }
+    if unicode.is_ascii_space(' ') {} else { return 32 }
+    if unicode.is_ascii_space('\u{8}') { return 33 }
+    if unicode.is_ascii_space('\u{E}') { return 34 }
+    if unicode.is_ascii_space('\u{1F}') { return 35 }
+    if unicode.is_ascii_space('!') { return 36 }
+    if unicode.is_ascii_space('\u{A0}') { return 37 }
+    if unicode.is_ascii_space('\u{3000}') { return 38 }
+
+    // The classifiers compose with the language's own char producer: a
+    // walk over a mixed literal classifies each scalar the way the
+    // fixture was built.
+    var digits = 0
+    var alphas = 0
+    var others = 0
+    for c in "a1é 9Z".chars() {
+        if unicode.is_ascii_digit(c) {
+            digits = digits + 1
+        } else if unicode.is_ascii_alpha(c) {
+            alphas = alphas + 1
+        } else {
+            others = others + 1
+        }
+    }
+    if digits == 2 {} else { return 39 }
+    if alphas == 2 {} else { return 40 }
+    if others == 2 {} else { return 41 }
     0
 }

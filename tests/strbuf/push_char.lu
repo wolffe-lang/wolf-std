@@ -8,11 +8,10 @@
 //! exactly the scalar's UTF-8 bytes: 1 for ASCII, 2 for é, 4 for 🐺 —
 //! `len` (bytes, the honest unit) says so below, and the round-trip
 //! through `to_str` says the characters arrived whole. Every `char`
-//! here is spelled through `.chars()` rather than a literal, so lupin's
-//! refusal stays the clean method `unsupported` (that lane has no
-//! `chars()` and no `char` until is26 — ledgered by lane, not claimed;
-//! `'` does not even lex there, which is why no literal appears in this
-//! file).
+//! here is spelled through `.chars()` — originally so lupin 0.1.14's
+//! refusal stayed the clean method `unsupported` (`'` did not lex
+//! there); three-lane as of sc25, since lupin 0.1.15 carries is26, and
+//! the walk stays because it is the natural producer for a push loop.
 //!
 //! Interleaving with `push_str` is deliberate: the two appends share
 //! one buffer and one contract, and a builder that treated them

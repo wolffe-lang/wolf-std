@@ -60,8 +60,10 @@
 //! below — THIRTEEN as of sc24: D58 ruled the `char` type
 //! (`[type.char]`, a Unicode scalar value — ordered, NOT an integer)
 //! and the sc24 wolf pair executes it, so `to_list_chars` is code at
-//! last, on the two wolf lanes (lupin's char tier is is26, running
-//! concurrently — its rows are ledgered by lane, not claimed). The
+//! last — on ALL executing lanes as of sc25: lupin 0.1.15 (the is26
+//! scalar release) runs `chars()` and `char`, and the rows that were
+//! ledgered by lane flipped at that release, as their comments
+//! promised. The
 //! sprint's own first measurement is worth a sentence here: the FIRST
 //! sc24 wolf acquisition (@ e7abf03) carried s120 without s121, spoke
 //! `chars()` in the v0 `List[int]` currency, and refused `'a'` at lex —
@@ -951,12 +953,18 @@ pub fn char_offsets(s: str) -> List[int] {
     out
 }
 
-/// The Unicode SCALAR VALUES of `s`'s code points, in order — the interim
-/// face of the blocked `to_list_chars` (module header), in the `int`
-/// currency `std.unicode` already spells a code point with. Feed them to
-/// `std.unicode`'s classifiers: `unicode.is_ascii_digit(c)` over this list
-/// is the character classification a scanner wants, and it is the reason
-/// this function exists rather than waiting for `char`.
+/// The Unicode SCALAR VALUES of `s`'s code points, in order, as `int`s.
+/// Born (sc09) as the interim face of the then-blocked `to_list_chars`;
+/// kept (sc25) as something better: std's own one-pass UTF-8 reading,
+/// independent of the builtin `chars()`, which is what lets
+/// `tests/str/chars_builtin_agree.lu` hold the two readings against
+/// each other element by element — the `bytes.is_utf8` pattern one tier
+/// up. A caller that wants `char`s calls `to_list_chars`; a caller that
+/// wants the numbers (a table index, a range check against a numeric
+/// spec) takes these and crosses back through `unicode.from_code`, the
+/// one validating door. `std.unicode`'s classifiers take `char` as of
+/// the sc25 retype, so this list no longer feeds them directly — that
+/// composition moved to `chars()`.
 ///
 /// Total over every `str`: a `str` is valid UTF-8 by construction (D24), so
 /// the decode below has no error path and needs no validation — the
@@ -1029,11 +1037,11 @@ pub fn code_points(s: str) -> List[int] {
 /// traps beyond allocation.
 ///
 /// LANES, stated honestly (the sc24 rule: a zero-lane surface is zero
-/// evidence, and a by-lane surface says so): both wolf rungs execute
-/// this; lupin 0.1.14 has no `chars()` and no `char` — the interpreter's
-/// char tier is is26, running concurrently — so the lupin column of
-/// every test and the example below is `unsupported` until the release
-/// that carries it (the doc-example waiver names it).
+/// evidence, and a by-lane surface says so): every executing lane runs
+/// this as of the sc25 pins — both wolf rungs since s121, and lupin
+/// since 0.1.15 (is26, the scalar release), where sc24's tests and
+/// example were honestly `unsupported` for one sprint. The doc-example
+/// waiver that named that debt died with it, on schedule.
 ///
 /// ```wolf-doc-example
 /// let cs = str.to_list_chars("aé🐺")
