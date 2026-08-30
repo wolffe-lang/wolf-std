@@ -20,8 +20,7 @@
 use std.time
 
 fn main() -> !int {
-    let a = time.Instant { ms: 10 }
-    let b = time.Instant { ms: 25 }
+    let a = time.Instant { ms: 10 }, b = time.Instant { ms: 25 }
 
     if time.as_millis(time.between(a, b)) != 15 { return 1 }
     if time.as_millis(time.between(b, a)) != -15 { return 2 }
