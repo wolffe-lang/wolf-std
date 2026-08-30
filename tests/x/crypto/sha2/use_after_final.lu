@@ -1,0 +1,31 @@
+//! check: fail(E1001)
+//! phase: typecheck
+//! conforms: std.x.crypto.sha2, mem.tier0.move.1, mem.tier0.move.2
+//!
+//! The finished-digest discipline (the `fs.close(take f)` precedent):
+//! `final256` takes its state by `take`, so updating a finished
+//! computation is a use-after-move — no liveness flag, no row on every
+//! call, no way to keep hashing into a digest that has already been
+//! produced. HISTORY, kept because the directive moved with a machine
+//! (this file was `use_after_final_trap.lu` until the sc28 bump — §13
+//! makes a `…_trap.lu` name a promise, so the name moved too): from
+//! sc18 through the 0.1.17 pins the two machines held this at two
+//! DIFFERENT rungs — the interpreter trapped `use-after-move` at the
+//! read (the directive was `run(exit=trap(use-after-move))` and the
+//! compilers' static `fail(E1001)` was the ledger's word for their
+//! honest non-answer) — and either rung was the discipline working.
+//! is29 (lupin 0.1.18) landed the take-mode reuse on the interpreter's
+//! static rung too, with the counterparty's code and span ([837,839],
+//! byte-identical to wolfgang's), so all three lanes now reject before
+//! anything runs and the directive says so.
+
+use std.x.crypto.sha2
+
+fn main() -> int {
+    var st = sha2.new256()
+    sha2.update256(mut st, "abc".bytes())
+    let d = sha2.final256(take st)
+    sha2.update256(mut st, "def".bytes())
+    print("unreachable: {d.len}")
+    0
+}
