@@ -1058,11 +1058,10 @@ pub fn unescape(s: str) -> str ! {syntax} {
     var i: int = 0
     while i < n {
         if byte_at(s, i) == 92 {
-            let step = escape_at(s, i)?
+            let (text, past) = escape_at(s, i)?
             let run = s[start..i]
-            let text = step.0
             out = "{out}{run}{text}"
-            i = step.1
+            i = past
             start = i
         } else {
             i = i + 1
