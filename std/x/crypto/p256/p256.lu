@@ -2088,17 +2088,8 @@ fn decode_point(b: List[int]) -> PtOpt {
     if b[0] != 4 {
         return PtOpt { ok: false, p: pt_identity() }
     }
-    var xb = List[int]()
-    var yb = List[int]()
-    var i: int = 1
-    while i < 33 {
-        (mut xb).push(b[i])
-        i = i + 1
-    }
-    while i < 65 {
-        (mut yb).push(b[i])
-        i = i + 1
-    }
+    let xb = b[1..33]
+    let yb = b[33..65]
     if !bytes_lt_p(xb) {
         return PtOpt { ok: false, p: pt_identity() }
     }
@@ -2420,17 +2411,8 @@ pub fn verify(pubkey: List[int], message: List[int], sig: List[int]) -> bool {
             return false
         }
     }
-    var rb = List[int]()
-    var sb = List[int]()
-    var i: int = 0
-    while i < 32 {
-        (mut rb).push(sig[i])
-        i = i + 1
-    }
-    while i < 64 {
-        (mut sb).push(sig[i])
-        i = i + 1
-    }
+    let rb = sig[0..32]
+    let sb = sig[32..64]
     // r, s in [1, n)
     if bytes_geq_n(rb) {
         return false
@@ -2569,12 +2551,7 @@ fn read_der_int(b: List[int], at: int) -> DerInt {
     if start + ln > b.len {
         return fail
     }
-    var body = List[int]()
-    var i: int = start
-    while i < start + ln {
-        (mut body).push(b[i])
-        i = i + 1
-    }
+    let body = b[start..start + ln]
     // high bit set => negative (ECDSA r/s are nonnegative)
     if body[0] >= 128 {
         return fail
@@ -2651,17 +2628,8 @@ pub fn signature_der(sig: List[int]) -> List[int] {
     if !(sig.len == 64) {
         assert(false, "p256: a raw signature is 64 bytes (r||s)")
     }
-    var rb = List[int]()
-    var sb = List[int]()
-    var i: int = 0
-    while i < 32 {
-        (mut rb).push(sig[i])
-        i = i + 1
-    }
-    while i < 64 {
-        (mut sb).push(sig[i])
-        i = i + 1
-    }
+    let rb = sig[0..32]
+    let sb = sig[32..64]
     let ri = der_int(rb)
     let si = der_int(sb)
     let total = ri.len + si.len

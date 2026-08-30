@@ -817,13 +817,7 @@ pub fn update384(mut st: Sha384, data: List[int]) {
 pub fn final384(take st: Sha384) -> List[int] {
     var core = st.st
     let full = final512(take core)
-    var out = List[int]()
-    var i: int = 0
-    while i < 48 {
-        (mut out).push(full[i])
-        i = i + 1
-    }
-    out
+    full[0..48]
 }
 
 /// The SHA-384 digest of `msg`, one shot. 48 bytes out. Traps `assert`

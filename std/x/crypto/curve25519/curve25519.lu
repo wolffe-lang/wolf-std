@@ -1328,12 +1328,7 @@ struct GeOpt {
 /// public — so the branches here protect no secret.
 fn ge_decompress(b: List[int]) -> GeOpt {
     let sign = b[31] / 128
-    var yb = List[int]()
-    var i: int = 0
-    while i < 31 {
-        (mut yb).push(b[i])
-        i = i + 1
-    }
+    var yb = b[0..31]
     (mut yb).push(b[31] % 128)
     if !fe_bytes_canonical(yb) {
         return GeOpt { ok: false, p: ge_identity() }
@@ -1428,25 +1423,13 @@ fn cat(a: List[int], b: List[int]) -> List[int] {
 
 /// The first 32 bytes of a list (a hash half / a signature half).
 fn first32(b: List[int]) -> List[int] {
-    var out = List[int]()
-    var i: int = 0
-    while i < 32 {
-        (mut out).push(b[i])
-        i = i + 1
-    }
-    out
+    b[0..32]
 }
 
 /// Bytes [32, 64) of a 64-byte list (SHA-512's prefix half, a
 /// signature's s half).
 fn second32(b: List[int]) -> List[int] {
-    var out = List[int]()
-    var i: int = 32
-    while i < 64 {
-        (mut out).push(b[i])
-        i = i + 1
-    }
-    out
+    b[32..64]
 }
 
 /// Expand a 32-byte secret to the clamped scalar and the nonce prefix

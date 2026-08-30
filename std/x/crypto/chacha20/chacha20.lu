@@ -676,13 +676,7 @@ fn push_tag_word(mut out: List[int], w: int) {
 /// ```
 pub fn poly_key(key: List[int], nonce: List[int]) -> List[int] {
     let ks = block(key, 0, nonce)
-    var out = List[int]()
-    var i: int = 0
-    while i < 32 {
-        (mut out).push(ks[i])
-        i = i + 1
-    }
-    out
+    ks[0..32]
 }
 
 /// §2.8's MAC transcript: aad, zero-padded to 16; ciphertext,
