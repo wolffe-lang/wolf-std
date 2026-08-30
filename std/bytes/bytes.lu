@@ -186,12 +186,22 @@ pub fn slice(b: List[int], from: int, to: int) -> List[int] {
     if to > n {
         assert(false, "bytes.slice: the range ends past the last byte")
     }
-    // The copy is the language's own word now ([mem.list.slice], s128):
-    // a fresh List, exactly what the sc02 index loop hand-rolled. The
-    // asserts above keep the documented `assert` contract — the range is
-    // valid by the time the slice runs, so its `bounds` trap is
-    // unreachable and the kind question stays a future Bytes decision.
-    b[from..to]
+    // The copy has a language spelling now (`b[from..to]`, [mem.list.slice],
+    // s128) — and this function deliberately does not use it. `b` may
+    // arrive as a LENT byte view (`s.bytes()` crosses the call, s89;
+    // `lend_across_calls.lu` pins it, the doc examples above lend too),
+    // and the native rung refuses a slice of a lent view at `mem`
+    // ("range VALUES outside `for` headers", measured at v0.2.0/c88ab64;
+    // owned callers compile — the refusal is the lend path alone).
+    // F-0101 carries the measurement; the loop is the lane-portable
+    // spelling until the native rung learns the shape.
+    var out = List[int]()
+    var k = from
+    while k < to {
+        (mut out).push(b[k])
+        k = k + 1
+    }
+    out
 }
 
 /// The index of the first occurrence of `needle` in `b`; `none` when it
