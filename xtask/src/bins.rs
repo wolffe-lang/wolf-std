@@ -117,8 +117,11 @@ pub fn resolve(imp: Impl, repo: &Path) -> Option<Resolved> {
 #[derive(Debug, Clone)]
 pub struct ToolPin {
     pub version: String,
-    /// wolf-lang commit the binary conforms to (lupin names it in
-    /// `--version`; wolf cannot yet — doctor reports that honestly).
+    /// wolf-lang commit the binary conforms to. BOTH binaries name it in
+    /// `--version` now — lupin since 0.1.0, wolf since v0.2.0 (r03's D57
+    /// clause: `wolf 0.2.0 (wolfgang, pin c88ab64)`) — and doctor GATES
+    /// on the match; the sc24-era "trusted from acquisition" WARN
+    /// retired at sc28 with the surface that forced it.
     pub pin: String,
 }
 
@@ -239,6 +242,30 @@ mod tests {
         let w = parse_version_line("wolf 0.0.1 (pre-alpha)").unwrap();
         assert_eq!(w.pin_short, None);
         assert!(parse_version_line("garbage").is_none());
+    }
+
+    /// The r03 release's two-line `--version` (sc28): line 1 carries
+    /// D57's doctor-parseable pin clause — the compiler finally names
+    /// its OWN wolf-lang pin — while line 2 stays the pairing
+    /// (reported, never gated). Both shas parse from where they belong.
+    #[test]
+    fn the_v020_line_names_its_own_pin() {
+        let w = parse_version_line(
+            "wolf 0.2.0 (wolfgang, pin c88ab64)\n\
+             paired with lupin 0.1.17 (reference interpreter), pin addcd7f\n",
+        )
+        .unwrap();
+        assert_eq!(w.name, "wolf");
+        assert_eq!(w.version, "0.2.0");
+        assert_eq!(w.pin_short.as_deref(), Some("c88ab64"));
+        assert_eq!(
+            w.pairing.as_deref(),
+            Some("paired with lupin 0.1.17 (reference interpreter), pin addcd7f")
+        );
+        // An off-tag build self-brands +dev and can never match a
+        // recorded release version — doctor's version gate reads it.
+        let dev = parse_version_line("wolf 0.2.0+dev.1a2b3c4 (wolfgang, pin 1a2b3c4)").unwrap();
+        assert_eq!(dev.version, "0.2.0+dev.1a2b3c4");
     }
 
     /// The r01 release's two-line `--version`: the second line names

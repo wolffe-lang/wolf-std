@@ -3,15 +3,20 @@
 # source, never cargo deps (the ls00 honesty, adopted verbatim).
 # Resolution order: $LUPIN_BIN / $WOLF_BIN → .wolf-bin/ → PATH.
 #
-# `pin` is the wolf-lang commit the binary conforms to. lupin names its
-# pin in `--version` and doctor verifies it; `wolf` names none of its own
-# — and as of 0.1.0 it names its PAIRING instead, on a second line
-# ("paired with lupin 0.1.8 (reference interpreter), pin 7886559"). That
-# sha is the INTERPRETER's commit in wolf-interp, not a wolf-lang commit,
-# so the rig reads identity from the first line only and reports the
-# pairing without gating it (F-0064, and the doctor line that shows it).
-# The two binaries may lawfully sit at different wolf-lang pins (two
-# moving upstreams); the nightly lane watches the drift, report-never-gate.
+# `pin` is the wolf-lang commit the binary conforms to. BOTH binaries
+# name it in `--version` line 1 now and doctor GATES on the match —
+# lupin since 0.1.0, wolf since v0.2.0 (r03's D57 clause:
+# `wolf 0.2.0 (wolfgang, pin c88ab64)`; an off-tag build self-brands
+# `+dev.<commit>` and fails the version gate instead). The sc24-era
+# "trusted from acquisition" WARN retired at sc28 with the surface
+# that forced it: a binary that names no pin is older than every
+# recorded pin and doctor reds on it. wolf's SECOND line stays the
+# PAIRING ("paired with lupin 0.1.17 …, pin addcd7f") — that sha is
+# the INTERPRETER's commit in wolf-interp, not a wolf-lang commit, so
+# the rig reads identity from line 1 only and reports the pairing
+# without gating it (F-0064). The two binaries may lawfully sit at
+# different wolf-lang pins (two moving upstreams); the nightly lane
+# watches the drift, report-never-gate.
 
 [lupin]
 # 0.1.18 (sc28 bump, from 0.1.17) — THE FIRST ARM YIELDS (is29): the
