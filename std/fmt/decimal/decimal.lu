@@ -120,7 +120,7 @@ fn big_digits(x: List[int]) -> str {
     while i >= 0 {
         let limb = x[i]
         let padded = fmt.pad_left_with("{limb}", 9, "0")
-        out = "{out}{padded}"
+        out += padded
         i = i - 1
     }
     out
@@ -283,7 +283,7 @@ fn scale_digits(dg: str, keep: int) -> str {
     let n = dg.len
     if keep >= n {
         let tail = zeros(keep - n)
-        return "{dg}{tail}"
+        return dg + tail
     }
     let head = dg[0..keep]
     let rest = dg[keep..]
@@ -321,7 +321,7 @@ fn point_split(dg: str, scale: int) -> (str, str) {
         return (dg[0..n - scale], dg[n - scale..])
     }
     let pad = zeros(scale - n)
-    ("0", "{pad}{dg}")
+    ("0", pad + dg)
 }
 
 /// Compares `a * 10^ea` against `b * 10^eb`, both digit strings of
@@ -338,11 +338,11 @@ fn cmp_scaled(a: str, ea: int, b: str, eb: int) -> int {
     var right = b
     if ea > eb {
         let pad = zeros(ea - eb)
-        left = "{a}{pad}"
+        left = a + pad
     }
     if eb > ea {
         let pad = zeros(eb - ea)
-        right = "{b}{pad}"
+        right = b + pad
     }
     left = strip_leading(left)
     right = strip_leading(right)
@@ -638,13 +638,13 @@ pub fn to_str_fixed(x: f64, prec: int) -> str {
     let parts = decompose(x)
     let exact = exact_decimal(parts.0, parts.1)
     let halves = point_split(exact.0, exact.1)
-    let all = "{halves.0}{halves.1}"
+    let all = halves.0 + halves.1
     let keep = halves.0.len + prec
     let rounded = scale_digits(all, keep)
     let int_len = rounded.len - prec
     let head = rounded[0..int_len]
     if prec == 0 {
-        return "{sign}{head}"
+        return sign + head
     }
     let tail = rounded[int_len..]
     "{sign}{head}.{tail}"

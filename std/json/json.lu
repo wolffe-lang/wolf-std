@@ -1000,7 +1000,7 @@ pub fn escape(s: str) -> str {
         return s
     }
     let tail = s[start..s.len]
-    "{out}{tail}"
+    out + tail
 }
 
 /// The JSON escape for one byte, or the empty string when the byte passes
@@ -1072,7 +1072,7 @@ pub fn unescape(s: str) -> str ! {syntax} {
         return s
     }
     let tail = s[start..n]
-    "{out}{tail}"
+    out + tail
 }
 
 /// The text one escape at `at` denotes, and the offset just past it.
@@ -1324,7 +1324,7 @@ fn render_arr(xs: List[Value], depth: int) -> str ! {deep} {
     while i < n {
         let piece = render(xs[i], depth + 1)?
         if i == 0 {
-            out = "{out}{piece}"
+            out += piece
         } else {
             out = "{out},{piece}"
         }

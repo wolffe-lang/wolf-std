@@ -1018,7 +1018,7 @@ pub fn close(take f: File) -> () ! {io} {
 /// ```
 pub fn join(base: str, name: str) -> str {
     if base.is_empty() { return name }
-    if base.ends_with("/") { return "{base}{name}" }
+    if base.ends_with("/") { return base + name }
     "{base}/{name}"
 }
 

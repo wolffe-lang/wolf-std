@@ -549,7 +549,7 @@ pub fn splitn(s: str, sep: str, n: int) -> List[str] {
 ///
 /// ```wolf-doc-example
 /// var first = "?"
-/// for p in str.rsplit("a,b,c", ",") { first = "{first}{p}" }
+/// for p in str.rsplit("a,b,c", ",") { first += p }
 /// first == "?cba"
 /// ```
 pub fn rsplit(s: str, sep: str) -> List[str] {
@@ -664,7 +664,7 @@ pub fn replacen(s: str, old: str, new: str, n: int) -> str {
             left = left - 1
         }
     }
-    "{out}{rest}"
+    out + rest
 }
 
 /// `s` with every code point lowercased, freshly allocated in the ambient

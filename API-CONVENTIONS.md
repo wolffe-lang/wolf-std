@@ -474,6 +474,39 @@ matching a builtin's set carries a test pinning the agreement member by
 member stands, and `tests/str/trim_whitespace_set.lu` remains the
 worked example until the tables land.
 
+**§9 amendment (sc28): `+` joins, interpolation converts, strbuf
+builds.** D62 (`[type.str.concat]`) made `a + b` and `a += b` legal on
+two strs at the sc27 pin, and `[type.str.concat.cost]` prices them as
+the SAME interpolation-append lowering as `"{a}{b}"` — so the choice is
+a reading, not a cost, and std spells it by role:
+
+- **A pure two-str join is `+`** (`pad + s`, `sign + out`,
+  `base + name`); **a self-append accumulation is `+=`**
+  (`out += piece`). The operator names the operation; a two-hole
+  interpolation at such a site was the pre-D62 spelling and reads as
+  formatting where none happens.
+- **A hole that CONVERTS keeps interpolation**: `"{b.s}{c}"` on a
+  `char` (`[type.char.interp]` — the appended bytes are the scalar's
+  UTF-8 encoding, which IS the contract at `strbuf.push`),
+  `"{digits}{d}"` on an int. The mixes are refused by name
+  (`str + char` / `str + int` are E0409 by ruling,
+  `[type.str.concat.mix]`), so interpolation at these sites is
+  load-bearing, not legacy.
+- **Three or more pieces keep interpolation**
+  (`"{sign}{head}.{tail}"`, `"{out}{sep}{c}"`): one hole-string reads
+  better than an operator chain, and the lowering is identical anyway.
+- **`+=` in a loop is still quadratic by the anchor's own words** —
+  `std.strbuf` remains the builder. The adopted `out += piece` loops
+  are the pre-existing interpolation-append loops made VISIBLE, not
+  endorsed: each was already carrying that cost, and the operator now
+  says so.
+
+The sc28 measure over std/: 27 two-hole interpolation sites; 23
+adopted (pure two-str joins and self-appends), 4 kept as conversion
+holes (`strbuf.push`'s char, `std.fmt.decimal`'s int digits), every
+3+-piece site kept. Zero verdict motion — the rig proved the whole
+family is style (`[type.str.concat.cost]`, measured).
+
 ## 11. Formatting, text↔number, and encodings (sc05)
 
 - **The format spec is a spelling; std owns the operations.** Every
