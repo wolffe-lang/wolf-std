@@ -24,7 +24,7 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0015 | 2026-08-11 | wolfc checked tier: the row RAISE path inside an imported module's function is `unsupported — module items in checked execution` — the same call runs when it yields a value, and the same body inlined into the entry file runs both ways. Every `! {None}` miss test in std.list/x.deque_int is `unsupported` for this reason alone | wolf-lang s23/s31 | [filed: wolf-lang#13](https://github.com/wolffe-lang/wolf-lang/issues/13) |
 | F-0016 | 2026-08-11 | `wolf fmt` splits a dotted call at the dot when a `//` comment line precedes it (`xs.push(1)` becomes `xs.` + newline + `push(1)`), idempotently — fmt is law (D34), so its output is the style, and this one is a defect | wolf-lang fmt owner | [filed: wolf-lang#14](https://github.com/wolffe-lang/wolf-lang/issues/14) |
 | F-0017 | 2026-08-11 | lupin still accepts `let` reassignment after wolf-lang#2 closed compiler-side (wolfc now says E0410 with a `var` fix-it): the interpreter half of the divergence is open | wolf-interp | [filed: wolf-interp#8](https://github.com/wolffe-lang/wolf-interp/issues/8) |
-| F-0018 | 2026-08-12 | (sc03 Targets 1–4) **The boundary primitive is missing**: no recoverable slice (`str.get`), no byte accessor, no `chars()`/`char` type — so no scan can advance past a code point of unknown length, and 28 of sc03's 64 functions are unwritable rather than merely unimplemented; plus `^n` resolving nowhere, `str` methods `unsupported` in wolfc, `str + str` diverging | wolf-lang s37 (core types) owners | [filed: wolf-lang#17](https://github.com/wolffe-lang/wolf-lang/issues/17) — **#17 CLOSED at s120/s121 and sc24 RE-MEASURED every clause, twice — the sprint spanned TWO wolf acquisitions**: 21 of the 28 were already shipped (sc09–sc13); `^n` HEALED on all three lanes (its one residue is F-0096); and after the mid-sprint s121-carrying wolf (@ a900b8c) landed, sc24 SHIPPED three more — `str.to_list_chars`, `strbuf.push(c: char)`, `unicode.code(c: char)`, wolf-lane rows (lupin's char tier is is26, ledgered by lane) — for **24 of 28 shipped**. The 4-item residue: `chars` (the pair — needs tuple lists, `List[(int, int)]` still `unsupported` at resolve on the wolf rungs), `strbuf.in(r)` (region placement), `reserve` (capacity/SSO), `graphemes` (segmentation tier). See "the sc24 re-measure" below |
+| F-0018 | 2026-08-12 | (sc03 Targets 1–4) **The boundary primitive is missing**: no recoverable slice (`str.get`), no byte accessor, no `chars()`/`char` type — so no scan can advance past a code point of unknown length, and 28 of sc03's 64 functions are unwritable rather than merely unimplemented; plus `^n` resolving nowhere, `str` methods `unsupported` in wolfc, `str + str` diverging | wolf-lang s37 (core types) owners | [filed: wolf-lang#17](https://github.com/wolffe-lang/wolf-lang/issues/17) — **#17 CLOSED at s120/s121 and sc24 RE-MEASURED every clause, twice — the sprint spanned TWO wolf acquisitions**: 21 of the 28 were already shipped (sc09–sc13); `^n` HEALED on all three lanes (its one residue is F-0096); and after the mid-sprint s121-carrying wolf (@ a900b8c) landed, sc24 SHIPPED three more — `str.to_list_chars`, `strbuf.push(c: char)`, `unicode.code(c: char)`, wolf-lane rows (lupin's char tier is is26, ledgered by lane) — for **24 of 28 shipped**. The 4-item residue: `chars` (the pair — needs tuple lists, `List[(int, int)]` still `unsupported` at resolve on the wolf rungs), `strbuf.in(r)` (region placement), `reserve` (capacity/SSO), `graphemes` (segmentation tier). See "the sc24 re-measure" below. **sc27: residue row 6 — the `str + str` adjacent clause — HEALS at wolf @ 0a5c1af (D62, [type.str.concat]): `+`/`+=`/chains three-lane, mixes E0409 by ruling; the 4-item residue stands (`List[(int, int)]` re-probed `unsupported` at resolve on both rungs — s128 destructures tuples, it does not instantiate tuple lists). Adoption filed for the next contract, not taken** |
 | F-0019 | 2026-08-12 | (sc03 Target 4) **Decision request — the unicode tables budget**: where category/case/normalization/segmentation data lives (std recommends penumbra or `std/x`, never core), with the evidence that lupin's `lower`/`upper` ALREADY do simple Unicode case mapping and `trim`/`words` already use Unicode `White_Space` — so std had to carry a 25-entry table to agree with the builtin | wolf-lang spec/std owners | [filed: wolf-lang#18](https://github.com/wolffe-lang/wolf-lang/issues/18) |
 | F-0020 | 2026-08-12 | `assert(cond, msg)` traps `assert` even when `cond` HOLDS (wolfc 12ae8c2) — the two-argument intrinsic wolf-lang#9 just landed ignores its condition; the one-argument form is correct; contradicts `[conf.trap.assert]`'s "silent and effect-free when the condition holds" | wolf-lang (the #9 implementation) | [filed: wolf-lang#19](https://github.com/wolffe-lang/wolf-lang/issues/19) |
 | F-0021 | 2026-08-12 | lupin: a method call on a SLICE EXPRESSION over a binding (`d[0..1].upper()`) is `unsupported` at resolve ("does not denote a place at run time") while the same shape over a literal runs — every std.str body binds the slice first | wolf-interp | [filed: wolf-interp#10](https://github.com/wolffe-lang/wolf-interp/issues/10) |
@@ -3904,3 +3904,148 @@ regressed.** The sprint's measurement thesis held: lighting a third
 lane on a new platform moved NOTHING the records did not predict,
 except one row whose mechanism was hunted down and named, and one
 registry defect the delta measurement itself surfaced.
+
+## Retirements and movements at the sc27 pin — the divergences re-measure
+
+**The contract's either/or resolved at launch: s128 HAS merged, so BOTH
+binaries and the data pin move to ONE wolf-lang sha — trunk `0a5c1af`
+(s128's merge + the ir-volume ratchet) — and lupin moves to the v0.1.17
+TAG in the same bump, carrying TWO releases (0.1.16/is27 + 0.1.17/is28;
+0.1.16 was deliberately not chased at sc26).** wolf built in ../wolf-lang
+at the sha (`cargo build --release -p wolf_driver -p wolf_rt`), wolf +
+libwolf_rt.a installed via fresh inode (the sc26 SIGKILL rule); lupin
+built at the tag (= 450ed42), answering the bare
+`lupin 0.1.17 (wolf-interp, reference interpreter at pin addcd7f)`, the
+wolf-interp tree returned to trunk after the build. Doctor green at the
+trio; sync-pin green at the re-vendor.
+
+**The pairing nuance, reported-never-gated (F-0064; the wsm03
+precedent):** wolf @ 0a5c1af's `--version` pairs "lupin 0.1.16 …, pin
+e561c6f" — ONE release behind the 0.1.17 staged beside it, because the
+pairing stamp is s128's file, cut before the 0.1.17 release existed.
+Recorded at the bump; the rig reads identity from the first line only.
+
+**The acquisition verified behaviorally by the span's own witness:**
+`let c = a + b` on two strs compiles and prints the concatenation on
+BOTH rungs (`wolfgang`, exit 0; lupin agreeing) where every pre-s128
+binary answers E0409 — cheap, decisive, un-fakeable by a stale binary.
+
+**The two-upstream drift is nonzero again and honest:** data pin
+0a5c1af, lupin conformance pin addcd7f — behind by exactly the s128
+span. is28 shipped concurrently with s128, and D62/D63 were already the
+interpreter's behavior ("nothing to build — this machine's behavior IS
+the ruling", its own changelog).
+
+**Anchors regen: 397 -> 402, +5/-0 CLEAN** — +[type.str],
++[type.str.concat], +[type.str.concat.cost], +[type.str.concat.mix]
+(D62), +[mem.list.slice] (s128's slice ruling). [gram.lex.ident] is
+STILL absent at 0a5c1af: F-0100 / wolf-lang#170 unhealed (the heading
+survives in 01-grammar.md; the hole is carried, not new — and
+wolf-interp independently hit and filed the same defect as
+wolf-lang#177 at its own addcd7f bump, a second witness for the fix).
+
+**The untouched-ledger drift, measured over all 365 rows, three lanes,
+idle, before a single sc27 edit: ZERO deeper, ZERO shallower — against
+a prediction of ZERO/ZERO written down BEFORE the run** (release notes
+and span logs read first, per release; then the grep letter: zero
+`str + str` expressions, zero comma binders, zero tuple destructuring,
+zero list slices, zero `#![` markers, zero `#!` lines in std/ or
+tests/ — the corpus predates every s128/is28 surface). std-test GREEN,
+exit 0; 0 unstable; 0 slow skips (`slow` keeps zero carriers since
+sc25); the 3 sc24-era char rows (`str/chars_builtin_agree`,
+`strbuf/push_char`, `unicode/char_code`) hold `run`; the 25 lupin
+50M-step rows answer the same refusal sentence at the same budget — no
+perf or budget commit anywhere in v0.1.15..v0.1.17 or s128, so the
+step-budget/knife-edge story is one line: zero motion. Every clause of
+the prediction is reconciled; no delta exists to explain or file.
+
+**The four `divergent(…)` rows' THIRD measurement — re-measured one at
+a time, all UNHEALED, all byte-identical to the sc24 filings**
+(predicted: no net/process commit exists in the span):
+`net/refused_row` exit(1) `handled: -9` + `error: refused` (the io arm,
+listed first, still answers where `refused` should — F-0097);
+`net/closed_row` exit(1) `peer-gone: not-firedio-arm` + `error: closed`
+(same mechanism — F-0097); `net/use_after_close`
+trap(use-after-move) at [mem.tier0.move.2] (F-0098);
+`process/use_after_wait` exit(1) `error: not_found` (diverts at
+`start()` — F-0098). wolf-interp#47 and #48 commented the day of the
+measurement; the rows stand and the runner's designed red at the
+eventual heal is undisturbed.
+
+**The #50 char-copy heal is REAL, measured with the issue's own
+reproducer, and its boundary is measured too.** Under 0.1.17,
+`let c = "x".chars()[0]; var d = 0 as char; d = c; print("{c}{d}")`
+prints `xx` exit 0 on ALL THREE lanes — 0.1.15/0.1.16 trapped
+use-after-move [mem.tier0.move.2] exit 3 on the lupin lane. A `char`
+is a copy value in the tier-0 move discipline now, exactly as `int`
+is. The heal is the char scalar ONLY: the sc22 cursor-struct shape
+(`Rd { b: bs, pos: 0, end: bs.len }` over a `List`) re-probed UNMOVED
+— E1001 on both compiler rungs, trap(use-after-move) [mem.tier0.move.2]
+under 0.1.17 — so the Guide's sc22 entry stands as written and the
+E1001-class ledger rows (`x/crypto/sha2/use_after_final_trap`, the
+net/process pair above) keep their values; no guidance history is
+rewritten. wolf-interp#50 commented with the heal measurement
+(closable from this side). Incidental but worth a line: lupin's E0302
+now TEACHES the D59 escape ("two separate programs sharing a directory
+each mark themselves `//! member: false`") — is28's voice observed
+live while staging the probe.
+
+**F-0018 residue row 6 (str + str) HEALS at this pin — the residue
+economy shrinks by one.** From sc03's filing: "`str + str` runs in
+lupin while wolfc says E0409" — the last living adjacent clause. At
+0a5c1af, `+` and `+=` and a chain all run three-lane (D62,
+[type.str.concat]: interpolation-append, a builtin operator on the
+builtin type, NOT an Add bridge); the mixes (`str + int` probed) stay
+E0409 by ruling ([type.str.concat.mix]), refused by name under lupin.
+NOT adopted into std/ this sprint (the contract's one-moving-part
+rule): std keeps `"{a}{b}"`, which is the SAME lowering by
+[type.str.concat.cost] — adoption is cosmetic, filed below. The other
+residues, re-probed cheaply at the trio:
+
+- **`chars` (the pair): UNMOVED, and the probe is sharper now.**
+  `List[(int, int)]` is still `unsupported` at resolve on BOTH wolf
+  rungs — "prelude container instantiation (generic data)" — while
+  lupin runs the same program (push a tuple, index it, destructure it:
+  `12`). s128's tuple work is DESTRUCTURING and tuple PATTERNS; it
+  does not instantiate a tuple LIST, so the
+  `chars(s) -> List[(int, char)]` fusion stays blocked on exactly the
+  sc24 refusal, now dated at a third pin.
+- **`strbuf.in(r)`: unmoved** — no placement syntax exists in the spec
+  at 0a5c1af (grepped; `[mem.region.promote]` is about unobservable
+  placement, not a surface).
+- **`reserve(n)`: unmoved** — no capacity/SSO decision anywhere in the
+  span; a documented no-op would still be a lie.
+- **`graphemes`: unmoved** — segmentation is a later tier by the #18
+  ruling; nothing in s128/is28 brings it closer.
+- F-0096 (`get(a..^n)`) stands via the gauntlet: `str/end_relative_get`
+  observed at its recorded `run/unsupported/unsupported` in the
+  untouched-ledger run — [mem.list.slice] rules `cs[a..^b]` for LISTS
+  and does not touch `str.get`'s refusal.
+
+**The adoption-candidate list for the next sc contract (measured this
+sprint, adopted never this sprint — one moving part):**
+
+- `str +`/`+=` where std spells `"{a}{b}"` today (24 two-hole
+  interpolation sites in std/) — cost-equal by [type.str.concat.cost]
+  (the same strbuf lowering), so purely a readability adoption;
+  `std.strbuf` remains the loop builder and `+=`-in-a-loop stays
+  quadratic by the anchor's own words.
+- Tuple destructuring where std/tests spell `.0`/`.1` today:
+  `decompose`'s six `let parts = decompose(x)` sites in
+  std/fmt/decimal, `equal_range`'s four call sites in
+  tests/search/bounds_and_equal_range.lu.
+- Comma-grouped binders (D63) in test files — fixture setup lines.
+- List slices ([mem.list.slice]) in std bodies that hand-roll index
+  windows (sort/search) — priced against the anchor's fresh-List copy
+  cost before any adoption.
+- `chars(s) -> List[(int, char)]` fusion — GATED, not a candidate yet:
+  waits on tuple-list instantiation on the wolf rungs (the residue
+  above).
+
+**No F-number consumed, no new issue filed, three issues commented
+(#47, #48, #50 — the first two never closed by this repo, the third
+now closable from upstream's side).** The sprint's thesis held at a
+new address: a bump whose release notes predict zero motion, measured
+to zero motion over 365 rows with the prediction written first, is the
+cheapest gauntlet a rig can run — and the four divergences' third
+measurement is now upstream where the heal will read it.

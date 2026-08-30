@@ -14,6 +14,48 @@
 # moving upstreams); the nightly lane watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.17 (sc27 bump, from 0.1.15 — 0.1.16 deliberately not chased at
+# sc26, the one-moving-part rule; this bump carries two releases) — THE
+# INTERPRETER KEEPS TWO PROMISES (is28) on top of 0.1.16's trap-site
+# renderer (is27). Conformance pin `addcd7f` (the s126 wave) — BEHIND
+# this repo's data pin 0a5c1af by exactly the s128 span, the honest
+# normal: is28 shipped concurrently with s128 and the D62/D63 semantics
+# were already this machine's behavior ("nothing to build — this
+# machine's behavior IS the ruling", its own changelog).
+#
+# ACQUISITION (nomad-1, macOS arm64): built from the release TAG
+# v0.1.17 (= 450ed42 in wolf-interp) with `cargo build --release`, per
+# D57; the binary answers the bare
+# `lupin 0.1.17 (wolf-interp, reference interpreter at pin addcd7f)`;
+# installed to ~/.local/bin via fresh inode (the sc26 SIGKILL rule);
+# the wolf-interp tree returned to trunk after the build.
+#
+# What the two-release span carries (v0.1.15..v0.1.17, release notes
+# read before a single measurement): is27 renders trap/diagnostic sites
+# `line:col` on the HUMAN doors only — the `--json` records this rig's
+# runner reads are byte-identical, so zero row motion by construction.
+# is28: D59's four standalone spellings in module formation (#49), the
+# D61 `#![index(n)]` marker + the [gram.expr.index.origin] shift
+# (wolf-lang#169), the #50 char-copy fix (`d = c` then `{c}` no longer
+# traps use-after-move — a char is a copy value exactly as int is),
+# D63 comma-grouped binders, D62 str-`+` witnesses. NO net/process
+# commit and NO perf/budget commit anywhere in the span. Measured over
+# the untouched 365-row ledger at the trio, prediction written BEFORE
+# the run (see the sc27 note in docs/findings.md): predicted ZERO
+# deeper / ZERO shallower, measured ZERO / ZERO — std-test GREEN over
+# 365 rows, three lanes, zero reds. The 3 sc24-era char rows hold
+# `run`; the 4 `divergent(…)` rows are UNHEALED at 0.1.17 (F-0097/
+# F-0098 re-measured one at a time, byte-identical observations;
+# wolf-interp#47/#48 commented same-day — their THIRD measurement);
+# the 25 50M-step rows keep the same refusal sentence at the same
+# budget (zero motion, one line); no std/ or tests/ file uses
+# str-`+`/binders/destructuring/slices (grepped), so no row moves on
+# the s128 surfaces. The #50 char-copy fix is HEALED (the issue's own
+# reproducer prints `xx` exit 0 on all three lanes; #50 commented) —
+# char only: the sc22 cursor-struct E1001/use-after-move class over
+# Lists re-probed UNMOVED ([mem.tier0.move.2] here, E1001 both rungs).
+#
+# The sc25 note, kept for the history it records:
 # 0.1.15 (sc25 bump, from 0.1.14) — THE SCALAR RELEASE (is26, one sprint
 # behind s121/D58): char literals lex ([gram.lex.char], the string escape
 # set plus \'), `char` is a value ordered by scalar and NOT an integer
@@ -133,9 +175,10 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.15"
+version = "0.1.17"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
-pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"
+# pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
+pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
@@ -273,6 +316,47 @@ pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"
 
 [wolf]
 version = "0.1.0"
+# sc27 bump: @ `0a5c1af` (trunk = s128's merge + the ir-volume ratchet)
+# — THE WALLS COME DOWN. Binary + data pin move TOGETHER to this one
+# wolf-lang sha (the sc26 invariant, second application); lupin moves
+# to 0.1.17 in the same bump because the contract's either/or resolved
+# to "s128 merged" at launch. Built in ../wolf-lang at the sha (clean
+# checkout, HEAD == 0a5c1af): `cargo build --release -p wolf_driver
+# -p wolf_rt`; wolf + libwolf_rt.a installed to ~/.local/bin via fresh
+# inode (the sc26 SIGKILL rule — never overwrite in place). The span
+# c1ca543..0a5c1af is s128 whole: D62 str `+`/`+=` as
+# interpolation-append ([type.str.concat] — the E0409 mixes stay
+# refused by name), D63 comma binders, tuple destructuring with
+# element-wise partial moves, list slices as fresh-List copies +
+# for-over-slice ([mem.list.slice]), plus the bench ratchet commit.
+# `--version` still names no pin (pre-s66) and PAIRS
+# "lupin 0.1.16 (reference interpreter), pin e561c6f" — ONE RELEASE
+# BEHIND the 0.1.17 this bump stages: reported-never-gated (F-0064's
+# rule, the wsm03 precedent; the pairing stamp is s128's file, cut
+# before the 0.1.17 release existed). VERIFIED BEHAVIORALLY by the
+# span's own witness: `let c = a + b` on two strs compiles and prints
+# the concatenation on BOTH rungs (checked `wolf run` and the native
+# binary, `wolfgang` exit 0, lupin agreeing) where every pre-s128
+# binary answers E0409 — cheap, decisive, and a stale binary cannot
+# fake it. Anchors snapshot regen: 397 -> 402, +5/-0 CLEAN:
+# +[type.str] +[type.str.concat] +[type.str.concat.cost]
+# +[type.str.concat.mix] (D62) +[mem.list.slice] (s128's slice
+# ruling). [gram.lex.ident] is STILL absent — F-0100/wolf-lang#170
+# unhealed at this sha (the heading survives in 01-grammar.md; the
+# hole is carried, not new; wolf-interp independently filed it as
+# wolf-lang#177 at its own addcd7f bump). Re-probed at this sha, the
+# F-0018 residue economy: `str + str` HEALS (row 6 — the last sc03
+# adjacent clause; `+`, `+=`, chains all three-lane; mixes stay E0409
+# by ruling, probed) and `List[(int, int)]` is STILL `unsupported` at
+# resolve on both rungs ("prelude container instantiation (generic
+# data)" — s128's tuple DESTRUCTURING does not instantiate a tuple
+# LIST; lupin runs it), so the chars-pair fusion stays blocked and the
+# 4-item residue (chars pair, strbuf.in(r), reserve, graphemes) stands
+# with F-0096. NOT adopted anywhere in std/ this sprint — the adoption
+# candidates are filed in the sc27 findings note for the next
+# contract (one moving part per sprint).
+#
+# The sc26 note, kept for the history it records:
 # sc26 bump: @ `c1ca543` (trunk, merge s126) — THE NATIVE LANE COMES
 # HOME. Binary + data pin move TOGETHER to this one wolf-lang sha
 # (lupin stays 0.1.15 @ a900b8c: the one-moving-part rule; 0.1.16/is27
@@ -794,4 +878,5 @@ version = "0.1.0"
 # pin = "21b129e90c4589c0fc6b5698e0468e84edbd574d"  (superseded, sc18-sc23 era)
 # pin = "e7abf0354daea50df13a86f7e95962d29ee9cbf3"  (superseded mid-sc24 — the pre-s121 first acquisition)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc24/sc25 era — the data-pin-itself acquisition)
-pin = "c1ca543cb5abf334b70c38b13204170973dc4e23"
+# pin = "c1ca543cb5abf334b70c38b13204170973dc4e23"  (superseded, sc26 era — the native-lane-comes-home acquisition)
+pin = "0a5c1afd7818477a6b283a5e325eec487e81bd8d"
