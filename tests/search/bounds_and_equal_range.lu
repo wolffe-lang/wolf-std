@@ -30,10 +30,13 @@ fn main() -> !int {
     // Between two present values: both bounds land on the gap.
     if search.lower_bound(xs, 3) == 4 {} else { return 11 }
     if search.upper_bound(xs, 3) == 4 {} else { return 12 }
-    if search.equal_range(xs, 2).0 == 1 {} else { return 13 }
-    if search.equal_range(xs, 2).1 == 4 {} else { return 14 }
-    if search.equal_range(xs, 3).0 == search.equal_range(xs, 3).1 {} else { return 15 }
-    if search.equal_range(xs, 1).1 - search.equal_range(xs, 1).0 == 1 {} else { return 16 }
+    let (lo2, hi2) = search.equal_range(xs, 2)
+    if lo2 == 1 {} else { return 13 }
+    if hi2 == 4 {} else { return 14 }
+    let (lo3, hi3) = search.equal_range(xs, 3)
+    if lo3 == hi3 {} else { return 15 }
+    let (lo1, hi1) = search.equal_range(xs, 1)
+    if hi1 - lo1 == 1 {} else { return 16 }
     var e = List[int]()
     if search.lower_bound(e, 1) == 0 {} else { return 17 }
     if search.upper_bound(e, 1) == 0 {} else { return 18 }

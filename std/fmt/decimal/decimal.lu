@@ -120,7 +120,7 @@ fn big_digits(x: List[int]) -> str {
     while i >= 0 {
         let limb = x[i]
         let padded = fmt.pad_left_with("{limb}", 9, "0")
-        out = "{out}{padded}"
+        out += padded
         i = i - 1
     }
     out
@@ -283,7 +283,7 @@ fn scale_digits(dg: str, keep: int) -> str {
     let n = dg.len
     if keep >= n {
         let tail = zeros(keep - n)
-        return "{dg}{tail}"
+        return dg + tail
     }
     let head = dg[0..keep]
     let rest = dg[keep..]
@@ -321,7 +321,7 @@ fn point_split(dg: str, scale: int) -> (str, str) {
         return (dg[0..n - scale], dg[n - scale..])
     }
     let pad = zeros(scale - n)
-    ("0", "{pad}{dg}")
+    ("0", pad + dg)
 }
 
 /// Compares `a * 10^ea` against `b * 10^eb`, both digit strings of
@@ -338,11 +338,11 @@ fn cmp_scaled(a: str, ea: int, b: str, eb: int) -> int {
     var right = b
     if ea > eb {
         let pad = zeros(ea - eb)
-        left = "{a}{pad}"
+        left = a + pad
     }
     if eb > ea {
         let pad = zeros(eb - ea)
-        right = "{b}{pad}"
+        right = b + pad
     }
     left = strip_leading(left)
     right = strip_leading(right)
@@ -366,9 +366,9 @@ fn cmp_scaled(a: str, ea: int, b: str, eb: int) -> int {
 /// Private.
 fn bits_as_scaled(bits: int) -> (str, int) {
     let x = float.from_bits(bits)
-    let parts = decompose(x)
-    let exact = exact_decimal(parts.0, parts.1)
-    (exact.0, 0 - exact.1)
+    let (m, e) = decompose(x)
+    let (dg, sc) = exact_decimal(m, e)
+    (dg, 0 - sc)
 }
 
 /// The exact midpoint between the double with bit pattern `bits` and its
@@ -377,9 +377,9 @@ fn bits_as_scaled(bits: int) -> (str, int) {
 /// whether or not the successor crosses into the next binade.
 fn upper_mid_scaled(bits: int) -> (str, int) {
     let x = float.from_bits(bits)
-    let parts = decompose(x)
-    let exact = exact_decimal(parts.0 * 2 + 1, parts.1 - 1)
-    (exact.0, 0 - exact.1)
+    let (m, e) = decompose(x)
+    let (dg, sc) = exact_decimal(m * 2 + 1, e - 1)
+    (dg, 0 - sc)
 }
 
 /// The exact midpoint between the double with bit pattern `bits` and its
@@ -388,17 +388,15 @@ fn upper_mid_scaled(bits: int) -> (str, int) {
 /// below is half the gap above and the midpoint is `(4m - 1) * 2^(e - 2)`.
 fn lower_mid_scaled(bits: int) -> (str, int) {
     let x = float.from_bits(bits)
-    let parts = decompose(x)
-    let m = parts.0
-    let e = parts.1
+    let (m, e) = decompose(x)
     if m == 4503599627370496 {
         if e > 0 - 1074 {
-            let tight = exact_decimal(m * 4 - 1, e - 2)
-            return (tight.0, 0 - tight.1)
+            let (tdg, tsc) = exact_decimal(m * 4 - 1, e - 2)
+            return (tdg, 0 - tsc)
         }
     }
-    let exact = exact_decimal(m * 2 - 1, e - 1)
-    (exact.0, 0 - exact.1)
+    let (dg, sc) = exact_decimal(m * 2 - 1, e - 1)
+    (dg, 0 - sc)
 }
 
 /// 10^q as an exact `f64`, for 0 <= q <= 22 — the powers of ten that are
@@ -555,8 +553,8 @@ fn value_of(dg: str, exp: int) -> f64 ! {overflow} {
     // handful of ulp, so the guard is generous rather than load-bearing.
     var guard: int = 0
     while guard < 200 && bits > 0 {
-        let here = bits_as_scaled(bits)
-        if cmp_scaled(here.0, here.1, digits, exp) > 0 {
+        let (hd, he) = bits_as_scaled(bits)
+        if cmp_scaled(hd, he, digits, exp) > 0 {
             bits = bits - 1
             guard = guard + 1
         } else {
@@ -565,8 +563,8 @@ fn value_of(dg: str, exp: int) -> f64 ! {overflow} {
     }
     guard = 0
     while guard < 200 && bits < 9218868437227405311 {
-        let next = bits_as_scaled(bits + 1)
-        if cmp_scaled(next.0, next.1, digits, exp) <= 0 {
+        let (nd, ne) = bits_as_scaled(bits + 1)
+        if cmp_scaled(nd, ne, digits, exp) <= 0 {
             bits = bits + 1
             guard = guard + 1
         } else {
@@ -576,8 +574,8 @@ fn value_of(dg: str, exp: int) -> f64 ! {overflow} {
     // `bits` is now the largest double at or below the target; the answer
     // is it or its successor, decided by the exact midpoint with ties to
     // even.
-    let mid = upper_mid_scaled(bits)
-    let side = cmp_scaled(mid.0, mid.1, digits, exp)
+    let (md, me) = upper_mid_scaled(bits)
+    let side = cmp_scaled(md, me, digits, exp)
     var chosen = bits
     if side < 0 {
         chosen = bits + 1
@@ -635,16 +633,16 @@ pub fn to_str_fixed(x: f64, prec: int) -> str {
     if float.is_sign_negative(x) {
         sign = "-"
     }
-    let parts = decompose(x)
-    let exact = exact_decimal(parts.0, parts.1)
-    let halves = point_split(exact.0, exact.1)
-    let all = "{halves.0}{halves.1}"
-    let keep = halves.0.len + prec
+    let (m, e) = decompose(x)
+    let (dg, sc) = exact_decimal(m, e)
+    let (ip, fp) = point_split(dg, sc)
+    let all = ip + fp
+    let keep = ip.len + prec
     let rounded = scale_digits(all, keep)
     let int_len = rounded.len - prec
     let head = rounded[0..int_len]
     if prec == 0 {
-        return "{sign}{head}"
+        return sign + head
     }
     let tail = rounded[int_len..]
     "{sign}{head}.{tail}"
@@ -684,17 +682,17 @@ pub fn to_str_exp(x: f64, prec: int) -> str {
     if float.is_sign_negative(x) {
         sign = "-"
     }
-    let parts = decompose(x)
-    if parts.0 == 0 {
+    let (m, e) = decompose(x)
+    if m == 0 {
         let zero_tail = zeros(prec)
         if prec == 0 {
             return "{sign}0e+00"
         }
         return "{sign}0.{zero_tail}e+00"
     }
-    let exact = exact_decimal(parts.0, parts.1)
-    let digits = strip_leading(exact.0)
-    var exponent = digits.len - 1 - exact.1
+    let (dg, sc) = exact_decimal(m, e)
+    let digits = strip_leading(dg)
+    var exponent = digits.len - 1 - sc
     let keep = prec + 1
     var rounded = scale_digits(digits, keep)
     if rounded.len > keep {
@@ -770,22 +768,22 @@ pub fn to_str(x: f64) -> str {
     if float.is_sign_negative(x) {
         sign = "-"
     }
-    let parts = decompose(x)
-    if parts.0 == 0 {
+    let (m, e) = decompose(x)
+    if m == 0 {
         return "{sign}0"
     }
-    let exact = exact_decimal(parts.0, parts.1)
-    let digits = strip_leading(exact.0)
-    let exponent = digits.len - 1 - exact.1
+    let (dg, sc) = exact_decimal(m, e)
+    let digits = strip_leading(dg)
+    let exponent = digits.len - 1 - sc
     let bits = float.to_bits(float.abs(x))
-    let low = lower_mid_scaled(bits)
-    let high = upper_mid_scaled(bits)
+    let (lod, loe) = lower_mid_scaled(bits)
+    let (hid, hie) = upper_mid_scaled(bits)
     // A candidate sitting exactly ON a midpoint is readable back only
     // when the tie goes to this value — round-half-even, so when this
     // value's mantissa is the even one. That inclusivity is what makes
     // `to_str(9.999999999999999e22)` the one digit `1e+23` rather than
     // seventeen.
-    let inclusive = parts.0 % 2 == 0
+    let inclusive = m % 2 == 0
     var keep: int = 1
     var chosen = strip_trailing(digits)
     var chosen_exp = exponent
@@ -798,8 +796,8 @@ pub fn to_str(x: f64) -> str {
         }
         // The candidate denotes `candidate * 10^(candidate_exp - keep + 1)`.
         let scale = candidate_exp - keep + 1
-        let above_low = cmp_scaled(candidate, scale, low.0, low.1)
-        let below_high = cmp_scaled(candidate, scale, high.0, high.1)
+        let above_low = cmp_scaled(candidate, scale, lod, loe)
+        let below_high = cmp_scaled(candidate, scale, hid, hie)
         var fits = above_low > 0 && below_high < 0
         if inclusive {
             if above_low >= 0 && below_high <= 0 {

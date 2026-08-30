@@ -14,6 +14,40 @@
 # Every slow row is owed a re-measure at pin bumps; an interpreter perf
 # wave is its exit.
 #
+# THE sc28 PIN BUMP (wolf 0a5c1af -> the v0.2.0 TAG = c88ab64, r03 —
+# release machinery only, five commits, nothing semantic; lupin 0.1.17
+# -> the v0.1.18 TAG = 66dc06c, is29 — the first arm yields) MOVED SIX
+# ROWS, all on the lupin lane, all paid by is29's two heals — and the
+# prediction (written first, docs/findings.md sc28 register) named
+# FOUR of them: the four `divergent(...)` rows observed their HEALS
+# (the runner's designed red, read and flipped on it) exactly as
+# pre-verified — net/refused_row `handled: -1` + `error: refused`
+# exit(1), net/closed_row `peer-gone: handled` + `error: closed`
+# exit(1), net/use_after_close fail(E1001) span [1137,1140],
+# process/use_after_wait fail(E1001) span [1178,1180] — and the
+# `divergent(…)` word retires to ZERO carriers with its mechanism
+# kept armed (the sc25 waiver-plumbing precedent: price any future
+# entry at a named finding). The TWO the prediction missed are the
+# SAME #48 take-mode rung at unfiled addresses, both re-measured one
+# at a time with byte-identical spans to the compiler's own E1001
+# (span parity, is29's promise observed): fs/use_after_close flips
+# `unsupported` -> `run` (the static rejection now answers BEFORE the
+# fs-tier decline ever would — the directive is fail(E1001) and lupin
+# finally reaches it), and x/crypto/sha2/use_after_final_trap's lupin
+# lane now rejects fail(E1001) span [837,839] where it TRAPPED
+# use-after-move through 0.1.17 — no lupin ledger word can spell a
+# static rejection under a trap directive, so the DIRECTIVE
+# modernizes to fail(E1001) and the file renames to use_after_final.lu
+# (§13's name-promise; all three lanes hold the discipline at the
+# same rung now; the file records the history). Anchors 402 ->
+# 403, +1/-0, the +1 EXACTLY [gram.lex.ident] — the FILED anchor
+# returns (F-0100/#170/#177 healed at r03's extractor fix) and the
+# sc26-era carried-hole prose dies. Zero other motion: no perf/budget
+# commit in either span; the 25 50M-step rows answer the same refusal
+# at the same budget; the 3 char rows hold `run`; `slow` keeps zero
+# carriers; zero `#![` markers in std/ or tests/ (re-grepped), so
+# is29's W0317 lint has nothing to see here.
+#
 # THE sc27 PIN BUMP (wolf trunk c1ca543 -> 0a5c1af, the s128 span —
 # D62 str `+`, D63 comma binders, tuple destructuring, list slices;
 # lupin 0.1.15 -> 0.1.17 at the tag, carrying is27 + is28) MOVED ZERO
@@ -1118,7 +1152,7 @@ native = "run"  # sc08 pin bump (13b811f)
 # `fail(E1001)` — the day a pin accepts this program, this row goes red,
 # which is the point of writing the discipline down as a test.
 [tests."fs/use_after_close.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc28 binary bump (lupin 0.1.18): is29/#48's take-mode rung reaches an address the prediction missed — the static fail(E1001), span [929,930] byte-identical to the compiler's, now answers BEFORE the machine's by-design fs decline ever would, so the lane that refused this file for its capability finally holds it for its discipline. `unsupported` -> `run`, deeper; staged re-measure 2026-08-30
 wolfc = "run"
 native = "run"
 
@@ -1176,12 +1210,12 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # s70 and the payload pattern as of s71, which is what `read_all` below is
 # written over.
 [tests."net/refused_row.lu"]
-lupin = "divergent(stdout)"  # sc24: F-0097 — first arm answers for a BUILTIN-raised row (0.1.14, both orders measured); the propagated tag is right, the handler's arm is not. sc25 re-measure (0.1.15): UNHEALED, byte-identical ("handled: -9\n" then "error: refused"); wolf-interp#47 commented with the measurement. sc27 re-measure (0.1.17, THIRD measurement): UNHEALED, byte-identical again — expected, no net commit in v0.1.15..v0.1.17; #47 commented 2026-08-29
+lupin = "run"  # sc28 binary bump (lupin 0.1.18): is29 pays F-0097/#47 on the FOURTH measurement — builtin error values mint with the raising builtin's whole declared row, so the refused arm finally answers (`handled: -1` where three releases said `-9`, the io arm) and the `?` ride-out propagates the tag (`error: refused`, exit 1). The sc24 `divergent(stdout)` word retires here; observed as the runner's designed red at the heal and flipped on it (staged re-measure 2026-08-30, byte-exact directive match)
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
 [tests."net/closed_row.lu"]
-lupin = "divergent(stdout)"  # sc24: F-0097 — same mechanism; the io arm (first) answers where closed should. sc25 re-measure (0.1.15): UNHEALED, byte-identical ("peer-gone: not-firedio-arm"); wolf-interp#47 commented. sc27 re-measure (0.1.17, THIRD): UNHEALED, byte-identical; #47 commented 2026-08-29
+lupin = "run"  # sc28 binary bump (lupin 0.1.18): is29/#47 — same mechanism, same heal: the closed arm fires (`peer-gone: handled` then `error: closed`, exit 1) where 0.1.17's io-arm answered `not-fired`. divergent(stdout) retires; staged re-measure 2026-08-30
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
@@ -1195,7 +1229,7 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # `run` here means "satisfies the directive", and the directive is
 # `fail(E1001)`.
 [tests."net/use_after_close.lu"]
-lupin = "divergent(trap(use-after-move))"  # sc24: F-0098 — the staleness discipline's dynamic half: the compilers reject E1001, the interpreter executes to [mem.tier0.move.2]'s trap. sc25 re-measure (0.1.15): UNHEALED, same trap, same clause; wolf-interp#48 commented. sc27 re-measure (0.1.17, THIRD): UNHEALED, same trap, same clause — 0.1.17's #50 heal is the char scalar only, the List/struct take-mode split stands; #48 commented 2026-08-29
+lupin = "run"  # sc28 binary bump (lupin 0.1.18): is29 pays F-0098/#48 — take-mode reuse joins the interpreter's static rung: fail(E1001) at the reuse, span [1137,1140] BYTE-IDENTICAL to the compiler's own (span parity, the release's promise observed), where three releases executed to [mem.tier0.move.2]'s trap. divergent(trap(use-after-move)) retires; staged re-measure 2026-08-30
 wolfc = "run"
 native = "run"
 
@@ -1533,7 +1567,7 @@ native = "run"  # 1b149ba: s107 crossed the process trio natively
 # (X1 `take`) because waiting REAPS, so a second wait is E1001. `run` means
 # "satisfies the directive", and the directive is `fail(E1001)`.
 [tests."process/use_after_wait.lu"]
-lupin = "divergent(exit(1))"  # sc24: F-0098 — the lane executes; start() raises not_found (no such program) before the reuse the compilers reject statically. sc25 re-measure (0.1.15): UNHEALED, "error: not_found" exit 1; wolf-interp#48 commented. sc27 re-measure (0.1.17, THIRD): UNHEALED, "error: not_found" exit 1; #48 commented 2026-08-29
+lupin = "run"  # sc28 binary bump (lupin 0.1.18): is29/#48 — fail(E1001) at the reuse, span [1178,1180], where three releases diverted at start() (`error: not_found` exit 1) before ever reaching it: the static rung answers ahead of execution, so the divergence and its detour die together. divergent(exit(1)) retires; staged re-measure 2026-08-30
 wolfc = "run"
 native = "run"
 
@@ -1799,9 +1833,15 @@ native = "run"
 # budgets, not an operator gap — see the sc18 bump note up top. Two
 # deliberate exceptions below: `non_byte_trap` traps at INGESTION, before
 # any wrapping op runs, so even the checked machine reaches it; and
-# `use_after_final_trap` is the mutate_while_iterating precedent — the
-# interpreter traps at its rung (`use-after-move`, satisfying the
-# directive), both compiler rungs reject statically (`fail(E1001)`).
+# `use_after_final` (named `use_after_final_trap` through sc27) held
+# the staleness discipline at two rungs — the interpreter's dynamic
+# trap, the compilers' static E1001 — until is29 (lupin 0.1.18) landed
+# the take-mode rung and all three lanes reject statically: the
+# directive modernized to `fail(E1001)` at the sc28 bump (no lupin
+# ledger word can spell a static rejection under a trap directive —
+# `fail(…)` is a wolfc word by design), the file renamed with it (§13:
+# a `…_trap.lu` name is a promise, and lint-conventions enforced it),
+# and the file's header keeps the two-rung history.
 
 [tests."x/crypto/sha2/known_answers.lu"]
 lupin = "run"
@@ -1823,10 +1863,10 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/crypto/sha2/use_after_final_trap.lu"]
-lupin = "run"
-wolfc = "fail(E1001)"
-native = "fail(E1001)"
+[tests."x/crypto/sha2/use_after_final.lu"]
+lupin = "run"  # sc28 binary bump (lupin 0.1.18): is29/#48 — the reuse is fail(E1001) span [837,839] (compiler span parity) where 0.1.14-0.1.17 trapped use-after-move at the read; the directive modernized with it (see the block note above)
+wolfc = "run"  # sc28: the directive is fail(E1001) now, so the compilers' unchanged static rejection SATISFIES it — the lane's answer did not move, the directive met it where it stood
+native = "run"  # sc28: as wolfc
 
 # The vector suites (generated by `cargo xtask gen-vectors` from
 # vendor/vectors/ — provenance in vendor/vectors/README.md; ci's

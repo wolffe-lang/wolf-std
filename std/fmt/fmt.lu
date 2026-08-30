@@ -141,7 +141,7 @@ fn digits(n: int, radix: int) -> str {
     while v < 0 {
         let d = 0 - v % radix
         let c = digit_char(d)
-        out = "{c}{out}"
+        out = c + out
         v = v / radix
     }
     if n < 0 {
@@ -187,7 +187,7 @@ pub fn pad_left_with(s: str, width: int, fill: str) -> str {
         return s
     }
     let pad = fill.repeat(missing)
-    "{pad}{s}"
+    pad + s
 }
 
 /// `s` padded on the RIGHT with spaces to at least `width` bytes —
@@ -219,7 +219,7 @@ pub fn pad_right_with(s: str, width: int, fill: str) -> str {
         return s
     }
     let pad = fill.repeat(missing)
-    "{s}{pad}"
+    s + pad
 }
 
 /// `s` centered in `width` bytes with spaces — the `{x:^w}` spec's
@@ -417,11 +417,11 @@ pub fn group(n: int, sep: str) -> str {
         if i > 0 && remaining % 3 == 0 {
             out = "{out}{sep}{c}"
         } else {
-            out = "{out}{c}"
+            out += c
         }
         i = i + 1
     }
-    "{sign}{out}"
+    sign + out
 }
 
 /// `s` parsed as a whole decimal integer; `parse` when it is not one.

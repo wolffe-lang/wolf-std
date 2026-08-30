@@ -91,15 +91,20 @@ fn check_one(imp: Impl, pin: &ToolPin, repo: &std::path::Path) -> Result<(), Str
             }
         }
         None => {
-            // `wolf --version` names no pin pre-M1 — reported, not
-            // papered over. The recorded pin documents the acquisition;
-            // it cannot be verified from the binary itself yet.
-            println!(
-                "        WARN: --version names no pin (pre-M1); recorded pin {} \
-                 is trusted from acquisition, unverifiable from the binary",
+            // sc28: the sc24-era "trusted from acquisition" WARN retired
+            // when r03's D57 pin clause landed — `wolf --version` names
+            // its own pin on line 1 as of v0.2.0 (lupin has since 0.1.0),
+            // and an off-tag build self-brands `+dev.<commit>`. Every
+            // supported binary can now PROVE its provenance, so one that
+            // names no pin is older than every recorded pin: absence of
+            // the clause is a red, no longer a shrug.
+            Err(format!(
+                "doctor: {name}: --version names no pin — a pre-D57 build \
+                 cannot prove its provenance against recorded pin {}; \
+                 re-acquire at the release tag (wolf names its pin on line 1 \
+                 as of v0.2.0, lupin since 0.1.0)",
                 short(&pin.pin)
-            );
-            Ok(())
+            ))
         }
     }
 }

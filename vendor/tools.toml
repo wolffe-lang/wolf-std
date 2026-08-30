@@ -3,17 +3,62 @@
 # source, never cargo deps (the ls00 honesty, adopted verbatim).
 # Resolution order: $LUPIN_BIN / $WOLF_BIN → .wolf-bin/ → PATH.
 #
-# `pin` is the wolf-lang commit the binary conforms to. lupin names its
-# pin in `--version` and doctor verifies it; `wolf` names none of its own
-# — and as of 0.1.0 it names its PAIRING instead, on a second line
-# ("paired with lupin 0.1.8 (reference interpreter), pin 7886559"). That
-# sha is the INTERPRETER's commit in wolf-interp, not a wolf-lang commit,
-# so the rig reads identity from the first line only and reports the
-# pairing without gating it (F-0064, and the doctor line that shows it).
-# The two binaries may lawfully sit at different wolf-lang pins (two
-# moving upstreams); the nightly lane watches the drift, report-never-gate.
+# `pin` is the wolf-lang commit the binary conforms to. BOTH binaries
+# name it in `--version` line 1 now and doctor GATES on the match —
+# lupin since 0.1.0, wolf since v0.2.0 (r03's D57 clause:
+# `wolf 0.2.0 (wolfgang, pin c88ab64)`; an off-tag build self-brands
+# `+dev.<commit>` and fails the version gate instead). The sc24-era
+# "trusted from acquisition" WARN retired at sc28 with the surface
+# that forced it: a binary that names no pin is older than every
+# recorded pin and doctor reds on it. wolf's SECOND line stays the
+# PAIRING ("paired with lupin 0.1.17 …, pin addcd7f") — that sha is
+# the INTERPRETER's commit in wolf-interp, not a wolf-lang commit, so
+# the rig reads identity from line 1 only and reports the pairing
+# without gating it (F-0064). The two binaries may lawfully sit at
+# different wolf-lang pins (two moving upstreams); the nightly lane
+# watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.18 (sc28 bump, from 0.1.17) — THE FIRST ARM YIELDS (is29): the
+# two thrice-measured lupin-side correctness debts behind this repo's
+# four `divergent(…)` rows are PAID — #47 (F-0097: a handler over a
+# BUILTIN-raised row took its first arm; builtin error values now mint
+# with the raising builtin's whole declared row) and #48 (F-0098:
+# take-mode reuse over a whole binding is now fail(E1001) at the reuse,
+# the counterparty's code and span, instead of executing to the trap
+# map's answer). Conformance pin `addcd7f` UNCHANGED from 0.1.17 —
+# wolf-lang had no v0.2.0 tag at is29's release, so the pin question
+# re-opens at is30 (its own changelog); this repo's data pin moved to
+# c88ab64 in the same sc28 bump, so the two-upstream drift is the
+# 0a5c1af..c88ab64 release span plus s128-to-addcd7f — release
+# machinery only, nothing semantic (read commit by commit at the bump).
+#
+# ACQUISITION (nomad-1, macOS arm64, 2026-08-30): built from the
+# release TAG v0.1.18 (= 66dc06c in wolf-interp, which was also
+# trunk's tip) with `cargo build --release`, per D57; the binary
+# answers the bare
+# `lupin 0.1.18 (wolf-interp, reference interpreter at pin addcd7f)`;
+# installed to ~/.local/bin via fresh inode (the sc26 SIGKILL rule);
+# the wolf-interp tree returned to trunk after the build.
+#
+# What the bump changes for this repo, predicted in writing BEFORE the
+# run (docs/findings.md, the sc28 register) and measured over the
+# untouched 365-row ledger: EXACTLY the four `divergent(…)` rows flip
+# to `run` — net/refused_row (`handled: -1` + `error: refused`, exit
+# 1), net/closed_row (`peer-gone: handled` + `error: closed`, exit 1),
+# net/use_after_close (fail(E1001) where 0.1.17 trapped
+# use-after-move) and process/use_after_wait (fail(E1001) where 0.1.17
+# diverted at start()) — the runner's designed red at the heal, read
+# and paid at face value; the `divergent` word retires to ZERO
+# carriers with the mechanism kept armed (the sc25 waiver precedent).
+# Zero other motion: W0317 (is29's D61 lint half) needs a
+# `#![index(1)]` scope and std/ + tests/ carry zero `#![` markers
+# (re-grepped); no perf/budget commit in the span, so the 25 50M-step
+# rows keep the machine's own refusal at the same budget; the 3 char
+# rows hold `run`; every pre-existing wolf-interp corpus file is
+# verdict-identical across the span (its changelog's own gate).
+#
+# The sc27 note, kept for the history it records:
 # 0.1.17 (sc27 bump, from 0.1.15 — 0.1.16 deliberately not chased at
 # sc26, the one-moving-part rule; this bump carries two releases) — THE
 # INTERPRETER KEEPS TWO PROMISES (is28) on top of 0.1.16's trap-site
@@ -175,7 +220,7 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.17"
+version = "0.1.18"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"
@@ -315,7 +360,44 @@ pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.1.0"
+version = "0.2.0"
+# sc28 bump: @ the **v0.2.0 TAG** (= `c88ab64`) — WOLFGANG TELLS THE
+# TRUTH (r03): the first sc bump taken at a wolf RELEASE TAG rather
+# than a trunk sha, and the first whose acquisition the binary itself
+# can prove. D57 lands on the compiler: a build made exactly at the
+# tag prints the bare version and NAMES ITS OWN PIN on line 1 —
+# `wolf 0.2.0 (wolfgang, pin c88ab64)` — while any off-tag build
+# self-brands `0.2.0+dev.<commit>`. VERIFIED at acquisition: the
+# installed binary answers the bare string exactly (no +dev), so the
+# sc24-era "trusted from acquisition" posture retires — doctor now
+# reads the pin clause and GATES on it (its own commit, this sprint).
+# Data pin follows to c88ab64 (the one-sha invariant, third
+# application). The span 0a5c1af..c88ab64 is five commits of release
+# machinery and nothing semantic: ad6f83f (the F-0100 extractor fix —
+# a bare `[` literal no longer swallows the next anchor), 42f632f
+# (pairing stamp -> lupin 0.1.17 @ addcd7f), 371dfd6 (the D57 +dev
+# stamp; line 1 gains the doctor-parseable pin clause), dd94f8c
+# (CHANGELOG), c88ab64 (the release commit; the tag points here).
+# Anchors snapshot regen: 402 -> 403, +1/-0, the +1 EXACTLY
+# [gram.lex.ident] — the FILED anchor RETURNS (F-0100 / wolf-lang#170,
+# wolf-interp#177 the twin; the heading never left 01-grammar.md, the
+# extractor dropped it) and the sc26-era carried-hole prose dies on
+# the heal, two sprints after the filing. ZERO row motion predicted
+# and measured over the untouched ledger (docs/findings.md, sc28
+# register — prediction written before the run). `--version` PAIRS
+# "lupin 0.1.17 (reference interpreter), pin addcd7f" — one release
+# behind the 0.1.18 this same bump stages, the sc27 nuance at a new
+# address (the pairing stamp is 42f632f, cut before is29 released;
+# reported-never-gated, F-0064). ACQUISITION (nomad-1, macOS arm64,
+# 2026-08-30): provisioned to ~/.local/bin with libwolf_rt.a beside it
+# (fresh inodes, both dated at the install) ahead of this sprint's
+# launch; provenance verified FROM THE BINARY, which is what D57
+# newly permits — the bare `wolf 0.2.0 (wolfgang, pin c88ab64)` with
+# no `+dev` suffix is r03's proof the build was made exactly at the
+# v0.2.0 tag, and a stale or off-tag binary cannot fake it (the
+# behavioral-witness ritual of sc24-sc27 retires with the WARN).
+#
+# The sc27 note, kept for the history it records:
 # sc27 bump: @ `0a5c1af` (trunk = s128's merge + the ir-volume ratchet)
 # — THE WALLS COME DOWN. Binary + data pin move TOGETHER to this one
 # wolf-lang sha (the sc26 invariant, second application); lupin moves
@@ -879,4 +961,5 @@ version = "0.1.0"
 # pin = "e7abf0354daea50df13a86f7e95962d29ee9cbf3"  (superseded mid-sc24 — the pre-s121 first acquisition)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc24/sc25 era — the data-pin-itself acquisition)
 # pin = "c1ca543cb5abf334b70c38b13204170973dc4e23"  (superseded, sc26 era — the native-lane-comes-home acquisition)
-pin = "0a5c1afd7818477a6b283a5e325eec487e81bd8d"
+# pin = "0a5c1afd7818477a6b283a5e325eec487e81bd8d"  (superseded, sc27 era — the walls-come-down acquisition)
+pin = "c88ab6441b2706e20375deeec86eaf6da9bde25b"

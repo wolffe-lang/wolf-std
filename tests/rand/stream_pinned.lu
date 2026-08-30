@@ -36,8 +36,7 @@ fn main() -> !int {
     if rand.next_int(mut z) == 2055130073 {} else { return 12 }
     // Two generators from one seed agree forever; copying a generator
     // copies its position (value semantics).
-    var a = rand.new(99)
-    var b = rand.new(99)
+    var a = rand.new(99), b = rand.new(99)
     if rand.next_int(mut a) == rand.next_int(mut b) {} else { return 13 }
     if rand.next_int(mut a) == rand.next_int(mut b) {} else { return 14 }
     0

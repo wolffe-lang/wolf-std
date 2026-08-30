@@ -109,6 +109,7 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0098 | 2026-08-28 | **take-mode reuse is a STATIC `fail(E1001)` on both compiler rungs and EXECUTES under lupin 0.1.14** — `net/use_after_close` runs to `trap(use-after-move)` (`[mem.tier0.move.2]`, the trap map's own dynamic answer) and `process/use_after_wait` never reaches the reuse (`start` honestly raises `not_found` first, `error: not_found` exit 1). Whether take-reuse joins lupin's static set (the E1007 precedent) or the dynamic trap is the reference is the counterparty's ruling to make; the two rows carry `divergent(trap(use-after-move))` / `divergent(exit(1))` until it lands | wolf-interp | [filed: wolf-interp#48](https://github.com/wolffe-lang/wolf-interp/issues/48); sc24 |
 | F-0099 | 2026-08-28 | **`[conf.anchor.ns]` does not admit `type` (nor `ct`/`diag`/`os`) while `spec-extract` publishes their anchors** — the s115/#120 class again, four documents later: `[type.char]` is in the registry the clause calls authoritative and a conforming test may not cite it by the clause's own letter. Surfaced by sc24's char-surface tests (`conforms: type.char` refused by this rig, which mirrors the letter); the same investigation caught this rig's own registry lagging `pkg` by nine sprints (fixed here). The reserved-forward `ty` now points at a name nothing will use — named in the filing for the same decision | wolf-lang spec | [filed: wolf-lang#165](https://github.com/wolffe-lang/wolf-lang/issues/165); sc24 |
 | F-0100 | 2026-08-28 | **`spec-extract`'s anchor scanner swallows a still-normative anchor: `gram.lex.ident` fell out of anchors.json at the s126 regen** — the scanner pairs each `[` with the NEXT `]` and resumes past it, and s126's amended `[gram.lex.shebang]` prose introduces bare literal `[` runs (`` `[` ``, `` `#[` ``, `` `#![` ``): the `[` of `` `#[` `` pairs with the `]` of the `### 1.3 Identifiers [gram.lex.ident]` heading below it, the span swallows the anchor's only occurrence, and the registry the spec calls authoritative ([conf.anchor.index]) silently disagrees with the spec's own text. `link_check` cannot catch it (it tests `contains`, still true). Measured at the sc26 bump: registry 393 -> 397 is +5/-1 where the clean delta is +5/0. No wolf-std test cites the anchor, so nothing reds here; the snapshot is re-vendored byte-faithful with the defect named in the bump record | wolf-lang spec/xtask | [filed: wolf-lang#170](https://github.com/wolffe-lang/wolf-lang/issues/170); sc26 |
+| F-0101 | 2026-08-30 | **the native rung refuses a slice of a LENT byte view at `mem`, and the refusal names the wrong conservatism** — `b[from..to]` in a callee is `unsupported` ("range VALUES outside `for` headers (owned `Iter[int]` ranges, c06/std)") when the caller lends `s.bytes()` across the call (s89), while the SAME callee over an owned list and the inline slice of an owned local both `exit(0)` at v0.2.0/c88ab64 — the message cites a limit the owned probes show lifted; the operative edge is the mem-phase lowering of slice-of-lent-view. `--checked` and lupin 0.1.18 run all three shapes. Caught by the sc28 slices adoption: `bytes.slice` took the range spelling and the gauntlet moved exactly one row (`tests/bytes/lend_across_calls.lu [native]`, `run` -> `unsupported`, the corpus's only lend-into-slice witness — `bytes.slice`'s doc examples lend too); the site retreated to the index loop the same day with the shape named in a comment, and the row holds `run` again. Blocks the s128 slice spelling in any std function whose parameter is lend-reachable; three-probe isolation at `probes/sc28_p6_slice_of_view` in the filing | wolf-lang | [filed: wolf-lang#184](https://github.com/wolffe-lang/wolf-lang/issues/184); sc28 |
 
 
 ## F-0001 — the std search path
@@ -4049,3 +4050,105 @@ new address: a bump whose release notes predict zero motion, measured
 to zero motion over 365 rows with the prediction written first, is the
 cheapest gauntlet a rig can run — and the four divergences' third
 measurement is now upstream where the heal will read it.
+
+## Retirements and movements at the sc28 pin — the library writes the new words
+
+**The drift prediction, written 2026-08-30 14:13 EDT, BEFORE any
+gauntlet at the new pins** (release notes read first, per release: the
+wolf v0.2.0 CHANGELOG, the five-commit span 0a5c1af..c88ab64 read
+commit by commit, and the lupin v0.1.18 CHANGELOG/is29):
+
+- **Wolf 0a5c1af -> v0.2.0 (= c88ab64, the TAG; data pin follows): ZERO
+  row motion.** The span is five commits and none is semantic: ad6f83f
+  (the F-0100 extractor fix), 42f632f (pairing stamp -> lupin 0.1.17),
+  371dfd6 (D57 +dev stamp; line 1 gains the doctor-parseable pin
+  clause), dd94f8c (CHANGELOG), c88ab64 (release). Predicted anchors:
+  402 -> 403, +1/-0, the +1 EXACTLY `gram.lex.ident` — the FILED anchor
+  RETURNS (F-0100 / wolf-lang#170 / wolf-interp's #177 twin healed by
+  ad6f83f) and the sc26-era carried-hole waiver prose dies.
+- **lupin 0.1.17 -> v0.1.18 (= 66dc06c, the TAG; conformance pin
+  addcd7f unchanged): EXACTLY FOUR rows move, all deeper, zero
+  shallower — the four `divergent(…)` rows flip to `run`** (is29 pays
+  F-0097/#47 and F-0098/#48; the runner REDS on each because a
+  divergent row observing anything but its filed observation is the
+  designed signal). Predicted healed observations, per row:
+  `net/refused_row` stdout `handled: -1` + `error: refused` exit 1
+  (0.1.17 answered `-9`, the io arm); `net/closed_row` `peer-gone:
+  handled` + `error: closed` exit 1 (was `not-fired`+io-arm);
+  `net/use_after_close` fail(E1001) at the reuse (was
+  trap(use-after-move) [mem.tier0.move.2]); `process/use_after_wait`
+  fail(E1001) (was `error: not_found` exit 1 — the lane diverted at
+  `start()` before the reuse). Each satisfies its directive, so each
+  flips to `run` and the `divergent` word retires to ZERO carriers —
+  the MECHANISM stays armed per the sc25 waiver precedent (keep the
+  plumbing; price any future entry at a named finding).
+- **Zero else.** W0317 (is29's D61 lint) needs a `#![index(1)]` scope
+  and the corpus carries zero `#![` markers (re-grepped at this pin);
+  no perf/budget commit anywhere in v0.1.17..v0.1.18, so the 25
+  50M-step rows keep the same refusal at the same budget; the 3 char
+  rows hold `run`; `slow` keeps zero carriers; no commit in either
+  span touches net/process beyond the two heals themselves.
+
+**The measurement (same day, untouched ledger, three lanes, idle):
+SIX movers, all lupin-lane, all paid by is29's two heals — the
+prediction named FOUR and under-enumerated one mechanism's footprint
+by two rows.** The four predicted flips observed EXACTLY as
+pre-verified, each re-measured one at a time from its staged dir
+(`lupin conform-run --std-root std <entry> --json`, the sc27 method):
+`net/refused_row` exit(1), stdout `handled: -1\nerror: refused` (three
+releases said `-9`); `net/closed_row` exit(1), `peer-gone:
+handled\nerror: closed`; `net/use_after_close` fail(E1001) at resolve,
+span [1137,1140]; `process/use_after_wait` fail(E1001), span
+[1178,1180]. Each satisfies its directive; each flipped to `run` on
+the runner's designed red; the `divergent(…)` word holds ZERO carriers
+for the first time since sc24 and the mechanism stays armed (the sc25
+waiver-plumbing precedent — keep the plumbing, price any future entry
+at a named finding).
+
+**The two unpredicted movers are the SAME #48 take-mode rung at the
+corpus's two unfiled E1001-class addresses — the prediction read the
+release notes' four downstream verifications and missed that a static
+rung sweeps a corpus, not a list.** Both re-measured one at a time,
+both with spans BYTE-IDENTICAL to the compiler's own E1001 on the same
+staged entry (is29's span-parity promise, observed here):
+- `fs/use_after_close`: lupin `unsupported` -> `run`, DEEPER — the
+  static fail(E1001) (span [929,930] = wolfgang's) answers at resolve,
+  BEFORE the machine's by-design fs decline ever would, so the lane
+  that refused this file for its capability now holds it for its
+  discipline. The directive was already `fail(E1001)`.
+- `x/crypto/sha2/use_after_final_trap`: lupin rejected fail(E1001)
+  span [837,839] (= wolfgang's) where 0.1.14–0.1.17 executed to
+  [mem.tier0.move.2]'s trap — and no lupin ledger word can spell a
+  static rejection under a trap directive (`fail(…)` is a wolfc word
+  by design), so the DIRECTIVE modernized: `run(exit=trap(use-after-
+  move))` -> `fail(E1001)`, all three lanes `run` against it, the
+  two-rung history kept in the file's header — and the file RENAMED to
+  `use_after_final.lu`, because §13's lint-conventions gate enforced
+  the name-promise the old directive made (`…_trap.lu` must expect a
+  trap) the moment the directive stopped making it: the rig catching
+  its own paperwork, working as built. The compilers' answers did not
+  move; the directive met them where they stood.
+
+The rest of the prediction reconciled at face value: anchors 402 ->
+403, +1/-0, the +1 exactly `gram.lex.ident` (measured by set-diff at
+the re-vendor before the run); zero motion anywhere else over the
+remaining 359 rows; the 25 50M-step rows answer the same refusal at
+the same budget; the 3 char rows hold `run`; `slow` keeps zero
+carriers; W0317 sees nothing (zero `#![` markers, re-grepped). The
+lesson the miss teaches is filed in the Guide entry: when a release
+lands a STATIC rung, grep the corpus for the rung's SHAPE (every
+`take`-then-reuse witness), not just the issues it closes — the four
+filed rows were the mechanism's carriers, not its extent.
+
+**Both acquisitions, recorded:** wolf at the v0.2.0 TAG (= c88ab64),
+provenance verified FROM THE BINARY for the first time — r03's D57
+clause prints the bare `wolf 0.2.0 (wolfgang, pin c88ab64)` with no
+`+dev`, so the sc24-era behavioral-witness ritual and doctor's
+"trusted from acquisition" WARN both retire (doctor now gates the pin
+clause; its own commit). lupin at the v0.1.18 TAG (= 66dc06c, built
+there, bare `lupin 0.1.18 (wolf-interp, reference interpreter at pin
+addcd7f)`, fresh-inode install, tree returned to trunk). Data pin
+follows wolf to c88ab64; lupin's conformance pin addcd7f is unchanged
+by its own release (wolf-lang had no v0.2.0 tag when is29 shipped —
+the pin question re-opens at is30), so the two-upstream drift is the
+addcd7f..c88ab64 release span, nothing semantic in it.

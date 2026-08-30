@@ -80,7 +80,8 @@
 //!     acquisitions, and AGAIN at the sc27 pin 0a5c1af — s128's tuple
 //!     work is destructuring/patterns and does not instantiate a tuple
 //!     LIST; same "prelude container instantiation" refusal, dated
-//!     2026-08-29). `char_offsets` below is the offset half; the day
+//!     2026-08-29; re-measured verbatim at the sc28 pin v0.2.0/c88ab64,
+//!     2026-08-30). `char_offsets` below is the offset half; the day
 //!     tuple lists land they fuse into this one function.
 //! graphemes(s: str) -> List[str]
 //!     Extended grapheme clusters, as slices of `s`. A std call and never
@@ -549,7 +550,7 @@ pub fn splitn(s: str, sep: str, n: int) -> List[str] {
 ///
 /// ```wolf-doc-example
 /// var first = "?"
-/// for p in str.rsplit("a,b,c", ",") { first = "{first}{p}" }
+/// for p in str.rsplit("a,b,c", ",") { first += p }
 /// first == "?cba"
 /// ```
 pub fn rsplit(s: str, sep: str) -> List[str] {
@@ -664,7 +665,7 @@ pub fn replacen(s: str, old: str, new: str, n: int) -> str {
             left = left - 1
         }
     }
-    "{out}{rest}"
+    out + rest
 }
 
 /// `s` with every code point lowercased, freshly allocated in the ambient

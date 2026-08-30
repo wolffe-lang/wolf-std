@@ -25,9 +25,7 @@ fn pattern(n: int) -> List[int] {
 
 fn chunked256(msg: List[int], first: int, second: int) -> str {
     var st = sha2.new256()
-    var a = List[int]()
-    var b = List[int]()
-    var c = List[int]()
+    var a = List[int](), b = List[int](), c = List[int]()
     for v in msg {
         if a.len < first {
             (mut a).push(v)
