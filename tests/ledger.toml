@@ -14,6 +14,31 @@
 # Every slow row is owed a re-measure at pin bumps; an interpreter perf
 # wave is its exit.
 #
+# THE sc27 PIN BUMP (wolf trunk c1ca543 -> 0a5c1af, the s128 span —
+# D62 str `+`, D63 comma binders, tuple destructuring, list slices;
+# lupin 0.1.15 -> 0.1.17 at the tag, carrying is27 + is28) MOVED ZERO
+# ROWS, and the zero was PREDICTED before the run: release notes read
+# first (no net/process commit, no perf/budget commit anywhere in
+# v0.1.15..v0.1.17 or s128), the corpus grepped for every new surface
+# (zero `str + str`, zero comma binders, zero destructuring, zero list
+# slices, zero `#![` markers in std/ or tests/ — the corpus predates
+# them all), prediction ZERO/ZERO written down, std-test measured
+# ZERO/ZERO: GREEN over all 365 rows, three lanes, before a single
+# sc27 edit. The 4 `divergent(...)` rows observed EXACTLY as filed and
+# were re-measured one at a time — their THIRD measurement, all
+# byte-identical to the sc24 filings (wolf-interp#47/#48 commented
+# same-day; see the per-row comments). The #50 char-copy fix in 0.1.17
+# is real and HEALED at probe level (the issue's reproducer: `xx` exit
+# 0, three lanes) but no ledger row ever observed the old behavior, so
+# no row moves on it; the sc22 cursor-struct E1001 class over Lists is
+# unmoved (re-probed). The 25 lupin 50M-step rows answer the same
+# refusal at the same budget; `slow` keeps zero carriers. F-0018's
+# str-`+` residue (row 6) heals on the wolf rungs at this sha —
+# no ledger row spells it, so the flip lives in the register and the
+# adoption-candidate list, not here. Anchors 397 -> 402 (+5/-0 clean,
+# the D62 family + [mem.list.slice]); [gram.lex.ident] still absent
+# (F-0100/#170 carried).
+#
 # THE sc26 PIN BUMP (wolf trunk a900b8c -> c1ca543, the s59-apple +
 # s122-s127 span; lupin UNCHANGED at 0.1.15 — the one-moving-part rule;
 # 0.1.16/is27 exists and is a later sprint's bump) is the NATIVE LANE
@@ -1151,12 +1176,12 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # s70 and the payload pattern as of s71, which is what `read_all` below is
 # written over.
 [tests."net/refused_row.lu"]
-lupin = "divergent(stdout)"  # sc24: F-0097 — first arm answers for a BUILTIN-raised row (0.1.14, both orders measured); the propagated tag is right, the handler's arm is not. sc25 re-measure (0.1.15): UNHEALED, byte-identical ("handled: -9\n" then "error: refused"); wolf-interp#47 commented with the measurement
+lupin = "divergent(stdout)"  # sc24: F-0097 — first arm answers for a BUILTIN-raised row (0.1.14, both orders measured); the propagated tag is right, the handler's arm is not. sc25 re-measure (0.1.15): UNHEALED, byte-identical ("handled: -9\n" then "error: refused"); wolf-interp#47 commented with the measurement. sc27 re-measure (0.1.17, THIRD measurement): UNHEALED, byte-identical again — expected, no net commit in v0.1.15..v0.1.17; #47 commented 2026-08-29
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
 [tests."net/closed_row.lu"]
-lupin = "divergent(stdout)"  # sc24: F-0097 — same mechanism; the io arm (first) answers where closed should. sc25 re-measure (0.1.15): UNHEALED, byte-identical ("peer-gone: not-firedio-arm"); wolf-interp#47 commented
+lupin = "divergent(stdout)"  # sc24: F-0097 — same mechanism; the io arm (first) answers where closed should. sc25 re-measure (0.1.15): UNHEALED, byte-identical ("peer-gone: not-firedio-arm"); wolf-interp#47 commented. sc27 re-measure (0.1.17, THIRD): UNHEALED, byte-identical; #47 commented 2026-08-29
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
@@ -1170,7 +1195,7 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # `run` here means "satisfies the directive", and the directive is
 # `fail(E1001)`.
 [tests."net/use_after_close.lu"]
-lupin = "divergent(trap(use-after-move))"  # sc24: F-0098 — the staleness discipline's dynamic half: the compilers reject E1001, the interpreter executes to [mem.tier0.move.2]'s trap. sc25 re-measure (0.1.15): UNHEALED, same trap, same clause; wolf-interp#48 commented
+lupin = "divergent(trap(use-after-move))"  # sc24: F-0098 — the staleness discipline's dynamic half: the compilers reject E1001, the interpreter executes to [mem.tier0.move.2]'s trap. sc25 re-measure (0.1.15): UNHEALED, same trap, same clause; wolf-interp#48 commented. sc27 re-measure (0.1.17, THIRD): UNHEALED, same trap, same clause — 0.1.17's #50 heal is the char scalar only, the List/struct take-mode split stands; #48 commented 2026-08-29
 wolfc = "run"
 native = "run"
 
@@ -1508,7 +1533,7 @@ native = "run"  # 1b149ba: s107 crossed the process trio natively
 # (X1 `take`) because waiting REAPS, so a second wait is E1001. `run` means
 # "satisfies the directive", and the directive is `fail(E1001)`.
 [tests."process/use_after_wait.lu"]
-lupin = "divergent(exit(1))"  # sc24: F-0098 — the lane executes; start() raises not_found (no such program) before the reuse the compilers reject statically. sc25 re-measure (0.1.15): UNHEALED, "error: not_found" exit 1; wolf-interp#48 commented
+lupin = "divergent(exit(1))"  # sc24: F-0098 — the lane executes; start() raises not_found (no such program) before the reuse the compilers reject statically. sc25 re-measure (0.1.15): UNHEALED, "error: not_found" exit 1; wolf-interp#48 commented. sc27 re-measure (0.1.17, THIRD): UNHEALED, "error: not_found" exit 1; #48 commented 2026-08-29
 wolfc = "run"
 native = "run"
 
