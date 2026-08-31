@@ -38,19 +38,22 @@ fn main() -> !int {
         "308201af30820154a0030201020214740cdfa4c8e3db375b3bf304e3f76556f2fc35a1300a06082a8648ce3d040302301d311b301906035504030c1265636473612e776f6c662e6578616d706c65301e170d3236303832373132323930325a170d3237303832373132323930325a301d311b301906035504030c1265636473612e776f6c662e6578616d706c653059301306072a8648ce3d020106082a8648ce3d03010703420004fc53bced13903902d293f716083815447e1ada582249395ebac44c44ef06b9fd55026df310ac4dd98d0048e3f22150f038bdec71768a87456de64a00171bfdd9a3723070301d0603551d0e0416041435ee311235bc6546e5fb2eca0ed5aa2066788df4301f0603551d2304183016801435ee311235bc6546e5fb2eca0ed5aa2066788df4300f0603551d130101ff040530030101ff301d0603551d1104163014821265636473612e776f6c662e6578616d706c65300a06082a8648ce3d04030203490030460221009a31986bc666c74ef3e8c91871a43fd1b59946c72ff6e320559c71ded7528c01022100de70e4ddebde9db7ccf2a1cbde2097ba48ce18dfeead1fa25d9cb03cbd0b1a3f",
     )
     let now = cert.timestamp(2026, 10, 1, 0, 0, 0)
-    let rc = cert.parse(rsa) else |_| {
+    // Each parse is destructured where it is born (sc30,
+    // [gram.pat.struct]), fields renamed apart since both certificates
+    // share main's scope; `..` leaves what this witness does not pin.
+    let cert.Cert { subject_cn: rsa_cn, sig_alg: rsa_sig_alg, spki_alg: rsa_spki_alg, has_san: rsa_has_san, .. } = cert.parse(rsa) else |_| {
         return 2
     }
-    assert(rc.subject_cn == "rsa.wolf.example", "rsa subject CN parsed")
-    assert(cert.alg_name(rc.sig_alg) == "rsa", "rsa signature algorithm classified")
-    assert(cert.alg_name(rc.spki_alg) == "rsa", "rsa SPKI classified")
-    assert(rc.has_san, "rsa SAN parsed")
-    let ec = cert.parse(ecdsa) else |_| {
+    assert(rsa_cn == "rsa.wolf.example", "rsa subject CN parsed")
+    assert(cert.alg_name(rsa_sig_alg) == "rsa", "rsa signature algorithm classified")
+    assert(cert.alg_name(rsa_spki_alg) == "rsa", "rsa SPKI classified")
+    assert(rsa_has_san, "rsa SAN parsed")
+    let cert.Cert { subject_cn: ec_cn, sig_alg: ec_sig_alg, spki_alg: ec_spki_alg, .. } = cert.parse(ecdsa) else |_| {
         return 2
     }
-    assert(ec.subject_cn == "ecdsa.wolf.example", "ecdsa subject CN parsed")
-    assert(cert.alg_name(ec.sig_alg) == "ecdsa", "ecdsa signature algorithm classified")
-    assert(cert.alg_name(ec.spki_alg) == "ecdsa", "ecdsa SPKI classified")
+    assert(ec_cn == "ecdsa.wolf.example", "ecdsa subject CN parsed")
+    assert(cert.alg_name(ec_sig_alg) == "ecdsa", "ecdsa signature algorithm classified")
+    assert(cert.alg_name(ec_spki_alg) == "ecdsa", "ecdsa SPKI classified")
     print("witness: rsa and ecdsa parse structurally")
     assert(rejects(rsa, "rsa.wolf.example", rsa, now), "rsa chain must name unsupported_alg")
     print("witness: rsa validation names the unsupported algorithm")

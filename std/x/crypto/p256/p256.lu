@@ -2501,22 +2501,25 @@ fn parse_der(b: List[int]) -> SigOpt {
     if l + 2 != b.len {
         return bad
     }
-    let r_res = read_der_int(b, 2)
-    if r_res.stop < 0 {
+    // Each parsed INTEGER is destructured where it is born (sc30,
+    // [gram.pat.struct]): the halves are a magnitude and a stop, and
+    // the names say which is which at every use below.
+    let DerInt { val: r_val, stop: r_stop } = read_der_int(b, 2)
+    if r_stop < 0 {
         return bad
     }
-    let s_res = read_der_int(b, r_res.stop)
-    if s_res.stop < 0 {
+    let DerInt { val: s_val, stop: s_stop } = read_der_int(b, r_stop)
+    if s_stop < 0 {
         return bad
     }
-    if s_res.stop != b.len {
+    if s_stop != b.len {
         return bad
     }
     var out = List[int]()
-    for v in left_pad32(r_res.val) {
+    for v in left_pad32(r_val) {
         (mut out).push(v)
     }
-    for v in left_pad32(s_res.val) {
+    for v in left_pad32(s_val) {
         (mut out).push(v)
     }
     SigOpt { ok: true, sig: out }
@@ -2612,11 +2615,11 @@ fn left_pad32(mag: List[int]) -> List[int] {
 /// p256.signature_der(p256.sign(d, msg)))` is true, and a malformed
 /// DER signature is false, never a trap.
 pub fn verify_der(pubkey: List[int], message: List[int], der: List[int]) -> bool {
-    let parsed = parse_der(der)
-    if !parsed.ok {
+    let SigOpt { ok, sig } = parse_der(der)
+    if !ok {
         return false
     }
-    verify(pubkey, message, parsed.sig)
+    verify(pubkey, message, sig)
 }
 
 /// Encode a 64-byte r || s signature as strict DER (SEQUENCE{INTEGER r,
