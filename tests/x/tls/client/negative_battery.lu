@@ -1,0 +1,382 @@
+//! check: run(exit=0, stdout="downgrade-v12: downgrade\ndowngrade-sentinel: downgrade\nhelloretry: unexpected_message\nbad-suite: handshake_failure\nbad-group: illegal_parameter\nbad-version: illegal_parameter\nbad-compression: illegal_parameter\ntruncated-sh: decode_error\ntampered-record: bad_record_mac\nbad-finished: decrypt_error\nwrong-name: name_mismatch\nexpired: expired\nbad-sig-cv: bad_signature\nbattery: all rows named")
+//! phase: run
+//! conforms: std.x.tls.client, std.x.tls.handshake, std.x.tls.record, std.x.tls.cert
+//!
+//! THE NEGATIVE BATTERY — every adversarial input is a NAMED row
+//! refusal, never a hang and never a silent accept. Each row of the
+//! contract's battery is a witness here, and all of it is PURE (no
+//! socket) so it runs on ALL THREE lanes: the parsers, the negotiation
+//! checks, the record open, the Finished compare and the chain
+//! validator all refuse by name over hand-built or mutated inputs.
+//!
+//! The rows, in order:
+//!   downgrade-shaped ServerHello (TLS 1.2 selected_version, and the
+//!     §4.1.3 sentinel random) -> `downgrade`
+//!   HelloRetryRequest (outside this one-flight profile) ->
+//!     `unexpected_message`
+//!   wrong cipher suite -> `handshake_failure`
+//!   wrong group / version / compression -> `illegal_parameter`
+//!   truncated ServerHello -> `decode_error`
+//!   tampered record (one flipped byte) -> `bad_record_mac`
+//!   bad Finished MAC -> `decrypt_error`
+//!   wrong-name cert -> `name_mismatch`
+//!   expired chain -> `expired`
+//!   bad CertificateVerify signature -> `bad_signature`
+
+use std.hex
+use std.x.tls.cert
+use std.x.tls.client
+use std.x.tls.handshake as hs
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+/// A well-formed ServerHello with a caller-chosen random, suite,
+/// group, version, compression — every negotiation lever in one place.
+fn make_sh(random: List[int], suite: int, group: int, selected: int, compression: int) -> List[int] {
+    var share = List[int]()
+    var i = 0
+    while i < 32 {
+        (mut share).push(7)
+        i = i + 1
+    }
+    var entry = List[int]()
+    (mut entry).push(group / 256 % 256)
+    (mut entry).push(group % 256)
+    (mut entry).push(0)
+    (mut entry).push(32)
+    for b in share {
+        (mut entry).push(b)
+    }
+    var ks = List[int]()
+    (mut ks).push(0)
+    (mut ks).push(51)
+    (mut ks).push(entry.len / 256 % 256)
+    (mut ks).push(entry.len % 256)
+    for b in entry {
+        (mut ks).push(b)
+    }
+    var sv = List[int]()
+    (mut sv).push(0)
+    (mut sv).push(43)
+    (mut sv).push(0)
+    (mut sv).push(2)
+    (mut sv).push(selected / 256 % 256)
+    (mut sv).push(selected % 256)
+    var exts = List[int]()
+    for b in ks {
+        (mut exts).push(b)
+    }
+    for b in sv {
+        (mut exts).push(b)
+    }
+    var body = List[int]()
+    (mut body).push(3)
+    (mut body).push(3)
+    for b in random {
+        (mut body).push(b)
+    }
+    (mut body).push(0)
+    (mut body).push(suite / 256 % 256)
+    (mut body).push(suite % 256)
+    (mut body).push(compression)
+    (mut body).push(exts.len / 256 % 256)
+    (mut body).push(exts.len % 256)
+    for b in exts {
+        (mut body).push(b)
+    }
+    hs.handshake(hs.hs_server_hello(), body)
+}
+
+fn zeros(n: int) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    while i < n {
+        (mut out).push(0)
+        i = i + 1
+    }
+    out
+}
+
+/// The §4.1.3 downgrade-sentinel random (last 8 bytes "DOWNGRD\x01").
+fn sentinel_random() -> List[int] {
+    var out = zeros(24)
+    (mut out).push(68)
+    (mut out).push(79)
+    (mut out).push(87)
+    (mut out).push(78)
+    (mut out).push(71)
+    (mut out).push(82)
+    (mut out).push(68)
+    (mut out).push(1)
+    out
+}
+
+/// Judge a ServerHello, returning the refusing tag's name (or "ok").
+fn negotiate_name(msg: List[int]) -> str {
+    let view = client.parse_server_hello(copy msg) else |_| {
+        return "decode_error"
+    }
+    let _r = client.check_negotiation(view) else |e| match e {
+        downgrade => {
+            return "downgrade"
+        },
+        handshake_failure => {
+            return "handshake_failure"
+        },
+        illegal_parameter => {
+            return "illegal_parameter"
+        },
+        unexpected_message => {
+            return "unexpected_message"
+        },
+    }
+    "ok"
+}
+
+fn main() -> int {
+    let ok_random = zeros(32)
+
+    // ---- downgrade: TLS 1.2 selected_version (0x0303) ----
+    let sh_v12 = make_sh(copy ok_random, 4867, 29, 771, 0)
+    print("downgrade-v12: {negotiate_name(sh_v12)}")
+
+    // ---- downgrade: the §4.1.3 sentinel random ----
+    let sh_sent = make_sh(sentinel_random(), 4867, 29, 772, 0)
+    print("downgrade-sentinel: {negotiate_name(sh_sent)}")
+
+    // ---- HelloRetryRequest sentinel random ----
+    let sh_hrr = make_sh(hrr(), 4867, 29, 772, 0)
+    print("helloretry: {negotiate_name(sh_hrr)}")
+
+    // ---- wrong cipher suite (0x1302 not offered) ----
+    let sh_suite = make_sh(copy ok_random, 4866, 29, 772, 0)
+    print("bad-suite: {negotiate_name(sh_suite)}")
+
+    // ---- wrong group (secp256r1 = 23, not offered) ----
+    let sh_group = make_sh(copy ok_random, 4867, 23, 772, 0)
+    print("bad-group: {negotiate_name(sh_group)}")
+
+    // ---- wrong legacy_version (not 0x0303) ----
+    let sh_ver = make_sh_legacy(copy ok_random, 770)
+    print("bad-version: {negotiate_name(sh_ver)}")
+
+    // ---- nonzero compression ----
+    let sh_comp = make_sh(copy ok_random, 4867, 29, 772, 1)
+    print("bad-compression: {negotiate_name(sh_comp)}")
+
+    // ---- truncated ServerHello (drop the last 10 bytes) ----
+    let full = make_sh(copy ok_random, 4867, 29, 772, 0)
+    let trunc = take_prefix(full, full_len(copy full) - 10)
+    print("truncated-sh: {negotiate_name(trunc)}")
+
+    // ---- tampered record: seal one, flip a ciphertext byte, open ----
+    print("tampered-record: {tampered_record_name()}")
+
+    // ---- bad Finished MAC ----
+    print("bad-finished: {bad_finished_name()}")
+
+    // ---- wrong-name cert (validate leaf for the wrong host) ----
+    print("wrong-name: {chain_name("not.wolf.example", 20260601000000)}")
+
+    // ---- expired chain (validate at a time past not_after) ----
+    print("expired: {chain_name("wolf.example", 20990101000000)}")
+
+    // ---- bad CertificateVerify signature (ed25519, garbage sig) ----
+    print("bad-sig-cv: {bad_cv_name()}")
+
+    print("battery: all rows named")
+    0
+}
+
+/// A ServerHello whose legacy_version field is `ver` (the one lever
+/// `make_sh` fixes at 0x0303), everything else valid.
+fn make_sh_legacy(random: List[int], ver: int) -> List[int] {
+    let base = make_sh(random, 4867, 29, 772, 0)
+    // base[4] and base[5] are the legacy_version bytes (after the
+    // 4-byte handshake header): rewrite them.
+    var out = List[int]()
+    var i = 0
+    for b in base {
+        if i == 4 {
+            (mut out).push(ver / 256 % 256)
+        } else if i == 5 {
+            (mut out).push(ver % 256)
+        } else {
+            (mut out).push(b)
+        }
+        i = i + 1
+    }
+    out
+}
+
+fn hrr() -> List[int] {
+    var out = List[int]()
+    (mut out).push(207)
+    (mut out).push(33)
+    (mut out).push(173)
+    (mut out).push(116)
+    (mut out).push(229)
+    (mut out).push(154)
+    (mut out).push(97)
+    (mut out).push(17)
+    (mut out).push(190)
+    (mut out).push(29)
+    (mut out).push(140)
+    (mut out).push(2)
+    (mut out).push(30)
+    (mut out).push(101)
+    (mut out).push(184)
+    (mut out).push(145)
+    (mut out).push(194)
+    (mut out).push(162)
+    (mut out).push(17)
+    (mut out).push(22)
+    (mut out).push(122)
+    (mut out).push(187)
+    (mut out).push(140)
+    (mut out).push(94)
+    (mut out).push(7)
+    (mut out).push(158)
+    (mut out).push(9)
+    (mut out).push(226)
+    (mut out).push(200)
+    (mut out).push(168)
+    (mut out).push(51)
+    (mut out).push(156)
+    out
+}
+
+fn full_len(b: List[int]) -> int {
+    b.len
+}
+
+fn take_prefix(b: List[int], n: int) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    for v in b {
+        if i < n {
+            (mut out).push(v)
+        }
+        i = i + 1
+    }
+    out
+}
+
+/// Seal a record, flip one ciphertext byte, and confirm the client's
+/// `read`-shaped open answers `bad_record_mac` (via `record.open`'s
+/// `tag`, the row `read` maps it to).
+fn tampered_record_name() -> str {
+    let key = zeros(32)
+    let iv = zeros(12)
+    var content = List[int]()
+    (mut content).push(104)
+    (mut content).push(105)
+    let sealed = record.
+        seal(copy key, copy iv, 0, record.content_type_application_data(), content, 0)
+    // Flip a byte inside the ciphertext (index 7, past the 5-byte
+    // header).
+    var tampered = List[int]()
+    var i = 0
+    for b in sealed {
+        if i == 7 {
+            (mut tampered).push((b + 1) % 256)
+        } else {
+            (mut tampered).push(b)
+        }
+        i = i + 1
+    }
+    let _inner = record.open(key, iv, 0, tampered) else |e| match e {
+        tag => {
+            return "bad_record_mac"
+        },
+        short => {
+            return "decode_error"
+        },
+        unexpected => {
+            return "unexpected_message"
+        },
+    }
+    "opened (should have rejected)"
+}
+
+/// A Finished whose verify_data is wrong: `accept_finished` answers
+/// `decrypt_error` (sc21's tag, which the client maps to the same).
+fn bad_finished_name() -> str {
+    let secret = zeros(32)
+    let th = zeros(32)
+    let wrong = zeros(32)
+    let _ok = hs.accept_finished(secret, th, wrong) else |_| {
+        return "decrypt_error"
+    }
+    "accepted (should have rejected)"
+}
+
+/// Validate the sc22 leaf/root chain for a given host and time,
+/// returning the refusing tag name.
+fn chain_name(host: str, now: int) -> str {
+    let leaf = bytes_of(
+        "3082013e3081f1a00302010202021337300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3236303130313030303030305a170d3237303130313030303030305a3017311530130603550403130c776f6c662e6578616d706c65302a300506032b6570032100b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3a356305430090603551d1304023000300b0603551d0f04040302078030290603551d1104223020820c776f6c662e6578616d706c6582107777772e776f6c662e6578616d706c65300f06092b0601040183b2030204020500300506032b6570034100b263c2d9ba14201bbbd2944f4909bb1668576c4c77a6cf4abfa604931b254ca9508e74a9b2b902b85a2ba7eae7782c98b9ea8a8755a4ffd4384e06ac6ccd510c",
+    )
+    let root = bytes_of(
+        "308201373081eaa003020102020101300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3235303130313030303030305a170d3335313233313233353935395a30223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74302a300506032b6570032100df29ea96435aa95c2b6f9176b5e2bc532916525aa49207b10e6b8e3e5bdefb08a345304330120603551d130101ff040830060101ff020101300e0603551d0f0101ff040403020106301d0603551d0e04160414783463495867e2affe02ec7ffbcf86216bc59be7300506032b6570034100573764a0bb4fd69a98281bc428deea50474f8e1e12e719c83310312ac790da36ff45bfc88ae586bdb5a03ed8537e922d80b07c7e4da3325af92f90efa2f68a07",
+    )
+    let _leaf = cert.validate_chain(leaf, host, root, now) else |e| match e {
+        der => {
+            return "der"
+        },
+        unsupported_alg => {
+            return "unsupported_alg"
+        },
+        bad_signature => {
+            return "bad_signature"
+        },
+        expired => {
+            return "expired"
+        },
+        not_yet_valid => {
+            return "not_yet_valid"
+        },
+        name_mismatch => {
+            return "name_mismatch"
+        },
+        not_ca => {
+            return "not_ca"
+        },
+        issuer_mismatch => {
+            return "issuer_mismatch"
+        },
+        unknown_critical => {
+            return "unknown_critical"
+        },
+    }
+    "validated (should have rejected)"
+}
+
+/// CertificateVerify under ed25519 with a garbage signature over the
+/// leaf's real key: `verify_certificate_verify` answers `bad_signature`
+/// (the RETIREMENT's failing branch — a recognized scheme whose
+/// signature does not check).
+fn bad_cv_name() -> str {
+    let leaf_key = bytes_of("b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3")
+    let bad_sig = zeros(64)
+    let th = zeros(32)
+    let _v = client.
+        verify_certificate_verify(
+        cert.oid_ed25519(),
+        leaf_key,
+        client.scheme_ed25519(),
+        bad_sig,
+        th,
+    ) else |e| match e {
+        unsupported_alg => {
+            return "unsupported_alg"
+        },
+        bad_signature => {
+            return "bad_signature"
+        },
+    }
+    "verified (should have rejected)"
+}

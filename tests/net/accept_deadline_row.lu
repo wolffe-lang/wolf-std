@@ -1,0 +1,26 @@
+//! check: run(exit=1, stdout="error: timeout")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate
+//!
+//! An `accept` with no peer coming RETURNS now (sc29): arm
+//! `set_listener_deadline` and the hazard the module header documented
+//! from sc08 on — a blocking accept nothing can rescue — resolves as
+//! the `timeout` row inside the budget. The tag rides out of `main` so
+//! the toolchain names it (the strongest witness, §13).
+//!
+//! Nobody dials in this file, deliberately: the deadline is the ONLY
+//! thing that can end the accept, so a pass proves the budget fired and
+//! a hang would be the regression this test exists to catch (the rig's
+//! per-test ceiling backstops it).
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    net.set_listener_deadline(mut srv, 150)?
+    var conn = net.accept(mut srv)?
+    print("unreachable: {conn.fd}")
+    net.close(take conn)?
+    net.close_listener(take srv)?
+    0
+}

@@ -1,0 +1,270 @@
+//! check: run(exit=0, stdout="app: hello from the server\nwitness: TLS 1.3 client shook hands with std's own server half")
+//! phase: run
+//! conforms: std.x.tls.client, std.x.tls.handshake, std.x.tls.record, std.x.tls.cert, std.x.crypto.curve25519
+//!
+//! THE sc29 FLAGSHIP — the tests are the server. A wolf program dials
+//! loopback TCP, shakes a full TLS 1.3 handshake with a SERVER HALF
+//! built from the SAME library primitives the client parses (sc21's
+//! message + schedule builders, sc20's record seal, sc18's X25519 +
+//! Ed25519 sign), verifies the real sc22 chain (leaf signed by root,
+//! `vendor/vectors/pki`) + a real Ed25519 CertificateVerify (signed
+//! here with the leaf's own deterministic key) + the server Finished,
+//! exchanges application data both ways, and closes. lobo's fixture-CA
+//! lesson turned inward: the two halves of one library prove each other.
+//!
+//! **Single-threaded reality, solved by phase separation** (the
+//! contract's recorded shape). Every net operation blocks the whole
+//! process, so an in-process client+server witness cannot have both
+//! sides reading at once. `client.begin` writes the ClientHello and
+//! returns WITHOUT reading; the test's server half then reads it and
+//! writes its whole flight into the loopback buffer; `client.complete`
+//! reads that buffered flight and writes the client Finished; the
+//! server reads that. Strict alternation, every read served from a
+//! buffer a prior write already filled — nothing ever blocks, exactly
+//! as the dial-first net discipline generalizes.
+//!
+//! **Lanes**: NATIVE-ONLY. The byte tier is lupin-`unsupported`
+//! (F-0102) and the four X25519 ladders + Ed25519 sign/verify + the
+//! AEAD flight exceed the checked tier's and lupin's step budgets (the
+//! p256/curve25519 lane note; the sc25 per-rig honesty). The pure
+//! parse/verify witnesses in this directory carry the three-lane
+//! coverage.
+
+use std.bytes
+use std.hex
+use std.net
+use std.x.crypto.curve25519
+use std.x.tls.cert
+use std.x.tls.client
+use std.x.tls.handshake as hs
+use std.x.tls.record
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+/// Exactly `n` bytes off the socket (the test's own read_exact).
+fn read_n(mut s: net.Socket, n: int) -> List[int] ! {closed, timeout, io} {
+    var out = List[int]()
+    while out.len < n {
+        let piece = net.read_bytes(mut s, n - out.len)?
+        if piece.len == 0 {
+            return closed
+        }
+        for b in piece {
+            (mut out).push(b)
+        }
+    }
+    out
+}
+
+/// One whole wire record: 5-byte header, then a body of the header's
+/// length.
+fn read_record(mut s: net.Socket) -> List[int] ! {closed, timeout, io} {
+    let header = read_n(mut s, 5)?
+    let blen = header[3] * 256 + header[4]
+    let body = read_n(mut s, blen)?
+    var wire = List[int]()
+    for b in header {
+        (mut wire).push(b)
+    }
+    for b in body {
+        (mut wire).push(b)
+    }
+    wire
+}
+
+/// A plaintext record (§5.1) — how the server frames its ServerHello.
+fn plaintext(content_type: int, payload: List[int]) -> List[int] {
+    var out = List[int]()
+    (mut out).push(content_type)
+    (mut out).push(3)
+    (mut out).push(3)
+    (mut out).push(payload.len / 256 % 256)
+    (mut out).push(payload.len % 256)
+    for b in payload {
+        (mut out).push(b)
+    }
+    out
+}
+
+/// The inner content of a sealed record the server opened.
+fn inner_content(inner: List[int]) -> List[int] {
+    record.content_of(inner)
+}
+
+fn main() -> !int {
+    // ---- Fixtures (deterministic; no entropy source in std) ----
+    let leaf = bytes_of(
+        "3082013e3081f1a00302010202021337300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3236303130313030303030305a170d3237303130313030303030305a3017311530130603550403130c776f6c662e6578616d706c65302a300506032b6570032100b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3a356305430090603551d1304023000300b0603551d0f04040302078030290603551d1104223020820c776f6c662e6578616d706c6582107777772e776f6c662e6578616d706c65300f06092b0601040183b2030204020500300506032b6570034100b263c2d9ba14201bbbd2944f4909bb1668576c4c77a6cf4abfa604931b254ca9508e74a9b2b902b85a2ba7eae7782c98b9ea8a8755a4ffd4384e06ac6ccd510c",
+    )
+    let root = bytes_of(
+        "308201373081eaa003020102020101300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3235303130313030303030305a170d3335313233313233353935395a30223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74302a300506032b6570032100df29ea96435aa95c2b6f9176b5e2bc532916525aa49207b10e6b8e3e5bdefb08a345304330120603551d130101ff040830060101ff020101300e0603551d0f0101ff040403020106301d0603551d0e04160414783463495867e2affe02ec7ffbcf86216bc59be7300506032b6570034100573764a0bb4fd69a98281bc428deea50474f8e1e12e719c83310312ac790da36ff45bfc88ae586bdb5a03ed8537e922d80b07c7e4da3325af92f90efa2f68a07",
+    )
+    // The leaf's own Ed25519 signing key (gen_pki: sha256 of the label).
+    let leaf_seed = bytes_of("94cfb97e26fffa7335e0c0365ab6cbdfee6788d98a0a1f621cc00694228c02db")
+    // The client's ClientHello random and X25519 private scalar.
+    let client_random = bytes_of("1111111111111111111111111111111111111111111111111111111111111111")
+    let key_seed = bytes_of("2222222222222222222222222222222222222222222222222222222222222222")
+    // The server's ephemeral X25519 scalar and its ServerHello random.
+    let server_priv = bytes_of("3333333333333333333333333333333333333333333333333333333333333333")
+    let server_random = bytes_of("4444444444444444444444444444444444444444444444444444444444444444")
+    // A validation time inside the leaf's window (2026-01-01..2027-01-01).
+    let now = cert.timestamp(2026, 6, 1, 0, 0, 0)
+
+    // ---- Transport: bind, dial (into the backlog), accept ----
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli_sock = net.connect(net.loopback(p))?
+
+    // ---- PHASE 1: the client sends its ClientHello and yields ----
+    let pend = client.
+        begin(take cli_sock, "wolf.example", copy root, now, client_random, copy key_seed)?
+
+    // ---- The server half reads the ClientHello ----
+    var conn = net.accept(mut srv)?
+    let ch_rec = read_record(mut conn)?
+    let ch_msg = sub_from(ch_rec, 5)
+
+    // ---- The server builds its ServerHello ----
+    let server_share = curve25519.x25519_base(copy server_priv)
+    var she = List[int]()
+    hs.transcript_add(mut she, hs.ext_key_share_server_x25519(copy server_share))
+    hs.transcript_add(mut she, hs.ext_supported_versions_server())
+    let sh_msg = hs.server_hello(server_random, List[int](), 4867, she)
+
+    // ---- Transcript CH..SH and the handshake key schedule ----
+    var tr = List[int]()
+    hs.transcript_add(mut tr, copy ch_msg)
+    hs.transcript_add(mut tr, copy sh_msg)
+    let client_share = curve25519.x25519_base(copy key_seed)
+    let dh = curve25519.x25519(copy server_priv, client_share) else |_| {
+        print("server: x25519 failed")
+        return 1
+    }
+    let early = hs.early_secret()
+    let hsecret = hs.handshake_secret(early, dh)
+    let th_ch_sh = hs.transcript_hash(copy tr)
+    let c_hs = hs.client_handshake_traffic(copy hsecret, copy th_ch_sh)
+    let s_hs = hs.server_handshake_traffic(copy hsecret, th_ch_sh)
+    let s_key = record.traffic_key(copy s_hs, 32)
+    let s_iv = record.traffic_iv(copy s_hs)
+
+    // ---- The server flight: EE, Certificate, CertificateVerify,
+    // Finished — the transcript extends as each is built ----
+    let ee = hs.encrypted_extensions(List[int]())
+    let certmsg = hs.certificate(List[int](), copy leaf)
+    hs.transcript_add(mut tr, copy ee)
+    hs.transcript_add(mut tr, copy certmsg)
+    let th_cert = hs.transcript_hash(copy tr)
+    let cv_content = hs.certificate_verify_content("TLS 1.3, server CertificateVerify", th_cert)
+    let cv_sig = curve25519.sign(leaf_seed, cv_content)
+    let cvmsg = hs.certificate_verify(2055, cv_sig)
+    hs.transcript_add(mut tr, copy cvmsg)
+    let th_cv = hs.transcript_hash(copy tr)
+    let sfin = hs.finished_for(copy s_hs, th_cv)
+    hs.transcript_add(mut tr, copy sfin)
+    let th_sfin = hs.transcript_hash(copy tr)
+
+    // ---- Write the flight: SH plaintext, then EE/Cert/CV/Finished
+    // sealed under the server handshake key (seq 0..3) ----
+    net.write_bytes(mut conn, plaintext(22, sh_msg))?
+    net.write_bytes(mut conn, record.seal(copy s_key, copy s_iv, 0, 22, ee, 0))?
+    net.write_bytes(mut conn, record.seal(copy s_key, copy s_iv, 1, 22, certmsg, 0))?
+    net.write_bytes(mut conn, record.seal(copy s_key, copy s_iv, 2, 22, cvmsg, 0))?
+    net.write_bytes(mut conn, record.seal(s_key, s_iv, 3, 22, sfin, 0))?
+
+    // ---- The server's application-traffic keys (over th_sfin) ----
+    let master = hs.master_secret(hsecret)
+    let c_ap = hs.client_application_traffic(copy master, copy th_sfin)
+    let s_ap = hs.server_application_traffic(master, copy th_sfin)
+    let c_ap_key = record.traffic_key(copy c_ap, 32)
+    let c_ap_iv = record.traffic_iv(c_ap)
+    let s_ap_key = record.traffic_key(copy s_ap, 32)
+    let s_ap_iv = record.traffic_iv(s_ap)
+
+    // ---- PHASE 2: the client reads the flight, verifies the chain +
+    // CertificateVerify + Finished, sends its own Finished, and then
+    // one application record ----
+    var tls = client.complete(take pend)?
+    client.write(mut tls, str_bytes("hello from the client"))?
+
+    // ---- The server reads the client Finished, then the client's app
+    // record, verifying both against the schedule it derived ----
+    let c_key = record.traffic_key(copy c_hs, 32)
+    let c_iv = record.traffic_iv(c_hs)
+    let cfin_rec = read_record(mut conn)?
+    let cfin_inner = record.open(c_key, c_iv, 0, cfin_rec) else |_| {
+        print("server: client Finished record failed to open")
+        return 1
+    }
+    let cfin_msg = inner_content(cfin_inner)
+    let cfin_vd = client.finished_of(cfin_msg) else |_| {
+        print("server: client Finished malformed")
+        return 1
+    }
+    let cfin_ok = hs.accept_finished(c_hs, th_sfin, cfin_vd) else |_| {
+        print("server: client Finished did not verify")
+        return 1
+    }
+    if cfin_ok != 1 {
+        print("server: client Finished rejected")
+        return 1
+    }
+    let app_rec = read_record(mut conn)?
+    let app_inner = record.open(c_ap_key, c_ap_iv, 0, app_rec) else |_| {
+        print("server: client app record failed to open")
+        return 1
+    }
+    let app_from_client = inner_content(app_inner)
+    if !(str_of(app_from_client) == "hello from the client") {
+        print("server: wrong app data from client")
+        return 1
+    }
+
+    // ---- The server replies with one application record ----
+    let reply = record.
+        seal(
+        s_ap_key,
+        s_ap_iv,
+        0,
+        record.content_type_application_data(),
+        str_bytes("hello from the server"),
+        0,
+    )
+    net.write_bytes(mut conn, reply)?
+
+    // ---- The client reads the server's application data ----
+    let got = client.read(mut tls)?
+    print("app: {str_of(got)}")
+
+    print("witness: TLS 1.3 client shook hands with std's own server half")
+    client.close(take tls)?
+    net.close(take conn)?
+    net.close_listener(take srv)?
+    0
+}
+
+fn sub_from(b: List[int], from: int) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    for v in b {
+        if i >= from {
+            (mut out).push(v)
+        }
+        i = i + 1
+    }
+    out
+}
+
+fn str_bytes(s: str) -> List[int] {
+    var out = List[int]()
+    for b in s.bytes() {
+        (mut out).push(b)
+    }
+    out
+}
+
+fn str_of(b: List[int]) -> str {
+    bytes.to_str(b) else "?"
+}

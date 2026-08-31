@@ -13,9 +13,9 @@
 //! that std adds no translation layer:
 //!
 //! - `refused` — nobody is listening at that address
-//! - `timeout` — the operation's deadline expired (see the deadline note
-//!   below: DECLARED so the vocabulary is stable, and not reachable from
-//!   wolf source at this pin)
+//! - `timeout` — the operation's deadline expired. Declared from sc08 so
+//!   the vocabulary would be stable, REACHABLE since sc29: `set_deadline`
+//!   / `set_listener_deadline` arm the budget (s106's `net_deadline`)
 //! - `closed` — the peer finished: the socket's `eof`, an outcome rather
 //!   than a failure, and the value that ends a read loop
 //! - `utf8` — the bytes read are not well-formed UTF-8; a wolf `str` is
@@ -57,7 +57,8 @@
 //! **The three-way split** (§8/§9's rule, applied to sockets). The
 //! IMPLEMENTATION owns the builtins this module delegates to
 //! (`net_listen`, `net_port`, `net_accept`, `net_connect`, `net_read`,
-//! `net_write`, `net_close`) — their semantics are therefore part of this
+//! `net_write`, `net_read_bytes`, `net_write_bytes`, `net_deadline`,
+//! `net_close`) — their semantics are therefore part of this
 //! module's contract and are documented per function. std owns everything
 //! else: the `Listener` and `Socket` values, the consuming closers, and
 //! the pure address helpers. The LANGUAGE owns nothing here; there is no
@@ -69,20 +70,24 @@
 //! — X6's completion-io posture is the s35 reactor's story and reaches std
 //! when the builtin tier does. Two consequences a caller must design
 //! around: a server written over these functions serves one connection at
-//! a time, and an `accept` with no peer coming never returns (which is why
-//! every test in this module connects BEFORE it accepts).
+//! a time, and an `accept` with no peer coming never returns UNLESS a
+//! deadline is armed (`set_listener_deadline`, sc29 — before it, never
+//! returns full stop, which is why every test in this module connects
+//! BEFORE it accepts; the dial-first discipline stays, a deadline is a
+//! net for a mistake rather than a license to block).
 //!
 //! **What is deliberately absent.** Each of these is a reviewed contract
 //! with a filing behind it rather than an approximation:
 //!
-//! - `set_deadline(mut s, millis)` / `read_timeout` — **the `timeout` tag
-//!   is declared and unreachable.** The runtime has a per-socket deadline
-//!   (`wolf_rt`'s net table implements one and unit-tests it), and NO
-//!   builtin exposes it, so no wolf program can arm one; the executing
-//!   lane's sockets are plain blocking sockets that never consult it
-//!   (F-0049). std ships no deadline helper rather than one that cannot
-//!   work, and every signature already carries the tag so that arming a
-//!   deadline is a pure addition when the builtin lands.
+//! - ~~`set_deadline(mut s, millis)`~~ — **HERE now (sc29).** For nine
+//!   sprints the `timeout` tag was declared and unreachable (F-0049: the
+//!   runtime held a per-socket deadline no builtin exposed); s106's
+//!   `net_deadline` builtin (#45's builtin half) closed the gap, and
+//!   `set_deadline` below wraps it on ALL THREE lanes — lupin 0.1.18
+//!   arms it too, measured. The pure-addition promise this bullet made
+//!   was kept: no signature changed, the tag the vocabulary carried from
+//!   day one is simply reachable at last, and
+//!   `tests/net/read_deadline_row.lu` witnesses it firing.
 //! - `read_line(mut s) -> str ! {closed, timeout, utf8, io}` — ONE line,
 //!   as it arrives. Still blocked, and this is now the module's only
 //!   blocked read: a buffered reader is writable in principle (a `str`
@@ -109,24 +114,29 @@
 //! - UDP (`send_to`/`recv_from`), name resolution, and any HTTP: no
 //!   builtin surface at this pin, and the sprint's non-targets besides.
 //!   TLS is never this tier's business.
-//! - Byte-level `read_bytes`/`write_bytes` — no `net_*` builtin moves
-//!   bytes at this pin. This used to be the same gap as `std.fs`'s and it
-//!   is not any more: s90 gave the FS tier its byte calls (F-0044 closed,
-//!   `fs.copy_file` is a byte copy now) and left the net tier where it
-//!   was, so the shape of the fix is known and the socket half is
-//!   unwritten (F-0080). It is why `read` carries a `utf8` row at all.
+//! - ~~Byte-level `read_bytes`/`write_bytes`~~ — **HERE now (sc29).**
+//!   F-0080 predicted the fix's exact shape from the fs tier's (s90) and
+//!   s106 shipped it: `net_read_bytes`/`net_write_bytes` carry
+//!   `List[int]` with no `utf8` row anywhere — a lone `0x80` is data —
+//!   and the wrappers below adopt them verbatim. This is what makes a
+//!   BINARY protocol over TCP writable at all (`std.x.tls.client` is the
+//!   first consumer: a TLS record is not text). The one lane cost is
+//!   lupin's: 0.1.18's is18 socket tier is the STR calls only, the byte
+//!   pair does not resolve there (F-0102, filed), so the byte functions
+//!   are compiler-lanes-only where the rest of the module is three-lane.
+//!   `read` keeps its `utf8` row for the callers that want text.
 //!
-//! **Lanes (re-measured at the sc11 pin).** The compiler's checked tier is
-//! the executing lane: it opens REAL sockets (the comptime sandbox is the one place they are refused,
-//! D33). lupin has no `net_*` builtins by design — a program that reaches
-//! them is an honest `unsupported` at resolve, the conservatism posture the
-//! rig records once rather than per test — but lupin resolves module bodies
-//! LAZILY, so the two pure address helpers RUN there, which is a property of
-//! that lane rather than a leak in this module. The native rung refuses the
-//! tier by name ("net
-//! builtins in native lowering (checked lane only at s39)"), and refuses
-//! the whole module including the pure helpers, because lowering budgets a
-//! module by more than the body it needs.
+//! **Lanes (re-measured at the sc29 pin, wolf v0.2.0 + lupin 0.1.18).**
+//! The str tier and `set_deadline` run on ALL THREE lanes now: the
+//! checked tier since s39, the native rung since s106 crossed net (the
+//! "checked lane only at s39" refusal this paragraph used to record is
+//! history), and lupin since 0.1.18's is18 sockets (nonblocking polls
+//! under the baton). The byte tier (`read_bytes`/`write_bytes`) is the
+//! exception: both compiler rungs run it, lupin does not resolve it
+//! (F-0102) — a program that reaches it there is an honest `unsupported`
+//! at resolve, and because lupin resolves module bodies LAZILY the rest
+//! of the module keeps its lane. Comptime refuses the whole capability
+//! everywhere (D33).
 
 /// A bound TCP listener: the host socket this process accepts connections
 /// on.
@@ -206,10 +216,10 @@ pub fn port(l: Listener) -> int ! {io} {
 
 /// Take the next connection from `l`'s backlog, waiting until one arrives.
 ///
-/// Rows: `timeout` when a deadline expires — declared for the vocabulary's
-/// sake and not reachable at this pin, because nothing in wolf can arm one
-/// (F-0049) — and `io` when the handle is closed, forged or the host
-/// failed. Never traps.
+/// Rows: `timeout` when an armed deadline expires — arm one with
+/// `set_listener_deadline` (reachable since sc29; it was declared-only
+/// under F-0049 for nine sprints) — and `io` when the handle is closed,
+/// forged or the host failed. Never traps.
 ///
 /// **This blocks until a peer connects.** There is no non-blocking accept
 /// and no way to poll, so a program that accepts before anyone dials waits
@@ -242,8 +252,10 @@ pub fn accept(mut l: Listener) -> Socket ! {timeout, io} {
 ///
 /// Rows: `refused` when nobody is listening there — the commonest network
 /// outcome there is, and a row rather than a trap because the caller could
-/// not have checked; `timeout` when a deadline expires (declared, not
-/// reachable at this pin — F-0049); `io` for every other host failure,
+/// not have checked; `timeout` when a deadline expires (a CONNECT
+/// deadline has no arming surface here — `set_deadline` needs the
+/// `Socket` this call has not yet produced, so on this function the tag
+/// is still vocabulary-only); `io` for every other host failure,
 /// including an address that does not parse. Never traps.
 ///
 /// **This blocks until the connection completes or fails**, and the host
@@ -271,8 +283,8 @@ pub fn connect(addr: str) -> Socket ! {refused, timeout, io} {
 ///
 /// Rows: `closed` when the peer finished — the socket's `eof`, an OUTCOME
 /// that ends a read loop rather than a failure, and the tag a reader stops
-/// on rather than reports; `timeout` when a deadline expires (declared, not reachable
-/// — F-0049); `utf8` when the bytes read are not well-formed UTF-8, WHICH
+/// on rather than reports; `timeout` when an armed deadline expires
+/// (`set_deadline` — reachable since sc29); `utf8` when the bytes read are not well-formed UTF-8, WHICH
 /// INCLUDES a chunk boundary that lands inside a code point, and the bytes
 /// are consumed either way; `io` when the handle is closed, forged or the
 /// host failed. Never traps.
@@ -345,6 +357,152 @@ pub fn write(mut s: Socket, text: str) -> () ! {closed, io} {
     net_write(s.fd, text)?
 }
 
+/// Read up to `max` BYTES from `s` as a `List[int]` — the binary read.
+///
+/// Bytes are bytes: there is no `utf8` row here and can never be one
+/// (the fs byte tier's posture, adopted verbatim per F-0080's ask —
+/// a lone `0x80` is data, not a miss). This is the read a binary
+/// protocol builds on; `read` above is the one for text.
+///
+/// Rows: `closed` when the peer finished (the row that ends a read
+/// loop); `timeout` when an armed deadline expired (`set_deadline`);
+/// `io` for a host failure or a bad handle. Never traps.
+///
+/// **A short read is normal**: up to `max` means "what the host had",
+/// exactly as `read`'s doc states for text — a caller that needs N
+/// bytes loops until it has them (`std.x.tls.client.read_exact` is the
+/// worked example).
+///
+/// `mut s` because reading consumes from the stream (§14).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_read_bytes` (s106) — both compiler lanes; lupin 0.1.18 does
+/// not resolve the byte tier (F-0102), so this example's lupin lane is
+/// an honest `unsupported`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// var msg = List[int]()
+/// (mut msg).push(0)
+/// (mut msg).push(255)
+/// net.write_bytes(mut cli, msg)?
+/// var conn = net.accept(mut srv)?
+/// let got = net.read_bytes(mut conn, 8) else List[int]()
+/// got.len == 2
+/// net.close(take cli)?
+/// net.close(take conn)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn read_bytes(mut s: Socket, max: int) -> List[int] ! {closed, timeout, io} {
+    net_read_bytes(s.fd, max)?
+}
+
+/// Write all of `b` — raw bytes — to `s`.
+///
+/// The binary twin of `write`, and the same completeness promise: the
+/// whole list is written or the call raises, so there is no partial
+/// write to observe.
+///
+/// Rows: `closed` when the peer has gone away; **`invalid` when an
+/// element of `b` is not a byte** — outside 0..255 — the same
+/// pre-write check and the same tag as `fs.write_bytes` (§14's os-tier
+/// vocabulary, adopted verbatim: nothing is masked, truncated or sent
+/// before the reject); `io` for a host failure or a bad handle. Never
+/// traps.
+///
+/// `mut s` because writing advances the stream (§14).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_write_bytes` (s106) — both compiler lanes; lupin 0.1.18 does
+/// not resolve the byte tier (F-0102).
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// var msg = List[int]()
+/// (mut msg).push(128)
+/// net.write_bytes(mut cli, msg)?
+/// net.close(take cli)?
+/// var conn = net.accept(mut srv)?
+/// let got = net.read_bytes(mut conn, 8) else List[int]()
+/// got.len == 1
+/// net.close(take conn)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn write_bytes(mut s: Socket, b: List[int]) -> () ! {closed, invalid, io} {
+    net_write_bytes(s.fd, b)?
+}
+
+/// Arm (`ms > 0`) or clear (`ms <= 0`) a deadline BUDGET on `s`: every
+/// subsequent parking operation on this socket — `read`, `read_bytes`,
+/// `write` — resolves as its row's `timeout` tag when the budget fires
+/// first.
+///
+/// **This is what makes `timeout` reachable** — the tag every read and
+/// write signature has carried since sc08, declared against exactly
+/// this day (F-0049's deadline half, closed by s106's `net_deadline`).
+/// A socket with no deadline armed behaves as before: it blocks until
+/// the host answers. The budget is per-OPERATION arming, not a
+/// wall-clock alarm — it is consulted by each parking call, and
+/// clearing it returns the socket to plain blocking.
+///
+/// Rows: `io` — arming fails only on a forged, closed or wrong-kind
+/// handle (or a host that cannot hold a deadline). Never traps.
+///
+/// `mut s` because the socket's host state changes even though the
+/// value's field does not (§14's stream rule: the call site spells the
+/// mutation).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_deadline` (s106) — ALL THREE lanes, lupin 0.1.18 included
+/// (measured: an armed 200ms budget resolves a silent-peer read as
+/// `timeout` there too).
+///
+/// ```wolf-doc-example
+/// var srv = net.listen("127.0.0.1:0")?
+/// let p = net.port(srv)?
+/// var cli = net.connect("127.0.0.1:{p}")?
+/// net.set_deadline(mut cli, 150)?
+/// let missed = net.read(mut cli, 8) else "deadline"
+/// missed == "deadline"
+/// net.close(take cli)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn set_deadline(mut s: Socket, ms: int) -> () ! {io} {
+    net_deadline(s.fd, ms)?
+}
+
+/// Arm (`ms > 0`) or clear (`ms <= 0`) a deadline budget on the
+/// LISTENER `l`: an `accept` whose peer never dials resolves `timeout`
+/// instead of blocking forever.
+///
+/// **Why the name is not `set_deadline`**: `close_listener`'s reason —
+/// no overloading, one verb per type, and the vocabulary word goes to
+/// the connected socket (§1). This is the deadline that retires the
+/// "an accept with no peer coming never returns" hazard the module
+/// header documented from sc08 on; the dial-first test discipline
+/// stays (a deadline is a net for a mistake, not a license to block).
+///
+/// Rows: `io` — a forged, closed or wrong-kind handle. Never traps.
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_deadline` (s106) — all three lanes.
+///
+/// Example (prose, because `accept`'s success type is a `Socket` no
+/// deadline-firing example can produce — the fenced form would need a
+/// diverging handler around a value the block must still type, F-0040's
+/// monomorphic edge in one line): arm
+/// `net.set_listener_deadline(mut srv, 150)?` and an `accept` with no
+/// peer dialing resolves its `timeout` tag inside ~150ms instead of
+/// blocking forever. `tests/net/accept_deadline_row.lu` witnesses the
+/// tag riding out of `main`.
+pub fn set_listener_deadline(mut l: Listener, ms: int) -> () ! {io} {
+    net_deadline(l.fd, ms)?
+}
+
 /// Close `s`, consuming it.
 ///
 /// Rows: `io` when the handle was already closed or is foreign. Never
@@ -401,8 +559,10 @@ pub fn close_listener(take l: Listener) -> () ! {io} {
 /// Every byte the peer sends until it closes, decoded as UTF-8, as one
 /// `str`.
 ///
-/// Rows: `timeout` when a deadline expires (declared, not reachable at this
-/// pin — F-0049); `utf8` when what arrived is not well-formed UTF-8, WHICH
+/// Rows: `timeout` when an armed deadline expires (`set_deadline` —
+/// reachable since sc29, and on THIS function it turns a peer that stops
+/// sending without closing from a hang into a row); `utf8` when what
+/// arrived is not well-formed UTF-8, WHICH
 /// INCLUDES a chunk boundary that lands inside a code point (see below);
 /// `io` for a host failure or a bad handle. All three are RE-RAISED
 /// unchanged from the read they came from. `closed` is not in the row: the
@@ -511,8 +671,8 @@ pub fn write_line(mut s: Socket, text: str) -> () ! {closed, io} {
 
 /// Every line the peer sends until it closes, terminators stripped.
 ///
-/// Rows: `read_all`'s exactly — `timeout` (declared, unreachable at this
-/// pin), `utf8` (including a chunk boundary inside a code point), `io` —
+/// Rows: `read_all`'s exactly — `timeout` (an armed deadline,
+/// `set_deadline`), `utf8` (including a chunk boundary inside a code point), `io` —
 /// and `closed` is again the OUTCOME that ends the read rather than a tag.
 /// Never traps. Allocates the list.
 ///

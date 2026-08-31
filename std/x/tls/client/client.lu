@@ -1,0 +1,1262 @@
+//! member: true
+//!
+//! std.x.tls.client — the TLS 1.3 CLIENT (RFC 8446, one profile) over
+//! the library's own proven halves. Stability tier: x — the FOURTH rung
+//! of the stdc-tls campaign (sprint sc29), and the rung that turns the
+//! stack AROUND: sc20's record layer, sc21's handshake machinery and
+//! sc22/sc23's chain validation were all built and vectored from the
+//! verifier's side, which IS the client's side — this module is the
+//! state machine that drives them against a live socket. A wolf program
+//! dials loopback TCP, shakes TLS 1.3 with the std server half,
+//! verifies the chain + CertificateVerify + Finished, exchanges
+//! application data, and closes.
+//!
+//! **The nursery banner (D31).** `std.x.tls.client` is not `std.tls`:
+//! its path, names and behaviour may change or vanish in one sprint; no
+//! other std module may depend on it. Its reason and graduation trigger
+//! live in `std/x/README.md`. It depends on FIVE sibling residents —
+//! `std.x.tls.record` (seal/open + the key-schedule primitives),
+//! `std.x.tls.handshake` (messages, transcript, schedule, Finished,
+//! the §4.1 state machine), `std.x.tls.cert` (chain validation),
+//! `std.x.crypto.curve25519` (X25519 + Ed25519 verify) and
+//! `std.x.crypto.p256` (ECDSA-P256 verify) — plus the `std.net` FACADE
+//! (a resident may depend on the facade). The resident-on-resident
+//! edges are named in the register beside the earlier rungs' own.
+//!
+//! ## The one profile (the contract's scope line)
+//!
+//! TLS 1.3 only, TLS_CHACHA20_POLY1305_SHA256 (0x1303 — the suite the
+//! server half speaks), X25519 the only group, SNI + the RFC 8446
+//! minimum extensions. CertificateVerify VERIFIES — see below. NAMED
+//! NON-TARGETS (this sprint's contract): OS truststore reading (trust
+//! anchors are CALLER-SUPPLIED), session resumption/0-RTT, rsa_pss
+//! verification (a named `unsupported_alg`, never a silent accept),
+//! TLS 1.2 (a downgrade-shaped ServerHello is a named refusal),
+//! HelloRetryRequest (one key share is offered and a server that
+//! cannot take it is a named refusal, not a second flight).
+//!
+//! ## The CertificateVerify RETIREMENT (sc21's posture ends here)
+//!
+//! sc21 built the §4.4.3 signed octets and verified NOTHING (no
+//! verifier existed for the trace's schemes). That posture RETIRES for
+//! two schemes at sc29: **ed25519 (0x0807)** verifies via sc18's
+//! `curve25519.verify` and **ecdsa_secp256r1_sha256 (0x0403)** verifies
+//! via sc23's `p256.verify_der` — both against the validated leaf's
+//! SPKI over the exact §4.4.3 content. `rsa_pss_rsae_sha256` (0x0804)
+//! and its family remain the named `unsupported_alg` rejection (RSA's
+//! crypto rung is unbuilt — the sc22 honesty split, unchanged).
+//! NOTHING about a peer is trusted before chain + CertificateVerify +
+//! Finished all pass.
+//!
+//! ## The API shape: the caller owns the dial, the module owns the
+//! state machine — in TWO PHASES
+//!
+//! `begin(take sock, …) -> Pending` writes the ClientHello and returns
+//! WITHOUT reading; `complete(take p) -> Client` reads the server
+//! flight, verifies everything, sends the client Finished. Two phases
+//! rather than one blocking `connect` is a deliberate, recorded choice
+//! (the contract's single-threaded-reality question): every operation
+//! at this tier blocks the whole process (std.net's posture), so an
+//! IN-PROCESS client+server witness needs the client to yield between
+//! its first write and its first read — between `begin` and `complete`
+//! the test's server half reads the ClientHello and writes its whole
+//! flight into the loopback buffer, and nothing ever blocks (the
+//! dial-first discipline generalized to strict alternation with
+//! kernel-buffered flights). A two-process shape (`std.process` exists)
+//! was the alternative and costs a spawned binary no lane can build
+//! here; phase separation costs one extra call and keeps the witness
+//! single-file and three-lane-shaped. A real program against a real
+//! server just calls the two in a row.
+//!
+//! Entropy is the CALLER'S: `begin` takes the 32-byte ClientHello
+//! random and the 32-byte X25519 private scalar as arguments (no
+//! entropy source exists in std — the rand/os_random D-question lives
+//! with the crypto ladder, and deterministic tests are the point).
+//!
+//! ## Rows (each battery refusal is a NAMED tag, never a hang)
+//!
+//! Transport: `closed`, `timeout` (arm `net.set_deadline` on the socket
+//! BEFORE `begin` — a deadline is per-fd host state and survives the
+//! handoff; this module arms none itself), `io`. Record layer:
+//! `bad_record_mac` (a tampered/forged record — AEAD reject, zero
+//! plaintext exposed), `decode_error` (malformed framing/messages).
+//! Negotiation: `illegal_parameter` (wrong version/compression/group
+//! shapes), `downgrade` (the §4.1.3 sentinel randoms, or a ServerHello
+//! whose supported_versions is absent or not 0x0304 — TLS 1.2 shapes
+//! refuse by THIS name), `handshake_failure` (the suite is not 0x1303,
+//! or the peer alerted mid-handshake), `unexpected_message` (§4.1
+//! flow violations — reordered/duplicated/illegal flights, via sc21's
+//! `hs_step`). Keys: `zero` (the all-zero X25519 shared secret, sc18's
+//! row, RFC 8446 §7.4.2). Identity: sc22's nine chain rows verbatim
+//! (`der`, `unsupported_alg`, `bad_signature`, `expired`,
+//! `not_yet_valid`, `name_mismatch`, `not_ca`, `issuer_mismatch`,
+//! `unknown_critical`) plus `bad_signature`/`unsupported_alg` again
+//! from CertificateVerify, and `decrypt_error` (a wrong Finished,
+//! §4.4.4 — sc21's tag). Application data: `invalid` on `write` for a
+//! non-byte element (the net byte tier's tag, §14).
+//!
+//! ## Lanes (measured at the sc29 pin)
+//!
+//! The socket-bearing functions (`begin`/`complete`/`read`/`write`/
+//! `close`) ride `net.read_bytes`/`net.write_bytes`: BOTH COMPILER
+//! RUNGS run them; lupin 0.1.18 does not resolve the byte tier
+//! (F-0102), so every loopback witness's lupin column is an honest
+//! `unsupported`. The pure half — the flight parsers, the negotiation
+//! checks, `verify_certificate_verify`, the constants — runs on ALL
+//! THREE lanes (lupin resolves lazily, the sc10 pure-half discipline),
+//! and the RFC 8448 client-perspective vector test is three-lane. A
+//! FULL in-process handshake (client + server halves: four X25519
+//! ladders, Ed25519 sign + verifies, the AEAD flight) exceeds the
+//! checked tier's step budget — the ledger records the measured
+//! verdict per file, the sc25 per-rig honesty.
+//!
+//! ## Why `Client` holds an `int` fd and not a `net.Socket`
+//!
+//! F-0092: the native rung refuses `f(mut param.field)` — a `mut` field
+//! path whose base is itself a `mut` parameter — so `net.read_bytes(mut
+//! c.sock, …)` inside `read(mut c: Client)` would cost the native lane.
+//! The portable spelling: hold the descriptor (an `int` field read is a
+//! copy), rebuild the one-field `net.Socket` wrapper at each call (a
+//! documented-legal construction, the sc08 forge rule), and let
+//! `close(take c)` consume the `Client` so staleness stays a static
+//! use-after-move exactly as the facade's own closers arrange.
+//!
+//! ## ct: (D53's retrofit clause)
+//!
+//! Everything this module PARSES is public wire material (the server
+//! flight, certificates, signatures — the sc18 verify-is-public rule);
+//! branches on it protect no secret. The key schedule, Finished and
+//! the record AEAD carry SECRETS through sc20/sc21/sc16/sc18's own
+//! `ct:` lines; this module adds no secret-dependent branch of its own
+//! — the Finished compare is sc21's `ct_eq`
+//! (accumulate-then-single-check), and the traffic keys live in
+//! `Client` fields this pin cannot make private (a forged `Client` is
+//! ordinary code; every consumer answers rows, never traps). The
+//! 0..255 ingestion guards are the ladder's recorded ct exception
+//! (F-0035).
+
+use std.net
+use std.x.crypto.curve25519
+use std.x.crypto.p256
+use std.x.tls.cert
+use std.x.tls.handshake
+use std.x.tls.record
+
+// ---------------------------------------------------------------------
+// Constants (zero-argument functions, F-0025's rule) — the one profile.
+// ---------------------------------------------------------------------
+
+/// TLS_CHACHA20_POLY1305_SHA256 (0x1303) — the ONE cipher suite this
+/// profile offers and accepts (RFC 8446 §9.1 MTI; the suite sc17/sc20
+/// built). ct: public.
+///
+/// ```wolf-doc-example
+/// client.suite_chacha20_sha256() == 4867
+/// ```
+pub fn suite_chacha20_sha256() -> int {
+    4867
+}
+
+/// SignatureScheme ed25519 (0x0807) — first-class: CertificateVerify
+/// VERIFIES under it (sc18's verifier). ct: public.
+///
+/// ```wolf-doc-example
+/// client.scheme_ed25519() == 2055
+/// ```
+pub fn scheme_ed25519() -> int {
+    2055
+}
+
+/// SignatureScheme ecdsa_secp256r1_sha256 (0x0403) — verifies via
+/// sc23's `p256.verify_der` (the sc21 "verify nothing" posture retired
+/// for this scheme too). ct: public.
+///
+/// ```wolf-doc-example
+/// client.scheme_ecdsa_p256_sha256() == 1027
+/// ```
+pub fn scheme_ecdsa_p256_sha256() -> int {
+    1027
+}
+
+/// SignatureScheme rsa_pss_rsae_sha256 (0x0804) — OFFERED (RFC 8446
+/// §9.1 lists it MTI, and refusing to offer it would misdescribe the
+/// library to a compliant server) and NOT verifiable: a
+/// CertificateVerify under it is the named `unsupported_alg`
+/// rejection, never a silent accept. ct: public.
+///
+/// ```wolf-doc-example
+/// client.scheme_rsa_pss_sha256() == 2052
+/// ```
+pub fn scheme_rsa_pss_sha256() -> int {
+    2052
+}
+
+// ---------------------------------------------------------------------
+// Byte plumbing — the 0..255 contract and the small readers every
+// parser below shares. A parser must never trap on wire data (§10:
+// data raises where a caller's mistake traps), so every index is
+// window-checked and every reject is the `decode_error` row.
+// ---------------------------------------------------------------------
+
+/// The 0..255 ingestion guard (§11's `List[int]` byte contract) — for
+/// arguments the CALLER built (randoms, scalars, plaintext): a non-byte
+/// there is a contract violation and traps. Wire data never reaches
+/// this; the readers below answer `decode_error` instead.
+/// ct: the ladder's recorded ct exception (F-0035).
+fn require_byte(v: int) {
+    if v < 0 {
+        assert(false, "tls.client: element outside 0..255")
+    }
+    if v > 255 {
+        assert(false, "tls.client: element outside 0..255")
+    }
+}
+
+/// The bytes of `b` from `from` (inclusive) to `to` (exclusive), as a
+/// fresh list — offsets are the module's own computed values (the cert
+/// `sub` precedent).
+fn sub(b: List[int], from: int, to: int) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    for v in b {
+        if i >= from {
+            if i < to {
+                (mut out).push(v)
+            }
+        }
+        i = i + 1
+    }
+    out
+}
+
+/// A cursor over one wire message: `pos` never passes `end`, truncation
+/// is `decode_error`, and a non-byte element on the wire is too.
+struct Rd {
+    b: List[int],
+    pos: int,
+    end: int,
+}
+
+/// One byte, advancing.
+fn rd_u8(mut r: Rd) -> int ! {decode_error} {
+    if r.pos >= r.end {
+        return decode_error
+    }
+    let v = r.b[r.pos]
+    if v < 0 {
+        return decode_error
+    }
+    if v > 255 {
+        return decode_error
+    }
+    r.pos = r.pos + 1
+    v
+}
+
+/// A big-endian uint16, advancing.
+fn rd_u16(mut r: Rd) -> int ! {decode_error} {
+    let hi = rd_u8(mut r)?
+    let lo = rd_u8(mut r)?
+    hi * 256 + lo
+}
+
+/// A big-endian uint24, advancing.
+fn rd_u24(mut r: Rd) -> int ! {decode_error} {
+    let hi = rd_u8(mut r)?
+    let mid = rd_u8(mut r)?
+    let lo = rd_u8(mut r)?
+    hi * 65536 + mid * 256 + lo
+}
+
+/// `n` raw bytes, advancing.
+fn rd_take(mut r: Rd, n: int) -> List[int] ! {decode_error} {
+    if n < 0 {
+        return decode_error
+    }
+    if r.end - r.pos < n {
+        return decode_error
+    }
+    let out = sub(r.b, r.pos, r.pos + n)
+    r.pos = r.pos + n
+    out
+}
+
+/// Byte-list equality (public data — no ct obligation; the one secret
+/// compare in this stack is sc21's `ct_eq`).
+fn bytes_eq(a: List[int], b: List[int]) -> bool {
+    if a.len != b.len {
+        return false
+    }
+    var i = 0
+    var same = true
+    while i < a.len {
+        if a[i] != b[i] {
+            same = false
+        }
+        i = i + 1
+    }
+    same
+}
+
+// ---------------------------------------------------------------------
+// The server-flight parsers (RFC 8446 §4.1.3 / §4.3.1 / §4.4.2 /
+// §4.4.3 / §4.4.4) — PURE, three-lane, vectored against RFC 8448's own
+// server flight in `tests/x/tls/client/rfc8448_parse_vectors.lu`.
+// Structure only: negotiation judgment lives in `check_negotiation`
+// so the parsers can read ANY spec-shaped flight (RFC 8448's AES-GCM
+// trace included).
+// ---------------------------------------------------------------------
+
+/// A parsed ServerHello — the fields the client judges. `server_share`
+/// is the raw key_exchange bytes of the (single) key_share entry;
+/// `selected_version`/`key_share_group` are -1 when their extensions
+/// are absent; `hello_retry` is the §4.1.3 HelloRetryRequest sentinel
+/// random. ct: public wire material.
+pub struct ServerHelloView {
+    legacy_version: int,
+    random: List[int],
+    session_echo: List[int],
+    cipher_suite: int,
+    compression: int,
+    selected_version: int,
+    key_share_group: int,
+    server_share: List[int],
+    hello_retry: bool,
+}
+
+/// The §4.1.3 downgrade sentinel tail (the last 8 random bytes):
+/// "DOWNGRD" then 0x01 (TLS 1.2) or 0x00 (TLS 1.1 and below).
+fn downgrade_tail(random: List[int], last: int) -> bool {
+    if random.len != 32 {
+        return false
+    }
+    var tail = List[int]()
+    (mut tail).push(68)
+    (mut tail).push(79)
+    (mut tail).push(87)
+    (mut tail).push(78)
+    (mut tail).push(71)
+    (mut tail).push(82)
+    (mut tail).push(68)
+    (mut tail).push(last)
+    bytes_eq(sub(random, 24, 32), tail)
+}
+
+/// The §4.1.3 HelloRetryRequest sentinel random (SHA-256 of
+/// "HelloRetryRequest" — a fixed public constant).
+fn hrr_random() -> List[int] {
+    var out = List[int]()
+    (mut out).push(207)
+    (mut out).push(33)
+    (mut out).push(173)
+    (mut out).push(116)
+    (mut out).push(229)
+    (mut out).push(154)
+    (mut out).push(97)
+    (mut out).push(17)
+    (mut out).push(190)
+    (mut out).push(29)
+    (mut out).push(140)
+    (mut out).push(2)
+    (mut out).push(30)
+    (mut out).push(101)
+    (mut out).push(184)
+    (mut out).push(145)
+    (mut out).push(194)
+    (mut out).push(162)
+    (mut out).push(17)
+    (mut out).push(22)
+    (mut out).push(122)
+    (mut out).push(187)
+    (mut out).push(140)
+    (mut out).push(94)
+    (mut out).push(7)
+    (mut out).push(158)
+    (mut out).push(9)
+    (mut out).push(226)
+    (mut out).push(200)
+    (mut out).push(168)
+    (mut out).push(51)
+    (mut out).push(156)
+    out
+}
+
+/// Parse a complete ServerHello wire message (4-byte handshake header
+/// included) into its view (§4.1.3). STRUCTURE only — trailing bytes,
+/// truncation, a vector that overruns its container are each
+/// `decode_error`; whether the fields are ACCEPTABLE is
+/// `check_negotiation`'s question. Unknown extensions are skipped (a
+/// client MUST ignore unrecognized extensions).
+/// ct: public wire material.
+///
+/// Example: prose — a fenced example cannot carry a realistic
+/// ServerHello under §4's one-module rule;
+/// `tests/x/tls/client/rfc8448_parse_vectors.lu` parses RFC 8448's own
+/// ServerHello and asserts every extracted field byte-for-byte.
+pub fn parse_server_hello(msg: List[int]) -> ServerHelloView ! {decode_error} {
+    let n = msg.len
+    var r = Rd { b: msg, pos: 0, end: n }
+    let mtype = rd_u8(mut r)?
+    if mtype != handshake.hs_server_hello() {
+        return decode_error
+    }
+    let blen = rd_u24(mut r)?
+    if blen != n - 4 {
+        return decode_error
+    }
+    let ver = rd_u16(mut r)?
+    let random = rd_take(mut r, 32)?
+    let echo_len = rd_u8(mut r)?
+    if echo_len > 32 {
+        return decode_error
+    }
+    let echo = rd_take(mut r, echo_len)?
+    let suite = rd_u16(mut r)?
+    let comp = rd_u8(mut r)?
+    let ext_len = rd_u16(mut r)?
+    if ext_len != r.end - r.pos {
+        return decode_error
+    }
+    var selected = 0 - 1
+    var group = 0 - 1
+    var share = List[int]()
+    while r.pos < r.end {
+        let et = rd_u16(mut r)?
+        let el = rd_u16(mut r)?
+        if el > r.end - r.pos {
+            return decode_error
+        }
+        let stop = r.pos + el
+        if et == 43 {
+            // supported_versions (ServerHello): the single
+            // selected_version.
+            if el != 2 {
+                return decode_error
+            }
+            selected = rd_u16(mut r)?
+        } else if et == 51 {
+            // key_share (ServerHello): ONE KeyShareEntry.
+            group = rd_u16(mut r)?
+            let klen = rd_u16(mut r)?
+            if klen != stop - r.pos {
+                return decode_error
+            }
+            share = rd_take(mut r, klen)?
+        } else {
+            let skipped = rd_take(mut r, el)?
+            if skipped.len != el {
+                return decode_error
+            }
+        }
+        if r.pos != stop {
+            return decode_error
+        }
+    }
+    let retry = bytes_eq(random, hrr_random())
+    ServerHelloView {
+        legacy_version: ver,
+        random: random,
+        session_echo: echo,
+        cipher_suite: suite,
+        compression: comp,
+        selected_version: selected,
+        key_share_group: group,
+        server_share: share,
+        hello_retry: retry,
+    }
+}
+
+/// Judge a parsed ServerHello against THIS profile (§4.1.3's checks,
+/// each a named refusal): `downgrade` — the sentinel randoms, an
+/// absent supported_versions, or a selected_version that is not
+/// 0x0304 (a TLS 1.2-shaped answer refuses by THIS name, RFC 8446
+/// §4.1.3's downgrade protection); `unexpected_message` — the
+/// HelloRetryRequest sentinel (one key share is offered, a second
+/// flight is outside the profile); `illegal_parameter` — a
+/// legacy_version that is not 0x0303, a nonzero compression method, a
+/// key_share group that is not x25519(29) or a share that is not 32
+/// bytes; `handshake_failure` — a cipher suite other than 0x1303.
+/// Answers the negotiated suite (public data in, public data out).
+/// ct: public.
+pub fn check_negotiation(v: ServerHelloView) -> int ! {
+    downgrade,
+    handshake_failure,
+    illegal_parameter,
+    unexpected_message,
+} {
+    if v.hello_retry {
+        return unexpected_message
+    }
+    if downgrade_tail(v.random, 1) {
+        return downgrade
+    }
+    if downgrade_tail(v.random, 0) {
+        return downgrade
+    }
+    if v.selected_version != 772 {
+        return downgrade
+    }
+    if v.legacy_version != 771 {
+        return illegal_parameter
+    }
+    if v.compression != 0 {
+        return illegal_parameter
+    }
+    if v.cipher_suite != suite_chacha20_sha256() {
+        return handshake_failure
+    }
+    if v.key_share_group != 29 {
+        return illegal_parameter
+    }
+    if v.server_share.len != 32 {
+        return illegal_parameter
+    }
+    suite_chacha20_sha256()
+}
+
+/// Validate an EncryptedExtensions wire message's structure (§4.3.1):
+/// header, one uint16-prefixed extensions vector filling the body,
+/// each extension well-formed. Contents are not judged (nothing in
+/// this profile turns on them). ct: public.
+pub fn check_encrypted_extensions(msg: List[int]) -> int ! {decode_error} {
+    let n = msg.len
+    var r = Rd { b: msg, pos: 0, end: n }
+    let mtype = rd_u8(mut r)?
+    if mtype != handshake.hs_encrypted_extensions() {
+        return decode_error
+    }
+    let blen = rd_u24(mut r)?
+    if blen != n - 4 {
+        return decode_error
+    }
+    let ext_len = rd_u16(mut r)?
+    if ext_len != r.end - r.pos {
+        return decode_error
+    }
+    while r.pos < r.end {
+        let skipped_type = rd_u16(mut r)?
+        if skipped_type < 0 {
+            return decode_error
+        }
+        let el = rd_u16(mut r)?
+        let body = rd_take(mut r, el)?
+        if body.len != el {
+            return decode_error
+        }
+    }
+    1
+}
+
+/// The peer's certificate chain out of a Certificate wire message
+/// (§4.4.2): the CertificateEntry `cert_data` blobs CONCATENATED, leaf
+/// first — exactly `cert.validate_chain`'s `chain` currency. Per-entry
+/// extensions are skipped; an empty certificate_list is `decode_error`
+/// (a server must certify itself). ct: public.
+///
+/// Example: prose (§4's one-module rule) —
+/// `tests/x/tls/client/rfc8448_parse_vectors.lu` extracts RFC 8448's
+/// 432-octet certificate and asserts the bytes verbatim.
+pub fn certificate_chain_of(msg: List[int]) -> List[int] ! {decode_error} {
+    let n = msg.len
+    var r = Rd { b: msg, pos: 0, end: n }
+    let mtype = rd_u8(mut r)?
+    if mtype != handshake.hs_certificate() {
+        return decode_error
+    }
+    let blen = rd_u24(mut r)?
+    if blen != n - 4 {
+        return decode_error
+    }
+    let ctx_len = rd_u8(mut r)?
+    let ctx = rd_take(mut r, ctx_len)?
+    if ctx.len != ctx_len {
+        return decode_error
+    }
+    let list_len = rd_u24(mut r)?
+    if list_len != r.end - r.pos {
+        return decode_error
+    }
+    var chain = List[int]()
+    while r.pos < r.end {
+        let dlen = rd_u24(mut r)?
+        let der_bytes = rd_take(mut r, dlen)?
+        for b in der_bytes {
+            (mut chain).push(b)
+        }
+        let elen = rd_u16(mut r)?
+        let eskip = rd_take(mut r, elen)?
+        if eskip.len != elen {
+            return decode_error
+        }
+    }
+    if chain.len == 0 {
+        return decode_error
+    }
+    chain
+}
+
+/// A parsed CertificateVerify: the SignatureScheme and the raw
+/// signature bytes. ct: public wire material.
+pub struct CertVerifyView {
+    scheme: int,
+    sig: List[int],
+}
+
+/// Parse a CertificateVerify wire message (§4.4.3): scheme (uint16) +
+/// uint16-prefixed signature filling the body. ct: public.
+pub fn certificate_verify_of(msg: List[int]) -> CertVerifyView ! {decode_error} {
+    let n = msg.len
+    var r = Rd { b: msg, pos: 0, end: n }
+    let mtype = rd_u8(mut r)?
+    if mtype != handshake.hs_certificate_verify() {
+        return decode_error
+    }
+    let blen = rd_u24(mut r)?
+    if blen != n - 4 {
+        return decode_error
+    }
+    let scheme = rd_u16(mut r)?
+    let slen = rd_u16(mut r)?
+    if slen != r.end - r.pos {
+        return decode_error
+    }
+    let sig = rd_take(mut r, slen)?
+    CertVerifyView { scheme: scheme, sig: sig }
+}
+
+/// The verify_data out of a Finished wire message (§4.4.4): the body,
+/// which for this profile's SHA-256 must be exactly 32 bytes.
+/// ct: public (the MAC is wire material; judging it is
+/// `handshake.accept_finished`'s job).
+pub fn finished_of(msg: List[int]) -> List[int] ! {decode_error} {
+    let n = msg.len
+    var r = Rd { b: msg, pos: 0, end: n }
+    let mtype = rd_u8(mut r)?
+    if mtype != handshake.hs_finished() {
+        return decode_error
+    }
+    let blen = rd_u24(mut r)?
+    if blen != n - 4 {
+        return decode_error
+    }
+    if blen != 32 {
+        return decode_error
+    }
+    rd_take(mut r, 32)?
+}
+
+// ---------------------------------------------------------------------
+// CertificateVerify verification — THE RETIREMENT (sc21's
+// "build the octets, verify nothing" ends here for two schemes).
+// ---------------------------------------------------------------------
+
+/// Verify a server CertificateVerify signature (§4.4.3) against the
+/// validated leaf's SPKI: `spki_alg`/`spki_key` are the leaf's
+/// (`cert.Cert`'s fields), `transcript_hash` is the running hash
+/// THROUGH Certificate (CertificateVerify itself excluded), `scheme`/
+/// `sig` are the wire message's. The signed content is sc21's §4.4.3
+/// octets (64 spaces + "TLS 1.3, server CertificateVerify" + 0x00 +
+/// the hash), built here via `handshake.certificate_verify_content`.
+///
+/// Dispatch, each answer named: **ed25519 (0x0807)** — the SPKI must
+/// be an Ed25519 key (RFC 8410) and sc18's `curve25519.verify` judges;
+/// **ecdsa_secp256r1_sha256 (0x0403)** — the SPKI must be an EC key
+/// and sc23's `p256.verify_der` judges (the signature is the DER
+/// SEQUENCE the wire carries, verbatim); a recognized scheme over the
+/// WRONG key type is `bad_signature` (that key cannot have produced
+/// it); the rsa_pss family and every unrecognized scheme are the named
+/// `unsupported_alg` — never a silent accept (the sc22 honesty split).
+/// Answers 1 on success so the miss is a row, not a bool a caller can
+/// forget (§2).
+///
+/// ct: public data throughout (a signature, a public key and a
+/// transcript hash are wire material — the sc18 verify-is-public
+/// rule). The ECDSA path is native-only by sc23's lane note (two
+/// P-256 ladders); the Ed25519 path is three-lane.
+pub fn verify_certificate_verify(
+    spki_alg: str,
+    spki_key: List[int],
+    scheme: int,
+    sig: List[int],
+    transcript_hash: List[int],
+) -> int ! {unsupported_alg, bad_signature} {
+    let content = handshake.
+        certificate_verify_content("TLS 1.3, server CertificateVerify", transcript_hash)
+    if scheme == scheme_ed25519() {
+        if spki_alg != cert.oid_ed25519() {
+            return bad_signature
+        }
+        if curve25519.verify(spki_key, content, sig) {
+            return 1
+        }
+        return bad_signature
+    }
+    if scheme == scheme_ecdsa_p256_sha256() {
+        if spki_alg != cert.oid_ec_public_key() {
+            return bad_signature
+        }
+        if p256.verify_der(spki_key, content, sig) {
+            return 1
+        }
+        return bad_signature
+    }
+    unsupported_alg
+}
+
+// ---------------------------------------------------------------------
+// The socket plumbing — the fd-forge shapes (see the module header's
+// F-0092 note). Byte moves ride std.net's sc29 byte tier.
+// ---------------------------------------------------------------------
+
+/// Exactly `n` bytes off the socket, looping over short reads (TCP
+/// promises a stream, not a framing).
+fn read_exact(fd: int, n: int) -> List[int] ! {closed, timeout, io} {
+    var out = List[int]()
+    while out.len < n {
+        var s = net.Socket { fd: fd }
+        let piece = net.read_bytes(mut s, n - out.len)?
+        if piece.len == 0 {
+            return closed
+        }
+        for b in piece {
+            (mut out).push(b)
+        }
+    }
+    out
+}
+
+/// The whole of `b` onto the socket. `invalid` cannot fire (every list
+/// this module writes is library-built 0..255) and coarsens to `io`
+/// truthfully if a future pin ever reaches it (the sc12·02-os
+/// unreachable-arm rule).
+fn write_all(fd: int, b: List[int]) -> () ! {closed, io} {
+    var s = net.Socket { fd: fd }
+    net.write_bytes(mut s, b) else |e| match e {
+        closed => {
+            return closed
+        },
+        invalid => {
+            return io
+        },
+        io => {
+            return io
+        },
+    }
+}
+
+/// One wire record, whole: the 5-byte header read first, the body read
+/// to the header's length. `rtype` is the outer ContentType. A length
+/// above the §5.2 ciphertext bound (2^14 + 256) is `decode_error`
+/// (record_overflow's shape) before a single body byte is read.
+struct RawRecord {
+    rtype: int,
+    wire: List[int],
+}
+
+fn read_record(fd: int) -> RawRecord ! {closed, timeout, decode_error, io} {
+    let header = read_exact(fd, 5)?
+    let rtype = header[0]
+    let blen = header[3] * 256 + header[4]
+    if blen > 16640 {
+        return decode_error
+    }
+    let body = read_exact(fd, blen)?
+    var wire = List[int]()
+    for b in header {
+        (mut wire).push(b)
+    }
+    for b in body {
+        (mut wire).push(b)
+    }
+    RawRecord { rtype: rtype, wire: wire }
+}
+
+/// A PLAINTEXT record (§5.1): type, legacy version 0x0303, uint16
+/// length, payload — the framing the ClientHello rides (everything
+/// after ServerHello is sc20's sealed framing).
+fn plaintext_record(content_type: int, payload: List[int]) -> List[int] {
+    assert(payload.len <= 16384, "tls.client: plaintext record over 2^14")
+    var out = List[int]()
+    (mut out).push(content_type)
+    (mut out).push(3)
+    (mut out).push(3)
+    (mut out).push(payload.len / 256 % 256)
+    (mut out).push(payload.len % 256)
+    for b in payload {
+        require_byte(b)
+        (mut out).push(b)
+    }
+    out
+}
+
+// ---------------------------------------------------------------------
+// Anchor selection — the caller-supplied root store.
+// ---------------------------------------------------------------------
+
+/// Whether `chain` validates against the single `anchor` (a probe —
+/// the tag is re-derived by the real validation afterwards).
+fn chain_validates(chain: List[int], hostname: str, anchor: List[int], now: int) -> bool {
+    let probe = cert.validate_chain(chain, hostname, anchor, now) else |_| {
+        return false
+    }
+    probe.version > 0
+}
+
+/// The byte offset (in `anchors`) of the first anchor the chain
+/// validates against, or 0 when none does — so the caller's `?`
+/// validation against the choice re-derives the FIRST anchor's named
+/// rejection deterministically. `anchors` is concatenated DER roots
+/// (DER is self-delimiting; `cert.cert_end` finds each boundary).
+fn pick_anchor(chain: List[int], hostname: str, anchors: List[int], now: int) -> int ! {der} {
+    let n = anchors.len
+    if n == 0 {
+        return der
+    }
+    var pos = 0
+    while pos < n {
+        let stop = cert.cert_end(anchors, pos)?
+        let anchor = sub(anchors, pos, stop)
+        if chain_validates(chain, hostname, anchor, now) {
+            return pos
+        }
+        pos = stop
+    }
+    0
+}
+
+// ---------------------------------------------------------------------
+// The two-phase handshake.
+// ---------------------------------------------------------------------
+
+/// The state between `begin` and `complete`: the ClientHello is on the
+/// wire, nothing has been read. This pin has no private fields; the
+/// scalar it carries is exactly as secret as the caller's own copy.
+pub struct Pending {
+    fd: int,
+    scalar: List[int],
+    hostname: str,
+    anchors: List[int],
+    now: int,
+    transcript: List[int],
+}
+
+/// PHASE ONE: take ownership of a connected socket (the CALLER dialed
+/// — `net.connect` is the caller's line), build and send the
+/// ClientHello, return without reading.
+///
+/// `hostname` rides SNI and is the name the chain must certify;
+/// `anchors` is the caller-supplied root store (concatenated DER, one
+/// or more roots — NO OS truststore is read, the contract's named
+/// non-target); `now` is the compact `cert.timestamp(...)` UTC time
+/// the chain is judged at (supplied, never the wall clock — sc22's
+/// determinism rule). `client_random` (32 bytes) and `key_seed` (the
+/// 32-byte X25519 private scalar) are the CALLER'S entropy; both are
+/// contract arguments (a wrong length or a non-byte element traps —
+/// the caller could have checked).
+///
+/// The ClientHello this profile sends: 0x1303 alone, SNI, groups
+/// [x25519], signature_algorithms [ed25519, ecdsa_secp256r1_sha256,
+/// rsa_pss_rsae_sha256], supported_versions [0x0304], one X25519 key
+/// share. Rows: the transport's (`closed`, `io`).
+///
+/// To bound the WHOLE handshake, arm `net.set_deadline` on the socket
+/// BEFORE calling this — the budget is per-fd host state and survives
+/// the handoff; every read `complete` makes then answers `timeout`
+/// instead of hanging on a stalled peer.
+///
+/// ct: the scalar is SECRET — it is stored, not branched on; the
+/// derivation is sc18's ladder (its ct: line holds). Everything else
+/// here is public message building.
+pub fn begin(
+    take sock: net.Socket,
+    hostname: str,
+    anchors: List[int],
+    now: int,
+    client_random: List[int],
+    key_seed: List[int],
+) -> Pending ! {closed, io} {
+    assert(client_random.len == 32, "tls.client: random must be 32 bytes")
+    assert(key_seed.len == 32, "tls.client: key seed must be 32 bytes")
+    for b in client_random {
+        require_byte(b)
+    }
+    for b in key_seed {
+        require_byte(b)
+    }
+    for b in anchors {
+        require_byte(b)
+    }
+    let fd = sock.fd
+    let share = curve25519.x25519_base(key_seed)
+    var groups = List[int]()
+    (mut groups).push(29)
+    var schemes = List[int]()
+    (mut schemes).push(scheme_ed25519())
+    (mut schemes).push(scheme_ecdsa_p256_sha256())
+    (mut schemes).push(scheme_rsa_pss_sha256())
+    var exts = List[int]()
+    handshake.transcript_add(mut exts, handshake.ext_server_name(hostname))
+    handshake.transcript_add(mut exts, handshake.ext_supported_groups(groups))
+    handshake.transcript_add(mut exts, handshake.ext_signature_algorithms(schemes))
+    handshake.transcript_add(mut exts, handshake.ext_supported_versions_client())
+    handshake.transcript_add(mut exts, handshake.ext_key_share_client_x25519(share))
+    var suites = List[int]()
+    (mut suites).push(19)
+    (mut suites).push(3)
+    let ch = handshake.client_hello(client_random, List[int](), suites, exts)
+    write_all(fd, plaintext_record(record.content_type_handshake(), copy ch))?
+    Pending {
+        fd: fd,
+        scalar: key_seed,
+        hostname: hostname,
+        anchors: anchors,
+        now: now,
+        transcript: ch,
+    }
+}
+
+/// An established TLS 1.3 connection: the application-traffic keys and
+/// sequence numbers over the caller's socket. Produced by `complete`;
+/// consumed by `close`. This pin has no private fields (the header's
+/// ct: note); a forged `Client` misbehaves as rows, never traps.
+pub struct Client {
+    fd: int,
+    write_key: List[int],
+    write_iv: List[int],
+    write_seq: int,
+    read_key: List[int],
+    read_iv: List[int],
+    read_seq: int,
+}
+
+/// PHASE TWO: read the server flight, verify EVERYTHING, send the
+/// client Finished, answer the established `Client`.
+///
+/// The flow (§4.1, driven through sc21's `hs_step` so a reordered or
+/// duplicated flight is the named `unexpected_message`, never a wrong
+/// state): ServerHello (parsed + judged — `downgrade`,
+/// `handshake_failure`, `illegal_parameter`, `unexpected_message` for
+/// a HelloRetryRequest), the key schedule's client side (sc21 over
+/// sc20/sc16, with sc18's X25519 — the all-zero shared secret is the
+/// `zero` row), then the encrypted flight opened record by record
+/// (sc20's `open`: a forged/tampered record is `bad_record_mac` with
+/// zero plaintext exposed; handshake messages may span or share
+/// records — the client reassembles): EncryptedExtensions
+/// (structure-checked), Certificate (chain extracted, validated
+/// through sc22 against the caller's anchors — nine named rejections),
+/// CertificateVerify (VERIFIED — see `verify_certificate_verify`),
+/// server Finished (sc21's `accept_finished` — a wrong MAC is
+/// `decrypt_error` with nothing derived onward). Then the client
+/// Finished goes out under the handshake keys, the application
+/// traffic secrets derive, and the `Client` is the answer.
+///
+/// A ChangeCipherSpec record (middlebox compatibility, §5) is ignored
+/// wherever it appears, per the RFC. An alert mid-handshake is
+/// `handshake_failure` (the peer refused; its own named refusal is in
+/// ITS log). A stalled peer is a hang unless a deadline was armed
+/// (`begin`'s note) — with one, every read here answers `timeout`.
+///
+/// ct: the schedule and Finished carry secrets through sc20/sc21's own
+/// paths; every branch here is on public wire material.
+pub fn complete(take p: Pending) -> Client ! {
+    closed,
+    timeout,
+    io,
+    decode_error,
+    bad_record_mac,
+    unexpected_message,
+    illegal_parameter,
+    downgrade,
+    handshake_failure,
+    decrypt_error,
+    zero,
+    der,
+    unsupported_alg,
+    bad_signature,
+    expired,
+    not_yet_valid,
+    name_mismatch,
+    not_ca,
+    issuer_mismatch,
+    unknown_critical,
+} {
+    let fd = p.fd
+    let hostname = p.hostname
+    let now = p.now
+    let scalar = p.scalar
+    let anchors = p.anchors
+    var transcript = p.transcript
+
+    // ---- ServerHello (plaintext) ----
+    var sh_msg = List[int]()
+    var looking = true
+    while looking {
+        let rec = read_record(fd)?
+        if rec.rtype == 20 {
+            // ChangeCipherSpec: ignored (§5's middlebox note).
+            looking = true
+        } else if rec.rtype == 21 {
+            return handshake_failure
+        } else if rec.rtype != 22 {
+            return unexpected_message
+        } else {
+            sh_msg = sub(rec.wire, 5, rec.wire.len)
+            looking = false
+        }
+    }
+    // Exactly one complete handshake message in the first record (this
+    // profile's server half frames it so; a fragmented ServerHello
+    // would be a legal server nobody here speaks for — decode_error).
+    if sh_msg.len < 4 {
+        return decode_error
+    }
+    let view = parse_server_hello(sh_msg)?
+    let negotiated = check_negotiation(view)?
+    if negotiated != suite_chacha20_sha256() {
+        return handshake_failure
+    }
+    handshake.transcript_add(mut transcript, copy sh_msg)
+
+    // ---- The key schedule's client side (§7.1) ----
+    let dh = handshake.ecdhe_shared(scalar, view.server_share)?
+    let early = handshake.early_secret()
+    let hs = handshake.handshake_secret(early, dh)
+    let th_ch_sh = handshake.transcript_hash(copy transcript)
+    let c_hs = handshake.client_handshake_traffic(copy hs, copy th_ch_sh)
+    let s_hs = handshake.server_handshake_traffic(copy hs, th_ch_sh)
+    let s_key = record.traffic_key(copy s_hs, 32)
+    let s_iv = record.traffic_iv(copy s_hs)
+    var s_seq = 0
+
+    // ---- The encrypted server flight: EE, Certificate,
+    // CertificateVerify, Finished — reassembled from sealed records and
+    // driven through the §4.1 state machine. ----
+    var stage = handshake.hs_step(handshake.role_client(), 0, handshake.hs_server_hello())?
+    var hbuf = List[int]()
+    var chain = List[int]()
+    var leaf_alg = ""
+    var leaf_key = List[int]()
+    while stage < 5 {
+        // Refill until one complete message is buffered.
+        var need = true
+        if hbuf.len >= 4 {
+            let want = 4 + hbuf[1] * 65536 + hbuf[2] * 256 + hbuf[3]
+            if hbuf.len >= want {
+                need = false
+            }
+        }
+        if need {
+            let rec = read_record(fd)?
+            if rec.rtype == 20 {
+                // ChangeCipherSpec: ignored.
+                need = true
+            } else if rec.rtype == 21 {
+                return handshake_failure
+            } else if rec.rtype != 23 {
+                return unexpected_message
+            } else {
+                let inner = record.open(s_key, s_iv, s_seq, rec.wire) else |e| match e {
+                    tag => {
+                        return bad_record_mac
+                    },
+                    short => {
+                        return decode_error
+                    },
+                    unexpected => {
+                        return unexpected_message
+                    },
+                }
+                s_seq = s_seq + 1
+                let ctype = record.content_type_of(copy inner)
+                if ctype == record.content_type_alert() {
+                    return handshake_failure
+                }
+                if ctype != record.content_type_handshake() {
+                    return unexpected_message
+                }
+                let content = record.content_of(inner)
+                for b in content {
+                    (mut hbuf).push(b)
+                }
+            }
+        } else {
+            let mlen = 4 + hbuf[1] * 65536 + hbuf[2] * 256 + hbuf[3]
+            let msg = sub(hbuf, 0, mlen)
+            hbuf = sub(hbuf, mlen, hbuf.len)
+            let mtype = msg[0]
+            stage = handshake.hs_step(handshake.role_client(), stage, mtype)?
+            if stage == 2 {
+                // EncryptedExtensions arrived.
+                let ee_ok = check_encrypted_extensions(copy msg)?
+                if ee_ok != 1 {
+                    return decode_error
+                }
+            } else if stage == 3 {
+                // Certificate arrived: extract and validate the chain.
+                chain = certificate_chain_of(copy msg)?
+                let apos = pick_anchor(copy chain, hostname, copy anchors, now)?
+                let astop = cert.cert_end(copy anchors, apos)?
+                let anchor = sub(anchors, apos, astop)
+                let leaf = cert.validate_chain(copy chain, hostname, anchor, now)?
+                leaf_alg = leaf.spki_alg
+                leaf_key = leaf.spki_key
+            } else if stage == 4 {
+                // CertificateVerify arrived: THE verification (the
+                // transcript hash is through Certificate — msg not yet
+                // added).
+                let cv = certificate_verify_of(copy msg)?
+                let th_cert = handshake.transcript_hash(copy transcript)
+                let cv_ok = verify_certificate_verify(
+                    leaf_alg,
+                    copy leaf_key,
+                    cv.scheme,
+                    cv.sig,
+                    th_cert,
+                )?
+                if cv_ok != 1 {
+                    return bad_signature
+                }
+            } else {
+                // Server Finished arrived: judged over the transcript
+                // through CertificateVerify.
+                let fv = finished_of(copy msg)?
+                let th_cv = handshake.transcript_hash(copy transcript)
+                let fin_ok = handshake.accept_finished(copy s_hs, th_cv, fv)?
+                if fin_ok != 1 {
+                    return decrypt_error
+                }
+            }
+            handshake.transcript_add(mut transcript, msg)
+        }
+    }
+
+    // ---- The client's own Finished, under the HANDSHAKE keys ----
+    let th_sfin = handshake.transcript_hash(copy transcript)
+    let cfin = handshake.finished_for(copy c_hs, copy th_sfin)
+    let c_key = record.traffic_key(copy c_hs, 32)
+    let c_iv = record.traffic_iv(c_hs)
+    let cfin_rec = record.seal(c_key, c_iv, 0, record.content_type_handshake(), copy cfin, 0)
+    write_all(fd, cfin_rec)?
+    handshake.transcript_add(mut transcript, cfin)
+
+    // ---- Application traffic secrets (§7.1) ----
+    let master = handshake.master_secret(hs)
+    let c_ap = handshake.client_application_traffic(copy master, copy th_sfin)
+    let s_ap = handshake.server_application_traffic(master, th_sfin)
+    Client {
+        fd: fd,
+        write_key: record.traffic_key(copy c_ap, 32),
+        write_iv: record.traffic_iv(c_ap),
+        write_seq: 0,
+        read_key: record.traffic_key(copy s_ap, 32),
+        read_iv: record.traffic_iv(s_ap),
+        read_seq: 0,
+    }
+}
+
+// ---------------------------------------------------------------------
+// Application data — read/write/close mirroring the facade's seam.
+// ---------------------------------------------------------------------
+
+/// One record's application data, deprotected. Post-handshake
+/// HANDSHAKE messages (a NewSessionTicket) are skipped, per the RFC; a
+/// close_notify (or any alert) answers the `closed` row — the outcome
+/// that ends a read loop, exactly `net.read`'s convention.
+///
+/// Rows: `closed` (the peer finished — TLS close_notify or TCP eof),
+/// `timeout` (an armed deadline), `bad_record_mac` (a tampered or
+/// forged record — nothing exposed), `decode_error` (malformed
+/// framing), `unexpected_message` (a plaintext record where sealed
+/// ones must ride), `io`. Never traps on wire data.
+/// ct: the AEAD open carries the read key through sc20/sc17.
+pub fn read(mut c: Client) -> List[int] ! {
+    closed,
+    timeout,
+    bad_record_mac,
+    decode_error,
+    unexpected_message,
+    io,
+} {
+    var going = true
+    var out = List[int]()
+    while going {
+        let rec = read_record(c.fd)?
+        if rec.rtype == 20 {
+            going = true
+        } else if rec.rtype != 23 {
+            return unexpected_message
+        } else {
+            let inner = record.open(copy c.read_key, copy c.read_iv, c.read_seq, rec.wire) else |e| match e {
+                tag => {
+                    return bad_record_mac
+                },
+                short => {
+                    return decode_error
+                },
+                unexpected => {
+                    return unexpected_message
+                },
+            }
+            c.read_seq = c.read_seq + 1
+            let ctype = record.content_type_of(copy inner)
+            if ctype == record.content_type_alert() {
+                return closed
+            }
+            if ctype == record.content_type_application_data() {
+                out = record.content_of(inner)
+                going = false
+            }
+            // A handshake content type (NewSessionTicket etc.) falls
+            // through: skipped, the loop reads on.
+        }
+    }
+    out
+}
+
+/// Seal `data` as one application-data record and send it.
+///
+/// Rows: `invalid` — an element of `data` outside 0..255, checked
+/// BEFORE any sealing (the caller's data answers a row, §10; the byte
+/// tier's own tag, §14); `closed`, `io` — the transport's. The record
+/// sequence advances only on success.
+/// ct: the seal carries the write key through sc20/sc17.
+pub fn write(mut c: Client, data: List[int]) -> () ! {closed, invalid, io} {
+    for b in data {
+        if b < 0 {
+            return invalid
+        }
+        if b > 255 {
+            return invalid
+        }
+    }
+    let rec = record.
+        seal(
+        copy c.write_key,
+        copy c.write_iv,
+        c.write_seq,
+        record.content_type_application_data(),
+        data,
+        0,
+    )
+    write_all(c.fd, rec)?
+    c.write_seq = c.write_seq + 1
+}
+
+/// Close the connection, consuming the `Client`: a close_notify alert
+/// goes out under the write keys (best-effort — a peer that already
+/// vanished does not un-close the socket), then the socket closes.
+/// `take` for the facade's reason: every later use is a static
+/// use-after-move.
+///
+/// Rows: `io` — the socket close's. Never traps.
+/// ct: the final seal carries the write key; nothing else is secret.
+pub fn close(take c: Client) -> () ! {io} {
+    var alert = List[int]()
+    (mut alert).push(1)
+    (mut alert).push(0)
+    let rec = record.
+        seal(c.write_key, c.write_iv, c.write_seq, record.content_type_alert(), alert, 0)
+    write_all(c.fd, rec) else |_| {}
+    var s = net.Socket { fd: c.fd }
+    net.close(take s)?
+}

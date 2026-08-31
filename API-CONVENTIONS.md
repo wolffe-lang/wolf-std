@@ -1114,6 +1114,29 @@ capability's life.
 
 ## Review record
 
+- 2026-08-30, sc29 amendments (the net byte tier + the deadline, and the
+  first PROTOCOL CLIENT): §14's os-tier vocabulary reaches sockets' binary
+  half — `net.read_bytes`/`write_bytes` carry `List[int]` with the `invalid`
+  tag for a non-byte element, verbatim from `fs`'s byte tier (no `utf8` row:
+  a lone `0x80` is data), and the `timeout` tag `std.net` declared from sc08
+  becomes REACHABLE via `set_deadline`/`set_listener_deadline` over s106's
+  `net_deadline` — a declared-early row paid as a PURE ADDITION (no signature
+  changed, F-0049's deadline half closed). The lane split is recorded, not
+  designed: the str tier and the deadline are three-lane, the byte pair is
+  compiler-lanes-only (lupin 0.1.18 does not resolve it, F-0102), and a
+  facade keeps its other lanes because lupin resolves module bodies lazily.
+  A protocol CLIENT (`std.x.tls.client`) adds the reviewed pattern for a
+  blocking, no-reactor tier: a two-PHASE handshake (`begin` writes without
+  reading, `complete` reads the flight) so an in-process client+server
+  witness alternates with kernel-buffered flights instead of deadlocking a
+  single thread — the shape stated in the module header as an API decision;
+  every adversarial input a NAMED row (the negative battery, pure and
+  three-lane); the CertificateVerify verify a DISPATCH that answers
+  `unsupported_alg` for a scheme it cannot check, never a silent accept; and
+  a descriptor held as an `int` (rebuilding the `net.Socket` wrapper per
+  call) where a `mut self` method would otherwise trip F-0092. Review rides
+  the same pending sc00 gate.
+
 - 2026-08-22, sc12 (02-os) amendments: §14 gains the second-half-of-a-
   capability rules (a row deleted when its delegate stops raising it; a row
   not added for a tag the arguments cannot reach, with the coarsening in a

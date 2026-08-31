@@ -1,0 +1,135 @@
+//! check: run(exit=0, stdout="parsed: SH EE Cert CV Fin\nsuite refused: handshake_failure\nrsa_pss refused: unsupported_alg")
+//! phase: run
+//! conforms: std.x.tls.client, std.x.tls.handshake
+//!
+//! RFC 8448 §3 — the differential TURNED INWARD. The client's flight
+//! parsers are fed the EXACT server-flight wire bytes RFC 8448's Simple
+//! 1-RTT trace publishes (the same bytes sc21's server-side builders
+//! emit, asserted there byte-for-byte), and every extracted field is
+//! checked. This is the client seeing precisely what the server half
+//! produces — the two halves of one library proving each other, at the
+//! parse boundary, on all three lanes (pure structure, no crypto).
+//!
+//! Two of the checks are the HONESTY SPLIT in action against the real
+//! trace: RFC 8448's suite is TLS_AES_128_GCM_SHA256 (0x1301), which
+//! this profile does not speak — `check_negotiation` refuses it
+//! `handshake_failure` (not a silent mis-parse). And the trace's
+//! CertificateVerify is rsa_pss_rsae_sha256 (0x0804), whose crypto rung
+//! is unbuilt — `verify_certificate_verify` refuses it
+//! `unsupported_alg`, never a silent accept (the sc22 rule the sc21
+//! "verify nothing" posture retires INTO for the two schemes that CAN
+//! verify, ed25519/ecdsa — witnessed against a real key in
+//! `loopback_handshake.lu`).
+
+use std.hex
+use std.x.tls.client
+use std.x.tls.handshake as hs
+
+fn bytes_of(h: str) -> List[int] {
+    hex.decode(h) else List[int]()
+}
+
+fn main() -> !int {
+    // ---- ServerHello (RFC 8448 §3) ----
+    let sh = bytes_of(
+        "020000560303a6af06a4121860dc5e6e60249cd34c95930c8ac5cb1434dac155772ed3e2692800130100002e00330024001d0020c9828876112095fe66762bdbf7c672e156d6cc253b833df1dd69b1b04e751f0f002b00020304",
+    )
+    let view = client.parse_server_hello(sh)?
+    assert(view.legacy_version == 771, "SH legacy_version")
+    assert(view.cipher_suite == 4865, "SH cipher_suite (0x1301)")
+    assert(view.compression == 0, "SH compression")
+    assert(view.selected_version == 772, "SH selected_version (0x0304)")
+    assert(view.key_share_group == 29, "SH key_share group (x25519)")
+    assert(view.server_share.len == 32, "SH share length")
+    assert(!view.hello_retry, "SH not a HelloRetryRequest")
+    assert(
+        hs.to_hex(view.server_share) ==
+            "c9828876112095fe66762bdbf7c672e156d6cc253b833df1dd69b1b04e751f0f",
+        "SH share bytes",
+    )
+
+    // The suite is 0x1301, which THIS profile does not speak.
+    var suite_msg = "?"
+    let _neg = client.check_negotiation(view) else |e| match e {
+        downgrade => {
+            suite_msg = "downgrade"
+            0
+        },
+        handshake_failure => {
+            suite_msg = "handshake_failure"
+            0
+        },
+        illegal_parameter => {
+            suite_msg = "illegal_parameter"
+            0
+        },
+        unexpected_message => {
+            suite_msg = "unexpected_message"
+            0
+        },
+    }
+
+    // ---- EncryptedExtensions ----
+    let ee = bytes_of(
+        "080000240022000a00140012001d00170018001901000101010201030104001c0002400100000000",
+    )
+    let ee_ok = client.check_encrypted_extensions(ee)?
+    assert(ee_ok == 1, "EE structure")
+
+    // ---- Certificate (the trace's 432-octet RSA cert) ----
+    let certmsg = bytes_of(
+        "0b0001b9000001b50001b0308201ac30820115a003020102020102300d06092a864886f70d01010b0500300e310c300a06035504031303727361301e170d3136303733303031323335395a170d3236303733303031323335395a300e310c300a0603550403130372736130819f300d06092a864886f70d010101050003818d0030818902818100b4bb498f8279303d980836399b36c6988c0c68de55e1bdb826d3901a2461eafd2de49a91d015abbc9a95137ace6c1af19eaa6af98c7ced43120998e187a80ee0ccb0524b1b018c3e0b63264d449a6d38e22a5fda430846748030530ef0461c8ca9d9efbfae8ea6d1d03e2bd193eff0ab9a8002c47428a6d35a8d88d79f7f1e3f0203010001a31a301830090603551d1304023000300b0603551d0f0404030205a0300d06092a864886f70d01010b05000381810085aad2a0e5b9276b908c65f73a7267170618a54c5f8a7b337d2df7a594365417f2eae8f8a58c8f8172f9319cf36b7fd6c55b80f21a03015156726096fd335e5e67f2dbf102702e608ccae6bec1fc63a42a99be5c3eb7107c3c54e9b9eb2bd5203b1c3b84e0a8b2f759409ba3eac9d91d402dcc0cc8f8961229ac9187b42b4de10000",
+    )
+    let chain = client.certificate_chain_of(certmsg)?
+    assert(chain.len == 432, "Cert chain (one leaf, 432 octets)")
+
+    // ---- CertificateVerify (rsa_pss_rsae_sha256 in the trace) ----
+    let cvmsg = bytes_of(
+        "0f000084080400805a747c5d88fa9bd2e55ab085a61015b7211f824cd484145ab3ff52f1fda8477b0b7abc90db78e2d33a5c141a078653fa6bef780c5ea248eeaaa785c4f394cab6d30bbe8d4859ee511f602957b15411ac027671459e46445c9ea58c181e818e95b8c3fb0bf3278409d3be152a3da5043e063dda65cdf5aea20d53dfacd42f74f3",
+    )
+    let cv = client.certificate_verify_of(cvmsg)?
+    assert(cv.scheme == 2052, "CV scheme (0x0804 rsa_pss_rsae_sha256)")
+    assert(cv.sig.len == 128, "CV signature length")
+
+    // rsa_pss is a NAMED unsupported_alg — never a silent accept.
+    var rsa_msg = "?"
+    var dummy_hash = List[int]()
+    var z = 0
+    while z < 32 {
+        (mut dummy_hash).push(0)
+        z = z + 1
+    }
+    let _rsa = client.
+        verify_certificate_verify(
+        "1.2.840.113549.1.1.1",
+        List[int](),
+        cv.scheme,
+        copy cv.sig,
+        dummy_hash,
+    ) else |e| match e {
+        unsupported_alg => {
+            rsa_msg = "unsupported_alg"
+            0
+        },
+        bad_signature => {
+            rsa_msg = "bad_signature"
+            0
+        },
+    }
+
+    // ---- Finished ----
+    let finmsg = bytes_of(
+        "140000209b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718",
+    )
+    let vd = client.finished_of(finmsg)?
+    assert(vd.len == 32, "Finished verify_data length")
+    assert(
+        hs.to_hex(vd) == "9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718",
+        "Finished bytes",
+    )
+
+    print("parsed: SH EE Cert CV Fin")
+    print("suite refused: {suite_msg}")
+    print("rsa_pss refused: {rsa_msg}")
+    0
+}

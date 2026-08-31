@@ -1,0 +1,35 @@
+//! check: run(exit=1, stdout="handled: invalid\nerror: invalid")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate, err.else
+//!
+//! `write_bytes`' `invalid` row: an element outside 0..255 is rejected
+//! by name BEFORE anything reaches the wire — the same pre-write check
+//! and the same tag as `fs.write_bytes` (§14's os-tier vocabulary).
+//! Handler witness first, then the `?` ride-out so the toolchain names
+//! the tag. The socket carries nothing afterwards: the reject is whole,
+//! not a truncation.
+//!
+//! Lanes: the byte tier is compiler-lanes-only at this pin (F-0102).
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli = net.connect(net.loopback(p))?
+    var bad = List[int]()
+    (mut bad).push(65)
+    (mut bad).push(256)
+    net.write_bytes(mut cli, bad) else |e| match e {
+        closed => { print("handled: closed") },
+        invalid => { print("handled: invalid") },
+        io => { print("handled: io") },
+    }
+    var worse = List[int]()
+    (mut worse).push(0 - 1)
+    net.write_bytes(mut cli, worse)?
+    print("unreachable")
+    net.close(take cli)?
+    net.close_listener(take srv)?
+    0
+}
