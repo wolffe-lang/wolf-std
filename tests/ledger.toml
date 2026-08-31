@@ -1249,6 +1249,38 @@ lupin = "run"
 wolfc = "run"
 native = "run"  # 1b149ba: s106 crossed net natively
 
+# ---- sc29: the byte tier + the deadline (s106's three builtins, wrapped
+# at last). `read_bytes`/`write_bytes` carry `List[int]` with no `utf8`
+# row (F-0080's ask, shipped upstream at s106, adopted verbatim here) —
+# both compiler rungs run them, lupin 0.1.18 does not resolve the byte
+# pair (F-0102 / wolf-interp#…, the is18 socket tier is str-only), so the
+# two byte rows record the honest `unsupported` there. `set_deadline` /
+# `set_listener_deadline` arm `net_deadline` on ALL THREE lanes (lupin
+# included, measured: a 150ms budget resolves a silent-peer read and a
+# peer-less accept as `timeout`) — the tag every net signature declared
+# from sc08 (F-0049) is REACHABLE at last, and its two rows are
+# three-lane.
+
+[tests."net/bytes_round_trip.lu"]
+lupin = "unsupported"  # F-0102: `net_read_bytes`/`net_write_bytes` do not resolve at 0.1.18 — the byte tier is the str tier's one-release-behind half
+wolfc = "run"
+native = "run"
+
+[tests."net/write_bytes_invalid_row.lu"]
+lupin = "unsupported"  # F-0102
+wolfc = "run"
+native = "run"
+
+[tests."net/read_deadline_row.lu"]
+lupin = "run"  # 0.1.18 arms the budget on its str-tier read — measured at the sc29 pin
+wolfc = "run"
+native = "run"
+
+[tests."net/accept_deadline_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
 # ---- sc09: std.str's census flip and std.bytes' first code ----
 # Sixteen new rows and every one of them is `run` on ALL THREE LANES — the
 # first time a sprint has landed a clean three-lane block, and the reason is

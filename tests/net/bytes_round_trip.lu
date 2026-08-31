@@ -1,0 +1,47 @@
+//! check: run(exit=0, stdout="got: 0 255 128 7 10\nback: 3")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate
+//!
+//! The byte tier end to end (sc29, s106's builtins): bytes that are NOT
+//! text — 0x00, 0xff, a lone 0x80, a bare LF — ride a loopback socket
+//! both directions with no `utf8` row anywhere, which is the property
+//! the str tier structurally cannot have (F-0080's ask, delivered).
+//! Dial-first as every net test: the connection waits in the backlog and
+//! nothing blocks.
+//!
+//! Lanes: both compiler rungs run the byte tier; lupin 0.1.18 does not
+//! resolve `net_read_bytes`/`net_write_bytes` (F-0102, filed) — the
+//! ledger records the honest `unsupported` there.
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli = net.connect(net.loopback(p))?
+    var msg = List[int]()
+    (mut msg).push(0)
+    (mut msg).push(255)
+    (mut msg).push(128)
+    (mut msg).push(7)
+    (mut msg).push(10)
+    net.write_bytes(mut cli, msg)?
+    var conn = net.accept(mut srv)?
+    let got = net.read_bytes(mut conn, 16)?
+    var line = ""
+    for b in got {
+        line = "{line} {b}"
+    }
+    print("got:{line}")
+    var reply = List[int]()
+    (mut reply).push(254)
+    (mut reply).push(0)
+    (mut reply).push(253)
+    net.write_bytes(mut conn, reply)?
+    let back = net.read_bytes(mut cli, 16)?
+    print("back: {back.len}")
+    net.close(take cli)?
+    net.close(take conn)?
+    net.close_listener(take srv)?
+    0
+}

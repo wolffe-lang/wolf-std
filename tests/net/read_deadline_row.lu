@@ -1,0 +1,41 @@
+//! check: run(exit=1, stdout="handled: deadline fired\nerror: timeout")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate, err.else
+//!
+//! The `timeout` tag FIRES (sc29): nine sprints after sc08 declared it
+//! for vocabulary stability (F-0049 — the runtime's deadline no builtin
+//! could arm), `set_deadline` arms s106's `net_deadline` budget and a
+//! read from a silent peer resolves as the row instead of blocking
+//! forever. Both witnesses, the refused_row shape: a discriminating
+//! handler names the tag in-band, then the `?` ride-out lets the
+//! toolchain name it on stdout (`error: timeout`, exit 1).
+//!
+//! Deterministic and quick: the peer never writes, so only the armed
+//! budget (150ms) decides when the read returns — no data race, no
+//! wall-clock assertion beyond "it returned with the right tag".
+//!
+//! Three-lane: lupin 0.1.18 arms the deadline on its str-tier read too
+//! (measured at the sc29 pin).
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli = net.connect(net.loopback(p))?
+    var conn = net.accept(mut srv)?
+    net.set_deadline(mut cli, 150)?
+    let first = net.read(mut cli, 8) else |e| match e {
+        closed => "closed",
+        timeout => "deadline fired",
+        utf8 => "utf8",
+        io => "io",
+    }
+    print("handled: {first}")
+    let strict = net.read(mut cli, 8)?
+    print("unreachable: {strict.len}")
+    net.close(take cli)?
+    net.close(take conn)?
+    net.close_listener(take srv)?
+    0
+}
