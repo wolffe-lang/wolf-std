@@ -186,22 +186,22 @@ pub fn slice(b: List[int], from: int, to: int) -> List[int] {
     if to > n {
         assert(false, "bytes.slice: the range ends past the last byte")
     }
-    // The copy has a language spelling now (`b[from..to]`, [mem.list.slice],
-    // s128) — and this function deliberately does not use it. `b` may
-    // arrive as a LENT byte view (`s.bytes()` crosses the call, s89;
-    // `lend_across_calls.lu` pins it, the doc examples above lend too),
-    // and the native rung refuses a slice of a lent view at `mem`
-    // ("range VALUES outside `for` headers", measured at v0.2.0/c88ab64;
-    // owned callers compile — the refusal is the lend path alone).
-    // F-0101 carries the measurement; the loop is the lane-portable
-    // spelling until the native rung learns the shape.
-    var out = List[int]()
-    var k = from
-    while k < to {
-        (mut out).push(b[k])
-        k = k + 1
-    }
-    out
+    // The copy is the language's own word ([mem.list.slice], s128): a
+    // fresh List, exactly what the sc02 index loop hand-rolled. The
+    // asserts above keep the documented `assert` contract — the range is
+    // valid by the time the slice runs, so its `bounds` trap is
+    // unreachable and the kind question stays a future Bytes decision.
+    // This line has a history (found -> filed -> fixed -> re-adopted):
+    // sc28 adopted it, the gauntlet moved exactly one row
+    // (`lend_across_calls.lu` [native] — a slice of a LENT view, `b`
+    // arriving as `s.bytes()` across the call, refused at `mem` at
+    // v0.2.0/c88ab64 while owned callers compiled), and the site
+    // retreated to the index loop the same day with the shape named
+    // (F-0101, wolf-lang#184). s129 paid the filing — the lent-view
+    // path gained its slice arm — and sc30 re-adopted at b80d239 with
+    // the same one row holding `run` on the range spelling. The lend
+    // witness and the doc examples above exercise the healed shape.
+    b[from..to]
 }
 
 /// The index of the first occurrence of `needle` in `b`; `none` when it
