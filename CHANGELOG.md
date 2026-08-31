@@ -1,5 +1,37 @@
 # Changelog
 
+## sc30 — 2026-08-31 — the slice comes home
+
+Pins advance to wolf b80d239 (the s129/s130 merges; a dev-stamped
+build whose `+dev.b80d239` identity carries the pin clause doctor
+gates — no release tag exists past v0.2.0, and D57's honest answer is
+the dev brand) and lupin v0.1.19 at conformance pin 83f83bb, one
+merge behind the data pin with the gap named. Drift predicted two
+movers and measured three, all lupin, all deeper: the sc29 byte-tier
+rows go three-lane (F-0102 paid exactly as filed) and
+`loopback_handshake`'s lupin lane RUNS the full TLS 1.3 handshake
+inside the 50M step budget — sc29's "and the step budget" was an
+inference the resolve refusal had shadowed, and the measurement
+outvoted it. F-0101 closes the sc28 arc: `bytes.slice` re-adopts
+`b[from..to]` (the retreat commit reverses) and the one row the sc28
+adoption moved holds `run` on every lane with the range spelling —
+found, filed, fixed, re-adopted. Struct patterns adopted where the
+struct is born: 14 patterns at 8 files, probe-proven compositions
+first, ledger flat throughout. The chars-pairs tuple list refused at
+its fourth consecutive pin; F-0096 verbatim; anchors 404
+(+`gram.pat.struct`).
+
+## sc29 — 2026-08-31 — the client shakes the hand
+
+std.x.tls.client lands: a TLS 1.3 client over the library's proven
+halves, two-phase begin/complete for the single-threaded reality,
+CertificateVerify VERIFIES (ed25519 + ecdsa-p256; sc21's
+verify-nothing retires), the eleven-shape negative battery refuses by
+name, and the loopback flagship shakes hands with a server half built
+from the same primitives. std.net gains `read_bytes`/`write_bytes`
+and the deadline pair — F-0049's `timeout` tag reachable at last.
+F-0102 filed (wolf-interp#52): the byte tier dark under lupin 0.1.18.
+
 ## sc28 — 2026-08-30 — the library writes the new words
 
 Pins advance to wolf v0.2.0 and lupin 0.1.18, both D57-bare release
