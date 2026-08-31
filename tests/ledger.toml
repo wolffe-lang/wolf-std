@@ -14,6 +14,54 @@
 # Every slow row is owed a re-measure at pin bumps; an interpreter perf
 # wave is its exit.
 #
+# THE sc30 PIN BUMP (wolf v0.2.0/c88ab64 -> b80d239, the s129+s130
+# merges — struct patterns whole-pipe, the #184 lend-slice mem fix,
+# match arms take the product domain; lupin 0.1.18 -> the v0.1.19 TAG
+# = 23dcf62, is30 — the shape binds, conformance pin addcd7f ->
+# 83f83bb) MOVED THREE ROWS, all lupin, all DEEPER — and the
+# prediction (written first, docs/findings.md sc30 register) named
+# TWO of them and called the third's verdict word wrong in the
+# right direction. The two predicted: net/bytes_round_trip and
+# net/write_bytes_invalid_row flip `unsupported` -> `run` (F-0102
+# paid: is30's net_read_bytes/net_write_bytes land as the str calls'
+# own shape — one receive of up to n raw bytes, whole-or-raise
+# writes behind the WHOLE pre-write check, no utf8 row, the fs
+# vocabulary this facade adopted verbatim at sc29; both re-measured
+# one at a time from staged dirs, bytes_round_trip exit(0)
+# "got: 0 255 128 7 10\nback: 3", write_bytes_invalid_row exit(1)
+# "handled: invalid\nerror: invalid" — declared against the fix at
+# sc29, observed at first sight, the F-0049 lesson again). The
+# UNPREDICTED third: x/tls/client/loopback_handshake's lupin lane
+# flips `unsupported` -> `run` — the prediction said the verdict
+# word would HOLD with the reason re-attributed from the byte tier's
+# can't-resolve to the 50M step budget, repeating sc29's "and
+# lupin's" budget attribution, which was INFERRED and never
+# measured (at 0.1.18 the byte tier refused at resolve before a
+# single step was evaluated, so the budget claim had no
+# observation). Measured at 0.1.19: the full handshake — four X25519
+# ladders + Ed25519 sign/verify + the AEAD flight — evaluates in
+# 18.9s idle, INSIDE the 50M budget, exact directive stdout. The
+# corpus's own rungs already said which class the handshake sits in:
+# the single-ladder x25519 rows (s52, s61_dh) have run under lupin
+# since sc18 and only the VECTOR SWEEPS (wycheproof parts, the
+# chain) blow 50M — a handshake is a handful of ladders, not a
+# sweep. wolfc keeps its measured step-budget refusal, so the
+# flagship is two-lane now and the checked tier is the one dark
+# lane. Anchors 403 -> 404, +1/-0, the +1 EXACTLY [gram.pat.struct]
+# (s129; s130 added no clause), set-diffed both ways at the
+# re-vendor. Zero other motion over the remaining 369 rows: zero
+# struct patterns / match-arm guards / `#![` markers in std/ or
+# tests/ (grepped before the run); std/cmp's three match-arm tuple
+# products sit behind the EARLIER trait/enum refusal on the compiler
+# lanes and lupin ran products all along; the #184 fix finds zero
+# carriers at the bump because bytes.slice still spells the sc28
+# retreat loop — its healing is spent by this sprint's re-adopt
+# commit, deliberately separate; sc28's tuple destructures never
+# read a moved-from element, so is30's element-move discipline
+# changes no answer; no perf/budget commit in either span (the 25
+# 50M-step rows keep the same refusal at the same budget, the 3 char
+# rows hold `run`, `slow` and `divergent` keep zero carriers).
+#
 # THE sc28 PIN BUMP (wolf 0a5c1af -> the v0.2.0 TAG = c88ab64, r03 —
 # release machinery only, five commits, nothing semantic; lupin 0.1.17
 # -> the v0.1.18 TAG = 66dc06c, is29 — the first arm yields) MOVED SIX
@@ -1252,22 +1300,27 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # ---- sc29: the byte tier + the deadline (s106's three builtins, wrapped
 # at last). `read_bytes`/`write_bytes` carry `List[int]` with no `utf8`
 # row (F-0080's ask, shipped upstream at s106, adopted verbatim here) —
-# both compiler rungs run them, lupin 0.1.18 does not resolve the byte
-# pair (F-0102 / wolf-interp#…, the is18 socket tier is str-only), so the
-# two byte rows record the honest `unsupported` there. `set_deadline` /
-# `set_listener_deadline` arm `net_deadline` on ALL THREE lanes (lupin
-# included, measured: a 150ms budget resolves a silent-peer read and a
-# peer-less accept as `timeout`) — the tag every net signature declared
-# from sc08 (F-0049) is REACHABLE at last, and its two rows are
-# three-lane.
+# both compiler rungs ran them from sc29; lupin 0.1.18 did not resolve
+# the byte pair (F-0102 / wolf-interp#52, the is18 socket tier was
+# str-only), so the two byte rows recorded the honest `unsupported`
+# there for exactly one sprint — 0.1.19 resolves the pair as the str
+# calls' own shape and the block is THREE-LANE now (the sc30 bump; both
+# rows re-measured singly from staged dirs, observed at first sight
+# against the sc29 bodies untouched — declared against the fix, paid as
+# a pure flip, the F-0049 lesson at its second address). `set_deadline`
+# / `set_listener_deadline` arm `net_deadline` on ALL THREE lanes
+# (lupin included, measured: a 150ms budget resolves a silent-peer read
+# and a peer-less accept as `timeout`) — the tag every net signature
+# declared from sc08 (F-0049) is REACHABLE at last, and its two rows
+# are three-lane.
 
 [tests."net/bytes_round_trip.lu"]
-lupin = "unsupported"  # F-0102: `net_read_bytes`/`net_write_bytes` do not resolve at 0.1.18 — the byte tier is the str tier's one-release-behind half
+lupin = "run"  # sc30 binary bump (lupin 0.1.19): F-0102 paid — is30's net_read_bytes/net_write_bytes land as the str calls' own shape (List[int], no utf8 row); exit(0) "got: 0 255 128 7 10\nback: 3", staged re-measure 2026-08-31
 wolfc = "run"
 native = "run"
 
 [tests."net/write_bytes_invalid_row.lu"]
-lupin = "unsupported"  # F-0102
+lupin = "run"  # sc30 binary bump (lupin 0.1.19): F-0102 paid — the invalid row raises off the WHOLE pre-write check, nothing reaches the wire; exit(1) "handled: invalid\nerror: invalid", staged re-measure 2026-08-31
 wolfc = "run"
 native = "run"
 
@@ -2722,11 +2775,18 @@ native = "run"
 #   client (begin/complete/read/write/close) against a server half
 #   built from the same primitives (sc21 builders + record.seal + sc18
 #   sign), verifying the real sc22 chain + a real Ed25519
-#   CertificateVerify + both Finished, app data both ways. NATIVE-ONLY:
-#   the byte tier is lupin-`unsupported` (F-0102) and four X25519
-#   ladders + Ed25519 sign/verify + the AEAD flight blow the checked
-#   tier's step budget (measured `unsupported @1924..11690`) and
-#   lupin's — the p256/curve25519 lane-cost mechanism, one rung up.
+#   CertificateVerify + both Finished, app data both ways. TWO-LANE as
+#   of the sc30 bump (lupin 0.1.19 + native): sc29 wrote it native-only
+#   for the byte tier (F-0102, lupin-`unsupported` at resolve) "AND the
+#   step budget" — and that second attribution was INFERRED, never
+#   measured, because the resolve refusal fired before a single step
+#   evaluated. 0.1.19 resolves the byte tier and the measurement
+#   outvotes the inference: the whole handshake evaluates in 18.9s
+#   idle, INSIDE lupin's 50M budget — a handshake is a handful of
+#   ladders, and the single-ladder x25519 rows always ran under lupin;
+#   only the vector sweeps blow the budget. The checked tier is the one
+#   dark lane: four X25519 ladders + Ed25519 sign/verify + the AEAD
+#   flight blow ITS step budget (measured `unsupported @1924..11690`).
 #   The witness runs ~0.9s native (a handshake is not a vector sweep).
 
 [tests."x/tls/client/rfc8448_parse_vectors.lu"]
@@ -2740,7 +2800,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/tls/client/loopback_handshake.lu"]
-lupin = "unsupported"  # F-0102: the byte tier does not resolve at 0.1.18 (the socket witness cannot run there)
+lupin = "run"  # sc30 binary bump (lupin 0.1.19): F-0102 paid and the inferred step-budget refusal never materialized — the full handshake evaluates INSIDE the 50M budget (18.9s idle, exact directive stdout); staged re-measure 2026-08-31. The block comment above carries the inference-vs-measurement story
 wolfc = "unsupported"  # step budget exhausted @1924..11690 — four X25519 ladders + Ed25519 sign/verify + the AEAD flight (the curve25519 lane cost, one rung up)
 native = "run"
 
