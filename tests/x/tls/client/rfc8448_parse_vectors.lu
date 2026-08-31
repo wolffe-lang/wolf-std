@@ -87,9 +87,12 @@ fn main() -> !int {
     let cvmsg = bytes_of(
         "0f000084080400805a747c5d88fa9bd2e55ab085a61015b7211f824cd484145ab3ff52f1fda8477b0b7abc90db78e2d33a5c141a078653fa6bef780c5ea248eeaaa785c4f394cab6d30bbe8d4859ee511f602957b15411ac027671459e46445c9ea58c181e818e95b8c3fb0bf3278409d3be152a3da5043e063dda65cdf5aea20d53dfacd42f74f3",
     )
-    let cv = client.certificate_verify_of(cvmsg)?
-    assert(cv.scheme == 2052, "CV scheme (0x0804 rsa_pss_rsae_sha256)")
-    assert(cv.sig.len == 128, "CV signature length")
+    // The parsed view is destructured where it is born (sc30,
+    // [gram.pat.struct] — a dotted path names an imported struct in
+    // pattern position, probe-proven on all three lanes first).
+    let client.CertVerifyView { scheme, sig } = client.certificate_verify_of(cvmsg)?
+    assert(scheme == 2052, "CV scheme (0x0804 rsa_pss_rsae_sha256)")
+    assert(sig.len == 128, "CV signature length")
 
     // rsa_pss is a NAMED unsupported_alg — never a silent accept.
     var rsa_msg = "?"
@@ -100,13 +103,7 @@ fn main() -> !int {
         z = z + 1
     }
     let _rsa = client.
-        verify_certificate_verify(
-        "1.2.840.113549.1.1.1",
-        List[int](),
-        cv.scheme,
-        copy cv.sig,
-        dummy_hash,
-    ) else |e| match e {
+        verify_certificate_verify("1.2.840.113549.1.1.1", List[int](), scheme, copy sig, dummy_hash) else |e| match e {
         unsupported_alg => {
             rsa_msg = "unsupported_alg"
             0

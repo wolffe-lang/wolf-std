@@ -295,11 +295,14 @@ fn rd_tag_len(mut r: Rd) -> Tlv ! {der} {
 /// SEQUENCE or a constructed INTEGER is rejected by the same equality).
 /// Returns the content length.
 fn rd_expect(mut r: Rd, tag: int) -> int ! {der} {
-    let t = rd_tag_len(mut r)?
-    if t.tag != tag {
+    // Destructured where the header is born (sc30, [gram.pat.struct]):
+    // the constructedness bit is not this check's business, so `..`
+    // says so.
+    let Tlv { tag: got, len, .. } = rd_tag_len(mut r)?
+    if got != tag {
         return der
     }
-    t.len
+    len
 }
 
 /// Skip `n` content bytes (already validated against the window by the

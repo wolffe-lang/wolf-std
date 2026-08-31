@@ -1046,16 +1046,16 @@ pub fn complete(take p: Pending) -> Client ! {
             }
         }
         if need {
-            let rec = read_record(fd)?
-            if rec.rtype == 20 {
+            let RawRecord { rtype, wire } = read_record(fd)?
+            if rtype == 20 {
                 // ChangeCipherSpec: ignored.
                 need = true
-            } else if rec.rtype == 21 {
+            } else if rtype == 21 {
                 return handshake_failure
-            } else if rec.rtype != 23 {
+            } else if rtype != 23 {
                 return unexpected_message
             } else {
-                let inner = record.open(s_key, s_iv, s_seq, rec.wire) else |e| match e {
+                let inner = record.open(s_key, s_iv, s_seq, wire) else |e| match e {
                     tag => {
                         return bad_record_mac
                     },
@@ -1104,15 +1104,12 @@ pub fn complete(take p: Pending) -> Client ! {
                 // CertificateVerify arrived: THE verification (the
                 // transcript hash is through Certificate — msg not yet
                 // added).
-                let cv = certificate_verify_of(copy msg)?
+                // The view is destructured where it is born (the sc30
+                // struct-pattern adoption, [gram.pat.struct]): both
+                // fields feed the one verify call.
+                let CertVerifyView { scheme, sig } = certificate_verify_of(copy msg)?
                 let th_cert = handshake.transcript_hash(copy transcript)
-                let cv_ok = verify_certificate_verify(
-                    leaf_alg,
-                    copy leaf_key,
-                    cv.scheme,
-                    cv.sig,
-                    th_cert,
-                )?
+                let cv_ok = verify_certificate_verify(leaf_alg, copy leaf_key, scheme, sig, th_cert)?
                 if cv_ok != 1 {
                     return bad_signature
                 }
@@ -1180,13 +1177,13 @@ pub fn read(mut c: Client) -> List[int] ! {
     var going = true
     var out = List[int]()
     while going {
-        let rec = read_record(c.fd)?
-        if rec.rtype == 20 {
+        let RawRecord { rtype, wire } = read_record(c.fd)?
+        if rtype == 20 {
             going = true
-        } else if rec.rtype != 23 {
+        } else if rtype != 23 {
             return unexpected_message
         } else {
-            let inner = record.open(copy c.read_key, copy c.read_iv, c.read_seq, rec.wire) else |e| match e {
+            let inner = record.open(copy c.read_key, copy c.read_iv, c.read_seq, wire) else |e| match e {
                 tag => {
                     return bad_record_mac
                 },

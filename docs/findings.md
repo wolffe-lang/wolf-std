@@ -109,8 +109,8 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0098 | 2026-08-28 | **take-mode reuse is a STATIC `fail(E1001)` on both compiler rungs and EXECUTES under lupin 0.1.14** — `net/use_after_close` runs to `trap(use-after-move)` (`[mem.tier0.move.2]`, the trap map's own dynamic answer) and `process/use_after_wait` never reaches the reuse (`start` honestly raises `not_found` first, `error: not_found` exit 1). Whether take-reuse joins lupin's static set (the E1007 precedent) or the dynamic trap is the reference is the counterparty's ruling to make; the two rows carry `divergent(trap(use-after-move))` / `divergent(exit(1))` until it lands | wolf-interp | [filed: wolf-interp#48](https://github.com/wolffe-lang/wolf-interp/issues/48); sc24 |
 | F-0099 | 2026-08-28 | **`[conf.anchor.ns]` does not admit `type` (nor `ct`/`diag`/`os`) while `spec-extract` publishes their anchors** — the s115/#120 class again, four documents later: `[type.char]` is in the registry the clause calls authoritative and a conforming test may not cite it by the clause's own letter. Surfaced by sc24's char-surface tests (`conforms: type.char` refused by this rig, which mirrors the letter); the same investigation caught this rig's own registry lagging `pkg` by nine sprints (fixed here). The reserved-forward `ty` now points at a name nothing will use — named in the filing for the same decision | wolf-lang spec | [filed: wolf-lang#165](https://github.com/wolffe-lang/wolf-lang/issues/165); sc24 |
 | F-0100 | 2026-08-28 | **`spec-extract`'s anchor scanner swallows a still-normative anchor: `gram.lex.ident` fell out of anchors.json at the s126 regen** — the scanner pairs each `[` with the NEXT `]` and resumes past it, and s126's amended `[gram.lex.shebang]` prose introduces bare literal `[` runs (`` `[` ``, `` `#[` ``, `` `#![` ``): the `[` of `` `#[` `` pairs with the `]` of the `### 1.3 Identifiers [gram.lex.ident]` heading below it, the span swallows the anchor's only occurrence, and the registry the spec calls authoritative ([conf.anchor.index]) silently disagrees with the spec's own text. `link_check` cannot catch it (it tests `contains`, still true). Measured at the sc26 bump: registry 393 -> 397 is +5/-1 where the clean delta is +5/0. No wolf-std test cites the anchor, so nothing reds here; the snapshot is re-vendored byte-faithful with the defect named in the bump record | wolf-lang spec/xtask | [filed: wolf-lang#170](https://github.com/wolffe-lang/wolf-lang/issues/170); sc26 |
-| F-0102 | 2026-08-30 | **lupin 0.1.18 does not resolve the net BYTE tier (`net_read_bytes`/`net_write_bytes`), where it resolves the str tier and `net_deadline`** — s106 shipped all three builtins and lupin's is18 socket crossing (0.1.14) took the str calls + the deadline (both measured three-lane at the sc29 pin: a 150ms `set_deadline` budget resolves a silent-peer `net_read` as `timeout` under lupin, and a peer-less `net_accept` too), but the byte pair is `unsupported: `net_write_bytes` does not resolve` at resolve — the one-release-behind half of the same tier. Costs the sc29 byte-tier facade rows (`net/bytes_round_trip`, `net/write_bytes_invalid_row`) their lupin lane and every `std.x.tls.client` socket witness its lupin lane (`loopback_handshake` is native-only for this AND the step budget); the pure client parse/verify half stays three-lane by lupin's lazy body resolution. The str/deadline tier proves the surface exists on that lane, so this is a completeness gap in the byte mirror, not a design decline — the shape of the fix is the str calls' own | wolf-interp | [filed: wolf-interp#52](https://github.com/wolffe-lang/wolf-interp/issues/52); sc29 |
-| F-0101 | 2026-08-30 | **the native rung refuses a slice of a LENT byte view at `mem`, and the refusal names the wrong conservatism** — `b[from..to]` in a callee is `unsupported` ("range VALUES outside `for` headers (owned `Iter[int]` ranges, c06/std)") when the caller lends `s.bytes()` across the call (s89), while the SAME callee over an owned list and the inline slice of an owned local both `exit(0)` at v0.2.0/c88ab64 — the message cites a limit the owned probes show lifted; the operative edge is the mem-phase lowering of slice-of-lent-view. `--checked` and lupin 0.1.18 run all three shapes. Caught by the sc28 slices adoption: `bytes.slice` took the range spelling and the gauntlet moved exactly one row (`tests/bytes/lend_across_calls.lu [native]`, `run` -> `unsupported`, the corpus's only lend-into-slice witness — `bytes.slice`'s doc examples lend too); the site retreated to the index loop the same day with the shape named in a comment, and the row holds `run` again. Blocks the s128 slice spelling in any std function whose parameter is lend-reachable; three-probe isolation at `probes/sc28_p6_slice_of_view` in the filing | wolf-lang | [filed: wolf-lang#184](https://github.com/wolffe-lang/wolf-lang/issues/184); sc28 |
+| F-0102 | 2026-08-30 | **lupin 0.1.18 does not resolve the net BYTE tier (`net_read_bytes`/`net_write_bytes`), where it resolves the str tier and `net_deadline`** — s106 shipped all three builtins and lupin's is18 socket crossing (0.1.14) took the str calls + the deadline (both measured three-lane at the sc29 pin: a 150ms `set_deadline` budget resolves a silent-peer `net_read` as `timeout` under lupin, and a peer-less `net_accept` too), but the byte pair is `unsupported: `net_write_bytes` does not resolve` at resolve — the one-release-behind half of the same tier. Costs the sc29 byte-tier facade rows (`net/bytes_round_trip`, `net/write_bytes_invalid_row`) their lupin lane and every `std.x.tls.client` socket witness its lupin lane (`loopback_handshake` is native-only for this AND the step budget); the pure client parse/verify half stays three-lane by lupin's lazy body resolution. The str/deadline tier proves the surface exists on that lane, so this is a completeness gap in the byte mirror, not a design decline — the shape of the fix is the str calls' own | wolf-interp | [filed: wolf-interp#52](https://github.com/wolffe-lang/wolf-interp/issues/52); sc29 — **CLOSED at sc30** by lupin 0.1.19 (is30, #52 paid exactly as filed: the byte pair lands as the str calls' own shape, `List[int]` marshalling, no utf8 row, whole-or-raise writes). Healing measured at the sc30 bump: `net/bytes_round_trip` and `net/write_bytes_invalid_row` flip lupin `unsupported` -> `run` at FIRST SIGHT against sc29 bodies untouched (declared against the fix, the F-0049 pattern), the sc29 byte-tier block goes three-lane, and `loopback_handshake`'s lupin lane flips all the way to `run` — the "AND the step budget" half of its sc29 native-only attribution was an inference the resolve refusal had shadowed, and the measurement outvoted it (18.9s idle, inside the 50M budget). #52 commented same-day with the downstream healing |
+| F-0101 | 2026-08-30 | **the native rung refuses a slice of a LENT byte view at `mem`, and the refusal names the wrong conservatism** — `b[from..to]` in a callee is `unsupported` ("range VALUES outside `for` headers (owned `Iter[int]` ranges, c06/std)") when the caller lends `s.bytes()` across the call (s89), while the SAME callee over an owned list and the inline slice of an owned local both `exit(0)` at v0.2.0/c88ab64 — the message cites a limit the owned probes show lifted; the operative edge is the mem-phase lowering of slice-of-lent-view. `--checked` and lupin 0.1.18 run all three shapes. Caught by the sc28 slices adoption: `bytes.slice` took the range spelling and the gauntlet moved exactly one row (`tests/bytes/lend_across_calls.lu [native]`, `run` -> `unsupported`, the corpus's only lend-into-slice witness — `bytes.slice`'s doc examples lend too); the site retreated to the index loop the same day with the shape named in a comment, and the row holds `run` again. Blocks the s128 slice spelling in any std function whose parameter is lend-reachable; three-probe isolation at `probes/sc28_p6_slice_of_view` in the filing | wolf-lang | [filed: wolf-lang#184](https://github.com/wolffe-lang/wolf-lang/issues/184); sc28 — **CLOSED at sc30** by s129 (the #184 fix, in the sc30 pin b80d239): the diagnosis upstream was a real mem-phase gap wearing the retired range-value conservatism's refusal string, and the fix gave the lent-view path its slice arm. Healing measured at the re-adopt: `bytes.slice` took back `b[from..to]` and `lend_across_calls.lu` — the ONE row the sc28 adoption moved — holds `run` on ALL THREE lanes with the range spelling (native re-measured singly, exit(0), the exact shape that refused at `mem` at c88ab64); ledger flat everywhere else. The retreat commit bc01f8c reverses at the sc30 re-adopt with the arc named at the site (found -> filed -> fixed -> re-adopted); upstream's own `byte_view_slice_lent` corpus twin joined the two-machine agreement class at lupin's 83f83bb pin bump (lupin ran the lent slice all along). #184 commented same-day with the downstream healing |
 
 
 ## F-0001 — the std search path
@@ -4153,3 +4153,142 @@ follows wolf to c88ab64; lupin's conformance pin addcd7f is unchanged
 by its own release (wolf-lang had no v0.2.0 tag when is29 shipped —
 the pin question re-opens at is30), so the two-upstream drift is the
 addcd7f..c88ab64 release span, nothing semantic in it.
+
+## Retirements and movements at the sc30 pin — the slice comes home
+
+**The drift prediction, written 2026-08-31 16:35 EDT, BEFORE any
+gauntlet at the new pins** (release notes read first, per release:
+wolf-lang's CHANGELOG through the s129 merge `83f83bb` and the s130
+merge `b80d239` — both merge commits read, s130 landed first so the
+bump takes `b80d239`; lupin's v0.1.19 CHANGELOG/is30 read at the tag
+`23dcf62`; the corpus grepped for every new surface before the run):
+
+- **wolf c88ab64 (v0.2.0) -> b80d239 (the s130 merge; data pin
+  follows): ZERO wolf-lane row motion.** The span is s129 (struct
+  patterns whole-pipe per `[gram.pat.struct]`; the #184 lend-slice
+  mem fix — F-0101's counterparty) + s130 (match arms take the
+  product domain, c06 retired; checked guard/dotted-tag fixes; a
+  release-tier bool-fold ICE fix). Grepped first, the sc28 lesson
+  (grep for the RUNG'S SHAPE, not the issues it closes): ZERO struct
+  patterns in std/ or tests/ (they predate s129), ZERO match-arm
+  guards, ZERO `#![` markers, and the #184 fix finds ZERO carriers
+  because `bytes.slice` still spells the sc28 retreat loop — the
+  healing is only observable at the RE-ADOPT, which is deliberate,
+  in its own commit, after the bump. Match-arm tuple PRODUCTS exist
+  at exactly ONE module (std/cmp: three `match (self, other)` sites)
+  and every carrying row's wolfc/native verdict is `unsupported` at
+  the EARLIER trait/enum/impl tier (the F-0012/F-0026 class), so
+  s130's product domain has no reachable carrier here; the
+  bool-fold ICE fix is release-tier and no lane here builds release.
+- **lupin 0.1.18 -> v0.1.19 (= the TAG 23dcf62; conformance pin
+  addcd7f -> 83f83bb, the two-bump is30 story): EXACTLY TWO rows
+  move, both lupin, both deeper — `net/bytes_round_trip` and
+  `net/write_bytes_invalid_row` flip `unsupported` -> `run`**
+  (F-0102's fix: `net_read_bytes`/`net_write_bytes` land as the str
+  calls' own shape, whole-or-raise writes, no utf8 row — the fs
+  vocabulary this facade adopted verbatim at sc29, so the rows
+  should observe at first sight). The ledger's byte-tier block flips
+  compiler-lanes-only -> three-lane. In lupin's OWN census the same
+  fix moves its two byte-tier corpus rows (`net/byte_roundtrip`,
+  `net/line_reader_bytes`) out-of-scope -> match — read from the
+  release's tracked verdict table at the tag, cited here because it
+  is the same mechanism observed from the other repo's side.
+  is30's element-move destructure discipline finds zero carriers:
+  sc28's tuple destructures never read a moved-from element (they
+  were adopted behavior-neutral under 0.1.18's whole-tuple move, so
+  a LOOSER move rule cannot change their answers).
+- **`x/tls/client/loopback_handshake` stays native-only with the
+  lupin REASON STRING moving**: the byte tier resolving takes away
+  the F-0102 can't-resolve refusal, and the step budget is what
+  remains — four X25519 ladders + Ed25519 sign/verify + the AEAD
+  flight blow lupin's 50M evaluation-step budget exactly as they
+  blow wolfc's step budget one rung down. Verdict word unchanged
+  (`unsupported`), comment re-attributed; the reason string is to be
+  verified from the runner's record and noted.
+- **Anchors 403 -> 404, +1/-0, the +1 EXACTLY `gram.pat.struct`**
+  (s129's clause; s130 added no clause — its witnesses live under
+  anchors that already exist). Set-diffed BOTH WAYS at the
+  re-vendor per the F-0100 lesson. (The wave letter said 405; its
+  own parenthetical adds one anchor to 403, and the release notes
+  and the pre-vendor set-diff both say 404 — the letter's arithmetic,
+  not a third clause.)
+- **Zero else.** No perf/budget commit in either span: the 25
+  50M-step rows keep the same refusal at the same budget; the 3 char
+  rows hold `run`; `slow` and `divergent` keep zero carriers; the
+  doctor trio is wolf = data pin = b80d239 with lupin's conformance
+  pin 83f83bb exactly ONE merge behind (the s130 span, whose
+  semantic content is the product match domain — named, not
+  papered).
+
+Predicted total: TWO verdict movers (both lupin, both deeper), one
+reason-string move with no verdict motion, 404 anchors.
+
+**The measurement (same day, untouched ledger, three lanes, idle):
+THREE movers, all lupin, all DEEPER — the prediction named two
+exactly and called the third's verdict word wrong in the right
+direction.** The gauntlet's designed red named exactly three rows
+(`ledger says unsupported, observed run`), each then re-measured one
+at a time from its staged dir (`lupin conform-run --std-root std
+<entry> --json`, the sc27 method):
+
+- `net/bytes_round_trip` — `run`, exit(0), stdout
+  `got: 0 255 128 7 10\nback: 3`: as predicted (F-0102's fix).
+- `net/write_bytes_invalid_row` — `run`, exit(1), stdout
+  `handled: invalid\nerror: invalid`: as predicted. Both byte-tier
+  rows observed at FIRST SIGHT against sc29 bodies untouched — the
+  facade was declared against the fix (the F-0049 lesson), so the
+  heal is a pure flip. The sc29 byte-tier block is three-lane.
+- `x/tls/client/loopback_handshake` [lupin] — **`run`**, exit(0),
+  the exact directive stdout, 18.9s idle. UNPREDICTED AS A VERDICT:
+  the prediction repeated sc29's "native-only for F-0102 AND the
+  step budget", and that second attribution was an INFERENCE that
+  had never been measured — at 0.1.18 the byte tier refused at
+  RESOLVE, before a single evaluation step ran, so no observation
+  of the budget ever existed for this program. 0.1.19 removes the
+  resolve refusal and the measurement outvotes the inference: the
+  whole handshake — four X25519 ladders, Ed25519 sign/verify, the
+  AEAD flight — fits inside lupin's 50M evaluation-step budget. The
+  corpus's own rungs had already sorted the classes: the
+  single-ladder x25519 rows (`x25519_rfc7748_s52`, `_s61_dh`) have
+  run under lupin since sc18, and only the VECTOR SWEEPS (the
+  wycheproof parts, the chain) blow 50M — a handshake is a handful
+  of ladders, not a sweep, and it lands in the class its siblings
+  predicted even though the sprint prose did not. The flagship is
+  TWO-LANE now (lupin + native); wolfc's checked tier keeps its
+  MEASURED step-budget refusal (`@1924..11690`) and is the one dark
+  lane. The lesson is sc28's rung-shape lesson wearing lane
+  colors: a refusal that fires EARLY in one release hides every
+  refusal behind it, so "and the budget" claims about a
+  resolve-refused program are predictions, not measurements —
+  write them as such.
+
+The rest reconciled at face value: anchors 403 -> 404, +1/-0, the
++1 exactly `gram.pat.struct`, set-diffed both ways at the re-vendor
+(nothing dropped — the F-0100 regen lesson held); zero motion over
+the remaining 369 rows; the 25 50M-step rows answer the same refusal
+at the same budget; the 3 char rows hold `run`; `slow` and
+`divergent` keep zero carriers; doctor green at the trio with the
+agreement state stated: wolf's own commit = data pin = b80d239 (the
+first bump where the BINARY's pin clause and the data pin agree by
+construction on a dev-stamped build), lupin's conformance pin
+83f83bb one merge behind — the s130 span, the product match domain,
+named. F-0102 CLOSES on the two byte rows' measured heal; lupin's
+own census moved its twin rows (`net/byte_roundtrip`,
+`net/line_reader_bytes`) out-of-scope -> match at the same fix,
+read from the release's tracked verdict table at the tag.
+
+**The residues, re-probed at b80d239, one line each:** the
+chars-pairs tuple list (`List[(int, int)]`) is refused at resolve on
+both wolf rungs at its FOURTH consecutive pin — same "prelude
+container instantiation (generic data)" word, lupin runs it; s129/
+s130 are struct patterns and product match arms, neither
+instantiates a tuple list (dated in the str header). F-0096
+(`s.get(0..^1)`) refuses verbatim — "open-ended or end-relative
+ranges (slicing)" at resolve on both rungs against `[mem.str.get]`'s
+own sentence, lupin runs; dated in the str header beside the row
+that flips at its closure. `graphemes` owes no probe: a segmentation
+TABLES tier, and nothing in either span brings it closer.
+`strbuf.in(r)` (region placement) and `reserve` (capacity/SSO) are
+unmoved: no commit in c88ab64..b80d239 or 0.1.18..0.1.19 touches
+regions or capacity. The four `divergent(…)`-era addresses stay
+healed (re-observed green in every sc30 gauntlet).

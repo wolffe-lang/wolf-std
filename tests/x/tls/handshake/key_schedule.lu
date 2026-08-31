@@ -70,10 +70,13 @@ fn main() -> int {
 
     // The FROZEN ws05 seam: a completed handshake packages the negotiated
     // suite + the six secrets into a HandshakeResult ws05 hands to sc20.
-    let result = hs.handshake_result(4865, chs, shs, cap, sap, exp, res)
-    assert(result.cipher_suite == 4865, "seam: cipher_suite")
-    assert(hs.to_hex(result.server_handshake_secret) == "b67b7d690cc16c4e75e54213cb2d37b4e9c912bcded9105d42befd59d391ad38", "seam: s hs secret")
-    assert(hs.to_hex(result.client_application_secret) == "9e40646ce79a7f9dc05af8889bce6552875afa0b06df0087f792ebb7c17504a5", "seam: c ap secret")
-    assert(hs.to_hex(result.resumption_master_secret) == "7df235f2031d2a051287d02b0241b0bfdaf86cc856231f2d5aba46c434ec196c", "seam: res master")
+    // The seam's product is destructured where it is born (sc30,
+    // [gram.pat.struct]): the four fields this witness pins bind by
+    // name, `..` leaves the other three packaged.
+    let hs.HandshakeResult { cipher_suite, server_handshake_secret, client_application_secret, resumption_master_secret, .. } = hs.handshake_result(4865, chs, shs, cap, sap, exp, res)
+    assert(cipher_suite == 4865, "seam: cipher_suite")
+    assert(hs.to_hex(server_handshake_secret) == "b67b7d690cc16c4e75e54213cb2d37b4e9c912bcded9105d42befd59d391ad38", "seam: s hs secret")
+    assert(hs.to_hex(client_application_secret) == "9e40646ce79a7f9dc05af8889bce6552875afa0b06df0087f792ebb7c17504a5", "seam: c ap secret")
+    assert(hs.to_hex(resumption_master_secret) == "7df235f2031d2a051287d02b0241b0bfdaf86cc856231f2d5aba46c434ec196c", "seam: res master")
     0
 }

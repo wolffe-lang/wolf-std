@@ -19,7 +19,46 @@
 # watches the drift, report-never-gate.
 
 [lupin]
-# 0.1.18 (sc28 bump, from 0.1.17) — THE FIRST ARM YIELDS (is29): the
+# 0.1.19 (sc30 bump, from 0.1.18) — THE SHAPE BINDS (is30): struct
+# patterns land whole-pipe from the [gram.pat.struct] text alone
+# (s129/#179), destructures learn the s128 element-move discipline
+# they owed, and the s106 net BYTE tier resolves at last — F-0102
+# (wolf-interp#52) is PAID: `net_read_bytes`/`net_write_bytes` land as
+# the str calls' own shape with List[int] marshalling, no utf8 row,
+# whole-or-raise writes behind the WHOLE pre-write check (§14's fs
+# vocabulary, which this repo's facade adopted verbatim at sc29).
+# Conformance pin addcd7f -> **83f83bb** (the s129 merge) — the pin
+# question 0.1.18 left open closed twice over in is30 (c88ab64 killed
+# the #177 waiver, then the second bump took the s129 merge), and for
+# the first time lupin's pin sits ONE MERGE behind this repo's data
+# pin b80d239 rather than a release span: the s130 gap is the product
+# match domain, named in the findings section, nothing else.
+#
+# ACQUISITION (nomad-1, macOS arm64, 2026-08-31): built from the
+# release TAG v0.1.19 (= 23dcf62 in wolf-interp; trunk had one
+# registry commit past it) with `cargo build --release`, per D57; the
+# binary answers the bare
+# `lupin 0.1.19 (wolf-interp, reference interpreter at pin 83f83bb)`;
+# installed to ~/.local/bin via fresh inode (the sc26 SIGKILL rule);
+# the wolf-interp tree returned to trunk after the build.
+#
+# What the bump changes for this repo, predicted in writing BEFORE the
+# run (docs/findings.md, the sc30 register) and measured over the
+# untouched ledger: EXACTLY TWO rows flip, both lupin, both deeper —
+# net/bytes_round_trip and net/write_bytes_invalid_row `unsupported`
+# -> `run` (the F-0102 heal; the sc29 byte-tier block goes
+# three-lane) — plus ONE reason-string move with no verdict motion:
+# x/tls/client/loopback_handshake's lupin lane keeps `unsupported`
+# with the reason re-attributed from the byte tier's can't-resolve to
+# the 50M step budget (four X25519 ladders + Ed25519 + the AEAD
+# flight, the same wall wolfc's checked tier names one rung down).
+# Zero other motion: zero struct patterns / match-arm guards / `#![`
+# markers in std/ or tests/ (grepped before the run); sc28's tuple
+# destructures never read a moved-from element, so the element-move
+# discipline changes no answer; no perf/budget commit in the span.
+#
+# The 0.1.18 note (sc28 bump), kept for the history it records —
+# THE FIRST ARM YIELDS (is29): the
 # two thrice-measured lupin-side correctness debts behind this repo's
 # four `divergent(…)` rows are PAID — #47 (F-0097: a handler over a
 # BUILTIN-raised row took its first arm; builtin error values now mint
@@ -220,10 +259,11 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.18"
+version = "0.1.19"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
-pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"
+# pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
+pin = "83f83bbf44ce5dd6a8f6e2fe255fa37d1fe3954b"
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
@@ -360,7 +400,45 @@ pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.0"
+version = "0.2.0+dev.b80d239"
+# sc30 bump: @ **b80d239** (trunk = the s130 merge; the contract's
+# either/or resolved "s130 landed first" at launch, so the bump takes
+# what exists — the s129 fix this sprint spends rides inside it). NOT
+# a tag build: no wolf release exists past v0.2.0, so D57's honest
+# answer is the self-branding dev identity — the binary was built at
+# the sha with the commit stamped (`WOLF_COMMIT=b80d239`, the xtask
+# dist stamp applied by hand to a plain driver build) and answers
+# `wolf 0.2.0+dev.b80d239 (wolfgang, pin b80d239)`
+# — the +dev.<commit> string r03 designed for exactly this case: it
+# CLAIMS NO RELEASE and still names its own pin, so doctor's
+# provenance gate reads the pin clause the same way it reads a bare
+# tag build's, and the recorded `version` key above carries the full
+# dev identity (a lying binary is worse than none; an honest dev
+# binary is neither). A plain unstamped `cargo build` answers
+# `+dev.unknown` with NO pin clause and does NOT pass doctor —
+# measured first, rebuilt with the stamp. Data pin follows to b80d239
+# (the one-sha invariant). The span c88ab64..b80d239 is s129 (struct
+# patterns whole-pipe, [gram.pat.struct]; the #184 lend-slice mem fix
+# — F-0101's counterparty, spent by this sprint's re-adopt commit,
+# deliberately NOT observable at the bump because bytes.slice still
+# spells the retreat loop when the bump lands) + s130 (match arms
+# take the product domain, c06 retired; checked guard/dotted-tag
+# fixes; a release-tier bool-fold ICE fix — no lane here builds
+# release). Anchors snapshot regen: 403 -> 404, +1/-0, the +1
+# EXACTLY [gram.pat.struct], set-diffed both ways (the F-0100
+# lesson). ZERO wolf-lane row motion predicted and measured over the
+# untouched ledger (docs/findings.md, sc30 register — prediction
+# written before the run). `--version` PAIRS "lupin 0.1.18 (reference
+# interpreter), pin addcd7f" — one release behind the 0.1.19 this
+# same bump stages (the sc27/sc28 nuance again: the pairing stamp was
+# cut before is30 released; reported-never-gated, F-0064).
+# ACQUISITION (nomad-1, macOS arm64, 2026-08-31): built in
+# ../wolf-lang at b80d239 (clean checkout, HEAD == the sha):
+# `WOLF_COMMIT=b80d239 cargo build --release -p wolf_driver -p
+# wolf_rt`; wolf + libwolf_rt.a installed to ~/.local/bin via fresh
+# inodes (the sc26 SIGKILL rule — never overwrite in place).
+#
+# The sc28 note, kept for the history it records:
 # sc28 bump: @ the **v0.2.0 TAG** (= `c88ab64`) — WOLFGANG TELLS THE
 # TRUTH (r03): the first sc bump taken at a wolf RELEASE TAG rather
 # than a trunk sha, and the first whose acquisition the binary itself
@@ -962,4 +1040,5 @@ version = "0.2.0"
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc24/sc25 era — the data-pin-itself acquisition)
 # pin = "c1ca543cb5abf334b70c38b13204170973dc4e23"  (superseded, sc26 era — the native-lane-comes-home acquisition)
 # pin = "0a5c1afd7818477a6b283a5e325eec487e81bd8d"  (superseded, sc27 era — the walls-come-down acquisition)
-pin = "c88ab6441b2706e20375deeec86eaf6da9bde25b"
+# pin = "c88ab6441b2706e20375deeec86eaf6da9bde25b"  (superseded, sc28/sc29 era — the v0.2.0 tag acquisition)
+pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"

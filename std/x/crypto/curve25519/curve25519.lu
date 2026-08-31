@@ -934,8 +934,10 @@ pub fn x25519(scalar: List[int], u_bytes: List[int]) -> List[int] ! {zero} {
     require_32(u_bytes)
     let k = clamp(scalar)
     let u = fe_frombytes(u_bytes)
-    let r = ladder(k, u)
-    let out = fe_tobytes(fe_mul(r.a, fe_invert(r.b)))
+    // The ladder's pair is destructured where it is born (sc30,
+    // [gram.pat.struct]): x2 over z2 is the whole formula.
+    let FePair { a, b } = ladder(k, u)
+    let out = fe_tobytes(fe_mul(a, fe_invert(b)))
     if is_zero_bytes(out) {
         return zero
     }
