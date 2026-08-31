@@ -2696,6 +2696,54 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# ---- sc29: std.x.tls.client — the TLS 1.3 CLIENT over the library's
+# own proven halves (the stdc-tls campaign's FOURTH rung, the rung that
+# turns the stack around). Three test SHAPES, three lane profiles:
+#
+#   rfc8448_parse_vectors — the flight parsers + negotiation/verify
+#   refusals fed RFC 8448's own server-flight wire bytes (the bytes
+#   sc21's server-side builders emit): PURE structure, no crypto,
+#   THREE-LANE. The differential turned inward at the parse boundary,
+#   plus the two honesty-split refusals against the real trace
+#   (0x1301 -> handshake_failure, rsa_pss -> unsupported_alg).
+#
+#   negative_battery — every adversarial input a NAMED row: downgrade
+#   (v1.2 + the §4.1.3 sentinel), HelloRetryRequest, wrong
+#   suite/group/version/compression, truncated SH, tampered record
+#   (record.open's tag -> bad_record_mac), bad Finished
+#   (accept_finished -> decrypt_error), wrong-name/expired chain
+#   (validate_chain), bad CertificateVerify signature (the RETIREMENT's
+#   failing ed25519 branch). PURE (hand-built/mutated inputs, no
+#   socket), THREE-LANE — the whole battery refuses by name on every
+#   lane. Note the chain rows here are Ed25519 (three-lane), NOT the
+#   P-256 path (native-only, its own rung's cost).
+#
+#   loopback_handshake — THE FLAGSHIP: a full in-process handshake, the
+#   client (begin/complete/read/write/close) against a server half
+#   built from the same primitives (sc21 builders + record.seal + sc18
+#   sign), verifying the real sc22 chain + a real Ed25519
+#   CertificateVerify + both Finished, app data both ways. NATIVE-ONLY:
+#   the byte tier is lupin-`unsupported` (F-0102) and four X25519
+#   ladders + Ed25519 sign/verify + the AEAD flight blow the checked
+#   tier's step budget (measured `unsupported @1924..11690`) and
+#   lupin's — the p256/curve25519 lane-cost mechanism, one rung up.
+#   The witness runs ~0.9s native (a handshake is not a vector sweep).
+
+[tests."x/tls/client/rfc8448_parse_vectors.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/client/negative_battery.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/tls/client/loopback_handshake.lu"]
+lupin = "unsupported"  # F-0102: the byte tier does not resolve at 0.1.18 (the socket witness cannot run there)
+wolfc = "unsupported"  # step budget exhausted @1924..11690 — four X25519 ladders + Ed25519 sign/verify + the AEAD flight (the curve25519 lane cost, one rung up)
+native = "run"
+
 # ---- sc23: std.x.crypto.p256 — the Weierstrass curve (NIST P-256) and
 # ECDSA (FIPS 186-5 / SEC1 / SP 800-186 / RFC 6979). The field is
 # checked `int` in sixteen 16-bit Solinas limbs; the scalar field mod n
