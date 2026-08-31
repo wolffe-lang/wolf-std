@@ -42,7 +42,9 @@
 //! claims). The one residue is the RANGE `get` consumes: `s.get(0..^1)`
 //! runs under lupin and is `unsupported` at resolve on both wolf rungs,
 //! against `[mem.str.get]`'s own sentence that end-relative endpoints
-//! resolve exactly as in `s[a..b]` (F-0096, filed;
+//! resolve exactly as in `s[a..b]` (F-0096, filed; re-measured
+//! verbatim at the sc30 pin b80d239, 2026-08-31 — "open-ended or
+//! end-relative ranges" at resolve on both rungs, lupin runs;
 //! `tests/str/end_relative_get.lu` is the row that flips at its
 //! closure). There is deliberately no std function that papers over
 //! either spelling.
@@ -81,8 +83,11 @@
 //!     work is destructuring/patterns and does not instantiate a tuple
 //!     LIST; same "prelude container instantiation" refusal, dated
 //!     2026-08-29; re-measured verbatim at the sc28 pin v0.2.0/c88ab64,
-//!     2026-08-30). `char_offsets` below is the offset half; the day
-//!     tuple lists land they fuse into this one function.
+//!     2026-08-30; re-measured verbatim at the sc30 pin b80d239, the
+//!     FOURTH consecutive pin, 2026-08-31 — s129/s130 are struct
+//!     patterns and product match arms, and neither instantiates a
+//!     tuple list either). `char_offsets` below is the offset half; the
+//!     day tuple lists land they fuse into this one function.
 //! graphemes(s: str) -> List[str]
 //!     Extended grapheme clusters, as slices of `s`. A std call and never
 //!     the default unit (D24). Needs segmentation TABLES — a later tier

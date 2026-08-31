@@ -4276,3 +4276,19 @@ named. F-0102 CLOSES on the two byte rows' measured heal; lupin's
 own census moved its twin rows (`net/byte_roundtrip`,
 `net/line_reader_bytes`) out-of-scope -> match at the same fix,
 read from the release's tracked verdict table at the tag.
+
+**The residues, re-probed at b80d239, one line each:** the
+chars-pairs tuple list (`List[(int, int)]`) is refused at resolve on
+both wolf rungs at its FOURTH consecutive pin — same "prelude
+container instantiation (generic data)" word, lupin runs it; s129/
+s130 are struct patterns and product match arms, neither
+instantiates a tuple list (dated in the str header). F-0096
+(`s.get(0..^1)`) refuses verbatim — "open-ended or end-relative
+ranges (slicing)" at resolve on both rungs against `[mem.str.get]`'s
+own sentence, lupin runs; dated in the str header beside the row
+that flips at its closure. `graphemes` owes no probe: a segmentation
+TABLES tier, and nothing in either span brings it closer.
+`strbuf.in(r)` (region placement) and `reserve` (capacity/SSO) are
+unmoved: no commit in c88ab64..b80d239 or 0.1.18..0.1.19 touches
+regions or capacity. The four `divergent(…)`-era addresses stay
+healed (re-observed green in every sc30 gauntlet).
