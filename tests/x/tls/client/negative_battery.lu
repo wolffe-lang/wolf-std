@@ -114,26 +114,20 @@ fn sentinel_random() -> List[int] {
     out
 }
 
-/// Judge a ServerHello, returning the refusing tag's name (or "ok").
+/// Judge a ServerHello, returning the refusing tag's name (or "ok") —
+/// both faces of sc31's naming pair, one line each (wolf-std#3). The
+/// parse's row comes back as its own NAME through `named` (so the
+/// literal `"decode_error"` this used to carry is now the row's word,
+/// not a copy of it), and `row_name` marks the negotiation. Every site
+/// BINDS first: the checked tier refuses a raising call passed
+/// straight into a row-typed parameter (the module header's note).
 fn negotiate_name(msg: List[int]) -> str {
-    let view = client.parse_server_hello(copy msg) else |_| {
-        return "decode_error"
+    let parsed = client.parse_server_hello(copy msg)
+    let view = client.named(parsed) else |Row(name)| {
+        return name
     }
-    let _r = client.check_negotiation(view) else |e| match e {
-        downgrade => {
-            return "downgrade"
-        },
-        handshake_failure => {
-            return "handshake_failure"
-        },
-        illegal_parameter => {
-            return "illegal_parameter"
-        },
-        unexpected_message => {
-            return "unexpected_message"
-        },
-    }
-    "ok"
+    let judged = client.check_negotiation(view)
+    client.row_name(judged)
 }
 
 fn main() -> int {
@@ -288,6 +282,12 @@ fn tampered_record_name() -> str {
         }
         i = i + 1
     }
+    // This match STAYS, and the reason is worth stating beside the
+    // three sites sc31's helper took: `record.open` raises the RECORD
+    // layer's own vocabulary (`tag`, `short`, `unexpected`) and this
+    // is a TRANSLATION into the client's names, not a naming of the
+    // client's rows. `client.row_name` would answer the wrong words
+    // here, so the arms are the work and not a transcription of it.
     let _inner = record.open(key, iv, 0, tampered) else |e| match e {
         tag => {
             return "bad_record_mac"
@@ -323,36 +323,17 @@ fn chain_name(host: str, now: int) -> str {
     let root = bytes_of(
         "308201373081eaa003020102020101300506032b657030223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74301e170d3235303130313030303030305a170d3335313233313233353935395a30223120301e06035504030c17776f6c662d7374642073633232207465737420726f6f74302a300506032b6570032100df29ea96435aa95c2b6f9176b5e2bc532916525aa49207b10e6b8e3e5bdefb08a345304330120603551d130101ff040830060101ff020101300e0603551d0f0101ff040403020106301d0603551d0e04160414783463495867e2affe02ec7ffbcf86216bc59be7300506032b6570034100573764a0bb4fd69a98281bc428deea50474f8e1e12e719c83310312ac790da36ff45bfc88ae586bdb5a03ed8537e922d80b07c7e4da3325af92f90efa2f68a07",
     )
-    let _leaf = cert.validate_chain(leaf, host, root, now) else |e| match e {
-        der => {
-            return "der"
-        },
-        unsupported_alg => {
-            return "unsupported_alg"
-        },
-        bad_signature => {
-            return "bad_signature"
-        },
-        expired => {
-            return "expired"
-        },
-        not_yet_valid => {
-            return "not_yet_valid"
-        },
-        name_mismatch => {
-            return "name_mismatch"
-        },
-        not_ca => {
-            return "not_ca"
-        },
-        issuer_mismatch => {
-            return "issuer_mismatch"
-        },
-        unknown_critical => {
-            return "unknown_critical"
-        },
+    // sc22's NINE chain rows, named by sc31's helper rather than by a
+    // nine-arm transcription of them: `std.x.tls.client` re-exports
+    // cert's row vocabulary verbatim, so a `cert` value's row rides
+    // into `client.row_name` by width subtyping — the cross-module
+    // half of the surface, measured on all three lanes.
+    let validated = cert.validate_chain(leaf, host, root, now)
+    let name = client.row_name(validated)
+    if name == "ok" {
+        return "validated (should have rejected)"
     }
-    "validated (should have rejected)"
+    name
 }
 
 /// CertificateVerify under ed25519 with a garbage signature over the
@@ -363,20 +344,17 @@ fn bad_cv_name() -> str {
     let leaf_key = bytes_of("b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3")
     let bad_sig = zeros(64)
     let th = zeros(32)
-    let _v = client.
+    let judged = client.
         verify_certificate_verify(
         cert.oid_ed25519(),
         leaf_key,
         client.scheme_ed25519(),
         bad_sig,
         th,
-    ) else |e| match e {
-        unsupported_alg => {
-            return "unsupported_alg"
-        },
-        bad_signature => {
-            return "bad_signature"
-        },
+    )
+    let name = client.row_name(judged)
+    if name == "ok" {
+        return "verified (should have rejected)"
     }
-    "verified (should have rejected)"
+    name
 }
