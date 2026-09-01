@@ -95,20 +95,80 @@
 //! §4.4.4 — sc21's tag). Application data: `invalid` on `write` for a
 //! non-byte element (the net byte tier's tag, §14).
 //!
-//! ## Lanes (measured at the sc29 pin)
+//! ## Naming the row (sc31, wolf-std#3 — the first consumer's ask)
+//!
+//! Twenty named rows are twenty ACTIONS for a caller that routes on
+//! them, and twenty ARMS for a caller that only wants to say which one
+//! killed the handshake. lobo's proxy and ACME doors wanted the
+//! second, and paid twice: the full `else |e| match e { … }` written
+//! out at both call sites (module dependency law forbids sharing it),
+//! and a DEAD `Client` forged in every arm, because a
+//! `Client`-yielding handler's arms must produce a `Client`. Neither
+//! cost is the row vocabulary's fault and neither had to be the
+//! caller's.
+//!
+//! `named` and `row_name` at the bottom of this module are the answer,
+//! and they are ONE match with two faces. `named` coarsens this
+//! module's whole vocabulary into the single payload-carrying tag
+//! `Row(str)` whose payload is the refusing row's own NAME: the value
+//! rides through untouched on success, so nothing is ever forged, and
+//! a consumer writes one arm. `row_name` is the marking face — the
+//! word, or `"ok"` — for a caller that wants to print rather than
+//! continue. API-CONVENTIONS §12 is what licenses the shape:
+//! coarsening is a NAMED call the caller writes (`errors.coarsen` is
+//! the exemplar), never something a std signature does silently, and
+//! what the caller gives up is visible in its own source.
+//!
+//! **The call-site spelling is BIND, THEN NAME**, and it is a measured
+//! lane fact, not taste: the checked tier refuses a raising call
+//! passed straight into a row-typed parameter — "control flow in an
+//! argument" at `mem` — while lupin and the native rung both run it.
+//! That is the same limit `std.option`'s six helpers have worn since
+//! sc06 (`tests/option/or_else_default.lu` is `wolfc = unsupported`
+//! for exactly this), so
+//!
+//! ```text
+//!     let judged = client.check_negotiation(view)   // bind first
+//!     let word = client.row_name(judged)            // then name
+//! ```
+//!
+//! keeps every naming site three-lane, where `row_name(check_negotiation(view))`
+//! would cost the checked lane. Probed on all three lanes before a
+//! line of this was written.
+//!
+//! ## Lanes (re-measured at the sc31 pin; the sc29 note is superseded)
 //!
 //! The socket-bearing functions (`begin`/`complete`/`read`/`write`/
-//! `close`) ride `net.read_bytes`/`net.write_bytes`: BOTH COMPILER
-//! RUNGS run them; lupin 0.1.18 does not resolve the byte tier
-//! (F-0102), so every loopback witness's lupin column is an honest
-//! `unsupported`. The pure half — the flight parsers, the negotiation
-//! checks, `verify_certificate_verify`, the constants — runs on ALL
-//! THREE lanes (lupin resolves lazily, the sc10 pure-half discipline),
-//! and the RFC 8448 client-perspective vector test is three-lane. A
-//! FULL in-process handshake (client + server halves: four X25519
-//! ladders, Ed25519 sign + verifies, the AEAD flight) exceeds the
-//! checked tier's step budget — the ledger records the measured
-//! verdict per file, the sc25 per-rig honesty.
+//! `close`) ride `net.read_bytes`/`net.write_bytes`, and ALL THREE
+//! lanes reach them now: sc29 wrote this paragraph while lupin 0.1.18
+//! could not resolve the byte tier (F-0102) and every loopback
+//! witness's lupin column was an honest `unsupported`; **0.1.19 paid
+//! F-0102 and the flagship RAN** — the full in-process handshake
+//! (client + server halves: four X25519 ladders, Ed25519 sign +
+//! verifies, the AEAD flight) evaluates INSIDE lupin's 50M step
+//! budget. The one dark lane is wolfc's checked tier, whose step
+//! budget the same program measurably exhausts. The pure half — the
+//! flight parsers, the negotiation checks,
+//! `verify_certificate_verify`, the naming pair below, the constants —
+//! runs on all three lanes (lupin resolves lazily, the sc10 pure-half
+//! discipline), and the RFC 8448 client-perspective vector test is
+//! three-lane. The ledger records the measured verdict per file, the
+//! sc25 per-rig honesty.
+//!
+//! **A handshake costs SECONDS, not milliseconds, at unoptimized
+//! tiers** — the lane note wolf-std#3 asked for, after the first
+//! consumer measured what this header had left to assumption. lobo's
+//! wsm04 doors measured ONE full client handshake against an OpenSSL
+//! server half at **~3.6s** on an M-series host at the NATIVE tier
+//! with `WOLF_MIDEND=0` (wolf-lang#146 keeps the mid-end off its
+//! release builds): four X25519 ladders plus the Ed25519 verifies
+//! dominate, and none of it is I/O. This repo's own in-process
+//! flagship — which is TWO halves in one program — measures 18.9s
+//! under lupin, idle. A consumer arming a sub-5s deadline around a
+//! dial is therefore on a knife edge: lobo widened its ACME
+//! transaction deadline from 5s to 15s and said why. Measure the rig
+//! you deploy on; do not assume milliseconds because the thing is a
+//! network protocol.
 //!
 //! ## Why `Client` holds an `int` fd and not a `net.Socket`
 //!
@@ -1256,4 +1316,189 @@ pub fn close(take c: Client) -> () ! {io} {
     write_all(c.fd, rec) else |_| {}
     var s = net.Socket { fd: c.fd }
     net.close(take s)?
+}
+
+// ---------------------------------------------------------------------
+// Naming the row (sc31, wolf-std#3) — the module's whole refusal
+// vocabulary, in two thin faces over ONE match.
+// ---------------------------------------------------------------------
+
+/// The value of `v`, or the NAME of the row that refused it, coarsened
+/// into the single payload-carrying tag `Row(str)` — ONE handler arm at
+/// the consumer instead of this module's twenty.
+///
+/// This is API-CONVENTIONS §12's coarsening rule at the protocol tier,
+/// and `errors.coarsen` is its shape: the widening is a NAMED call the
+/// caller writes, never something a std signature does silently, and
+/// what the caller gives up (the ability to branch on twenty rows) is
+/// visible in its own source. What it buys is the two costs the first
+/// consumer measured (wolf-std#3): the twenty-arm `else |e| match e`
+/// every logger had to write, and the DEAD `Client` those arms had to
+/// forge because a `Client`-yielding handler must produce a `Client`.
+/// Neither survives here — the value rides through untouched on
+/// success, and the failure path never needs one.
+///
+/// The payload is the tag's own NAME, the word this module's header
+/// and `docs/error-taxonomy.md` already use — `"expired"`,
+/// `"name_mismatch"`, `"handshake_failure"`. §12 forbids a payload
+/// that carries a rendered SENTENCE (it would force the caller to
+/// accept this library's wording and make the position unrecoverable);
+/// a row name is neither. It is the tag's identity, it is the finest
+/// information the row carries, and it is exactly the token an
+/// operator greps for. The names are stable: a rename here is a
+/// breaking change to this surface and is spelled as one.
+///
+/// The parameter is the module's WHOLE vocabulary — `complete`'s
+/// twenty rows plus `write`'s `invalid` — so any raising call in this
+/// module (and `cert.validate_chain`'s nine, which this module
+/// re-exports verbatim) rides in by width subtyping. `std.option`'s
+/// `or`/`exists` are the house shape for a row in parameter position.
+///
+/// Rows: `Row(str)` and nothing else. Total: no traps of its own.
+///
+/// Example (prose — a row value has no literal, F-0038; the runnable
+/// forms are `tests/x/tls/client/row_naming.lu` and the negative
+/// battery): `client.named(client.complete(take p))` is the `Client`
+/// when the handshake succeeds, and `else |Row(name)|` binds
+/// `"expired"` when the chain was.
+pub fn named[T](
+    v: T ! {
+        closed,
+        timeout,
+        io,
+        invalid,
+        decode_error,
+        bad_record_mac,
+        unexpected_message,
+        illegal_parameter,
+        downgrade,
+        handshake_failure,
+        decrypt_error,
+        zero,
+        der,
+        unsupported_alg,
+        bad_signature,
+        expired,
+        not_yet_valid,
+        name_mismatch,
+        not_ca,
+        issuer_mismatch,
+        unknown_critical,
+    },
+) -> T ! {Row(str)} {
+    let hit = v else |e| match e {
+        closed => {
+            return Row("closed")
+        },
+        timeout => {
+            return Row("timeout")
+        },
+        io => {
+            return Row("io")
+        },
+        invalid => {
+            return Row("invalid")
+        },
+        decode_error => {
+            return Row("decode_error")
+        },
+        bad_record_mac => {
+            return Row("bad_record_mac")
+        },
+        unexpected_message => {
+            return Row("unexpected_message")
+        },
+        illegal_parameter => {
+            return Row("illegal_parameter")
+        },
+        downgrade => {
+            return Row("downgrade")
+        },
+        handshake_failure => {
+            return Row("handshake_failure")
+        },
+        decrypt_error => {
+            return Row("decrypt_error")
+        },
+        zero => {
+            return Row("zero")
+        },
+        der => {
+            return Row("der")
+        },
+        unsupported_alg => {
+            return Row("unsupported_alg")
+        },
+        bad_signature => {
+            return Row("bad_signature")
+        },
+        expired => {
+            return Row("expired")
+        },
+        not_yet_valid => {
+            return Row("not_yet_valid")
+        },
+        name_mismatch => {
+            return Row("name_mismatch")
+        },
+        not_ca => {
+            return Row("not_ca")
+        },
+        issuer_mismatch => {
+            return Row("issuer_mismatch")
+        },
+        unknown_critical => {
+            return Row("unknown_critical")
+        },
+    }
+    hit
+}
+
+/// The NAME of the row that refused `v`, or `"ok"` when `v` carries a
+/// value — the marking form, for a caller that wants the WORD and not
+/// the value.
+///
+/// Answering CONSUMES `v` exactly as `option.exists` consumes its
+/// argument: a caller that needs the value back reaches for `named`
+/// instead of asking first and calling again. `"ok"` is reserved — no
+/// row in this module is named `ok` — so `row_name(v) == "ok"` is the
+/// success test.
+///
+/// Rows: none, and no traps. Thin over `named` by design: one match
+/// lives in this module and both faces read it.
+///
+/// Example (prose, F-0038; runnable in
+/// `tests/x/tls/client/row_naming.lu`):
+/// `client.row_name(client.check_negotiation(view))` is
+/// `"handshake_failure"` for a ServerHello that selected a suite this
+/// profile does not offer, and `"ok"` for one that negotiates.
+pub fn row_name[T](
+    v: T ! {
+        closed,
+        timeout,
+        io,
+        invalid,
+        decode_error,
+        bad_record_mac,
+        unexpected_message,
+        illegal_parameter,
+        downgrade,
+        handshake_failure,
+        decrypt_error,
+        zero,
+        der,
+        unsupported_alg,
+        bad_signature,
+        expired,
+        not_yet_valid,
+        name_mismatch,
+        not_ca,
+        issuer_mismatch,
+        unknown_critical,
+    },
+) -> str {
+    let hit = named(v) else |Row(name)| {
+        return name
+    }
+    "ok"
 }
