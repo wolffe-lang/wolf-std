@@ -1114,6 +1114,36 @@ capability's life.
 
 ## Review record
 
+- 2026-09-01, sc31 (§12 applied to a WIDE row union — the first
+  consumer's naming ask, wolf-std#3): a twenty-row union is twenty
+  actions for a caller that routes and twenty ARMS for one that only
+  logs, and the first consumer of `std.x.tls.client` paid the arms
+  twice over plus a forged dead `Client` per arm. The reviewed answer
+  is §12's own coarsening rule, unamended: **coarsening is a NAMED
+  call the caller writes**, so the module ships `named` — one
+  payload-carrying tag `Row(str)` that the value rides through on
+  success — and `row_name`, its marking face, both thin over ONE
+  match, exactly as `std.option`'s six are thin over `else`. Two
+  readings are recorded rather than assumed. First, §12's "a payload
+  is DATA, never a rendered string" is read as forbidding a rendered
+  SENTENCE (this library's wording, an unrecoverable position); a row
+  TAG'S OWN NAME is neither — it is the tag's identity, the finest
+  information the row carries, and the token an operator greps for, so
+  it is admitted as a payload and the names are declared stable (a
+  rename is a breaking change, spelled as one). An `int` kind plus a
+  `describe` was the §12-literal alternative and was declined: it would
+  invent a numbering the protocol does not have and route every
+  consumer through a second call for the word it already wanted.
+  Second, the CALL-SITE SPELLING is part of the surface's contract and
+  is stated in the module header: bind the raising call, then name the
+  binding — the checked tier refuses a raising call passed straight
+  into a row-typed parameter ("control flow in an argument" at `mem`),
+  which is the same limit `std.option`'s helpers have carried since
+  sc06, and the bound form keeps every naming site three-lane. Probed
+  on all three lanes before the surface was written; the in-repo
+  adoption is byte-identical in stdout on all three. Review rides the
+  same pending sc00 gate.
+
 - 2026-08-30, sc29 amendments (the net byte tier + the deadline, and the
   first PROTOCOL CLIENT): §14's os-tier vocabulary reaches sockets' binary
   half — `net.read_bytes`/`write_bytes` carry `List[int]` with the `invalid`

@@ -14,6 +14,39 @@
 # Every slow row is owed a re-measure at pin bumps; an interpreter perf
 # wave is its exit.
 #
+# THE sc31 PIN BUMP (wolf b80d239 -> the v0.2.1 TAG = 75fd2d0, r04 —
+# THE LETTER AND THE ARCHIVE, a patch release: four measured letters
+# (D66's defer-at-scope-exit, #189's one-to-six-digit \u{} bound,
+# #192's two region diagnostics) plus the Windows archive fix the tag
+# exists to prove; lupin 0.1.19 -> the v0.1.20 TAG = e3736c1, is31 —
+# the arms agree, conformance pin 83f83bb -> b80d239) MOVED ZERO ROWS.
+# The prediction (written first, docs/findings.md sc31 register) said
+# zero and named a reason per surface, and each reason was grepped for
+# its SHAPE before the run: the tree holds ONE executable `defer` and
+# it is function-body (scope exit and frame return are the same
+# instant there); no `\u{…}` in the tree exceeds six hex digits, the
+# bound's own maximum; there is not one `region { … }` BLOCK in std/
+# or tests/, and both #192 fixes only REMOVE a judgement from rows
+# that already read `run` on three lanes; and is31's arms find ZERO
+# struct patterns in ARM position, because sc30's 14-pattern adoption
+# is binders only. std/cmp's three `match (self, other)` sites are the
+# tree's only product arms — the tuple twin agreed at 0.1.19 already,
+# and no cmp arm is covered column-by-column by an earlier one, so the
+# widened E0802 warns nowhere. Measured over the untouched ledger:
+# 372 tests, 693 forward tags, 199 conservatism entries, 0 unstable,
+# 0 slow, 0 divergent; lupin 300 run / 72 unsupported, wolfc 296 / 74
+# / 2 fail, native 321 / 49 / 2 — the baseline reproduced to the
+# number. `loopback_handshake` observed TWO lanes again, so sc30's
+# unpredicted lupin flip is stable rather than a one-run accident.
+# Anchors HELD at 404 (+0/-0): the two letters amend existing clauses'
+# text and register none, the spec tree is file-identical across the
+# span, and the snapshot was already byte-identical at the new pin —
+# set-diffed both ways anyway (F-0100 is a lesson about the check).
+# Doctor green at the trio with wolf BARE again (`wolf 0.2.1
+# (wolfgang, pin 75fd2d0)` — sc30's dev stamp retired by a real tag);
+# wolf's own pin = data pin = 75fd2d0, lupin's conformance pin
+# b80d239 four commits behind, and those four commits are the letters.
+#
 # THE sc30 PIN BUMP (wolf v0.2.0/c88ab64 -> b80d239, the s129+s130
 # merges — struct patterns whole-pipe, the #184 lend-slice mem fix,
 # match arms take the product domain; lupin 0.1.18 -> the v0.1.19 TAG
@@ -2795,6 +2828,19 @@ wolfc = "run"
 native = "run"
 
 [tests."x/tls/client/negative_battery.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# sc31 (wolf-std#3): the naming pair's own witness. Pure — the Finished
+# parser and the CertificateVerify dispatch, no socket and no ladder —
+# so it is three-lane at first sight, and it is three-lane BECAUSE
+# every naming site binds the raising call before passing it: the
+# checked tier refuses "control flow in an argument" at mem for the
+# direct form (std.option's six helpers have worn the same limit since
+# sc06), and the module header records the bind-then-name spelling for
+# that reason. Probed on all three lanes before the surface was written.
+[tests."x/tls/client/row_naming.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"

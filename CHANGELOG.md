@@ -1,5 +1,28 @@
 # Changelog
 
+## sc31 — 2026-09-01 — the row gets a name
+
+Pins advance to wolf **v0.2.1** at 75fd2d0 (a real release tag again —
+the sc30 dev stamp retires, `wolf --version` answers bare) and lupin
+**v0.1.20** at conformance pin b80d239, four commits behind the data
+pin with the gap named: r04's four measured letters. Drift was
+predicted ZERO and measured ZERO over 372x3 — the first sc bump whose
+drift list came back empty — with anchors held at 404.
+
+`std.x.tls.client` answers its first consumer's ask (wolf-std#3):
+`named` coarsens the module's twenty-row vocabulary into one
+payload-carrying tag whose payload is the refusing row's own NAME, so
+a caller writes one handler arm instead of twenty and never forges a
+dead `Client`; `row_name` is its marking face. The call-site spelling
+is `bind, then name`, and the module header says why. Adopted at the
+negative battery's three naming sites with byte-identical stdout on
+all three lanes. F-0103 filed (wolf-lang#201): the checked tier
+refuses a raising call passed straight into a row-typed parameter
+where lupin and the native rung both run it — the long-unexplained
+cause of three `std.option` ledger rows. The client's lane note now
+states what a handshake COSTS: seconds, not milliseconds, at
+unoptimized tiers.
+
 ## sc30 — 2026-08-31 — the slice comes home
 
 Pins advance to wolf b80d239 (the s129/s130 merges; a dev-stamped

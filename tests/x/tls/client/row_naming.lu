@@ -1,0 +1,105 @@
+//! check: run(exit=0, stdout="ride-through: 32\nnamed-miss: decode_error\nname-ok: ok\nname-miss: decode_error\nname-other-type: unsupported_alg\nnaming: two faces, one match")
+//! phase: run
+//! conforms: std.x.tls.client
+//!
+//! THE ROW GETS A NAME (sc31, wolf-std#3) — the naming surface's own
+//! witness. `client.named` coarsens this module's whole refusal
+//! vocabulary into ONE payload-carrying tag whose payload is the
+//! refusing row's own name; `client.row_name` is its marking face.
+//! Both are exercised here over the PURE parsers, so all three lanes
+//! run it: no socket, no ladder, no vector sweep.
+//!
+//! Every naming site here BINDS the raising call first and passes the
+//! binding, which is the module header's recorded spelling: the
+//! checked tier refuses a raising call passed straight into a
+//! row-typed parameter ("control flow in an argument" at `mem`, the
+//! same limit `std.option`'s helpers have worn since sc06), while
+//! lupin and the native rung run it. Bind, then name, and the row
+//! stays three-lane.
+//!
+//! What each line proves:
+//!   ride-through    — `named` returns the VALUE untouched on success,
+//!                     so a consumer never forges a dead one
+//!   named-miss      — one handler arm binds the row's own name
+//!   name-ok         — `row_name` reserves `"ok"` for success
+//!   name-miss       — `row_name` answers the row's name
+//!   name-other-type — the SAME generic helper over a different value
+//!                     type (`int`, not `List[int]`) and a different
+//!                     row, arriving from a NARROWER declared union
+//!                     (width subtyping in argument position)
+
+use std.x.tls.cert
+use std.x.tls.client
+
+/// A well-formed Finished message: type 20, a 32-byte body.
+fn good_finished() -> List[int] {
+    var out = List[int]()
+    (mut out).push(20)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(32)
+    var i = 0
+    while i < 32 {
+        (mut out).push(7)
+        i = i + 1
+    }
+    out
+}
+
+/// A Finished message whose length header lies — `decode_error`.
+fn bad_finished() -> List[int] {
+    var out = List[int]()
+    (mut out).push(20)
+    (mut out).push(0)
+    (mut out).push(0)
+    (mut out).push(99)
+    out
+}
+
+fn zeros(n: int) -> List[int] {
+    var out = List[int]()
+    var i = 0
+    while i < n {
+        (mut out).push(0)
+        i = i + 1
+    }
+    out
+}
+
+fn main() -> int {
+    // The value rides through `named` untouched.
+    let good = client.finished_of(good_finished())
+    let vd = client.named(good) else |Row(_)| {
+        return 1
+    }
+    print("ride-through: {vd.len}")
+
+    // One arm binds the row's own name.
+    let bad = client.finished_of(bad_finished())
+    let _miss = client.named(bad) else |Row(name)| {
+        print("named-miss: {name}")
+        List[int]()
+    }
+
+    let good2 = client.finished_of(good_finished())
+    print("name-ok: {client.row_name(good2)}")
+    let bad2 = client.finished_of(bad_finished())
+    print("name-miss: {client.row_name(bad2)}")
+
+    // A different value type and a NARROWER declared union through the
+    // same helper: `verify_certificate_verify` answers `int` and
+    // raises only {unsupported_alg, bad_signature}.
+    let unknown_scheme = 9999
+    let judged = client.
+        verify_certificate_verify(
+        cert.oid_ed25519(),
+        zeros(32),
+        unknown_scheme,
+        zeros(64),
+        zeros(32),
+    )
+    print("name-other-type: {client.row_name(judged)}")
+
+    print("naming: two faces, one match")
+    0
+}
