@@ -2832,6 +2832,19 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# sc31 (wolf-std#3): the naming pair's own witness. Pure — the Finished
+# parser and the CertificateVerify dispatch, no socket and no ladder —
+# so it is three-lane at first sight, and it is three-lane BECAUSE
+# every naming site binds the raising call before passing it: the
+# checked tier refuses "control flow in an argument" at mem for the
+# direct form (std.option's six helpers have worn the same limit since
+# sc06), and the module header records the bind-then-name spelling for
+# that reason. Probed on all three lanes before the surface was written.
+[tests."x/tls/client/row_naming.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
 [tests."x/tls/client/loopback_handshake.lu"]
 lupin = "run"  # sc30 binary bump (lupin 0.1.19): F-0102 paid and the inferred step-budget refusal never materialized — the full handshake evaluates INSIDE the 50M budget (18.9s idle, exact directive stdout); staged re-measure 2026-08-31. The block comment above carries the inference-vs-measurement story
 wolfc = "unsupported"  # step budget exhausted @1924..11690 — four X25519 ladders + Ed25519 sign/verify + the AEAD flight (the curve25519 lane cost, one rung up)
