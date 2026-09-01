@@ -4292,3 +4292,168 @@ TABLES tier, and nothing in either span brings it closer.
 unmoved: no commit in c88ab64..b80d239 or 0.1.18..0.1.19 touches
 regions or capacity. The four `divergent(…)`-era addresses stay
 healed (re-observed green in every sc30 gauntlet).
+
+## Retirements and movements at the sc31 pin — the letters, and the arms
+
+**The drift prediction, written 2026-09-01 12:14 EDT, BEFORE any
+gauntlet at the new pins** (release notes read first, per release:
+wolf-lang's CHANGELOG 0.2.1 entry at the tag `75fd2d0` with the whole
+`b80d239..75fd2d0` span read commit by commit; lupin's v0.1.20
+CHANGELOG/is31 at the tag `e3736c1`; both upstream trees — `corpus/`
+and `spec/` — diffed at the two data-pin shas before the run, and the
+repo grepped for every new surface's SHAPE):
+
+- **wolf b80d239 -> 75fd2d0 (the v0.2.1 TAG; data pin follows): ZERO
+  wolf-lane row motion.** The span is r04 — four measured letters and
+  a release — and not one of them adds a surface. Each grepped for its
+  shape, the sc28 lesson:
+  - **D66, `defer` runs at SCOPE exit, not as the frames return**
+    (#193; `[mem.model.order]` amended, `defer_loop_turn` pins the
+    loop-body interleaving upstream). std/ and tests/ hold exactly ONE
+    executable `defer` — `std/fs/fs.lu:262`, `defer fs_close(fd) else
+    |_| {}` in `append_text` — and ZERO `errdefer`. It is a function-
+    body defer with no loop around it, where scope exit and frame
+    return are the same instant, so the clarified letter cannot change
+    its answer. Zero carriers.
+  - **#189, `\u{…}` takes one to six hex digits** (`CHAR_ESC`'s
+    `HEX_DIGIT+` amends to `UNI_ESC`; seven is E0101, and leading
+    zeros count toward the bound). Every `\u{…}` in the tree is four
+    digits or fewer except `'\u{10FFFF}'`/`"\u{10ffff}"` at exactly
+    six — the bound's own maximum, no leading zeros anywhere. Nothing
+    gains a refusal; the lexer already behaved this way and only the
+    prose moved. Zero carriers.
+  - **#192, two region diagnostics stop lying** (W1001 now also
+    requires no CALL in the region's extent; E1010 reads a region
+    block's tail THROUGH the error row). std/ and tests/ contain ZERO
+    `region { … }` BLOCKS: the two region-bearing rows
+    (`list/freeze_then_read.lu`, `strbuf/region_build_and_freeze.lu`)
+    take a region VALUE (`let r = region()`) and `freeze` it, so
+    neither diagnostic has a block to judge. Both fixes only REMOVE a
+    judgement — a narrowed warning, a lifted refusal — and both rows
+    already read `run` on all three lanes, so there is nothing left
+    for them to move.
+  - **The release-tier bool-fold ICE fix** (a type-blind peephole
+    folded `bxor x, x` to an integer constant): no lane in this repo
+    builds `--release`. Zero.
+  - **The Windows staticlib/dist fix** (#183 — the reason the tag
+    exists): release machinery, not a language surface; nomad-1 is
+    macOS arm64 and the archive lane is not this repo's.
+- **The upstream trees, counted before the run.** `upstream/corpus`
+  471 -> 475 files, the +4 EXACTLY r04's own witnesses and nothing
+  dropped: `grammar/defer_loop_turn` (D66), `grammar/char_uni_seven_digits`
+  (#189), `lints/region_call_allocates` + `memory/region_unit_tail_call`
+  (#192). `upstream/spec` is FILE-IDENTICAL between the two shas —
+  both letters amend an existing clause's text rather than register a
+  clause — so **anchors HOLD at 404**, and `vendor/upstream/anchors.json`
+  is already BYTE-IDENTICAL to `upstream/spec/anchors.json` at
+  75fd2d0, set-diffed BOTH WAYS (+0/-0) per the F-0100 lesson. The
+  re-vendor is a no-op on the snapshot; only `PIN` moves.
+- **lupin 0.1.19 -> v0.1.20 (= the TAG `e3736c1`; conformance pin
+  83f83bb -> b80d239): ZERO row motion.** is31 is one surface —
+  struct patterns in match ARMS (`[gram.pat.struct]` in arm position,
+  s130/wolf-lang#179) — plus E0802's reachability walk widening
+  column-wise over product arms. Grepped for the SHAPE, not the issue
+  it closes: **ZERO struct patterns in arm position** anywhere in
+  std/ or tests/. sc30's own 14-pattern adoption is BINDERS only
+  (`let RawRecord { rtype, wire } = …`, `let CertVerifyView { … } =
+  …`), which is exactly why the shape that landed this release finds
+  nothing here. The only product arms in the tree are std/cmp's three
+  `match (self, other)` sites (12 tuple arms): the tuple twin already
+  agreed at 0.1.19 — lupin has run products all along — every cmp row
+  carrying them already reads `run` under lupin and `unsupported` on
+  both wolf lanes at the EARLIER trait/impl tier (the F-0012/F-0026
+  class), and no cmp arm is covered column-by-column by an earlier one
+  (`(Less, _)` follows `(Less, Less)`, `(Greater, _)` follows
+  `(Greater, Greater)`; nothing splits a bool column and constrains
+  nothing else), so the widened E0802 warns nowhere. is31's
+  arm-boundary restatement — an arm takes the WHOLE scrutinee, no
+  clause extends partial moves to arms — is the status quo both
+  machines already had for the scalar and enum arms this repo writes.
+  Zero carriers.
+- **is31's 8 arm witnesses enter LUPIN's census, not this one**: 455
+  -> 463 files / 430 entries / 33 members, and every one of the 455
+  files carried over from 0.1.19 verdict-IDENTICAL, class for class;
+  the seven-witness differential table is six agreements plus one
+  honest conservatism (`match_arm_product_nonexhaustive`, beside
+  `match_missing` — exhaustiveness is the type checker's and E0801 has
+  no dynamic half). Read from the release's tracked verdict table at
+  the tag and cited because it is the same mechanism seen from the
+  other repo's side; this repo has no carrier for it.
+- **The two float-cast SOUNDNESS rows are unchanged** (wolf-lang#168's
+  family: `corpus/faults/cast_float_nan_trap.lu` and
+  `corpus/faults/cast_float_overflow_trap.lu` — the checked lane
+  exits 0 where the fault twins demand `trap(overflow)`). wolf-lang's
+  PAIRING ritual re-ran against the v0.1.20 release build and records
+  **checked 248 agreements / 2 soundness, native 268 / 0** — the same
+  two, at a strictly better agreement count than 0.1.19's 242/2 and
+  263/0. #168 stays OPEN upstream; nothing in either span touches cast
+  semantics; and this repo has no carrier at all — every `as int` in
+  std/ and tests/ is from an integer word type (`sha2`'s u32/u64
+  packing, `chacha20`'s word32, `handshake`'s `wrapping[u64]` ct
+  compare, `unicode`'s `c as int`), and there is not one float->int
+  cast in the tree.
+- **Zero else.** No perf/budget commit in either span: the
+  step-budget refusals keep the same wall at the same budget, the char
+  rows hold `run`, `slow` keeps zero carriers, and the four
+  `divergent(…)`-era addresses stay healed. The doctor trio reads
+  wolf's own pin = data pin = 75fd2d0, with lupin's conformance pin
+  b80d239 exactly FOUR COMMITS behind — r04's four letters, named
+  above, none of them a lowering change. That is a new shape for this
+  gap: every previous bump's lupin lag was lowering work waiting on a
+  release, and this one is prose the interpreter did not need.
+
+**Predicted total: ZERO verdict movers over 372x3.** The baseline the
+gauntlet must reproduce exactly, counted from the untouched ledger:
+lupin 300 `run` / 72 `unsupported`; wolfc 296 `run` / 74
+`unsupported` / 2 `fail(E…)`; native 321 `run` / 49 `unsupported` /
+2 `fail(E…)`. Anchors 404, +0/-0. Corpus 471 -> 475 upstream.
+
+**The measurement (same day, untouched ledger, three lanes, idle):
+ZERO movers — the prediction is exact, and this is the first sc bump
+whose drift list came back empty.** The gauntlet ran 12:26:34 ->
+12:52:21 EDT over files last touched at 12:15 (the prediction, the
+two tool records and PIN — mtimes checked against the run window,
+the sc30 rule), `cargo xtask ci` exit code 0, `ci: GREEN`, no piping:
+
+- `std-test: 372 test(s); forward tags: 693; conservatism ledger: 199
+  entries; unstable rows: 0; slow skips: 0; divergent rows: 0.` Every
+  row observed exactly the verdict the untouched ledger claims —
+  a deeper answer is a designed RED here, so a green run over an
+  unedited ledger IS the zero-motion measurement. The baseline holds
+  to the number: lupin 300 `run` / 72 `unsupported`, wolfc 296 / 74 /
+  2 `fail(E…)`, native 321 / 49 / 2. `x/tls/client/loopback_handshake`
+  observed TWO lanes again (lupin + native, wolfc's measured step
+  budget the one dark lane) — sc30's unpredicted flip is stable at the
+  new pins, not a one-run accident.
+- Anchors 404, +0/-0, `vendor/upstream/anchors.json` byte-identical to
+  `upstream/spec/anchors.json` at 75fd2d0 — set-diffed both ways
+  BEFORE the re-vendor and confirmed by `sync-pin`'s own comparison in
+  the green run. Nothing was regenerated, so the F-0100 hole had
+  nothing to fall through; the check was run anyway, because the
+  lesson is about the check, not the regeneration.
+- The upstream census reconciled at face value: corpus 471 -> 475,
+  the +4 exactly r04's four witnesses; spec tree file-identical;
+  lupin's own census 455 -> 463 with the 455 carried-over files
+  verdict-identical; wolf-lang's PAIRING at the v0.1.20 build reads
+  checked 248/2-soundness and native 268/0, so #168's two float-cast
+  rows are where they were.
+- Doctor green at the trio, each edge stated:
+  `lupin 0.1.20 … pin b80d239` matches `vendor/tools.toml`;
+  `wolf 0.2.1 (wolfgang, pin 75fd2d0)` matches, BARE — the release
+  shape, the sc30 dev stamp retired by a real tag — with the pairing
+  line reported and not gated; the native rung's `libwolf_rt.a`
+  present, lane lit. wolf's own pin = the data pin = 75fd2d0; lupin's
+  conformance pin b80d239 is four commits behind, and those four
+  commits are r04's letters.
+
+**What the empty drift list is worth saying about.** Three of the four
+letters in this span are the kind of change that CANNOT move a
+downstream row by construction — a clarified `defer` timing that both
+machines already implemented, a lexer bound the lexer already
+enforced, and two diagnostics that only ever REMOVE a judgement. The
+fourth (is31's arms) is a real new surface with a real new capability,
+and it moved nothing here for the reason the sc30 adoption chose: this
+repo destructures in BINDERS, and the release that landed the same
+pattern in ARM position finds no carrier. A zero is only worth
+recording when it was predicted for stated reasons and each reason was
+checked separately; that is what the four bullets above are.

@@ -19,7 +19,55 @@
 # watches the drift, report-never-gate.
 
 [lupin]
-# 0.1.19 (sc30 bump, from 0.1.18) — THE SHAPE BINDS (is30): struct
+# 0.1.20 (sc31 bump, from 0.1.19) — THE ARMS AGREE (is31): match arms
+# take the product domain, and the last pattern asymmetry between the
+# two machines closes — the c06 refusal family s130 retired on the
+# compiler's side had a deliberately symmetric twin here and it dies
+# in the same motion (s130, wolf-lang#179). Struct patterns work in
+# arm position ([gram.pat.struct]: an arm is a CONJUNCTION of field
+# tests, literal fields test, shorthand and renamed fields bind, `..`
+# ignores the rest, sub-patterns nest through enum payloads and
+# @-bindings), the arm boundary takes the WHOLE scrutinee (no clause
+# extends partial moves to arms; testing is not taking), and E0802's
+# reachability walk widens column-wise over products
+# ([ty.match.reachable]). Conformance pin 83f83bb -> **b80d239** (the
+# s130 merge) — this release was cut BEFORE wolf-lang's v0.2.1 tag
+# existed, so the merge sha is its pin and its spec tree is
+# byte-identical to 83f83bb's (404 anchors, nothing gained, nothing
+# dropped). That leaves lupin's pin exactly FOUR COMMITS behind this
+# repo's data pin 75fd2d0, and the gap is r04's four measured LETTERS
+# (D66's defer-at-scope-exit, #189's \u{…} bound, #192's two region
+# diagnostics) plus the release — prose the interpreter did not need,
+# not lowering work waiting on a release. A new shape for this gap,
+# named rather than papered.
+#
+# ACQUISITION (nomad-1, macOS arm64, 2026-09-01): built from the
+# release TAG v0.1.20 (= e3736c1 in wolf-interp, which was also
+# trunk's tip — the tree needed no checkout and was left on trunk)
+# with `cargo build --release`, per D57; the binary answers the bare
+# `lupin 0.1.20 (wolf-interp, reference interpreter at pin b80d239)`;
+# installed to ~/.local/bin via fresh inode (the sc26 SIGKILL rule —
+# 116951877 -> 119125591, verified). This retires the 0.1.19 doctor
+# pin deliberately, on the sprint's own schedule.
+#
+# What the bump changes for this repo, predicted in writing BEFORE the
+# run (docs/findings.md, the sc31 register) and measured over the
+# untouched ledger: **ZERO rows move**. is31 is one surface and this
+# repo has no carrier for it — ZERO struct patterns in ARM position
+# anywhere in std/ or tests/ (sc30's 14-pattern adoption is BINDERS
+# only, which is exactly why the arm release finds nothing), and the
+# only product arms in the tree are std/cmp's three
+# `match (self, other)` sites, whose tuple twin already agreed at
+# 0.1.19 and whose rows sit behind the earlier trait/impl refusal on
+# both wolf lanes. No cmp arm is covered column-by-column by an
+# earlier one, so the widened E0802 warns nowhere. The arm-boundary
+# restatement is the status quo for the scalar and enum arms this
+# repo writes. is31's 8 new arm witnesses enter LUPIN's census
+# (455 -> 463 files, 430 entries, 33 members; the 455 carried-over
+# files verdict-identical), not this one.
+#
+# The 0.1.19 note (sc30 bump), kept for the history it records —
+# THE SHAPE BINDS (is30): struct
 # patterns land whole-pipe from the [gram.pat.struct] text alone
 # (s129/#179), destructures learn the s128 element-move discipline
 # they owed, and the s106 net BYTE tier resolves at last — F-0102
@@ -259,11 +307,12 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.19"
+version = "0.1.20"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
-pin = "83f83bbf44ce5dd6a8f6e2fe255fa37d1fe3954b"
+# pin = "83f83bbf44ce5dd6a8f6e2fe255fa37d1fe3954b"  (superseded, sc30 era — is30's s129-merge pin)
+pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
@@ -400,8 +449,35 @@ pin = "83f83bbf44ce5dd6a8f6e2fe255fa37d1fe3954b"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.0+dev.b80d239"
-# sc30 bump: @ **b80d239** (trunk = the s130 merge; the contract's
+version = "0.2.1"
+# sc31 bump: @ **75fd2d0** — the v0.2.1 TAG, and the first bump since
+# sc28 where the compiler binary is a RELEASE build again: the sc30
+# pin was a dev-stamped `0.2.0+dev.b80d239` because no tag existed
+# past v0.2.0, and v0.2.1 (THE LETTER AND THE ARCHIVE) closes that
+# open question. The binary answers the BARE
+# `wolf 0.2.1 (wolfgang, pin 75fd2d0)` on line 1 — D57's release
+# shape, no `+dev.<commit>` — with the pairing on line 2
+# (`paired with lupin 0.1.20 (reference interpreter), pin b80d239`),
+# reported and never gated (F-0064: that sha is the interpreter's own
+# commit, not a wolf-lang one). Data pin follows to 75fd2d0 (the
+# one-sha invariant). The span b80d239..75fd2d0 is r04: a PATCH
+# release with no new features — nothing runs at v0.2.1 that did not
+# run at v0.2.0 — carrying four measured letters (D66 `defer` at
+# SCOPE exit / #193; #189's one-to-six-hex-digit `\u{…}` bound;
+# #192's two region diagnostics, W1001's missing call test and
+# E1010's read through the error row), the Windows staticlib fix the
+# tag exists to prove (#183), and a release-tier bool-fold ICE fix no
+# lane here builds. Every letter grepped for its SHAPE before the run
+# and every one finds ZERO carriers (the one executable `defer` in
+# the tree is function-body, no `\u{…}` exceeds six digits, there is
+# not one `region { … }` BLOCK in std/ or tests/) — see the sc31
+# register in docs/findings.md. `upstream/corpus` 471 -> 475, the +4
+# exactly r04's own witnesses; `upstream/spec` FILE-IDENTICAL, so
+# anchors HOLD at 404 (+0/-0, set-diffed both ways) and the snapshot
+# re-vendor is a byte no-op — only PIN moves.
+#
+# The sc30 note, kept for the history it records: @ **b80d239**
+# (trunk = the s130 merge; the contract's
 # either/or resolved "s130 landed first" at launch, so the bump takes
 # what exists — the s129 fix this sprint spends rides inside it). NOT
 # a tag build: no wolf release exists past v0.2.0, so D57's honest
@@ -1041,4 +1117,5 @@ version = "0.2.0+dev.b80d239"
 # pin = "c1ca543cb5abf334b70c38b13204170973dc4e23"  (superseded, sc26 era — the native-lane-comes-home acquisition)
 # pin = "0a5c1afd7818477a6b283a5e325eec487e81bd8d"  (superseded, sc27 era — the walls-come-down acquisition)
 # pin = "c88ab6441b2706e20375deeec86eaf6da9bde25b"  (superseded, sc28/sc29 era — the v0.2.0 tag acquisition)
-pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"
+# pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"  (superseded, sc30 era — the s130-merge dev-stamped acquisition)
+pin = "75fd2d0b25b6ed995ec7293053bc32fb3497e272"
