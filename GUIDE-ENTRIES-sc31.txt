@@ -1,0 +1,95 @@
+Drafted Guide entries for AN_AGENTS_GUIDE_TO_WRITING_GOOD_WOLF.md —
+append the dated section verbatim at merge (the guide is untracked in
+the main checkout, so a worktree sprint hands its entries over as this
+file; delete the file once appended). No amendments to earlier
+sections this sprint.
+
+## 2026-09-01 (sc31) — the row gets a name
+
+- A twenty-row union is twenty ACTIONS for a caller that routes and
+  twenty ARMS for one that only logs, and the second caller is the
+  common one. When a consumer reports that your row vocabulary costs
+  it a twenty-arm match, the fix is not fewer rows — it is a NAMED
+  coarsening beside them (API-CONVENTIONS §12: `errors.coarsen` is the
+  exemplar). `std.x.tls.client` grew `named`, which takes the module's
+  whole vocabulary as a row-typed PARAMETER and re-raises the single
+  payload tag `Row(str)` carrying the refusing row's own name, plus
+  `row_name`, its marking face. Both are thin over ONE match, exactly
+  as `std.option`'s six are thin over `else`. The consumer's second
+  cost dies with the first and for free: a handler that yields a value
+  must produce one in every arm, so a naming match forced a FORGED
+  dead value — and a helper whose success path returns the real value
+  never needs one. If your consumer is forging a corpse to satisfy an
+  arm's type, the arm is the bug.
+
+- A row union is a legal PARAMETER type, it takes width subtyping in
+  argument position, and a payload-carrying row round-trips out of a
+  GENERIC function — all three measured, none of them obvious. One
+  helper declaring a twenty-one-tag union serves every raising
+  function in its module AND the imported module whose nine rows it
+  re-exports, because a value whose declared row is a subset passes
+  in. That is the difference between one naming surface and one per
+  raising function, and it is worth the probe it costs to learn.
+
+- MEASURE THE ARGUMENT POSITION BEFORE YOU DESIGN THE CALL SITE. The
+  checked tier refuses an unhandled raising call passed straight into
+  a row-typed parameter — `unsupported: control flow in an argument`
+  at `mem` — while lupin and wolf's own NATIVE rung both run it. Four
+  probes drew the boundary: a non-raising call in an argument is fine,
+  `f(g(x) else d)` is fine, `f(g(x)?)` is fine, and `let r = g(x)`
+  then `f(r)` is fine on every lane. Only the unhandled union riding
+  in is refused, and a `let` dissolves it — which makes it a lowering
+  gap and not a rule, and makes "bind, then name" a call-site contract
+  worth stating in the module header rather than a style. The
+  retroactive payoff was the real one: three `std.option` rows have
+  carried `wolfc = "unsupported"` since sc06 with lupin and native
+  green, and nobody had ever isolated why. A limit you keep paying is
+  cheaper to isolate once than to route around forever (F-0103,
+  wolf-lang#201).
+
+- A payload is data, never a rendered string — and a row TAG'S OWN
+  NAME is not a rendered string. §12 forbids a payload that carries a
+  SENTENCE, because that forces every caller to accept the library's
+  wording and makes the position unrecoverable; a tag name is the
+  tag's identity, the finest information the row carries, and the
+  token an operator greps for. The §12-literal alternative here was an
+  `int` kind plus a `describe` renderer — `std.errors`' own pattern —
+  and it was declined in writing: it would have invented a numbering
+  the protocol does not have and routed every consumer through a
+  second call to get the word it already wanted. Record the reading in
+  the review record, declare the names stable, and a rename becomes a
+  breaking change spelled as one. Deciding a convention's edge in
+  public is what keeps the convention usable.
+
+- The proof that an adoption is behaviour-neutral is the STDOUT HASH,
+  not the reviewer's confidence. Fifteen hand-written match arms at
+  three sites became five bound calls, and the battery's
+  `stdout_sha256` was identical on all three lanes before and after —
+  one number, checked, nothing argued. And the adoption's honesty is
+  the site it does NOT take: the fourth match in the same file stayed,
+  with a comment, because it TRANSLATES a sibling module's vocabulary
+  (`tag`/`short`/`unexpected`) into this module's names rather than
+  naming this module's own rows. The helper would have answered the
+  wrong words there. A sweep that takes every site that LOOKS like the
+  pattern is a sweep that has stopped reading.
+
+- A predicted zero is worth writing down only if each reason was
+  checked separately. sc31's drift list came back EMPTY — the first sc
+  bump where it did — and the four bullets that predicted it are the
+  whole value: three of the release's four letters cannot move a
+  downstream row BY CONSTRUCTION (a clarified `defer` timing both
+  machines already implemented, a lexer bound the lexer already
+  enforced, two diagnostics that only ever REMOVE a judgement), and
+  the fourth is a real new capability with no carrier here because
+  this repo destructures in BINDERS and the release landed the same
+  pattern in ARM position. "Nothing moved" is a measurement when it
+  names why per surface, and a shrug otherwise.
+
+- A four-commit gap between the two upstream pins is not automatically
+  lowering debt. Every earlier bump's lupin lag was work waiting on a
+  release; sc31's is r04's four LETTERS — prose the interpreter did
+  not need, because the machines already agreed on what the prose was
+  correcting. State which kind of gap you have. A trio does not have
+  to be one sha to be fully verified; it has to have every edge
+  stated, and "four commits, all documentation" is an edge that reads
+  very differently from "four commits, all codegen".
