@@ -4459,6 +4459,32 @@ pattern in ARM position finds no carrier. A zero is only worth
 recording when it was predicted for stated reasons and each reason was
 checked separately; that is what the four bullets above are.
 
+**The residues, re-probed at 75fd2d0, one line each:** the chars-pairs
+tuple list (`List[(int, int)]`) is refused at resolve on both wolf
+rungs at its **FIFTH** consecutive pin — same "this prelude container
+instantiation (generic data)" word, `@455..473`, lupin runs it; r04 is
+four measured letters and container instantiation is none of them
+(dated in the str header). F-0096 (`s.get(0..^2)`) refuses verbatim —
+"open-ended or end-relative ranges (slicing)" at resolve on both
+rungs, `@493..498`, against `[mem.str.get]`'s own sentence, lupin runs;
+dated in the str header beside the row that flips at its closure.
+`graphemes` owes no probe: a segmentation TABLES tier, and nothing in
+either span brings it closer. `strbuf.in(r)` is unmoved BY NAME — r04
+touches regions only through #192's two DIAGNOSTICS, which judge
+region blocks and change no placement plumbing — and `reserve` is
+unmoved for the same reason plus the absence of any capacity or
+SSO commit in `b80d239..75fd2d0` or `0.1.19..0.1.20`. The four
+`divergent(…)`-era addresses stay healed (re-observed green in the
+sc31 gauntlets). **And one deliberate non-consumption, noted so the
+next lane does not re-discover the question:** the region ACCOUNTING
+surface wolf-lang#187 asks for (a charged-bytes query plus a
+creation-time cap that faults as a catchable row — lobo's
+`memory_budget` customer) is s131's, landing MID-WAVE and therefore
+after this bump's pin. It is not consumed at sc31 and is not a residue
+this sprint failed to move; it is the NEXT sc bump's first
+measurement, and `strbuf`'s header says so at the `reserve` line where
+a reader will look for it.
+
 ## F-0103 — the checked tier and a row in argument position (sc31)
 
 Isolated 2026-09-01 while designing `std.x.tls.client`'s naming pair

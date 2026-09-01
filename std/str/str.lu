@@ -43,8 +43,11 @@
 //! runs under lupin and is `unsupported` at resolve on both wolf rungs,
 //! against `[mem.str.get]`'s own sentence that end-relative endpoints
 //! resolve exactly as in `s[a..b]` (F-0096, filed; re-measured
-//! verbatim at the sc30 pin b80d239, 2026-08-31 — "open-ended or
-//! end-relative ranges" at resolve on both rungs, lupin runs;
+//! verbatim at the sc31 pin v0.2.1/75fd2d0, 2026-09-01 — "open-ended
+//! or end-relative ranges (slicing)" at resolve on both rungs, lupin
+//! runs; r04 is four measured letters about `defer` timing, the
+//! `\u{…}` escape's shape and two region diagnostics, and none of them
+//! is the `get` lowering;
 //! `tests/str/end_relative_get.lu` is the row that flips at its
 //! closure). There is deliberately no std function that papers over
 //! either spelling.
@@ -86,7 +89,11 @@
 //!     2026-08-30; re-measured verbatim at the sc30 pin b80d239, the
 //!     FOURTH consecutive pin, 2026-08-31 — s129/s130 are struct
 //!     patterns and product match arms, and neither instantiates a
-//!     tuple list either). `char_offsets` below is the offset half; the
+//!     tuple list either; re-measured verbatim AGAIN at the sc31 pin
+//!     v0.2.1/75fd2d0, the FIFTH consecutive pin, 2026-09-01 — r04 is
+//!     four measured letters, `defer` timing, the `\u{…}` bound and
+//!     two region diagnostics, and container instantiation is none of
+//!     them). `char_offsets` below is the offset half; the
 //!     day tuple lists land they fuse into this one function.
 //! graphemes(s: str) -> List[str]
 //!     Extended grapheme clusters, as slices of `s`. A std call and never

@@ -40,10 +40,19 @@
 //!   the s37 `.in(r)` pattern). Placement syntax over a std type is
 //!   compiler plumbing this pin does not have; the ambient-region
 //!   constructor below is D10's default and needs no annotation.
+//!   UNMOVED at the sc31 pin v0.2.1/75fd2d0 (2026-09-01): r04 touches
+//!   regions only through two DIAGNOSTICS (#192's W1001 and E1010),
+//!   which judge region blocks and change no placement plumbing.
 //! - `reserve(n)` — API-CONVENTIONS §8's rule ("no capacity API without a
 //!   capacity") applies verbatim: a `str`-backed buffer has no capacity to
 //!   reserve, and a documented no-op would be a lie. It lands with the SSO
-//!   backing that gives it meaning.
+//!   backing that gives it meaning. UNMOVED at the sc31 pin
+//!   (2026-09-01): nothing in b80d239..75fd2d0 or 0.1.19..0.1.20
+//!   touches capacity or the string backing. The region ACCOUNTING
+//!   surface wolf-lang#187 asks for (a charged-bytes query and a
+//!   creation-time cap) is s131's, landing mid-wave and deliberately
+//!   NOT consumed here — it is the next sc bump's to measure, and this
+//!   line exists so the next lane does not re-discover the question.
 //!
 //! Absence is spelled `none` where it appears, which is the convention's
 //! own spelling: F-0003 died at the sc05 pins and the rename landed
