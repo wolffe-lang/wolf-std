@@ -1,0 +1,86 @@
+//! check: run(exit=0, stdout="roomy true | breached true | reclaimed true | zero_cap true")
+//! phase: run
+//! conforms: std.mem.budget, mem.region.cap.1, mem.region.cap.2, mem.region.cap.3, conc.proc.exit
+//!
+//! The flagship: a region-budget breach reaches the caller as an
+//! ORDINARY ERROR ROW. This is D68's whole containment story
+//! (`[mem.region.cap.3]`, `[conc.proc.exit]`'s `fault(kind)`) collapsed
+//! into one `else` arm — the shape lobo's per-request 503 consumes, and
+//! the reason this module exists at all.
+//!
+//! Four claims, all in one run:
+//!
+//!  - **A budget that fits is invisible.** `with_cap` with a roomy
+//!    budget returns normally and raises nothing.
+//!  - **A budget that does not fit is the row `exhausted`**, not a dead
+//!    process. The trap fires at the allocating site inside the proc
+//!    (`trap(alloc-contract)`, the existing kind — a byte budget is an
+//!    allocation contract, `[mem.region.cap.1]`), is CONTAINED at the
+//!    proc boundary, and reaches the join as a value.
+//!  - **The memory is already back.** `[mem.region.cap.3]` makes
+//!    teardown free-then-deliver, and this file measures it from the
+//!    OUTSIDE: `live()` after the breach equals `live()` before the
+//!    call. A supervisor that admits new work on this row was handed
+//!    the memory back first, which is the half of the contract that
+//!    makes the row safe to act on.
+//!  - **`cap: 0` is a legal budget** (`[mem.region.cap.2]`) that every
+//!    charge breaches, so `with_cap(0, …)` over work that allocates is
+//!    the honest spelling of "this may allocate nothing".
+//!
+//! The budgets here are hand-picked rather than derived, and that is
+//! safe for exactly the reason the module header warns callers it is
+//! usually NOT: the two sides are an order of magnitude apart in every
+//! tier's units, not one byte apart. A witness that needed the exact
+//! boundary would have to measure it with a dry run first
+//! (`[mem.region.cap.1]`'s ledger-units sentence, wolf-lang#203), which
+//! is what wolf-lang's own `faults/region_cap_breach.lu` does.
+//!
+//! LANES: lupin and native. `wolf conform-run --checked` refuses this
+//! file — "structured concurrency in checked execution (C1 deferred)" —
+//! because D68's containment mechanism IS a proc and the checked
+//! executor defers the whole task layer. That refusal is the tier's,
+//! not this surface's: no spelling of a contained breach avoids it.
+
+use std.mem.budget
+
+fn tiny() {
+    var xs = List[int]()
+    for i in 0..8 {
+        (mut xs).push(i)
+    }
+}
+
+fn hefty() {
+    var xs = List[int]()
+    for i in 0..4000 {
+        (mut xs).push(i)
+    }
+}
+
+fn main() -> !int {
+    let base = budget.live()
+
+    var roomy = true
+    budget.with_cap(100000000, tiny) else |exhausted| {
+        roomy = false
+    }
+
+    var breached = false
+    budget.with_cap(64, hefty) else |exhausted| {
+        breached = true
+    }
+
+    let reclaimed = budget.live() == base
+
+    var zero_cap = false
+    budget.with_cap(0, tiny) else |exhausted| {
+        zero_cap = true
+    }
+
+    print("roomy {roomy} | breached {breached} | reclaimed {reclaimed} | zero_cap {zero_cap}")
+    if !roomy { return 1 }
+    if !breached { return 2 }
+    if !reclaimed { return 3 }
+    if !zero_cap { return 4 }
+    0
+}

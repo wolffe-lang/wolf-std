@@ -1,0 +1,50 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.mem.budget, conf.trap.map, mem.region.cap.2
+//!
+//! A negative byte budget traps `assert` AT THE DOOR, and the reason it
+//! is std's own check rather than the language's is the whole point of
+//! the file.
+//!
+//! `[mem.region.cap.2]` already rules the domain: a negative cap is
+//! `trap(alloc-contract)` at the CREATING site. But `with_cap` creates
+//! its region inside a proc, so that trap would be CONTAINED
+//! (`[mem.region.cap.3]`) and would reach the caller as the row
+//! `exhausted` — a caller's arithmetic mistake answered with a
+//! recoverable value, which is exactly the failure API-CONVENTIONS §2's
+//! trap rule exists to prevent. So `with_cap` checks `n` before it
+//! spawns anything, and this file holds that check the way
+//! `tests/bytes/slice_out_of_order_trap.lu` holds `bytes.slice`'s.
+//!
+//! `n == 0` is deliberately NOT in this family: the clause says `cap: 0`
+//! is legal and every charge breaches it, so a zero budget is an honest
+//! budget and answers the row. `breach_is_a_row.lu` pins that half.
+//!
+//! LANES: THREE, and the third one is a measurement worth keeping. Its
+//! sibling `breach_is_a_row.lu` is `unsupported` on `wolf conform-run
+//! --checked` — "structured concurrency in checked execution (C1
+//! deferred)", reported at `mem` — and both files call the same
+//! `with_cap`, so a reader would expect this one to be refused too. It
+//! is not: the checked tier reaches `run` here and traps `assert` like
+//! the other two lanes, because the guard fires BEFORE the `spawn proc`
+//! is ever reached. The C1 refusal is raised where the construct is
+//! EXECUTED, not statically over every program that can reach it —
+//! probed separately with a `with_cap` call behind a runtime-false
+//! branch, which the checked rung compiles and runs to `exit(0)`. So
+//! this file's checked column is `run` and its sibling's is
+//! `unsupported`, from one module, and neither is a mistake.
+
+use std.mem.budget
+
+fn nothing() {
+}
+
+fn main() -> !int {
+    budget.with_cap(-1, nothing) else |exhausted| {
+        // Unreachable: the guard traps before the proc is spawned. If
+        // this arm ever runs, the check has been lost and the row is
+        // answering a caller's bug.
+        return 1
+    }
+    0
+}

@@ -3075,3 +3075,52 @@ native = "run"
 # Motion count: 7 kind-changes on the lupin column (3 deeper to `run`,
 # 4 `slow` -> the honest refusal), 0 on wolfc, 0 on native (dark,
 # carried), 0 shallower.
+
+# ---- sc32: std.mem.budget — the region ledger named, and the budget
+# breach made into a ROW. THE MODULE HAS TWO LANE STORIES AND THEY COME
+# FROM ONE MEASUREMENT, so the three rows below do not agree and none of
+# them is a mistake.
+#
+# The QUERY half (`charged`, `live`) is three lanes: `region_bytes` and
+# `live_region_bytes` land whole-pipe at this pin (s131,
+# [mem.region.account.1/.2]) and a `region` passed ACROSS a module
+# boundary survives the call on every lane — the unwritten `read` mode
+# is the spec's own answer to the affinity a reader will expect to bite
+# ([mem.tier0.mode.read]: "the caller retains it"), probed rather than
+# reasoned.
+#
+# The CONTAINMENT half (`with_cap`) is two lanes, and the dark one is
+# the TIER's rather than this surface's: D68's containment mechanism IS
+# a proc, and `wolf conform-run --checked` answers "structured
+# concurrency in checked execution (C1 deferred)" at `mem` for the whole
+# task layer. No spelling of a contained breach avoids it.
+#
+# AND THE REFUSAL IS REACHED AT EXECUTION, NOT STATICALLY — which is why
+# `negative_cap_trap` is `run` on the checked column while
+# `breach_is_a_row` is `unsupported`, from one module and one function.
+# The guard traps before the `spawn proc` is reached, so the checked
+# rung never meets the construct. Probed apart from both rows with a
+# `with_cap` call behind a runtime-false branch: the checked rung
+# compiles that file and runs it to `exit(0)`.
+#
+# Units, stated here because it decides the test design: the ledger's
+# numbers are per-tier measured facts and NOT comparison surface
+# ([mem.region.account.1]) — the same 100-element list reads 4064 under
+# lupin, 2032 native and 1600 checked at this pin. Every row below
+# prints RELATIONS and never a count, which is what lets one `stdout=`
+# hash cover every lane it runs on. ----
+
+[tests."mem/budget/ledger_relations.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."mem/budget/breach_is_a_row.lu"]
+lupin = "run"
+wolfc = "unsupported"  # sc32: "structured concurrency in checked execution (C1 deferred)" @mem — the checked tier defers the whole task layer, and D68's containment IS a proc
+native = "run"
+
+[tests."mem/budget/negative_cap_trap.lu"]
+lupin = "run"
+wolfc = "run"  # sc32: three lanes despite its sibling's C1 refusal — the guard traps before the `spawn proc` is reached, and C1 is raised at execution
+native = "run"
