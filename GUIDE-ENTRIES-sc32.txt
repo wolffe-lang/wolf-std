@@ -1,0 +1,115 @@
+Drafted Guide entries for AN_AGENTS_GUIDE_TO_WRITING_GOOD_WOLF.md —
+append the dated section verbatim at merge (the guide is untracked in
+the main checkout, so a worktree sprint hands its entries over as this
+file; delete the file once appended). No amendments to earlier
+sections this sprint.
+
+## 2026-09-02 (sc32) — the budget has a shape
+
+- A CAPABILITY with no carrier moves nothing, and that is a
+  measurement only if you grep for it. sc31's empty drift list came
+  from a span that added no surface; sc32's came from the span that
+  added the biggest memory surface since regions themselves — the byte
+  ledger, the creation-time cap, the contained fault — and it is still
+  empty, because this repo had never asked the question the new
+  surface answers. The two zeros read identically and mean opposite
+  things: one says "nothing could have moved", the other says "a
+  sprint's worth of work is sitting in front of you". Write which one
+  you have. And never let "additive" stand in for the check: the grep
+  that found no `region_bytes`, no `cap:` and no `spawn` in the tree is
+  the evidence, not the word.
+
+- PROBE THE SIGNATURE YOU MEAN TO SHIP, ONE PROPERTY AT A TIME, BEFORE
+  THE FIRST LINE. `std.mem.budget` cost fifteen probes and five of them
+  changed the module. The two that would have been guessed wrong in
+  both directions are the pair worth remembering. A `region` in
+  ARGUMENT position is RETAINED by the caller — region values are
+  affine, `[mem.region.create.2]` says they move and are never copied,
+  and a reader is right to expect `charged(r)` to eat its argument; it
+  does not, on any lane, because `[mem.tier0.mode.read]` says the
+  unwritten mode leaves the caller holding the value, and nobody had
+  ever tested that sentence against a region. But a region may not be
+  RETURNED: the native rung refuses `-> region` by name ("first-class
+  region values beyond local bindings"). Taking and returning are not
+  one question, and the clause that licenses one says nothing about
+  the other.
+
+- WHEN A HELPER CANNOT HAND BACK A VALUE, FIND OUT WHETHER THAT IS A
+  LIMIT OR THE CONTRACT. The obvious signature was
+  `with_cap[T](n, f) -> T ! {exhausted}`, and three measurements closed
+  the door: a proc has no shared address space beyond its channels
+  (`[conc.proc.1]`), a `channel[int]` in a std SIGNATURE is refused on
+  both wolf rungs, and one kept inside a std BODY is refused on the
+  checked one. The right response was not to mourn the signature but
+  to notice that the contract had already ruled: `[conc.proc.kill]`
+  bulk-frees the proc's regions before the reason delivers, so nothing
+  the work ALLOCATED could have survived under any spelling. Only a
+  scalar was ever crossing — which is the discipline the consumer's own
+  request path already wrote by hand. A limit that agrees with the
+  contract is a design, and saying so in the header is what stops the
+  next lane from re-litigating it.
+
+- A TIER'S REFUSAL MAY BE REACHED AT EXECUTION RATHER THAN DECIDED
+  STATICALLY, and that changes what a module costs. The checked tier
+  answers "structured concurrency in checked execution (C1 deferred)"
+  for the task layer — so a module built on procs looks two-lane. It is
+  not: a `with_cap` call behind a runtime-false branch compiles and
+  runs to `exit(0)` there, and one of this module's three witnesses is
+  `run` on all three lanes because its guard traps before the `spawn`
+  is reached. So the same function yields two different checked columns
+  in one ledger, neither of them a mistake, and a caller may link the
+  module on the checked tier and pay only for the paths that spawn.
+  Before you write a module off as two-lane, find out whether the
+  refusal is a verdict on the program or on the step.
+
+- WHEN THE UNITS ARE PER-TIER, THE TEST PRINTS RELATIONS. The region
+  ledger's numbers are implementation-measured facts and explicitly not
+  comparison surface — the same 100-element list reads 4064 under
+  lupin, 2032 native and 1600 checked — and this rig proves behaviour
+  with a stdout hash compared ACROSS lanes. Those two facts decide the
+  test design between them: print `grew`/`stable`/`reclaimed`, never a
+  count, and one hash covers every lane. It is the same reasoning
+  wolf-lang's own three-tier cap witnesses use to breach on every tier
+  from one file, and it is worth copying a corpus witness's exact shape
+  when the shape is the part that was measured — the attribution half
+  of ours is written the way `memory/region_bytes_value.lu` writes it
+  because the other way is E1010 on both wolf rungs.
+
+- A ROW WITH NO PAYLOAD IS SOMETIMES THE CONTRACT SPEAKING, not
+  minimalism. `exhausted` carries no number because
+  `[mem.region.cap.3]` makes teardown free-then-deliver: the breaching
+  proc's regions are reclaimed wholesale before the reason reaches the
+  join, so the charge a reader would want in the payload is
+  UNOBSERVABLE by contract and would have to be invented. The same
+  clause is why the row is safe to act on at all — the supervisor that
+  answers 503 was handed the memory back first. And where the row and
+  the trap rule collide, the trap rule wins: a negative budget would
+  have ridden out as `exhausted` (the language's own trap fires inside
+  the proc and is contained), so std checks it at the door, because a
+  caller's arithmetic mistake answered with a recoverable value is the
+  exact failure the trap rule exists to prevent.
+
+- MEASURE A UPSTREAM ASK FROM YOUR OWN SIDE BEFORE YOU SECOND IT. #203
+  reported a 16x byte-buffer cost from one consumer; this repo
+  reproduced both numbers to the byte from a different program at a
+  later pin, showed the ratio is flat from 1 KiB to 64 KiB, and turned
+  up a multiplier the issue did not have (the reference interpreter is
+  32x, because its value slot is twice the compiled tiers'). An
+  independent reproduction turns "our server sees this" into "the
+  representation is this", and the extra column is what tells a
+  portable program not to hard-code a per-tier constant. The
+  measurement also found something nobody asked for — a `str` charges
+  NO named region on ANY tier, where the clause scopes that gap to one
+  — which is the ordinary dividend of writing the probe rather than
+  citing the issue.
+
+- A RESIDUE'S METHOD HAS TO SURVIVE THE SPAN THAT CONTRADICTS IT. Five
+  bumps running, `strbuf.in(r)` was re-dated from the commit list:
+  "nothing in this span touches regions". This span touched regions
+  more than any since regions landed, so the sentence had to become a
+  probe — and the probe says the placement syntax is absent on every
+  lane and `fail(E0201)` at PARSE for the struct form. The residue did
+  not move, but the reason it did not move is now measured rather than
+  inherited. When the span finally does touch your residue's area, that
+  is the bump where the argument stops being allowed to stand in for
+  the measurement.
