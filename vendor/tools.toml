@@ -19,6 +19,73 @@
 # watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.23 (sc33 bump, from 0.1.22 — ONE release, chased on schedule).
+# THE LETTERS IN THE MIRROR (is34): the three letters r05 sent back
+# with v0.2.2, and this machine takes all three.
+#   - **#209, a trap runs no defers, at the ROOT too.** The divergence
+#     sc32 recorded LIVE at its pin — every wolfc lane abandoned a
+#     pending root defer, 0.1.22 ran it — HEALS here: `eval_block`'s
+#     trap arm drops its `inside_proc()` half, so one rule now governs
+#     both domains. sc32 predicted in writing that this could not move
+#     a row in this tree, and the carrier check was RE-RUN rather than
+#     inherited at this bump: still exactly ONE executable `defer`
+#     (std/fs/fs.lu:262, `append_text`, on no trapping path) and ZERO
+#     `errdefer`. A heal with no carrier moves nothing — the same
+#     sentence as a divergence with no carrier, read from the other
+#     side.
+#   - **#55, the record carries the trap's output.** The letter with
+#     the most rows behind it and no motion in any of them. Through
+#     0.1.22 this machine reported `stdout_inline: null` on EVERY
+#     trapping program; now the digest and the inline text are present
+#     for `exit`, `trap` and `ub` alike. **ELEVEN std rows trap after
+#     printing** (grepped by shape over all 56 trap files, read to
+#     confirm the print PRECEDES the trapping call, and checked against
+#     the ledger to confirm the lane runs them — listed in the sc33
+#     register), and all eleven lupin RECORDS change shape. **ZERO rows
+#     move**, because this rig never looks at a trap's stdout, in three
+#     independent places: `classify`'s Trap arm discards the field BY
+#     PATTERN (`Check::Run { exit: ExitExpect::Trap(want), .. }`),
+#     `diff_class` compares `stdout_sha256` only under
+#     `Verdict::Exit(_)`, and lint R3 bars `stdout=` beside a trap
+#     expectation outright — so no trap row even CARRIES an expectation
+#     the change could contradict. Measured on BOTH sides of the bump
+#     with a three-lane witness that prints and then divides by zero:
+#     at 0.1.22 lupin said null where both wolf lanes already carried
+#     `5726e3cf…`; at 0.1.23 lupin joins with the SAME digest and the
+#     three lanes agree field for field. The asymmetry was always
+#     lupin's alone, and it stayed invisible for exactly the reason it
+#     is harmless here — the comparator does not look. What did NOT
+#     change is the comparison: `[proto.cmp.phase]` still says "for
+#     `trap`, compare kind only" on both sides, and widening it is
+#     filed upstream as wolf-lang#216.
+#   - **#56, the comma refusals teach the comma.** `Diag` gains `help`
+#     — a zero-width insertion point and the text that belongs at it —
+#     on all five D67/D69 list closers. Wording is outside the
+#     differential protocol (D22) and upstream asserts span parity
+#     structurally, so no record moved there and none could here: this
+#     rig compares verdicts and diagnostic CODES, never message text.
+#     Zero carriers by shape as well (sc32 swept all 420 `.lu` files
+#     for the D67/D69 separator forms and found none; the tree has not
+#     gained one).
+# Conformance pin 2bfbe5e -> **8cda3aa**, and this is the number to
+# notice: lupin's pin CATCHES UP to wolf's own. sc32 recorded a
+# 35-commit gap and called it the largest this repo had ever seen;
+# is34 chased v0.2.2 THE TAG and the gap closes to **ZERO**. The sc31
+# rule — state which KIND of gap you have — reads here as "no gap at
+# all", for the first time since the two-upstream era began. The
+# 0.1.22 doctor pin retires with this entry.
+#
+# ACQUISITION (nomad-1, macOS arm64, 2026-09-02): built from the
+# release TAG v0.1.23 (= 127b6fa in wolf-interp, which was ALSO
+# trunk's tip — the tree needed no checkout and was left on trunk,
+# and no other lane owns that tree this wave) with
+# `cargo build --release --bin lupin`, per D57; the binary answers the
+# bare `lupin 0.1.23 (wolf-interp, reference interpreter at pin
+# 8cda3aa)` — no `+dev.<commit>`, the tag build D57 demands; installed
+# to ~/.local/bin via fresh inode (the sc26 SIGKILL rule — 125801618
+# -> 127124479, verified).
+#
+# The sc32 note, kept for the history it records:
 # 0.1.22 (sc32 bump, from 0.1.20 — TWO releases in one bump, 0.1.21
 # having been deliberately not chased mid-wave). THE LEDGER IN THE
 # MIRROR (is32, 0.1.21) and THE MIRROR HOLDS (is33, 0.1.22): this
@@ -347,13 +414,14 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.22"
+version = "0.1.23"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
 # pin = "83f83bbf44ce5dd6a8f6e2fe255fa37d1fe3954b"  (superseded, sc30 era — is30's s129-merge pin)
 # pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"  (superseded, sc31 era — is31's s130-merge pin)
-pin = "2bfbe5e6e877d3b6b43a9d8a68b56b1ef74c21c4"
+# pin = "2bfbe5e6e877d3b6b43a9d8a68b56b1ef74c21c4"  (superseded, sc32 era — is33's s132-merge pin)
+pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
@@ -491,6 +559,73 @@ pin = "2bfbe5e6e877d3b6b43a9d8a68b56b1ef74c21c4"
 
 [wolf]
 version = "0.2.2"
+# sc33 bump: THE BINARY DOES NOT MOVE, AND THE DATA PIN DOES. This is
+# the first entry in this file where the two come apart on purpose, so
+# it names the invariant it suspends out loud.
+#
+# The binary stays at the v0.2.2 TAG **8cda3aa** — r06 moves it to
+# v0.2.3 later this wave — and doctor's two gates are therefore
+# untouched: `wolf 0.2.2 (wolfgang, pin 8cda3aa)` on line 1, BARE,
+# still matching the `version` and `pin` recorded here. The checked and
+# native lanes meet no new compiler at all this bump, so their zero
+# drift is a zero BY CONSTRUCTION rather than by grep — a third kind of
+# zero after sc31's (a span with no capability) and sc32's (a
+# capability with no carrier), and the cheapest of the three to defend:
+# nothing was measured about wolfc because nothing about wolfc changed.
+#
+# The DATA pin moves 8cda3aa -> **813153e** (wolf-lang trunk, 19
+# commits past the tag, with NO tag of its own — sc30's dev-stamp
+# precedent for pinning data at a trunk sha). **The one-sha invariant
+# the sc32 entry named ("Data pin follows to 8cda3aa") is deliberately
+# suspended here**, and it is worth being exact about what that costs,
+# because the answer is "nothing, for a structural reason rather than a
+# lucky one": doctor NEVER READS `vendor/upstream/PIN`. Its two gates
+# are the binary's self-declared version and its self-declared pin
+# against THIS file; the vendored snapshot is `sync-pin`'s business,
+# and `sync-pin` gates that snapshot against the SUBMODULE, not against
+# either binary. So a data pin 19 commits ahead of both binary pins is
+# green AND silent — by design, not by accident. Predicted in writing
+# before the run and confirmed; see the sc33 register.
+#
+# What the 19 commits carry, read commit by commit (3 first-parent):
+# **s60b**, the windows task layer — Win32 workers on the kernel's
+# reserve-and-guard stacks, a VEH reporter answering
+# STATUS_STACK_OVERFLOW in wolf's voice and exiting 134, `os.signal`
+# over SetConsoleCtrlHandler, and the WSAPoll reactor rung (a real
+# poller wake bug found and fixed); the windows floor moves
+# 259/255/0/274/0 -> 261/278/0/295/0 and refused-by-name goes 21 -> 0,
+# native at macOS parity. That is a windows RUNTIME bring-up, on a host
+# nomad-1 is not, against a compiler binary that does not move here.
+# Plus the 2026-09-02 ledger ritual and `4d9683d` (wolf-lang's own
+# xtask dist smoke degrading by name on unserved hosts — an archive-gap
+# repair for the next tag, not a language surface).
+#
+# The upstream trees, counted at BOTH shas before the run:
+# `upstream/corpus` **490 -> 490, unchanged**; `upstream/spec` moves in
+# exactly ONE file — `spec/11-os.md`, +15/-6, all of it prose INSIDE
+# the already-existing `[os.signal.platform]` clause, recording that
+# windows console-control delivery landed and that `os_signal_raise`
+# there is an in-process delivery. **Anchors 411, and `anchors.json` is
+# BYTE-IDENTICAL between the two shas** — so the re-vendor moves no
+# bytes and the F-0100 both-ways key-set diff is a formality this time.
+# Said out loud rather than skipped: sc32's was load-bearing (404 ->
+# 411, the first byte-moving re-vendor since sc27), this one is not,
+# and knowing WHICH KIND you have is the whole point of doing it
+# either way. Zero carriers for the os.signal prose in any case —
+# `grep -rn "os\.signal\|os_signal" std tests` finds nothing, and
+# nomad-1 is macOS/arm64.
+#
+# The PAIRING line goes one release stale again, and that is expected
+# rather than wrong: it still reads `paired with lupin 0.1.22
+# (reference interpreter), pin 2bfbe5e` while the machine now carries
+# lupin 0.1.23. r05 cut v0.2.2's pairing commit when 0.1.22 was
+# current and is34 released 0.1.23 afterwards, so the sc27
+# one-release-behind nuance — which sc32 was able to report as NOT
+# recurring — recurs here. Reported and never gated (F-0064): the rig
+# reads identity from line 1 only, and line 2's sha is a wolf-interp
+# commit rather than a wolf-lang one in any case.
+#
+# The sc32 note, kept for the history it records:
 # sc32 bump: @ **8cda3aa** — the v0.2.2 TAG, THE LEARNERS' RELEASE,
 # and the SECOND consecutive release build (the sc30 dev stamp stays
 # retired). The binary answers the BARE
