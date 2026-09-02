@@ -4944,3 +4944,177 @@ witness is therefore written the way wolf-lang's own
 `memory/region_bytes_value.lu` writes it — the push sits AFTER the
 `in r { … }` block, not inside it. Copying a corpus witness's shape is
 not laziness when the shape is the part that was measured.
+
+## F-0103 re-measured at the sc32 pin — #201 has NOT ruled, and the residue is re-dated
+
+Re-probed 2026-09-02 at `wolf 0.2.2 (wolfgang, pin 8cda3aa)` /
+`lupin 0.1.22 (pin 2bfbe5e)`, both halves, each in its own directory:
+
+| probe | shape | lupin | wolfc `--checked` | wolf `--native` |
+|---|---|---|---|---|
+| f1 | `row_name(narrow(1))` — a raising call STRAIGHT into a row-typed parameter | `exit(0)` `alpha` | **`unsupported` — `control flow in an argument` @`mem`, `@575..584`** | `exit(0)` `alpha` |
+| f2 | `let r = narrow(1)` then `row_name(r)` — the BOUND form | `exit(0)` `alpha` | `exit(0)` `alpha` | `exit(0)` `alpha` |
+
+**Verbatim. Nothing moved, and wolf-lang#201 is still OPEN — no
+ruling, so there is nothing to adopt.** The residue is re-dated rather
+than retired, and the reason is checked per surface the way the drift
+prediction's are: the v0.2.1..v0.2.2 span is a windows native bring-up
+(a different backend on a host this machine is not), an LSP navigation
+trio (a `wolf_query` surface, not a lowering), the region ledger and
+its cap (new `mem` capability, no change to `mem`'s ARGUMENT handling),
+D69's separator tightening (a parser rule) and four letters. Not one
+commit in 35 touches how the checked tier lowers an unhandled raising
+call in argument position.
+
+So `std.x.tls.client`'s header keeps its **bind, then name** sentence
+unamended, and the three `std.option` rows this finding explains
+(`or_else_default.lu`, `exists_marking.lu`, `is_none_marking.lu`) keep
+their `wolfc = "unsupported"` with the cause still named. The new
+module inherits the lesson without paying it: `std.mem.budget` has no
+row-typed parameter, so nothing in it needed the workaround — which is
+the second time in two sprints that reading F-0103 first changed a
+signature before it cost a ledger row.
+
+## The residues, re-probed at 8cda3aa, one line each
+
+- **The chars-pairs tuple list is refused at its SIXTH consecutive
+  pin.** `List[(int, int)]()` is `unsupported — this prelude container
+  instantiation (generic data)` at resolve on both wolf rungs,
+  `@72..90`, lupin runs it. Six pins is long enough to state the shape
+  rather than re-argue it each time: this refusal has never moved as a
+  SIDE EFFECT of anything, and it will move the sprint someone lowers
+  generic container instantiation on purpose. Dated in the str header.
+- **F-0096 refuses verbatim.** `s.get(0..^2)` is `unsupported —
+  open-ended or end-relative ranges (slicing)` at resolve on both
+  rungs, `@103..108`, against `[mem.str.get]`'s own sentence, lupin
+  runs it. Dated in the str header beside the row that flips at its
+  closure (`tests/str/end_relative_get.lu`).
+- **`strbuf.in(r)` was RE-PROBED this time rather than argued from the
+  span, and it is the one residue whose method had to change.** Every
+  previous bump could say "regions did not move" from the commit list;
+  this span moved regions more than any since regions landed. So the
+  placement syntax itself was measured, both shapes: `List[int].in(r)`
+  is `unsupported — a std/prelude stub without a signature` at resolve
+  on both wolf rungs and refused by lupin too, and `Buf.in(r) { … }`
+  over a plain struct is `fail(E0201)` at PARSE on all three — the form
+  is not in the grammar. s131/s132 gave regions an ACCOUNTING surface
+  and a BUDGET and gave them no placement plumbing; the two are
+  different work, and a reader of the strbuf header can now see that
+  the distinction was measured and not assumed.
+- **`reserve(n)` is unmoved**, and its forward-looking sentence is
+  ANSWERED rather than carried: no capacity or string-backing commit
+  exists anywhere in `75fd2d0..8cda3aa` or `0.1.20..0.1.22`, and the
+  region accounting surface sc31's header pointed the next lane at
+  landed in this span, was consumed at sc32, and lives in
+  `std.mem.budget`. It bought `strbuf` nothing — a ledger says what a
+  buffer COST and a cap says when to stop, and neither is a capacity
+  you can reserve.
+- **`graphemes` owes no probe**: a segmentation TABLES tier, and
+  nothing in either span brings it closer.
+- **The four `divergent(…)`-era addresses stay healed** (re-observed
+  green in both sc32 gauntlets).
+
+## F-0104 — the byte-buffer cost, measured from the library's side (wolf-lang#203's evidence)
+
+The sprint contract asked for the #203 ask's EVIDENCE rather than its
+fix: measure what a `bytes`-tier io buffer would cost against
+`List[int]` in std's own readers, recommend, and build nothing. Filed
+here as a finding because it is a measurement this repo owns and will
+be re-run at every bump until the ask lands.
+
+**Method.** `region_bytes` over a fresh region per size, a `List[int]`
+filled by `push` to N elements — the exact shape every byte-producing
+surface in std hands back (`fs.read_bytes`, `fs.read_chunk`,
+`net.read_bytes`, `bytes.from_str`, `str.bytes()` materialized). Three
+lanes, 2026-09-02, at wolf 0.2.2/8cda3aa and lupin 0.1.22/pin 2bfbe5e,
+macOS arm64.
+
+| payload bytes | lupin ledger | checked ledger | native ledger | native ÷ payload |
+|---|---|---|---|---|
+| 1,024 | 32,736 | 16,384 | 16,368 | 16.0x |
+| 2,048 | 65,504 | 32,768 | 32,752 | 16.0x |
+| 4,096 | 131,040 | 65,536 | 65,520 | 16.0x |
+| 8,192 | 262,112 | 131,072 | 131,056 | 16.0x |
+| 16,384 | 524,256 | 262,144 | 262,128 | 16.0x |
+| 32,768 | 1,048,544 | 524,288 | 524,272 | 16.0x |
+| **65,536** | **2,097,120** | **1,048,576** | **1,048,560** | **16.0x** |
+
+**Three things this table says that #203 could not.**
+
+1. **It reproduces lobo's numbers to the byte, from a different
+   program, at a later pin.** The issue reports 1,048,560 native and
+   1,048,576 checked for a 64 KiB chunk; this repo measures exactly
+   those two numbers with no lobo code involved. The 16x is a property
+   of the representation, not of one consumer's loop.
+2. **It is linear and clean at every scale**, from 1 KiB to 64 KiB —
+   `ledger = 16 x payload` on both wolf tiers, with the native tier
+   sixteen bytes under (one allocation header). So a fix is worth
+   exactly its multiplier: a byte-width element type takes every row
+   in this table down 8x, and preallocation from a known length takes
+   the remainder down 2x. Neither is a rounding error at any size a
+   server sees.
+3. **The reference interpreter is 32x, not 16x — a multiplier #203
+   does not carry.** lupin's own documented geometry is a 16-byte value
+   slot (against the wolf tiers' 8), so the element-width half of the
+   cost is 16x there and the growth history doubles it again. Every
+   number in the lupin column is exactly 2x its checked twin. That
+   matters to the ask: a portable program deriving a budget from a
+   measured `region_bytes` reading is fine (the clause's own advice),
+   but a program that hard-codes a per-tier constant is out by 2x
+   between the two machines before it is out by 16x against its
+   payload.
+
+**And a fourth measurement, which is a finding in its own right: a
+`str` charges NO named region's ledger on ANY tier at this pin.**
+`[mem.region.account.1]` names this gap and scopes it to the NATIVE
+tier ("the native tier realizes `str` materialization's ambient region
+as the process root — wolf-lang#191, the c09 seam — so string bytes
+appear in no named region's ledger THERE today"). Measured: 200 fresh
+interpolated strings built inside `in r { … }` leave `region_bytes(r)`
+at **0** under lupin, on the checked machine and natively alike. The
+clause's own warning — "programs must not read this clause as `str`
+never charges" — is currently true of every tier, not one, and the
+sentence should either widen or the two non-native tiers should charge.
+This is the half of lobo's memory story that no ledger can see, and
+it means an operator reading `region_bytes` as "what this request
+cost" is missing string bytes entirely on every machine.
+
+**The recommendation, in the ask's own terms.** #203 asks for one of
+two properties and says either alone helps. Both are worth having and
+they are separable work:
+
+- **One byte per byte** is the bigger win (8x, and it is the half that
+  makes the type honest about what it holds — a byte buffer that cannot
+  hold invalid UTF-8 is not a byte buffer). std has documented `Bytes`
+  as an interim since sc05, and `std.bytes`' header already states the
+  landing shape: **every signature keeps its form — `List[int]` becomes
+  `Bytes` and nothing else moves.** That is a real, checked property of
+  the existing surface, not a hope: all nine functions in `std.bytes`,
+  plus `fs.read_bytes`/`read_chunk`/`write_bytes`/`write_chunk` and
+  `net.read_bytes`/`write_bytes`, are monomorphic over `List[int]`
+  today precisely so they run on all three lanes (F-0026), and a
+  byte-width nominal type keeps that property where a generic would
+  lose it.
+- **Preallocation from a known length** is the smaller win (2x) and the
+  cheaper one: `fs_read_chunk(fd, n)` and `net_read_bytes(s, max)` both
+  KNOW their bound at the call. A buffer sized from that argument
+  rather than grown by doubling reports the buffer instead of the
+  buffer's history, and it needs no new type at all.
+
+**Recommendation: a std `Bytes` over a language byte-width element
+type, not a std-only wrapper.** std cannot fix this from its own side
+and should not pretend to: a `struct Bytes { xs: List[int] }` would
+change no allocation, hide the cost behind a nicer name, and cost a
+lane (a wrapper's methods are methods on a std type, and this sprint's
+own probes just measured what the checked rung does with those). The
+element-width half is a language change by construction. What std can
+do, and did at this sprint, is make the cost VISIBLE and keep every
+signature in the landing shape so the fix is a pure substitution when
+it comes — the F-0049 lesson (declare against the fix; the fix is then
+an addition) applied to a type rather than to a row.
+
+**No build. Nothing in this repo is worked around** — the byte
+surfaces keep their shapes, the ledger did not move, and
+`std.mem.budget`'s header carries the caveat so a caller sizing a
+budget from payload arithmetic is warned at the place they would make
+the mistake.
