@@ -40,19 +40,36 @@
 //!   the s37 `.in(r)` pattern). Placement syntax over a std type is
 //!   compiler plumbing this pin does not have; the ambient-region
 //!   constructor below is D10's default and needs no annotation.
-//!   UNMOVED at the sc31 pin v0.2.1/75fd2d0 (2026-09-01): r04 touches
-//!   regions only through two DIAGNOSTICS (#192's W1001 and E1010),
-//!   which judge region blocks and change no placement plumbing.
+//!   **RE-PROBED rather than argued at the sc32 pin v0.2.2/8cda3aa
+//!   (2026-09-02), because for the first time in this residue's life
+//!   the span MOVED regions for real** — s131 and s132 landed the byte
+//!   ledger, the creation-time cap and D68's contained fault
+//!   whole-pipe, so "regions did not change" stopped being a sentence a
+//!   reader should take on trust. The probe is the placement syntax
+//!   itself, both shapes: `List[int].in(r)` is `unsupported — a
+//!   std/prelude stub without a signature` at resolve on both wolf
+//!   rungs AND refused by lupin, and `Buf.in(r) { … }` over a plain
+//!   struct is `fail(E0201)` at PARSE on all three — the form does not
+//!   exist in the grammar, which is the honest state of a surface
+//!   nobody has built. s131/s132 gave regions an ACCOUNTING surface and
+//!   a BUDGET; they gave them no placement plumbing, and the two are
+//!   different work. `std.mem.budget` is what this repo consumed from
+//!   that span instead.
 //! - `reserve(n)` — API-CONVENTIONS §8's rule ("no capacity API without a
 //!   capacity") applies verbatim: a `str`-backed buffer has no capacity to
 //!   reserve, and a documented no-op would be a lie. It lands with the SSO
-//!   backing that gives it meaning. UNMOVED at the sc31 pin
-//!   (2026-09-01): nothing in b80d239..75fd2d0 or 0.1.19..0.1.20
-//!   touches capacity or the string backing. The region ACCOUNTING
-//!   surface wolf-lang#187 asks for (a charged-bytes query and a
-//!   creation-time cap) is s131's, landing mid-wave and deliberately
-//!   NOT consumed here — it is the next sc bump's to measure, and this
-//!   line exists so the next lane does not re-discover the question.
+//!   backing that gives it meaning. UNMOVED at the sc32 pin
+//!   (2026-09-02): there is no capacity or string-backing commit
+//!   anywhere in `75fd2d0..8cda3aa` or `0.1.20..0.1.22`. And the
+//!   question this line carried forward from sc31 is now ANSWERED
+//!   rather than deferred — the region accounting surface wolf-lang#187
+//!   asked for landed in this span (both halves: `region_bytes`/
+//!   `live_region_bytes` from s131, the `cap:` budget and its contained
+//!   `fault(kind)` from s132/D68), it was consumed at sc32, and it
+//!   lives in `std.mem.budget`. It bought this module nothing, which is
+//!   the honest outcome: a ledger tells you what a buffer COST and a
+//!   cap tells you when to stop, and neither is a capacity you can
+//!   reserve.
 //!
 //! Absence is spelled `none` where it appears, which is the convention's
 //! own spelling: F-0003 died at the sc05 pins and the rename landed
