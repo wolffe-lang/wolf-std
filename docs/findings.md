@@ -4583,3 +4583,173 @@ TRANSLATION into the client's names, not a transcription of them.
 `client.row_name` would answer the wrong words, so that match is the
 work rather than boilerplate, and an adoption that swallowed it would
 have been wrong in a way the ledger could not see.
+
+## Retirements and movements at the sc32 pin — the budget arrives
+
+**The drift prediction, written 2026-09-02 03:27 EDT, BEFORE any
+gauntlet at the new pins** (release notes read first, per release:
+wolf-lang's CHANGELOG 0.2.2 entry at the tag `8cda3aa` with the whole
+`75fd2d0..8cda3aa` span read commit by commit — 35 commits, 9
+first-parent; lupin's v0.1.21 and v0.1.22 CHANGELOG entries and the
+is32/is33 records at the tag `753d686`; both upstream trees — `corpus/`
+and `spec/` — counted and diffed at the two data-pin shas before the
+run, and the repo grepped for every new surface's SHAPE):
+
+- **wolf 75fd2d0 -> 8cda3aa (the v0.2.2 TAG; data pin follows): ZERO
+  wolf-lane row motion over the 373 rows that exist today.** The span
+  is s60a + s133 + s131/s132's merges + four letters + the release.
+  Each grepped for its shape, the sc28 lesson:
+  - **s131 + s132, the region ledger and the cap** (`region_bytes(r)`,
+    `live_region_bytes()`, `region r(cap: n)` / `region(cap: n)`,
+    `trap(alloc-contract)` at the allocating site, `fault(kind)` at the
+    proc join with `is_fault()`/`is_alloc_contract()`). This is a real
+    new capability with real new surface — and it has ZERO carriers in
+    the tree as it stands: `grep` finds no `region_bytes`, no
+    `live_region_bytes`, no `cap:`, and no `spawn`/`proc`/`select`
+    anywhere in std/ or tests/ (the tree's only "process" is
+    `std.process`, the child-process trio, an unrelated word). The two
+    region-bearing rows (`list/freeze_then_read.lu`,
+    `strbuf/region_build_and_freeze.lu`) take a region VALUE and
+    `freeze` it; neither reads a ledger nor sets a budget. **This
+    sprint ADDS carriers deliberately — new rows are the sprint's
+    work, not the bump's drift**, and they are counted separately
+    below.
+  - **D69, the comma insists everywhere** (struct LITERAL fields
+    including the newline-separated spelling, closure parameters
+    `fn(a b)`, inline-C capture lists `unsafe c [a b]` — all E0201,
+    machine-applicable). Static rejections: a carrier would red the
+    parse phase on every wolfc lane. Swept by SHAPE over all 420 `.lu`
+    files in std/ + tests/: zero `unsafe c` capture lists anywhere,
+    zero `fn(` closure headers with an unseparated parameter pair, and
+    a line-pair scan for `name: expr` struct-literal fields with no
+    trailing separator followed by another field flags **zero** files.
+    Upstream's own blast-radius measurement counted this repo at 887
+    files with the sole flagged file in the world being wolf-lang's
+    fuzz-minimized formatter fixture. Zero carriers.
+  - **#206, a bare entry name means `.`** — `conform-run hello.lu`
+    used to answer "the package root has no wolf source files" because
+    `Path::parent()` on a bare relative name is the EMPTY path, and
+    the anchoring now lives in the loader. Two reasons this cannot
+    move a row here, both checked in the rig's source rather than
+    assumed: the runner never passes a bare name — `stage::stage_test`
+    copies the entry to `scratch.join(file_name)` and
+    `runner` passes that ABSOLUTE path (`cmd.arg(staged.entry)`), so
+    the empty-parent case was never reachable; and the record's
+    `file` field, whose spelling the fix changes, is one the rig
+    checks for PRESENCE only (`record::parse`'s required-field list)
+    and never compares between implementations — the divergence
+    report's `file` is the rig's own `format!("tests/{test}")`
+    string. Zero carriers.
+  - **#198, `STR_PART` derives escapes** — `STR_ESC`/`UNI_ESC` land in
+    the productions so the one-to-six-digit `\u{…}` bound is read off
+    the grammar for `"…"` as well as `'…'`. The BOUND did not move
+    (v0.2.1 already had it); only the derivation did. Every `\u{…}` in
+    std/ + tests/ is six hex digits or fewer with no leading zeros —
+    the maximum in the tree is `'\u{10FFFF}'` / `"\u{10ffff}"` at
+    exactly six, the bound's own top. Zero carriers.
+  - **#209, a trap runs no defers, at the ROOT too** — the letter that
+    carries a MEASURED DIVERGENCE at this very pin: every wolfc lane
+    abandons a pending root defer, **lupin 0.1.22 runs it**
+    (`faults/trap_skips_root_defers.lu`; is34's flip). Carrier check
+    done by shape, because this is the one letter in the span that
+    could bite: the tree holds exactly **ONE** executable `defer` —
+    `std/fs/fs.lu:262`, `defer fs_close(fd) else |_| {}` in
+    `append_text` — and **ZERO** `errdefer`, unchanged since sc31. The
+    four rows that reach that defer (`fs/append_is_an_append.lu`,
+    `fs/text_round_trip.lu` and their siblings) propagate with `?` and
+    never trap; and not one of the tree's ~24 trap rows (cmp, hex,
+    bytes, strbuf, fmt, math, search, testing) has a `defer` anywhere
+    in the frame that traps. So there is **no std row that traps at
+    root with a pending defer**, and the divergence has nothing to
+    ride. Recorded anyway, in writing, because it is live at this pin
+    and the next lane to write a `defer` beside a trap will meet it.
+    (Second-order note from the release's own text: on a trapping
+    program the interpreter's record carries no stdout, so even a
+    carrier would compare verdict-identical — the differ could not
+    see this divergence, which is why it took a spec letter to find.)
+  - **#205, two nondeterministic verdicts retired** — wolf-lang's own
+    `cargo test` net refusal probes dialing an ephemeral port. Test
+    infrastructure in the upstream repo; not a language surface, not
+    consumed here. Zero.
+  - **s60a, the Windows native bring-up** — nomad-1 is macOS/arm64.
+    The 21 by-name refusals (task layer, `os.signal`, `net` deadlines)
+    are windows-only rows on a windows-only floor line
+    (259/255/0/274/0); macOS's floors moved by measurement, not by
+    refusal. This repo's three lanes are unaffected. Zero.
+  - **s133, the LSP navigation trio** — `wolf lsp`'s
+    definition/references/rename over the new binding table. This repo
+    runs `conform-run` only and links no `wolf_query`. Zero.
+  - **The release tier** — no lane in this repo builds `--release`.
+    Zero.
+- **lupin 0.1.20 (`e3736c1`) -> v0.1.22 (= the TAG `753d686`);
+  conformance pin b80d239 -> 2bfbe5e: ZERO row motion.** Two releases
+  carried in one bump (0.1.21/is32 was deliberately not chased
+  mid-wave), read separately:
+  - **is32 / 0.1.21 — the ledger in the mirror.** `region_bytes` /
+    `live_region_bytes` land as two pure prelude builtins over state
+    this machine has held since is02, with lupin's own geometry
+    written down (a 16-byte grain, a 32-byte allocation header, 16
+    bytes a value slot, a `str`'s UTF-8 length, container capacity in
+    powers of two from four, and a growth realloc charging the WHOLE
+    new buffer while the abandoned one stays charged). Additive; zero
+    carriers, same grep as the wolf half. #53's `--explore --json`
+    doors add `seed`/`schedule` as `x-` EXTENSION keys emitted only
+    under `--seed=`/`--schedule=`, which this rig never passes, and
+    `record::parse` validates a required-field SET rather than
+    rejecting extras. Zero. The one REAL behaviour change in is32 is
+    the lexer: `\u{…}`'s one-to-six-digit bound now binds in STRING
+    literals at **E0101**, where lupin previously had no bound at all
+    and quietly decoded `"\u{0000041}"` to `A` — and where this
+    machine used to file E0110. Grepped both halves: no `\u{…}` in the
+    tree exceeds six digits (above), and no std row or ledger entry
+    pins **E0110** anywhere. Zero carriers.
+  - **is33 / 0.1.22 — the mirror holds.** The cap twin at pin
+    `2bfbe5e`: `[mem.region.cap.1-3]` and `[conc.proc.exit]`'s
+    `fault(kind)` implemented, so s132's three witnesses flip
+    resolve-refusal -> run in LUPIN's census, not in this one. Plus
+    the dist lane (`lupin.exe`) and a CI lex-rung fix. Additive; zero
+    carriers today, and the sprint's new rows measure it rather than
+    inherit it.
+- **The upstream trees, counted before the run.** `upstream/corpus`
+  475 -> 490 files, the **+15 exactly the span's own witnesses and
+  nothing dropped**: s131's two ledger relations
+  (`memory/region_bytes_query`, `memory/region_bytes_value`), s132's
+  three cap witnesses (`faults/region_cap_breach`,
+  `memory/region_cap_boundary`, `conc/proc_cap_fault_join`), #196's
+  two or-pattern divergence pins (`grammar/match_arm_or_over_product`,
+  `grammar/match_arm_or_inside_product`), D67/D69's five comma
+  refusals (`grammar/struct_pattern_no_separator`,
+  `grammar/struct_pattern_rest_bare`,
+  `grammar/tuple_pattern_no_separator`,
+  `grammar/struct_literal_no_separator`,
+  `grammar/closure_params_no_separator`), #198's two string-escape
+  witnesses (`grammar/str_uni_seven_digits`,
+  `strings/str_uni_leading_zeros`), and #209's
+  `faults/trap_skips_root_defers`. `upstream/spec` **moves this time**:
+  anchors **404 -> 411**, `+7 / -0`, and the seven are exactly
+  `mem.region.account`, `.account.1`, `.account.2`, `mem.region.cap`,
+  `.cap.1`, `.cap.2`, `.cap.3` — set-diffed BOTH WAYS per the F-0100
+  lesson before the re-vendor. The re-vendor is a REAL snapshot move,
+  the first since sc27, so the check that was a formality at sc31 is
+  load-bearing here.
+- **The pin gap, named.** wolf's own pin = the data pin = `8cda3aa`;
+  lupin's conformance pin `2bfbe5e` is **35 commits behind** it — the
+  largest gap this repo has recorded — and every one of those commits
+  is named above: s60a's windows bring-up (a platform this machine is
+  not), s133's LSP navigation (a binary this repo does not run), and
+  the four letters (#206, #198, #209, #205). `2bfbe5e` is the s132
+  merge, which is to say **lupin is pinned at exactly the commit that
+  landed the surface this sprint consumes** — the gap is a windows
+  port and an editor server, not lowering debt. State which kind of
+  gap you have (the sc31 rule); this one is "35 commits, none of them
+  a language lowering either machine owes the other".
+
+**Predicted total: ZERO verdict movers over 373x3.** The baseline the
+gauntlet must reproduce exactly, counted from the untouched ledger at
+trunk `a62a5d4`: lupin 301 `run` / 72 `unsupported`; wolfc 297 `run` /
+74 `unsupported` / 2 `fail(E…)` (E1013, E0301); native 322 `run` / 49
+`unsupported` / 2 `fail(E…)`. Anchors 404 -> **411**, +7/-0. Corpus
+475 -> 490 upstream. (sc31's register recorded 372x3 — that gauntlet
+ran before `x/tls/client/row_naming.lu` landed three-lane `run` at the
+end of the same sprint; the +1 to each `run` column is that file and
+nothing else.)
