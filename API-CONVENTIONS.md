@@ -1114,6 +1114,35 @@ capability's life.
 
 ## Review record
 
+- 2026-09-02, sc32 (§2's trap rule and §12's mark casing, applied to a
+  failure the RUNTIME reports — `std.mem.budget`): the region-budget
+  breach is the first failure std surfaces that it does not itself
+  detect, and three readings are recorded rather than assumed. First,
+  **the row is a payload-free lowercase mark** (`exhausted`), and the
+  reason is stronger than §12's default: the payload a reader reaches
+  for — "how much did it want?" — is *unobservable by contract*,
+  because `[mem.region.cap.3]`'s free-then-deliver teardown reclaims
+  the breaching proc's regions wholesale before the reason reaches the
+  join. A payload here would have to be invented, which is the one
+  thing §12's "a payload is DATA" forbids outright. Second, **§2's trap
+  rule wins over the row where the two collide**: a negative budget is
+  a caller's arithmetic mistake, and the language's own
+  `trap(alloc-contract)` for it (`[mem.region.cap.2]`) would fire
+  INSIDE the helper's proc, be contained, and come back as
+  `exhausted` — a bug answered with a recoverable value. So the check
+  is std's own, at the door, before anything spawns, and is held as a
+  trap test the way `bytes.slice`'s is. `cap: 0` is deliberately not in
+  that family: the clause makes it a legal budget, so it answers the
+  row. Third, **§5's region rule is read as permitting a region
+  PARAMETER for a query about a region**, which is not the `.in(r)`
+  placement surface it was written to bound: `charged(r)` takes a
+  region because reading that region's ledger is the whole operation,
+  no allocation is placed anywhere, and the unwritten `read` mode
+  leaves the caller holding it (`[mem.tier0.mode.read]`, measured on
+  all three lanes against the affinity a reader would expect to bite).
+  No function here demands a region for ordinary use, which is what §5
+  actually forbids.
+
 - 2026-09-01, sc31 (§12 applied to a WIDE row union — the first
   consumer's naming ask, wolf-std#3): a twenty-row union is twenty
   actions for a caller that routes and twenty ARMS for one that only

@@ -270,3 +270,41 @@ contract violation (key/nonce/counter shape, non-byte elements, the
 `_trap.lu` files that run on ALL THREE lanes because every guard fires
 before the first keystream operation. `seal` deliberately has NO row:
 sealing cannot fail on data, only on the caller's own inputs.
+
+## sc32 (15-the-budget): one mark for a failure std does not detect
+
+`std.mem.budget` ships exactly one row, and it is the first row in this
+library whose failure the LIBRARY never observes: the region-budget
+breach is a `trap(alloc-contract)` fired by the runtime at the
+allocating site, contained at a proc boundary, and read at the join as
+a value (`[mem.region.cap.1/.3]`, `[conc.proc.exit]`, wolf-lang D68).
+std's contribution is to turn that join into an `else` arm.
+
+| tag | sites | payload | verdict |
+|---|---|---|---|
+| `exhausted` | 1 (`budget.with_cap`) | never — and the reason is a contract, not a style | conforming. One mark for one actionable mode: the work did not fit its budget, and the only thing a caller does about it is stop admitting work (lobo's per-request 503 is the motivating consumer). There is no second tag to want — every other outcome of the join is either normal or a caller's bug that traps before the spawn. The name was checked both ways per sc14's symmetric rule: no module, function, binding or prelude name in std collides with `exhausted` |
+
+**Why there is no payload, stated because a reader will reach for
+one.** "How much did it want?" is the obvious field, and it is
+**unobservable by contract**: `[mem.region.cap.3]` makes teardown
+free-then-deliver, so the breaching proc's regions are reclaimed
+wholesale *before* the exit reason reaches the join, and no postmortem
+query can see the dead proc's charge. `live()` at the join is already
+back to its pre-call reading — that is the half of the contract that
+makes the row safe to act on, and it is also exactly why there is no
+number left to carry. A payload here would have to be invented, which
+§12's "a payload is DATA, never a rendered string" forbids in the
+direction that matters. The budget the caller passed is the caller's
+own value and needs no return trip.
+
+**And one failure deliberately kept OUT of the row vocabulary.** A
+negative budget is `trap(assert)` at the door, not `exhausted`.
+`[mem.region.cap.2]` already rules it a `trap(alloc-contract)` at the
+creating site — but `with_cap` creates its region inside the proc, so
+that trap would be CONTAINED and would reach the caller as a
+recoverable row, answering a caller's arithmetic mistake with a value
+they can handle. §2's trap rule wins: the check runs before anything
+spawns, and `tests/mem/budget/negative_cap_trap.lu` holds it. `cap: 0`
+is not in this family — the clause makes it a legal budget every charge
+breaches, so it answers the row, and `breach_is_a_row.lu` pins that
+half beside it.
