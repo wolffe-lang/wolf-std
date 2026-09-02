@@ -4753,3 +4753,70 @@ trunk `a62a5d4`: lupin 301 `run` / 72 `unsupported`; wolfc 297 `run` /
 ran before `x/tls/client/row_naming.lu` landed three-lane `run` at the
 end of the same sprint; the +1 to each `run` column is that file and
 nothing else.)
+
+**The measurement (same day, untouched ledger, three lanes, idle):
+ZERO movers — the prediction is exact, and this is the second
+consecutive sc bump whose drift list came back empty, over the largest
+upstream span this repo has ever crossed in one go.** The gauntlet ran
+03:30:02 -> 03:50:49 EDT over files last touched at 03:28:34
+(the prediction) and 03:29:36 (the two tool records, PIN and the
+anchors re-vendor) — mtimes checked against the run window, the sc30
+rule — with `tests/ledger.toml` untouched at 03:13:51 (the worktree's
+own checkout). `cargo xtask ci` exit code **0**, `ci: GREEN`, no
+piping:
+
+- `std-test: 373 test(s); forward tags: 694; conservatism ledger: 199
+  entries; unstable rows: 0; slow skips: 0; divergent rows: 0.` Every
+  row observed exactly the verdict the untouched ledger claims — a
+  deeper answer is a designed RED here, so a green run over an unedited
+  ledger IS the zero-motion measurement. The baseline holds to the
+  number: lupin 301 `run` / 72 `unsupported`; wolfc 297 `run` / 74
+  `unsupported` / 2 `fail(E…)` (E1013, E0301); native 322 `run` / 49
+  `unsupported` / 2. `ledger-check: 373 test(s), all ledgered` and
+  `lint-conventions: 373 test(s), all conforming (5 rules)`;
+  `doc-examples: 412 block(s), GREEN`; `ulp: 200 reference row(s),
+  GREEN` with the standing 16-value libm note unchanged.
+- Anchors **411**, +7/-0, `vendor/upstream/anchors.json` byte-identical
+  to `upstream/spec/anchors.json` at 8cda3aa — set-diffed both ways
+  BEFORE the re-vendor and confirmed by `sync-pin`'s own comparison in
+  the green run. This is the first re-vendor since sc27 that actually
+  moves bytes, which is exactly the case F-0100 was filed about: the
+  key sets were compared in BOTH directions rather than the count, and
+  the seven added keys are the seven the spec's own diff shows.
+- The upstream census reconciled at face value: corpus 475 -> 490, the
+  +15 exactly the span's own witnesses, nothing dropped; the spec tree
+  moves only in `02-memory-model.md` (the account and cap clauses),
+  `03-concurrency.md` (`[conc.proc.exit]`'s `fault(kind)`),
+  `01-grammar.md`/`grammar.ebnf` (the `region_cap` production and D69's
+  three separator tightenings) and `05-conformance.md`.
+- Doctor green at the trio, each edge stated:
+  `lupin 0.1.22 (wolf-interp, reference interpreter at pin 2bfbe5e)`
+  matches `vendor/tools.toml`, BARE (a real tag build; the release's
+  own D57 assertion refuses a `+dev.` binary before it can ship);
+  `wolf 0.2.2 (wolfgang, pin 8cda3aa)` matches, BARE — the second
+  consecutive release-tag acquisition — with the pairing line
+  (`paired with lupin 0.1.22 (reference interpreter), pin 2bfbe5e`)
+  reported and not gated, and for once naming EXACTLY the interpreter
+  installed beside it (r05's pairing commit was cut after the 0.1.22
+  release existed, so the sc27 one-release-behind nuance does not
+  recur). The native rung's `libwolf_rt.a` is present, lane lit.
+  wolf's own pin = the data pin = 8cda3aa; lupin's conformance pin
+  2bfbe5e is 35 commits behind, and those 35 commits are a windows
+  port, an editor server and four letters.
+
+**What the empty drift list is worth saying about, and it is a
+different thing from sc31's.** sc31's zero came from a span with no new
+capability in it: three letters that could not move a row by
+construction and a fourth whose surface this repo does not write. This
+span is the opposite — it carries the biggest new memory surface since
+regions themselves (a byte ledger, a creation-time cap, a contained
+fault at the proc boundary) — and the zero is real for a reason that
+only sounds like the same sentence: **a capability with no carrier
+moves nothing, and this repo had no carrier because it had never asked
+the question.** That is not a stable state; it is a sprint's worth of
+work sitting in front of the lane, which is what sc32 spends. The
+useful rule is the one the two bumps share from opposite directions: a
+predicted zero is only a measurement when each surface's reason is
+checked separately, and "additive, and nobody here calls it yet" is a
+reason you must confirm with a grep rather than assume from the word
+"additive".
