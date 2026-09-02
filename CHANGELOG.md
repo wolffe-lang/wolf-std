@@ -1,5 +1,84 @@
 # Changelog
 
+## sc33 — 2026-09-02 — the bytes get a width
+
+lupin advances to **v0.1.23** at conformance pin 8cda3aa (is34, THE
+LETTERS IN THE MIRROR), and its pin CATCHES UP to wolf's own — sc32's
+35-commit gap, the largest this repo had recorded, closes to **zero**.
+The wolf binary does NOT move (r06 takes it to v0.2.3), so for the
+first time the three pins come apart on purpose: the **DATA pin**
+advances to wolf-lang trunk **813153e**, 19 commits ahead of both
+binaries, suspending the one-sha invariant deliberately. That costs
+nothing and the reason is structural rather than lucky — doctor never
+reads `vendor/upstream/PIN` (it gates the binary's self-declared
+version and pin against `vendor/tools.toml`) and `sync-pin` gates the
+snapshot against the SUBMODULE — predicted from the gates' source
+before the run and confirmed by a green, silent doctor. The 0.1.22
+doctor pin retires. Drift was predicted ZERO and measured ZERO over
+**376x3**, the third consecutive empty drift list, with anchors **411
+unmoved** and `anchors.json` byte-identical across the span (the
+re-vendor moved no bytes; F-0100's both-ways key-set diff was a
+formality this time, and said so out loud).
+
+**The drift prediction's real content was a number and a mechanism that
+disagree.** wolf-interp#55 puts trap-path stdout in lupin's records, so
+the contract asked which std rows move. **Eleven rows trap after
+printing** — grepped over all 56 trap files, read to confirm the print
+PRECEDES the trapping call, and checked against the ledger to confirm
+the lane runs them (three more contain a `print(` that sits *after* the
+trap and never executes). All eleven records changed shape; **zero rows
+moved**, because this rig never looks at a trap's stdout in three
+independent places: `classify`'s Trap arm discards the field by
+PATTERN, `diff_class` compares `stdout_sha256` only under
+`Verdict::Exit(_)`, and lint R3 bars `stdout=` beside a trap
+expectation outright. Measured on BOTH sides of the bump: at 0.1.22
+lupin reported null where both wolf lanes already carried
+`5726e3cf…`; at 0.1.23 it joins with the byte-identical digest. The
+asymmetry was always lupin's alone and invisible only because the
+comparator does not look. #209's root-defer divergence HEALS with the
+same zero effect (one executable `defer` in the tree, on no trapping
+path), and #56 is diagnostic wording, outside D22's protocol.
+
+**wolf-lang#203's ask is filed as a spec-shaped proposal**
+(`#issuecomment-5509341730`), with the evidence and no std wrapper —
+sc32 measured that one changes no allocation. The io readers are
+measured for the first time and reproduce the synthetic 16x to the
+byte, with one new and sharp result: **`fs.read_chunk(f, n)` charges
+exactly what the unbounded `read_bytes` charges**, so #203's
+preallocation property is not partly taken on the one surface that
+already knows its bound — it is *entirely* untaken, a 2x sitting
+unclaimed behind no new type at all. The proposal's spine is that
+**there is no width story to extend**: the spec has no type inventory,
+no `[type.int]`, no width vocabulary, no literal suffixes, and `int`
+carries no defining clause anywhere. Both cheap answers fail by the
+same mechanism — the std wrapper by measurement, and the spec's own
+`distinct` newtype by its own clause ("same layout as the base") — so
+the recommendation is `[type.byte]` modelled on `[type.char]`, the
+spec's ONE existing scalar-width clause, finishing the job s121 started
+when it wrote "`char` is the scalar tier, never a byte". A stale count
+in F-0104 is corrected in passing: `std.bytes` has TEN public
+functions, not nine, all still monomorphic over `List[int]`.
+
+**F-0105 filed**: wolfc's zero-width parse span (DIV-2026-020, ruled as
+D71) is reachable from ordinary std-side code, not just the eight
+upstream `grammar/` files — turned up by accident re-probing the
+`strbuf` placement residue, and confirming from a second independent
+rig why nothing measured it (this runner compares codes, never spans).
+Recorded on #220.
+
+F-0103 re-measured verbatim and NOT adopted — #201 still has not ruled
+— with the honest caveat that this bump's "unmoved" is cheap, because
+the wolf binary did not move and the probe could not have. The checked
+tier's `breach_is_a_row` flip is **DEFERRED**: s134's item 1 has not
+merged (trunk unmoved at 813153e and #219 still OPEN at both
+gauntlets), so the row keeps its two-lane reason, with a lead left for
+s134 on the `wolf run --checked` half of its bisection. Residues
+re-dated: the chars-pairs tuple list refuses at its **seventh**
+consecutive pin, F-0096 verbatim, and the `str`-charges-no-region
+finding was RE-PROBED rather than carried — the lupin binary moved, so
+the tier that could have changed its answer is the one that got a new
+build; it still reads 0 on all three lanes.
+
 ## sc32 — 2026-09-02 — the budget has a shape
 
 Pins advance to wolf **v0.2.2** at 8cda3aa (THE LEARNERS' RELEASE) and
