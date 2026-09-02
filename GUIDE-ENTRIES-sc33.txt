@@ -1,0 +1,100 @@
+Drafted Guide entries for AN_AGENTS_GUIDE_TO_WRITING_GOOD_WOLF.md —
+append the dated section verbatim at merge (the guide is untracked in
+the main checkout, so a worktree sprint hands its entries over as this
+file; delete the file once appended). No amendments to earlier
+sections this sprint.
+
+## 2026-09-02 (sc33) — the bytes get a width
+
+- A BUMP CAN CHANGE WHAT A RECORD *SAYS* WITHOUT CHANGING WHAT ANY
+  LANE *CONCLUDES*, and you find out which by reading the comparator
+  rather than the release notes. lupin 0.1.23 put trap-path stdout in
+  its records (#55). Eleven std rows trap after printing, so eleven
+  records changed shape — and zero rows moved, because this rig never
+  looks at a trap's stdout in three separate places: `classify`'s Trap
+  arm discards the field BY PATTERN, `diff_class` compares
+  `stdout_sha256` only under `Verdict::Exit(_)`, and lint R3 bars
+  `stdout=` beside a trap expectation outright. The right prediction
+  was not "eleven movers" and not "zero movers" — it was both, at two
+  different levels, and the only way to know was to open the rig and
+  read what it compares. A release note tells you what an
+  implementation now EMITS; only your own rig tells you what you now
+  CONCLUDE. Predict at both levels or you will report the wrong number
+  in one direction or the other.
+
+- MEASURE BOTH SIDES OF A BUMP WHEN THE CLAIM IS ABOUT THE BUMP. The
+  #55 before-picture was taken at 0.1.22 with the old binary still
+  installed, and it is what turned a dull restatement of the changelog
+  into the actual finding: both wolf lanes ALREADY carried trap stdout,
+  with the byte-identical digest lupin would later produce, so the
+  asymmetry was lupin's alone and it had been invisible for exactly the
+  reason it is harmless — the comparator does not look. Five minutes
+  spent before the fresh-inode install bought a fact that cannot be
+  recovered afterwards at any price.
+
+- THERE ARE THREE KINDS OF ZERO AND THE THIRD IS THE CHEAPEST: NAME
+  WHICH ONE YOU HAVE. sc31's empty drift list came from a span with no
+  new capability. sc32's came from a capability with no carrier — a
+  sprint's worth of work sitting in front of the lane. sc33's wolfc
+  zero is neither: **the binary did not move at all**, because the
+  sprint took a lupin release and a data-pin advance while wolf stayed
+  at its tag. All three print as "0 movers" and they cost completely
+  different amounts to defend. Say which one you have in the first
+  sentence: half the drift work evaporates honestly, and the half that
+  remains gets the attention it actually needed.
+
+- A PIN IS THREE PINS — TELL THEM APART BEFORE YOU CLAIM AN INVARIANT,
+  AND PREDICT FROM THE GATE'S SOURCE RATHER THAN THE INVARIANT'S PROSE.
+  This sprint suspended the "data pin follows the binary pin" one-sha
+  invariant deliberately, leaving the data pin nineteen commits ahead
+  of both binaries. Whether that reds anything is answerable from
+  source in two minutes: doctor NEVER READS `vendor/upstream/PIN` — it
+  gates the binary's self-declared version and pin against
+  `vendor/tools.toml` — and `sync-pin` gates the snapshot against the
+  SUBMODULE, not against either binary. So the answer was "green and
+  silent, by design", predicted in writing and confirmed. An invariant
+  recorded in a comment is a CONVENTION; only a gate is a RULE, and
+  the difference is one grep.
+
+- WHEN THE FIX YOU ARE ASKING FOR HAS NO CLAUSE TO SIT BESIDE, SAY
+  *THAT* FIRST. The most useful sentence in the #203 proposal is not
+  the ask. It is that the spec has no type inventory at all: twenty
+  `[type.*]` anchors in three families, no `[type.int]`, no width
+  vocabulary, no literal suffixes, and `int` itself carrying no
+  defining clause anywhere. Going to look for the clause you would
+  AMEND, before writing the ask, is what turns "please add a `u8`"
+  into "this is the first clause of an inventory that does not exist"
+  — a different piece of work, correctly scoped, and a different
+  conversation with the lane that owns it. Find the hole's edges
+  before you describe the hole.
+
+- TWO CHEAP ANSWERS THAT FAIL BY THE SAME MECHANISM ARE WORTH FAR MORE
+  THAN ONE THAT FAILS. sc32 MEASURED that a std `struct Bytes { xs:
+  List[int] }` changes no allocation. sc33 READ that the spec's own
+  newtype is no better: `[gram.item.trait]` defines `distinct` as
+  "same layout as the base", because layout preservation is the whole
+  point of the construct. The library-side workaround and the
+  language-side newtype fail identically — one by measurement, one off
+  the page — and setting them side by side closes the "can't you just
+  …" question from both directions at once. A single refutation invites
+  a variation; a matched pair names the mechanism and ends the thread.
+
+- THE PRECEDENT YOU NEED MAY ALREADY BE IN THE DOCUMENT, ONE TIER OVER.
+  `[type.char]` is the spec's ONLY clause that gives a scalar a stated
+  width, and it carries every part a byte type would need: a domain, a
+  layout, a `List[T]` stride, a C-seam rule, a no-arithmetic posture
+  and an explicit cast bridge. `[mem.str.chars]` even says why the byte
+  tier was left behind — "`char` is the scalar tier, never a byte". So
+  the proposal became "finish the job s121 started" rather than "invent
+  a primitive". Search the spec for the SHAPE of your answer before you
+  design one: a request modelled on a clause the document already
+  accepted is far harder to refuse, and it inherits every argument that
+  clause already won.
+
+- RE-MEASURE THE COUNTS YOU ARE ABOUT TO QUOTE, EVEN OUT OF YOUR OWN
+  FINDINGS FILE. F-0104 said "all nine functions in `std.bytes`"; at
+  this pin there are ten. Nothing depended on the number, which is
+  precisely why it survived — and it was two keystrokes from being
+  restated in a public upstream issue as this repo's own evidence. A
+  figure nobody re-checks is a figure quietly rotting toward the first
+  place it will embarrass you.
