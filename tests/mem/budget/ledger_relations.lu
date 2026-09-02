@@ -1,0 +1,86 @@
+//! check: run(exit=0, stdout="live_up true | reclaimed true | created true | grew true | stable true | birth true")
+//! phase: run
+//! conforms: std.mem.budget, mem.region.account.1, mem.region.account.2
+//!
+//! The query half, three lanes: `charged` and `live` name the two
+//! builtins `[mem.region.account.1/.2]` landed, and this file pins the
+//! RELATIONS the clause guarantees on every tier rather than any
+//! number. That distinction is the whole test-design decision here —
+//! the same 100-element list reads 4064 under lupin, 2032 native and
+//! 1600 checked at the sc32 pin, so a golden carrying a count would be
+//! a per-lane file, and the clause says plainly that the units are
+//! implementation-measured facts and not comparison surface.
+//!
+//! Six relations, in two shapes because the clause has two halves:
+//!   - the sugar block, for the PROCESS-WIDE total: it rises while a
+//!     region holds charged storage and a freed region's contribution
+//!     vanishes wholesale at the block's `}`;
+//!   - the first-class value, for one region's OWN ledger: zero at
+//!     creation, monotone while a container fills, stable between
+//!     allocations (two reads with no charge between them agree), and
+//!     the attribution rule — a container charges the region ambient at
+//!     its ALLOCATION site, its birth region (`[mem.region.create.3]`),
+//!     so growing a root-born list moves `r`'s ledger not one byte.
+//!
+//! The other thing this file proves, quietly, is that a `region` value
+//! survives being passed across a module boundary: `charged` is called
+//! four times on one region and the region is still usable after every
+//! one. Region values are affine, so that is not free — it is
+//! `[mem.tier0.mode.read]` ("the caller retains it") holding for a
+//! region like any other value, measured on all three lanes rather than
+//! assumed from the clause.
+//!
+//! One shape this file deliberately does NOT take, because measuring it
+//! cost a red: growing a root-born list INSIDE a `region scratch { … }`
+//! block is `E1010` on both wolf rungs ("the value flows out of the
+//! region here"), where lupin's birth-region attribution runs it. The
+//! attribution half is therefore written the way wolf-lang's own
+//! `memory/region_bytes_value.lu` writes it — the push sits after the
+//! `in r { … }` block, not inside it.
+
+use std.mem.budget
+
+fn main() -> !int {
+    // The process-wide half: a sugar block's charge appears in the live
+    // total and disappears wholesale at its `}`.
+    let base = budget.live()
+    var live_up = false
+    region scratch {
+        var zs = List[int]()
+        for i in 0..500 {
+            (mut zs).push(i)
+        }
+        live_up = budget.live() > base
+    }
+    let reclaimed = budget.live() == base
+
+    // One region's own ledger, over a first-class value.
+    let r = region()
+    let created = budget.charged(r) == 0
+    var root_born = List[int]()
+    in r {
+        var ys = List[int]()
+        for i in 0..500 {
+            (mut ys).push(i)
+        }
+    }
+    let c1 = budget.charged(r)
+    let c2 = budget.charged(r)
+    let grew = c1 > 0
+    let stable = c1 == c2
+
+    (mut root_born).push(1)
+    (mut root_born).push(2)
+    let birth = budget.charged(r) == c1
+
+    print(
+        "live_up {live_up} | reclaimed {reclaimed} | created {created} | grew {grew} | stable {stable} | birth {birth}",
+    )
+    if !live_up { return 1 }
+    if !reclaimed { return 2 }
+    if !created { return 3 }
+    if !grew { return 4 }
+    if !stable { return 5 }
+    if !birth { return 6 }
+    0
+}

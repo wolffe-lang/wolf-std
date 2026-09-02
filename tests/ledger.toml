@@ -14,6 +14,46 @@
 # Every slow row is owed a re-measure at pin bumps; an interpreter perf
 # wave is its exit.
 #
+# THE sc32 PIN BUMP (wolf 75fd2d0 -> the v0.2.2 TAG = 8cda3aa, THE
+# LEARNERS' RELEASE — 35 commits, the largest span this repo has
+# crossed in one bump: the windows native bring-up (s60a), the LSP
+# navigation trio (s133), THE REGION LEDGER AND ITS CAP (s131 + s132 /
+# D68 — region_bytes, live_region_bytes, region r(cap: n),
+# trap(alloc-contract), fault(kind) at the proc join), D69's comma
+# tightening, and four letters (#206, #198, #209, #205); lupin 0.1.20
+# -> the v0.1.22 TAG = 753d686, TWO releases (is32's ledger, is33's cap
+# twin), conformance pin b80d239 -> 2bfbe5e) MOVED ZERO ROWS.
+# The prediction (written first, docs/findings.md sc32 register) said
+# zero and named a reason per surface, each grepped for its SHAPE: the
+# region ledger and cap are a real new capability with NO CARRIER here
+# (no region_bytes, no cap:, no spawn/proc/select anywhere in std/ or
+# tests/ before this sprint); D69's three lax forms sweep to zero over
+# all 420 .lu files, matching upstream's own 887-file count for this
+# repo; #206's bare-entry anchoring cannot reach a rig that stages an
+# ABSOLUTE entry path and never compares the record's `file` field;
+# #198 moved the derivation and not the bound, and no \u{…} in the tree
+# exceeds six digits; #209's root-defer divergence (every wolfc lane
+# abandons it, lupin 0.1.22 runs it) has nothing to ride, because the
+# tree holds exactly ONE executable `defer` — std/fs/fs.lu:262,
+# function-body, on no trapping path — and ZERO errdefer; and is32's
+# one real behaviour change, the \u{…} bound now binding in STRING
+# literals at E0101 where lupin had none, finds no carrier and no row
+# pins the E0110 it replaced. Measured over the untouched ledger: 373
+# tests, 694 forward tags, 199 conservatism entries, 0 unstable, 0
+# slow, 0 divergent; lupin 301 run / 72 unsupported, wolfc 297 / 74 / 2
+# fail, native 322 / 49 / 2 — the baseline reproduced to the number.
+# Anchors 404 -> 411 (+7 / -0: mem.region.account{,.1,.2} and
+# mem.region.cap{,.1,.2,.3}), the FIRST byte-moving re-vendor since
+# sc27 — key sets diffed both ways per F-0100 before the copy, which is
+# the case that lesson was filed about. Corpus 475 -> 490, the +15
+# exactly the span's own witnesses. Doctor green at the trio with BOTH
+# binaries bare (`wolf 0.2.2 (wolfgang, pin 8cda3aa)`, `lupin 0.1.22
+# (wolf-interp, reference interpreter at pin 2bfbe5e)`), the pairing
+# line naming exactly the interpreter installed beside it for once;
+# wolf's own pin = data pin = 8cda3aa, lupin's conformance pin 2bfbe5e
+# 35 commits behind, and those 35 are a windows port, an editor server
+# and four letters — not lowering debt.
+#
 # THE sc31 PIN BUMP (wolf b80d239 -> the v0.2.1 TAG = 75fd2d0, r04 —
 # THE LETTER AND THE ARCHIVE, a patch release: four measured letters
 # (D66's defer-at-scope-exit, #189's one-to-six-digit \u{} bound,
@@ -3075,3 +3115,52 @@ native = "run"
 # Motion count: 7 kind-changes on the lupin column (3 deeper to `run`,
 # 4 `slow` -> the honest refusal), 0 on wolfc, 0 on native (dark,
 # carried), 0 shallower.
+
+# ---- sc32: std.mem.budget — the region ledger named, and the budget
+# breach made into a ROW. THE MODULE HAS TWO LANE STORIES AND THEY COME
+# FROM ONE MEASUREMENT, so the three rows below do not agree and none of
+# them is a mistake.
+#
+# The QUERY half (`charged`, `live`) is three lanes: `region_bytes` and
+# `live_region_bytes` land whole-pipe at this pin (s131,
+# [mem.region.account.1/.2]) and a `region` passed ACROSS a module
+# boundary survives the call on every lane — the unwritten `read` mode
+# is the spec's own answer to the affinity a reader will expect to bite
+# ([mem.tier0.mode.read]: "the caller retains it"), probed rather than
+# reasoned.
+#
+# The CONTAINMENT half (`with_cap`) is two lanes, and the dark one is
+# the TIER's rather than this surface's: D68's containment mechanism IS
+# a proc, and `wolf conform-run --checked` answers "structured
+# concurrency in checked execution (C1 deferred)" at `mem` for the whole
+# task layer. No spelling of a contained breach avoids it.
+#
+# AND THE REFUSAL IS REACHED AT EXECUTION, NOT STATICALLY — which is why
+# `negative_cap_trap` is `run` on the checked column while
+# `breach_is_a_row` is `unsupported`, from one module and one function.
+# The guard traps before the `spawn proc` is reached, so the checked
+# rung never meets the construct. Probed apart from both rows with a
+# `with_cap` call behind a runtime-false branch: the checked rung
+# compiles that file and runs it to `exit(0)`.
+#
+# Units, stated here because it decides the test design: the ledger's
+# numbers are per-tier measured facts and NOT comparison surface
+# ([mem.region.account.1]) — the same 100-element list reads 4064 under
+# lupin, 2032 native and 1600 checked at this pin. Every row below
+# prints RELATIONS and never a count, which is what lets one `stdout=`
+# hash cover every lane it runs on. ----
+
+[tests."mem/budget/ledger_relations.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."mem/budget/breach_is_a_row.lu"]
+lupin = "run"
+wolfc = "unsupported"  # sc32: "structured concurrency in checked execution (C1 deferred)" @mem — the checked tier defers the whole task layer, and D68's containment IS a proc
+native = "run"
+
+[tests."mem/budget/negative_cap_trap.lu"]
+lupin = "run"
+wolfc = "run"  # sc32: three lanes despite its sibling's C1 refusal — the guard traps before the `spawn proc` is reached, and C1 is raised at execution
+native = "run"

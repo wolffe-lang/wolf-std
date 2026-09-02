@@ -19,6 +19,46 @@
 # watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.22 (sc32 bump, from 0.1.20 — TWO releases in one bump, 0.1.21
+# having been deliberately not chased mid-wave). THE LEDGER IN THE
+# MIRROR (is32, 0.1.21) and THE MIRROR HOLDS (is33, 0.1.22): this
+# machine grows the whole region-budget surface the sprint consumes.
+# is32 surfaces the byte ledger it has counted since is02 —
+# `region_bytes(r)` and `live_region_bytes()` as two pure prelude
+# builtins ([mem.region.account.1/.2]) — and writes lupin's own
+# GEOMETRY down instead of leaving it incidental: a 16-byte grain, a
+# 32-byte allocation header, 16 bytes a value slot, a `str`'s UTF-8
+# length, container capacity in powers of two from four (this
+# machine's policy, never Rust's Vec), and a growth realloc charging
+# the WHOLE new buffer while the abandoned one stays charged. is33
+# lands the cap twin — `region r(cap: n)` / `region(cap: n)`,
+# `trap(alloc-contract)` at the allocating site, and
+# `[conc.proc.exit]`'s `fault(kind)` read at the join as
+# `is_fault()` / `is_alloc_contract()` with free-then-deliver
+# teardown — so s132's three witnesses flip resolve-refusal -> run in
+# LUPIN's census. Two more moves worth naming because they are the
+# only behaviour changes in the span that could have bitten a row
+# here: the lexer's one-to-six-digit `\u{…}` bound now binds in
+# STRING literals at **E0101** (where this machine had NO bound and
+# quietly decoded `"\u{0000041}"` to `A`, and where it used to file
+# E0110), and #53's `--explore --json` doors gain `seed`/`schedule`
+# as `x-` EXTENSION keys emitted only under `--seed=`/`--schedule=`.
+# Both grepped for their shape at the bump: no `\u{…}` in std/ or
+# tests/ exceeds six hex digits, no row or ledger entry pins E0110,
+# and this rig passes neither flag. Zero carriers, measured.
+# Conformance pin b80d239 -> **2bfbe5e** — the s132 MERGE, which is
+# to say lupin is pinned at exactly the commit that landed the
+# surface this sprint is built on. That leaves it **35 commits**
+# behind this repo's data pin 8cda3aa, the largest gap recorded here,
+# and every commit in the gap is named: s60a's windows native
+# bring-up (a platform this machine is not), s133's LSP navigation (a
+# binary this repo does not run), and four letters (#206, #198, #209,
+# #205). The sc31 rule — state which KIND of gap you have — reads
+# here as "35 commits, none of them a language lowering either
+# machine owes the other". The 0.1.20 doctor pin retires with this
+# entry.
+#
+# The sc31 note, kept for the history it records:
 # 0.1.20 (sc31 bump, from 0.1.19) — THE ARMS AGREE (is31): match arms
 # take the product domain, and the last pattern asymmetry between the
 # two machines closes — the c06 refusal family s130 retired on the
@@ -307,12 +347,13 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.20"
+version = "0.1.22"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
 # pin = "83f83bbf44ce5dd6a8f6e2fe255fa37d1fe3954b"  (superseded, sc30 era — is30's s129-merge pin)
-pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"
+# pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"  (superseded, sc31 era — is31's s130-merge pin)
+pin = "2bfbe5e6e877d3b6b43a9d8a68b56b1ef74c21c4"
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
@@ -449,8 +490,50 @@ pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.1"
-# sc31 bump: @ **75fd2d0** — the v0.2.1 TAG, and the first bump since
+version = "0.2.2"
+# sc32 bump: @ **8cda3aa** — the v0.2.2 TAG, THE LEARNERS' RELEASE,
+# and the SECOND consecutive release build (the sc30 dev stamp stays
+# retired). The binary answers the BARE
+# `wolf 0.2.2 (wolfgang, pin 8cda3aa)` on line 1 — D57's release
+# shape, no `+dev.<commit>` — with the pairing on line 2
+# (`paired with lupin 0.1.22 (reference interpreter), pin 2bfbe5e`),
+# reported and never gated (F-0064), and for once the pairing line
+# names EXACTLY the lupin this repo installed: r05's pairing commit
+# (`ec30889`) was cut after the 0.1.22 release existed, so the three
+# way trio agrees at acquisition instead of one release behind (the
+# sc27 nuance does not recur here). Data pin follows to 8cda3aa (the
+# one-sha invariant). The span 75fd2d0..8cda3aa is 35 commits / 9
+# first-parent: **s131 + s132** — the region ANSWERS and then HOLDS,
+# which is the surface this sprint exists to consume
+# (`region_bytes(r)`, `live_region_bytes()`, `region r(cap: n)` /
+# `region(cap: n)`, `trap(alloc-contract)` at the allocating site,
+# and `[conc.proc.exit]`'s `fault(kind)` contained at the proc
+# boundary, read at the join as `is_fault()`/`is_alloc_contract()`,
+# teardown free-then-deliver) — plus **s60a**'s windows native
+# bring-up (a host this machine is not; its 21 by-name refusals ride
+# a windows-only floor line), **s133**'s LSP definition/references/
+# rename (a binary this repo does not run), **D69**'s comma
+# tightening at struct LITERALS, closure params and inline-C capture
+# lists (static E0201 rejections, swept at zero over all 420 `.lu`
+# files here and at zero across five repos upstream), and four
+# letters: #206 (a bare entry name means `.` — this rig has always
+# passed the staged ABSOLUTE path, and never compares the record's
+# `file` field), #198 (`STR_PART` derives the escape set; the bound
+# itself did not move), #209 (a trap runs no defers AT THE ROOT too
+# — the span's one live divergence: every wolfc lane abandons the
+# pending root defer and lupin 0.1.22 runs it, and this tree holds
+# exactly ONE executable `defer`, function-body, on no trapping
+# path), and #205 (upstream's own flaky net probe). Every surface
+# grepped for its SHAPE before the run; see the sc32 register in
+# docs/findings.md. `upstream/corpus` 475 -> 490, the +15 exactly the
+# span's own witnesses; `upstream/spec` MOVES — anchors **404 -> 411**
+# (+7/-0, set-diffed both ways per F-0100), the seven being
+# `mem.region.account{,.1,.2}` and `mem.region.cap{,.1,.2,.3}` — so
+# the snapshot re-vendor is a REAL byte move, the first since sc27,
+# and the check that was a formality at sc31 is load-bearing here.
+#
+# The sc31 note, kept for the history it records: @ **75fd2d0** — the
+# v0.2.1 TAG, and the first bump since
 # sc28 where the compiler binary is a RELEASE build again: the sc30
 # pin was a dev-stamped `0.2.0+dev.b80d239` because no tag existed
 # past v0.2.0, and v0.2.1 (THE LETTER AND THE ARCHIVE) closes that
@@ -1118,4 +1201,5 @@ version = "0.2.1"
 # pin = "0a5c1afd7818477a6b283a5e325eec487e81bd8d"  (superseded, sc27 era — the walls-come-down acquisition)
 # pin = "c88ab6441b2706e20375deeec86eaf6da9bde25b"  (superseded, sc28/sc29 era — the v0.2.0 tag acquisition)
 # pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"  (superseded, sc30 era — the s130-merge dev-stamped acquisition)
-pin = "75fd2d0b25b6ed995ec7293053bc32fb3497e272"
+# pin = "75fd2d0b25b6ed995ec7293053bc32fb3497e272"  (superseded, sc31 era — the v0.2.1 tag acquisition)
+pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"

@@ -43,11 +43,13 @@
 //! runs under lupin and is `unsupported` at resolve on both wolf rungs,
 //! against `[mem.str.get]`'s own sentence that end-relative endpoints
 //! resolve exactly as in `s[a..b]` (F-0096, filed; re-measured
-//! verbatim at the sc31 pin v0.2.1/75fd2d0, 2026-09-01 — "open-ended
-//! or end-relative ranges (slicing)" at resolve on both rungs, lupin
-//! runs; r04 is four measured letters about `defer` timing, the
-//! `\u{…}` escape's shape and two region diagnostics, and none of them
-//! is the `get` lowering;
+//! verbatim AGAIN at the sc32 pin v0.2.2/8cda3aa, 2026-09-02 —
+//! "open-ended or end-relative ranges (slicing)" at resolve on both
+//! rungs, `@103..108`, lupin runs. v0.2.2 is a windows native
+//! bring-up, an LSP navigation trio, the region ledger and its cap,
+//! D69's comma tightening and four letters, and none of them is the
+//! `get` lowering; the sc31 reading at v0.2.1/75fd2d0 it replaces was
+//! byte-identical;
 //! `tests/str/end_relative_get.lu` is the row that flips at its
 //! closure). There is deliberately no std function that papers over
 //! either spelling.
@@ -93,7 +95,17 @@
 //!     v0.2.1/75fd2d0, the FIFTH consecutive pin, 2026-09-01 — r04 is
 //!     four measured letters, `defer` timing, the `\u{…}` bound and
 //!     two region diagnostics, and container instantiation is none of
-//!     them). `char_offsets` below is the offset half; the
+//!     them; and AGAIN at the sc32 pin v0.2.2/8cda3aa, the **SIXTH**
+//!     consecutive pin, 2026-09-02 — same word verbatim, `@72..90`,
+//!     lupin runs it. v0.2.2 is the largest span this repo has ever
+//!     crossed in one bump — a windows native bring-up, an LSP
+//!     navigation trio, the whole region ledger and cap, D69 and four
+//!     letters — and not one commit in it lowers a generic container
+//!     instantiation. Six pins is long enough to state the shape
+//!     plainly: this refusal never moves as a SIDE EFFECT, and it
+//!     will move the sprint someone lowers generic container
+//!     instantiation on purpose). `char_offsets` below is the offset
+//!     half; the
 //!     day tuple lists land they fuse into this one function.
 //! graphemes(s: str) -> List[str]
 //!     Extended grapheme clusters, as slices of `s`. A std call and never
