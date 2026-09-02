@@ -14,6 +14,46 @@
 # Every slow row is owed a re-measure at pin bumps; an interpreter perf
 # wave is its exit.
 #
+# THE sc32 PIN BUMP (wolf 75fd2d0 -> the v0.2.2 TAG = 8cda3aa, THE
+# LEARNERS' RELEASE — 35 commits, the largest span this repo has
+# crossed in one bump: the windows native bring-up (s60a), the LSP
+# navigation trio (s133), THE REGION LEDGER AND ITS CAP (s131 + s132 /
+# D68 — region_bytes, live_region_bytes, region r(cap: n),
+# trap(alloc-contract), fault(kind) at the proc join), D69's comma
+# tightening, and four letters (#206, #198, #209, #205); lupin 0.1.20
+# -> the v0.1.22 TAG = 753d686, TWO releases (is32's ledger, is33's cap
+# twin), conformance pin b80d239 -> 2bfbe5e) MOVED ZERO ROWS.
+# The prediction (written first, docs/findings.md sc32 register) said
+# zero and named a reason per surface, each grepped for its SHAPE: the
+# region ledger and cap are a real new capability with NO CARRIER here
+# (no region_bytes, no cap:, no spawn/proc/select anywhere in std/ or
+# tests/ before this sprint); D69's three lax forms sweep to zero over
+# all 420 .lu files, matching upstream's own 887-file count for this
+# repo; #206's bare-entry anchoring cannot reach a rig that stages an
+# ABSOLUTE entry path and never compares the record's `file` field;
+# #198 moved the derivation and not the bound, and no \u{…} in the tree
+# exceeds six digits; #209's root-defer divergence (every wolfc lane
+# abandons it, lupin 0.1.22 runs it) has nothing to ride, because the
+# tree holds exactly ONE executable `defer` — std/fs/fs.lu:262,
+# function-body, on no trapping path — and ZERO errdefer; and is32's
+# one real behaviour change, the \u{…} bound now binding in STRING
+# literals at E0101 where lupin had none, finds no carrier and no row
+# pins the E0110 it replaced. Measured over the untouched ledger: 373
+# tests, 694 forward tags, 199 conservatism entries, 0 unstable, 0
+# slow, 0 divergent; lupin 301 run / 72 unsupported, wolfc 297 / 74 / 2
+# fail, native 322 / 49 / 2 — the baseline reproduced to the number.
+# Anchors 404 -> 411 (+7 / -0: mem.region.account{,.1,.2} and
+# mem.region.cap{,.1,.2,.3}), the FIRST byte-moving re-vendor since
+# sc27 — key sets diffed both ways per F-0100 before the copy, which is
+# the case that lesson was filed about. Corpus 475 -> 490, the +15
+# exactly the span's own witnesses. Doctor green at the trio with BOTH
+# binaries bare (`wolf 0.2.2 (wolfgang, pin 8cda3aa)`, `lupin 0.1.22
+# (wolf-interp, reference interpreter at pin 2bfbe5e)`), the pairing
+# line naming exactly the interpreter installed beside it for once;
+# wolf's own pin = data pin = 8cda3aa, lupin's conformance pin 2bfbe5e
+# 35 commits behind, and those 35 are a windows port, an editor server
+# and four letters — not lowering debt.
+#
 # THE sc31 PIN BUMP (wolf b80d239 -> the v0.2.1 TAG = 75fd2d0, r04 —
 # THE LETTER AND THE ARCHIVE, a patch release: four measured letters
 # (D66's defer-at-scope-exit, #189's one-to-six-digit \u{} bound,
