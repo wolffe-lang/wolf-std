@@ -1,0 +1,272 @@
+//! member: true
+//!
+//! std.mem.budget — the region ledger, named, and the budget breach made
+//! into a ROW. Stability tier: core.
+//!
+//! **What is the language's and what is std's** (F-0011, the sc02
+//! structural finding, applied again). The language owns all of the
+//! machinery here and owns it whole: `region r { … }` and `region()`
+//! (`[mem.region.create.1]`), the byte ledger and its two builtin
+//! queries `region_bytes(r)` / `live_region_bytes()`
+//! (`[mem.region.account.1/.2]`, wolf-lang s131), the creation-time
+//! budget `region r(cap: n) { … }` / `region(cap: n)` and the
+//! deterministic `trap(alloc-contract)` a charge past it fires
+//! (`[mem.region.cap.1/.2]`, s132/D68), and the containment that makes
+//! that trap a value at a proc's join — `fault(kind)`, read as
+//! `is_fault()` / `is_alloc_contract()` (`[mem.region.cap.3]`,
+//! `[conc.proc.exit]`). std adds exactly two things over that, and
+//! nothing else: **names for the two queries**, and **the containment
+//! boilerplate collapsed into one call whose failure is an ordinary
+//! error row a caller can handle**.
+//!
+//! What std deliberately does NOT add: a trap-shaped runner. Asking
+//! "does this work fit in n bytes, and kill me if it does not" is
+//! already `region r(cap: n) { … }` — three lanes, zero ceremony, no
+//! library in the way. A wrapper would be a rename. What a caller
+//! cannot write in one line is the CONTAINED form, and that is
+//! `with_cap`.
+//!
+//! ## THE BUDGET IS DENOMINATED IN LEDGER UNITS, NOT PAYLOAD BYTES
+//!
+//! This is the sharpest thing on the page and it is the clause's own
+//! sentence (`[mem.region.cap.1]`), restated here because a caller who
+//! misses it will size a budget by arithmetic and be wrong by an order
+//! of magnitude. The ledger is **per-tier**, **cumulative** and
+//! **high-water**: a byte held as a container element charges the
+//! ELEMENT's storage rather than one byte, and a grown container's
+//! abandoned buffers stay charged for the region's whole life
+//! (`[mem.region.account.1]`: "nothing is ever subtracted while the
+//! region lives"). wolf-lang#203 measured the product on the io path —
+//! a 64 KiB chunk read into a `List[int]` charges about **1 MiB**, 16x
+//! the payload: 8x because a byte buffer is one machine int per byte,
+//! 2x because the doubling growth's history stays charged. This
+//! library's own measurement at the sc32 pin agrees to the byte and is
+//! recorded in `docs/findings.md`.
+//!
+//! Two consequences a caller must act on:
+//!
+//! - **Derive budgets from measured `charged` readings, never from
+//!   payload arithmetic or a per-tier constant.** A dry run of the same
+//!   build pattern under no cap, `charged(r)` read at the end, is the
+//!   portable way to a number — it is how wolf-lang's own three-tier
+//!   cap witnesses pin the boundary on every tier at once.
+//! - **The number is not comparable across lanes and must never be
+//!   printed into a golden.** The same 100-element list measured at the
+//!   sc32 pin reads 4064 under lupin, 2032 native and 1600 checked.
+//!   Every witness in `tests/mem/budget/` therefore prints RELATIONS
+//!   (zero at creation, monotone, stable, reclaimed) and never a count,
+//!   which is what lets one `stdout=` hash cover every lane.
+//!
+//! And one gap the clause names rather than hides: on the native tier
+//! `str` materialization's ambient region is the process root
+//! (wolf-lang#191, the c09 seam), so string bytes appear in **no**
+//! named region's ledger there today. Do not read the clause as "`str`
+//! never charges" — it charges under lupin and the checked machine now,
+//! and it will charge natively when the seam closes.
+//!
+//! ## NOTHING COMES BACK OUT OF `with_cap`, AND THAT IS MEASURED
+//!
+//! The obvious signature for this helper is `with_cap[T](n, f) -> T !
+//! {exhausted}` — run the work, hand back what it made, or the row.
+//! Every part of that was probed on all three lanes before a line of
+//! this module was written, and it does not exist at this pin. Three
+//! measurements, in the order they close the door:
+//!
+//! 1. A proc is a FAILURE DOMAIN with no shared address space
+//!    (`[conc.proc.1]`: "nothing may assume shared address-space
+//!    visibility into a proc beyond its channels"), so the only
+//!    licensed way out is a channel.
+//! 2. A `channel[int]` in a std function's SIGNATURE is `unsupported —
+//!    methods on generic std data (the std surface)` on **both** wolf
+//!    rungs (the F-0026 monomorphization family, reported at the caller's
+//!    instantiation site).
+//! 3. A `channel[int]` kept entirely inside a std body is `unsupported —
+//!    methods without resolvable bodies` on the checked rung. It runs
+//!    natively — but a returning `with_cap` would then be a
+//!    lupin-and-native-only surface whose two-lane sibling is free.
+//!
+//! So the value stays inside. That is less of a loss than it reads,
+//! because of what the contract already says: the capped region dies
+//! with the proc (`[conc.proc.kill]` — regions bulk-free before the
+//! reason delivers), so nothing it ALLOCATED could have survived the
+//! call under any signature. Only a scalar was ever going to cross, and
+//! this is the same discipline lobo's own request path already writes
+//! by hand — the write rows leave its per-response region as an `int`
+//! because heap values must not escape it. `with_cap` answers the one
+//! question a scalar would have carried anyway: **did the work fit?**
+//!
+//! ## THE ROW IS A MARK, AND IT CARRIES NO NUMBER ON PURPOSE
+//!
+//! `exhausted` is lowercase and payload-free (API-CONVENTIONS §12: a
+//! mark names a failure mode a caller can act on; CapCase is reserved
+//! for a tag that carries a payload TYPE). The payload a reader will
+//! reach for — "how much did it want?" — is not merely unavailable, it
+//! is **unobservable by contract**: `[mem.region.cap.3]` makes teardown
+//! free-then-deliver, so the breaching proc's regions are reclaimed
+//! WHOLESALE before the reason reaches the join and no postmortem query
+//! can see the dead proc's charge. A payload here would have to be
+//! invented. The cap the caller passed is the caller's own value and
+//! needs no return trip.
+//!
+//! ## Lanes (measured at the sc32 pin: wolf v0.2.2/8cda3aa, lupin
+//! ## 0.1.22/pin 2bfbe5e)
+//!
+//! **The query half is three lanes.** `charged` and `live` run on
+//! lupin, the checked rung and the native rung — including the shape
+//! that is not obvious, a `region` passed ACROSS a module boundary.
+//! Region values are affine (`[mem.region.create.2]`: they move, they
+//! are never copied), so a reader is right to expect a call to consume
+//! one; it does not, because the unwritten `read` mode is the spec's own
+//! answer (`[mem.tier0.mode.read]`: the callee reads a value immutable
+//! for the whole call, "the caller retains it"). Probed rather than
+//! reasoned: two `charged(r)` calls in a row answer the same number on
+//! every lane and the region is still usable after both.
+//!
+//! **The containment half is TWO lanes, and the missing one is not a
+//! gap in this module.** `with_cap` is `unsupported — structured
+//! concurrency in checked execution (C1 deferred)` on `wolf
+//! conform-run --checked`, because D68's containment mechanism IS a
+//! proc and the checked executor defers the whole task layer. lupin
+//! 0.1.22 (is33) and the native rung both run it, byte-identically.
+//! The refusal is at the tier, not at this surface: nothing this module
+//! could be spelled differently to avoid it, short of not containing
+//! the breach at all.
+//!
+//! **That refusal is reached at EXECUTION, not statically**, which is
+//! why this module's three witnesses do not share one checked column.
+//! `tests/mem/budget/negative_cap_trap.lu` calls the same `with_cap`
+//! and is `run` on all three lanes, because its `assert` fires before
+//! the `spawn proc` is ever reached; `breach_is_a_row.lu` reaches the
+//! spawn and is refused. Probed apart from both, with a `with_cap` call
+//! behind a runtime-false branch: the checked rung compiles that file
+//! and runs it to `exit(0)`. A caller may therefore link this module on
+//! the checked tier and only pay for the paths that actually spawn.
+//!
+//! **A region value may not be RETURNED from a function on the native
+//! rung** — `unsupported — first-class region values beyond local
+//! bindings (c05)` — which is why there is no `capped(n) -> region`
+//! constructor here even though it is two lines and runs under lupin
+//! and the checked rung. The value form `region(cap: n)` is the
+//! language's, at the caller's own site, where it is three lanes.
+//!
+//! Regions (API-CONVENTIONS §5): no function here demands a region for
+//! ordinary use. `charged` takes one because reading a specific
+//! region's ledger is the whole operation — it is a query ABOUT a
+//! region, not an allocation IN one — and `with_cap` creates and
+//! destroys its own.
+
+/// The bytes charged to `r`'s ledger — `[mem.region.account.1]`'s
+/// cumulative count, named. O(1). Total: no error row; the trap
+/// surface is the builtin's own (reading a stale region value faults
+/// exactly where `in r` would).
+///
+/// The number's UNITS are an implementation-measured fact per tier and
+/// are **not comparison surface** — see the module header. What every
+/// tier guarantees, and what a program may rely on: zero at creation,
+/// monotone within the region's lifetime, and stable between
+/// allocations (two reads with no intervening charge agree).
+///
+/// `r` is read, not consumed: the region is usable after the call.
+///
+/// ```wolf-doc-example
+/// let r = region()
+/// budget.charged(r) == 0
+/// ```
+pub fn charged(r: region) -> int {
+    region_bytes(r)
+}
+
+/// The process-wide total the implementation holds for LIVE first-class
+/// and sugar regions — `[mem.region.account.2]`, named. O(1). Total: no
+/// error row, no traps.
+///
+/// It is the reclamation counter, **not an RSS proxy**: the process-root
+/// arena is never counted, granularity is implementation-specified, and
+/// a freed region's contribution vanishes wholesale at its free. On a
+/// program with no live region it reads 0, and that is the clause
+/// working rather than a broken gauge.
+///
+/// ```wolf-doc-example
+/// budget.live() >= 0
+/// ```
+pub fn live() -> int {
+    live_region_bytes()
+}
+
+/// Runs `f` under a region capped at `n` LEDGER UNITS, inside a proc, so
+/// that a breach comes back as the row `exhausted` instead of ending the
+/// process.
+///
+/// This is D68's containment made ergonomic. Without it a caller writes
+/// the whole join by hand — spawn the proc, take its monitor, `select`
+/// on the exit reason, ask `is_alloc_contract()` — for a question that
+/// has one bit of answer. `[mem.region.cap.3]` is what makes the bit
+/// trustworthy: the breaching proc dies by the killed-proc sequence, its
+/// regions bulk-free BEFORE the reason delivers, and `live()` is already
+/// back to its pre-call reading by the time this function returns. A
+/// supervisor that answers 503 on this row was handed the memory back
+/// first.
+///
+/// Nothing crosses back on the success path, by contract rather than by
+/// omission — see the module header's third section. `f` runs in a
+/// failure domain with no shared memory, and its region dies with it.
+///
+/// Traps `assert` when `n` is negative: a negative budget is not a
+/// budget, it is a caller's arithmetic mistake, and API-CONVENTIONS §2
+/// says such a thing traps rather than raising. The check is here, at
+/// the door, rather than left to the language's own
+/// `trap(alloc-contract)` at the creating site — that trap would fire
+/// INSIDE the proc, be contained, and reach the caller as `exhausted`,
+/// which would answer a bug with a recoverable row. `n == 0` is not a
+/// mistake: it is a legal budget every charge breaches
+/// (`[mem.region.cap.2]`), so `with_cap(0, f)` is the honest spelling
+/// of "this work may allocate nothing".
+///
+/// Rows: `exhausted` and nothing else.
+///
+/// Lanes: lupin and the native rung. `wolf conform-run --checked`
+/// refuses it — "structured concurrency in checked execution (C1
+/// deferred)" — because the containment IS a proc. Measured at the sc32
+/// pin; `tests/mem/budget/breach_is_a_row.lu` is the witness.
+///
+/// Example (prose — the fenced form cannot declare the `fn` this takes,
+/// and a doc example is one synthesized `main`; the runnable form is
+/// `tests/mem/budget/breach_is_a_row.lu`):
+/// `budget.with_cap(4096, build) else |exhausted| { return 503 }` runs
+/// `build` under a 4 KiB budget and routes the breach.
+pub fn with_cap(n: int, f: fn()) -> () ! {exhausted} {
+    if n < 0 {
+        assert(false, "budget.with_cap: a negative byte budget is not a budget")
+    }
+    let w = spawn proc under_cap(n, f)
+    let m = w.monitor()
+    var ok = false
+    select {
+        exit(reason) from m => {
+            ok = reason.is_normal()
+        },
+        timeout(30.s) => {
+            ok = false
+        },
+    }
+    if !ok {
+        return exhausted
+    }
+}
+
+// The proc's body. Private: `spawn proc` takes a CALL, so the work and
+// its budget have to arrive as arguments to a named function rather
+// than as a closure over them. The cap parenthesis follows the region's
+// NAME (`[mem.region.cap.1]`'s sugar form) and `n` is evaluated once,
+// at creation, before any allocation can charge (`[mem.region.cap.2]`).
+//
+// The `int` return is the proc's exit value and is never read: the join
+// above asks the exit REASON, not the value, because the reason is
+// where containment speaks. See the module header for why no value can
+// cross this boundary.
+fn under_cap(n: int, f: fn()) -> int {
+    region tight(cap: n) {
+        f()
+    }
+    0
+}
