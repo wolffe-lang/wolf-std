@@ -4820,3 +4820,127 @@ predicted zero is only a measurement when each surface's reason is
 checked separately, and "additive, and nobody here calls it yet" is a
 reason you must confirm with a grep rather than assume from the word
 "additive".
+
+## The budget surface at sc32 — `std.mem.budget`, and what the probes refused
+
+wolf-lang s131 + s132 landed the whole region-budget pipe at this
+sprint's pin (the query `region_bytes(r)` / `live_region_bytes()`, the
+creation-time cap `region r(cap: n)`, `trap(alloc-contract)` at the
+allocating site, and D68's containment — `fault(kind)` at a proc's
+join). sc31's register ended by naming this as "the NEXT sc bump's
+first measurement". This is that measurement, and it is written before
+the module because the module is what fell out of it.
+
+**Fifteen probes, each in its own directory** (D32: two probe files in
+one scratch dir are ONE module — the sc30 lesson), all at
+`wolf 0.2.2 (wolfgang, pin 8cda3aa)` / `lupin 0.1.22 (pin 2bfbe5e)`:
+
+| probe | shape | lupin | wolfc `--checked` | wolf `--native` |
+|---|---|---|---|---|
+| p1 | `charged(r: region) -> int` across a module boundary, called TWICE on one region | `exit(0)` | `exit(0)` | `exit(0)` |
+| p2 | the same over the bare builtin, no module (control) | `exit(0)` | `exit(0)` | `exit(0)` |
+| p3 | `region name(cap: n) { … }` SUGAR inside a std body, `n` an int parameter | `exit(0)` | `exit(0)` | `exit(0)` |
+| p4 | `capped(n) -> region` — a std function RETURNING a region value | `exit(0)` | `exit(0)` | **`unsupported` — first-class region values beyond local bindings (c05)** |
+| p5 | the corpus join shape at root (`spawn proc` + `monitor` + `select` + `is_alloc_contract`) | `exit(0)` | **`unsupported` — structured concurrency in checked execution (C1 deferred)** | `exit(0)` |
+| p7 | a `fn` VALUE parameter called inside a capped region, NO proc | `exit(0)` | `exit(0)` | `exit(0)` |
+| p8 | `spawn proc` over a std-module function, predicates read in a std body | `exit(0)` | **`unsupported` — C1** | `exit(0)` |
+| p6 | the containment as a std helper, breach back as a ROW | `exit(0)` | **`unsupported` — C1** | `exit(0)` |
+| p9 | the same, returning the work's value through a `channel[int]` | `exit(0)` | **`unsupported` — methods on generic std data (the std surface)** | **same refusal** |
+| p10 | a `channel[int]` created and consumed entirely INSIDE a std body | `exit(0)` | **`unsupported` — methods without resolvable bodies** | `exit(0)` |
+| p11 | the channel as the CALLER's, passed into a std signature | `exit(0)` | **`unsupported` — methods on generic std data** | **same refusal** |
+| p12 | the containment with NO value crossing back | `exit(0)` | **`unsupported` — C1** | `exit(0)` |
+| p13 | the landed shape: `with_cap(n, f: fn())` + `charged` + `live` | `exit(0)` | **`unsupported` — C1** | `exit(0)` |
+| p14 | the QUERY half alone (`charged` + `live`, no proc) | `exit(0)` | `exit(0)` | `exit(0)` |
+| p15 | a `with_cap` call behind a RUNTIME-FALSE branch | `exit(0)` | `exit(0)` | `exit(0)` |
+
+Five things the table settles that prose would have guessed at, and
+each of them changed the shipped surface:
+
+1. **A `region` in ARGUMENT position is read, not consumed** (p1/p14).
+   Region values are affine — `[mem.region.create.2]` says they move
+   and are never copied — so the reasonable expectation is that
+   `charged(r)` eats its argument and the query is useless as a std
+   function. It does not, on any lane: two calls in a row answer the
+   same number and the region is still usable after both. The licence
+   is `[mem.tier0.mode.read]`, whose sentence is exactly this ("the
+   callee reads a value that is immutable for the whole call; the
+   caller retains it") and which nobody had ever tested against a
+   region. That one probe is the difference between a `charged(r)` std
+   can ship and a `charged(r)` it cannot.
+2. **A region may be TAKEN but not RETURNED** (p4). The native rung
+   refuses `-> region` by name — "first-class region values beyond
+   local bindings (c05)" — where lupin and the checked rung run it. So
+   there is no `capped(n) -> region` constructor in the module even
+   though it is two lines: the value form `region(cap: n)` stays the
+   language's, at the caller's own site, where it is three lanes.
+3. **THE VALUE CANNOT COME BACK, and it takes three measurements to
+   close the door** (p9/p10/p11). The obvious signature is
+   `with_cap[T](n, f) -> T ! {exhausted}`. A proc is a failure domain
+   with no shared address space (`[conc.proc.1]`), so the only licensed
+   way out is a channel; a `channel[int]` in a std SIGNATURE is refused
+   on **both** wolf rungs (the F-0026 monomorphization family,
+   reported at the caller's instantiation site); and a channel kept
+   inside a std BODY is refused on the checked rung. The helper
+   therefore answers a question rather than producing a value — which
+   costs less than it reads, because `[conc.proc.kill]` bulk-frees the
+   proc's regions before the reason delivers, so nothing the work
+   ALLOCATED could have survived the call under any signature. Only a
+   scalar was ever crossing, and lobo's request path already carries
+   its region results out as scalars by hand for the same reason.
+4. **The C1 refusal is reached at EXECUTION, not statically** (p15,
+   against p6/p8/p12/p13). A `with_cap` call behind a runtime-false
+   branch compiles and runs to `exit(0)` on the checked rung. That is
+   why this module ships three witnesses with two different checked
+   columns from one function: `negative_cap_trap.lu` is `run` on all
+   three lanes because its guard traps before the `spawn proc` is
+   reached, and `breach_is_a_row.lu` is `unsupported` because it
+   reaches it. A caller may link this module on the checked tier and
+   pay only for the paths that actually spawn — worth knowing, and not
+   a thing anyone would have predicted from "the checked tier defers
+   the task layer".
+5. **The trap-shaped runner is not std's to ship** (p3/p7). Running a
+   fn value inside a capped region, with the breach left as the
+   process-ending trap, is three lanes — and it is also
+   `region r(cap: n) { … }` with a library in the way. What a caller
+   cannot write in one line is the CONTAINED form, so that is the only
+   runner in the module.
+
+**What landed.** `std.mem.budget`, three functions: `charged(r)` and
+`live()` naming the two queries (three lanes), and
+`with_cap(n, f: fn()) -> () ! {exhausted}` collapsing the spawn /
+monitor / `select` / `is_alloc_contract()` join into one call whose
+failure is an ordinary row (lupin + native). The row is the payload-free
+mark `exhausted` per API-CONVENTIONS §12, and the reason it carries no
+number is not modesty — `[mem.region.cap.3]`'s free-then-deliver
+teardown makes the dead proc's charge **unobservable by contract**, so
+a payload would have to be invented. A negative budget traps `assert`
+at the door rather than riding out as a row, because
+`[mem.region.cap.2]`'s own `trap(alloc-contract)` would fire inside the
+proc, be contained, and answer a caller's arithmetic mistake with a
+recoverable value — the exact failure §2's trap rule exists to prevent.
+
+**The witnesses, and the one test-design decision that mattered.** The
+ledger's numbers are per-tier measured facts and NOT comparison surface
+(`[mem.region.account.1]`), and this repo's rig compares a `stdout=`
+hash across lanes — so a witness that printed a count would be a
+per-lane file. Measured, to make the point concrete: the same
+100-element `List[int]` reads **4064** under lupin, **2032** native and
+**1600** on the checked machine. Every row therefore prints RELATIONS —
+zero at creation, monotone, stable between allocations, the live total
+rising and returning wholesale, birth-region attribution, the breach
+contained, the memory already back — and one hash covers every lane the
+row runs on (`ledger_relations.lu`
+`2a60aeaecaed6c6bbc2b5d957fe06236be0e95748179ba8629acd3dc8b5de1ff`
+three lanes; `breach_is_a_row.lu`
+`05c2dc7adf52121ef88612a33e8ecd5c7cc8adc45c3774e50633309507419e37`
+lupin + native).
+
+One shape cost a red before it was written down, and it is worth the
+sentence: growing a root-born `List` INSIDE a `region scratch { … }`
+block is **E1010** on both wolf rungs ("`root_born` still holds a value
+allocated in region `scratch` when the region is freed"), where lupin's
+birth-region attribution runs it happily. The attribution half of the
+witness is therefore written the way wolf-lang's own
+`memory/region_bytes_value.lu` writes it — the push sits AFTER the
+`in r { … }` block, not inside it. Copying a corpus witness's shape is
+not laziness when the shape is the part that was measured.
