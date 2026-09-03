@@ -7076,3 +7076,189 @@ release, working on D74's lex codes — and the installed binary is still
 the branch is handed over with the lupin lane dark, its 182 rows and 87
 doc blocks counted by name above, and the flip owed to the bump that
 installs is36's release. Re-measure then; do not assume.
+
+## The sc35 SECOND bump — lupin 0.1.25 arrives, wolf takes its tag, and all three pins land on one sha
+
+**F-0108 was filed at 05:22 EDT with the branch dark on one lane and the
+exit named as a release. The release landed the same day.** This section
+is the re-measure that finding asked for, plus a second pin move it did
+not ask for and got anyway.
+
+### What moved, and the drift prediction written 2026-09-03 18:34 EDT, BEFORE the bare `ci`
+
+- **lupin 0.1.23 -> 0.1.25**, TWO releases in one chase (0.1.24 was
+  never installed here — see `vendor/tools.toml`). Tag `v0.1.25` =
+  wolf-interp `ae34115`; is36 ships `[type.byte]` in the mirror.
+  Installed by the orchestrator through fresh inodes.
+- **wolf `0.2.3+dev.4230b00` -> `0.2.4` (the TAG, `982f857`)**, and the
+  DATA pin moves with it, `4230b00 -> 982f857`, five commits. This was
+  not sc35's plan: r07 merged and installed v0.2.4 over the dev build at
+  05:49, which is a lane other than lupin moving under a pushed branch,
+  so the sprint STOPPED and reported rather than accommodating it. The
+  re-pin is authorised, and it is the good outcome: **the dev stamp goes
+  away.** sc34 and sc35's first bump both had to build off trunk because
+  no tagged wolf could compile a byte; v0.2.4 is the first tag that can,
+  so the `+dev.` suffix retires after two sprints.
+
+**Predicted: ZERO row motion on every lane from the WOLF half, and every
+byte row returning on the LUPIN half.** The wolf half's prediction is the
+cheapest kind this register has ever recorded, and for once that is a
+fact rather than an argument:
+
+- **`git diff --name-only 4230b00 982f857` touches EIGHT files and NOT
+  ONE OF THEM IS A `.rs`.** The count is literally zero. The span is
+  `867accf` (a `.github/workflows/release.yml` addition), `2201426`
+  (README prose), `281e3b2` (`crates/wolf_driver/PAIRING`, a data file),
+  `a504e09` (CHANGELOG prose) and `982f857` (the version bump:
+  `Cargo.toml`, both lockfiles, README, and one `wolf_sema` test
+  SNAPSHOT that embeds the version string by design). There is no
+  compiler in this span. A prediction of zero over a span with no source
+  is not a judgement call, and the only honest way to get it wrong would
+  be to have miscounted — so the count is quoted rather than described.
+- **`spec/` and `corpus/` are untouched: 0 files.** Anchors **417 ->
+  417**, key sets diffed BOTH ways, **+0 / -0** — the first bump in this
+  repo's history where the anchor snapshot is BYTE-IDENTICAL to the one
+  already vendored, so `vendor/upstream/anchors.json` does not change at
+  all and only `PIN` moves. Corpus **511 -> 511**.
+- **The lupin half is predicted to return all 181 dark rows and all 87
+  dark doc blocks**, because F-0108's cause was one cast target and is36
+  ships it. Predicted NOT to return: the ten converted witnesses, whose
+  directives expect `fail(E0401)` — a type refusal the interpreter has
+  no reason to make. Those were measured before this prediction was
+  written (they are what the ledger words below record), so they are
+  stated as a known rather than claimed as a forecast.
+- **The doctor prediction, and it is the headline of this section: ALL
+  THREE PINS ON ONE SHA.** `vendor/tools.toml` records wolf `0.2.4` /
+  `982f857` and lupin `0.1.25` / `982f857`; `vendor/upstream/PIN` records
+  `982f857`. Doctor gates the two binaries' self-declared identity and
+  `sync-pin` gates the snapshot against the submodule, so all four
+  numbers should be the same sha for the first time in this repository's
+  history. sc34 restored the one-sha invariant between the wolf BINARY
+  and the DATA pin; this is the first time the INTERPRETER joins them.
+- **The pairing line will still mismatch, and that is correct.**
+  `crates/wolf_driver/PAIRING` was set to `lupin-version = 0.1.24` /
+  `lupin-pin = 3befc3e` in `281e3b2` — r07's release-time record — so the
+  v0.2.4 binary's line 2 names 0.1.24 while the installed interpreter is
+  0.1.25. Reported and NOT gated (F-0064: the rig reads identity from
+  line 1). Predicted to appear in doctor's output and to move nothing.
+
+### The BEFORE side
+
+The sc33 lesson says measure the before-picture on the binary about to be
+replaced. That binary was replaced at 05:49 without this sprint's
+knowledge, so the before side is this morning's own three gauntlets at
+`4230b00` / 0.1.23, recorded above: `376 test(s); forward tags 700;
+conservatism 153; unstable 0; slow 0; divergent 0`, 182 reds all on
+`[lupin]`, `doc-examples` 87 of 414 red, `ulp` GREEN. Three identical
+readings from two code paths. **That is a complete before side, and it is
+worth naming why it survives the accident: it was written down.**
+
+### The measurement — `ci: GREEN`, and the prediction exact on both halves
+
+`cargo xtask ci` exit code **0**, `ci: GREEN`, **18:36:01 -> 18:54:37
+EDT**, bare, the exit code read directly from the process and not through
+a pipe.
+
+    sync-pin: PIN 982f857885b991e686c6b045de213d10cab013c1
+              anchors.json snapshot parses (registry v1)
+              snapshot == submodule at pin — OK
+    doctor:   lupin — version: lupin 0.1.25
+                      pin: 982f857 matches vendor/tools.toml — OK
+              wolf  — version: wolf 0.2.4
+                      pairing: paired with lupin 0.1.24 (reference
+                               interpreter), pin 3befc3e
+                      pin: 982f857 matches vendor/tools.toml — OK
+              native rung — libwolf_rt.a … (lane lit)
+    ledger-check:      376 test(s), all ledgered
+    lint-conventions:  376 test(s), all conforming (5 rules)
+    gen-vectors --check: all generated files match their vendored sources
+    std-test: 376 test(s); forward tags: 700; conservatism ledger: 201
+              entries; unstable rows: 0; slow skips: 0; divergent rows: 8
+              — std-test: GREEN
+    doc-examples: 414 block(s), GREEN
+    ulp: 200 reference row(s), GREEN
+
+**ALL THREE PINS READ ONE SHA, AND IT IS THE FIRST TIME.** `982f857` is
+the wolf binary's self-declared pin, the lupin binary's self-declared
+pin, and `vendor/upstream/PIN`. sc30 pulled the pins apart, sc33 suspended
+the invariant, sc34 restored it between the BINARY and the DATA pin, and
+this bump adds the interpreter. It is also the first bump in this repo
+where `vendor/upstream/anchors.json` did not change one byte: `spec/` is
+untouched in the span, so anchors are **417 -> 417, +0/-0**, corpus
+**511 -> 511**, and only `PIN` moved.
+
+**And `version: wolf 0.2.4` has no `+dev.` suffix.** Two sprints of
+dev-stamped builds end here, exactly as r03's design intended: sc34 and
+sc35's first bump both had to build off trunk because no tag could
+compile a `byte`, and v0.2.4 is the first tag that carries s135 and s136
+together. The mechanism was used for precisely as long as the gap it was
+built for.
+
+**The pairing line mismatches and doctor is right not to care.** wolf's
+line 2 says `lupin 0.1.24 … pin 3befc3e` — r07's release-time
+`crates/wolf_driver/PAIRING` record, frozen in `281e3b2` — while the
+installed interpreter is 0.1.25 conforming to `982f857`. Reported, not
+gated (F-0064). Predicted above; observed verbatim; moved nothing.
+
+**Zero row motion from the wolf half, as predicted over a span with no
+compiler in it.** Every wolf-lane word in `tests/ledger.toml` is
+unchanged and every one still holds; `ulp`'s 200 rows reproduce exactly
+on all three lanes; `gen-vectors --check` and `lint-conventions` are
+unmoved. The only numbers that move are the lupin half's, below.
+
+## F-0108 CLOSES — 181 of 181 rows returned, and what is left has a word
+
+**Status: CLOSED, one day after filing, by the release it named as its
+own exit.** lupin 0.1.25 (is36) ships `[type.byte]` in the mirror.
+Re-measured over all 376 rows with `lupin conform-run`:
+
+| | at 0.1.23 (this morning) | at 0.1.25 |
+|---|---|---|
+| rows answering `fail(E0301)` | **181** | **0** |
+| doc blocks refused | **87 of 414** | **0 of 414** |
+| `std-test` reds | **182**, all `[lupin]` | **0** |
+
+**Zero residual refusals.** The 181 come back as 122 `exit`, 48
+`unsupported` and 11 `trap` — and **not one lane word in
+`tests/ledger.toml` had to be corrected for any of them.** That is the
+strongest thing this section can say: the column had been right all along
+about what the interpreter is FOR, and wrong only about what it could
+reach for one morning. A ledger left honestly wrong, with its own note
+naming the count and the cause, needed no repair when the cause left.
+
+`conservatism ledger` moves **153 -> 201**. sc34's baseline was 200, so
+the tier is +1 and the one entry is `x/crypto/p256/non_byte_refused.lu`,
+whose lupin lane declines at `resolve` (the ladder is outside the
+modelled surface — not a byte question).
+
+### What remains: eight rows, one mechanism, and now a legal word
+
+The ten witnesses sc35 converted expect `fail(E0401)`. **lupin 0.1.25 has
+the byte TYPE but not the byte DOMAIN**: `push(256)` into a `List[byte]`
+still stores 256 dynamically, so where both compilers refuse at typecheck
+the interpreter executes the program to its honest end.
+
+| row | lupin 0.1.25 | ledger word |
+|---|---|---|
+| `hex/encode_non_byte_refused` | `trap(assert)` | `divergent(trap(assert))` |
+| `net/write_bytes_invalid_row` | `exit(1)` | `divergent(exit(1))` |
+| `x/tls/cert/non_byte_refused` | `exit(1)` | `divergent(exit(1))` |
+| `x/crypto/sha2`, `chacha20`, `curve25519`, `x/tls/handshake`, `x/tls/record` | `exit(0)` | `divergent(exit(0))` |
+| `fs/invalid_row` | `unsupported` @ resolve | `unsupported` |
+| `x/crypto/p256/non_byte_refused` | `unsupported` @ resolve | `unsupported` |
+
+**`divergent rows: 0 -> 8`, and this is F-0098's word used outside the
+take-mode pair for the first time.** This morning the same finding had NO
+legal spelling and the reds were left standing; the release did not just
+return the rows, it moved the residue into a shape the rig can carry —
+loud (the divergence ledger names all eight every run), out of the
+cross-lane differ, and armed to RED the day it heals. Filed as
+**wolf-interp#62** (is37's, not is36's) and cited on every row.
+
+**`hex/encode_non_byte_refused` is the one worth reading twice.** Its
+`byte_digits` assert — which sc35 documented as "now provably unreachable
+from every door in this module" — is unreachable on the two wolf lanes
+and **still fires under lupin**, because the interpreter can still hand
+it a 256. The sentence was true of the compilers and false of the
+reference machine, and the divergence ledger is where that difference now
+lives rather than in a claim nobody re-checked.
