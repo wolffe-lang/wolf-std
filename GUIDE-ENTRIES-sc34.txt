@@ -1,0 +1,101 @@
+Drafted Guide entries for AN_AGENTS_GUIDE_TO_WRITING_GOOD_WOLF.md —
+append the dated section verbatim at merge (the guide is untracked in
+the main checkout, so a worktree sprint hands its entries over as this
+file; delete the file once appended). No amendments to earlier
+sections this sprint.
+
+## 2026-09-02 (sc34) — the byte tier is bytes, and it cannot be yet
+
+- A TYPE LANDING IS NOT THE SAME EVENT AS ITS PRODUCERS LANDING, AND A
+  SPRINT WHOSE JOB IS "SUBSTITUTE THE NEW TYPE" SHOULD CHECK WHICH ONE
+  HAPPENED BEFORE IT EDITS ANYTHING. `[type.byte]` shipped complete —
+  clause, casts, operators, both backends, the checked machine, three
+  witnesses — and every builtin that PRODUCES or CONSUMES a byte
+  sequence stayed declared over `List[int]`. Sixteen std signatures sit
+  on eight such builtins as thin wrappers, so "rename the type" turned
+  into "insert a conversion at every boundary", which a cumulative
+  ledger prices at 17x/18x against the 16x it replaces. The check is
+  one grep of the callee side's signature table, it takes two minutes,
+  and it is the difference between a rename and a regression. Read the
+  table, not the release note.
+
+- WHEN THE PLAN SAYS "A PURE SUBSTITUTION", THE WORD TO AUDIT IS
+  "PURE", AND THE AUDIT IS A MEASUREMENT. Three documents said this
+  change was a rename: the decision, the sprint contract, and the
+  upstream issue's own closing comment. All three were right about the
+  SHAPE — the signatures really are monomorphic and really do keep
+  their form — and all three were describing a pipe that did not exist
+  yet. The measurement that settled it took one program and four
+  numbers. If a plan's central claim is quantitative, spend the twenty
+  minutes to produce the quantity before you spend the day on the
+  edit; the plan is a hypothesis with a good pedigree, not a result.
+
+- A SUBSTITUTION THAT WINS ON ONE TIER AND LOSES ON ANOTHER IS NOT A
+  PARTIAL WIN, IT IS A BET, AND A THREE-LANE LIBRARY DOES NOT SHIP
+  BETS. The one shape with a real gain — building a `List[byte]` by
+  walking a borrowed byte view — read 131,120 natively (a clean 8x) and
+  1,114,112 checked. Same source, same pin, opposite verdicts about
+  whether the change is an improvement. The instinct to take the win
+  "where it works" is how a library acquires a per-tier performance
+  cliff nobody documents. Take the tier-uniform win or take none, and
+  file the reason the tiers disagree — which in this case turned out to
+  be a bug worth more than the substitution would have been.
+
+- MEASURING THE THING YOU DECIDED NOT TO BUILD IS THE CHEAPEST
+  EVIDENCE YOU WILL EVER PRODUCE. The fourth column of this sprint's
+  table — "what a substituted reader would charge" — is four lines of
+  probe and it is the whole argument. It converts "we judged this
+  premature" into "it costs 18x where the status quo costs 16x, here
+  are seven sizes", which is a sentence an upstream maintainer can act
+  on and a reviewer cannot argue with. Whenever you decline a change,
+  build the smallest possible model of it and price it. A declined
+  change with a number attached is a filed issue; a declined change
+  without one is an opinion.
+
+- A LEDGER BUG HIDES BEST WHERE THE CLAUSE FORBIDS TESTING IT. No
+  conforming test in this tree may print a `region_bytes` count,
+  because the units are per-tier and the clause says so — which is
+  correct, and which also means an entire class of divergence is
+  structurally invisible to every gauntlet and every differ. The
+  checked machine charging 16x for a walk that allocates nothing on the
+  shipping tier was found by a probe written for another purpose
+  entirely. When a clause tells you a value is not comparison surface,
+  read that as "nothing will ever check this for me" and probe it by
+  hand at every bump.
+
+- A PROBE THAT REPRODUCES THE SYMPTOM IS NOT YET A PROBE THAT PINS THE
+  TRIGGER, AND THE DIFFERENCE SHOWS UP AS A FALSE HEAL. Three sprints
+  described F-0103 as "an unhandled raising call passed straight into a
+  row-typed parameter". A minimal file of exactly that shape RUNS on
+  the checked lane — because the callee ignored its parameter, so no
+  control flow was lowered for the argument. The refusal needs the row
+  to be CONSUMED in the callee; the trigger is a pair, and the recorded
+  description named half of it. Had this sprint stopped at the first
+  green it would have reported a heal that had not happened. When a
+  re-probe suddenly passes after several pins of refusing, suspect the
+  probe before the compiler.
+
+- THE FOURTH KIND OF ZERO IS THE EXPENSIVE ONE: A BINARY THAT MOVED
+  FURTHER THAN ANY BEFORE IT. sc31's empty drift list came from a span
+  with no capability, sc32's from a capability with no carrier, sc33's
+  from a binary that did not move at all. sc34's came from 51 commits
+  of new compiler, every carrier of which had to be grepped for by
+  name: the record extension keys against the record parser's key list,
+  the parse-span change against what `classify` compares, the path
+  spelling against whether the rig runs a package verb at all, the
+  reset-socket fix against the one `set_deadline` call site in the
+  tree. Same printed result, four very different costs. Say in the
+  first sentence which kind you have — and when it is the fourth, budget
+  for it, because the cheap answer is not available.
+
+- A BINARY'S TAG AND A BINARY'S CAPABILITY ARE DIFFERENT QUESTIONS.
+  The contract said "the machine wolf stays at v0.2.3", and the v0.2.3
+  TAG turned out to sit twelve commits before the feature the sprint
+  existed to use — its lowering refuses the type by name. Both
+  sentences are true at once: the machine stays 0.2.3 and the tag build
+  cannot do the job, because a dev stamp keeps the version and moves
+  the pin. The lesson is to ask the binary rather than the version
+  string: one four-line program answered in a second what no amount of
+  reading the release notes would have settled, and it was the last
+  moment that answer was obtainable, since the binary was about to be
+  replaced.
