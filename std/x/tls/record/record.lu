@@ -67,9 +67,11 @@
 //! 8448's real traffic secrets by an independent reference (the sc17
 //! discipline; F-0094 records the AES-GCM/ChaCha reconciliation).
 //!
-//! **Byte sequences are `List[int]` with the 0..255 element contract**
-//! (§11's interim, F-0035), the sha2/chacha20 convention: an element
-//! outside 0..255 traps `assert` at ingestion.
+//! **Byte sequences are `List[byte]` (sc35)**, the sha2/chacha20
+//! convention: the 0..255 element contract (§11's interim, F-0035) is
+//! the TYPE's now, so this module's `require_byte` — its recorded ct
+//! exception, a comparison pair on every ingested element — is deleted
+//! rather than left as decoration.
 //!
 //! **Error rows.** `open` raises `{tag, short, unexpected}`: a forged,
 //! modified or truncated box is the DATA's failure (`tag`, sc17's
@@ -77,7 +79,7 @@
 //! too short to hold a header, a tag and one content-type octet is
 //! `short`; a deprotected inner with no non-zero octet is `unexpected`
 //! (§5.4). Everything else is total over its documented domain; length
-//! misuse and non-byte elements are caller-contract violations that trap
+//! misuse is a caller-contract violation that traps
 //! `assert`.
 //!
 //! **The sc21-consumable seam (FROZEN).** The handshake sprint gets:
@@ -100,33 +102,20 @@
 //! `record_nonce` does wrapping-not-checked arithmetic on the write IV
 //! (a secret) with the public sequence number and is branch-free.
 //! `open`'s padding scan reads the DEPROTECTED length (§5.4) — a
-//! value-dependent loop bound c28 must model; it is marked below. The
-//! 0..255 ingestion guards are the recorded value-dependent branch
-//! shared with sha2/chacha20 (F-0035's real byte type retires them).
+//! value-dependent loop bound c28 must model; it is marked below. **The
+//! 0..255 ingestion guards were the other recorded value-dependent
+//! branch, shared with sha2/chacha20, and F-0035's real byte type
+//! RETIRED them at sc35 — exactly as this note said it would.**
 
 use std.x.crypto.sha2
 use std.x.crypto.chacha20
 
 // ---------------------------------------------------------------------
-// Byte helpers (the sha2/chacha20 0..255 contract, and the one wrapping
+// Byte helpers (the one wrapping
 // XOR the nonce needs — bitwise `^` on plain `int` costs the checked
 // lane, F-0026, so byte XOR rides `wrapping[u64]` exactly as chacha20's
 // `xor_byte` does).
 // ---------------------------------------------------------------------
-
-/// The 0..255 ingestion guard (§11's `List[int]` byte contract).
-/// ct: NOT free of value-dependent branches — this comparison pair runs
-/// on every input element and is the module's recorded ct exception,
-/// shared verbatim with sha2/chacha20 (it leaves with F-0035's real
-/// byte type).
-fn require_byte(v: int) {
-    if v < 0 {
-        assert(false, "tls.record: element outside 0..255")
-    }
-    if v > 255 {
-        assert(false, "tls.record: element outside 0..255")
-    }
-}
 
 /// One byte XOR in the `wrapping[u64]` domain (bitwise `^` on plain
 /// `int` costs the checked lane, F-0026 — the chacha20 spelling).
@@ -159,9 +148,8 @@ fn label_prefix() -> str {
 
 /// Push the bytes of an ASCII `str` onto `out`, asserting each is a
 /// byte (labels are ASCII; the prefixed label is `<7..255>`).
-fn push_ascii(mut out: List[int], s: str) {
+fn push_ascii(mut out: List[byte], s: str) {
     for b in s.bytes() {
-        require_byte(b)
         (mut out).push(b)
     }
 }
@@ -173,10 +161,10 @@ fn push_ascii(mut out: List[int], s: str) {
 /// dumps, asserted byte-for-byte.
 /// ct: public structure only (label and context are public; the length
 /// prefixes are public) — no secret touched here.
-pub fn hkdf_label(length: int, label: str, context: List[int]) -> List[int] {
+pub fn hkdf_label(length: int, label: str, context: List[byte]) -> List[byte] {
     assert(length >= 0, "tls.record: negative expand length")
     assert(length <= 65535, "tls.record: expand length exceeds uint16")
-    var full = List[int]()
+    var full = List[byte]()
     push_ascii(mut full, label_prefix())
     push_ascii(mut full, label)
     let full_len = full.len
@@ -184,16 +172,15 @@ pub fn hkdf_label(length: int, label: str, context: List[int]) -> List[int] {
     assert(full_len <= 255, "tls.record: label exceeds 255 bytes")
     let ctx_len = context.len
     assert(ctx_len <= 255, "tls.record: context exceeds 255 bytes")
-    var out = List[int]()
-    (mut out).push(length / 256 % 256)
-    (mut out).push(length % 256)
-    (mut out).push(full_len)
+    var out = List[byte]()
+    (mut out).push((length / 256 % 256) as byte)
+    (mut out).push((length % 256) as byte)
+    (mut out).push(full_len as byte)
     for b in full {
         (mut out).push(b)
     }
-    (mut out).push(ctx_len)
+    (mut out).push(ctx_len as byte)
     for b in context {
-        require_byte(b)
         (mut out).push(b)
     }
     out
@@ -206,7 +193,7 @@ pub fn hkdf_label(length: int, label: str, context: List[int]) -> List[int] {
 /// ct: `secret` is the PRK, carried through sha2's HKDF (its `ct:` line
 /// holds the wrapping-not-checked posture); the label/context/length
 /// that select `HkdfLabel` are public.
-pub fn expand_label(secret: List[int], label: str, context: List[int], length: int) -> List[int] {
+pub fn expand_label(secret: List[byte], label: str, context: List[byte], length: int) -> List[byte] {
     let info = hkdf_label(length, label, context)
     sha2.hkdf256_expand(secret, info, length)
 }
@@ -219,7 +206,7 @@ pub fn expand_label(secret: List[int], label: str, context: List[int], length: i
 /// transcript the "derived"/"finished" steps use.
 /// ct: as `expand_label` — `secret` is carried through HKDF; the
 /// transcript hash is public.
-pub fn derive_secret(secret: List[int], label: str, transcript: List[int]) -> List[int] {
+pub fn derive_secret(secret: List[byte], label: str, transcript: List[byte]) -> List[byte] {
     expand_label(secret, label, transcript, 32)
 }
 
@@ -230,7 +217,7 @@ pub fn derive_secret(secret: List[int], label: str, transcript: List[int]) -> Li
 /// (EC)DHE shared secret (or zeros where there is no input keying
 /// material).
 /// ct: `salt`/`ikm` are secret; carried through sha2's HMAC.
-pub fn extract(salt: List[int], ikm: List[int]) -> List[int] {
+pub fn extract(salt: List[byte], ikm: List[byte]) -> List[byte] {
     sha2.hkdf256_extract(salt, ikm)
 }
 
@@ -252,15 +239,15 @@ fn iv_length() -> int {
 /// for AES-128-GCM — the caller states which, since it knows the suite).
 /// The context is empty.
 /// ct: `secret` is the traffic secret; carried through HKDF.
-pub fn traffic_key(secret: List[int], key_len: int) -> List[int] {
-    expand_label(secret, "key", List[int](), key_len)
+pub fn traffic_key(secret: List[byte], key_len: int) -> List[byte] {
+    expand_label(secret, "key", List[byte](), key_len)
 }
 
 /// The `[sender]_write_iv` (§7.3): expand the traffic secret under the
 /// `"iv"` label to the 12-byte IV length. The context is empty.
 /// ct: `secret` is the traffic secret; carried through HKDF.
-pub fn traffic_iv(secret: List[int]) -> List[int] {
-    expand_label(secret, "iv", List[int](), iv_length())
+pub fn traffic_iv(secret: List[byte]) -> List[byte] {
+    expand_label(secret, "iv", List[byte](), iv_length())
 }
 
 /// The Finished MAC key (§4.4.4): `HKDF-Expand-Label(Secret,
@@ -268,8 +255,8 @@ pub fn traffic_iv(secret: List[int]) -> List[int] {
 /// but part of the same §7.1 vocabulary and published by RFC 8448 §3, so
 /// the seam carries it for sc21's Finished computation.
 /// ct: `secret` is the traffic secret; carried through HKDF.
-pub fn finished_key(secret: List[int]) -> List[int] {
-    expand_label(secret, "finished", List[int](), 32)
+pub fn finished_key(secret: List[byte]) -> List[byte] {
+    expand_label(secret, "finished", List[byte](), 32)
 }
 
 // ---------------------------------------------------------------------
@@ -288,22 +275,22 @@ pub fn finished_key(secret: List[int]) -> List[int] {
 /// `wrapping[u64]` domain with LITERAL shift amounts (a shift by a
 /// plain-`int` binding is refused natively — sc16's measurement — and a
 /// wrapping shift keeps all three lanes).
-fn seq_field(seq: int) -> List[int] {
+fn seq_field(seq: int) -> List[byte] {
     assert(seq >= 0, "tls.record: sequence number must be non-negative")
     let s = seq as wrapping[u64]
-    var f = List[int]()
-    (mut f).push(0)
-    (mut f).push(0)
-    (mut f).push(0)
-    (mut f).push(0)
-    (mut f).push((s >> 56 & 0xff) as int)
-    (mut f).push((s >> 48 & 0xff) as int)
-    (mut f).push((s >> 40 & 0xff) as int)
-    (mut f).push((s >> 32 & 0xff) as int)
-    (mut f).push((s >> 24 & 0xff) as int)
-    (mut f).push((s >> 16 & 0xff) as int)
-    (mut f).push((s >> 8 & 0xff) as int)
-    (mut f).push((s & 0xff) as int)
+    var f = List[byte]()
+    (mut f).push(0 as byte)
+    (mut f).push(0 as byte)
+    (mut f).push(0 as byte)
+    (mut f).push(0 as byte)
+    (mut f).push((s >> 56 & 0xff) as int as byte)
+    (mut f).push((s >> 48 & 0xff) as int as byte)
+    (mut f).push((s >> 40 & 0xff) as int as byte)
+    (mut f).push((s >> 32 & 0xff) as int as byte)
+    (mut f).push((s >> 24 & 0xff) as int as byte)
+    (mut f).push((s >> 16 & 0xff) as int as byte)
+    (mut f).push((s >> 8 & 0xff) as int as byte)
+    (mut f).push((s & 0xff) as int as byte)
     f
 }
 
@@ -312,15 +299,14 @@ fn seq_field(seq: int) -> List[int] {
 /// sequence number (0 for the first record under a key, incrementing).
 /// ct: branch-free over the public sequence number; the wrapping XOR
 /// touches the secret write IV (wrapping-not-checked, marked for c28).
-pub fn record_nonce(iv: List[int], seq: int) -> List[int] {
+pub fn record_nonce(iv: List[byte], seq: int) -> List[byte] {
     assert(iv.len == iv_length(), "tls.record: write IV must be 12 bytes")
     let field = seq_field(seq)
-    var out = List[int]()
+    var out = List[byte]()
     var i = 0
     while i < iv_length() {
-        let a = iv[i]
-        require_byte(a)
-        (mut out).push(xor_byte(a, field[i]))
+        let a = iv[i] as int
+        (mut out).push(xor_byte(a, field[i] as int) as byte)
         i = i + 1
     }
     out
@@ -363,15 +349,15 @@ pub fn content_type_alert() -> int {
 /// `length` bytes: `17 03 03 <length big-endian uint16>` (§5.2). The
 /// legacy_record_version is 0x0303 ("TLS 1.2") on every 1.3 record.
 /// ct: public lengths only.
-pub fn record_header(length: int) -> List[int] {
+pub fn record_header(length: int) -> List[byte] {
     assert(length >= 0, "tls.record: negative record length")
     assert(length <= 65535, "tls.record: record length exceeds uint16")
-    var out = List[int]()
-    (mut out).push(content_type_application_data())
-    (mut out).push(3)
-    (mut out).push(3)
-    (mut out).push(length / 256 % 256)
-    (mut out).push(length % 256)
+    var out = List[byte]()
+    (mut out).push(content_type_application_data() as byte)
+    (mut out).push(3 as byte)
+    (mut out).push(3 as byte)
+    (mut out).push((length / 256 % 256) as byte)
+    (mut out).push((length % 256) as byte)
     out
 }
 
@@ -379,7 +365,7 @@ pub fn record_header(length: int) -> List[int] {
 /// 16-byte tag) is `cipher_len` bytes: the record header (§5.2). This is
 /// exactly `record_header(cipher_len)`, named for the role.
 /// ct: public lengths only.
-pub fn additional_data(cipher_len: int) -> List[int] {
+pub fn additional_data(cipher_len: int) -> List[byte] {
     record_header(cipher_len)
 }
 
@@ -393,18 +379,18 @@ fn tag_length() -> int {
 /// zeros[pad]`. The real content type is appended after the content, and
 /// `pad` zero octets follow (§5.4's length hiding). `pad` may be 0.
 /// ct: public structure; `content` is plaintext the caller owns.
-pub fn inner_plaintext(content: List[int], content_type: int, pad: int) -> List[int] {
-    require_byte(content_type)
+pub fn inner_plaintext(content: List[byte], content_type: int, pad: int) -> List[byte] {
+    assert(content_type >= 0, "tls.record: content type outside 0..255")
+    assert(content_type <= 255, "tls.record: content type outside 0..255")
     assert(pad >= 0, "tls.record: negative padding")
-    var out = List[int]()
+    var out = List[byte]()
     for b in content {
-        require_byte(b)
         (mut out).push(b)
     }
-    (mut out).push(content_type)
+    (mut out).push(content_type as byte)
     var i = 0
     while i < pad {
-        (mut out).push(0)
+        (mut out).push(0 as byte)
         i = i + 1
     }
     out
@@ -423,19 +409,19 @@ pub fn inner_plaintext(content: List[int], content_type: int, pad: int) -> List[
 /// ct: the AEAD is chacha20's (its `ct:` line carries); this function
 /// adds only public framing and the nonce (see `record_nonce`).
 pub fn seal(
-    key: List[int],
-    iv: List[int],
+    key: List[byte],
+    iv: List[byte],
     seq: int,
     content_type: int,
-    content: List[int],
+    content: List[byte],
     pad: int,
-) -> List[int] {
+) -> List[byte] {
     let inner = inner_plaintext(content, content_type, pad)
     let cipher_len = inner.len + tag_length()
     let header = record_header(cipher_len)
     let nonce = record_nonce(iv, seq)
     let boxed = chacha20.seal(key, nonce, header, inner)
-    var out = List[int]()
+    var out = List[byte]()
     for b in header {
         (mut out).push(b)
     }
@@ -469,7 +455,7 @@ fn min_record_len() -> int {
 /// there). The padding scan below reads the DEPROTECTED length — a
 /// value-dependent loop bound c28 must model (§5.4 notes it as a
 /// constant-time hazard).
-pub fn open(key: List[int], iv: List[int], seq: int, record: List[int]) -> List[int] ! {
+pub fn open(key: List[byte], iv: List[byte], seq: int, record: List[byte]) -> List[byte] ! {
     tag,
     short,
     unexpected,
@@ -479,8 +465,8 @@ pub fn open(key: List[int], iv: List[int], seq: int, record: List[int]) -> List[
     }
     // Split the wire record into the 5-byte header (the AEAD's
     // additional-data, §5.2) and the encrypted body, in one walk.
-    var header = List[int]()
-    var encrypted = List[int]()
+    var header = List[byte]()
+    var encrypted = List[byte]()
     var i = 0
     for b in record {
         if i < 5 {
@@ -502,7 +488,7 @@ pub fn open(key: List[int], iv: List[int], seq: int, record: List[int]) -> List[
     var ct_index = 0 - 1
     var j = 0
     for b in inner {
-        if b != 0 {
+        if b as int != 0 {
             ct_index = j
         }
         j = j + 1
@@ -512,7 +498,7 @@ pub fn open(key: List[int], iv: List[int], seq: int, record: List[int]) -> List[
     }
     // Return content || content_type (the deprotected inner, padding
     // stripped): everything up to and including the content-type octet.
-    var out = List[int]()
+    var out = List[byte]()
     var k = 0
     for b in inner {
         if k <= ct_index {
@@ -526,19 +512,19 @@ pub fn open(key: List[int], iv: List[int], seq: int, record: List[int]) -> List[
 /// The inner content type recovered by `open`: the last octet of the
 /// deprotected inner plaintext (§5.4).
 /// ct: reads a public position of already-authenticated plaintext.
-pub fn content_type_of(inner: List[int]) -> int {
+pub fn content_type_of(inner: List[byte]) -> int {
     let n = inner.len
     assert(n >= 1, "tls.record: empty deprotected inner")
-    inner[n - 1]
+    inner[n - 1] as int
 }
 
 /// The inner content recovered by `open`: the deprotected inner
 /// plaintext with its trailing content-type octet removed (§5.4).
 /// ct: reads public positions of already-authenticated plaintext.
-pub fn content_of(inner: List[int]) -> List[int] {
+pub fn content_of(inner: List[byte]) -> List[byte] {
     let n = inner.len
     assert(n >= 1, "tls.record: empty deprotected inner")
-    var out = List[int]()
+    var out = List[byte]()
     var i = 0
     for b in inner {
         if i < n - 1 {
@@ -557,11 +543,11 @@ pub fn content_of(inner: List[int]) -> List[int] {
 
 /// Lowercase hex of a byte list. ct: NOT constant-time (a rendering
 /// convenience for tests and vectors, never a secret-handling path).
-pub fn to_hex(b: List[int]) -> str {
+pub fn to_hex(b: List[byte]) -> str {
     let alphabet = "0123456789abcdef"
     var out = ""
-    for v in b {
-        require_byte(v)
+    for raw in b {
+        let v = raw as int
         let hi = v / 16
         let lo = v % 16
         let hd = alphabet[hi..hi + 1]

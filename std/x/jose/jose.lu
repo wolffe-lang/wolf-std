@@ -100,7 +100,7 @@
 //!       2. sign and serialize — `acme_body(secret, protected, payload)`
 //!          returns the flattened-JWS JSON `{"protected":…,"payload":…,
 //!          "signature":…}` that is the POST body. A POST-as-GET carries
-//!          an EMPTY payload (`List[int]()`), whose base64url is `""`,
+//!          an EMPTY payload (`List[byte]()`), whose base64url is `""`,
 //!          per RFC 8555 §6.3.
 //!   - The account binding uses `jwk_thumbprint(pubkey)` (RFC 7638),
 //!     which ws06 places wherever the server's challenge demands it.
@@ -144,38 +144,39 @@ fn hexdigit(d: int) -> int {
 /// field cannot break out of its JSON string, which is what "defensive"
 /// means for an envelope other people's servers fill in.
 fn esc(s: str) -> str {
-    var out = List[int]()
-    for b in s.bytes() {
+    var out = List[byte]()
+    for raw in s.bytes() {
+        let b = raw as int
         if b == 34 {
-            (mut out).push(92)
-            (mut out).push(34)
+            (mut out).push(92 as byte)
+            (mut out).push(34 as byte)
         } else if b == 92 {
-            (mut out).push(92)
-            (mut out).push(92)
+            (mut out).push(92 as byte)
+            (mut out).push(92 as byte)
         } else if b == 8 {
-            (mut out).push(92)
-            (mut out).push(98)
+            (mut out).push(92 as byte)
+            (mut out).push(98 as byte)
         } else if b == 9 {
-            (mut out).push(92)
-            (mut out).push(116)
+            (mut out).push(92 as byte)
+            (mut out).push(116 as byte)
         } else if b == 10 {
-            (mut out).push(92)
-            (mut out).push(110)
+            (mut out).push(92 as byte)
+            (mut out).push(110 as byte)
         } else if b == 12 {
-            (mut out).push(92)
-            (mut out).push(102)
+            (mut out).push(92 as byte)
+            (mut out).push(102 as byte)
         } else if b == 13 {
-            (mut out).push(92)
-            (mut out).push(114)
+            (mut out).push(92 as byte)
+            (mut out).push(114 as byte)
         } else if b < 32 {
-            (mut out).push(92)
-            (mut out).push(117)
-            (mut out).push(48)
-            (mut out).push(48)
-            (mut out).push(hexdigit(b / 16))
-            (mut out).push(hexdigit(b % 16))
+            (mut out).push(92 as byte)
+            (mut out).push(117 as byte)
+            (mut out).push(48 as byte)
+            (mut out).push(48 as byte)
+            (mut out).push(hexdigit(b / 16) as byte)
+            (mut out).push(hexdigit(b % 16) as byte)
         } else {
-            (mut out).push(b)
+            (mut out).push(raw)
         }
     }
     bytes.to_str(out) else ""
@@ -191,7 +192,7 @@ fn esc(s: str) -> str {
 /// let payload = "Example of Ed25519 signing".bytes()
 /// jose.signing_input("{{\"alg\":\"EdDSA\"}}", payload) == "eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc"
 /// ```
-pub fn signing_input(protected: str, payload: List[int]) -> str {
+pub fn signing_input(protected: str, payload: List[byte]) -> str {
     let p = base64.url_encode(protected.bytes())
     let pl = base64.url_encode(payload)
     "{p}.{pl}"
@@ -214,7 +215,7 @@ pub fn signing_input(protected: str, payload: List[int]) -> str {
 /// let jws = jose.jws_sign_compact(sk, "{{\"alg\":\"EdDSA\"}}", "hi".bytes())
 /// jws.starts_with("eyJhbGciOiJFZERTQSJ9.aGk.")
 /// ```
-pub fn jws_sign_compact(secret: List[int], protected: str, payload: List[int]) -> str {
+pub fn jws_sign_compact(secret: List[byte], protected: str, payload: List[byte]) -> str {
     let si = signing_input(protected, payload)
     let sig = curve25519.sign(secret, si.bytes())
     let sb = base64.url_encode(sig)
@@ -239,7 +240,7 @@ pub fn jws_sign_compact(secret: List[int], protected: str, payload: List[int]) -
 /// jose.jws_verify_compact("x".bytes(), "not.a.jws") == false
 /// jose.jws_verify_compact("x".bytes(), "onlyonepart") == false
 /// ```
-pub fn jws_verify_compact(pubkey: List[int], compact: str) -> bool {
+pub fn jws_verify_compact(pubkey: List[byte], compact: str) -> bool {
     let parts = str.split(compact, ".")
     if parts.len != 3 {
         return false
@@ -263,7 +264,7 @@ pub fn jws_verify_compact(pubkey: List[int], compact: str) -> bool {
 /// flat.starts_with("{{\"protected\":\"eyJhbGciOiJFZERTQSJ9\",\"payload\":\"aGk\",\"signature\":\"")
 /// flat.ends_with("\"}}")
 /// ```
-pub fn jws_flattened(secret: List[int], protected: str, payload: List[int]) -> str {
+pub fn jws_flattened(secret: List[byte], protected: str, payload: List[byte]) -> str {
     let p_b64 = base64.url_encode(protected.bytes())
     let pl_b64 = base64.url_encode(payload)
     let si = "{p_b64}.{pl_b64}"
@@ -284,7 +285,7 @@ pub fn jws_flattened(secret: List[int], protected: str, payload: List[int]) -> s
 /// let pk = "a 32-byte ed25519 public key !!!".bytes()
 /// jose.jwk_ed25519_public(pk) == "{{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"YSAzMi1ieXRlIGVkMjU1MTkgcHVibGljIGtleSAhISE\"}}"
 /// ```
-pub fn jwk_ed25519_public(pubkey: List[int]) -> str {
+pub fn jwk_ed25519_public(pubkey: List[byte]) -> str {
     let x = base64.url_encode(pubkey)
     "{{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"{x}\"}}"
 }
@@ -299,7 +300,7 @@ pub fn jwk_ed25519_public(pubkey: List[int]) -> str {
 /// let pk = "a 32-byte ed25519 public key !!!".bytes()
 /// jose.jwk_thumbprint_input(pk) == "{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"YSAzMi1ieXRlIGVkMjU1MTkgcHVibGljIGtleSAhISE\"}}"
 /// ```
-pub fn jwk_thumbprint_input(pubkey: List[int]) -> str {
+pub fn jwk_thumbprint_input(pubkey: List[byte]) -> str {
     let x = base64.url_encode(pubkey)
     "{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"{x}\"}}"
 }
@@ -313,7 +314,7 @@ pub fn jwk_thumbprint_input(pubkey: List[int]) -> str {
 /// let pk = "a 32-byte ed25519 public key !!!".bytes()
 /// jose.jwk_thumbprint(pk).len == 43
 /// ```
-pub fn jwk_thumbprint(pubkey: List[int]) -> str {
+pub fn jwk_thumbprint(pubkey: List[byte]) -> str {
     let canon = jwk_thumbprint_input(pubkey)
     let h = sha2.sum256(canon.bytes())
     base64.url_encode(h)
@@ -332,7 +333,7 @@ pub fn jwk_thumbprint(pubkey: List[int]) -> str {
 /// let pk = "a 32-byte ed25519 public key !!!".bytes()
 /// jose.acme_protected_jwk(pk, "aXk6", "https://acme.test/new-account") == "{{\"alg\":\"EdDSA\",\"jwk\":{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"YSAzMi1ieXRlIGVkMjU1MTkgcHVibGljIGtleSAhISE\"}},\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-account\"}}"
 /// ```
-pub fn acme_protected_jwk(pubkey: List[int], nonce: str, url: str) -> str {
+pub fn acme_protected_jwk(pubkey: List[byte], nonce: str, url: str) -> str {
     let jwk = jwk_thumbprint_input(pubkey)
     let n = esc(nonce)
     let u = esc(url)
@@ -359,15 +360,15 @@ pub fn acme_protected_kid(kid: str, nonce: str, url: str) -> str {
 /// over `protected` and `payload`, signed with the account key. This is
 /// `jws_flattened` under its ACME name — the door ws06 calls after
 /// building the header with `acme_protected_jwk`/`acme_protected_kid`. A
-/// POST-as-GET (RFC 8555 §6.3) passes an EMPTY `payload` (`List[int]()`),
+/// POST-as-GET (RFC 8555 §6.3) passes an EMPTY `payload` (`List[byte]()`),
 /// whose base64url is the empty string.
 ///
 /// ```wolf-doc-example
 /// let sk = "a 32-byte ed25519 secret key !!!".bytes()
 /// let header = jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order")
-/// let body = jose.acme_body(sk, header, List[int]())
+/// let body = jose.acme_body(sk, header, List[byte]())
 /// body.contains("\"payload\":\"\"")
 /// ```
-pub fn acme_body(secret: List[int], protected: str, payload: List[int]) -> str {
+pub fn acme_body(secret: List[byte], protected: str, payload: List[byte]) -> str {
     jws_flattened(secret, protected, payload)
 }

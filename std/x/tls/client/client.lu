@@ -258,25 +258,11 @@ pub fn scheme_rsa_pss_sha256() -> int {
 // window-checked and every reject is the `decode_error` row.
 // ---------------------------------------------------------------------
 
-/// The 0..255 ingestion guard (§11's `List[int]` byte contract) — for
-/// arguments the CALLER built (randoms, scalars, plaintext): a non-byte
-/// there is a contract violation and traps. Wire data never reaches
-/// this; the readers below answer `decode_error` instead.
-/// ct: the ladder's recorded ct exception (F-0035).
-fn require_byte(v: int) {
-    if v < 0 {
-        assert(false, "tls.client: element outside 0..255")
-    }
-    if v > 255 {
-        assert(false, "tls.client: element outside 0..255")
-    }
-}
-
 /// The bytes of `b` from `from` (inclusive) to `to` (exclusive), as a
 /// fresh list — offsets are the module's own computed values (the cert
 /// `sub` precedent).
-fn sub(b: List[int], from: int, to: int) -> List[int] {
-    var out = List[int]()
+fn sub(b: List[byte], from: int, to: int) -> List[byte] {
+    var out = List[byte]()
     var i = 0
     for v in b {
         if i >= from {
@@ -292,7 +278,7 @@ fn sub(b: List[int], from: int, to: int) -> List[int] {
 /// A cursor over one wire message: `pos` never passes `end`, truncation
 /// is `decode_error`, and a non-byte element on the wire is too.
 struct Rd {
-    b: List[int],
+    b: List[byte],
     pos: int,
     end: int,
 }
@@ -302,13 +288,7 @@ fn rd_u8(mut r: Rd) -> int ! {decode_error} {
     if r.pos >= r.end {
         return decode_error
     }
-    let v = r.b[r.pos]
-    if v < 0 {
-        return decode_error
-    }
-    if v > 255 {
-        return decode_error
-    }
+    let v = r.b[r.pos] as int
     r.pos = r.pos + 1
     v
 }
@@ -329,7 +309,7 @@ fn rd_u24(mut r: Rd) -> int ! {decode_error} {
 }
 
 /// `n` raw bytes, advancing.
-fn rd_take(mut r: Rd, n: int) -> List[int] ! {decode_error} {
+fn rd_take(mut r: Rd, n: int) -> List[byte] ! {decode_error} {
     if n < 0 {
         return decode_error
     }
@@ -343,7 +323,7 @@ fn rd_take(mut r: Rd, n: int) -> List[int] ! {decode_error} {
 
 /// Byte-list equality (public data — no ct obligation; the one secret
 /// compare in this stack is sc21's `ct_eq`).
-fn bytes_eq(a: List[int], b: List[int]) -> bool {
+fn bytes_eq(a: List[byte], b: List[byte]) -> bool {
     if a.len != b.len {
         return false
     }
@@ -374,70 +354,70 @@ fn bytes_eq(a: List[int], b: List[int]) -> bool {
 /// random. ct: public wire material.
 pub struct ServerHelloView {
     legacy_version: int,
-    random: List[int],
-    session_echo: List[int],
+    random: List[byte],
+    session_echo: List[byte],
     cipher_suite: int,
     compression: int,
     selected_version: int,
     key_share_group: int,
-    server_share: List[int],
+    server_share: List[byte],
     hello_retry: bool,
 }
 
 /// The §4.1.3 downgrade sentinel tail (the last 8 random bytes):
 /// "DOWNGRD" then 0x01 (TLS 1.2) or 0x00 (TLS 1.1 and below).
-fn downgrade_tail(random: List[int], last: int) -> bool {
+fn downgrade_tail(random: List[byte], last: int) -> bool {
     if random.len != 32 {
         return false
     }
-    var tail = List[int]()
-    (mut tail).push(68)
-    (mut tail).push(79)
-    (mut tail).push(87)
-    (mut tail).push(78)
-    (mut tail).push(71)
-    (mut tail).push(82)
-    (mut tail).push(68)
-    (mut tail).push(last)
+    var tail = List[byte]()
+    (mut tail).push(68 as byte)
+    (mut tail).push(79 as byte)
+    (mut tail).push(87 as byte)
+    (mut tail).push(78 as byte)
+    (mut tail).push(71 as byte)
+    (mut tail).push(82 as byte)
+    (mut tail).push(68 as byte)
+    (mut tail).push(last as byte)
     bytes_eq(sub(random, 24, 32), tail)
 }
 
 /// The §4.1.3 HelloRetryRequest sentinel random (SHA-256 of
 /// "HelloRetryRequest" — a fixed public constant).
-fn hrr_random() -> List[int] {
-    var out = List[int]()
-    (mut out).push(207)
-    (mut out).push(33)
-    (mut out).push(173)
-    (mut out).push(116)
-    (mut out).push(229)
-    (mut out).push(154)
-    (mut out).push(97)
-    (mut out).push(17)
-    (mut out).push(190)
-    (mut out).push(29)
-    (mut out).push(140)
-    (mut out).push(2)
-    (mut out).push(30)
-    (mut out).push(101)
-    (mut out).push(184)
-    (mut out).push(145)
-    (mut out).push(194)
-    (mut out).push(162)
-    (mut out).push(17)
-    (mut out).push(22)
-    (mut out).push(122)
-    (mut out).push(187)
-    (mut out).push(140)
-    (mut out).push(94)
-    (mut out).push(7)
-    (mut out).push(158)
-    (mut out).push(9)
-    (mut out).push(226)
-    (mut out).push(200)
-    (mut out).push(168)
-    (mut out).push(51)
-    (mut out).push(156)
+fn hrr_random() -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(207 as byte)
+    (mut out).push(33 as byte)
+    (mut out).push(173 as byte)
+    (mut out).push(116 as byte)
+    (mut out).push(229 as byte)
+    (mut out).push(154 as byte)
+    (mut out).push(97 as byte)
+    (mut out).push(17 as byte)
+    (mut out).push(190 as byte)
+    (mut out).push(29 as byte)
+    (mut out).push(140 as byte)
+    (mut out).push(2 as byte)
+    (mut out).push(30 as byte)
+    (mut out).push(101 as byte)
+    (mut out).push(184 as byte)
+    (mut out).push(145 as byte)
+    (mut out).push(194 as byte)
+    (mut out).push(162 as byte)
+    (mut out).push(17 as byte)
+    (mut out).push(22 as byte)
+    (mut out).push(122 as byte)
+    (mut out).push(187 as byte)
+    (mut out).push(140 as byte)
+    (mut out).push(94 as byte)
+    (mut out).push(7 as byte)
+    (mut out).push(158 as byte)
+    (mut out).push(9 as byte)
+    (mut out).push(226 as byte)
+    (mut out).push(200 as byte)
+    (mut out).push(168 as byte)
+    (mut out).push(51 as byte)
+    (mut out).push(156 as byte)
     out
 }
 
@@ -453,7 +433,7 @@ fn hrr_random() -> List[int] {
 /// ServerHello under §4's one-module rule;
 /// `tests/x/tls/client/rfc8448_parse_vectors.lu` parses RFC 8448's own
 /// ServerHello and asserts every extracted field byte-for-byte.
-pub fn parse_server_hello(msg: List[int]) -> ServerHelloView ! {decode_error} {
+pub fn parse_server_hello(msg: List[byte]) -> ServerHelloView ! {decode_error} {
     let n = msg.len
     var r = Rd { b: msg, pos: 0, end: n }
     let mtype = rd_u8(mut r)?
@@ -479,7 +459,7 @@ pub fn parse_server_hello(msg: List[int]) -> ServerHelloView ! {decode_error} {
     }
     var selected = 0 - 1
     var group = 0 - 1
-    var share = List[int]()
+    var share = List[byte]()
     while r.pos < r.end {
         let et = rd_u16(mut r)?
         let el = rd_u16(mut r)?
@@ -578,7 +558,7 @@ pub fn check_negotiation(v: ServerHelloView) -> int ! {
 /// header, one uint16-prefixed extensions vector filling the body,
 /// each extension well-formed. Contents are not judged (nothing in
 /// this profile turns on them). ct: public.
-pub fn check_encrypted_extensions(msg: List[int]) -> int ! {decode_error} {
+pub fn check_encrypted_extensions(msg: List[byte]) -> int ! {decode_error} {
     let n = msg.len
     var r = Rd { b: msg, pos: 0, end: n }
     let mtype = rd_u8(mut r)?
@@ -616,7 +596,7 @@ pub fn check_encrypted_extensions(msg: List[int]) -> int ! {decode_error} {
 /// Example: prose (§4's one-module rule) —
 /// `tests/x/tls/client/rfc8448_parse_vectors.lu` extracts RFC 8448's
 /// 432-octet certificate and asserts the bytes verbatim.
-pub fn certificate_chain_of(msg: List[int]) -> List[int] ! {decode_error} {
+pub fn certificate_chain_of(msg: List[byte]) -> List[byte] ! {decode_error} {
     let n = msg.len
     var r = Rd { b: msg, pos: 0, end: n }
     let mtype = rd_u8(mut r)?
@@ -636,7 +616,7 @@ pub fn certificate_chain_of(msg: List[int]) -> List[int] ! {decode_error} {
     if list_len != r.end - r.pos {
         return decode_error
     }
-    var chain = List[int]()
+    var chain = List[byte]()
     while r.pos < r.end {
         let dlen = rd_u24(mut r)?
         let der_bytes = rd_take(mut r, dlen)?
@@ -659,12 +639,12 @@ pub fn certificate_chain_of(msg: List[int]) -> List[int] ! {decode_error} {
 /// signature bytes. ct: public wire material.
 pub struct CertVerifyView {
     scheme: int,
-    sig: List[int],
+    sig: List[byte],
 }
 
 /// Parse a CertificateVerify wire message (§4.4.3): scheme (uint16) +
 /// uint16-prefixed signature filling the body. ct: public.
-pub fn certificate_verify_of(msg: List[int]) -> CertVerifyView ! {decode_error} {
+pub fn certificate_verify_of(msg: List[byte]) -> CertVerifyView ! {decode_error} {
     let n = msg.len
     var r = Rd { b: msg, pos: 0, end: n }
     let mtype = rd_u8(mut r)?
@@ -688,7 +668,7 @@ pub fn certificate_verify_of(msg: List[int]) -> CertVerifyView ! {decode_error} 
 /// which for this profile's SHA-256 must be exactly 32 bytes.
 /// ct: public (the MAC is wire material; judging it is
 /// `handshake.accept_finished`'s job).
-pub fn finished_of(msg: List[int]) -> List[int] ! {decode_error} {
+pub fn finished_of(msg: List[byte]) -> List[byte] ! {decode_error} {
     let n = msg.len
     var r = Rd { b: msg, pos: 0, end: n }
     let mtype = rd_u8(mut r)?
@@ -735,10 +715,10 @@ pub fn finished_of(msg: List[int]) -> List[int] ! {decode_error} {
 /// P-256 ladders); the Ed25519 path is three-lane.
 pub fn verify_certificate_verify(
     spki_alg: str,
-    spki_key: List[int],
+    spki_key: List[byte],
     scheme: int,
-    sig: List[int],
-    transcript_hash: List[int],
+    sig: List[byte],
+    transcript_hash: List[byte],
 ) -> int ! {unsupported_alg, bad_signature} {
     let content = handshake.
         certificate_verify_content("TLS 1.3, server CertificateVerify", transcript_hash)
@@ -770,8 +750,8 @@ pub fn verify_certificate_verify(
 
 /// Exactly `n` bytes off the socket, looping over short reads (TCP
 /// promises a stream, not a framing).
-fn read_exact(fd: int, n: int) -> List[int] ! {closed, timeout, io} {
-    var out = List[int]()
+fn read_exact(fd: int, n: int) -> List[byte] ! {closed, timeout, io} {
+    var out = List[byte]()
     while out.len < n {
         var s = net.Socket { fd: fd }
         let piece = net.read_bytes(mut s, n - out.len)?
@@ -789,7 +769,7 @@ fn read_exact(fd: int, n: int) -> List[int] ! {closed, timeout, io} {
 /// this module writes is library-built 0..255) and coarsens to `io`
 /// truthfully if a future pin ever reaches it (the sc12·02-os
 /// unreachable-arm rule).
-fn write_all(fd: int, b: List[int]) -> () ! {closed, io} {
+fn write_all(fd: int, b: List[byte]) -> () ! {closed, io} {
     var s = net.Socket { fd: fd }
     net.write_bytes(mut s, b) else |e| match e {
         closed => {
@@ -810,18 +790,18 @@ fn write_all(fd: int, b: List[int]) -> () ! {closed, io} {
 /// (record_overflow's shape) before a single body byte is read.
 struct RawRecord {
     rtype: int,
-    wire: List[int],
+    wire: List[byte],
 }
 
 fn read_record(fd: int) -> RawRecord ! {closed, timeout, decode_error, io} {
     let header = read_exact(fd, 5)?
-    let rtype = header[0]
-    let blen = header[3] * 256 + header[4]
+    let rtype = header[0] as int
+    let blen = header[3] as int * 256 + header[4] as int
     if blen > 16640 {
         return decode_error
     }
     let body = read_exact(fd, blen)?
-    var wire = List[int]()
+    var wire = List[byte]()
     for b in header {
         (mut wire).push(b)
     }
@@ -834,16 +814,15 @@ fn read_record(fd: int) -> RawRecord ! {closed, timeout, decode_error, io} {
 /// A PLAINTEXT record (§5.1): type, legacy version 0x0303, uint16
 /// length, payload — the framing the ClientHello rides (everything
 /// after ServerHello is sc20's sealed framing).
-fn plaintext_record(content_type: int, payload: List[int]) -> List[int] {
+fn plaintext_record(content_type: int, payload: List[byte]) -> List[byte] {
     assert(payload.len <= 16384, "tls.client: plaintext record over 2^14")
-    var out = List[int]()
-    (mut out).push(content_type)
-    (mut out).push(3)
-    (mut out).push(3)
-    (mut out).push(payload.len / 256 % 256)
-    (mut out).push(payload.len % 256)
+    var out = List[byte]()
+    (mut out).push(content_type as byte)
+    (mut out).push(3 as byte)
+    (mut out).push(3 as byte)
+    (mut out).push((payload.len / 256 % 256) as byte)
+    (mut out).push((payload.len % 256) as byte)
     for b in payload {
-        require_byte(b)
         (mut out).push(b)
     }
     out
@@ -855,7 +834,7 @@ fn plaintext_record(content_type: int, payload: List[int]) -> List[int] {
 
 /// Whether `chain` validates against the single `anchor` (a probe —
 /// the tag is re-derived by the real validation afterwards).
-fn chain_validates(chain: List[int], hostname: str, anchor: List[int], now: int) -> bool {
+fn chain_validates(chain: List[byte], hostname: str, anchor: List[byte], now: int) -> bool {
     let probe = cert.validate_chain(chain, hostname, anchor, now) else |_| {
         return false
     }
@@ -867,7 +846,7 @@ fn chain_validates(chain: List[int], hostname: str, anchor: List[int], now: int)
 /// validation against the choice re-derives the FIRST anchor's named
 /// rejection deterministically. `anchors` is concatenated DER roots
 /// (DER is self-delimiting; `cert.cert_end` finds each boundary).
-fn pick_anchor(chain: List[int], hostname: str, anchors: List[int], now: int) -> int ! {der} {
+fn pick_anchor(chain: List[byte], hostname: str, anchors: List[byte], now: int) -> int ! {der} {
     let n = anchors.len
     if n == 0 {
         return der
@@ -893,11 +872,11 @@ fn pick_anchor(chain: List[int], hostname: str, anchors: List[int], now: int) ->
 /// scalar it carries is exactly as secret as the caller's own copy.
 pub struct Pending {
     fd: int,
-    scalar: List[int],
+    scalar: List[byte],
     hostname: str,
-    anchors: List[int],
+    anchors: List[byte],
     now: int,
-    transcript: List[int],
+    transcript: List[byte],
 }
 
 /// PHASE ONE: take ownership of a connected socket (the CALLER dialed
@@ -930,22 +909,13 @@ pub struct Pending {
 pub fn begin(
     take sock: net.Socket,
     hostname: str,
-    anchors: List[int],
+    anchors: List[byte],
     now: int,
-    client_random: List[int],
-    key_seed: List[int],
+    client_random: List[byte],
+    key_seed: List[byte],
 ) -> Pending ! {closed, io} {
     assert(client_random.len == 32, "tls.client: random must be 32 bytes")
     assert(key_seed.len == 32, "tls.client: key seed must be 32 bytes")
-    for b in client_random {
-        require_byte(b)
-    }
-    for b in key_seed {
-        require_byte(b)
-    }
-    for b in anchors {
-        require_byte(b)
-    }
     let fd = sock.fd
     let share = curve25519.x25519_base(key_seed)
     var groups = List[int]()
@@ -954,16 +924,16 @@ pub fn begin(
     (mut schemes).push(scheme_ed25519())
     (mut schemes).push(scheme_ecdsa_p256_sha256())
     (mut schemes).push(scheme_rsa_pss_sha256())
-    var exts = List[int]()
+    var exts = List[byte]()
     handshake.transcript_add(mut exts, handshake.ext_server_name(hostname))
     handshake.transcript_add(mut exts, handshake.ext_supported_groups(groups))
     handshake.transcript_add(mut exts, handshake.ext_signature_algorithms(schemes))
     handshake.transcript_add(mut exts, handshake.ext_supported_versions_client())
     handshake.transcript_add(mut exts, handshake.ext_key_share_client_x25519(share))
-    var suites = List[int]()
-    (mut suites).push(19)
-    (mut suites).push(3)
-    let ch = handshake.client_hello(client_random, List[int](), suites, exts)
+    var suites = List[byte]()
+    (mut suites).push(19 as byte)
+    (mut suites).push(3 as byte)
+    let ch = handshake.client_hello(client_random, List[byte](), suites, exts)
     write_all(fd, plaintext_record(record.content_type_handshake(), copy ch))?
     Pending {
         fd: fd,
@@ -981,11 +951,11 @@ pub fn begin(
 /// ct: note); a forged `Client` misbehaves as rows, never traps.
 pub struct Client {
     fd: int,
-    write_key: List[int],
-    write_iv: List[int],
+    write_key: List[byte],
+    write_iv: List[byte],
     write_seq: int,
-    read_key: List[int],
-    read_iv: List[int],
+    read_key: List[byte],
+    read_iv: List[byte],
     read_seq: int,
 }
 
@@ -1048,7 +1018,7 @@ pub fn complete(take p: Pending) -> Client ! {
     var transcript = p.transcript
 
     // ---- ServerHello (plaintext) ----
-    var sh_msg = List[int]()
+    var sh_msg = List[byte]()
     var looking = true
     while looking {
         let rec = read_record(fd)?
@@ -1092,10 +1062,10 @@ pub fn complete(take p: Pending) -> Client ! {
     // CertificateVerify, Finished — reassembled from sealed records and
     // driven through the §4.1 state machine. ----
     var stage = handshake.hs_step(handshake.role_client(), 0, handshake.hs_server_hello())?
-    var hbuf = List[int]()
-    var chain = List[int]()
+    var hbuf = List[byte]()
+    var chain = List[byte]()
     var leaf_alg = ""
-    var leaf_key = List[int]()
+    var leaf_key = List[byte]()
     while stage < 5 {
         // Refill until one complete message is buffered.
         var need = true
@@ -1143,7 +1113,7 @@ pub fn complete(take p: Pending) -> Client ! {
             let mlen = 4 + hbuf[1] * 65536 + hbuf[2] * 256 + hbuf[3]
             let msg = sub(hbuf, 0, mlen)
             hbuf = sub(hbuf, mlen, hbuf.len)
-            let mtype = msg[0]
+            let mtype = msg[0] as int
             stage = handshake.hs_step(handshake.role_client(), stage, mtype)?
             if stage == 2 {
                 // EncryptedExtensions arrived.
@@ -1226,7 +1196,7 @@ pub fn complete(take p: Pending) -> Client ! {
 /// framing), `unexpected_message` (a plaintext record where sealed
 /// ones must ride), `io`. Never traps on wire data.
 /// ct: the AEAD open carries the read key through sc20/sc17.
-pub fn read(mut c: Client) -> List[int] ! {
+pub fn read(mut c: Client) -> List[byte] ! {
     closed,
     timeout,
     bad_record_mac,
@@ -1235,7 +1205,7 @@ pub fn read(mut c: Client) -> List[int] ! {
     io,
 } {
     var going = true
-    var out = List[int]()
+    var out = List[byte]()
     while going {
         let RawRecord { rtype, wire } = read_record(c.fd)?
         if rtype == 20 {
@@ -1272,20 +1242,18 @@ pub fn read(mut c: Client) -> List[int] ! {
 
 /// Seal `data` as one application-data record and send it.
 ///
-/// Rows: `invalid` — an element of `data` outside 0..255, checked
-/// BEFORE any sealing (the caller's data answers a row, §10; the byte
-/// tier's own tag, §14); `closed`, `io` — the transport's. The record
-/// sequence advances only on success.
+/// Rows: `invalid` — DECLARED AND UNREACHABLE FROM TYPED CODE since
+/// sc35. It named an element of `data` outside 0..255, checked before
+/// any sealing (the caller's data answers a row, §10; the byte tier's
+/// own tag, §14); a `List[byte]` cannot hold one, so the check is gone
+/// and the row stays in the vocabulary — the posture wolf-lang#231 took
+/// for the two byte-write builtins, adopted verbatim (§14): the row is
+/// still what an FFI caller's wrong-width list earns, and removing the
+/// tag would be a vocabulary change this rename is not.
+/// `closed`, `io` — the transport's. The record sequence advances only
+/// on success.
 /// ct: the seal carries the write key through sc20/sc17.
-pub fn write(mut c: Client, data: List[int]) -> () ! {closed, invalid, io} {
-    for b in data {
-        if b < 0 {
-            return invalid
-        }
-        if b > 255 {
-            return invalid
-        }
-    }
+pub fn write(mut c: Client, data: List[byte]) -> () ! {closed, invalid, io} {
     let rec = record.
         seal(
         copy c.write_key,
@@ -1308,9 +1276,9 @@ pub fn write(mut c: Client, data: List[int]) -> () ! {closed, invalid, io} {
 /// Rows: `io` — the socket close's. Never traps.
 /// ct: the final seal carries the write key; nothing else is secret.
 pub fn close(take c: Client) -> () ! {io} {
-    var alert = List[int]()
-    (mut alert).push(1)
-    (mut alert).push(0)
+    var alert = List[byte]()
+    (mut alert).push(1 as byte)
+    (mut alert).push(0 as byte)
     let rec = record.
         seal(c.write_key, c.write_iv, c.write_seq, record.content_type_alert(), alert, 0)
     write_all(c.fd, rec) else |_| {}
