@@ -5856,3 +5856,55 @@ with wolf's line 1 read as the dev identity and the pairing line
 (`lupin 0.1.23 … pin 8cda3aa`) reported and not gated (F-0064). If
 doctor gates the `+dev.` suffix in a way sc30's note did not record,
 that is the finding.
+
+### The measurement at the bump — ZERO movers, the prediction exact
+
+`cargo xtask ci` exit code **0**, `ci: GREEN`, **21:52:28 -> 22:20:25
+EDT**, the exit code read directly from the process and **not** through
+a pipe (the gauntlet's standing lesson). Over the untouched ledger:
+
+- `std-test: 376 test(s); forward tags: 697; conservatism ledger: 200
+  entries; unstable rows: 0; slow skips: 0; divergent rows: 0` —
+  `std-test: GREEN`. A row that answers DEEPER than its ledger claims
+  is a designed RED here, so a green run over an unedited
+  `tests/ledger.toml` IS the zero-motion measurement. The 200-entry
+  conservatism ledger is the per-lane counts summed and therefore
+  re-proves them arithmetically: 72 (lupin `unsupported`) + 75 (wolfc)
+  + 49 (native) + 2 + 2 (the `fail(E…)` pairs) = 200, the sc33 baseline
+  to the entry.
+- `ledger-check: 376 test(s), all ledgered`; `lint-conventions: 376
+  test(s), all conforming (5 rules)`; `doc-examples: 414 block(s),
+  GREEN`; `ulp: 200 reference row(s), GREEN` on all three lanes with
+  the standing 16-value libm note unchanged.
+- `sync-pin: PIN 31170d119379086f6242cd88d4f4e5386f6aef23` /
+  `sync-pin: snapshot == submodule at pin — OK`. Anchors **415**.
+- **Doctor green, exit 0, and it reads the dev stamp exactly as sc30's
+  note predicted it would:**
+
+      doctor: lupin — /Users/…/.local/bin/lupin (source: PATH)
+              version: lupin 0.1.23
+              pin: 8cda3aa matches vendor/tools.toml — OK
+      doctor: wolf — /Users/…/.local/bin/wolf (source: PATH)
+              version: wolf 0.2.3+dev.31170d1
+              pairing: paired with lupin 0.1.23 (reference interpreter), pin 8cda3aa
+              pin: 31170d1 matches vendor/tools.toml — OK
+      doctor: native rung — libwolf_rt.a … (lane lit)
+
+  Both gates pass on a binary that claims no release. The pairing line
+  names the interpreter actually installed beside it, reported and not
+  gated (F-0064).
+
+**And #219's extension keys are live and confirmed unread**, which is
+the one prediction worth showing rather than asserting. A wolf
+`unsupported` record now reads:
+
+    {"commit":"31170d1", … ,"verdict":"unsupported","warnings":[],
+     "x-unsupported-construct":"this prelude container instantiation (generic data)",
+     "x-unsupported-span":[25,43]}
+
+Every `unsupported` record in the tree gained those two keys this bump
+— 124 of them on the wolf lanes — and `record::parse`'s key list does
+not contain either name, so all 124 changed shape and none could move.
+That is sc33's #55 lesson arriving a second time from a different
+implementation: **predict at both levels, and the level that decides is
+what your comparator reads.**
