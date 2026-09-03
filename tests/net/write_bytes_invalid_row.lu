@@ -1,15 +1,31 @@
-//! check: run(exit=1, stdout="handled: invalid\nerror: invalid")
-//! phase: run
-//! conforms: std.net, err.row, err.propagate, err.else
+//! check: fail(E0401)
+//! phase: typecheck
+//! conforms: std.net, ty.byte
 //!
-//! `write_bytes`' `invalid` row: an element outside 0..255 is rejected
-//! by name BEFORE anything reaches the wire — the same pre-write check
-//! and the same tag as `fs.write_bytes` (§14's os-tier vocabulary).
-//! Handler witness first, then the `?` ride-out so the toolchain names
-//! the tag. The socket carries nothing afterwards: the reject is whole,
-//! not a truncation.
+//! **THE ROW IS DECLARED AND UNREACHABLE FROM TYPED CODE (sc35), AND
+//! THIS FILE IS THE WITNESS THAT SAYS SO.** It used to pin the `invalid`
+//! row being RAISED: the byte currency was `List[int]` (§11's recorded
+//! interim), so a caller could spell an element that is not a byte and
+//! the builtin tier answered `invalid` rather than writing something the
+//! caller did not mean. s136 (wolf-lang#231) moved the eight byte
+//! builtins to `List[byte]` and sc35 renamed std's byte tier onto them,
+//! so **a `List[byte]` cannot hold 300 or -1** and this program is
+//! REFUSED at `typecheck` with **E0401** — one phase earlier and with
+//! the fix in the diagnostic's own words.
 //!
-//! Lanes: the byte tier is compiler-lanes-only at this pin (F-0102).
+//! **The `invalid` tag STAYS DECLARED on both byte writes**, which is
+//! deliberate and is upstream's own posture adopted verbatim (#231: "the
+//! vocabulary is stable, an FFI caller's wrong-width list still earns
+//! it, typed code can no longer reach it"). Removing the tag would be a
+//! vocabulary change, and §14 says the row vocabulary is the
+//! toolchain's. So the honest record is: the tag is real, the row is
+//! unreachable through the type, and the program that used to reach it
+//! does not compile.
+//!
+//! **The lupin lane DIVERGES**: 0.1.23 is dynamically typed and has no
+//! `byte`, so it runs this program where both compilers refuse it —
+//! `divergent(exit(…))`, F-0098's word for exactly this shape, retiring
+//! when is36 ships a lupin carrying `[type.byte]`. See F-0108.
 
 use std.net
 
@@ -17,7 +33,7 @@ fn main() -> !int {
     var srv = net.listen(net.loopback(0))?
     let p = net.port(srv)?
     var cli = net.connect(net.loopback(p))?
-    var bad = List[int]()
+    var bad = List[byte]()
     (mut bad).push(65)
     (mut bad).push(256)
     net.write_bytes(mut cli, bad) else |e| match e {
@@ -25,7 +41,7 @@ fn main() -> !int {
         invalid => { print("handled: invalid") },
         io => { print("handled: io") },
     }
-    var worse = List[int]()
+    var worse = List[byte]()
     (mut worse).push(0 - 1)
     net.write_bytes(mut cli, worse)?
     print("unreachable")

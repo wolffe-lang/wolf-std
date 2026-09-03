@@ -1,34 +1,36 @@
-//! check: run(exit=1, stdout="handled: refused\nerror: invalid")
-//! phase: run
-//! conforms: std.fs, err.row, err.propagate, err.else
+//! check: fail(E0401)
+//! phase: typecheck
+//! conforms: std.fs, ty.byte
 //!
-//! The `invalid` litmus — the second tag s90 added here — witnessed the
-//! same way `not_found` and `exists` are: an `else` that handles it, and
-//! a `?` that rides it out of `main` so the RECORD names the tag rather
-//! than this repository asserting its own reading of it.
+//! **THE ROW IS DECLARED AND UNREACHABLE FROM TYPED CODE (sc35), AND
+//! THIS FILE IS THE WITNESS THAT SAYS SO.** It used to pin the `invalid`
+//! row being RAISED: the byte currency was `List[int]` (§11's recorded
+//! interim), so a caller could spell an element that is not a byte and
+//! the builtin tier answered `invalid` rather than writing something the
+//! caller did not mean. s136 (wolf-lang#231) moved the eight byte
+//! builtins to `List[byte]` and sc35 renamed std's byte tier onto them,
+//! so **a `List[byte]` cannot hold 300 or -1** and this program is
+//! REFUSED at `typecheck` with **E0401** — one phase earlier and with
+//! the fix in the diagnostic's own words.
 //!
-//! What `invalid` means and why it is a row at all: the byte currency is
-//! `List[int]` (§11's recorded interim), so a caller can spell an element
-//! that is not a byte, and the builtin tier answers `invalid` rather than
-//! writing something the caller did not mean. §11's encoder rule has
-//! `hex.encode` TRAP on the same input, and the difference is decided by
-//! §14, which is the stronger rule for an os module: the row vocabulary
-//! is the toolchain's, adopted verbatim, and a library that traps where
-//! the toolchain raises has taken a decision away from its caller.
+//! **The `invalid` tag STAYS DECLARED on both byte writes**, which is
+//! deliberate and is upstream's own posture adopted verbatim (#231: "the
+//! vocabulary is stable, an FFI caller's wrong-width list still earns
+//! it, typed code can no longer reach it"). Removing the tag would be a
+//! vocabulary change, and §14 says the row vocabulary is the
+//! toolchain's. So the honest record is: the tag is real, the row is
+//! unreachable through the type, and the program that used to reach it
+//! does not compile.
 //!
-//! Both directions of the range are here — a negative element and one
-//! above 255 — because "is not a byte" has two edges and a check written
-//! for one of them is a check that passes the other.
-//!
-//! `copy_file` cannot raise this tag and does not declare it: its bytes
-//! came out of `read_bytes` and are bytes by construction. That absence
-//! is a signature, not an omission, and `std.fs`'s doc says so on both
-//! functions.
+//! **The lupin lane DIVERGES**: 0.1.23 is dynamically typed and has no
+//! `byte`, so it runs this program where both compilers refuse it —
+//! `divergent(exit(…))`, F-0098's word for exactly this shape, retiring
+//! when is36 ships a lupin carrying `[type.byte]`. See F-0108.
 
 use std.fs
 
 fn main() -> !int {
-    var high = List[int]()
+    var high = List[byte]()
     (mut high).push(119)
     (mut high).push(256)
     var handled = "not-handled"
@@ -36,7 +38,7 @@ fn main() -> !int {
         handled = "refused"
     }
     print("handled: {handled}")
-    var low = List[int]()
+    var low = List[byte]()
     (mut low).push(0 - 1)
     fs.write_bytes("invalid-row.bin", low)?
     print("unreachable")
