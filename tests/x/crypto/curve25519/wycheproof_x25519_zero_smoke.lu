@@ -17,8 +17,8 @@ use std.hex
 use std.x.crypto.curve25519
 
 fn zero_verdict(priv_hex: str, pub_hex: str) -> int {
-    let sk = hex.decode(priv_hex) else List[int]()
-    let pk = hex.decode(pub_hex) else List[int]()
+    let sk = hex.decode(priv_hex) else List[byte]()
+    let pk = hex.decode(pub_hex) else List[byte]()
     let out = curve25519.x25519(sk, pk) else |_| {
         return -1
     }

@@ -10,7 +10,7 @@
 
 use std.hex
 
-fn same(a: List[int], b: List[int]) -> bool {
+fn same(a: List[byte], b: List[byte]) -> bool {
     if a.len == b.len {} else {
         return false
     }
@@ -25,18 +25,18 @@ fn same(a: List[int], b: List[int]) -> bool {
 }
 
 fn main() -> !int {
-    var empty = List[int]()
+    var empty = List[byte]()
     if hex.encode(empty) == "" {} else { return 1 }
     if same(hex.decode("") else copy empty, empty) {} else { return 2 }
-    var edges = List[int]()
-    (mut edges).push(0)
-    (mut edges).push(1)
-    (mut edges).push(15)
-    (mut edges).push(16)
-    (mut edges).push(127)
-    (mut edges).push(128)
-    (mut edges).push(254)
-    (mut edges).push(255)
+    var edges = List[byte]()
+    (mut edges).push(0 as byte)
+    (mut edges).push(1 as byte)
+    (mut edges).push(15 as byte)
+    (mut edges).push(16 as byte)
+    (mut edges).push(127 as byte)
+    (mut edges).push(128 as byte)
+    (mut edges).push(254 as byte)
+    (mut edges).push(255 as byte)
     if hex.encode(edges) == "00010f107f80feff" {} else { return 3 }
     if hex.encode_upper(edges) == "00010F107F80FEFF" {} else { return 4 }
     let back = hex.decode(hex.encode(edges)) else copy empty
@@ -44,10 +44,10 @@ fn main() -> !int {
     let back_upper = hex.decode(hex.encode_upper(edges)) else copy empty
     if same(back_upper, edges) {} else { return 6 }
     // Every byte value, both directions.
-    var all = List[int]()
+    var all = List[byte]()
     var i: int = 0
     while i < 256 {
-        (mut all).push(i)
+        (mut all).push(i as byte)
         i = i + 1
     }
     let text = hex.encode(all)
@@ -60,7 +60,7 @@ fn main() -> !int {
     // Case is not significant on the way in.
     let mixed = hex.decode("AbCd") else copy empty
     if mixed.len == 2 {} else { return 10 }
-    if mixed[0] == 171 {} else { return 11 }
-    if mixed[1] == 205 {} else { return 12 }
+    if mixed[0] == 171 as byte {} else { return 11 }
+    if mixed[1] == 205 as byte {} else { return 12 }
     0
 }

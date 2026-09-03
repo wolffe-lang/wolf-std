@@ -19,8 +19,8 @@
 use std.hex
 use std.x.crypto.p256
 
-fn b(h: str) -> List[int] {
-    hex.decode(h) else List[int]()
+fn b(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
 }
 
 fn bad_ders() -> List[str] {
@@ -50,12 +50,12 @@ fn bad_ders() -> List[str] {
     out
 }
 
-fn dummy_key() -> List[int] {
-    var k = List[int]()
-    (mut k).push(4)
+fn dummy_key() -> List[byte] {
+    var k = List[byte]()
+    (mut k).push(4 as byte)
     var i = 0
     while i < 64 {
-        (mut k).push(1)
+        (mut k).push(1 as byte)
         i = i + 1
     }
     k

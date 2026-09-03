@@ -16,7 +16,7 @@ use std.hex
 use std.x.crypto.sha2
 
 fn digest_matches(msg_hex: str, want: str) -> bool {
-    let msg = hex.decode(msg_hex) else List[int]()
+    let msg = hex.decode(msg_hex) else List[byte]()
     sha2.to_hex(sha2.sum384(msg)) == want
 }
 

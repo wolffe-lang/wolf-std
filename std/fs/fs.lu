@@ -24,10 +24,15 @@
 //!   rather than a failure (the fd tier only)
 //! - `exists` — the path is already there and the operation demanded to
 //!   create it (`create_dir`, and nothing else here)
-//! - `invalid` — a `List[int]` element that is not a byte (outside
-//!   0..255) was offered to a byte write. It is the WRITE's spelling of
-//!   the refusal `str_from_utf8` makes on the way in: writing is not
-//!   decoding, so `utf8` would be a lie
+//! - `invalid` — DECLARED AND UNREACHABLE FROM TYPED CODE since sc35.
+//!   It named a `List[int]` element that is not a byte (outside 0..255)
+//!   offered to a byte write — the WRITE's spelling of the refusal
+//!   `str_from_utf8` makes on the way in (writing is not decoding, so
+//!   `utf8` would be a lie). The byte writes take `List[byte]` now, so
+//!   no typed caller can build the argument that raises it; the tag
+//!   stays in the vocabulary because §14 says the vocabulary is the
+//!   toolchain's and an FFI caller's wrong-width list still earns it
+//!   (wolf-lang#231's own posture, adopted verbatim)
 //! - `cross_device` — declared by `fs_rename` and never raised by this
 //!   module: `move_file` HANDLES it, which is what the fallback below is
 //!   for
@@ -278,18 +283,18 @@ pub fn append_text(path: str, text: str) -> () ! {not_found, denied, io} {
 /// `fs_read_bytes`.
 ///
 /// ```wolf-doc-example
-/// var raw = List[int]()
-/// (mut raw).push(128)
-/// (mut raw).push(0)
-/// (mut raw).push(255)
+/// var raw = List[byte]()
+/// (mut raw).push(128 as byte)
+/// (mut raw).push(0 as byte)
+/// (mut raw).push(255 as byte)
 /// fs.write_bytes("doc-read-bytes.tmp", raw)?
-/// let back = fs.read_bytes("doc-read-bytes.tmp") else List[int]()
+/// let back = fs.read_bytes("doc-read-bytes.tmp") else List[byte]()
 /// back.len == 3
-/// back[0] == 128
-/// back[2] == 255
+/// back[0] as int == 128
+/// back[2] as int == 255
 /// fs.remove("doc-read-bytes.tmp")?
 /// ```
-pub fn read_bytes(path: str) -> List[int] ! {not_found, denied, io} {
+pub fn read_bytes(path: str) -> List[byte] ! {not_found, denied, io} {
     fs_read_bytes(path)?
 }
 
@@ -298,19 +303,25 @@ pub fn read_bytes(path: str) -> List[int] ! {not_found, denied, io} {
 ///
 /// Rows: `not_found` when the path's parent directory does not exist,
 /// `denied` when the host refuses, `io` for any other host failure, and
-/// **`invalid` when an element of `b` is not a byte** — outside 0..255,
-/// which the interim `List[int]` currency (§11) makes spellable. Never
-/// traps.
+/// **`invalid` — declared and UNREACHABLE from typed code (sc35).** It
+/// named an element of `b` that is not a byte (outside 0..255), which
+/// the interim `List[int]` currency (§11) made spellable; `b` is a
+/// `List[byte]` now and cannot hold one. Never traps.
 ///
-/// That last row is a deliberate departure from §11's encoder rule,
-/// which has `hex.encode` TRAP on an element out of range. The rule
-/// there is that a caller who hands an encoder a non-byte violated a
-/// contract it could have checked; the rule here is §14's, which is
-/// stronger for an os module and wins: the row vocabulary is the
-/// toolchain's, adopted verbatim, and the builtin answers `invalid`.
-/// A caller who would rather trap can check the elements first;
-/// a library that traps where the toolchain raises has taken a decision
-/// away from its caller.
+/// The tag is not removed, and that is deliberate: §14 says the row
+/// vocabulary is the toolchain's, `fs_write_bytes` still declares
+/// `invalid` (wolf-lang#231 kept it on purpose — an FFI caller's
+/// wrong-width list still earns it), and dropping a tag a caller may
+/// have written a handler for is a breaking change this rename is not.
+/// The witness moved with the contract: `tests/fs/invalid_row.lu` is a
+/// static E0401 rejection now.
+///
+/// The row was a deliberate departure from §11's encoder rule, which
+/// has `hex.encode` TRAP on an element out of range — and at sc35 both
+/// halves of that disagreement are moot, because neither door can be
+/// reached. The reasoning is kept because it is still the rule for the
+/// next row: a library that traps where the toolchain raises has taken
+/// a decision away from its caller.
 ///
 /// Not atomic, exactly as `write_text` is not.
 ///
@@ -318,20 +329,15 @@ pub fn read_bytes(path: str) -> List[int] ! {not_found, denied, io} {
 /// `fs_write_bytes`.
 ///
 /// ```wolf-doc-example
-/// var raw = List[int]()
-/// (mut raw).push(119)
-/// (mut raw).push(0)
-/// (mut raw).push(102)
+/// var raw = List[byte]()
+/// (mut raw).push(119 as byte)
+/// (mut raw).push(0 as byte)
+/// (mut raw).push(102 as byte)
 /// fs.write_bytes("doc-write-bytes.tmp", raw)?
 /// (fs.size("doc-write-bytes.tmp") else 0 - 1) == 3
-/// var bad = List[int]()
-/// (mut bad).push(300)
-/// var refused = false
-/// fs.write_bytes("doc-write-bytes.tmp", bad) else |_| { refused = true }
-/// refused == true
 /// fs.remove("doc-write-bytes.tmp")?
 /// ```
-pub fn write_bytes(path: str, b: List[int]) -> () ! {not_found, denied, invalid, io} {
+pub fn write_bytes(path: str, b: List[byte]) -> () ! {not_found, denied, invalid, io} {
     fs_write_bytes(path, b)?
 }
 
@@ -897,13 +903,13 @@ pub fn read(mut f: File, max: int) -> str ! {eof, io, utf8} {
 /// fs.write(mut w, "wolf")?
 /// fs.close(take w)?
 /// var f = fs.open("doc-read-chunk.tmp")?
-/// let head = fs.read_chunk(mut f, 2) else List[int]()
+/// let head = fs.read_chunk(mut f, 2) else List[byte]()
 /// head.len == 2
-/// head[0] == 119
+/// head[0] as int == 119
 /// fs.close(take f)?
 /// fs.remove("doc-read-chunk.tmp")?
 /// ```
-pub fn read_chunk(mut f: File, max: int) -> List[int] ! {eof, io} {
+pub fn read_chunk(mut f: File, max: int) -> List[byte] ! {eof, io} {
     fs_read_chunk(f.fd, max)?
 }
 
@@ -953,16 +959,16 @@ pub fn write(mut f: File, text: str) -> () ! {io} {
 /// `fs_write_chunk`.
 ///
 /// ```wolf-doc-example
-/// var raw = List[int]()
-/// (mut raw).push(128)
-/// (mut raw).push(255)
+/// var raw = List[byte]()
+/// (mut raw).push(128 as byte)
+/// (mut raw).push(255 as byte)
 /// var f = fs.create("doc-write-chunk.tmp")?
 /// fs.write_chunk(mut f, raw)?
 /// fs.close(take f)?
 /// (fs.size("doc-write-chunk.tmp") else 0 - 1) == 2
 /// fs.remove("doc-write-chunk.tmp")?
 /// ```
-pub fn write_chunk(mut f: File, b: List[int]) -> () ! {invalid, io} {
+pub fn write_chunk(mut f: File, b: List[byte]) -> () ! {invalid, io} {
     fs_write_chunk(f.fd, b)?
 }
 

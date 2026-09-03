@@ -1,0 +1,41 @@
+//! check: fail(E0401)
+//! phase: typecheck
+//! conforms: std.x.tls.cert, ty.byte
+//!
+//! **THE CONTRACT MOVED INTO THE TYPE, SO THE WITNESS MOVED WITH IT
+//! (sc35).** This file used to pin a RUNTIME trap: the byte currency was
+//! `List[int]` (§11's interim, F-0035), a caller could spell an element
+//! outside 0..255, and the module's ingestion guard trapped `assert`
+//! before the value could be used. s136 (wolf-lang#231) moved the eight
+//! byte builtins to `List[byte]` and sc35 renamed std's byte tier onto
+//! them, so a `List[byte]` CANNOT HOLD a non-byte and the guard was
+//! unreachable code — deleted rather than left as decoration. The
+//! contract is not weaker; it is enforced one layer down and one phase
+//! earlier. The program below is unchanged in shape and is now REFUSED
+//! at `typecheck` with **E0401**, whose note names the fix in the
+//! language's own words (`b as int`, or narrow this side with
+//! `as byte`). The sc28 precedent is exact: when a discipline becomes
+//! static, the DIRECTIVE modernizes and the file loses a name that
+//! promised the old outcome (`use_after_final_trap.lu` ->
+//! `use_after_final.lu`, §13's name-promise).
+//!
+//! **The lupin lane DIVERGES here and the divergence is the point.**
+//! lupin 0.1.23 is dynamically typed and has no `byte`, so it executes
+//! this program to its honest end where both compilers refuse it. That
+//! is `divergent(exit(…))` in the ledger — F-0098's word, used for
+//! exactly this shape (a static rejection on the compiler lanes against
+//! an honest dynamic run on the interpreter) — and it retires the day
+//! is36 ships a lupin that carries `[type.byte]`. See F-0108.
+
+use std.x.tls.cert
+
+fn main() -> int {
+    var b = List[byte]()
+    (mut b).push(48)
+    (mut b).push(300)
+    let c = cert.parse(b) else |_| {
+        return 1
+    }
+    print("unreachable: {c.version}")
+    0
+}

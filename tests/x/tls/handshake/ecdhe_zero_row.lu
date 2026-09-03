@@ -15,13 +15,13 @@ use std.x.tls.handshake as hs
 
 fn main() -> !int {
     let private = "alice's own 32-byte x25519 key!!".bytes()
-    var zero_peer = List[int]()
+    var zero_peer = List[byte]()
     var i = 0
     while i < 32 {
-        (mut zero_peer).push(0)
+        (mut zero_peer).push(0 as byte)
         i = i + 1
     }
-    let fallback = hs.ecdhe_shared(private, zero_peer) else List[int]()
+    let fallback = hs.ecdhe_shared(private, zero_peer) else List[byte]()
     print("witness: fallback empty")
     if !(fallback.len == 0) {
         print("LEAK: {fallback.len}")

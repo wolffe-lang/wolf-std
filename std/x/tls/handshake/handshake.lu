@@ -78,9 +78,9 @@
 //! key derivation (`record.extract`/`derive_secret`/`traffic_key`/
 //! `traffic_iv`/`finished_key`); this module produces the transcript
 //! hashes and shared secret those functions take as inputs, drives the
-//! flow, and hands sc20 the traffic keys. Byte sequences are `List[int]`
-//! with the 0..255 element contract (§11's interim, F-0035), the
-//! sha2/chacha20/record convention.
+//! flow, and hands sc20 the traffic keys. Byte sequences are
+//! `List[byte]` (sc35 — the 0..255 element contract is the TYPE's now,
+//! F-0035 discharged), the sha2/chacha20/record convention.
 //!
 //! **The ws05-consumable seam (FROZEN).** A completed handshake yields a
 //! `HandshakeResult`: the negotiated `cipher_suite`, the four traffic
@@ -120,63 +120,50 @@ use std.x.crypto.curve25519
 // lengths are public so no wrapping domain is needed.
 // ---------------------------------------------------------------------
 
-/// The 0..255 ingestion guard (§11's `List[int]` byte contract).
-/// ct: NOT free of value-dependent branches — the recorded ct exception
-/// shared verbatim with sha2/chacha20/record (it leaves with F-0035's
-/// real byte type). Runs only on public message bytes here.
-fn require_byte(v: int) {
-    if v < 0 {
-        assert(false, "tls.handshake: element outside 0..255")
-    }
-    if v > 255 {
-        assert(false, "tls.handshake: element outside 0..255")
-    }
-}
-
-/// Append every element of `src` onto `out`, guarding the 0..255
-/// contract.
-fn push_all(mut out: List[int], src: List[int]) {
+/// Append every element of `src` onto `out`. It used to guard the
+/// 0..255 contract on every element; since sc35 the element TYPE holds
+/// it.
+fn push_all(mut out: List[byte], src: List[byte]) {
     for b in src {
-        require_byte(b)
         (mut out).push(b)
     }
 }
 
 /// A big-endian `uint16` as two bytes.
-fn u16(v: int) -> List[int] {
+fn u16(v: int) -> List[byte] {
     assert(v >= 0, "tls.handshake: negative uint16")
     assert(v <= 65535, "tls.handshake: value exceeds uint16")
-    var out = List[int]()
-    (mut out).push(v / 256 % 256)
-    (mut out).push(v % 256)
+    var out = List[byte]()
+    (mut out).push((v / 256 % 256) as byte)
+    (mut out).push((v % 256) as byte)
     out
 }
 
 /// A big-endian `uint24` as three bytes.
-fn u24(v: int) -> List[int] {
+fn u24(v: int) -> List[byte] {
     assert(v >= 0, "tls.handshake: negative uint24")
     assert(v <= 16777215, "tls.handshake: value exceeds uint24")
-    var out = List[int]()
-    (mut out).push(v / 65536 % 256)
-    (mut out).push(v / 256 % 256)
-    (mut out).push(v % 256)
+    var out = List[byte]()
+    (mut out).push((v / 65536 % 256) as byte)
+    (mut out).push((v / 256 % 256) as byte)
+    (mut out).push((v % 256) as byte)
     out
 }
 
 /// `data` prefixed with a single length byte (`opaque X<0..255>`).
-fn u8_prefixed(data: List[int]) -> List[int] {
+fn u8_prefixed(data: List[byte]) -> List[byte] {
     let n = data.len
     assert(n <= 255, "tls.handshake: u8-prefixed vector exceeds 255")
-    var out = List[int]()
-    (mut out).push(n)
+    var out = List[byte]()
+    (mut out).push(n as byte)
     push_all(mut out, data)
     out
 }
 
 /// `data` prefixed with a big-endian `uint16` length (`opaque
 /// X<0..2^16-1>`).
-fn u16_prefixed(data: List[int]) -> List[int] {
-    var out = List[int]()
+fn u16_prefixed(data: List[byte]) -> List[byte] {
+    var out = List[byte]()
     push_all(mut out, u16(data.len))
     push_all(mut out, data)
     out
@@ -184,8 +171,8 @@ fn u16_prefixed(data: List[int]) -> List[int] {
 
 /// `data` prefixed with a big-endian `uint24` length (`opaque
 /// X<0..2^24-1>`).
-fn u24_prefixed(data: List[int]) -> List[int] {
-    var out = List[int]()
+fn u24_prefixed(data: List[byte]) -> List[byte] {
+    var out = List[byte]()
     push_all(mut out, u24(data.len))
     push_all(mut out, data)
     out
@@ -194,8 +181,8 @@ fn u24_prefixed(data: List[int]) -> List[int] {
 /// `a` followed by `b` — the byte-sequence concatenation the callers and
 /// the transcript build on.
 /// ct: public structure only.
-pub fn concat(a: List[int], b: List[int]) -> List[int] {
-    var out = List[int]()
+pub fn concat(a: List[byte], b: List[byte]) -> List[byte] {
+    var out = List[byte]()
     push_all(mut out, a)
     push_all(mut out, b)
     out
@@ -230,10 +217,11 @@ pub fn hs_finished() -> int { 20 }
 /// length of `body`, then `body` (§4). This is the exact wire message
 /// the transcript hashes (header included).
 /// ct: public structure only.
-pub fn handshake(msg_type: int, body: List[int]) -> List[int] {
-    require_byte(msg_type)
-    var out = List[int]()
-    (mut out).push(msg_type)
+pub fn handshake(msg_type: int, body: List[byte]) -> List[byte] {
+    assert(msg_type >= 0, "tls.handshake: message type outside 0..255")
+    assert(msg_type <= 255, "tls.handshake: message type outside 0..255")
+    var out = List[byte]()
+    (mut out).push(msg_type as byte)
     push_all(mut out, u24(body.len))
     push_all(mut out, body)
     out
@@ -248,8 +236,8 @@ pub fn handshake(msg_type: int, body: List[int]) -> List[int] {
 /// One Extension: `extension_type` (uint16) then a uint16-length-prefixed
 /// `extension_data`.
 /// ct: public structure only.
-pub fn ext(extension_type: int, data: List[int]) -> List[int] {
-    var out = List[int]()
+pub fn ext(extension_type: int, data: List[byte]) -> List[byte] {
+    var out = List[byte]()
     push_all(mut out, u16(extension_type))
     push_all(mut out, u16_prefixed(data))
     out
@@ -258,29 +246,29 @@ pub fn ext(extension_type: int, data: List[int]) -> List[int] {
 /// server_name (0), a single host_name (§3 of RFC 6066): a
 /// ServerNameList of one ServerName `{ NameType host_name(0), HostName
 /// opaque<1..2^16-1> }`.
-pub fn ext_server_name(host: str) -> List[int] {
-    var name = List[int]()
-    (mut name).push(0)
+pub fn ext_server_name(host: str) -> List[byte] {
+    var name = List[byte]()
+    (mut name).push(0 as byte)
     push_all(mut name, u16_prefixed(str_bytes(host)))
     ext(0, u16_prefixed(name))
 }
 
 /// server_name (0) as the server's empty acknowledgement in
 /// EncryptedExtensions (§4.2.10): the extension_data is empty.
-pub fn ext_server_name_ack() -> List[int] {
-    ext(0, List[int]())
+pub fn ext_server_name_ack() -> List[byte] {
+    ext(0, List[byte]())
 }
 
 /// renegotiation_info (0xff01) with an empty renegotiated_connection
 /// (RFC 5746): a single zero length byte. TLS 1.3 carries it inertly.
-pub fn ext_renegotiation_info_empty() -> List[int] {
-    ext(65281, u8_prefixed(List[int]()))
+pub fn ext_renegotiation_info_empty() -> List[byte] {
+    ext(65281, u8_prefixed(List[byte]()))
 }
 
 /// supported_groups (0x000a, §4.2.7): a NamedGroupList, each group a
 /// big-endian uint16, uint16-length-prefixed.
-pub fn ext_supported_groups(groups: List[int]) -> List[int] {
-    var list = List[int]()
+pub fn ext_supported_groups(groups: List[int]) -> List[byte] {
+    var list = List[byte]()
     for g in groups {
         push_all(mut list, u16(g))
     }
@@ -288,8 +276,8 @@ pub fn ext_supported_groups(groups: List[int]) -> List[int] {
 }
 
 /// session_ticket (0x0023, RFC 5077) with an empty ticket.
-pub fn ext_session_ticket_empty() -> List[int] {
-    ext(35, List[int]())
+pub fn ext_session_ticket_empty() -> List[byte] {
+    ext(35, List[byte]())
 }
 
 /// key_share (0x0033, §4.2.8) for a ClientHello: a KeyShareClientHello =
@@ -297,8 +285,8 @@ pub fn ext_session_ticket_empty() -> List[int] {
 /// x25519(0x001d), key_exchange opaque<1..2^16-1> = the 32 point bytes
 /// }`.
 /// ct: the point bytes are public.
-pub fn ext_key_share_client_x25519(pubkey: List[int]) -> List[int] {
-    var entry = List[int]()
+pub fn ext_key_share_client_x25519(pubkey: List[byte]) -> List[byte] {
+    var entry = List[byte]()
     push_all(mut entry, u16(29))
     push_all(mut entry, u16_prefixed(pubkey))
     ext(51, u16_prefixed(entry))
@@ -307,8 +295,8 @@ pub fn ext_key_share_client_x25519(pubkey: List[int]) -> List[int] {
 /// key_share (0x0033, §4.2.8) for a ServerHello: a KeyShareServerHello =
 /// a single KeyShareEntry (NO client_shares vector wrapper).
 /// ct: the point bytes are public.
-pub fn ext_key_share_server_x25519(pubkey: List[int]) -> List[int] {
-    var entry = List[int]()
+pub fn ext_key_share_server_x25519(pubkey: List[byte]) -> List[byte] {
+    var entry = List[byte]()
     push_all(mut entry, u16(29))
     push_all(mut entry, u16_prefixed(pubkey))
     ext(51, entry)
@@ -317,20 +305,20 @@ pub fn ext_key_share_server_x25519(pubkey: List[int]) -> List[int] {
 /// supported_versions (0x002b, §4.2.1) for a ClientHello: a
 /// uint8-length-prefixed list of ProtocolVersions, here the single
 /// TLS 1.3 (0x0304).
-pub fn ext_supported_versions_client() -> List[int] {
+pub fn ext_supported_versions_client() -> List[byte] {
     ext(43, u8_prefixed(u16(772)))
 }
 
 /// supported_versions (0x002b, §4.2.1) for a ServerHello: the single
 /// selected_version (0x0304), NOT length-prefixed.
-pub fn ext_supported_versions_server() -> List[int] {
+pub fn ext_supported_versions_server() -> List[byte] {
     ext(43, u16(772))
 }
 
 /// signature_algorithms (0x000d, §4.2.3): a SignatureSchemeList, each
 /// scheme a big-endian uint16, uint16-length-prefixed.
-pub fn ext_signature_algorithms(schemes: List[int]) -> List[int] {
-    var list = List[int]()
+pub fn ext_signature_algorithms(schemes: List[int]) -> List[byte] {
+    var list = List[byte]()
     for s in schemes {
         push_all(mut list, u16(s))
     }
@@ -339,12 +327,12 @@ pub fn ext_signature_algorithms(schemes: List[int]) -> List[int] {
 
 /// psk_key_exchange_modes (0x002d, §4.2.9): a uint8-length-prefixed list
 /// of PskKeyExchangeMode bytes (0x01 = psk_dhe_ke).
-pub fn ext_psk_key_exchange_modes(modes: List[int]) -> List[int] {
+pub fn ext_psk_key_exchange_modes(modes: List[byte]) -> List[byte] {
     ext(45, u8_prefixed(modes))
 }
 
 /// record_size_limit (0x001c, RFC 8449): a single big-endian uint16.
-pub fn ext_record_size_limit(limit: int) -> List[int] {
+pub fn ext_record_size_limit(limit: int) -> List[byte] {
     ext(28, u16(limit))
 }
 
@@ -362,13 +350,13 @@ pub fn ext_record_size_limit(limit: int) -> List[int] {
 /// `cipher_suites` and `extensions` are the concatenated inner bytes.
 /// ct: every field is public.
 pub fn client_hello(
-    random: List[int],
-    session_id: List[int],
-    cipher_suites: List[int],
-    extensions: List[int],
-) -> List[int] {
+    random: List[byte],
+    session_id: List[byte],
+    cipher_suites: List[byte],
+    extensions: List[byte],
+) -> List[byte] {
     assert(random.len == 32, "tls.handshake: ClientHello random must be 32 bytes")
-    var body = List[int]()
+    var body = List[byte]()
     push_all(mut body, u16(771))
     push_all(mut body, random)
     push_all(mut body, u8_prefixed(session_id))
@@ -384,18 +372,18 @@ pub fn client_hello(
 /// extensions vector<6..2^16-1>.
 /// ct: every field is public (the server random is not a secret).
 pub fn server_hello(
-    random: List[int],
-    session_id: List[int],
+    random: List[byte],
+    session_id: List[byte],
     cipher_suite: int,
-    extensions: List[int],
-) -> List[int] {
+    extensions: List[byte],
+) -> List[byte] {
     assert(random.len == 32, "tls.handshake: ServerHello random must be 32 bytes")
-    var body = List[int]()
+    var body = List[byte]()
     push_all(mut body, u16(771))
     push_all(mut body, random)
     push_all(mut body, u8_prefixed(session_id))
     push_all(mut body, u16(cipher_suite))
-    (mut body).push(0)
+    (mut body).push(0 as byte)
     push_all(mut body, u16_prefixed(extensions))
     handshake(hs_server_hello(), body)
 }
@@ -403,7 +391,7 @@ pub fn server_hello(
 /// EncryptedExtensions (§4.3.1): the extensions vector<0..2^16-1>.
 /// `extensions` is the concatenated inner bytes.
 /// ct: public structure only.
-pub fn encrypted_extensions(extensions: List[int]) -> List[int] {
+pub fn encrypted_extensions(extensions: List[byte]) -> List[byte] {
     handshake(hs_encrypted_extensions(), u16_prefixed(extensions))
 }
 
@@ -413,11 +401,11 @@ pub fn encrypted_extensions(extensions: List[int]) -> List[int] {
 /// extensions Extension<0..2^16-1> = empty }`. `cert_der` is carried
 /// verbatim and never inspected (X.509 is sc22).
 /// ct: public structure; the DER is public.
-pub fn certificate(context: List[int], cert_der: List[int]) -> List[int] {
-    var entry = List[int]()
+pub fn certificate(context: List[byte], cert_der: List[byte]) -> List[byte] {
+    var entry = List[byte]()
     push_all(mut entry, u24_prefixed(cert_der))
-    push_all(mut entry, u16_prefixed(List[int]()))
-    var body = List[int]()
+    push_all(mut entry, u16_prefixed(List[byte]()))
+    var body = List[byte]()
     push_all(mut body, u8_prefixed(context))
     push_all(mut body, u24_prefixed(entry))
     handshake(hs_certificate(), body)
@@ -428,8 +416,8 @@ pub fn certificate(context: List[int], cert_der: List[int]) -> List[int] {
 /// verified here (see the module header — RSA-PSS/ECDSA verification is
 /// sc22); `certificate_verify_content` builds the octets it is over.
 /// ct: public structure; the signature is public wire material.
-pub fn certificate_verify(algorithm: int, signature: List[int]) -> List[int] {
-    var body = List[int]()
+pub fn certificate_verify(algorithm: int, signature: List[byte]) -> List[byte] {
+    var body = List[byte]()
     push_all(mut body, u16(algorithm))
     push_all(mut body, u16_prefixed(signature))
     handshake(hs_certificate_verify(), body)
@@ -442,15 +430,15 @@ pub fn certificate_verify(algorithm: int, signature: List[int]) -> List[int] {
 /// CertificateVerify. Built here for sc22 to verify against a real
 /// public key; this rung does NOT verify the signature.
 /// ct: public content (transcript hash is public).
-pub fn certificate_verify_content(context: str, transcript_hash: List[int]) -> List[int] {
-    var out = List[int]()
+pub fn certificate_verify_content(context: str, transcript_hash: List[byte]) -> List[byte] {
+    var out = List[byte]()
     var i = 0
     while i < 64 {
-        (mut out).push(32)
+        (mut out).push(32 as byte)
         i = i + 1
     }
     push_all(mut out, str_bytes(context))
-    (mut out).push(0)
+    (mut out).push(0 as byte)
     push_all(mut out, transcript_hash)
     out
 }
@@ -460,7 +448,7 @@ pub fn certificate_verify_content(context: str, transcript_hash: List[int]) -> L
 /// the verify_data.
 /// ct: the verify_data is derived from a secret via HMAC; the framing is
 /// public.
-pub fn finished_message(verify_data: List[int]) -> List[int] {
+pub fn finished_message(verify_data: List[byte]) -> List[byte] {
     handshake(hs_finished(), verify_data)
 }
 
@@ -475,14 +463,14 @@ pub fn finished_message(verify_data: List[int]) -> List[int] {
 
 /// A fresh, empty transcript.
 /// ct: no secret.
-pub fn transcript_new() -> List[int] {
-    List[int]()
+pub fn transcript_new() -> List[byte] {
+    List[byte]()
 }
 
 /// Append one handshake message's exact wire bytes (header included) to
 /// the running transcript, in order (§4.4.1).
 /// ct: public message bytes only.
-pub fn transcript_add(mut acc: List[int], msg: List[int]) {
+pub fn transcript_add(mut acc: List[byte], msg: List[byte]) {
     push_all(mut acc, msg)
 }
 
@@ -490,7 +478,7 @@ pub fn transcript_add(mut acc: List[int], msg: List[int]) {
 /// (§4.4.1). Feeds Derive-Secret (sc20's `record.derive_secret`) and
 /// Finished.
 /// ct: hashes public message bytes; the digest is public context.
-pub fn transcript_hash(acc: List[int]) -> List[int] {
+pub fn transcript_hash(acc: List[byte]) -> List[byte] {
     sha2.sum256(acc)
 }
 
@@ -508,11 +496,11 @@ pub fn transcript_hash(acc: List[int]) -> List[int] {
 
 /// A list of `n` zero bytes (the extract salt/IKM where there is no PSK
 /// or where the salt is Hash.length zeros).
-fn zeros(n: int) -> List[int] {
-    var out = List[int]()
+fn zeros(n: int) -> List[byte] {
+    var out = List[byte]()
     var i = 0
     while i < n {
-        (mut out).push(0)
+        (mut out).push(0 as byte)
         i = i + 1
     }
     out
@@ -520,18 +508,18 @@ fn zeros(n: int) -> List[int] {
 
 /// A single-element byte list (the null compression method, small
 /// literals).
-fn one(v: int) -> List[int] {
-    require_byte(v)
-    var out = List[int]()
-    (mut out).push(v)
+fn one(v: int) -> List[byte] {
+    assert(v >= 0, "tls.handshake: element outside 0..255")
+    assert(v <= 255, "tls.handshake: element outside 0..255")
+    var out = List[byte]()
+    (mut out).push(v as byte)
     out
 }
 
 /// The bytes of an ASCII `str`, guarding the byte contract.
-fn str_bytes(s: str) -> List[int] {
-    var out = List[int]()
+fn str_bytes(s: str) -> List[byte] {
+    var out = List[byte]()
     for b in s.bytes() {
-        require_byte(b)
         (mut out).push(b)
     }
     out
@@ -544,7 +532,7 @@ fn str_bytes(s: str) -> List[int] {
 /// ct: `private` is a secret scalar carried through curve25519's ladder
 /// (its `ct:` line holds the branch-free posture); the reject-on-zero is
 /// on the public output.
-pub fn ecdhe_shared(private: List[int], peer_public: List[int]) -> List[int] ! {zero} {
+pub fn ecdhe_shared(private: List[byte], peer_public: List[byte]) -> List[byte] ! {zero} {
     curve25519.x25519(private, peer_public) else |_| {
         return zero
     }
@@ -553,7 +541,7 @@ pub fn ecdhe_shared(private: List[int], peer_public: List[int]) -> List[int] ! {
 /// The early secret (§7.1): HKDF-Extract(0, 0) for the no-PSK handshake —
 /// salt and IKM both 32 zero bytes.
 /// ct: carried through record/sha2 HKDF.
-pub fn early_secret() -> List[int] {
+pub fn early_secret() -> List[byte] {
     record.extract(zeros(32), zeros(32))
 }
 
@@ -561,58 +549,58 @@ pub fn early_secret() -> List[int] {
 /// Derive-Secret(early, "derived", "") and IKM the (EC)DHE shared secret.
 /// `empty_hash` is SHA-256 of the empty string, the "derived" context.
 /// ct: `early`/`dh` are secret, carried through record/sha2.
-pub fn handshake_secret(early: List[int], dh: List[int]) -> List[int] {
-    let derived = record.derive_secret(early, "derived", sha2.sum256(List[int]()))
+pub fn handshake_secret(early: List[byte], dh: List[byte]) -> List[byte] {
+    let derived = record.derive_secret(early, "derived", sha2.sum256(List[byte]()))
     record.extract(derived, dh)
 }
 
 /// The master secret (§7.1): HKDF-Extract with salt
 /// Derive-Secret(handshake, "derived", "") and IKM 32 zero bytes.
 /// ct: `hs` is secret, carried through record/sha2.
-pub fn master_secret(hs: List[int]) -> List[int] {
-    let derived = record.derive_secret(hs, "derived", sha2.sum256(List[int]()))
+pub fn master_secret(hs: List[byte]) -> List[byte] {
+    let derived = record.derive_secret(hs, "derived", sha2.sum256(List[byte]()))
     record.extract(derived, zeros(32))
 }
 
 /// client_handshake_traffic_secret (§7.1): Derive-Secret(handshake,
 /// "c hs traffic", Transcript-Hash(ClientHello..ServerHello)).
 /// ct: `hs` is secret; the transcript hash is public.
-pub fn client_handshake_traffic(hs: List[int], th_ch_sh: List[int]) -> List[int] {
+pub fn client_handshake_traffic(hs: List[byte], th_ch_sh: List[byte]) -> List[byte] {
     record.derive_secret(hs, "c hs traffic", th_ch_sh)
 }
 
 /// server_handshake_traffic_secret (§7.1): Derive-Secret(handshake,
 /// "s hs traffic", Transcript-Hash(ClientHello..ServerHello)).
 /// ct: `hs` is secret; the transcript hash is public.
-pub fn server_handshake_traffic(hs: List[int], th_ch_sh: List[int]) -> List[int] {
+pub fn server_handshake_traffic(hs: List[byte], th_ch_sh: List[byte]) -> List[byte] {
     record.derive_secret(hs, "s hs traffic", th_ch_sh)
 }
 
 /// client_application_traffic_secret_0 (§7.1): Derive-Secret(master,
 /// "c ap traffic", Transcript-Hash(ClientHello..server Finished)).
 /// ct: `master` is secret; the transcript hash is public.
-pub fn client_application_traffic(master: List[int], th_sfin: List[int]) -> List[int] {
+pub fn client_application_traffic(master: List[byte], th_sfin: List[byte]) -> List[byte] {
     record.derive_secret(master, "c ap traffic", th_sfin)
 }
 
 /// server_application_traffic_secret_0 (§7.1): Derive-Secret(master,
 /// "s ap traffic", Transcript-Hash(ClientHello..server Finished)).
 /// ct: `master` is secret; the transcript hash is public.
-pub fn server_application_traffic(master: List[int], th_sfin: List[int]) -> List[int] {
+pub fn server_application_traffic(master: List[byte], th_sfin: List[byte]) -> List[byte] {
     record.derive_secret(master, "s ap traffic", th_sfin)
 }
 
 /// exporter_master_secret (§7.1): Derive-Secret(master, "exp master",
 /// Transcript-Hash(ClientHello..server Finished)).
 /// ct: `master` is secret; the transcript hash is public.
-pub fn exporter_master(master: List[int], th_sfin: List[int]) -> List[int] {
+pub fn exporter_master(master: List[byte], th_sfin: List[byte]) -> List[byte] {
     record.derive_secret(master, "exp master", th_sfin)
 }
 
 /// resumption_master_secret (§7.1): Derive-Secret(master, "res master",
 /// Transcript-Hash(ClientHello..client Finished)).
 /// ct: `master` is secret; the transcript hash is public.
-pub fn resumption_master(master: List[int], th_cfin: List[int]) -> List[int] {
+pub fn resumption_master(master: List[byte], th_cfin: List[byte]) -> List[byte] {
     record.derive_secret(master, "res master", th_cfin)
 }
 
@@ -627,7 +615,7 @@ pub fn resumption_master(master: List[int], th_cfin: List[int]) -> List[int] {
 /// Finished, the client's for the client Finished). `transcript_hash` is
 /// the running hash THROUGH the message before this Finished.
 /// ct: `base_secret` is secret, carried through record/sha2 HMAC.
-pub fn finished_verify_data(base_secret: List[int], transcript_hash: List[int]) -> List[int] {
+pub fn finished_verify_data(base_secret: List[byte], transcript_hash: List[byte]) -> List[byte] {
     let fk = record.finished_key(base_secret)
     sha2.hmac256(fk, transcript_hash)
 }
@@ -635,7 +623,7 @@ pub fn finished_verify_data(base_secret: List[int], transcript_hash: List[int]) 
 /// The complete Finished handshake message for a sender: frame the
 /// verify_data computed from `base_secret` over `transcript_hash`.
 /// ct: as `finished_verify_data`.
-pub fn finished_for(base_secret: List[int], transcript_hash: List[int]) -> List[int] {
+pub fn finished_for(base_secret: List[byte], transcript_hash: List[byte]) -> List[byte] {
     finished_message(finished_verify_data(base_secret, transcript_hash))
 }
 
@@ -647,17 +635,15 @@ pub fn finished_for(base_secret: List[int], transcript_hash: List[int]) -> List[
 /// ct: THE compare — accumulate-then-single-check, a c28 verification
 /// target. Loop bound and indices are public (the 32-byte digest length);
 /// the per-byte XOR touches secret-derived MAC bytes without branching.
-pub fn ct_eq(a: List[int], b: List[int]) -> bool {
+pub fn ct_eq(a: List[byte], b: List[byte]) -> bool {
     if a.len != b.len {
         return false
     }
     var diff = 0
     var i = 0
     while i < a.len {
-        let x = a[i]
-        let y = b[i]
-        require_byte(x)
-        require_byte(y)
+        let x = a[i] as int
+        let y = b[i] as int
         diff = ((diff as wrapping[u64]) | (x as wrapping[u64] ^ y as wrapping[u64])) as int
         i = i + 1
     }
@@ -671,7 +657,7 @@ pub fn ct_eq(a: List[int], b: List[int]) -> bool {
 /// no key material is exposed on the miss (the recompute leaks nothing the
 /// peer did not already send).
 /// ct: recompute is `finished_verify_data`; compare is `ct_eq`.
-pub fn verify_finished(base_secret: List[int], transcript_hash: List[int], received: List[int]) -> bool {
+pub fn verify_finished(base_secret: List[byte], transcript_hash: List[byte], received: List[byte]) -> bool {
     ct_eq(finished_verify_data(base_secret, transcript_hash), received)
 }
 
@@ -683,7 +669,7 @@ pub fn verify_finished(base_secret: List[int], transcript_hash: List[int], recei
 /// the miss). The state machine and the record layer continue their
 /// smuggling/confusion discipline through this named reject.
 /// ct: as `verify_finished`.
-pub fn accept_finished(base_secret: List[int], transcript_hash: List[int], received: List[int]) -> int ! {decrypt_error} {
+pub fn accept_finished(base_secret: List[byte], transcript_hash: List[byte], received: List[byte]) -> int ! {decrypt_error} {
     if verify_finished(base_secret, transcript_hash, received) {
         return 1
     }
@@ -774,12 +760,12 @@ pub fn hs_server_complete(stage: int) -> bool {
 /// ct: the secrets are carried; this is a value container only.
 pub struct HandshakeResult {
     cipher_suite: int,
-    client_handshake_secret: List[int],
-    server_handshake_secret: List[int],
-    client_application_secret: List[int],
-    server_application_secret: List[int],
-    exporter_master_secret: List[int],
-    resumption_master_secret: List[int],
+    client_handshake_secret: List[byte],
+    server_handshake_secret: List[byte],
+    client_application_secret: List[byte],
+    server_application_secret: List[byte],
+    exporter_master_secret: List[byte],
+    resumption_master_secret: List[byte],
 }
 
 /// Build the frozen ws05 result (the constructor — a module-qualified
@@ -791,12 +777,12 @@ pub struct HandshakeResult {
 /// ct: a value container; the secrets are carried, no branch on them.
 pub fn handshake_result(
     cipher_suite: int,
-    client_handshake_secret: List[int],
-    server_handshake_secret: List[int],
-    client_application_secret: List[int],
-    server_application_secret: List[int],
-    exporter_master_secret: List[int],
-    resumption_master_secret: List[int],
+    client_handshake_secret: List[byte],
+    server_handshake_secret: List[byte],
+    client_application_secret: List[byte],
+    server_application_secret: List[byte],
+    exporter_master_secret: List[byte],
+    resumption_master_secret: List[byte],
 ) -> HandshakeResult {
     HandshakeResult {
         cipher_suite: cipher_suite,
@@ -817,11 +803,11 @@ pub fn handshake_result(
 
 /// Lowercase hex of a byte list. ct: NOT constant-time (a rendering
 /// convenience for tests and vectors, never a secret-handling path).
-pub fn to_hex(b: List[int]) -> str {
+pub fn to_hex(b: List[byte]) -> str {
     let alphabet = "0123456789abcdef"
     var out = ""
-    for v in b {
-        require_byte(v)
+    for raw in b {
+        let v = raw as int
         let hi = v / 16
         let lo = v % 16
         let hd = alphabet[hi..hi + 1]

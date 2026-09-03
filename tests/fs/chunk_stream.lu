@@ -33,12 +33,12 @@ use std.fs
 
 fn main() -> !int {
     let p = "chunk.bin"
-    var raw = List[int]()
-    (mut raw).push(195)
-    (mut raw).push(169)
-    (mut raw).push(195)
-    (mut raw).push(169)
-    (mut raw).push(128)
+    var raw = List[byte]()
+    (mut raw).push(195 as byte)
+    (mut raw).push(169 as byte)
+    (mut raw).push(195 as byte)
+    (mut raw).push(169 as byte)
+    (mut raw).push(128 as byte)
     var w = fs.create(p)?
     fs.write_chunk(mut w, raw)?
     fs.close(take w)?
@@ -55,33 +55,28 @@ fn main() -> !int {
     var f = fs.open(p)?
     let a = fs.read_chunk(mut f, 2)?
     if a.len != 2 { return 3 }
-    if a[0] != 195 { return 4 }
-    if a[1] != 169 { return 5 }
+    if a[0] != 195 as byte { return 4 }
+    if a[1] != 169 as byte { return 5 }
     let b = fs.read_chunk(mut f, 2)?
     if b.len != 2 { return 6 }
     let tail = fs.read_chunk(mut f, 2)?
     if tail.len != 1 { return 7 }
-    if tail[0] != 128 { return 8 }
+    if tail[0] != 128 as byte { return 8 }
     var ended = false
     fs.read_chunk(mut f, 2) else |_| {
         ended = true
-        List[int]()
+        List[byte]()
     }
     if !ended { return 9 }
     fs.close(take f)?
 
-    // A non-byte element is the caller's data, so it is a row.
-    var bad = List[int]()
-    (mut bad).push(0 - 1)
-    var refused = false
-    var g = fs.create("chunk-bad.bin")?
-    fs.write_chunk(mut g, bad) else |_| {
-        refused = true
-    }
-    fs.close(take g)?
-    if !refused { return 10 }
+    // `write_chunk`'s `invalid` row used to be witnessed here with a
+    // non-byte element. It RETIRES at sc35: the parameter is
+    // `List[byte]`, no typed caller can build the argument, and the tag
+    // stays declared for the FFI caller it is still true of
+    // (wolf-lang#231's posture, `std.fs`'s doc). The static witness is
+    // `tests/fs/invalid_row.lu`.
 
     fs.remove(p)?
-    fs.remove("chunk-bad.bin")?
     0
 }

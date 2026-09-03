@@ -23,21 +23,21 @@ fn main() -> !int {
     if bytes.len(bytes.from_str("")) == 0 {} else { return 4 }
     if bytes.is_empty(bytes.from_str("")) {} else { return 5 }
     if bytes.is_empty(bytes.from_str("x")) { return 6 }
-    if bytes.at(bytes.from_str("A"), 0) == 65 {} else { return 7 }
-    if bytes.at(bytes.from_str("wolf"), 3) == 102 {} else { return 8 }
+    if bytes.at(bytes.from_str("A"), 0) == 65 as byte {} else { return 7 }
+    if bytes.at(bytes.from_str("wolf"), 3) == 102 as byte {} else { return 8 }
     // The encodings, spelled out: é is C3 A9, 🐺 is F0 9F 90 BA.
-    if bytes.at(bytes.from_str("é"), 0) == 195 {} else { return 9 }
-    if bytes.at(bytes.from_str("é"), 1) == 169 {} else { return 10 }
-    if bytes.at(bytes.from_str("🐺"), 0) == 240 {} else { return 11 }
-    if bytes.at(bytes.from_str("🐺"), 1) == 159 {} else { return 12 }
-    if bytes.at(bytes.from_str("🐺"), 2) == 144 {} else { return 13 }
-    if bytes.at(bytes.from_str("🐺"), 3) == 186 {} else { return 14 }
+    if bytes.at(bytes.from_str("é"), 0) == 195 as byte {} else { return 9 }
+    if bytes.at(bytes.from_str("é"), 1) == 169 as byte {} else { return 10 }
+    if bytes.at(bytes.from_str("🐺"), 0) == 240 as byte {} else { return 11 }
+    if bytes.at(bytes.from_str("🐺"), 1) == 159 as byte {} else { return 12 }
+    if bytes.at(bytes.from_str("🐺"), 2) == 144 as byte {} else { return 13 }
+    if bytes.at(bytes.from_str("🐺"), 3) == 186 as byte {} else { return 14 }
     // slice: a fresh list, and every legal range answers.
     let b = bytes.from_str("wolf")
     if bytes.len(bytes.slice(b, 0, 4)) == 4 {} else { return 15 }
     if bytes.len(bytes.slice(b, 1, 3)) == 2 {} else { return 16 }
-    if bytes.at(bytes.slice(b, 1, 3), 0) == 111 {} else { return 17 }
-    if bytes.at(bytes.slice(b, 1, 3), 1) == 108 {} else { return 18 }
+    if bytes.at(bytes.slice(b, 1, 3), 0) == 111 as byte {} else { return 17 }
+    if bytes.at(bytes.slice(b, 1, 3), 1) == 108 as byte {} else { return 18 }
     if bytes.len(bytes.slice(b, 2, 2)) == 0 {} else { return 19 }
     if bytes.len(bytes.slice(b, 4, 4)) == 0 {} else { return 20 }
     if bytes.is_empty(bytes.slice(b, 0, 0)) {} else { return 21 }
@@ -45,14 +45,14 @@ fn main() -> !int {
     // freedom byte-land sells, and the reason `to_str` has to validate.
     let wide = bytes.from_str("é")
     if bytes.len(bytes.slice(wide, 0, 1)) == 1 {} else { return 22 }
-    if bytes.at(bytes.slice(wide, 0, 1), 0) == 195 {} else { return 23 }
+    if bytes.at(bytes.slice(wide, 0, 1), 0) == 195 as byte {} else { return 23 }
     // A byte list a program built itself is the same type, and every
     // operation takes it.
-    var made = List[int]()
-    (mut made).push(104)
-    (mut made).push(105)
+    var made = List[byte]()
+    (mut made).push(104 as byte)
+    (mut made).push(105 as byte)
     if bytes.len(made) == 2 {} else { return 24 }
-    if bytes.at(made, 1) == 105 {} else { return 25 }
+    if bytes.at(made, 1) == 105 as byte {} else { return 25 }
     if bytes.len(bytes.slice(made, 0, 1)) == 1 {} else { return 26 }
     0
 }

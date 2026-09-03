@@ -17,8 +17,8 @@
 use std.hex
 use std.x.crypto.chacha20
 
-fn bytes_of(h: str) -> List[int] {
-    hex.decode(h) else List[int]()
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
 }
 
 fn main() -> !int {
@@ -35,7 +35,7 @@ fn main() -> !int {
         ),
     )
     let n = boxed.len
-    var dropped = List[int]()
+    var dropped = List[byte]()
     var pos: int = 0
     for b in boxed {
         if pos < n - 1 {
@@ -46,7 +46,7 @@ fn main() -> !int {
     var verdict = "not-handled"
     let handled = chacha20.open(key, nonce, aad, dropped) else |_| {
         verdict = "handled"
-        List[int]()
+        List[byte]()
     }
     assert(handled.len == 0, "dropped byte yields zero plaintext")
     print("dropped-byte: {verdict}")

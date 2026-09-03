@@ -30,13 +30,13 @@ fn main() -> int {
         return 1
     }
     // a flipped last byte must be rejected
-    var bad = List[int]()
+    var bad = List[byte]()
     var i = 0
     for v in sig {
         (mut bad).push(v)
         i = i + 1
     }
-    bad[63] = (bad[63] + 1) % 256
+    bad[63] = ((bad[63] as int + 1) % 256) as byte
     if p256.verify(pk, msg, bad) {
         print("tampered signature accepted")
         return 1

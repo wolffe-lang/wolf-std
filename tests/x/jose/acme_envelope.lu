@@ -23,8 +23,8 @@
 use std.hex
 use std.x.jose
 
-fn bs(h: str) -> List[int] {
-    hex.decode(h) else List[int]()
+fn bs(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
 }
 
 fn main() -> int {
@@ -40,7 +40,7 @@ fn main() -> int {
     // The signed request body for a POST-as-GET (empty payload). Frozen:
     // deterministic for the fixed key and header.
     let header = jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order")
-    let body = jose.acme_body(sk, header, List[int]())
+    let body = jose.acme_body(sk, header, List[byte]())
     assert(body == "{{\"protected\":\"eyJhbGciOiJFZERTQSIsImtpZCI6Imh0dHBzOi8vYWNtZS50ZXN0L2FjY3QvMSIsIm5vbmNlIjoiYVhrNiIsInVybCI6Imh0dHBzOi8vYWNtZS50ZXN0L25ldy1vcmRlciJ9\",\"payload\":\"\",\"signature\":\"tgYAMT9F9jrpjliBpCdmd7S7fvVGXiiHMy698J6KBBIODoxsVlK5rSQmeyzruPzsFjaExkrCTkDZEywFiiR8BA\"}}", "body")
     0
 }

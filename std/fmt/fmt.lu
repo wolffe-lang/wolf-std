@@ -102,7 +102,8 @@ fn digit_char(d: int) -> str {
 /// byte, so a multi-byte character's lead byte (195 for `é`) is simply not
 /// a digit.
 fn digit_of(s: str, radix: int) -> int {
-    for c in s.bytes() {
+    for raw in s.bytes() {
+        let c = raw as int
         var v: int = 0 - 1
         if c >= 48 && c <= 57 {
             v = c - 48

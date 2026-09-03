@@ -19,10 +19,10 @@
 use std.bytes
 
 fn main() -> !int {
-    var bad = List[int]()
-    (mut bad).push(237)
-    (mut bad).push(160)
-    (mut bad).push(128)
+    var bad = List[byte]()
+    (mut bad).push(237 as byte)
+    (mut bad).push(160 as byte)
+    (mut bad).push(128 as byte)
 
     let handled = bytes.to_str(bad) else |_| {
         print("utf8 taken")
@@ -30,8 +30,8 @@ fn main() -> !int {
     }
     if handled == "" {} else { return 2 }
 
-    var again = List[int]()
-    (mut again).push(255)
+    var again = List[byte]()
+    (mut again).push(255 as byte)
     let forced = bytes.to_str(again)?
     if forced.len >= 0 {} else { return 3 }
     0

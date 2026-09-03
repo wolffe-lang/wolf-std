@@ -3,13 +3,22 @@
 //! std.base64 — RFC 4648 base-64, standard and URL-safe. Stability tier:
 //! core.
 //!
-//! The byte sequence is `List[int]` with every element in 0..255, for the
-//! reason `std.hex`'s header gives at length: the `Bytes` TYPE still does
-//! not exist (F-0035, and F-0072 for what its absence costs), even though
-//! `std.bytes` has had code over
-//! this same currency since sc09, and an encoder cannot wait for the type
-//! it converts (F-0035). Every signature keeps its shape when `Bytes`
-//! lands.
+//! **The byte sequence is `List[byte]` (sc35).** For eleven sprints it
+//! was `List[int]` with every element in 0..255 — an interim this header
+//! took on `std.hex`'s reasoning, with the promise that "every signature
+//! keeps its shape when `Bytes` lands" (F-0035). D72/s135 landed the
+//! type and s136 (wolf-lang#231) moved the eight byte builtins to it, so
+//! the promise was kept literally: five signatures took the new element
+//! type and no body here changed shape.
+//!
+//! **`byte_at` used to be the boundary check and is now one cast.** It
+//! read an element and trapped `assert` on anything outside 0..255; the
+//! ELEMENT TYPE holds that contract now, both guards were unreachable
+//! code, and what remains is `[type.byte.cast]`'s widening — spelled,
+//! because the 24-bit group arithmetic below is `int`'s and
+//! `[type.byte.op]` widens every operand anyway. The three `push`es in
+//! `decode_with` narrow back the same way (`… as byte`), which is the
+//! only other line that moved.
 //!
 //! **Strictness is spelled in the name, and documented on each function.**
 //! `decode` is the strict RFC 4648 §4 profile: the standard alphabet, the
@@ -68,7 +77,7 @@ fn char_of(v: int, alphabet: str) -> str {
 /// An empty `s` yields no first byte and misses.
 fn value_of(s: str, alphabet: str) -> int {
     for b in s.bytes() {
-        return value_in(b, alphabet)
+        return value_in(b as int, alphabet)
     }
     0 - 1
 }
@@ -79,7 +88,7 @@ fn value_of(s: str, alphabet: str) -> int {
 fn value_in(c: int, alphabet: str) -> int {
     var i: int = 0
     for a in alphabet.bytes() {
-        if a == c {
+        if a as int == c {
             return i
         }
         i = i + 1
@@ -87,22 +96,19 @@ fn value_in(c: int, alphabet: str) -> int {
     0 - 1
 }
 
-/// One byte, checked. Private: an element outside 0..255 is a caller
-/// contract violation and traps `assert` (§2's trap rule).
-fn byte_at(b: List[int], i: int) -> int {
-    let v = b[i]
-    if v < 0 {
-        assert(false)
-    }
-    if v > 255 {
-        assert(false)
-    }
-    v
+/// One byte, widened. Private. **It used to be `checked`** — an element
+/// outside 0..255 was a caller contract violation and trapped `assert`
+/// (§2's trap rule) — and since sc35 the element type carries that
+/// contract, so the two guards were unreachable code and are gone. What
+/// is left is `[type.byte.cast]`'s widening, spelled: the group
+/// arithmetic below is `int`'s.
+fn byte_at(b: List[byte], i: int) -> int {
+    b[i] as int
 }
 
 /// `b` encoded with `alphabet`, padded with `=` when `padded`. Private:
 /// the shared body of `encode` and `url_encode`.
-fn encode_with(b: List[int], alphabet: str, padded: bool) -> str {
+fn encode_with(b: List[byte], alphabet: str, padded: bool) -> str {
     var out = ""
     let n = b.len
     var i: int = 0
@@ -141,8 +147,8 @@ fn encode_with(b: List[int], alphabet: str, padded: bool) -> str {
 /// `s` decoded with `alphabet`; `strict` demands a length that is a
 /// multiple of four, exact padding, and zero unused bits in a short final
 /// group. Private: the shared body of all three decoders.
-fn decode_with(s: str, alphabet: str, strict: bool) -> List[int] ! {parse} {
-    var out = List[int]()
+fn decode_with(s: str, alphabet: str, strict: bool) -> List[byte] ! {parse} {
+    var out = List[byte]()
     var rest = s
     var finished = false
     while rest.len > 0 {
@@ -199,12 +205,12 @@ fn decode_with(s: str, alphabet: str, strict: bool) -> List[int] ! {parse} {
                 }
             }
         }
-        (mut out).push(group / 65536 % 256)
+        (mut out).push((group / 65536 % 256) as byte)
         if kept > 1 {
-            (mut out).push(group / 256 % 256)
+            (mut out).push((group / 256 % 256) as byte)
         }
         if kept > 2 {
-            (mut out).push(group % 256)
+            (mut out).push((group % 256) as byte)
         }
     }
     out
@@ -230,17 +236,17 @@ fn pow2(e: int) -> int {
 /// Total otherwise: no error row.
 ///
 /// ```wolf-doc-example
-/// var b = List[int]()
-/// (mut b).push(77)
+/// var b = List[byte]()
+/// (mut b).push(77 as byte)
 /// base64.encode(b) == "TQ=="
-/// (mut b).push(97)
+/// (mut b).push(97 as byte)
 /// base64.encode(b) == "TWE="
-/// (mut b).push(110)
+/// (mut b).push(110 as byte)
 /// base64.encode(b) == "TWFu"
-/// var empty = List[int]()
+/// var empty = List[byte]()
 /// base64.encode(empty) == ""
 /// ```
-pub fn encode(b: List[int]) -> str {
+pub fn encode(b: List[byte]) -> str {
     encode_with(b, alphabet_std(), true)
 }
 
@@ -251,13 +257,13 @@ pub fn encode(b: List[int]) -> str {
 /// padding-emitting encoder still reads.
 ///
 /// ```wolf-doc-example
-/// var b = List[int]()
-/// (mut b).push(255)
-/// (mut b).push(239)
+/// var b = List[byte]()
+/// (mut b).push(255 as byte)
+/// (mut b).push(239 as byte)
 /// base64.url_encode(b) == "_-8"
 /// base64.encode(b) == "/+8="
 /// ```
-pub fn url_encode(b: List[int]) -> str {
+pub fn url_encode(b: List[byte]) -> str {
     encode_with(b, alphabet_url(), false)
 }
 
@@ -273,18 +279,18 @@ pub fn url_encode(b: List[int]) -> str {
 /// Total: no traps. Non-ASCII input is an ordinary miss.
 ///
 /// ```wolf-doc-example
-/// let one = base64.decode("TQ==") else List[int]()
+/// let one = base64.decode("TQ==") else List[byte]()
 /// one.len == 1
-/// let three = base64.decode("TWFu") else List[int]()
+/// let three = base64.decode("TWFu") else List[byte]()
 /// three.len == 3
-/// let unpadded = base64.decode("TQ") else List[int]()
+/// let unpadded = base64.decode("TQ") else List[byte]()
 /// unpadded.len == 0
-/// let noncanonical = base64.decode("TR==") else List[int]()
+/// let noncanonical = base64.decode("TR==") else List[byte]()
 /// noncanonical.len == 0
-/// let bad = base64.decode("T!==") else List[int]()
+/// let bad = base64.decode("T!==") else List[byte]()
 /// bad.len == 0
 /// ```
-pub fn decode(s: str) -> List[int] ! {parse} {
+pub fn decode(s: str) -> List[byte] ! {parse} {
     decode_with(s, alphabet_std(), true)?
 }
 
@@ -293,14 +299,14 @@ pub fn decode(s: str) -> List[int] ! {parse} {
 /// belong to the other variant and are a sign the caller mixed the two.
 ///
 /// ```wolf-doc-example
-/// let a = base64.url_decode("_-8") else List[int]()
+/// let a = base64.url_decode("_-8") else List[byte]()
 /// a.len == 2
-/// let b = base64.url_decode("_-8=") else List[int]()
+/// let b = base64.url_decode("_-8=") else List[byte]()
 /// b.len == 2
-/// let mixed = base64.url_decode("/+8=") else List[int]()
+/// let mixed = base64.url_decode("/+8=") else List[byte]()
 /// mixed.len == 0
 /// ```
-pub fn url_decode(s: str) -> List[int] ! {parse} {
+pub fn url_decode(s: str) -> List[byte] ! {parse} {
     decode_with(s, alphabet_url(), false)?
 }
 
@@ -314,15 +320,15 @@ pub fn url_decode(s: str) -> List[int] ! {parse} {
 /// unchanged.
 ///
 /// ```wolf-doc-example
-/// let a = base64.decode_lenient("TQ") else List[int]()
+/// let a = base64.decode_lenient("TQ") else List[byte]()
 /// a.len == 1
-/// let b = base64.decode_lenient("TR") else List[int]()
+/// let b = base64.decode_lenient("TR") else List[byte]()
 /// b.len == 1
-/// let c = base64.decode_lenient("TWFu") else List[int]()
+/// let c = base64.decode_lenient("TWFu") else List[byte]()
 /// c.len == 3
-/// let bad = base64.decode_lenient("T") else List[int]()
+/// let bad = base64.decode_lenient("T") else List[byte]()
 /// bad.len == 0
 /// ```
-pub fn decode_lenient(s: str) -> List[int] ! {parse} {
+pub fn decode_lenient(s: str) -> List[byte] ! {parse} {
     decode_with(s, alphabet_std(), false)?
 }

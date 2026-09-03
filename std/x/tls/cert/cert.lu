@@ -101,7 +101,7 @@
 //! carries the bytes; ws05 owns the socket conversation. The seam is
 //! frozen at sc22; `std/x/README.md` records it.
 //!
-//! Byte sequences are `List[int]` with the 0..255 element contract
+//! Byte sequences are `List[byte]` with the 0..255 element contract
 //! (§11's interim, F-0035), the whole ladder's convention. Chain
 //! validation is iterative (no recursion, no per-chain allocation
 //! beyond the parsed certificates); the trust anchor is validated like
@@ -118,32 +118,18 @@ use std.x.crypto.p256
 // data; the helpers are O(n) walks (the portable List shapes, F-0078).
 // ---------------------------------------------------------------------
 
-/// The 0..255 ingestion guard (§11's `List[int]` byte contract).
-/// ct: NOT free of value-dependent branches — the recorded ct exception
-/// shared verbatim with the ladder (it leaves with F-0035's real byte
-/// type). Runs only on public certificate bytes here.
-fn require_byte(v: int) {
-    if v < 0 {
-        assert(false, "tls.cert: element outside 0..255")
-    }
-    if v > 255 {
-        assert(false, "tls.cert: element outside 0..255")
-    }
-}
-
 /// The bytes of `b` from offset `from` (inclusive) to `to` (exclusive),
 /// as a fresh list. Offsets are the module's own (computed from
 /// validated lengths), so a violation would be a bug in std, not in the
 /// caller's data — hence the trap-on-contract posture via the checked
 /// walk (nothing here can actually go out of bounds: the walk is
 /// bounded by the list itself).
-fn sub(b: List[int], from: int, to: int) -> List[int] {
-    var out = List[int]()
+fn sub(b: List[byte], from: int, to: int) -> List[byte] {
+    var out = List[byte]()
     var i = 0
     for v in b {
         if i >= from {
             if i < to {
-                require_byte(v)
                 (mut out).push(v)
             }
         }
@@ -154,7 +140,7 @@ fn sub(b: List[int], from: int, to: int) -> List[int] {
 
 /// Byte-list equality. Public data; no constant-time obligation (names
 /// and encodings are public — the sc18 verify-is-public rule).
-fn bytes_eq(a: List[int], b: List[int]) -> bool {
+fn bytes_eq(a: List[byte], b: List[byte]) -> bool {
     if a.len != b.len {
         return false
     }
@@ -171,7 +157,7 @@ fn bytes_eq(a: List[int], b: List[int]) -> bool {
 
 /// X.690 §11.6 SET-OF order: `a <= b` comparing encodings as octet
 /// strings, the shorter padded at its trailing end with zero octets.
-fn set_le(a: List[int], b: List[int]) -> bool {
+fn set_le(a: List[byte], b: List[byte]) -> bool {
     var n = a.len
     if b.len > n {
         n = b.len
@@ -180,11 +166,11 @@ fn set_le(a: List[int], b: List[int]) -> bool {
     while i < n {
         var x = 0
         if i < a.len {
-            x = a[i]
+            x = a[i] as int
         }
         var y = 0
         if i < b.len {
-            y = b[i]
+            y = b[i] as int
         }
         if x < y {
             return true
@@ -208,7 +194,7 @@ fn set_le(a: List[int], b: List[int]) -> bool {
 // ---------------------------------------------------------------------
 
 struct Rd {
-    b: List[int],
+    b: List[byte],
     pos: int,
     end: int,
 }
@@ -225,13 +211,7 @@ fn rd_byte(mut r: Rd) -> int ! {der} {
     if r.pos >= r.end {
         return der
     }
-    let v = r.b[r.pos]
-    if v < 0 {
-        return der
-    }
-    if v > 255 {
-        return der
-    }
+    let v = r.b[r.pos] as int
     r.pos = r.pos + 1
     v
 }
@@ -312,7 +292,7 @@ fn rd_skip(mut r: Rd, n: int) {
 }
 
 /// The content bytes of length `n` from the cursor, advancing.
-fn rd_take(mut r: Rd, n: int) -> List[int] {
+fn rd_take(mut r: Rd, n: int) -> List[byte] {
     let out = sub(r.b, r.pos, r.pos + n)
     r.pos = r.pos + n
     out
@@ -326,15 +306,15 @@ fn rd_take(mut r: Rd, n: int) -> List[int] {
 /// INTEGER content minimality (X.690 §8.3.2): at least one octet; a
 /// leading 0x00 is legal only before a high bit, a leading 0xFF only
 /// before a clear one.
-fn int_minimal(bs: List[int]) -> bool {
+fn int_minimal(bs: List[byte]) -> bool {
     if bs.len == 0 {
         return false
     }
     if bs.len == 1 {
         return true
     }
-    let b0 = bs[0]
-    let b1 = bs[1]
+    let b0 = bs[0] as int
+    let b1 = bs[1] as int
     if b0 == 0 {
         if b1 < 128 {
             return false
@@ -359,12 +339,12 @@ fn rd_small_int(mut r: Rd) -> int ! {der} {
     if !int_minimal(bs) {
         return der
     }
-    if bs[0] >= 128 {
+    if bs[0] as int >= 128 {
         return der
     }
     var acc = 0
     for v in bs {
-        acc = acc * 256 + v
+        acc = acc * 256 + v as int
     }
     acc
 }
@@ -403,7 +383,7 @@ fn rd_oid(mut r: Rd) -> str ! {der} {
     var first_done = false
     var i = 0
     while i < bs.len {
-        let v = bs[i]
+        let v = bs[i] as int
         if !in_sub {
             if v == 128 {
                 return der
@@ -443,9 +423,10 @@ fn rd_oid(mut r: Rd) -> str ! {der} {
 
 /// PrintableString charset (X.680 §41.4): letters, digits, and the
 /// eleven permitted marks. Anything else rejects.
-fn printable_ok(bs: List[int]) -> bool {
+fn printable_ok(bs: List[byte]) -> bool {
     var ok = true
-    for v in bs {
+    for raw in bs {
+        let v = raw as int
         var this_ok = false
         if v >= 65 {
             if v <= 90 {
@@ -496,9 +477,10 @@ fn printable_ok(bs: List[int]) -> bool {
 
 /// IA5String content: bytes 0..127 (ASCII), and for the names this
 /// module reads (dNSName) additionally non-NUL.
-fn ia5_ok(bs: List[int]) -> bool {
+fn ia5_ok(bs: List[byte]) -> bool {
     var ok = true
-    for v in bs {
+    for raw in bs {
+        let v = raw as int
         if v > 127 {
             ok = false
         }
@@ -510,9 +492,9 @@ fn ia5_ok(bs: List[int]) -> bool {
 }
 
 /// Two ASCII digits from `bs` at `i` as an int, or the miss.
-fn two_digits(bs: List[int], i: int) -> int ! {der} {
-    let a = bs[i]
-    let b = bs[i + 1]
+fn two_digits(bs: List[byte], i: int) -> int ! {der} {
+    let a = bs[i] as int
+    let b = bs[i + 1] as int
     if a < 48 {
         return der
     }
@@ -573,7 +555,7 @@ fn rd_time(mut r: Rd) -> int ! {der} {
             return der
         }
         let bs = rd_take(mut r, 13)
-        if bs[12] != 90 {
+        if bs[12] as int != 90 {
             return der
         }
         let yy = two_digits(bs, 0)?
@@ -593,7 +575,7 @@ fn rd_time(mut r: Rd) -> int ! {der} {
             return der
         }
         let bs = rd_take(mut r, 15)
-        if bs[14] != 90 {
+        if bs[14] as int != 90 {
             return der
         }
         let hi = two_digits(bs, 0)?
@@ -619,17 +601,17 @@ fn rd_time(mut r: Rd) -> int ! {der} {
 
 struct Alg {
     dotted: str,
-    raw: List[int],
+    raw: List[byte],
 }
 
 struct NameInfo {
-    raw: List[int],
+    raw: List[byte],
     cn: str,
 }
 
 struct Spki {
     alg: str,
-    key: List[int],
+    key: List[byte],
 }
 
 struct Exts {
@@ -736,7 +718,7 @@ fn rd_name(mut r: Rd) -> NameInfo ! {der} {
         let rdn_stop = r.pos + rdn_len
         let rdn_saved = r.end
         r.end = rdn_stop
-        var prev = List[int]()
+        var prev = List[byte]()
         var have_prev = false
         while r.pos < rdn_stop {
             let atv_start = r.pos
@@ -798,7 +780,7 @@ fn rd_spki(mut r: Rd) -> Spki ! {der} {
 /// pathLenConstraint INTEGER OPTIONAL }. DER's §11.5 rule makes an
 /// encoded FALSE a rejection (the default is expressed by ABSENCE), and
 /// the RFC forbids pathLenConstraint without cA TRUE.
-fn parse_bc(bs: List[int]) -> Exts ! {der} {
+fn parse_bc(bs: List[byte]) -> Exts ! {der} {
     let bn0 = bs.len
     var r = Rd { b: bs, pos: 0, end: bn0 }
     let n = rd_expect(mut r, 48)?
@@ -850,7 +832,7 @@ fn parse_bc(bs: List[int]) -> Exts ! {der} {
 /// DER-trimmed (no trailing zero content octet, declared-unused bits
 /// zero). Decoded as an int where KeyUsage bit i contributes 2^i
 /// (digitalSignature = 1, keyCertSign = 32, cRLSign = 64, ...).
-fn parse_ku(bs: List[int]) -> int ! {der} {
+fn parse_ku(bs: List[byte]) -> int ! {der} {
     let bn0 = bs.len
     var r = Rd { b: bs, pos: 0, end: bn0 }
     let n = rd_expect(mut r, 3)?
@@ -865,7 +847,7 @@ fn parse_ku(bs: List[int]) -> int ! {der} {
     if r.pos != bn0 {
         return der
     }
-    let last = content[content.len - 1]
+    let last = content[content.len - 1] as int
     if last == 0 {
         return der
     }
@@ -882,7 +864,7 @@ fn parse_ku(bs: List[int]) -> int ! {der} {
     var j = 0
     for byte_v in content {
         var bit = 0
-        var rest = byte_v
+        var rest = byte_v as int
         var place = 128
         while bit < 8 {
             var weight = 1
@@ -911,7 +893,7 @@ fn parse_ku(bs: List[int]) -> int ! {der} {
 /// the other GeneralName forms (otherName, rfc822Name, dirName,
 /// uniformResourceIdentifier, iPAddress, registeredID, ...) are carried
 /// opaquely — present, unmatched (the residue line in the header).
-fn parse_san(bs: List[int]) -> List[str] ! {der} {
+fn parse_san(bs: List[byte]) -> List[str] ! {der} {
     let bn0 = bs.len
     var r = Rd { b: bs, pos: 0, end: bn0 }
     let n = rd_expect(mut r, 48)?
@@ -1069,16 +1051,16 @@ fn rd_exts(mut r: Rd) -> Exts ! {der} {
 /// ct: public data throughout — a certificate carries no secret.
 pub struct Cert {
     version: int,
-    serial: List[int],
+    serial: List[byte],
     sig_alg: str,
-    issuer: List[int],
+    issuer: List[byte],
     issuer_cn: str,
-    subject: List[int],
+    subject: List[byte],
     subject_cn: str,
     not_before: int,
     not_after: int,
     spki_alg: str,
-    spki_key: List[int],
+    spki_key: List[byte],
     has_bc: bool,
     is_ca: bool,
     path_len: int,
@@ -1086,8 +1068,8 @@ pub struct Cert {
     has_san: bool,
     san: List[str],
     crit_unknown: str,
-    tbs: List[int],
-    sig: List[int],
+    tbs: List[byte],
+    sig: List[byte],
 }
 
 /// Parse ONE DER certificate occupying the whole of `bytes` (RFC 5280
@@ -1111,10 +1093,7 @@ pub struct Cert {
 /// rules (non-empty, no duplicates, DEFAULT-FALSE absence,
 /// basicConstraints/keyUsage/subjectAltName inner form).
 /// ct: public data; no secret is present.
-pub fn parse(bytes: List[int]) -> Cert ! {der} {
-    for v in bytes {
-        require_byte(v)
-    }
+pub fn parse(bytes: List[byte]) -> Cert ! {der} {
     let n0 = bytes.len
     var r = Rd { b: bytes, pos: 0, end: n0 }
     let outer = rd_expect(mut r, 48)?
@@ -1154,11 +1133,11 @@ pub fn parse(bytes: List[int]) -> Cert ! {der} {
     if !int_minimal(serial) {
         return der
     }
-    if serial[0] >= 128 {
+    if serial[0] as int >= 128 {
         return der
     }
     if serial.len == 1 {
-        if serial[0] == 0 {
+        if serial[0] as int == 0 {
             return der
         }
     }
@@ -1263,7 +1242,7 @@ fn peek_rewind(pos: int, length: int) -> int {
 /// header only; `parse` validates the body. Truncation and every
 /// malformed length reject `der`.
 /// ct: public data.
-pub fn cert_end(chain: List[int], offset: int) -> int ! {der} {
+pub fn cert_end(chain: List[byte], offset: int) -> int ! {der} {
     if offset < 0 {
         return der
     }
@@ -1515,7 +1494,7 @@ fn check_hostname(c: Cert, hostname: str) -> int ! {name_mismatch} {
 /// Revocation (CRL/OCSP) is NAMED RESIDUE: nothing here consults
 /// revocation state, and the header says so.
 /// ct: public data throughout (certificates carry no secret).
-pub fn validate_chain(chain: List[int], hostname: str, anchor: List[int], now: int) -> Cert ! {
+pub fn validate_chain(chain: List[byte], hostname: str, anchor: List[byte], now: int) -> Cert ! {
     der,
     unsupported_alg,
     bad_signature,
@@ -1567,11 +1546,11 @@ pub fn validate_chain(chain: List[int], hostname: str, anchor: List[int], now: i
 
 /// Lowercase hex of a byte list. ct: public data (and a rendering
 /// convenience only, never a secret-handling path).
-pub fn to_hex(b: List[int]) -> str {
+pub fn to_hex(b: List[byte]) -> str {
     let alphabet = "0123456789abcdef"
     var out = ""
-    for v in b {
-        require_byte(v)
+    for raw in b {
+        let v = raw as int
         let hi = v / 16
         let lo = v % 16
         let hd = alphabet[hi..hi + 1]

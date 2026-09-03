@@ -25,8 +25,8 @@ use std.hex
 use std.x.tls.client
 use std.x.tls.handshake as hs
 
-fn bytes_of(h: str) -> List[int] {
-    hex.decode(h) else List[int]()
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
 }
 
 fn main() -> !int {
@@ -96,14 +96,14 @@ fn main() -> !int {
 
     // rsa_pss is a NAMED unsupported_alg — never a silent accept.
     var rsa_msg = "?"
-    var dummy_hash = List[int]()
+    var dummy_hash = List[byte]()
     var z = 0
     while z < 32 {
-        (mut dummy_hash).push(0)
+        (mut dummy_hash).push(0 as byte)
         z = z + 1
     }
     let _rsa = client.
-        verify_certificate_verify("1.2.840.113549.1.1.1", List[int](), scheme, copy sig, dummy_hash) else |e| match e {
+        verify_certificate_verify("1.2.840.113549.1.1.1", List[byte](), scheme, copy sig, dummy_hash) else |e| match e {
         unsupported_alg => {
             rsa_msg = "unsupported_alg"
             0

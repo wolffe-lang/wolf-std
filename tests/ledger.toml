@@ -1,3 +1,43 @@
+# =====================================================================
+# sc35 — THE LUPIN COLUMN IS TRUE AGAIN, AND THE 181 DARK ROWS CAME BACK
+# THE SAME DAY. This block replaces a note that said the opposite; the
+# history is worth two paragraphs because the shape recurs.
+#
+# sc35 renamed std's byte tier from `List[int]` to `List[byte]` on top of
+# s136's byte-typed builtins (wolf-lang#231). At `lupin 0.1.23` the
+# spelling `[type.byte.cast]` requires — `as byte` — was `fail(E0301)` at
+# `resolve`, so 181 of 376 rows and 87 of 414 doc blocks went dark on the
+# reference machine, and NONE of them had a legal word in this file:
+# `parse_expect` refuses `fail(…)` for this lane by name, and
+# `divergent(…)`'s vocabulary (`stdout | exit(N) | trap(kind)`) is
+# one-directional — built for "the compilers reject statically and the
+# interpreter runs", blind to the mirror. The column was left alone and
+# the reds were left standing, because writing `unsupported` would have
+# been a lie about the interpreter's semantics and inventing a word to
+# make CI green is the workaround sc00 forbids. F-0108 named the exit as
+# a release rather than an edit.
+#
+# is36 shipped it: **lupin 0.1.25** (`v0.1.25` = wolf-interp `ae34115`,
+# conformance pin `982f857`). Re-measured over all 376 rows: **181 of 181
+# returned, zero residual refusals** (122 exit, 48 unsupported, 11 trap),
+# and `doc-examples` is 414 of 414 GREEN. Not one lane word below had to
+# be corrected for them — the column had been right all along about what
+# the interpreter is FOR, and wrong only about what it could reach that
+# morning.
+#
+# WHAT REMAINS IS EIGHT ROWS AND THEY NOW HAVE A LEGAL WORD. The ten
+# witnesses sc35 converted expect `fail(E0401)` — a program the compilers
+# refuse at typecheck because a `List[byte]` cannot hold a non-byte.
+# lupin 0.1.25 has the byte TYPE but not the byte DOMAIN: `push(256)`
+# into a `List[byte]` still stores 256 dynamically, so the interpreter
+# executes these to their honest end. That is exactly F-0098's shape and
+# its first use outside the take-mode pair — eight `divergent(…)` rows,
+# each carrying its measured observation; the other two are ordinary
+# `unsupported`. Filed as **wolf-interp#62** (is37's, not is36's) and
+# cited on every row. When it closes, all eight red on the same day and
+# flip to `run` deliberately, which is what the word is for.
+# =====================================================================
+#
 # tests/ledger.toml — per-test, per-implementation expectations (sc00 §3,
 # the is00 corpus-overlay pattern). The two implementations diverge by
 # design; each test records what each one is expected to achieve TODAY:
@@ -1165,8 +1205,8 @@ lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
 native = "run"  # sc08 pin bump (13b811f)
 
-[tests."hex/encode_non_byte_trap.lu"]
-lupin = "run"
+[tests."hex/encode_non_byte_refused.lu"]
+lupin = "divergent(trap(assert))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to hex's own `byte_digits` assert, which the wolf lanes can no longer reach. F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
 wolfc = "run"  # sc07 pin bump (f0da6e6)
 native = "run"  # sc08 pin bump (13b811f)
 
@@ -1393,7 +1433,7 @@ wolfc = "run"
 native = "run"
 
 [tests."net/write_bytes_invalid_row.lu"]
-lupin = "run"  # sc30 binary bump (lupin 0.1.19): F-0102 paid — the invalid row raises off the WHOLE pre-write check, nothing reaches the wire; exit(1) "handled: invalid\nerror: invalid", staged re-measure 2026-08-31
+lupin = "divergent(exit(1))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to the `invalid` row it always raised. F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
 wolfc = "run"
 native = "run"
 
@@ -2011,8 +2051,8 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/crypto/sha2/non_byte_trap.lu"]
-lupin = "run"
+[tests."x/crypto/sha2/non_byte_refused.lu"]
+lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0): with the guard retired, 256 digests as itself here. F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
 wolfc = "run"
 native = "run"
 
@@ -2226,8 +2266,8 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/crypto/chacha20/non_byte_trap.lu"]
-lupin = "run"
+[tests."x/crypto/chacha20/non_byte_refused.lu"]
+lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0). F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
 wolfc = "run"
 native = "run"
 
@@ -2444,8 +2484,8 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/crypto/curve25519/non_byte_trap.lu"]
-lupin = "run"
+[tests."x/crypto/curve25519/non_byte_refused.lu"]
+lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0). F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
 wolfc = "run"
 native = "run"
 
@@ -2627,8 +2667,8 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/tls/record/non_byte_trap.lu"]
-lupin = "run"
+[tests."x/tls/record/non_byte_refused.lu"]
+lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0). F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
 wolfc = "run"
 native = "run"
 
@@ -2699,8 +2739,8 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/tls/handshake/non_byte_trap.lu"]
-lupin = "run"
+[tests."x/tls/handshake/non_byte_refused.lu"]
+lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0). F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
 wolfc = "run"
 native = "run"
 
@@ -2817,8 +2857,8 @@ lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the 50M-step refusal st
 wolfc = "unsupported"
 native = "run"
 
-[tests."x/tls/cert/non_byte_trap.lu"]
-lupin = "run"
+[tests."x/tls/cert/non_byte_refused.lu"]
+lupin = "divergent(exit(1))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(1) — the DER reject. F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
 wolfc = "run"
 native = "run"
 
@@ -2925,8 +2965,8 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/crypto/p256/non_byte_trap.lu"]
-lupin = "run"
+[tests."x/crypto/p256/non_byte_refused.lu"]
+lupin = "unsupported"  # sc35 (lupin 0.1.25): the module still declines at resolve here — the ladder is outside the modelled surface, not a byte question
 wolfc = "run"
 native = "run"
 

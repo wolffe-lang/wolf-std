@@ -39,13 +39,13 @@ use std.x.tls.client
 use std.x.tls.handshake as hs
 use std.x.tls.record
 
-fn bytes_of(h: str) -> List[int] {
-    hex.decode(h) else List[int]()
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
 }
 
 /// Exactly `n` bytes off the socket (the test's own read_exact).
-fn read_n(mut s: net.Socket, n: int) -> List[int] ! {closed, timeout, io} {
-    var out = List[int]()
+fn read_n(mut s: net.Socket, n: int) -> List[byte] ! {closed, timeout, io} {
+    var out = List[byte]()
     while out.len < n {
         let piece = net.read_bytes(mut s, n - out.len)?
         if piece.len == 0 {
@@ -60,11 +60,11 @@ fn read_n(mut s: net.Socket, n: int) -> List[int] ! {closed, timeout, io} {
 
 /// One whole wire record: 5-byte header, then a body of the header's
 /// length.
-fn read_record(mut s: net.Socket) -> List[int] ! {closed, timeout, io} {
+fn read_record(mut s: net.Socket) -> List[byte] ! {closed, timeout, io} {
     let header = read_n(mut s, 5)?
     let blen = header[3] * 256 + header[4]
     let body = read_n(mut s, blen)?
-    var wire = List[int]()
+    var wire = List[byte]()
     for b in header {
         (mut wire).push(b)
     }
@@ -75,13 +75,13 @@ fn read_record(mut s: net.Socket) -> List[int] ! {closed, timeout, io} {
 }
 
 /// A plaintext record (§5.1) — how the server frames its ServerHello.
-fn plaintext(content_type: int, payload: List[int]) -> List[int] {
-    var out = List[int]()
-    (mut out).push(content_type)
-    (mut out).push(3)
-    (mut out).push(3)
-    (mut out).push(payload.len / 256 % 256)
-    (mut out).push(payload.len % 256)
+fn plaintext(content_type: int, payload: List[byte]) -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(content_type as byte)
+    (mut out).push(3 as byte)
+    (mut out).push(3 as byte)
+    (mut out).push((payload.len / 256 % 256) as byte)
+    (mut out).push((payload.len % 256) as byte)
     for b in payload {
         (mut out).push(b)
     }
@@ -89,7 +89,7 @@ fn plaintext(content_type: int, payload: List[int]) -> List[int] {
 }
 
 /// The inner content of a sealed record the server opened.
-fn inner_content(inner: List[int]) -> List[int] {
+fn inner_content(inner: List[byte]) -> List[byte] {
     record.content_of(inner)
 }
 
@@ -128,13 +128,13 @@ fn main() -> !int {
 
     // ---- The server builds its ServerHello ----
     let server_share = curve25519.x25519_base(copy server_priv)
-    var she = List[int]()
+    var she = List[byte]()
     hs.transcript_add(mut she, hs.ext_key_share_server_x25519(copy server_share))
     hs.transcript_add(mut she, hs.ext_supported_versions_server())
-    let sh_msg = hs.server_hello(server_random, List[int](), 4867, she)
+    let sh_msg = hs.server_hello(server_random, List[byte](), 4867, she)
 
     // ---- Transcript CH..SH and the handshake key schedule ----
-    var tr = List[int]()
+    var tr = List[byte]()
     hs.transcript_add(mut tr, copy ch_msg)
     hs.transcript_add(mut tr, copy sh_msg)
     let client_share = curve25519.x25519_base(copy key_seed)
@@ -152,8 +152,8 @@ fn main() -> !int {
 
     // ---- The server flight: EE, Certificate, CertificateVerify,
     // Finished — the transcript extends as each is built ----
-    let ee = hs.encrypted_extensions(List[int]())
-    let certmsg = hs.certificate(List[int](), copy leaf)
+    let ee = hs.encrypted_extensions(List[byte]())
+    let certmsg = hs.certificate(List[byte](), copy leaf)
     hs.transcript_add(mut tr, copy ee)
     hs.transcript_add(mut tr, copy certmsg)
     let th_cert = hs.transcript_hash(copy tr)
@@ -245,8 +245,8 @@ fn main() -> !int {
     0
 }
 
-fn sub_from(b: List[int], from: int) -> List[int] {
-    var out = List[int]()
+fn sub_from(b: List[byte], from: int) -> List[byte] {
+    var out = List[byte]()
     var i = 0
     for v in b {
         if i >= from {
@@ -257,14 +257,14 @@ fn sub_from(b: List[int], from: int) -> List[int] {
     out
 }
 
-fn str_bytes(s: str) -> List[int] {
-    var out = List[int]()
+fn str_bytes(s: str) -> List[byte] {
+    var out = List[byte]()
     for b in s.bytes() {
         (mut out).push(b)
     }
     out
 }
 
-fn str_of(b: List[int]) -> str {
+fn str_of(b: List[byte]) -> str {
     bytes.to_str(b) else "?"
 }

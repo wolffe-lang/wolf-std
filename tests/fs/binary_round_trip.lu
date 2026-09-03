@@ -37,22 +37,22 @@
 use std.fs
 
 fn main() -> !int {
-    var raw = List[int]()
-    (mut raw).push(0)
-    (mut raw).push(128)
-    (mut raw).push(255)
-    (mut raw).push(10)
-    (mut raw).push(192)
+    var raw = List[byte]()
+    (mut raw).push(0 as byte)
+    (mut raw).push(128 as byte)
+    (mut raw).push(255 as byte)
+    (mut raw).push(10 as byte)
+    (mut raw).push(192 as byte)
     let src = "binary-src.bin"
     fs.write_bytes(src, raw)?
     if (fs.size(src) else 0 - 1) != 5 { return 1 }
     let back = fs.read_bytes(src)?
     if back.len != 5 { return 2 }
-    if back[0] != 0 { return 3 }
-    if back[1] != 128 { return 4 }
-    if back[2] != 255 { return 5 }
-    if back[3] != 10 { return 6 }
-    if back[4] != 192 { return 7 }
+    if back[0] != 0 as byte { return 3 }
+    if back[1] != 128 as byte { return 4 }
+    if back[2] != 255 as byte { return 5 }
+    if back[3] != 10 as byte { return 6 }
+    if back[4] != 192 as byte { return 7 }
     // The control: these bytes are not text, and the text tier says so.
     if (fs.read_text(src) else "not-text") != "not-text" { return 8 }
     let dst = "binary-dst.bin"
@@ -61,15 +61,15 @@ fn main() -> !int {
     if !fs.exists(src) { return 9 }
     let copied = fs.read_bytes(dst)?
     if copied.len != 5 { return 10 }
-    if copied[1] != 128 { return 11 }
-    if copied[4] != 192 { return 12 }
+    if copied[1] != 128 as byte { return 11 }
+    if copied[4] != 192 as byte { return 12 }
     let moved = "binary-moved.bin"
     fs.move_file(dst, moved)?
     if fs.exists(dst) { return 13 }
     let after = fs.read_bytes(moved)?
     if after.len != 5 { return 14 }
-    if after[1] != 128 { return 15 }
-    if after[2] != 255 { return 16 }
+    if after[1] != 128 as byte { return 15 }
+    if after[2] != 255 as byte { return 16 }
     fs.remove(src)?
     fs.remove(moved)?
     0

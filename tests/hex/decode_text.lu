@@ -52,14 +52,14 @@ fn main() -> !int {
     if (hex.decode_str("c080") else "NOT TEXT") == "NOT TEXT" {} else { return 20 }
     // And the whole byte range still round-trips as BYTES even where it
     // cannot be read as text, which is why `decode` keeps the short name.
-    var all = List[int]()
+    var all = List[byte]()
     var i: int = 0
     while i < 256 {
-        (mut all).push(i)
+        (mut all).push(i as byte)
         i = i + 1
     }
     let text = hex.encode(all)
-    let back = hex.decode(text) else List[int]()
+    let back = hex.decode(text) else List[byte]()
     if back.len == 256 {} else { return 21 }
     if (hex.decode_str(text) else "NOT TEXT") == "NOT TEXT" {} else { return 22 }
     0

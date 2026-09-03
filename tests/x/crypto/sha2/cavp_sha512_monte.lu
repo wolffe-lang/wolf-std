@@ -19,16 +19,16 @@
 use std.hex
 use std.x.crypto.sha2
 
-fn dup(xs: List[int]) -> List[int] {
-    var out = List[int]()
+fn dup(xs: List[byte]) -> List[byte] {
+    var out = List[byte]()
     for v in xs {
         (mut out).push(v)
     }
     out
 }
 
-fn concat3(a: List[int], b: List[int], c: List[int]) -> List[int] {
-    var out = List[int]()
+fn concat3(a: List[byte], b: List[byte], c: List[byte]) -> List[byte] {
+    var out = List[byte]()
     for v in a {
         (mut out).push(v)
     }
@@ -446,7 +446,7 @@ fn main() -> int {
     var seed = hex.
         decode(
         "5c337de5caf35d18ed90b5cddfce001ca1b8ee8602f367e7c24ccca6f893802fb1aca7a3dae32dcd60800a59959bc540d63237876b799229ae71a2526fbc52cd",
-    ) else List[int]()
+    ) else List[byte]()
     var j: int = 0
     while j < 100 {
         var md0 = dup(seed)

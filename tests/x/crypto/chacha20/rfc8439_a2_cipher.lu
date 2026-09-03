@@ -12,9 +12,9 @@ use std.hex
 use std.x.crypto.chacha20
 
 fn cipher_matches(key_hex: str, counter: int, nonce_hex: str, pt_hex: str, ct_hex: str) -> bool {
-    let key = hex.decode(key_hex) else List[int]()
-    let nonce = hex.decode(nonce_hex) else List[int]()
-    let pt = hex.decode(pt_hex) else List[int]()
+    let key = hex.decode(key_hex) else List[byte]()
+    let nonce = hex.decode(nonce_hex) else List[byte]()
+    let pt = hex.decode(pt_hex) else List[byte]()
     let ct = chacha20.stream_xor(key, counter, nonce, pt)
     if !(chacha20.to_hex(ct) == ct_hex) {
         return false

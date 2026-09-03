@@ -22,9 +22,9 @@ use std.hex
 use std.x.crypto.p256
 
 fn vd(pk: str, msg: str, der: str, want: bool) -> bool {
-    let key = hex.decode(pk) else List[int]()
-    let m = hex.decode(msg) else List[int]()
-    let d = hex.decode(der) else List[int]()
+    let key = hex.decode(pk) else List[byte]()
+    let m = hex.decode(msg) else List[byte]()
+    let d = hex.decode(der) else List[byte]()
     p256.verify_der(key, m, d) == want
 }
 

@@ -43,19 +43,28 @@
 //! library's own measurement at the sc32 pin agrees to the byte and is
 //! recorded in `docs/findings.md`.
 //!
-//! **HALF OF THAT 16x IS RETIRABLE IN THE LANGUAGE NOW, AND THE IO PATH
-//! HAS NOT COLLECTED IT YET (sc34).** D72's `byte` landed: the same
-//! 65,536 pushes into a `List[byte]` charge **131,120 native** (2.0x —
-//! `2 x payload + 48`, one list header) and **65,536 checked** (1.0x,
-//! the payload exactly). So the 8x element-width multiplier is gone
-//! wherever a buffer is spelled `List[byte]`, and what remains natively
-//! is the 2x push-growth history — which is #203's separable
-//! preallocation half and no type change can touch it. **But std's
-//! readers still hand back `List[int]`**, because no builtin in the
-//! language produces or consumes a byte-typed list yet (wolf-lang#231),
-//! so a caller sizing a budget around `fs.read_bytes`, `read_chunk` or
-//! `net.read_bytes` is still sizing around 16x today. The caveat below
-//! therefore STANDS, and now it names its own exit.
+//! **THE 16x IS COLLECTED, AND THE CAVEAT SHRINKS TO A GROWTH HISTORY
+//! (sc35).** The paragraph above is now history and is kept as history.
+//! D72's `byte` (s135) retired the 8x element width; s136
+//! (wolf-lang#231) moved the eight byte BUILTINS to `List[byte]`, and
+//! sc35 renamed std's sixteen byte-tier signatures onto them. **Measured
+//! at the io sites, through `std.fs.read_bytes`, at the sc35 pin: a
+//! 64 KiB read charges 65,584 native and 65,536 checked — 1.00x on both
+//! tiers, where it charged 1,048,560 / 1,048,576 (16.0x) at every pin
+//! from sc32 to sc34.** Not 2.0x: a PRODUCER mints its list at exact
+//! capacity through one memcpy and so has no growth history at all; the
+//! 48 is one list header.
+//!
+//! **So the caveat a caller must still act on is not 16x — it is a 2x
+//! GROWTH HISTORY on the native tier, and 1x on the checked one.** A
+//! `List[byte]` a program GROWS by `push` to 65,536 elements still
+//! charges 131,120 natively (`2 x payload + 48`, the doubling's
+//! abandoned buffers, `[mem.region.account.1]`) and exactly 65,536 under
+//! `--checked`, whose shadow model keeps no growth history. That
+//! residue is #203's separable preallocation half, it is what
+//! `reserve(n)` would retire, and no type change can touch it. **Read a
+//! buffer with a producer and you pay the payload; build one by pushing
+//! and you pay it twice on the tier that ships.**
 //!
 //! Two consequences a caller must act on:
 //!

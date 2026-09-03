@@ -626,7 +626,7 @@ struct Cursor {
 fn byte_at(text: str, at: int) -> int {
     let ch = text.get(at..at + 1) else ""
     for b in ch.bytes() {
-        return b
+        return b as int
     }
     0 - 1
 }
@@ -987,8 +987,8 @@ pub fn escape(s: str) -> str {
     var out = ""
     var start: int = 0
     var i: int = 0
-    for b in s.bytes() {
-        let mapped = byte_escape(b)
+    for raw in s.bytes() {
+        let mapped = byte_escape(raw as int)
         if !mapped.is_empty() {
             let run = s[start..i]
             out = "{out}{run}{mapped}"
@@ -1181,21 +1181,21 @@ fn hex_value(b: int) -> int {
 /// that discards a validating primitive's row is asserting where it could
 /// be checking — the same rule `std.bytes.to_str`'s test is built on.
 fn utf8_of(cp: int) -> str ! {syntax} {
-    var b = List[int]()
+    var b = List[byte]()
     if cp < 128 {
-        (mut b).push(cp)
+        (mut b).push(cp as byte)
     } else if cp < 2048 {
-        (mut b).push(192 + cp / 64)
-        (mut b).push(128 + cp % 64)
+        (mut b).push((192 + cp / 64) as byte)
+        (mut b).push((128 + cp % 64) as byte)
     } else if cp < 65536 {
-        (mut b).push(224 + cp / 4096)
-        (mut b).push(128 + cp / 64 % 64)
-        (mut b).push(128 + cp % 64)
+        (mut b).push((224 + cp / 4096) as byte)
+        (mut b).push((128 + cp / 64 % 64) as byte)
+        (mut b).push((128 + cp % 64) as byte)
     } else {
-        (mut b).push(240 + cp / 262144)
-        (mut b).push(128 + cp / 4096 % 64)
-        (mut b).push(128 + cp / 64 % 64)
-        (mut b).push(128 + cp % 64)
+        (mut b).push((240 + cp / 262144) as byte)
+        (mut b).push((128 + cp / 4096 % 64) as byte)
+        (mut b).push((128 + cp / 64 % 64) as byte)
+        (mut b).push((128 + cp % 64) as byte)
     }
     bytes.to_str(b) else |_| {
         return syntax

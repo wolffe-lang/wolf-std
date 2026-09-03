@@ -17,9 +17,9 @@ use std.hex
 use std.x.crypto.curve25519
 
 fn verify_is(pub_hex: str, msg_hex: str, sig_hex: str, want: bool) -> bool {
-    let pk = hex.decode(pub_hex) else List[int]()
-    let msg = hex.decode(msg_hex) else List[int]()
-    let sig = hex.decode(sig_hex) else List[int]()
+    let pk = hex.decode(pub_hex) else List[byte]()
+    let msg = hex.decode(msg_hex) else List[byte]()
+    let sig = hex.decode(sig_hex) else List[byte]()
     curve25519.verify(pk, msg, sig) == want
 }
 

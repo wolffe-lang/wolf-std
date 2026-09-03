@@ -5,8 +5,9 @@
 //!
 //! **This module had no code for five sprints, s37 gave it a producer, and
 //! s81 closed the circle.** `str.bytes()` produces the byte view
-//! (`List[int]`, one element per byte, 0..255) on all three lanes, and
-//! `str_from_utf8` — the prelude's validating way back, landed at s81
+//! (`List[byte]` since sc35 — one octet per element, and the TYPE says
+//! 0..255 now) on all three lanes, and `str_from_utf8` — the prelude's
+//! validating way back, landed at s81
 //! (wolf-lang#58, F-0057 CLOSED) — is what `to_str` delegates to. **All
 //! nine reviewed functions are code now**; the module has no contract left.
 //! `is_utf8` keeps its job, because the question "are these bytes text?"
@@ -52,7 +53,7 @@
 //!   — `E1015`, with the one-word fix in the diagnostic: bind the bytes
 //!   first (`let bs = s.bytes()` materializes) and the bound list is an
 //!   ordinary value the callee may own. Nothing in this module trips it;
-//!   the shape that would is a function returning its own `List[int]`
+//!   the shape that would is a function returning its own `List[byte]`
 //!   parameter.
 //! - **`from_str` is the way IN and still allocates, which is its job.** A
 //!   function that RETURNS a list must own it, so the copy is the price of
@@ -67,34 +68,50 @@
 //! was handed) rather than bytes it is walking through once. A one-pass
 //! walk over a string's bytes belongs in `std.str` and is written there.
 //!
-//! **THE TYPE IS `List[int]`, AND THAT IS A RECORDED INTERIM** (§11's byte
-//! currency, the same one `std.hex` and `std.base64` carry). A real `Bytes`
-//! wanted two things: a byte-width element type, and a type that can hold
-//! invalid UTF-8 while `str` cannot. Every signature below keeps its shape
-//! when it lands — `List[int]` becomes the byte type and nothing else
-//! moves. The ELEMENT CONTRACT is 0..255 per element, and it matters to
-//! exactly one function here (`is_utf8`, which answers `false` rather than
-//! trapping — see its doc); the container operations do not inspect values
-//! at all.
+//! **THE TYPE IS `List[byte]`, AND THE INTERIM IS OVER (sc35).** For nine
+//! sprints this header carried a recorded interim — the currency was
+//! `List[int]`, one element per byte, and the ELEMENT CONTRACT (0..255)
+//! was a promise the library made and the type could not keep. Both
+//! halves of the wait have landed. D72 / s135 gave the language
+//! `[type.byte]` — an 8-bit unsigned octet whose `List[byte]` strides by
+//! 1 — and s136 (wolf-lang#231) moved the eight byte BUILTINS to it, which
+//! is the half that decided whether this module could spend the type.
+//! **So every signature below is the rename this header promised, and
+//! nothing else moved**: `from_str` is still `s.bytes()`, `to_str` is
+//! still `str_from_utf8(b)?`, and not one function here gained a
+//! conversion loop.
 //!
-//! **THE TYPE EXISTS NOW AND THIS MODULE STILL CANNOT USE IT (sc34).**
-//! D72 / wolf-lang s135 landed `[type.byte]` — an 8-bit unsigned octet
-//! whose `List[byte]` strides by 1 — and this repo measured what it is
-//! worth: a 64 KiB byte buffer charges **131,120 native and 65,536
-//! checked** where the same buffer as `List[int]` charges 1,048,560 and
-//! 1,048,576. **16.0x -> 2.0x native, 16.0x -> 1.0x checked.** The
-//! substitution is still not made here, and the reason is measured rather
-//! than cautious: **s135 gave the language a byte type and no byte-typed
-//! BUILTIN.** `s.bytes()` still hands back `List[int]`, `str_from_utf8`
-//! still takes one, and so do all six `fs`/`net` byte builtins. Every
-//! function below is a thin wrapper over one of them, so a signature moved
-//! to `List[byte]` would have to CONVERT elementwise against a builtin —
-//! and the region ledger is cumulative, so the list it converted from stays
-//! charged: a substituted reader measures **17.0x checked / 18.0x native**,
-//! WORSE than the 16.0x it replaces. Filed as wolf-lang#231; when the eight
-//! builtin signatures move, this module's change is the rename it was
-//! always designed to be. See F-0104 (closed) and F-0106 in
-//! `docs/findings.md`.
+//! **What the rename is worth, measured through THIS module's own
+//! producers rather than synthetically** (F-0104's after-table, re-run at
+//! the io sites — `docs/findings.md`): a 64 KiB buffer read by
+//! `std.fs.read_bytes` charges **65,584 native and 65,536 checked**,
+//! where the same read as `List[int]` charged 1,048,560 and 1,048,576.
+//! **16.0x -> 1.00x native, 16.0x -> 1.00x checked.** The native number
+//! is not the 2.0x sc34 predicted for a byte buffer, and the reason is
+//! s136's: a PRODUCER mints its list at exact capacity through one
+//! memcpy, so it pays no push-growth history at all — the 48 is one list
+//! header. The 2.0x is still what a list this module GROWS by `push`
+//! costs, and that residue is `[mem.region.account.1]`'s, not the
+//! element width's.
+//!
+//! **Three things about the element contract are now the TYPE's job and
+//! not this module's.** A `List[byte]` cannot hold 300, cannot hold -1,
+//! and cannot hold a non-byte — so `is_utf8`'s "an element outside 0..255
+//! answers `false`" clause is unreachable rather than merely untested,
+//! `to_str`'s matching row is too, and `hex.encode`'s §11 assert has one
+//! fewer thing to defend. The clauses stay documented where the REASONING
+//! is still worth having (a validator answers, an encoder traps) and are
+//! marked unreachable where the type now forbids the input.
+//!
+//! **The element is a `byte`, so reading one is a `byte` and widening is
+//! SPELLED.** `at` returns `byte` — it is `b[i]`, and `b[i]` on a
+//! `List[byte]` is an octet — so a caller comparing it to a number writes
+//! `bytes.at(b, i) as int == 0x80` or `bytes.at(b, i) == 0x80 as byte`.
+//! That is `[type.byte.op]`'s rule and not this module's opinion: `byte`
+//! against `int` is the ordinary type mismatch, and every arithmetic
+//! operator widens to `int` anyway. Comparing two bytes needs no cast at
+//! all, which is why `find`, `starts_with` and `ends_with` did not change
+//! a line of their bodies.
 //!
 //! **Why these five duplicate `std.list`'s names, and why that is right.**
 //! `len`, `is_empty`, `at`, `find`, `starts_with` and `ends_with` all have
@@ -102,7 +119,7 @@
 //! than aesthetic: `std.list`'s are GENERIC, and a generic std function
 //! runs on the interpreter lane alone (both compiler rungs refuse
 //! monomorphization at a module boundary, F-0026), while these are
-//! monomorphic over `List[int]` and run on all three. A program that has
+//! monomorphic over `List[byte]` and run on all three. A program that has
 //! bytes wants the byte-tier operations to be available wherever it
 //! compiles. The vocabulary is §8's, deliberately: one concept, one name,
 //! across all of std — `len`, `is_empty`, `find`, `starts_with`,
@@ -143,7 +160,7 @@
 /// bytes.len("é".bytes()) == 2
 /// bytes.len("".bytes()) == 0
 /// ```
-pub fn len(b: List[int]) -> int {
+pub fn len(b: List[byte]) -> int {
     b.len
 }
 
@@ -153,7 +170,7 @@ pub fn len(b: List[int]) -> int {
 /// bytes.is_empty("".bytes()) == true
 /// bytes.is_empty("x".bytes()) == false
 /// ```
-pub fn is_empty(b: List[int]) -> bool {
+pub fn is_empty(b: List[byte]) -> bool {
     b.len == 0
 }
 
@@ -168,11 +185,11 @@ pub fn is_empty(b: List[int]) -> bool {
 /// spelling is `std.list.get`, which raises `none`.
 ///
 /// ```wolf-doc-example
-/// bytes.at("hé".bytes(), 0) == 104
-/// bytes.at("hé".bytes(), 1) == 195
-/// bytes.at("hé".bytes(), 2) == 169
+/// bytes.at("hé".bytes(), 0) as int == 104
+/// bytes.at("hé".bytes(), 1) as int == 195
+/// bytes.at("hé".bytes(), 2) == 169 as byte
 /// ```
-pub fn at(b: List[int], i: int) -> int {
+pub fn at(b: List[byte], i: int) -> byte {
     b[i]
 }
 
@@ -181,7 +198,7 @@ pub fn at(b: List[int], i: int) -> int {
 ///
 /// Traps `assert` when the range is out of order (`to < from`), starts
 /// below zero, or ends past `len(b)`. **This is a recorded delta from the
-/// reviewed contract**, which said `bounds`: with `List[int]` as the
+/// reviewed contract**, which said `bounds`: with `List[byte]` as the
 /// interim currency there is no slice SYNTAX to inherit the language's
 /// fault from, so the check is std's own and the kind is the one std can
 /// raise (§2 — either way it is a caller contract violation, and either
@@ -190,11 +207,11 @@ pub fn at(b: List[int], i: int) -> int {
 ///
 /// ```wolf-doc-example
 /// bytes.len(bytes.slice("wolf".bytes(), 1, 3)) == 2
-/// bytes.at(bytes.slice("wolf".bytes(), 1, 3), 0) == 111
+/// bytes.at(bytes.slice("wolf".bytes(), 1, 3), 0) as int == 111
 /// bytes.len(bytes.slice("wolf".bytes(), 2, 2)) == 0
 /// bytes.len(bytes.slice("wolf".bytes(), 0, 4)) == 4
 /// ```
-pub fn slice(b: List[int], from: int, to: int) -> List[int] {
+pub fn slice(b: List[byte], from: int, to: int) -> List[byte] {
     let n = b.len
     if from < 0 {
         assert(false, "bytes.slice: the start cannot be negative")
@@ -233,7 +250,7 @@ pub fn slice(b: List[int], from: int, to: int) -> List[int] {
 /// (bytes.find("wolf".bytes(), "z".bytes()) else 0 - 1) == 0 - 1
 /// (bytes.find("wolf".bytes(), "".bytes()) else 0 - 1) == 0
 /// ```
-pub fn find(b: List[int], needle: List[int]) -> int ! {none} {
+pub fn find(b: List[byte], needle: List[byte]) -> int ! {none} {
     let n = b.len
     let m = needle.len
     if m == 0 {
@@ -270,7 +287,7 @@ pub fn find(b: List[int], needle: List[int]) -> int ! {none} {
 /// bytes.starts_with("wolf".bytes(), "lf".bytes()) == false
 /// bytes.starts_with("wolf".bytes(), "".bytes()) == true
 /// ```
-pub fn starts_with(b: List[int], prefix: List[int]) -> bool {
+pub fn starts_with(b: List[byte], prefix: List[byte]) -> bool {
     let n = b.len
     let m = prefix.len
     if m > n {
@@ -298,7 +315,7 @@ pub fn starts_with(b: List[int], prefix: List[int]) -> bool {
 /// bytes.ends_with("wolf".bytes(), "wo".bytes()) == false
 /// bytes.ends_with("wolf".bytes(), "".bytes()) == true
 /// ```
-pub fn ends_with(b: List[int], suffix: List[int]) -> bool {
+pub fn ends_with(b: List[byte], suffix: List[byte]) -> bool {
     let n = b.len
     let m = suffix.len
     if m > n {
@@ -342,11 +359,11 @@ pub fn ends_with(b: List[int], suffix: List[int]) -> bool {
 /// wherever a value is what the reader needs to see.
 ///
 /// ```wolf-doc-example
-/// bytes.at(bytes.from_str("A"), 0) == 65
+/// bytes.at(bytes.from_str("A"), 0) as int == 65
 /// bytes.len(bytes.from_str("🐺")) == 4
-/// bytes.at(bytes.from_str("🐺"), 0) == 240
+/// bytes.at(bytes.from_str("🐺"), 0) as int == 240
 /// ```
-pub fn from_str(s: str) -> List[int] {
+pub fn from_str(s: str) -> List[byte] {
     s.bytes()
 }
 
@@ -376,7 +393,7 @@ pub fn from_str(s: str) -> List[int] {
 /// category, so with `json_*` it is the second such builtin family and
 /// the D33 sandbox has no reason to refuse it. That is a statement about
 /// the SANDBOX and not a promise about comptime, because the engine
-/// cannot reach this function for an unrelated reason: `List[int]()`
+/// cannot reach this function for an unrelated reason: `List[byte]()`
 /// inside a `comptime fn` is `unsupported` at resolve (F-0077), and a
 /// `List` is the only way to spell the argument. Measured, both compiler
 /// rungs, rather than inferred from the absence of a capability.
@@ -389,12 +406,12 @@ pub fn from_str(s: str) -> List[int] {
 ///
 /// ```wolf-doc-example
 /// (bytes.to_str(bytes.from_str("wolf é")) else "?") == "wolf é"
-/// (bytes.to_str(List[int]()) else "?") == ""
-/// var lone = List[int]()
-/// (mut lone).push(128)
+/// (bytes.to_str(List[byte]()) else "?") == ""
+/// var lone = List[byte]()
+/// (mut lone).push(128 as byte)
 /// (bytes.to_str(lone) else "?") == "?"
 /// ```
-pub fn to_str(b: List[int]) -> str ! {utf8} {
+pub fn to_str(b: List[byte]) -> str ! {utf8} {
     str_from_utf8(b)?
 }
 
@@ -429,18 +446,16 @@ pub fn to_str(b: List[int]) -> str ! {utf8} {
 /// ```wolf-doc-example
 /// bytes.is_utf8("héllo 🐺".bytes()) == true
 /// bytes.is_utf8("".bytes()) == true
-/// var bad = List[int]()
-/// (mut bad).push(255)
+/// var bad = List[byte]()
+/// (mut bad).push(255 as byte)
 /// bytes.is_utf8(bad) == false
 /// ```
-pub fn is_utf8(b: List[int]) -> bool {
+pub fn is_utf8(b: List[byte]) -> bool {
     let n = b.len
     var i = 0
     while i < n {
-        let b0 = b[i]
-        if b0 < 0 {
-            return false
-        } else if b0 < 128 {
+        let b0 = b[i] as int
+        if b0 < 128 {
             i = i + 1
         } else if b0 < 194 {
             return false
@@ -448,7 +463,7 @@ pub fn is_utf8(b: List[int]) -> bool {
             if i + 1 >= n {
                 return false
             }
-            if !is_cont(b[i + 1]) {
+            if !is_cont(b[i + 1] as int) {
                 return false
             }
             i = i + 2
@@ -456,8 +471,8 @@ pub fn is_utf8(b: List[int]) -> bool {
             if i + 2 >= n {
                 return false
             }
-            let b1 = b[i + 1]
-            if !is_cont(b1) || !is_cont(b[i + 2]) {
+            let b1 = b[i + 1] as int
+            if !is_cont(b1) || !is_cont(b[i + 2] as int) {
                 return false
             }
             if b0 == 224 && b1 < 160 {
@@ -471,8 +486,8 @@ pub fn is_utf8(b: List[int]) -> bool {
             if i + 3 >= n {
                 return false
             }
-            let b1 = b[i + 1]
-            if !is_cont(b1) || !is_cont(b[i + 2]) || !is_cont(b[i + 3]) {
+            let b1 = b[i + 1] as int
+            if !is_cont(b1) || !is_cont(b[i + 2] as int) || !is_cont(b[i + 3] as int) {
                 return false
             }
             if b0 == 240 && b1 < 144 {

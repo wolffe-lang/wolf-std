@@ -45,40 +45,40 @@
 
 use std.bytes
 
-fn seq1(a: int) -> List[int] {
-    var out = List[int]()
-    (mut out).push(a)
+fn seq1(a: int) -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(a as byte)
     out
 }
 
-fn seq2(a: int, b: int) -> List[int] {
-    var out = List[int]()
-    (mut out).push(a)
-    (mut out).push(b)
+fn seq2(a: int, b: int) -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(a as byte)
+    (mut out).push(b as byte)
     out
 }
 
-fn seq3(a: int, b: int, c: int) -> List[int] {
-    var out = List[int]()
-    (mut out).push(a)
-    (mut out).push(b)
-    (mut out).push(c)
+fn seq3(a: int, b: int, c: int) -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(a as byte)
+    (mut out).push(b as byte)
+    (mut out).push(c as byte)
     out
 }
 
-fn seq4(a: int, b: int, c: int, d: int) -> List[int] {
-    var out = List[int]()
-    (mut out).push(a)
-    (mut out).push(b)
-    (mut out).push(c)
-    (mut out).push(d)
+fn seq4(a: int, b: int, c: int, d: int) -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(a as byte)
+    (mut out).push(b as byte)
+    (mut out).push(c as byte)
+    (mut out).push(d as byte)
     out
 }
 
 /// Whether the FACADE accepts `b`. The handler diverges, so the refusal
 /// is observed as a value and never as a sentinel string a valid input
 /// could have produced.
-fn accepts(b: List[int]) -> bool {
+fn accepts(b: List[byte]) -> bool {
     let got = bytes.to_str(b) else |_| { return false }
     got.len >= 0
 }
@@ -90,7 +90,7 @@ fn accepts(b: List[int]) -> bool {
 /// comparison is `unsupported — comparison outside integers/floats` on
 /// the native rung, where `int`, `f64` and (since s81) `str` comparisons
 /// all lower (F-0076).
-fn agree(b: List[int]) -> bool {
+fn agree(b: List[byte]) -> bool {
     if bytes.is_utf8(b) {
         return accepts(b)
     }
@@ -103,7 +103,7 @@ fn main() -> !int {
     if (bytes.to_str(bytes.from_str("wolf")) else "?") == "wolf" {} else { return 1 }
     if (bytes.to_str(bytes.from_str("héllo")) else "?") == "héllo" {} else { return 2 }
     if (bytes.to_str(bytes.from_str("🐺")) else "?") == "🐺" {} else { return 3 }
-    if (bytes.to_str(List[int]()) else "?") == "" {} else { return 4 }
+    if (bytes.to_str(List[byte]()) else "?") == "" {} else { return 4 }
 
     // An interior NUL is text.
     let nul = bytes.to_str(seq3(119, 0, 102)) else "?"
@@ -126,8 +126,13 @@ fn main() -> !int {
     if !accepts(seq1(192)) {} else { return 19 }
     if !accepts(seq1(193)) {} else { return 20 }
     if !accepts(seq1(255)) {} else { return 21 }
-    if !accepts(seq1(300)) {} else { return 22 }
-    if !accepts(seq1(0 - 1)) {} else { return 23 }
+    // The two non-byte cases that used to sit here — 300 and -1 — RETIRE
+    // at sc35: `to_str`'s parameter is `List[byte]`, so neither value can
+    // be offered, and a test that spelled one would not compile (E0401).
+    // What they proved (bytes are DATA: an impossible element is a MISS,
+    // never a trap) is now the type's, one phase earlier. The static
+    // witnesses for the class live beside the modules that used to guard
+    // it (`tests/hex/encode_non_byte_refused.lu` and friends).
 
     // A valid sequence with one byte of garbage after it is a refusal:
     // validation is over the whole input, not over a prefix.
@@ -139,7 +144,7 @@ fn main() -> !int {
     // Agreement between the two decoders, class by class.
     if agree(bytes.from_str("wolf")) {} else { return 26 }
     if agree(bytes.from_str("héllo 🐺")) {} else { return 27 }
-    if agree(List[int]()) {} else { return 28 }
+    if agree(List[byte]()) {} else { return 28 }
     if agree(seq3(119, 0, 102)) {} else { return 29 }
     if agree(seq1(128)) {} else { return 30 }
     if agree(seq2(226, 130)) {} else { return 31 }

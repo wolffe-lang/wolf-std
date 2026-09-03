@@ -24,7 +24,7 @@
 //!   name-ok         — `row_name` reserves `"ok"` for success
 //!   name-miss       — `row_name` answers the row's name
 //!   name-other-type — the SAME generic helper over a different value
-//!                     type (`int`, not `List[int]`) and a different
+//!                     type (`int`, not `List[byte]`) and a different
 //!                     row, arriving from a NARROWER declared union
 //!                     (width subtyping in argument position)
 
@@ -32,35 +32,35 @@ use std.x.tls.cert
 use std.x.tls.client
 
 /// A well-formed Finished message: type 20, a 32-byte body.
-fn good_finished() -> List[int] {
-    var out = List[int]()
-    (mut out).push(20)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(32)
+fn good_finished() -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(20 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(32 as byte)
     var i = 0
     while i < 32 {
-        (mut out).push(7)
+        (mut out).push(7 as byte)
         i = i + 1
     }
     out
 }
 
 /// A Finished message whose length header lies — `decode_error`.
-fn bad_finished() -> List[int] {
-    var out = List[int]()
-    (mut out).push(20)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(99)
+fn bad_finished() -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(20 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(99 as byte)
     out
 }
 
-fn zeros(n: int) -> List[int] {
-    var out = List[int]()
+fn zeros(n: int) -> List[byte] {
+    var out = List[byte]()
     var i = 0
     while i < n {
-        (mut out).push(0)
+        (mut out).push(0 as byte)
         i = i + 1
     }
     out
@@ -78,7 +78,7 @@ fn main() -> int {
     let bad = client.finished_of(bad_finished())
     let _miss = client.named(bad) else |Row(name)| {
         print("named-miss: {name}")
-        List[int]()
+        List[byte]()
     }
 
     let good2 = client.finished_of(good_finished())

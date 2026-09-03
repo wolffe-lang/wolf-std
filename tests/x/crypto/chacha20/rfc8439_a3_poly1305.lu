@@ -17,8 +17,8 @@ use std.hex
 use std.x.crypto.chacha20
 
 fn tag_matches(key_hex: str, msg_hex: str, want: str) -> bool {
-    let key = hex.decode(key_hex) else List[int]()
-    let msg = hex.decode(msg_hex) else List[int]()
+    let key = hex.decode(key_hex) else List[byte]()
+    let msg = hex.decode(msg_hex) else List[byte]()
     chacha20.to_hex(chacha20.poly1305(key, msg)) == want
 }
 

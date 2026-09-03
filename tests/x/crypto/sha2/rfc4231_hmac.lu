@@ -17,20 +17,20 @@ use std.hex
 use std.x.crypto.sha2
 
 fn mac256(key_hex: str, data_hex: str) -> str {
-    let key = hex.decode(key_hex) else List[int]()
-    let data = hex.decode(data_hex) else List[int]()
+    let key = hex.decode(key_hex) else List[byte]()
+    let data = hex.decode(data_hex) else List[byte]()
     sha2.to_hex(sha2.hmac256(key, data))
 }
 
 fn mac384(key_hex: str, data_hex: str) -> str {
-    let key = hex.decode(key_hex) else List[int]()
-    let data = hex.decode(data_hex) else List[int]()
+    let key = hex.decode(key_hex) else List[byte]()
+    let data = hex.decode(data_hex) else List[byte]()
     sha2.to_hex(sha2.hmac384(key, data))
 }
 
 fn mac512(key_hex: str, data_hex: str) -> str {
-    let key = hex.decode(key_hex) else List[int]()
-    let data = hex.decode(data_hex) else List[int]()
+    let key = hex.decode(key_hex) else List[byte]()
+    let data = hex.decode(data_hex) else List[byte]()
     sha2.to_hex(sha2.hmac512(key, data))
 }
 

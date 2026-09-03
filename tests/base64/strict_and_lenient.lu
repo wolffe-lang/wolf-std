@@ -12,13 +12,13 @@
 use std.base64
 
 fn missed(s: str) -> bool {
-    let sentinel = List[int]()
+    let sentinel = List[byte]()
     let got = base64.decode(s) else sentinel
     got.len == 0
 }
 
 fn missed_lenient(s: str) -> bool {
-    let sentinel = List[int]()
+    let sentinel = List[byte]()
     let got = base64.decode_lenient(s) else sentinel
     got.len == 0
 }
@@ -40,16 +40,16 @@ fn main() -> !int {
     if missed_lenient("TQ=Q") {} else { return 9 }
     if missed_lenient("é") {} else { return 10 }
     // Lenient: padding optional, unused bits ignored.
-    let a = base64.decode_lenient("TQ") else List[int]()
+    let a = base64.decode_lenient("TQ") else List[byte]()
     if a.len == 1 {} else { return 11 }
-    if a[0] == 77 {} else { return 12 }
-    let b = base64.decode_lenient("TR") else List[int]()
+    if a[0] == 77 as byte {} else { return 12 }
+    let b = base64.decode_lenient("TR") else List[byte]()
     if b.len == 1 {} else { return 13 }
-    if b[0] == 77 {} else { return 14 }
-    let c = base64.decode_lenient("TWE") else List[int]()
+    if b[0] == 77 as byte {} else { return 14 }
+    let c = base64.decode_lenient("TWE") else List[byte]()
     if c.len == 2 {} else { return 15 }
     // Lenient still accepts well-formed input.
-    let d = base64.decode_lenient("TWFu") else List[int]()
+    let d = base64.decode_lenient("TWFu") else List[byte]()
     if d.len == 3 {} else { return 16 }
     0
 }
