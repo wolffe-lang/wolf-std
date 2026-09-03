@@ -65,7 +65,7 @@
 //! no, uncatchably (D30, no unwinding). s37 shipped the recoverable slice
 //! `s.get(a..b) -> str ! {none}` (`[mem.str.get]`) plus `find`/`rfind`/
 //! `split`/`count`/`ends_with`/`strip_suffix`/`replace` and the byte view
-//! `s.bytes() -> List[int]`, and all three lanes execute them (wolfc at
+//! `s.bytes() -> List[byte]`, and all three lanes execute them (wolfc at
 //! s37, lupin at 0.1.5, native at #40). Twelve of the fifteen are code
 //! below — THIRTEEN as of sc24: D58 ruled the `char` type
 //! (`[type.char]`, a Unicode scalar value — ordered, NOT an integer)
@@ -290,7 +290,7 @@ pub fn get(s: str, from: int, to: int) -> str ! {none} {
 /// n = n + 0
 /// n == 468
 /// ```
-pub fn bytes(s: str) -> List[int] {
+pub fn bytes(s: str) -> List[byte] {
     s.bytes()
 }
 
@@ -949,7 +949,8 @@ pub fn join(sep: str, parts: List[str]) -> str {
 /// ```
 pub fn char_count(s: str) -> int {
     var seen = 0
-    for b in s.bytes() {
+    for raw in s.bytes() {
+        let b = raw as int
         if b < 128 || b > 191 {
             seen = seen + 1
         }
@@ -980,7 +981,8 @@ pub fn char_count(s: str) -> int {
 pub fn char_offsets(s: str) -> List[int] {
     var out = List[int]()
     var at = 0
-    for b in s.bytes() {
+    for raw in s.bytes() {
+        let b = raw as int
         if b < 128 || b > 191 {
             (mut out).push(at)
         }
@@ -1035,7 +1037,8 @@ pub fn code_points(s: str) -> List[int] {
     var out = List[int]()
     var acc = 0
     var pending = 0
-    for b in s.bytes() {
+    for raw in s.bytes() {
+        let b = raw as int
         if pending > 0 {
             acc = acc * 64 + (b - 128)
             pending = pending - 1
@@ -1110,8 +1113,8 @@ pub fn to_list_chars(s: str) -> List[char] {
 /// str.is_ascii("") == true
 /// ```
 pub fn is_ascii(s: str) -> bool {
-    for b in s.bytes() {
-        if b > 127 {
+    for raw in s.bytes() {
+        if raw as int > 127 {
             return false
         }
     }
