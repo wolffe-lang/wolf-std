@@ -558,7 +558,43 @@ pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.3+dev.31170d1"
+version = "0.2.3+dev.4230b00"
+# sc35 bump: THE PRODUCERS SPEAK BYTES, AND THIS IS THE FIRST BUMP IN
+# THIS FILE'S HISTORY THAT WAS PREDICTED TO BREAK THE TREE ON PURPOSE.
+# Binary AND data pin move `31170d1` -> `4230b00` together (20 commits),
+# so sc34's restored one-sha invariant is HELD rather than re-argued.
+#
+# What the 20 commits are for: s136 (#231) moves the eight byte
+# builtins — `str.bytes()`, `str_from_utf8`, `fs_read_bytes`,
+# `fs_write_bytes`, `fs_read_chunk`, `fs_write_chunk`, `net_read_bytes`,
+# `net_write_bytes` — from `List[int]` to `List[byte]`, minted in the
+# native rt at EXACT capacity (a 64 KiB read charges 48 + 65,536, not
+# 1,048,560) and held in the checked machine as `Value::Byte` 1-byte
+# slots (the payload exactly). Every one of std's sixteen byte-tier
+# functions is a thin wrapper over one of those eight, so this pin
+# REFUSES the library that was written against the old signatures —
+# 198 sites over 45 files, E0401, each note naming `b as int`. That
+# refusal is F-0106's cure arriving, not a regression, and the sprint's
+# second half is the rename that answers it. The bump therefore does
+# not stand as its own green commit; it is a subset of the one green
+# tree the whole sprint was measured on (the sc34 posture, stated).
+#
+# Also in the span and carrying nothing here: #227's unix-domain
+# sockets (`net_listen_unix`/`net_connect_unix`, `[os.net.unix]` —
+# anchors 415 -> 417, the only two keys that move, set-diffed both ways
+# with nothing dropped), D74's string-layout codes (E0102/E0103/E0104
+# re-ruled — the tree's one executable `"""` is well-formed under every
+# new rule and its stdout hash is pinned), and the 2026-09-03 ledger
+# ritual.
+#
+# The tag is STILL unavailable and the reason is stronger than sc34's:
+# `v0.2.3` = `3befc3e` is twelve commits before s135 (no `byte` lowering
+# at all) and thirty-two before s136 (no byte-typed builtin). Built at
+# the sha with the stamp applied — `WOLF_COMMIT=4230b00 cargo build
+# --release -p wolf_driver -p wolf_rt` — and installed through fresh
+# inodes (the sc26 SIGKILL rule).
+#
+# (the sc34 entry, kept:)
 # sc34 bump: THE BINARY MOVES 51 COMMITS AND THE DATA PIN COMES BACK TO
 # MEET IT. sc33 pulled the two apart on purpose; this entry puts them
 # back on one sha (`31170d1`), so the one-sha invariant is restored
@@ -1420,4 +1456,5 @@ version = "0.2.3+dev.31170d1"
 # pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"  (superseded, sc30 era — the s130-merge dev-stamped acquisition)
 # pin = "75fd2d0b25b6ed995ec7293053bc32fb3497e272"  (superseded, sc31 era — the v0.2.1 tag acquisition)
 # pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc32/sc33 era — the v0.2.2 tag acquisition, held across sc33 while the data pin ran ahead)
-pin = "31170d119379086f6242cd88d4f4e5386f6aef23"
+# pin = "31170d119379086f6242cd88d4f4e5386f6aef23"  (superseded, sc34 era — the s135-merge dev-stamped acquisition, the byte TYPE)
+pin = "4230b008e39d6541f31ac9858057e4345a337271"
