@@ -558,7 +558,89 @@ pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.2"
+version = "0.2.3+dev.31170d1"
+# sc34 bump: THE BINARY MOVES 51 COMMITS AND THE DATA PIN COMES BACK TO
+# MEET IT. sc33 pulled the two apart on purpose; this entry puts them
+# back on one sha (`31170d1`), so the one-sha invariant is restored
+# rather than re-suspended — and, per the sc33 lesson, that is a
+# CONVENTION being honoured, not a gate being satisfied: doctor still
+# never reads `vendor/upstream/PIN`.
+#
+# **The binary is a DEV STAMP because no tagged wolf can compile this
+# sprint's subject.** The contract holds the machine at v0.2.3 until
+# r07, and a trunk build off `31170d1` self-brands
+# `wolf 0.2.3+dev.31170d1 (wolfgang, pin 31170d1)` — version 0.2.3,
+# claiming no release, naming its own pin on line 1 where doctor reads
+# it. What forces the dev build over the tag is measured rather than
+# assumed: the **v0.2.3 TAG is `3befc3e`, TWELVE commits BEFORE s135**,
+# and at that tag `crates/wolf_wir/src/lower.rs:1571` reads
+# `Prim::Byte => Err(refuse("byte lowering (runtime byte views, c08)",
+# span))`. The type NAME has resolved in sema for many sprints; the
+# LOWERING has always refused it. The installed tag build was asked,
+# in its own directory, before it was replaced:
+#
+#     $ wolf run main.lu            # let b = 65 as byte
+#     wolf run: cannot compile this yet — byte lowering
+#     (runtime byte views, c08) @24..34
+#     $ wolf run --checked main.lu  # byte-identical refusal
+#
+# and `git grep "byte lowering" 31170d1` finds nothing — s135 deleted
+# the refusal along with the conservatism entry. So a `List[byte]` is
+# unbuildable by every wolf release that exists, and sc30's precedent
+# is the honest answer: build at the sha with the stamp applied and
+# record the full dev identity in `version` above (a lying binary is
+# worse than none; an honest dev binary is neither).
+#
+# ACQUISITION (nomad-1, macOS arm64, 2026-09-02 21:44-21:51 EDT): built
+# in this worktree's own `upstream/` at 31170d1 (submodule HEAD ==
+# the sha, tree clean):
+#   `WOLF_COMMIT=31170d1 cargo build --release -p wolf_driver -p wolf_rt`
+# `wolf` + `libwolf_rt.a` installed to ~/.local/bin through FRESH
+# INODES (copy to a `.new` name, then rename over — the sc26 SIGKILL
+# rule: never overwrite a running image in place); the replaced
+# v0.2.3-tag pair was kept aside first, which is what made the
+# before-picture above possible at all.
+#
+# **What the 51 commits carry** (7 first-parent), and why none of them
+# has a carrier in this tree — the full grep is the sc34 register in
+# `docs/findings.md`, this is the index:
+#   - **s135** (`31170d1`): `[type.byte]` per D72 — the sprint's whole
+#     subject, and NEW SURFACE with zero carriers at the bump (not one
+#     `as byte`, not one `List[byte]` in `std/` or `tests/` when the
+#     gauntlet runs; the substitution is this sprint's second half and
+#     is deliberately measured separately). Plus **#222** one path
+#     spelling across 23 pkg sites — this rig runs no package verb,
+#     only `conform-run` — and **#224** the reset-socket EINVAL, 25
+#     lines in the CHECKED machine's `net_deadline` that fire only when
+#     `setsockopt` answers `InvalidInput` while `local_addr()` still
+#     succeeds. The tree's one `set_deadline` test arms a budget on a
+#     socket whose peer is accepted and then stays SILENT — never
+#     closed, never reset.
+#   - **r06** (`5241ab7`): v0.2.3 prepared; #212 dist prunes stale
+#     archives, #214 release notes from the CHANGELOG, #215 nine
+#     grammar productions with anchors held at 411. Version plumbing
+#     and spec text.
+#   - **s134** (`5f99b9f`): #219 (the LLVM emitter takes a mangled
+#     symbol's address across partitions — no lane here builds the
+#     release tier; and every `unsupported` record now names its
+#     construct through `x-unsupported-construct`/`x-unsupported-span`,
+#     which `record::parse` does not read: its key list is closed and
+#     `classify` maps `Verdict::Unsupported` by PATTERN). D71/#220 (a
+#     parse refusal spans its offending token — 35 upstream snapshots
+#     moved; this rig pins no span anywhere and compares `fail(E…)` by
+#     CODE). The LSP annotation trio is a `wolf_query` surface.
+#   - **the 2026-09-02 ledger ritual** (`813153e`) and **s60b**
+#     (`56ed5a5`, the windows task layer) and `4d9683d` — already the
+#     DATA at sc33, new to the BINARY here; windows-gated on a host
+#     nomad-1 is not.
+#
+# So sc34's zero is a FOURTH kind and the most expensive of the four to
+# defend: sc31's was a span with no capability, sc32's a capability
+# with no carrier, sc33's a binary that did not move — and this one is
+# a binary that moved further than any before it, every carrier of
+# which had to be grepped for by name.
+#
+# The sc33 note, kept for the history it records:
 # sc33 bump: THE BINARY DOES NOT MOVE, AND THE DATA PIN DOES. This is
 # the first entry in this file where the two come apart on purpose, so
 # it names the invariant it suspends out loud.
@@ -1337,4 +1419,5 @@ version = "0.2.2"
 # pin = "c88ab6441b2706e20375deeec86eaf6da9bde25b"  (superseded, sc28/sc29 era — the v0.2.0 tag acquisition)
 # pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"  (superseded, sc30 era — the s130-merge dev-stamped acquisition)
 # pin = "75fd2d0b25b6ed995ec7293053bc32fb3497e272"  (superseded, sc31 era — the v0.2.1 tag acquisition)
-pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"
+# pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc32/sc33 era — the v0.2.2 tag acquisition, held across sc33 while the data pin ran ahead)
+pin = "31170d119379086f6242cd88d4f4e5386f6aef23"

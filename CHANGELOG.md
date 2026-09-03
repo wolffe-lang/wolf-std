@@ -1,5 +1,67 @@
 # Changelog
 
+## sc34 — 2026-09-02 — the byte tier is bytes, and it cannot be yet
+
+The wolf binary advances **51 commits** — the largest span this repo has
+crossed in one bump — to a dev-stamped trunk build,
+`wolf 0.2.3+dev.31170d1 (wolfgang, pin 31170d1)`, and the DATA pin comes
+back to meet it at the same sha, restoring the one-sha invariant sc33
+suspended. The version stays **0.2.3** (r07 moves the tag) and the
+binary is a dev build rather than the v0.2.3 tag for a measured reason:
+**the tag cannot compile a byte.** `v0.2.3` = `3befc3e` sits twelve
+commits before s135, and its WIR lowering refuses `Prim::Byte` outright
+— confirmed on the installed tag build before it was replaced. lupin
+stays at **0.1.23**, whose conformance pin is now 51 commits behind
+wolf's own. Drift was predicted ZERO and measured ZERO over **376x3**,
+the fourth consecutive empty drift list and the first defended against a
+compiler that actually moved: anchors **411 -> 415** (+4/-0, exactly the
+`[type.byte]` family, key sets diffed both ways), corpus 490 -> 499.
+Every `unsupported` record in the tree gained wolf-lang#219's
+`x-unsupported-construct`/`x-unsupported-span` keys — 124 records changed
+shape and none could move a row, because this rig's record parser reads
+a closed key list.
+
+**D72's `byte` is in the language, this library measured what it is
+worth, and it did not substitute.** A 64 KiB buffer as `List[byte]`
+charges **131,120 native and 65,536 checked** where the same buffer as
+`List[int]` charges 1,048,560 and 1,048,576: **16.0x -> 2.0x native,
+16.0x -> 1.0x checked**, linear at every size from 1 KiB, with native's
+residue exactly `2 x payload + 48` (one list header) — the push-growth
+history that is #203's separable second half. **F-0104 closes** with
+that after-table. What does not close is the library's ability to spend
+it: **s135 gave the language a byte type and no byte-typed builtin.**
+`s.bytes()`, `str_from_utf8` and all six `fs`/`net` byte builtins are
+still declared over `List[int]`, and every one of std's sixteen
+byte-tier functions is a thin wrapper over one of them — so a
+substituted signature would have to convert elementwise against a
+builtin, and with a cumulative ledger the intermediate stays charged: a
+substituted `fs.read_bytes` measures **17.0x checked / 18.0x native**,
+worse than the 16.0x it replaces, at every size, at exactly the io sites
+the ask was filed about. Nothing is worked around; the sixteen
+signatures keep their form so the change stays a rename. Filed as
+**wolf-lang#231** — move the eight builtin signatures and the
+substitution is the rename it was designed to be.
+
+**Two findings and two closures.** **F-0106** is the producers gap
+above. **F-0107** (wolf-lang#232): the checked machine charges
+**1,048,576** — 16x the payload — for a CONSUMED `s.bytes()` walk that
+allocates nothing, where native and lupin both charge 0; it is why the
+one substitution with a real native win (`bytes.from_str` as a walk,
+131,120 natively) regresses to 1,114,112 under `--checked`, and it makes
+a region cap mis-fire between tiers on the idiom `std.bytes` teaches for
+byte walking. **F-0105 closes**: D71/#220 landed in this span and its
+exact reproducer now reads `[83,84]` on all three lanes, the zero-width
+wolfc span gone. **F-0103 is re-probed against a moving compiler for the
+first time and is unmoved** — and the probe got sharper: the checked
+tier's `control flow in an argument` needs the row to be CONSUMED in the
+callee, not merely passed, so a callee that ignores its row-typed
+parameter runs on every lane and reports a false heal.
+
+Residues re-probed at the new pin: the chars-pairs tuple list refuses at
+its **eighth** consecutive pin, F-0096 refuses verbatim, `List[int].in(r)`
+is the sc33 string unchanged, and a `str` still charges no named
+region's ledger on any tier.
+
 ## sc33 — 2026-09-02 — the bytes get a width
 
 lupin advances to **v0.1.23** at conformance pin 8cda3aa (is34, THE

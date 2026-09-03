@@ -545,7 +545,15 @@ family is style (`[type.str.concat.cost]`, measured).
   cannot be written (F-0018/F-0035), and an encoder cannot wait for the
   type it converts. Element-range violations trap `assert` (a caller
   contract, §2) instead of encoding something the caller did not mean.
-  Every signature keeps its shape when `Bytes` lands.
+  Every signature keeps its shape when `Bytes` lands — and at sc34 the
+  type it was waiting for EXISTS (`byte`, D72 / wolf-lang s135: an 8-bit
+  unsigned octet, `List[byte]` striding by 1, measured here at 2.0x
+  native / 1.0x checked against `List[int]`'s 16.0x) while the interim
+  STAYS, because no builtin in the language produces or consumes a
+  byte-typed list yet, so every substituted signature would have to
+  convert against one and would charge MORE than it saves
+  (wolf-lang#231, F-0106). The interim retires when the eight builtin
+  signatures move, and the retirement is a rename.
 - **§2's inventory gains three tags**: **`base`** (a radix outside 2..36,
   the CALLER's mistake, distinct from `parse`'s bad DATA), **`deep`** (a
   nesting limit reached, which a serializer raises instead of exhausting
