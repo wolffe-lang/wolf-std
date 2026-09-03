@@ -5680,3 +5680,179 @@ requires**: `git -C ../wolf-lang log origin/trunk` is still `813153e`
 remote. Item 1 has not merged at either gauntlet, so
 `breach_is_a_row`'s three-lane flip is **deferred** and the data pin
 stays `813153e`.
+
+## The sc34 pin bump — the byte arrives, and the three pins come back together
+
+**The drift prediction, written 2026-09-02 21:50 EDT, BEFORE the binary
+was installed and BEFORE any gauntlet at the new pins** (read first, per
+the ritual: the whole `8cda3aa..31170d1` binary span and the
+`813153e..31170d1` data span commit by commit; both upstream trees
+counted and diffed at the two data-pin shas before the run; the repo
+grepped for every new surface's SHAPE; and — the sc33 lesson —
+the BEFORE side measured on the binary that was about to be replaced).
+
+**All three pins move, and the one-sha invariant sc33 suspended is
+RESTORED.** sc33 was the first bump where the three came apart; sc34 is
+the bump that puts them back:
+
+- **The wolf BINARY moves 8cda3aa (the v0.2.2 tag) -> 31170d1**, a
+  dev-stamped build at trunk: `wolf 0.2.3+dev.31170d1 (wolfgang, pin
+  31170d1)`. **51 commits — the largest binary span this repo has ever
+  crossed in one bump** (sc32's 35 was the previous record), because
+  sc33 held the compiler at its tag while the data pin ran ahead, so
+  this bump pays for two sprints of compiler at once: s60b (the windows
+  task layer), the 2026-09-02 ledger ritual, s134 (the LSP annotates,
+  #219, D71/#220), r06 (v0.2.3, #212/#214/#215) and s135 (the byte,
+  #222, #224).
+- **The DATA pin moves 813153e -> 31170d1**, 32 commits, and lands on
+  the SAME sha as the binary. The invariant is a convention, not a
+  gate (the sc33 lesson); it is honoured here because nothing this
+  sprint wants it suspended for.
+- **The lupin BINARY does NOT move**: 0.1.23 (`127b6fa`), conformance
+  pin `8cda3aa`, unchanged in `vendor/tools.toml`. Note what that does
+  to the gap sc33 recorded as CLOSED: lupin's conformance pin was zero
+  commits behind wolf's own at sc33 and is **51 behind** here, the
+  largest this repo has recorded, and every one of those 51 is a
+  compiler the interpreter has not chased yet. is36 is where it closes.
+
+### Why the binary is a DEV STAMP and not the v0.2.3 tag — measured, not assumed
+
+The contract says "the machine wolf stays at v0.2.3 until r07", and it
+does: a dev build off trunk self-brands `0.2.3+dev.<commit>`, claiming
+no release. What forces the dev build rather than the tag is that
+**the v0.2.3 TAG CANNOT COMPILE THIS SPRINT'S SUBJECT.** `v0.2.3` =
+`3befc3e` sits twelve commits BEFORE s135, and at that tag
+`crates/wolf_wir/src/lower.rs:1571` reads
+`Prim::Byte => Err(refuse("byte lowering (runtime byte views, c08)", span))`
+— the type name has resolved in sema for many sprints and the lowering
+has always refused it. Measured on the installed tag build before it
+was replaced, in its own directory, on both wolf rungs:
+
+    $ wolf run main.lu          # let b = 65 as byte
+    wolf run: cannot compile this yet — byte lowering
+    (runtime byte views, c08) @24..34
+    $ wolf run --checked main.lu
+    (byte-identical refusal)
+
+and `git grep "byte lowering" 31170d1` finds nothing — s135 deleted the
+refusal. So there is no tagged wolf in existence that can build a
+`List[byte]`, and the sc30 precedent is the honest answer: build at the
+sha with the stamp applied
+(`WOLF_COMMIT=31170d1 cargo build --release -p wolf_driver -p wolf_rt`),
+install `wolf` + `libwolf_rt.a` to `~/.local/bin` through **fresh
+inodes** (the sc26 SIGKILL rule — never overwrite in place). The
+`+dev.<commit>` string is exactly what r03 designed for this case: it
+claims no release and still names its own pin on line 1, so doctor's
+provenance gate reads the pin clause the same way it reads a tag
+build's, and `vendor/tools.toml`'s `version` key carries the full dev
+identity (a lying binary is worse than none; an honest dev binary is
+neither).
+
+**And the same measurement is the before-picture the sc33 lesson says
+to take**: lupin 0.1.23 refuses `as byte` with `fail(E0301)` at phase
+**resolve** — `nothing with this name is in scope, so this cast names
+no target type … [mod.scope]` — which is the interpreter's answer both
+before and after this bump, since lupin does not move.
+
+### The drift prediction, surface by surface
+
+**Predicted total at the bump (before any substitution): ZERO verdict
+movers over 376x3.** The baseline the gauntlet must reproduce exactly,
+counted from the untouched ledger at trunk `35f69ef`: lupin **304**
+`run` / **72** `unsupported`; wolfc **299** `run` / **75**
+`unsupported` / **2** `fail(E…)` (E1013, E0301); native **325** `run` /
+**49** `unsupported` / **2** `fail(E…)`. `std-test` should print 376
+tests, 697 forward tags, 200 conservatism entries, 0 unstable, 0 slow,
+0 divergent; `doc-examples` 414 blocks; `ulp` 200 rows. Anchors
+**411 -> 415** (+4 / -0). Corpus **490 -> 499** files.
+
+This zero is a **fourth** kind, and it is the most expensive of the four
+to defend, so it gets the most words. sc31's was a span with no new
+capability; sc32's was a capability with no carrier; sc33's was a
+binary that did not move at all. sc34's is **a binary that moved
+further than any before it, across a surface every one of whose
+carriers has to be grepped for by name** — the cheap answer is not
+available and the work has to be done:
+
+- **`byte` itself (s135) is NEW SURFACE with no carrier at the bump.**
+  `grep -rn "byte" std/ tests/ --include=*.lu` finds the word only in
+  prose and in identifiers (`read_bytes`, `bytes.len`, `non_byte_trap`);
+  there is not one `as byte` and not one `List[byte]` in the tree when
+  the gauntlet runs. The substitution is this sprint's SECOND half and
+  is deliberately not in the bump's measurement — that is what makes
+  the bump a clean control.
+- **#219's record-shape change moves nothing, for sc33's exact
+  reason, re-read from source rather than inherited.** `conform-run`
+  now adds `x-unsupported-construct` / `x-unsupported-span` to every
+  `unsupported` record (`[proto.record.ext]`). This rig's
+  `record::parse` reads a closed list — `protocol`, `impl`,
+  `phase_reached`, `verdict`, `stdout_sha256`, `stdout_inline`,
+  `warnings` — and **never looks at an extension key**, and `classify`
+  maps `Verdict::Unsupported` to `Achieved::Unsupported` BY PATTERN
+  without reading another field. So 75 wolfc rows and 49 native rows
+  will emit strictly richer records and not one of them can move. This
+  is the same shape as sc33's #55 and the same answer for the same
+  structural reason: predict at both levels, and the level that counts
+  is what the comparator reads.
+- **D71/#220 (a parse refusal spans its offending token) moves
+  nothing.** 35 upstream snapshots moved; this rig pins **no span
+  anywhere**. `classify` compares a `fail(E…)` row by CODE
+  (`code == want`) and `diff_class` compares verdicts and, for
+  `Exit` only, `stdout_sha256`. The tree's two `fail` rows are E1013
+  and E0301, and neither names a locus. (This was already established
+  as F-0105's aside at sc33 and is re-read, not carried, because the
+  binary that produced the spans is new here.)
+- **#222 (one path spelling across 23 pkg sites) has no carrier: this
+  rig never runs a package verb.** `runner.rs` invokes exactly
+  `wolf conform-run [--checked|--native] --std-root <dir>` and
+  `lupin conform-run`; `add`/`rm`/`init`/`vendor`/`publish` are not in
+  the rig's vocabulary at all.
+- **#224 (net_deadline arms on a reset socket) has no carrier, and the
+  carrier check is specific rather than categorical.** The change is
+  25 lines in `wolf_mem/src/ubcheck.rs` — the CHECKED machine only —
+  and it fires on exactly one condition: `setsockopt` answering
+  `InvalidInput` while `local_addr()` still succeeds, i.e. a socket
+  the peer RESET by closing over unread data. The tree has exactly one
+  `set_deadline` call site in a test (`tests/net/read_deadline_row.lu`)
+  and it arms the budget on a socket whose peer (`conn`) is accepted
+  and never closed, never written to and never reset — the whole point
+  of that test is a SILENT peer, not a departed one. Native's timer
+  wheel never called `setsockopt` in the first place. Both wolf lanes
+  predicted unmoved.
+- **s60b (the windows task layer) has no carrier: the host is macOS
+  arm64.** `stack_win.rs` is a new file behind a target gate, and the
+  reactor/signal churn beside it is the same lane's. The one thing in
+  that merge that is NOT windows-only is a poller wake fix; the tree's
+  net rows are loopback and synchronous and were green across it at
+  the sc33 data pin already.
+- **s134's LSP trio (`signatureHelp`/`semanticTokens`/`inlayHint`) and
+  the binding table under it have no carrier**: `wolf_query` is an
+  editor surface, this repo runs `conform-run`.
+- **#219's LLVM half (func.addr across partitions) has no carrier: no
+  lane in this repo builds the release tier.**
+- **r06 is a version bump plus dist/release-notes plumbing**, and
+  #215's nine grammar productions are SPEC text — upstream states
+  anchors held at 411 across them, and the +4 this bump sees is
+  s135's `[type.byte]` family alone.
+- **The two `fail(E…)` rows and the three F-0103 rows are predicted
+  verbatim.** F-0103's asymmetry lives in `mem`-phase argument
+  lowering; nothing in 51 commits touches argument lowering, and
+  `wolf_wir/src/lower.rs`'s 76 changed lines are the byte cast/op
+  bridges. Re-probed as its own item below rather than assumed —
+  and unlike sc33, this time the binary DID move, so the probe is
+  evidence rather than a formality.
+
+**The lupin lane is predicted UNCHANGED AT THE BUMP, and that is a
+zero of sc33's cheapest kind — the binary did not move.** No std row
+uses `byte` when the gauntlet runs, so there is nothing for lupin's
+E0301 to reach even if it could.
+
+**The doctor prediction.** Doctor gates the binary's self-declared
+version and pin against `vendor/tools.toml` and never reads
+`vendor/upstream/PIN`; `sync-pin` gates the vendored snapshot against
+the SUBMODULE. With `version = "0.2.3+dev.31170d1"` and
+`pin = 31170d1…` recorded, doctor is predicted GREEN on both binaries
+with wolf's line 1 read as the dev identity and the pairing line
+(`lupin 0.1.23 … pin 8cda3aa`) reported and not gated (F-0064). If
+doctor gates the `+dev.` suffix in a way sc30's note did not record,
+that is the finding.
