@@ -7262,3 +7262,19 @@ and **still fires under lupin**, because the interpreter can still hand
 it a 256. The sentence was true of the compilers and false of the
 reference machine, and the divergence ledger is where that difference now
 lives rather than in a claim nobody re-checked.
+
+### The gauntlet over the COMMITTED tree
+
+`cargo xtask ci` exit code **0**, `ci: GREEN`, **18:57:36 -> 19:15:43
+EDT**, run after the four chunked commits from a clean working tree
+(`git status` shows only the untracked `.docs` checkout, which is
+nobody's input). Identical numbers: `sync-pin: PIN 982f857…`;
+`std-test: 376 test(s); forward tags: 700; conservatism ledger: 201
+entries; unstable rows: 0; slow skips: 0; divergent rows: 8` — GREEN;
+`doc-examples: 414 block(s), GREEN`; `ulp: 200 reference row(s), GREEN`.
+
+So sc35 ends the way its first half could not: **two consecutive greens
+at the new pins, the second over the tree the commits actually produce.**
+The branch's own history is the record of why that took two bumps —
+sixteen commits red on one lane by construction, with the count and the
+cause written down, then four commits that closed it.
