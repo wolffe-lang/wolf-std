@@ -43,6 +43,20 @@
 //! library's own measurement at the sc32 pin agrees to the byte and is
 //! recorded in `docs/findings.md`.
 //!
+//! **HALF OF THAT 16x IS RETIRABLE IN THE LANGUAGE NOW, AND THE IO PATH
+//! HAS NOT COLLECTED IT YET (sc34).** D72's `byte` landed: the same
+//! 65,536 pushes into a `List[byte]` charge **131,120 native** (2.0x —
+//! `2 x payload + 48`, one list header) and **65,536 checked** (1.0x,
+//! the payload exactly). So the 8x element-width multiplier is gone
+//! wherever a buffer is spelled `List[byte]`, and what remains natively
+//! is the 2x push-growth history — which is #203's separable
+//! preallocation half and no type change can touch it. **But std's
+//! readers still hand back `List[int]`**, because no builtin in the
+//! language produces or consumes a byte-typed list yet (wolf-lang#231),
+//! so a caller sizing a budget around `fs.read_bytes`, `read_chunk` or
+//! `net.read_bytes` is still sizing around 16x today. The caveat below
+//! therefore STANDS, and now it names its own exit.
+//!
 //! Two consequences a caller must act on:
 //!
 //! - **Derive budgets from measured `charged` readings, never from
