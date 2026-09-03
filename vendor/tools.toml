@@ -19,6 +19,27 @@
 # watches the drift, report-never-gate.
 
 [lupin]
+# 0.1.25 (sc35 SECOND acquisition, from 0.1.23 — TWO releases in one
+# chase, and the one that unblocks this branch). is36 ships
+# `[type.byte]` in the mirror: the byte type, the two casts, operator
+# widening and byte-slotted list storage, which is exactly what F-0108
+# said the byte tier was waiting for. Tag `v0.1.25` = wolf-interp
+# `ae34115`; installed by the orchestrator through fresh inodes (the
+# sc26 SIGKILL rule); this entry records the acquisition.
+#
+# **ITS CONFORMANCE PIN IS AHEAD OF THIS REPO'S DATA PIN, WHICH HAS
+# NEVER HAPPENED BEFORE.** lupin 0.1.25 conforms to `982f857` =
+# wolf-lang **v0.2.4**, FIVE commits past this branch's data pin
+# `4230b00`; at this morning's bump the same pin was 71 commits BEHIND.
+# The gap inverts rather than closes. Doctor reports the pairing and
+# does not gate it (F-0064: the rig reads identity from line 1 and the
+# two binaries may lawfully sit at different wolf-lang pins), and the
+# 0.1.23 -> 0.1.25 span carries no data-pin surface this tree reads —
+# the wolf binary and the DATA pin both stay at `4230b00`, so the
+# one-sha invariant between THOSE two is still held and only the
+# interpreter has run ahead.
+#
+# (the 0.1.23 entry, kept as history:)
 # 0.1.23 (sc33 bump, from 0.1.22 — ONE release, chased on schedule).
 # THE LETTERS IN THE MIRROR (is34): the three letters r05 sent back
 # with v0.2.2, and this machine takes all three.
@@ -414,14 +435,15 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.23"
+version = "0.1.25"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
 # pin = "83f83bbf44ce5dd6a8f6e2fe255fa37d1fe3954b"  (superseded, sc30 era — is30's s129-merge pin)
 # pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"  (superseded, sc31 era — is31's s130-merge pin)
 # pin = "2bfbe5e6e877d3b6b43a9d8a68b56b1ef74c21c4"  (superseded, sc32 era — is33's s132-merge pin)
-pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"
+# pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc33/sc34/sc35-bump era — is34's v0.2.2-tag pin, held while wolf ran 71 commits ahead)
+pin = "982f857885b991e686c6b045de213d10cab013c1"
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
@@ -558,7 +580,36 @@ pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.3+dev.4230b00"
+version = "0.2.4"
+# sc35 SECOND bump: THE DEV STAMP RETIRES, AND ALL THREE PINS LAND ON ONE
+# SHA FOR THE FIRST TIME. r07 shipped `v0.2.4` = `982f857` and installed
+# it over this branch's dev-stamped build mid-sprint; the branch STOPPED
+# and reported rather than accommodating a lane that moved under it, and
+# the re-pin was authorised after. Binary AND data pin move
+# `4230b00` -> `982f857`, five commits.
+#
+# THE SPAN HAS NO COMPILER IN IT: `git diff --name-only 4230b00 982f857`
+# touches eight files and NOT ONE is a `.rs` (release.yml, README,
+# crates/wolf_driver/PAIRING, CHANGELOG, and the version bump's
+# Cargo.toml + both lockfiles + one wolf_sema snapshot that embeds the
+# version string by design). `spec/` and `corpus/` are untouched, so
+# anchors are 417 -> 417 with the snapshot BYTE-IDENTICAL to the one
+# already vendored — the first bump here where `vendor/upstream/
+# anchors.json` does not change at all and only `PIN` moves.
+#
+# WHY THE TAG IS AVAILABLE NOW AND WAS NOT THIS MORNING: sc34 and sc35's
+# first bump both had to build off trunk because no tagged wolf could
+# compile a `byte` (v0.2.3 = 3befc3e sits twelve commits before s135, and
+# its WIR lowering refused `Prim::Byte` outright). v0.2.4 is the first
+# tag that carries s135 AND s136, so the `+dev.<commit>` suffix r03
+# designed for exactly this gap retires after two sprints, on schedule.
+#
+# The binary's line 2 names `lupin 0.1.24 … pin 3befc3e` — r07's
+# release-time PAIRING record — while the installed interpreter is
+# 0.1.25. Reported and NOT gated (F-0064): the rig reads identity from
+# line 1, and the two binaries may lawfully sit at different pins.
+#
+# (the first sc35 entry, kept as history:)
 # sc35 bump: THE PRODUCERS SPEAK BYTES, AND THIS IS THE FIRST BUMP IN
 # THIS FILE'S HISTORY THAT WAS PREDICTED TO BREAK THE TREE ON PURPOSE.
 # Binary AND data pin move `31170d1` -> `4230b00` together (20 commits),
@@ -1457,4 +1508,5 @@ version = "0.2.3+dev.4230b00"
 # pin = "75fd2d0b25b6ed995ec7293053bc32fb3497e272"  (superseded, sc31 era — the v0.2.1 tag acquisition)
 # pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc32/sc33 era — the v0.2.2 tag acquisition, held across sc33 while the data pin ran ahead)
 # pin = "31170d119379086f6242cd88d4f4e5386f6aef23"  (superseded, sc34 era — the s135-merge dev-stamped acquisition, the byte TYPE)
-pin = "4230b008e39d6541f31ac9858057e4345a337271"
+# pin = "4230b008e39d6541f31ac9858057e4345a337271"  (superseded, sc35 first bump — the s136-merge dev-stamped acquisition, the byte PRODUCERS)
+pin = "982f857885b991e686c6b045de213d10cab013c1"
