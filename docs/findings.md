@@ -113,6 +113,8 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0103 | 2026-09-01 | **the CHECKED tier refuses an unhandled raising call passed straight into a ROW-TYPED parameter — `unsupported — control flow in an argument` at `mem` — where lupin AND wolf's own native rung both run it.** The shape is `std.option`'s (`fn or[T](v: T ! {none}, default: T)`, sc06): a helper whose parameter is a row union, called as `row_name(narrow(1))`. Four probes characterize it, all three lanes green on the last three: a non-raising call in an argument; `take_int(narrow(9) else 0)`; `take_int(narrow(9)?)`; and `let r = narrow(1)` then `row_name(r)` — so the refusal is specific to the UNHANDLED union riding into the parameter, and the BOUND form of the same expression compiles on the same lane, which reads as a `mem`-phase argument-lowering gap rather than a typing rule. This is the cause behind `option/or_else_default.lu`, `option/exists_marking.lu` and `option/is_none_marking.lu` carrying `wolfc = unsupported` since sc06 with lupin and native both running them — the rows were ledgered, the cause had never been isolated. Costs `std.x.tls.client`'s sc31 naming pair its one-line call site: the surface documents "bind, then name" so every naming site stays three-lane (module header + `tests/x/tls/client/row_naming.lu`), which is a workaround in the CALLER's source for a limit only one of the two wolf tiers has | wolf-lang | [filed: wolf-lang#201](https://github.com/wolffe-lang/wolf-lang/issues/201); sc31 |
 | F-0101 | 2026-08-30 | **the native rung refuses a slice of a LENT byte view at `mem`, and the refusal names the wrong conservatism** — `b[from..to]` in a callee is `unsupported` ("range VALUES outside `for` headers (owned `Iter[int]` ranges, c06/std)") when the caller lends `s.bytes()` across the call (s89), while the SAME callee over an owned list and the inline slice of an owned local both `exit(0)` at v0.2.0/c88ab64 — the message cites a limit the owned probes show lifted; the operative edge is the mem-phase lowering of slice-of-lent-view. `--checked` and lupin 0.1.18 run all three shapes. Caught by the sc28 slices adoption: `bytes.slice` took the range spelling and the gauntlet moved exactly one row (`tests/bytes/lend_across_calls.lu [native]`, `run` -> `unsupported`, the corpus's only lend-into-slice witness — `bytes.slice`'s doc examples lend too); the site retreated to the index loop the same day with the shape named in a comment, and the row holds `run` again. Blocks the s128 slice spelling in any std function whose parameter is lend-reachable; three-probe isolation at `probes/sc28_p6_slice_of_view` in the filing | wolf-lang | [filed: wolf-lang#184](https://github.com/wolffe-lang/wolf-lang/issues/184); sc28 — **CLOSED at sc30** by s129 (the #184 fix, in the sc30 pin b80d239): the diagnosis upstream was a real mem-phase gap wearing the retired range-value conservatism's refusal string, and the fix gave the lent-view path its slice arm. Healing measured at the re-adopt: `bytes.slice` took back `b[from..to]` and `lend_across_calls.lu` — the ONE row the sc28 adoption moved — holds `run` on ALL THREE lanes with the range spelling (native re-measured singly, exit(0), the exact shape that refused at `mem` at c88ab64); ledger flat everywhere else. The retreat commit bc01f8c reverses at the sc30 re-adopt with the arc named at the site (found -> filed -> fixed -> re-adopted); upstream's own `byte_view_slice_lent` corpus twin joined the two-machine agreement class at lupin's 83f83bb pin bump (lupin ran the lent slice all along). #184 commented same-day with the downstream healing |
 | F-0104 | 2026-09-02 | **the byte-buffer cost, measured from the library's side** — a byte buffer held as `List[int]` charges 16.0x its payload on both wolf tiers and 32x under lupin, linear from 1 KiB to 64 KiB, reproducing wolf-lang#203's own numbers to the byte from a different program and again through std's readers (`fs.read_bytes` and `fs.read_chunk` charge identically, so #203's preallocation half is ENTIRELY unrealized). Recommended `[type.byte]` modelled on `[type.char]` as a spec-shaped proposal; both cheap answers (a std wrapper, the spec's `distinct` newtype) fail by the same layout-preserving mechanism. **CLOSED at sc34 with the after-table: 16.0x -> 2.0x native, 16.0x -> 1.0x checked** | wolf-lang | [filed: wolf-lang#203](https://github.com/wolffe-lang/wolf-lang/issues/203); D72 ruled, s135 landed; sc32-sc34 |
+| F-0106 | 2026-09-02 | **the byte TYPE landed and the byte PRODUCERS did not: std's byte tier cannot take `List[byte]` without a conversion that costs more than the type saves.** `[type.byte]` is in the language at 31170d1 and there is NO byte-typed builtin — `str`'s `.bytes()`, `str_from_utf8`, `fs_read_bytes`/`write_bytes`/`read_chunk`/`write_chunk` and `net_read_bytes`/`write_bytes` are all still declared over `List[int]` in `wolf_sema`'s signature table. Every one of std's sixteen byte-tier functions is a thin wrapper over one of those eight, so a substituted signature must convert elementwise against a builtin, and the cumulative ledger keeps the intermediate charged: a substituted `fs.read_bytes` measures **17.0x checked / 18.0x native** against today's 16.0x, at every size — WORSE, at exactly the io sites #203 was filed about. The fix is upstream and small: move the eight builtin signatures, and the std change becomes the rename it was designed to be | wolf-lang | [filed: wolf-lang#231](https://github.com/wolffe-lang/wolf-lang/issues/231); sc34 |
+| F-0107 | 2026-09-02 | **the checked machine charges 16x for a CONSUMED `s.bytes()` view where native and lupin charge nothing.** `for b in s.bytes()` over a 64 KiB `str` inside a fresh region reads `region_bytes` = 0 natively, 0 under lupin and **1,048,576** under `--checked`, for a walk that allocates nothing on the tier that ships — s77's borrow is not modelled in the checked ledger. Invisible to every gauntlet (no row may print a ledger count), it is the reason F-0106's one winning shape wins natively and regresses checked, and it makes `region r(cap: n)` mis-fire by an order of magnitude between tiers on the very idiom `std.bytes`' header teaches for byte walking | wolf-lang | [filed: wolf-lang#232](https://github.com/wolffe-lang/wolf-lang/issues/232); sc34 |
 
 
 ## F-0001 — the std search path
@@ -6012,3 +6014,161 @@ is36 needs `byte` in type position, the two casts, operator
 widening, `Value::Byte` with 1-byte list slots and `{b}` printing the
 number; until it ships, ANY substitution here trades three lanes for
 two on every row it touches.
+
+## F-0106 — the byte TYPE landed; the byte PRODUCERS did not, so std's tier cannot take `List[byte]` without paying more than the type saves
+
+**This sprint's headline, and the reason target 2 was not executed as
+written.** The contract and wolf-lang#203's closing comment both call
+the std-side change "a pure substitution: `List[int]` becomes
+`List[byte]` and nothing else moves". That was true of the SHAPE of
+std's signatures — sc32 and sc33 verified the monomorphism twice and it
+still holds — and it is false of the PIPE at this pin, for a reason
+neither sprint could have known before the landing: **s135 gave the
+language a byte type and gave it no byte-typed builtin.**
+
+### The measurement that decides it
+
+Read out of `crates/wolf_sema/src/check.rs` at `31170d1`, every builtin
+that produces or consumes a byte sequence, with the type it is declared
+at:
+
+| builtin | signature at 31170d1 |
+|---|---|
+| `str`'s `.bytes()` method | `-> List[int]` |
+| `str_from_utf8` | `(List[int]) -> str ! {utf8}` |
+| `fs_read_bytes` | `(str) -> List[int] ! {…}` |
+| `fs_write_bytes` | `(str, List[int]) -> () ! {…}` |
+| `fs_read_chunk` | `(int, int) -> List[int] ! {…}` |
+| `fs_write_chunk` | `(int, List[int]) -> () ! {…}` |
+| `net_read_bytes` | `(int, int) -> List[int] ! {…}` |
+| `net_write_bytes` | `(int, List[int]) -> () ! {…}` |
+
+`grep -n "Prim::Byte" crates/wolf_sema/src/check.rs` returns eleven
+hits and **not one of them is in the builtin signature table** — they
+are the cast kinds, the operator widenings, the diagnostic arms and one
+column-type mapping. There is **no byte-typed builtin in the language.**
+
+Every one of std's sixteen byte-tier functions is a thin wrapper over
+one of those eight builtins — `read_bytes` is `fs_read_bytes(path)?`,
+`from_str` is `s.bytes()`, `to_str` is `str_from_utf8(b)?` — so a
+signature moved to `List[byte]` cannot be a rename. It has to CONVERT,
+elementwise, against a builtin on the other side. And the ledger is
+cumulative, so the list it converted FROM stays charged for the
+region's life (`[mem.region.account.1]`: "nothing is ever subtracted
+while the region lives"). Measured, at every size, in F-0104's fourth
+column:
+
+| shape (65,536 bytes) | checked | native |
+|---|---|---|
+| `fs.read_bytes` today (`List[int]`) | 1,048,576 (16.0x) | 1,048,560 (16.0x) |
+| **the same reader substituted to `List[byte]`** | **1,114,112 (17.0x)** | **1,179,680 (18.0x)** |
+
+**A substituted std reader charges MORE than the reader it replaces, on
+both tiers, at every size, at exactly the io sites #203 was filed
+about.** That is not a tuning question. It is the arithmetic of a
+cumulative ledger plus a producer of the wrong type.
+
+### The one shape that could have won, and why it does not
+
+`std.bytes.from_str` is the single place std could plausibly have
+avoided the intermediate, because `s.bytes()` in a CONSUMED position is
+s77's borrow rather than a materialization — so
+`for b in s.bytes() { out.push(b as byte) }` should allocate exactly
+one list, the byte one. Measured over a 65,536-byte `str`:
+
+| shape | checked | native |
+|---|---|---|
+| `from_str` today (`s.bytes()` bound and returned) | 1,048,576 | 1,048,560 |
+| `from_str` as a walk building `List[byte]` | **1,114,112** | **131,120** |
+| `to_str`'s round trip (walk to `List[byte]`, widen back for `str_from_utf8`) | 2,162,688 | 1,179,680 |
+
+**Natively it works exactly as hoped — 131,120, a clean 8x win. On the
+checked machine it REGRESSES**, and the reason is F-0107 below. So the
+one substitution with a real win is a win on one tier and a loss on the
+other, which makes it a per-tier bet rather than an improvement, and
+this library does not ship those.
+
+### What std did instead, and what would change the answer
+
+**Nothing is worked around and nothing is built** — the sc32/sc33
+posture for the third sprint running, and for the same house rule
+(sc00: a gap in what the language can express is a finding, never a
+workaround invented here). Inserting a conversion loop at every byte
+boundary in std IS a workaround, it is measurable, and the measurement
+says it costs more than it saves. The sixteen signatures keep their
+form, so the substitution stays a rename for whoever gets to make it.
+
+**The one change that makes target 2 a pure substitution is upstream
+and small**: move those eight builtin signatures from `List[int]` to
+`List[byte]`. Then `fs.read_bytes` is a rename, `from_str` is
+`s.bytes()` unchanged, `to_str` is `str_from_utf8(b)?` unchanged, every
+call site keeps its shape, and the 16x becomes 2.0x/1.0x with no
+intermediate anywhere. Until then the honest reading of the landing is:
+**the type is right, it is measured, and the library cannot reach it.**
+
+Filed as **wolf-lang#231**, with the std-side numbers posted to #203's
+thread (`#issuecomment-5519440224`); sc35 or the sprint after the
+builtins move takes the substitution as the rename it was always
+designed to be.
+
+## F-0107 — the checked machine charges 16x for a CONSUMED `s.bytes()` view where native and lupin charge nothing
+
+Found while measuring F-0106's one hopeful shape, and it is a finding
+on its own because it is invisible to every gauntlet: no row in this
+tree prints a ledger count (`[mem.region.account]` forbids it — the
+units are per-tier), so this divergence cannot move a verdict and will
+not be caught by the differ.
+
+The probe is four lines: walk a 65,536-byte `str`'s bytes inside a
+fresh region, summing them, allocating nothing.
+
+```wolf
+region r {
+    for b in s.bytes() {
+        sink = sink + b
+    }
+    out = region_bytes(r)
+}
+```
+
+| lane | `region_bytes(r)` |
+|---|---|
+| native | **0** |
+| lupin 0.1.23 | **0** |
+| wolf `--checked` | **1,048,576** — 16.0x the payload |
+
+s77's rule is that `s.bytes()` CONSUMED on the spot is the receiver's
+own `{ptr, len}` and materializes only where the list must outlive the
+expression; `for b in s.bytes()` is the canonical consumed position and
+the one `std.bytes`' header teaches ("a caller who only wants to walk
+should write `for b in s.bytes()`"). **The native tier and the
+reference interpreter both honour it in the ledger. The checked
+machine's shadow model does not** — it charges a full `List[int]`,
+`16 x payload` exactly, for a walk that allocates nothing on the tier
+that ships.
+
+Three reasons this matters beyond the curiosity:
+
+1. **It is the reason F-0106's best case fails.** The one substitution
+   with a real native win (`from_str` as a walk) reads 131,120 natively
+   and 1,114,112 checked, and the difference is precisely this
+   1,048,576.
+2. **It makes `region r(cap: n)` mis-fire between tiers on the ONE
+   idiom std recommends for byte walking.** A cap derived from a
+   checked-tier `charged` reading is 16x too generous natively; a cap
+   derived natively breaches instantly under `--checked`. D68's own
+   advice — derive budgets from measured readings — is sound, and this
+   is a case where the two measurements disagree by more than an order
+   of magnitude for a program that allocates nothing.
+3. **It is the mirror of the `str` gap already in the clause.**
+   `[mem.region.account.1]` scopes ONE known ledger blind spot to the
+   native tier (str materialization's ambient region is the process
+   root). This is a blind spot in the other direction on a different
+   tier: the checked machine charging for storage the program never
+   takes. Re-measured this sprint against a NEW compiler, the `str`
+   half is unmoved — 200 fresh interpolated strings built inside
+   `region r { … }` leave `region_bytes(r)` at **0 on all three lanes**,
+   `before 0 after 0` byte-identical — so the clause's sentence should
+   still either widen or the non-native tiers should charge.
+
+Filed as **wolf-lang#232**.
