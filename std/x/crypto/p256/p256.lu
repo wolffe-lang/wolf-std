@@ -95,17 +95,22 @@
 //!   formulas, arithmetic selection; the secret bit is a multiplier.
 //! - `fe_select` — the selection itself (sc18's `fe_cswap` class).
 //! - the RFC 6979 HMAC chain — fixed-schedule digest work (sha2's).
-//! - recorded exceptions, all shared with the ladder's precedent: the
-//!   0..255 ingestion guard branches per input byte (F-0035's class);
-//!   `floordiv`'s sign correction (sc18's note); the 6979
+//! - recorded exceptions, all shared with the ladder's precedent —
+//!   **and one of them RETIRED at sc35**: the 0..255 ingestion guard
+//!   branched per input byte (F-0035's class) and is gone with the byte
+//!   type; `floordiv`'s sign correction (sc18's note); the 6979
 //!   candidate-acceptance compare (`bytes_geq_n`) — the RFC's own
 //!   rejection sampling, at most one extra HMAC round per 2^32 keys.
 //! - VERIFY and everything it calls: public data, no obligation.
 //!
-//! Byte sequences are `List[int]` with the 0..255 element contract
-//! (F-0035); all multi-byte values are BIG-endian (SEC1/FIPS
-//! convention — unlike curve25519's little-endian RFCs). `to_hex` is
-//! this module's own rendering (the ladder precedent).
+//! **Byte sequences are `List[byte]` (sc35).** They were `List[int]`
+//! with a documented 0..255 element contract (F-0035) that this module
+//! policed with `require_byte` at every door; D72/s135's `byte` and
+//! s136's byte-typed builtins (wolf-lang#231) make it the TYPE's, so
+//! the guard is deleted and `verify`'s two range-checking loops with
+//! it. All multi-byte values are BIG-endian (SEC1/FIPS convention —
+//! unlike curve25519's little-endian RFCs). `to_hex` is this module's
+//! own rendering (the ladder precedent).
 
 use std.x.crypto.sha2
 
@@ -1295,23 +1300,23 @@ fn fe_eq(f: Fe, g: Fe) -> bool {
 /// element. The caller guarantees 32 byte-valued elements and a value
 /// < p (`bytes_lt_p` is the ingestion check). Limb i is byte pair
 /// (31-2i, 30-2i). ct: fixed offsets.
-fn fe_frombytes_be(b: List[int]) -> Fe {
-    let l0: int = b[31] + b[30] * 256
-    let l1: int = b[29] + b[28] * 256
-    let l2: int = b[27] + b[26] * 256
-    let l3: int = b[25] + b[24] * 256
-    let l4: int = b[23] + b[22] * 256
-    let l5: int = b[21] + b[20] * 256
-    let l6: int = b[19] + b[18] * 256
-    let l7: int = b[17] + b[16] * 256
-    let l8: int = b[15] + b[14] * 256
-    let l9: int = b[13] + b[12] * 256
-    let l10: int = b[11] + b[10] * 256
-    let l11: int = b[9] + b[8] * 256
-    let l12: int = b[7] + b[6] * 256
-    let l13: int = b[5] + b[4] * 256
-    let l14: int = b[3] + b[2] * 256
-    let l15: int = b[1] + b[0] * 256
+fn fe_frombytes_be(b: List[byte]) -> Fe {
+    let l0: int = b[31] as int + b[30] as int * 256
+    let l1: int = b[29] as int + b[28] as int * 256
+    let l2: int = b[27] as int + b[26] as int * 256
+    let l3: int = b[25] as int + b[24] as int * 256
+    let l4: int = b[23] as int + b[22] as int * 256
+    let l5: int = b[21] as int + b[20] as int * 256
+    let l6: int = b[19] as int + b[18] as int * 256
+    let l7: int = b[17] as int + b[16] as int * 256
+    let l8: int = b[15] as int + b[14] as int * 256
+    let l9: int = b[13] as int + b[12] as int * 256
+    let l10: int = b[11] as int + b[10] as int * 256
+    let l11: int = b[9] as int + b[8] as int * 256
+    let l12: int = b[7] as int + b[6] as int * 256
+    let l13: int = b[5] as int + b[4] as int * 256
+    let l14: int = b[3] as int + b[2] as int * 256
+    let l15: int = b[1] as int + b[0] as int * 256
     Fe {
         l0: l0,
         l1: l1,
@@ -1334,193 +1339,193 @@ fn fe_frombytes_be(b: List[int]) -> Fe {
 
 /// Encode a field element as 32 BIG-endian bytes, canonical (< p).
 /// ct: freezes (fixed), then fixed byte extraction.
-fn fe_tobytes_be(fin: Fe) -> List[int] {
+fn fe_tobytes_be(fin: Fe) -> List[byte] {
     let f = fe_freeze(fin)
-    var out = List[int]()
-    (mut out).push(f.l15 / 256)
-    (mut out).push(f.l15 % 256)
-    (mut out).push(f.l14 / 256)
-    (mut out).push(f.l14 % 256)
-    (mut out).push(f.l13 / 256)
-    (mut out).push(f.l13 % 256)
-    (mut out).push(f.l12 / 256)
-    (mut out).push(f.l12 % 256)
-    (mut out).push(f.l11 / 256)
-    (mut out).push(f.l11 % 256)
-    (mut out).push(f.l10 / 256)
-    (mut out).push(f.l10 % 256)
-    (mut out).push(f.l9 / 256)
-    (mut out).push(f.l9 % 256)
-    (mut out).push(f.l8 / 256)
-    (mut out).push(f.l8 % 256)
-    (mut out).push(f.l7 / 256)
-    (mut out).push(f.l7 % 256)
-    (mut out).push(f.l6 / 256)
-    (mut out).push(f.l6 % 256)
-    (mut out).push(f.l5 / 256)
-    (mut out).push(f.l5 % 256)
-    (mut out).push(f.l4 / 256)
-    (mut out).push(f.l4 % 256)
-    (mut out).push(f.l3 / 256)
-    (mut out).push(f.l3 % 256)
-    (mut out).push(f.l2 / 256)
-    (mut out).push(f.l2 % 256)
-    (mut out).push(f.l1 / 256)
-    (mut out).push(f.l1 % 256)
-    (mut out).push(f.l0 / 256)
-    (mut out).push(f.l0 % 256)
+    var out = List[byte]()
+    (mut out).push((f.l15 / 256) as byte)
+    (mut out).push((f.l15 % 256) as byte)
+    (mut out).push((f.l14 / 256) as byte)
+    (mut out).push((f.l14 % 256) as byte)
+    (mut out).push((f.l13 / 256) as byte)
+    (mut out).push((f.l13 % 256) as byte)
+    (mut out).push((f.l12 / 256) as byte)
+    (mut out).push((f.l12 % 256) as byte)
+    (mut out).push((f.l11 / 256) as byte)
+    (mut out).push((f.l11 % 256) as byte)
+    (mut out).push((f.l10 / 256) as byte)
+    (mut out).push((f.l10 % 256) as byte)
+    (mut out).push((f.l9 / 256) as byte)
+    (mut out).push((f.l9 % 256) as byte)
+    (mut out).push((f.l8 / 256) as byte)
+    (mut out).push((f.l8 % 256) as byte)
+    (mut out).push((f.l7 / 256) as byte)
+    (mut out).push((f.l7 % 256) as byte)
+    (mut out).push((f.l6 / 256) as byte)
+    (mut out).push((f.l6 % 256) as byte)
+    (mut out).push((f.l5 / 256) as byte)
+    (mut out).push((f.l5 % 256) as byte)
+    (mut out).push((f.l4 / 256) as byte)
+    (mut out).push((f.l4 % 256) as byte)
+    (mut out).push((f.l3 / 256) as byte)
+    (mut out).push((f.l3 % 256) as byte)
+    (mut out).push((f.l2 / 256) as byte)
+    (mut out).push((f.l2 % 256) as byte)
+    (mut out).push((f.l1 / 256) as byte)
+    (mut out).push((f.l1 % 256) as byte)
+    (mut out).push((f.l0 / 256) as byte)
+    (mut out).push((f.l0 % 256) as byte)
     out
 }
 
 /// p - 2 as 32 big-endian bytes (the Fermat inversion exponent — a PUBLIC constant). Total.
-fn pm2_bytes() -> List[int] {
-    var out = List[int]()
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(1)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(253)
+fn pm2_bytes() -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(1 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(253 as byte)
     out
 }
 
 /// n - 2 as 32 big-endian bytes (the mod-n Fermat exponent — a PUBLIC constant). Total.
-fn nm2_bytes() -> List[int] {
-    var out = List[int]()
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(188)
-    (mut out).push(230)
-    (mut out).push(250)
-    (mut out).push(173)
-    (mut out).push(167)
-    (mut out).push(23)
-    (mut out).push(158)
-    (mut out).push(132)
-    (mut out).push(243)
-    (mut out).push(185)
-    (mut out).push(202)
-    (mut out).push(194)
-    (mut out).push(252)
-    (mut out).push(99)
-    (mut out).push(37)
-    (mut out).push(79)
+fn nm2_bytes() -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(188 as byte)
+    (mut out).push(230 as byte)
+    (mut out).push(250 as byte)
+    (mut out).push(173 as byte)
+    (mut out).push(167 as byte)
+    (mut out).push(23 as byte)
+    (mut out).push(158 as byte)
+    (mut out).push(132 as byte)
+    (mut out).push(243 as byte)
+    (mut out).push(185 as byte)
+    (mut out).push(202 as byte)
+    (mut out).push(194 as byte)
+    (mut out).push(252 as byte)
+    (mut out).push(99 as byte)
+    (mut out).push(37 as byte)
+    (mut out).push(79 as byte)
     out
 }
 
 /// p as 32 big-endian bytes (the coordinate range check, SEC1 §3.2.2). Total.
-fn p_bytes() -> List[int] {
-    var out = List[int]()
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(1)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
+fn p_bytes() -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(1 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
     out
 }
 
 /// n as 32 big-endian bytes (the r/s and nonce range checks, FIPS 186-5). Total.
-fn n_bytes() -> List[int] {
-    var out = List[int]()
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(0)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(255)
-    (mut out).push(188)
-    (mut out).push(230)
-    (mut out).push(250)
-    (mut out).push(173)
-    (mut out).push(167)
-    (mut out).push(23)
-    (mut out).push(158)
-    (mut out).push(132)
-    (mut out).push(243)
-    (mut out).push(185)
-    (mut out).push(202)
-    (mut out).push(194)
-    (mut out).push(252)
-    (mut out).push(99)
-    (mut out).push(37)
-    (mut out).push(81)
+fn n_bytes() -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(0 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(255 as byte)
+    (mut out).push(188 as byte)
+    (mut out).push(230 as byte)
+    (mut out).push(250 as byte)
+    (mut out).push(173 as byte)
+    (mut out).push(167 as byte)
+    (mut out).push(23 as byte)
+    (mut out).push(158 as byte)
+    (mut out).push(132 as byte)
+    (mut out).push(243 as byte)
+    (mut out).push(185 as byte)
+    (mut out).push(202 as byte)
+    (mut out).push(194 as byte)
+    (mut out).push(252 as byte)
+    (mut out).push(99 as byte)
+    (mut out).push(37 as byte)
+    (mut out).push(81 as byte)
     out
 }
 
@@ -1537,8 +1542,8 @@ fn fe_invert(z: Fe) -> Fe {
     var i: int = 0
     while i < 256 {
         r = fe_sq(r)
-        let byte = e[i / 8]
-        let bit = byte / pow2(7 - i % 8) % 2
+        let eb = e[i / 8] as int
+        let bit = eb / pow2(7 - i % 8) % 2
         if bit == 1 {
             r = fe_mul(r, z)
         }
@@ -1714,14 +1719,14 @@ fn pt_select(flag: int, f: Pt, g: Pt) -> Pt {
 /// exceptional-case branches an incomplete ladder would need.
 /// ct: THE SECRET PATH on signing (k is the nonce / the key); on
 /// verify the scalars are public and the fixed schedule is free.
-fn scalar_mul(k: List[int], pt: Pt) -> Pt {
+fn scalar_mul(k: List[byte], pt: Pt) -> Pt {
     var acc = pt_identity()
     var i: int = 0
     while i < 256 {
         acc = pt_double(acc)
         let sum = pt_add(acc, pt)
-        let byte = k[i / 8]
-        let bit = byte / pow2(7 - i % 8) % 2
+        let kb = k[i / 8] as int
+        let bit = kb / pow2(7 - i % 8) % 2
         acc = pt_select(bit, sum, acc)
         i = i + 1
     }
@@ -1908,11 +1913,11 @@ fn sc_cond_sub_n(t: List[int]) -> List[int] {
 /// one conditional subtraction reduces it — FIPS 186-5's bits2int for
 /// a 256-bit hash needs exactly this). The caller guarantees byte
 /// elements. ct: fixed.
-fn sc_from_bytes_be(b: List[int]) -> List[int] {
+fn sc_from_bytes_be(b: List[byte]) -> List[int] {
     var t = List[int]()
     var i: int = 0
     while i < 16 {
-        (mut t).push(b[31 - 2 * i] + b[30 - 2 * i] * 256)
+        (mut t).push(b[31 - 2 * i] as int + b[30 - 2 * i] as int * 256)
         i = i + 1
     }
     (mut t).push(0)
@@ -1920,12 +1925,12 @@ fn sc_from_bytes_be(b: List[int]) -> List[int] {
 }
 
 /// A 16-limb scalar as 32 BIG-endian bytes. ct: fixed extraction.
-fn sc_to_bytes_be(s: List[int]) -> List[int] {
-    var out = List[int]()
+fn sc_to_bytes_be(s: List[int]) -> List[byte] {
+    var out = List[byte]()
     var i: int = 15
     while i >= 0 {
-        (mut out).push(s[i] / 256)
-        (mut out).push(s[i] % 256)
+        (mut out).push((s[i] / 256) as byte)
+        (mut out).push((s[i] % 256) as byte)
         i = i - 1
     }
     out
@@ -1963,8 +1968,8 @@ fn sc_inv(a: List[int]) -> List[int] {
     var i: int = 0
     while i < 256 {
         r = sc_mont_mul(r, r)
-        let byte = e[i / 8]
-        let bit = byte / pow2(7 - i % 8) % 2
+        let eb = e[i / 8] as int
+        let bit = eb / pow2(7 - i % 8) % 2
         if bit == 1 {
             r = sc_mont_mul(r, am)
         }
@@ -2001,7 +2006,7 @@ fn sc_iszero(s: List[int]) -> bool {
 /// r/s range check and RFC 6979's candidate acceptance). ct: the
 /// early-exit compare is the recorded 6979 exception in the module
 /// header (the RFC's own rejection sampling); r and s are public.
-fn bytes_geq_n(b: List[int]) -> bool {
+fn bytes_geq_n(b: List[byte]) -> bool {
     let nb = n_bytes()
     var i: int = 0
     while i < 32 {
@@ -2018,7 +2023,7 @@ fn bytes_geq_n(b: List[int]) -> bool {
 
 /// True iff 32 big-endian bytes name a value < p (SEC1 §3.2.2's
 /// coordinate range check). ct: public data (an ingested point).
-fn bytes_lt_p(b: List[int]) -> bool {
+fn bytes_lt_p(b: List[byte]) -> bool {
     let pb = p_bytes()
     var i: int = 0
     while i < 32 {
@@ -2037,18 +2042,6 @@ fn bytes_lt_p(b: List[int]) -> bool {
 // Byte / point helpers, on-curve validation (SEC1 §3.2.2 — the
 // invalid-curve rejection), affine conversion.
 // ---------------------------------------------------------------------
-
-/// The 0..255 ingestion guard (F-0035's byte contract). ct: NOT free of
-/// a value-dependent branch — the module's recorded ct exception,
-/// shared verbatim with the whole ladder; runs on public bytes.
-fn require_byte(v: int) {
-    if v < 0 {
-        assert(false, "p256: element outside 0..255")
-    }
-    if v > 255 {
-        assert(false, "p256: element outside 0..255")
-    }
-}
 
 /// A validated point, or the marker that decoding rejected it (a bad
 /// length, a coordinate >= p, or a point not on the curve — the
@@ -2078,14 +2071,11 @@ fn on_curve(x: Fe, y: Fe) -> bool {
 /// scalar; Wycheproof patrols exactly this). The point at infinity has
 /// no uncompressed encoding here, so it is rejected by length. ct:
 /// public data — an ingested public key or ephemeral point.
-fn decode_point(b: List[int]) -> PtOpt {
+fn decode_point(b: List[byte]) -> PtOpt {
     if b.len != 65 {
         return PtOpt { ok: false, p: pt_identity() }
     }
-    for v in b {
-        require_byte(v)
-    }
-    if b[0] != 4 {
+    if b[0] as int != 4 {
         return PtOpt { ok: false, p: pt_identity() }
     }
     let xb = b[1..33]
@@ -2109,7 +2099,7 @@ fn decode_point(b: List[int]) -> PtOpt {
 /// x-coordinates taken mod n). The point must not be the identity —
 /// every caller checks z != 0 first. ct: public in verify; on signing
 /// the value becomes r (public once computed).
-fn affine_x_mod_n(pp: Pt) -> List[int] {
+fn affine_x_mod_n(pp: Pt) -> List[byte] {
     let zi = fe_invert(pp.z)
     let x = fe_mul(pp.x, zi)
     let xb = fe_tobytes_be(x)
@@ -2128,7 +2118,7 @@ fn affine_x_mod_n(pp: Pt) -> List[int] {
 /// is one conditional subtraction — `sc_from_bytes_be` then re-encode.
 /// ct: on the message hash (public) and, in the seed, mixed with the
 /// secret key inside HMAC.
-fn bits2octets(h: List[int]) -> List[int] {
+fn bits2octets(h: List[byte]) -> List[byte] {
     sc_to_bytes_be(sc_from_bytes_be(h))
 }
 
@@ -2139,14 +2129,14 @@ fn bits2octets(h: List[int]) -> List[int] {
 /// candidate-acceptance compare (`bytes_geq_n`), the RFC's own
 /// rejection sampling, which for P-256 rejects with probability < 2^-32
 /// per round (recorded exception in the module header).
-fn rfc6979_nonce(x: List[int], h1: List[int]) -> List[int] {
+fn rfc6979_nonce(x: List[byte], h1: List[byte]) -> List[byte] {
     let h1o = bits2octets(h1)
-    var v = List[int]()
-    var k = List[int]()
+    var v = List[byte]()
+    var k = List[byte]()
     var i: int = 0
     while i < 32 {
-        (mut v).push(1)
-        (mut k).push(0)
+        (mut v).push(1 as byte)
+        (mut k).push(0 as byte)
         i = i + 1
     }
     // K = HMAC_K(V || 0x00 || int2octets(x) || bits2octets(h1))
@@ -2162,7 +2152,7 @@ fn rfc6979_nonce(x: List[int], h1: List[int]) -> List[int] {
     k = sha2.hmac256(k, seed1)
     v = sha2.hmac256(k, v)
     var found = false
-    var out = List[int]()
+    var out = List[byte]()
     while !found {
         v = sha2.hmac256(k, v)
         // qlen == hlen == 256, so T = V is the candidate directly
@@ -2181,15 +2171,15 @@ fn rfc6979_nonce(x: List[int], h1: List[int]) -> List[int] {
 }
 
 /// A one-element byte list (the RFC 6979 separators). ct: fixed.
-fn one_byte(v: int) -> List[int] {
-    var out = List[int]()
-    (mut out).push(v)
+fn one_byte(v: int) -> List[byte] {
+    var out = List[byte]()
+    (mut out).push(v as byte)
     out
 }
 
 /// Concatenate two byte lists. ct: fixed by the lengths.
-fn cat(a: List[int], b: List[int]) -> List[int] {
-    var out = List[int]()
+fn cat(a: List[byte], b: List[byte]) -> List[byte] {
+    var out = List[byte]()
     for v in a {
         (mut out).push(v)
     }
@@ -2200,10 +2190,10 @@ fn cat(a: List[int], b: List[int]) -> List[int] {
 }
 
 /// True iff every byte is zero. ct: on public/derived values.
-fn is_zero_bytes(b: List[int]) -> bool {
+fn is_zero_bytes(b: List[byte]) -> bool {
     var all_zero = true
     for v in b {
-        if !(v == 0) {
+        if !(v as int == 0) {
             all_zero = false
         }
     }
@@ -2218,7 +2208,7 @@ fn is_zero_bytes(b: List[int]) -> bool {
 /// The ECDSA public key for a 32-byte big-endian private key `d` in
 /// [1, n): the uncompressed SEC1 encoding of [d]G (0x04 || X || Y).
 /// Traps `assert` on a private key that is not 32 bytes, carries a
-/// non-byte element, or is zero / >= n (a caller contract violation:
+/// zero, or >= n (a caller contract violation:
 /// FIPS 186-5 §6.2.1 requires d in [1, n-1]). ct: SECRET scalar `d`
 /// drives the table-free ladder (`scalar_mul`, c28's target); the
 /// derived public key is public.
@@ -2228,7 +2218,7 @@ fn is_zero_bytes(b: List[int]) -> bool {
 /// block; the pinned witnesses are `rfc6979_p256.lu` and
 /// `sign_verify_smoke.lu`): `p256.public_key(d)` returns 65 bytes for a
 /// 32-byte private key `d` in [1, n).
-pub fn public_key(d: List[int]) -> List[int] {
+pub fn public_key(d: List[byte]) -> List[byte] {
     require_private(d)
     let q = scalar_mul(d, pt_base())
     encode_point(q)
@@ -2236,12 +2226,12 @@ pub fn public_key(d: List[int]) -> List[int] {
 
 /// Encode a non-identity projective point as 65 uncompressed SEC1
 /// bytes. ct: public (a public key or a computed R).
-fn encode_point(pp: Pt) -> List[int] {
+fn encode_point(pp: Pt) -> List[byte] {
     let zi = fe_invert(pp.z)
     let x = fe_mul(pp.x, zi)
     let y = fe_mul(pp.y, zi)
-    var out = List[int]()
-    (mut out).push(4)
+    var out = List[byte]()
+    (mut out).push(4 as byte)
     for v in fe_tobytes_be(x) {
         (mut out).push(v)
     }
@@ -2252,14 +2242,11 @@ fn encode_point(pp: Pt) -> List[int] {
 }
 
 /// Require a 32-byte private key in [1, n) (FIPS 186-5 §6.2.1). A wrong
-/// length, a non-byte element, zero, or >= n is a caller contract
+/// length, zero, or >= n is a caller contract
 /// violation, not a recoverable row — traps `assert`.
-fn require_private(d: List[int]) {
+fn require_private(d: List[byte]) {
     if !(d.len == 32) {
         assert(false, "p256: a private key is 32 bytes (SEC1 §2.3.5)")
-    }
-    for v in d {
-        require_byte(v)
     }
     if bytes_geq_n(d) {
         assert(false, "p256: a private key is < n (FIPS 186-5 §6.2.1)")
@@ -2287,16 +2274,13 @@ fn require_private(d: List[int]) {
 /// past lupin's step budget; pinned byte-exact in `rfc6979_p256.lu`):
 /// `p256.sign(d, msg)` returns a 64-byte r || s that
 /// `p256.verify(p256.public_key(d), msg, sig)` accepts.
-pub fn sign(d: List[int], message: List[int]) -> List[int] {
+pub fn sign(d: List[byte], message: List[byte]) -> List[byte] {
     require_private(d)
-    for m in message {
-        require_byte(m)
-    }
     let h1 = sha2.sum256(message)
     let e = sc_from_bytes_be(h1)
     var attempt = copy d
     var done = false
-    var out = List[int]()
+    var out = List[byte]()
     // The RFC 6979 nonce is deterministic; on the vanishing r=0/s=0
     // events §3.2 step h.3 draws the NEXT DRBG candidate. This module
     // reseeds the generator with a domain-separated key instead (an
@@ -2329,18 +2313,18 @@ pub fn sign(d: List[int], message: List[int]) -> List[int] {
 /// construction (§3.2, and what the A.2.5 vectors pin); a nonzero salt
 /// re-runs the HMAC_DRBG with `salt` extra generate rounds skipped,
 /// used only on the ~2^-256 r=0/s=0 retry. ct: as `rfc6979_nonce`.
-fn rfc6979_nonce_salted(x: List[int], h1: List[int], salt: int) -> List[int] {
+fn rfc6979_nonce_salted(x: List[byte], h1: List[byte], salt: int) -> List[byte] {
     if salt == 0 {
         return rfc6979_nonce(x, h1)
     }
     // deterministic extra draws (never reached by any test vector)
     let h1o = bits2octets(h1)
-    var v = List[int]()
-    var k = List[int]()
+    var v = List[byte]()
+    var k = List[byte]()
     var i: int = 0
     while i < 32 {
-        (mut v).push(1)
-        (mut k).push(0)
+        (mut v).push(1 as byte)
+        (mut k).push(0 as byte)
         i = i + 1
     }
     var seed0 = cat(cat(v, one_byte(0)), cat(x, h1o))
@@ -2350,7 +2334,7 @@ fn rfc6979_nonce_salted(x: List[int], h1: List[int], salt: int) -> List[int] {
     k = sha2.hmac256(k, seed1)
     v = sha2.hmac256(k, v)
     var skip: int = 0
-    var out = List[int]()
+    var out = List[byte]()
     var found = false
     while !found {
         v = sha2.hmac256(k, v)
@@ -2374,7 +2358,7 @@ fn rfc6979_nonce_salted(x: List[int], h1: List[int], salt: int) -> List[int] {
 /// Verify an ECDSA signature (FIPS 186-5 §6.4.2) over `message` given a
 /// 65-byte uncompressed SEC1 public key and the 64-byte r || s
 /// signature. Returns true iff valid. Answers FALSE — never a trap —
-/// for a wrong-length key or signature, a non-byte element, a public
+/// for a wrong-length key or signature, a public
 /// key that fails the SEC1 §3.2.2 on-curve check (the invalid-curve
 /// rejection), r or s outside [1, n), or a failed verification
 /// equation: a signature and a key are the CALLER'S data to check, not
@@ -2388,28 +2372,12 @@ fn rfc6979_nonce_salted(x: List[int], h1: List[int], salt: int) -> List[int] {
 /// past lupin's step budget; pinned by the CAVP/Wycheproof suites and
 /// `sign_verify_smoke.lu`): `p256.verify(p256.public_key(d), msg,
 /// p256.sign(d, msg))` is true; a flipped signature byte is false.
-pub fn verify(pubkey: List[int], message: List[int], sig: List[int]) -> bool {
+pub fn verify(pubkey: List[byte], message: List[byte], sig: List[byte]) -> bool {
     if !(pubkey.len == 65) {
         return false
     }
     if !(sig.len == 64) {
         return false
-    }
-    for v in pubkey {
-        if v < 0 {
-            return false
-        }
-        if v > 255 {
-            return false
-        }
-    }
-    for v in sig {
-        if v < 0 {
-            return false
-        }
-        if v > 255 {
-            return false
-        }
     }
     let rb = sig[0..32]
     let sb = sig[32..64]
@@ -2445,7 +2413,7 @@ pub fn verify(pubkey: List[int], message: List[int], sig: List[int]) -> bool {
 }
 
 /// Byte-list equality. ct: public data (verify-side r comparison).
-fn bytes_eq(a: List[int], b: List[int]) -> bool {
+fn bytes_eq(a: List[byte], b: List[byte]) -> bool {
     if a.len != b.len {
         return false
     }
@@ -2470,7 +2438,7 @@ fn bytes_eq(a: List[int], b: List[int]) -> bool {
 /// strict-DER SEQUENCE{INTEGER, INTEGER} within the P-256 size bounds.
 struct SigOpt {
     ok: bool,
-    sig: List[int],
+    sig: List[byte],
 }
 
 /// Parse a strict-DER ECDSA signature to the 64-byte r || s form,
@@ -2482,18 +2450,15 @@ struct SigOpt {
 /// most 33 content octets), and trailing garbage. r or s wider than 32
 /// content octets after the optional leading zero is out of range and
 /// rejected. ct: public data (a signature to check).
-fn parse_der(b: List[int]) -> SigOpt {
-    let bad = SigOpt { ok: false, sig: List[int]() }
+fn parse_der(b: List[byte]) -> SigOpt {
+    let bad = SigOpt { ok: false, sig: List[byte]() }
     if b.len < 8 {
         return bad
     }
-    for v in b {
-        require_byte(v)
-    }
-    if b[0] != 48 {
+    if b[0] as int != 48 {
         return bad
     }
-    let l = b[1]
+    let l = b[1] as int
     // one length octet only (a P-256 sig is < 128 bytes of content)
     if l > 127 {
         return bad
@@ -2515,7 +2480,7 @@ fn parse_der(b: List[int]) -> SigOpt {
     if s_stop != b.len {
         return bad
     }
-    var out = List[int]()
+    var out = List[byte]()
     for v in left_pad32(r_val) {
         (mut out).push(v)
     }
@@ -2528,22 +2493,22 @@ fn parse_der(b: List[int]) -> SigOpt {
 /// A parsed DER INTEGER: `val` the big-endian magnitude bytes,
 /// `stop` the offset after it (or -1 on any violation).
 struct DerInt {
-    val: List[int],
+    val: List[byte],
     stop: int,
 }
 
 /// Read one strict-DER INTEGER at offset `at`. Returns stop = -1 on a
 /// non-INTEGER tag, an empty or over-long body, a negative value, or a
 /// non-minimal encoding (X.690 §8.3.2). ct: public data.
-fn read_der_int(b: List[int], at: int) -> DerInt {
-    let fail = DerInt { val: List[int](), stop: 0 - 1 }
+fn read_der_int(b: List[byte], at: int) -> DerInt {
+    let fail = DerInt { val: List[byte](), stop: 0 - 1 }
     if at + 2 > b.len {
         return fail
     }
-    if b[at] != 2 {
+    if b[at] as int != 2 {
         return fail
     }
-    let ln = b[at + 1]
+    let ln = b[at + 1] as int
     if ln > 127 {
         return fail
     }
@@ -2556,13 +2521,13 @@ fn read_der_int(b: List[int], at: int) -> DerInt {
     }
     let body = b[start..start + ln]
     // high bit set => negative (ECDSA r/s are nonnegative)
-    if body[0] >= 128 {
+    if body[0] as int >= 128 {
         return fail
     }
     // non-minimal: leading 0x00 whose successor's high bit is clear
     if ln > 1 {
-        if body[0] == 0 {
-            if body[1] < 128 {
+        if body[0] as int == 0 {
+            if body[1] as int < 128 {
                 return fail
             }
         }
@@ -2571,10 +2536,10 @@ fn read_der_int(b: List[int], at: int) -> DerInt {
     // only when body[0] == 0, and non-minimality is already rejected
     // above), then bound to 32 octets
     var strip = 0
-    if body[0] == 0 {
+    if body[0] as int == 0 {
         strip = 1
     }
-    var mag = List[int]()
+    var mag = List[byte]()
     var j: int = 0
     for v in body {
         if j >= strip {
@@ -2589,12 +2554,12 @@ fn read_der_int(b: List[int], at: int) -> DerInt {
 }
 
 /// Left-pad a big-endian magnitude to 32 bytes. ct: fixed by length.
-fn left_pad32(mag: List[int]) -> List[int] {
-    var out = List[int]()
+fn left_pad32(mag: List[byte]) -> List[byte] {
+    var out = List[byte]()
     var pad: int = 32 - mag.len
     var i: int = 0
     while i < pad {
-        (mut out).push(0)
+        (mut out).push(0 as byte)
         i = i + 1
     }
     for v in mag {
@@ -2614,7 +2579,7 @@ fn left_pad32(mag: List[int]) -> List[int] {
 /// three-lane in `der_codec.lu`): `p256.verify_der(pk, msg,
 /// p256.signature_der(p256.sign(d, msg)))` is true, and a malformed
 /// DER signature is false, never a trap.
-pub fn verify_der(pubkey: List[int], message: List[int], der: List[int]) -> bool {
+pub fn verify_der(pubkey: List[byte], message: List[byte], der: List[byte]) -> bool {
     let SigOpt { ok, sig } = parse_der(der)
     if !ok {
         return false
@@ -2627,7 +2592,7 @@ pub fn verify_der(pubkey: List[int], message: List[int], der: List[int]) -> bool
 /// a minimal nonnegative INTEGER (a leading 0x00 added when the high
 /// bit is set). Traps `assert` on a signature that is not 64 bytes.
 /// ct: public data.
-pub fn signature_der(sig: List[int]) -> List[int] {
+pub fn signature_der(sig: List[byte]) -> List[byte] {
     if !(sig.len == 64) {
         assert(false, "p256: a raw signature is 64 bytes (r||s)")
     }
@@ -2636,9 +2601,9 @@ pub fn signature_der(sig: List[int]) -> List[int] {
     let ri = der_int(rb)
     let si = der_int(sb)
     let total = ri.len + si.len
-    var out = List[int]()
-    (mut out).push(48)
-    (mut out).push(total)
+    var out = List[byte]()
+    (mut out).push(48 as byte)
+    (mut out).push(total as byte)
     for v in ri {
         (mut out).push(v)
     }
@@ -2651,14 +2616,14 @@ pub fn signature_der(sig: List[int]) -> List[int] {
 /// Encode a 32-byte big-endian magnitude as a minimal DER INTEGER TLV
 /// (strip leading zeros, prepend 0x00 if the top bit would read
 /// negative). ct: public data.
-fn der_int(mag32: List[int]) -> List[int] {
+fn der_int(mag32: List[byte]) -> List[byte] {
     // strip leading zero bytes (keep at least one byte)
     var start: int = 0
     var scanning = true
     var i: int = 0
     for v in mag32 {
         if scanning {
-            if v == 0 {
+            if v as int == 0 {
                 if i < 31 {
                     start = start + 1
                 }
@@ -2668,7 +2633,7 @@ fn der_int(mag32: List[int]) -> List[int] {
         }
         i = i + 1
     }
-    var body = List[int]()
+    var body = List[byte]()
     var j: int = 0
     for v in mag32 {
         if j >= start {
@@ -2676,16 +2641,16 @@ fn der_int(mag32: List[int]) -> List[int] {
         }
         j = j + 1
     }
-    var content = List[int]()
-    if body[0] >= 128 {
-        (mut content).push(0)
+    var content = List[byte]()
+    if body[0] as int >= 128 {
+        (mut content).push(0 as byte)
     }
     for v in body {
         (mut content).push(v)
     }
-    var out = List[int]()
-    (mut out).push(2)
-    (mut out).push(content.len)
+    var out = List[byte]()
+    (mut out).push(2 as byte)
+    (mut out).push(content.len as byte)
     for v in content {
         (mut out).push(v)
     }
@@ -2709,10 +2674,10 @@ fn der_int(mag32: List[int]) -> List[int] {
 /// A field element from a byte pattern (a self-test helper). ct: not a
 /// secret path.
 fn fe_sample(seed: int) -> Fe {
-    var b = List[int]()
+    var b = List[byte]()
     var i: int = 0
     while i < 32 {
-        (mut b).push((seed + i * 7) % 251)
+        (mut b).push(((seed + i * 7) % 251) as byte)
         i = i + 1
     }
     fe_frombytes_be(b)
@@ -2779,11 +2744,11 @@ pub fn self_test() -> bool {
         return false
     }
     let g = pt_base()
-    var nm1 = List[int]()
+    var nm1 = List[byte]()
     for v in n_bytes() {
         (mut nm1).push(v)
     }
-    nm1[31] = nm1[31] - 1
+    nm1[31] = (nm1[31] as int - 1) as byte
     let ng = pt_add(scalar_mul(nm1, g), g)
     fe_iszero(ng.z)
 }
@@ -2800,20 +2765,21 @@ fn pt_eq(p1: Pt, p2: Pt) -> bool {
 // Rendering (this module's own; the ladder precedent).
 // ---------------------------------------------------------------------
 
-/// `b` as lowercase hexadecimal, two digits per byte. Traps `assert`
-/// only on a non-byte element. ct: NOT constant-time (the alphabet
+/// `b` as lowercase hexadecimal, two digits per byte. **Total** — the
+/// non-byte element it used to trap on is a type error since sc35.
+/// ct: NOT constant-time (the alphabet
 /// slice is indexed by each byte's value) — renders public values only;
 /// a constant-time encoder is c28-tier work.
 ///
 /// ```wolf-doc-example
 /// p256.to_hex("abc".bytes()) == "616263"
-/// p256.to_hex(List[int]()) == ""
+/// p256.to_hex(List[byte]()) == ""
 /// ```
-pub fn to_hex(b: List[int]) -> str {
+pub fn to_hex(b: List[byte]) -> str {
     let alphabet = "0123456789abcdef"
     var out = ""
-    for v in b {
-        require_byte(v)
+    for raw in b {
+        let v = raw as int
         let hi = v / 16
         let lo = v % 16
         let hd = alphabet[hi..hi + 1]
