@@ -1,3 +1,43 @@
+# =====================================================================
+# sc35 — THE LUPIN COLUMN BELOW IS KNOWN-WRONG FOR 181 ROWS, ON PURPOSE,
+# AND THIS BLOCK IS THE RECORD OF WHY. READ IT BEFORE "FIXING" ANY OF
+# THEM.
+#
+# sc35 renamed std's byte tier from `List[int]` to `List[byte]` on top of
+# s136's byte-typed builtins (wolf-lang#231). The rename is complete and
+# measured on both wolf lanes. It is NOT executable on the reference
+# interpreter at `lupin 0.1.23`, because `[type.byte.cast]`'s spelling —
+# `as byte` — is `fail(E0301)` at phase `resolve` there ("nothing with
+# this name is in scope, so this cast names no target type"), and a byte
+# tier that never narrows is not a byte tier.
+#
+# MEASURED over the sc35 tree, all 376 rows conform-run under lupin
+# 0.1.23: 181 answer `fail(E0301)@resolve` — 134 of them ledgered `run`
+# below and 47 ledgered `unsupported`. `std-test` reports 173 of those as
+# reds (the rest land in the ten converted witnesses' own column). By
+# module reached: curve25519 31, sha2 28, chacha20 24, tls.cert 17,
+# p256 17, tls.record 12, tls.handshake 10, json 9, bytes 7, hex 6,
+# jose 5, tls.client 4, fs 4, str 3, base64 3, net 1.
+#
+# WHY THE COLUMN IS NOT "CORRECTED": there is no word for what lupin now
+# answers. `parse_expect` accepts `run | unsupported | slow |
+# divergent(…)` for this lane and refuses `fail(E…)` by name; and
+# `divergent(…)`'s own vocabulary is `stdout | exit(N) | trap(kind)` —
+# the three shapes an EXECUTING lane can produce. The divergence
+# vocabulary is one-directional: it has a word for "the compilers reject
+# statically and the interpreter runs" (F-0098, and the ten sc35
+# witnesses use exactly that shape) and none for the mirror. Writing
+# `unsupported` would be a LIE about the interpreter's semantics — lupin
+# does not decline the byte tier, it fails to resolve a cast — and
+# inventing a word to make CI green is the workaround sc00 forbids.
+#
+# THE EXIT IS A RELEASE, NOT AN EDIT: is36 ships `[type.byte]` in the
+# mirror as lupin 0.1.25. On the bump that installs it, every one of the
+# 181 should answer as it did before the rename, because nothing about
+# their semantics changed — re-measure, then this block and the reds go
+# out together. F-0108 in docs/findings.md carries the numbers.
+# =====================================================================
+#
 # tests/ledger.toml — per-test, per-implementation expectations (sc00 §3,
 # the is00 corpus-overlay pattern). The two implementations diverge by
 # design; each test records what each one is expected to achieve TODAY:
@@ -1165,7 +1205,7 @@ lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
 native = "run"  # sc08 pin bump (13b811f)
 
-[tests."hex/encode_non_byte_trap.lu"]
+[tests."hex/encode_non_byte_refused.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
 native = "run"  # sc08 pin bump (13b811f)
@@ -2011,7 +2051,7 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/crypto/sha2/non_byte_trap.lu"]
+[tests."x/crypto/sha2/non_byte_refused.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"
@@ -2226,7 +2266,7 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/crypto/chacha20/non_byte_trap.lu"]
+[tests."x/crypto/chacha20/non_byte_refused.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"
@@ -2444,7 +2484,7 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/crypto/curve25519/non_byte_trap.lu"]
+[tests."x/crypto/curve25519/non_byte_refused.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"
@@ -2627,7 +2667,7 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/tls/record/non_byte_trap.lu"]
+[tests."x/tls/record/non_byte_refused.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"
@@ -2699,7 +2739,7 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/tls/handshake/non_byte_trap.lu"]
+[tests."x/tls/handshake/non_byte_refused.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"
@@ -2817,7 +2857,7 @@ lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the 50M-step refusal st
 wolfc = "unsupported"
 native = "run"
 
-[tests."x/tls/cert/non_byte_trap.lu"]
+[tests."x/tls/cert/non_byte_refused.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"
@@ -2925,7 +2965,7 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
-[tests."x/crypto/p256/non_byte_trap.lu"]
+[tests."x/crypto/p256/non_byte_refused.lu"]
 lupin = "run"
 wolfc = "run"
 native = "run"
