@@ -2,18 +2,28 @@
 //!
 //! std.hex — base-16 encoding and decoding. Stability tier: core.
 //!
-//! **The byte sequence is `List[int]`, and that is an interim with a
-//! filing behind it.** The sprint contract spells these functions over
-//! `bytes`, the type `std.bytes` describes. That module has code as of
-//! sc09 — eight of its nine functions, over exactly this currency — and it
-//! still describes a `Bytes` TYPE that does not exist: a byte-width element
-//! type that can hold invalid UTF-8 (F-0035, and F-0072 for the cost it
-//! carries today). So the currency here
-//! is unchanged and so is the interim: `List[int]` with every element in
-//! 0..255 — documented, checked at the boundary, and trivially replaced by
-//! `Bytes` when `Bytes` exists, since every signature keeps its shape
-//! (F-0035). `std.bytes` is now the module to reach for when a program
-//! wants to LOOK at those bytes rather than encode them.
+//! **The byte sequence is `List[byte]`, and the interim this header
+//! carried for eleven sprints is DISCHARGED (sc35).** The currency was
+//! `List[int]` with every element in 0..255 — documented, checked at the
+//! boundary, and promised to be "trivially replaced when the type
+//! exists, since every signature keeps its shape" (F-0035). It was, and
+//! they did: D72/s135 gave the language `byte` and s136 (wolf-lang#231)
+//! moved the eight byte builtins to `List[byte]`, so `encode` and
+//! `decode` took the new element type and nothing else here moved.
+//! `std.bytes` is the module to reach for when a program wants to LOOK
+//! at those bytes rather than encode them.
+//!
+//! **What changed in the bodies, and it is two lines.** `encode` reads
+//! an element and hands it to `byte_digits`, which takes an `int`, so
+//! the read is spelled `b[i] as int` (`[type.byte.cast]` — widening is
+//! never implicit); `decode` pushes `(hi * 16 + lo) as byte`, because
+//! `[type.byte.op]` makes every arithmetic result an `int` and narrowing
+//! back is spelled. **`byte_digits`' `assert` on an element outside
+//! 0..255 is now UNREACHABLE from every door in this module** — the type
+//! forbids the input — and the guard stays, because it is the function's
+//! own contract and the one caller that could still violate it is a
+//! future one. §11's encoder rule (an encoder TRAPS on a non-byte where
+//! an os module RAISES) is not retired; it is simply out of reach here.
 //!
 //! What that used to cost was one function, and sc10 paid it:
 //! **`encode_str` is here now.** Hex-encoding text is the commonest use
@@ -31,7 +41,7 @@
 //! module has no reviewed contract left.
 //!
 //! One name note: `encode_str` and not `encode`, because wolf has no
-//! overloading and `encode(b: List[int])` owns the short name. It goes to
+//! overloading and `encode(b: List[byte])` owns the short name. It goes to
 //! the byte form deliberately — that is the operation the round-trip
 //! property is stated over.
 //!
@@ -72,7 +82,8 @@ use std.bytes
 /// loop zero times and falls through to the miss, which is the answer the
 /// `starts_with` probe gave it too.
 fn digit_of(s: str) -> int {
-    for c in s.bytes() {
+    for raw in s.bytes() {
+        let c = raw as int
         if c >= 48 && c <= 57 {
             return c - 48
         }
@@ -113,20 +124,20 @@ fn byte_digits(b: int) -> str {
 /// a datum (§2's trap rule). Total otherwise: no error row.
 ///
 /// ```wolf-doc-example
-/// var b = List[int]()
-/// (mut b).push(0)
-/// (mut b).push(15)
-/// (mut b).push(255)
+/// var b = List[byte]()
+/// (mut b).push(0 as byte)
+/// (mut b).push(15 as byte)
+/// (mut b).push(255 as byte)
 /// hex.encode(b) == "000fff"
-/// var empty = List[int]()
+/// var empty = List[byte]()
 /// hex.encode(empty) == ""
 /// ```
-pub fn encode(b: List[int]) -> str {
+pub fn encode(b: List[byte]) -> str {
     var out = ""
     let n = b.len
     var i: int = 0
     while i < n {
-        let pair = byte_digits(b[i])
+        let pair = byte_digits(b[i] as int)
         out += pair
         i = i + 1
     }
@@ -138,12 +149,12 @@ pub fn encode(b: List[int]) -> str {
 /// case-mapping question arises. Same `assert` trap on a non-byte.
 ///
 /// ```wolf-doc-example
-/// var b = List[int]()
-/// (mut b).push(171)
-/// (mut b).push(205)
+/// var b = List[byte]()
+/// (mut b).push(171 as byte)
+/// (mut b).push(205 as byte)
 /// hex.encode_upper(b) == "ABCD"
 /// ```
-pub fn encode_upper(b: List[int]) -> str {
+pub fn encode_upper(b: List[byte]) -> str {
     let lower_text = encode(b)
     lower_text.upper()
 }
@@ -166,17 +177,17 @@ pub fn encode_upper(b: List[int]) -> str {
 /// non-ASCII input, which is a miss like any other non-digit.
 ///
 /// ```wolf-doc-example
-/// let b = hex.decode("00ff") else List[int]()
+/// let b = hex.decode("00ff") else List[byte]()
 /// b.len == 2
-/// let bad = hex.decode("0f0") else List[int]()
+/// let bad = hex.decode("0f0") else List[byte]()
 /// bad.len == 0
-/// let mixed = hex.decode("AbCd") else List[int]()
+/// let mixed = hex.decode("AbCd") else List[byte]()
 /// mixed.len == 2
-/// let unicode = hex.decode("é") else List[int]()
+/// let unicode = hex.decode("é") else List[byte]()
 /// unicode.len == 0
 /// ```
-pub fn decode(s: str) -> List[int] ! {parse} {
-    var out = List[int]()
+pub fn decode(s: str) -> List[byte] ! {parse} {
+    var out = List[byte]()
     var rest = s
     while rest.len > 0 {
         let hi = digit_of(rest)
@@ -192,7 +203,7 @@ pub fn decode(s: str) -> List[int] ! {parse} {
             return parse
         }
         rest = rest[1..]
-        (mut out).push(hi * 16 + lo)
+        (mut out).push((hi * 16 + lo) as byte)
     }
     out
 }
@@ -213,7 +224,7 @@ pub fn decode(s: str) -> List[int] ! {parse} {
 /// **The body was `encode(s.bytes())` until sc12 and is a walk now.**
 /// Passing the view to `encode` is exactly the position s77 materializes
 /// in — an argument — so the delegation copied the whole string into a
-/// `List[int]` before rendering a digit. Consuming the view here costs the
+/// `List[byte]` before rendering a digit. Consuming the view here costs the
 /// duplication of one four-line loop and no longer allocates a list per
 /// call. The digits still come from `byte_digits`, so there is one
 /// rendering and the two entry points cannot drift; what is duplicated is
@@ -240,7 +251,7 @@ pub fn decode(s: str) -> List[int] ! {parse} {
 pub fn encode_str(s: str) -> str {
     var out = ""
     for b in s.bytes() {
-        let pair = byte_digits(b)
+        let pair = byte_digits(b as int)
         out += pair
     }
     out
