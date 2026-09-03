@@ -961,9 +961,9 @@ fn emit_cavp_sigver(cases: &[EcdsaVerCase]) -> String {
     s.push_str("\nuse std.hex\nuse std.x.crypto.p256\n\n");
     s.push_str(
         "fn vrf(qx: str, qy: str, msg: str, r: str, s: str, want: bool) -> bool {\n\
-         \x20   let pk = hex.decode(\"04{qx}{qy}\") else List[int]()\n\
-         \x20   let sig = hex.decode(\"{r}{s}\") else List[int]()\n\
-         \x20   p256.verify(pk, hex.decode(msg) else List[int](), sig) == want\n}\n\n\
+         \x20   let pk = hex.decode(\"04{qx}{qy}\") else List[byte]()\n\
+         \x20   let sig = hex.decode(\"{r}{s}\") else List[byte]()\n\
+         \x20   p256.verify(pk, hex.decode(msg) else List[byte](), sig) == want\n}\n\n\
          fn main() -> int {\n",
     );
     for (i, c) in cases.iter().enumerate() {
@@ -999,9 +999,9 @@ fn emit_cavp_siggen(cases: &[EcdsaGenCase]) -> String {
     s.push_str("\nuse std.hex\nuse std.x.crypto.p256\n\n");
     s.push_str(
         "fn vrf(qx: str, qy: str, msg: str, r: str, s: str) -> bool {\n\
-         \x20   let pk = hex.decode(\"04{qx}{qy}\") else List[int]()\n\
-         \x20   let sig = hex.decode(\"{r}{s}\") else List[int]()\n\
-         \x20   p256.verify(pk, hex.decode(msg) else List[int](), sig)\n}\n\n\
+         \x20   let pk = hex.decode(\"04{qx}{qy}\") else List[byte]()\n\
+         \x20   let sig = hex.decode(\"{r}{s}\") else List[byte]()\n\
+         \x20   p256.verify(pk, hex.decode(msg) else List[byte](), sig)\n}\n\n\
          fn main() -> int {\n",
     );
     for (i, c) in cases.iter().enumerate() {
@@ -1037,9 +1037,9 @@ fn emit_wycheproof_ecdsa(cases: &[WpEcdsaCase], part: usize, parts: usize, total
     s.push_str("\nuse std.hex\nuse std.x.crypto.p256\n\n");
     s.push_str(
         "fn vd(pk: str, msg: str, der: str, want: bool) -> bool {\n\
-         \x20   let key = hex.decode(pk) else List[int]()\n\
-         \x20   let m = hex.decode(msg) else List[int]()\n\
-         \x20   let d = hex.decode(der) else List[int]()\n\
+         \x20   let key = hex.decode(pk) else List[byte]()\n\
+         \x20   let m = hex.decode(msg) else List[byte]()\n\
+         \x20   let d = hex.decode(der) else List[byte]()\n\
          \x20   p256.verify_der(key, m, d) == want\n}\n\nfn main() -> int {\n",
     );
     for c in cases {
@@ -1100,7 +1100,7 @@ fn emit_cavp_msgs(
     // per-line literal keeps a failing vector identifiable by its span.
     let _ = write!(
         s,
-        "fn digest_matches(msg_hex: str, want: str) -> bool {{\n    let msg = hex.decode(msg_hex) else List[int]()\n    sha2.to_hex(sha2.sum{suffix}(msg)) == want\n}}\n\nfn main() -> int {{\n"
+        "fn digest_matches(msg_hex: str, want: str) -> bool {{\n    let msg = hex.decode(msg_hex) else List[byte]()\n    sha2.to_hex(sha2.sum{suffix}(msg)) == want\n}}\n\nfn main() -> int {{\n"
     );
     for v in vectors {
         let _ = writeln!(
@@ -1134,10 +1134,10 @@ fn emit_cavp_monte(stem: &str, suffix: &str, seed: &str, checkpoints: &[String])
     );
     s.push_str("\nuse std.hex\nuse std.x.crypto.sha2\n\n");
     s.push_str(
-        "fn dup(xs: List[int]) -> List[int] {\n    var out = List[int]()\n    for v in xs {\n        (mut out).push(v)\n    }\n    out\n}\n\n",
+        "fn dup(xs: List[byte]) -> List[byte] {\n    var out = List[byte]()\n    for v in xs {\n        (mut out).push(v)\n    }\n    out\n}\n\n",
     );
     s.push_str(
-        "fn concat3(a: List[int], b: List[int], c: List[int]) -> List[int] {\n    var out = List[int]()\n    for v in a {\n        (mut out).push(v)\n    }\n    for v in b {\n        (mut out).push(v)\n    }\n    for v in c {\n        (mut out).push(v)\n    }\n    out\n}\n\n",
+        "fn concat3(a: List[byte], b: List[byte], c: List[byte]) -> List[byte] {\n    var out = List[byte]()\n    for v in a {\n        (mut out).push(v)\n    }\n    for v in b {\n        (mut out).push(v)\n    }\n    for v in c {\n        (mut out).push(v)\n    }\n    out\n}\n\n",
     );
     s.push_str("fn main() -> int {\n    var exp = List[str]()\n");
     for md in checkpoints {
@@ -1145,7 +1145,7 @@ fn emit_cavp_monte(stem: &str, suffix: &str, seed: &str, checkpoints: &[String])
     }
     let _ = write!(
         s,
-        "    var seed = hex.decode(\"{seed}\") else List[int]()\n\
+        "    var seed = hex.decode(\"{seed}\") else List[byte]()\n\
          \x20   var j: int = 0\n\
          \x20   while j < 100 {{\n\
          \x20       var md0 = dup(seed)\n\
@@ -1212,9 +1212,9 @@ fn emit_wycheproof(suffix: &str, cases: &[&WpCase], smoke: bool, total_valid: us
     let _ = write!(
         s,
         "fn okm_matches(ikm_hex: str, salt_hex: str, info_hex: str, n: int, want: str) -> bool {{\n\
-         \x20   let ikm = hex.decode(ikm_hex) else List[int]()\n\
-         \x20   let salt = hex.decode(salt_hex) else List[int]()\n\
-         \x20   let info = hex.decode(info_hex) else List[int]()\n\
+         \x20   let ikm = hex.decode(ikm_hex) else List[byte]()\n\
+         \x20   let salt = hex.decode(salt_hex) else List[byte]()\n\
+         \x20   let info = hex.decode(info_hex) else List[byte]()\n\
          \x20   sha2.to_hex(sha2.hkdf{suffix}(salt, ikm, info, n)) == want\n}}\n\nfn main() -> int {{\n"
     );
     for c in cases {
@@ -1309,15 +1309,15 @@ fn emit_wycheproof_aead(
         let _ = write!(
             s,
             "fn aead_matches(key_hex: str, iv_hex: str, aad_hex: str, msg_hex: str, box_hex: str) -> bool {{\n\
-             \x20   let key = hex.decode(key_hex) else List[int]()\n\
-             \x20   let iv = hex.decode(iv_hex) else List[int]()\n\
-             \x20   let aad = hex.decode(aad_hex) else List[int]()\n\
-             \x20   let msg = hex.decode(msg_hex) else List[int]()\n\
+             \x20   let key = hex.decode(key_hex) else List[byte]()\n\
+             \x20   let iv = hex.decode(iv_hex) else List[byte]()\n\
+             \x20   let aad = hex.decode(aad_hex) else List[byte]()\n\
+             \x20   let msg = hex.decode(msg_hex) else List[byte]()\n\
              \x20   let boxed = chacha20.seal(key, iv, aad, msg)\n\
              \x20   if !(chacha20.to_hex(boxed) == box_hex) {{\n\
              \x20       return false\n\
              \x20   }}\n\
-             \x20   let opened = chacha20.open(key, iv, aad, boxed) else List[int]()\n\
+             \x20   let opened = chacha20.open(key, iv, aad, boxed) else List[byte]()\n\
              \x20   chacha20.to_hex(opened) == msg_hex\n}}\n\nfn main() -> int {{\n"
         );
         for c in cases {
@@ -1331,10 +1331,10 @@ fn emit_wycheproof_aead(
         let _ = write!(
             s,
             "fn open_verdict(key_hex: str, iv_hex: str, aad_hex: str, box_hex: str) -> int {{\n\
-             \x20   let key = hex.decode(key_hex) else List[int]()\n\
-             \x20   let iv = hex.decode(iv_hex) else List[int]()\n\
-             \x20   let aad = hex.decode(aad_hex) else List[int]()\n\
-             \x20   let boxed = hex.decode(box_hex) else List[int]()\n\
+             \x20   let key = hex.decode(key_hex) else List[byte]()\n\
+             \x20   let iv = hex.decode(iv_hex) else List[byte]()\n\
+             \x20   let aad = hex.decode(aad_hex) else List[byte]()\n\
+             \x20   let boxed = hex.decode(box_hex) else List[byte]()\n\
              \x20   let opened = chacha20.open(key, iv, aad, boxed) else |_| {{\n\
              \x20       return -1\n\
              \x20   }}\n\
@@ -1424,9 +1424,9 @@ fn emit_wycheproof_xdh(
         let _ = write!(
             s,
             "fn shared_matches(priv_hex: str, pub_hex: str, want: str) -> bool {{\n\
-             \x20   let sk = hex.decode(priv_hex) else List[int]()\n\
-             \x20   let pk = hex.decode(pub_hex) else List[int]()\n\
-             \x20   let out = curve25519.x25519(sk, pk) else List[int]()\n\
+             \x20   let sk = hex.decode(priv_hex) else List[byte]()\n\
+             \x20   let pk = hex.decode(pub_hex) else List[byte]()\n\
+             \x20   let out = curve25519.x25519(sk, pk) else List[byte]()\n\
              \x20   curve25519.to_hex(out) == want\n}}\n\nfn main() -> int {{\n"
         );
         for c in cases {
@@ -1440,8 +1440,8 @@ fn emit_wycheproof_xdh(
         let _ = write!(
             s,
             "fn zero_verdict(priv_hex: str, pub_hex: str) -> int {{\n\
-             \x20   let sk = hex.decode(priv_hex) else List[int]()\n\
-             \x20   let pk = hex.decode(pub_hex) else List[int]()\n\
+             \x20   let sk = hex.decode(priv_hex) else List[byte]()\n\
+             \x20   let pk = hex.decode(pub_hex) else List[byte]()\n\
              \x20   let out = curve25519.x25519(sk, pk) else |_| {{\n\
              \x20       return -1\n\
              \x20   }}\n\
@@ -1503,9 +1503,9 @@ fn emit_wycheproof_eddsa(cases: &[EddsaCase], part: usize, parts: usize, total: 
     let _ = write!(
         s,
         "fn verify_is(pub_hex: str, msg_hex: str, sig_hex: str, want: bool) -> bool {{\n\
-         \x20   let pk = hex.decode(pub_hex) else List[int]()\n\
-         \x20   let msg = hex.decode(msg_hex) else List[int]()\n\
-         \x20   let sig = hex.decode(sig_hex) else List[int]()\n\
+         \x20   let pk = hex.decode(pub_hex) else List[byte]()\n\
+         \x20   let msg = hex.decode(msg_hex) else List[byte]()\n\
+         \x20   let sig = hex.decode(sig_hex) else List[byte]()\n\
          \x20   curve25519.verify(pk, msg, sig) == want\n}}\n\nfn main() -> int {{\n"
     );
     for c in cases {
