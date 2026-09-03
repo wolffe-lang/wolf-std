@@ -112,6 +112,7 @@ finding gets a row; the filing link is the proof it left the building.
 | F-0102 | 2026-08-30 | **lupin 0.1.18 does not resolve the net BYTE tier (`net_read_bytes`/`net_write_bytes`), where it resolves the str tier and `net_deadline`** — s106 shipped all three builtins and lupin's is18 socket crossing (0.1.14) took the str calls + the deadline (both measured three-lane at the sc29 pin: a 150ms `set_deadline` budget resolves a silent-peer `net_read` as `timeout` under lupin, and a peer-less `net_accept` too), but the byte pair is `unsupported: `net_write_bytes` does not resolve` at resolve — the one-release-behind half of the same tier. Costs the sc29 byte-tier facade rows (`net/bytes_round_trip`, `net/write_bytes_invalid_row`) their lupin lane and every `std.x.tls.client` socket witness its lupin lane (`loopback_handshake` is native-only for this AND the step budget); the pure client parse/verify half stays three-lane by lupin's lazy body resolution. The str/deadline tier proves the surface exists on that lane, so this is a completeness gap in the byte mirror, not a design decline — the shape of the fix is the str calls' own | wolf-interp | [filed: wolf-interp#52](https://github.com/wolffe-lang/wolf-interp/issues/52); sc29 — **CLOSED at sc30** by lupin 0.1.19 (is30, #52 paid exactly as filed: the byte pair lands as the str calls' own shape, `List[int]` marshalling, no utf8 row, whole-or-raise writes). Healing measured at the sc30 bump: `net/bytes_round_trip` and `net/write_bytes_invalid_row` flip lupin `unsupported` -> `run` at FIRST SIGHT against sc29 bodies untouched (declared against the fix, the F-0049 pattern), the sc29 byte-tier block goes three-lane, and `loopback_handshake`'s lupin lane flips all the way to `run` — the "AND the step budget" half of its sc29 native-only attribution was an inference the resolve refusal had shadowed, and the measurement outvoted it (18.9s idle, inside the 50M budget). #52 commented same-day with the downstream healing |
 | F-0103 | 2026-09-01 | **the CHECKED tier refuses an unhandled raising call passed straight into a ROW-TYPED parameter — `unsupported — control flow in an argument` at `mem` — where lupin AND wolf's own native rung both run it.** The shape is `std.option`'s (`fn or[T](v: T ! {none}, default: T)`, sc06): a helper whose parameter is a row union, called as `row_name(narrow(1))`. Four probes characterize it, all three lanes green on the last three: a non-raising call in an argument; `take_int(narrow(9) else 0)`; `take_int(narrow(9)?)`; and `let r = narrow(1)` then `row_name(r)` — so the refusal is specific to the UNHANDLED union riding into the parameter, and the BOUND form of the same expression compiles on the same lane, which reads as a `mem`-phase argument-lowering gap rather than a typing rule. This is the cause behind `option/or_else_default.lu`, `option/exists_marking.lu` and `option/is_none_marking.lu` carrying `wolfc = unsupported` since sc06 with lupin and native both running them — the rows were ledgered, the cause had never been isolated. Costs `std.x.tls.client`'s sc31 naming pair its one-line call site: the surface documents "bind, then name" so every naming site stays three-lane (module header + `tests/x/tls/client/row_naming.lu`), which is a workaround in the CALLER's source for a limit only one of the two wolf tiers has | wolf-lang | [filed: wolf-lang#201](https://github.com/wolffe-lang/wolf-lang/issues/201); sc31 |
 | F-0101 | 2026-08-30 | **the native rung refuses a slice of a LENT byte view at `mem`, and the refusal names the wrong conservatism** — `b[from..to]` in a callee is `unsupported` ("range VALUES outside `for` headers (owned `Iter[int]` ranges, c06/std)") when the caller lends `s.bytes()` across the call (s89), while the SAME callee over an owned list and the inline slice of an owned local both `exit(0)` at v0.2.0/c88ab64 — the message cites a limit the owned probes show lifted; the operative edge is the mem-phase lowering of slice-of-lent-view. `--checked` and lupin 0.1.18 run all three shapes. Caught by the sc28 slices adoption: `bytes.slice` took the range spelling and the gauntlet moved exactly one row (`tests/bytes/lend_across_calls.lu [native]`, `run` -> `unsupported`, the corpus's only lend-into-slice witness — `bytes.slice`'s doc examples lend too); the site retreated to the index loop the same day with the shape named in a comment, and the row holds `run` again. Blocks the s128 slice spelling in any std function whose parameter is lend-reachable; three-probe isolation at `probes/sc28_p6_slice_of_view` in the filing | wolf-lang | [filed: wolf-lang#184](https://github.com/wolffe-lang/wolf-lang/issues/184); sc28 — **CLOSED at sc30** by s129 (the #184 fix, in the sc30 pin b80d239): the diagnosis upstream was a real mem-phase gap wearing the retired range-value conservatism's refusal string, and the fix gave the lent-view path its slice arm. Healing measured at the re-adopt: `bytes.slice` took back `b[from..to]` and `lend_across_calls.lu` — the ONE row the sc28 adoption moved — holds `run` on ALL THREE lanes with the range spelling (native re-measured singly, exit(0), the exact shape that refused at `mem` at c88ab64); ledger flat everywhere else. The retreat commit bc01f8c reverses at the sc30 re-adopt with the arc named at the site (found -> filed -> fixed -> re-adopted); upstream's own `byte_view_slice_lent` corpus twin joined the two-machine agreement class at lupin's 83f83bb pin bump (lupin ran the lent slice all along). #184 commented same-day with the downstream healing |
+| F-0104 | 2026-09-02 | **the byte-buffer cost, measured from the library's side** — a byte buffer held as `List[int]` charges 16.0x its payload on both wolf tiers and 32x under lupin, linear from 1 KiB to 64 KiB, reproducing wolf-lang#203's own numbers to the byte from a different program and again through std's readers (`fs.read_bytes` and `fs.read_chunk` charge identically, so #203's preallocation half is ENTIRELY unrealized). Recommended `[type.byte]` modelled on `[type.char]` as a spec-shaped proposal; both cheap answers (a std wrapper, the spec's `distinct` newtype) fail by the same layout-preserving mechanism. **CLOSED at sc34 with the after-table: 16.0x -> 2.0x native, 16.0x -> 1.0x checked** | wolf-lang | [filed: wolf-lang#203](https://github.com/wolffe-lang/wolf-lang/issues/203); D72 ruled, s135 landed; sc32-sc34 |
 
 
 ## F-0001 — the std search path
@@ -5908,3 +5909,106 @@ not contain either name, so all 124 changed shape and none could move.
 That is sc33's #55 lesson arriving a second time from a different
 implementation: **predict at both levels, and the level that decides is
 what your comparator reads.**
+
+## F-0104 CLOSES — the after-table, and the substitution that cannot be made yet
+
+**Status: CLOSED as a measurement.** wolf-lang#203's ask landed as D72
+/ s135's `[type.byte]`, the multiplier F-0104 filed is retired IN THE
+LANGUAGE, and this repo has now measured the after-picture from its own
+side. What does NOT close with it is the library's ability to spend the
+win, and the reason is a fact this sprint discovered rather than
+inherited — it is F-0106 below.
+
+### The after-table (native / checked), measured 2026-09-02 at `wolf 0.2.3+dev.31170d1` and `lupin 0.1.23`, macOS arm64
+
+Same method as sc32's before-table, run in one program so the two
+columns cannot drift: a fresh `region` per row, a list filled by `push`
+to N elements, `region_bytes` read inside the block.
+
+| payload | `List[int]` (before) | `List[byte]` (after) | after ÷ payload | `List[int]` then converted to `List[byte]` |
+|---|---|---|---|---|
+| 1,024 | 16,384 / **16,368** | 1,024 / **2,096** | 1.00x / **2.05x** | 17,408 / **18,464** |
+| 2,048 | 32,768 / **32,752** | 2,048 / **4,144** | 1.00x / **2.02x** | 34,816 / **36,896** |
+| 4,096 | 65,536 / **65,520** | 4,096 / **8,240** | 1.00x / **2.01x** | 69,632 / **73,760** |
+| 8,192 | 131,072 / **131,056** | 8,192 / **16,432** | 1.00x / **2.01x** | 139,264 / **147,488** |
+| 16,384 | 262,144 / **262,128** | 16,384 / **32,816** | 1.00x / **2.00x** | 278,528 / **294,944** |
+| 32,768 | 524,288 / **524,272** | 32,768 / **65,584** | 1.00x / **2.00x** | 557,056 / **589,856** |
+| **65,536** | 1,048,576 / **1,048,560** | **65,536** / **131,120** | **1.00x** / **2.00x** | 1,114,112 / **1,179,680** |
+
+(checked / **native**. The lupin column is gone from this table on
+purpose and is the last section below.)
+
+**Four things the table says.**
+
+1. **16.0x -> 2.0x native, 16.0x -> 1.0x checked, at every size.** The
+   8x element-width multiplier is retired on both wolf tiers. Natively
+   the residue is exactly `2 x payload + 48` — the 48 is one list
+   header, constant from 1 KiB to 64 KiB — so what remains is the
+   push-growth history `[mem.region.account.1]` keeps charged, which is
+   #203's separable second property and no type change can touch it.
+   **The checked machine has no growth history at all and charges the
+   payload EXACTLY**: 65,536 for 65,536 bytes, 1.00x, the first time
+   any number in this family has been 1.
+2. **The before column reproduces sc32's table to the byte at a
+   compiler 51 commits newer**, including lobo's own 1,048,560. The 16x
+   was the representation, and it still is wherever the representation
+   is still `List[int]`.
+3. **The io readers are the same numbers, measured through std rather
+   than synthetically** — `fs.write_bytes` a payload, read it back in a
+   fresh region: 16,368 / 65,520 / 262,128 / 1,048,560 native at
+   1 KiB / 4 KiB / 16 KiB / 64 KiB, and 16,384 / 65,536 / 262,144 /
+   1,048,576 checked. Identical to F-0104's io half at sc33, and to the
+   synthetic column above. Nothing about std's readers changed, which
+   is the point of the next column.
+4. **The fourth column is the finding.** `List[int]` **then converted
+   to** `List[byte]` — one list read from a producer, one list built by
+   `push`ing `x as byte` — charges **18.0x native and 17.0x checked**,
+   both **WORSE than the 16.0x it replaces**, at every size, because
+   the ledger is cumulative and the intermediate list is never
+   subtracted. That column is not a curiosity. **It is exactly what
+   every substituted signature in std would charge today**, and it is
+   why this sprint did not substitute. See F-0106.
+
+### The lupin lane, and the count the flip set needs
+
+lupin 0.1.23 does not move this bump, and it **refuses `byte` by name**:
+`fail(E0301)` at phase **resolve** — `nothing with this name is in
+scope, so this cast names no target type … [mod.scope]` — measured on
+each probe above.
+
+**But the refusal is narrower than "every substituted row", and the
+narrowness is worth a sentence, because it changes what is36 has to
+flip and what a lane audit should count.** lupin is dynamically typed
+and **does not check a type NAME in annotation position at all**: a
+program declaring `fn blen(b: List[byte]) -> int` and calling it RUNS
+under 0.1.23 and prints its answer. What refuses is the **cast target**
+`as byte` — the one construct that names the type in a position lupin
+resolves. So:
+
+- a signature-only substitution would move **zero** lupin rows;
+- and every row whose reachable source contains one `as byte` moves to
+  `fail(E0301)@resolve` — which is every row of a real substitution,
+  because with no byte-typed builtin in the language a `List[byte]` can
+  only be BUILT by casting (see F-0106), so the cast is unavoidable
+  wherever the tier is real.
+
+**The is36 flip set, counted rather than estimated: 57 files and 262
+call sites carry the byte tier in this tree** (95 `.bytes()` builtin
+calls, 132 `std.bytes` calls, 16 `std.fs` byte calls, 15 `std.net` byte
+calls, 4 direct `str_from_utf8`), spread over `std.bytes`, `std.fs`,
+`std.net`, `std.hex`, `std.base64`, `std.json`, `std.x.jose`,
+`std.x.crypto.{sha2,chacha20,curve25519,p256}` and
+`std.x.tls.{cert,handshake,record,client}`. Of the tree's 376 ledger
+rows, the ones a substitution would take dark on lupin are the rows
+reaching those files. Counted against the ledger: **40 of the 376
+rows sit on a test file that names the byte tier directly, and 32 of
+those 40 are `run` on lupin today** (the other 8 are already
+`unsupported` for other reasons). So a substitution's floor is **32
+lupin rows moving `run` -> `fail(E0301)@resolve`**, and the ceiling is
+higher, because a cast inside a std module refuses at resolve for every
+test that imports it, not only for the tests that name the tier.
+
+is36 needs `byte` in type position, the two casts, operator
+widening, `Value::Byte` with 1-byte list slots and `{b}` printing the
+number; until it ships, ANY substitution here trades three lanes for
+two on every row it touches.
