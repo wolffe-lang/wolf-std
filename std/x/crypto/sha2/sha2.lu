@@ -60,31 +60,40 @@
 //! bumps (is20's fix is merged upstream, unreleased — the flip waits on
 //! the lupin release that carries it).
 //!
-//! **Byte sequences are `List[int]` with the documented 0..255 element
-//! contract** (§11's interim, F-0035): an element outside 0..255 traps
-//! `assert` at ingestion — the caller promised bytes (a contract
-//! violation, §2's trap rule), and a wrapping cast would otherwise
-//! digest a value the caller never meant. `to_hex` is this module's own
-//! hex rendering so that its tests and doc examples import exactly one
-//! module (the `std.bytes.from_str` precedent); `std.hex.encode` is the
-//! facade spelling of the same operation.
+//! **Byte sequences are `List[byte]` (sc35), AND THE INGESTION GUARD IS
+//! GONE.** For eleven sprints the currency was `List[int]` with a
+//! documented 0..255 element contract (§11's interim, F-0035) and a
+//! `require_byte` that trapped `assert` on every element that broke it.
+//! D72/s135's `byte` and s136's byte-typed builtins (wolf-lang#231) make
+//! that contract the TYPE's, so the guard was unreachable code and it has
+//! been deleted rather than left standing as decoration. What the guard
+//! defended is unchanged and is now enforced one layer down: a
+//! `List[byte]` cannot hold 300 or -1, so no wrapping cast can digest a
+//! value the caller never meant. `to_hex` is this module's own hex
+//! rendering so that its tests and doc examples import exactly one module
+//! (the `std.bytes.from_str` precedent); `std.hex.encode` is the facade
+//! spelling of the same operation.
 //!
 //! **Constant-time obligations (D53's retrofit clause).** c28's
 //! compiler-enforced tier does not exist yet; until it does, every `pub`
 //! fn below carries a `ct:` line stating its obligation class, so the
 //! claims are auditable now and verifiable later. The honest summary:
 //! the digest cores branch and index on PUBLIC quantities only (byte
-//! counts, round numbers) — with ONE recorded exception, the 0..255
-//! ingestion guard, which compares every input element and is exactly
-//! the kind of value-dependent branch c28 will flag (it leaves with
-//! F-0035's real byte type). `to_hex` is NOT constant-time (it indexes
-//! an alphabet by the byte's value) and says so. HMAC's key path
+//! counts, round numbers) — **and the one recorded exception is RETIRED
+//! (sc35).** The 0..255 ingestion guard compared every input element,
+//! which is exactly the kind of value-dependent branch c28 will flag, and
+//! this header promised "it leaves with F-0035's real byte type". The
+//! type arrived and it left: `update256`/`update512` now absorb their
+//! elements with no comparison at all, so the digest path has NO
+//! value-dependent branch left. `to_hex` is still NOT constant-time (it
+//! indexes an alphabet by the byte's value) and says so. HMAC's key path
 //! branches on the key's LENGTH alone, never on key bytes.
 //!
 //! No error rows anywhere in this module: every function is total over
-//! its documented domain, and the two failure modes (a non-byte
-//! element, an out-of-range HKDF length) are caller contract violations
-//! that trap `assert`.
+//! its documented domain, and since sc35 there is exactly ONE failure
+//! mode left — an out-of-range HKDF length, a caller contract violation
+//! that traps `assert`. The other one (a non-byte element) is a type
+//! error now, caught before the program runs.
 
 // ---------------------------------------------------------------------
 // Byte <-> word helpers (the endianness seam, written and tested first:
@@ -107,23 +116,23 @@ fn word32_be(b0: int, b1: int, b2: int, b3: int) -> wrapping[u64] {
 }
 
 /// Append the low 32 bits of `w` to `out`, big-endian (FIPS 180-4 §3.1).
-fn push_word32_be(mut out: List[int], w: wrapping[u64]) {
-    (mut out).push((w >> 24 & 0xff) as int)
-    (mut out).push((w >> 16 & 0xff) as int)
-    (mut out).push((w >> 8 & 0xff) as int)
-    (mut out).push((w & 0xff) as int)
+fn push_word32_be(mut out: List[byte], w: wrapping[u64]) {
+    (mut out).push((w >> 24 & 0xff) as int as byte)
+    (mut out).push((w >> 16 & 0xff) as int as byte)
+    (mut out).push((w >> 8 & 0xff) as int as byte)
+    (mut out).push((w & 0xff) as int as byte)
 }
 
 /// Append the eight bytes of `w` to `out`, big-endian (FIPS 180-4 §3.1).
-fn push_word64_be(mut out: List[int], w: wrapping[u64]) {
-    (mut out).push((w >> 56 & 0xff) as int)
-    (mut out).push((w >> 48 & 0xff) as int)
-    (mut out).push((w >> 40 & 0xff) as int)
-    (mut out).push((w >> 32 & 0xff) as int)
-    (mut out).push((w >> 24 & 0xff) as int)
-    (mut out).push((w >> 16 & 0xff) as int)
-    (mut out).push((w >> 8 & 0xff) as int)
-    (mut out).push((w & 0xff) as int)
+fn push_word64_be(mut out: List[byte], w: wrapping[u64]) {
+    (mut out).push((w >> 56 & 0xff) as int as byte)
+    (mut out).push((w >> 48 & 0xff) as int as byte)
+    (mut out).push((w >> 40 & 0xff) as int as byte)
+    (mut out).push((w >> 32 & 0xff) as int as byte)
+    (mut out).push((w >> 24 & 0xff) as int as byte)
+    (mut out).push((w >> 16 & 0xff) as int as byte)
+    (mut out).push((w >> 8 & 0xff) as int as byte)
+    (mut out).push((w & 0xff) as int as byte)
 }
 
 /// Split a 64-bit word into its two 32-bit halves and push them onto the
@@ -133,19 +142,6 @@ fn push_word64_be(mut out: List[int], w: wrapping[u64]) {
 fn push_word_halves(mut hi: List[int], mut lo: List[int], w: wrapping[u64]) {
     (mut hi).push((w >> 32) as int)
     (mut lo).push((w & 0xffffffff) as int)
-}
-
-/// The 0..255 ingestion guard (§11's `List[int]` byte contract).
-/// ct: NOT free of value-dependent branches — this comparison pair runs
-/// on every input element and is the module's one recorded ct exception
-/// (see the header; it leaves with F-0035's real byte type).
-fn require_byte(v: int) {
-    if v < 0 {
-        assert(false, "sha2: element outside 0..255")
-    }
-    if v > 255 {
-        assert(false, "sha2: element outside 0..255")
-    }
 }
 
 // ---------------------------------------------------------------------
@@ -392,7 +388,7 @@ pub struct Sha256 {
     h5: wrapping[u64],
     h6: wrapping[u64],
     h7: wrapping[u64],
-    buf: List[int],
+    buf: List[byte],
     total: int,
     k: List[int],
 }
@@ -425,7 +421,7 @@ pub fn new256() -> Sha256 {
         h5: a5,
         h6: a6,
         h7: a7,
-        buf: List[int](),
+        buf: List[byte](),
         total: 0,
         k: k256(),
     }
@@ -440,7 +436,12 @@ fn compress256(mut st: Sha256) {
     var t: int = 0
     while t < 16 {
         let off = t * 4
-        let wt = word32_be(st.buf[off], st.buf[off + 1], st.buf[off + 2], st.buf[off + 3])
+        let wt = word32_be(
+            st.buf[off] as int,
+            st.buf[off + 1] as int,
+            st.buf[off + 2] as int,
+            st.buf[off + 3] as int,
+        )
         (mut w).push(wt as int)
         t = t + 1
     }
@@ -484,19 +485,19 @@ fn compress256(mut st: Sha256) {
     st.h5 = st.h5 + f & mask32()
     st.h6 = st.h6 + g & mask32()
     st.h7 = st.h7 + h & mask32()
-    st.buf = List[int]()
+    st.buf = List[byte]()
 }
 
 /// Absorbs `data` into the running SHA-256 computation. Bytes are
 /// buffered until a 512-bit block is full, then compressed; calling
 /// `update256` in any chunking produces the digest one call would (held
-/// by `tests/x/crypto/sha2/incremental_chunking.lu`). Traps `assert`
-/// when an element of `data` is outside 0..255 (§11's byte contract).
-/// ct: branches and indexes on byte COUNTS only, never on byte values —
-/// except the 0..255 ingestion guard recorded in the module header.
-pub fn update256(mut st: Sha256, data: List[int]) {
+/// by `tests/x/crypto/sha2/incremental_chunking.lu`). **Total** — the
+/// 0..255 element contract is the TYPE's since sc35, so the ingestion
+/// guard that used to trap here is gone.
+/// ct: branches and indexes on byte COUNTS only, never on byte values,
+/// with no exception left to record.
+pub fn update256(mut st: Sha256, data: List[byte]) {
     for byte_v in data {
-        require_byte(byte_v)
         (mut st.buf).push(byte_v)
         st.total = st.total + 1
         if st.buf.len == 64 {
@@ -516,25 +517,25 @@ pub fn update256(mut st: Sha256, data: List[int]) {
 ///
 /// ```wolf-doc-example
 /// var st = sha2.new256()
-/// sha2.update256(mut st, List[int]())
+/// sha2.update256(mut st, List[byte]())
 /// sha2.to_hex(sha2.final256(take st)) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 /// ```
-pub fn final256(take st: Sha256) -> List[int] {
+pub fn final256(take st: Sha256) -> List[byte] {
     var s = st
     let bits = s.total as wrapping[u64] << 3
-    (mut s.buf).push(0x80)
+    (mut s.buf).push(0x80 as byte)
     if s.buf.len > 56 {
         while s.buf.len < 64 {
-            (mut s.buf).push(0)
+            (mut s.buf).push(0 as byte)
         }
         compress256(mut s)
     }
     while s.buf.len < 56 {
-        (mut s.buf).push(0)
+        (mut s.buf).push(0 as byte)
     }
     push_word64_be(mut s.buf, bits)
     compress256(mut s)
-    var out = List[int]()
+    var out = List[byte]()
     push_word32_be(mut out, s.h0)
     push_word32_be(mut out, s.h1)
     push_word32_be(mut out, s.h2)
@@ -547,16 +548,15 @@ pub fn final256(take st: Sha256) -> List[int] {
 }
 
 /// The SHA-256 digest of `msg`, one shot: `new256` + `update256` +
-/// `final256`. 32 bytes out. Traps `assert` on an element outside
-/// 0..255; total otherwise.
-/// ct: as the incremental trio — public-count branching only, plus the
-/// recorded ingestion-guard exception.
+/// `final256`. 32 bytes out. **Total** (sc35: `List[byte]` cannot carry
+/// an element outside 0..255, so there is nothing left to trap on).
+/// ct: as the incremental trio — public-count branching only.
 ///
 /// ```wolf-doc-example
 /// sha2.to_hex(sha2.sum256("abc".bytes())) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 /// sha2.sum256("abc".bytes()).len == 32
 /// ```
-pub fn sum256(msg: List[int]) -> List[int] {
+pub fn sum256(msg: List[byte]) -> List[byte] {
     var st = new256()
     update256(mut st, msg)
     final256(take st)
@@ -578,7 +578,7 @@ pub struct Sha512 {
     h5: wrapping[u64],
     h6: wrapping[u64],
     h7: wrapping[u64],
-    buf: List[int],
+    buf: List[byte],
     total: int,
     khi: List[int],
     klo: List[int],
@@ -615,7 +615,7 @@ pub fn new512() -> Sha512 {
         h5: a5,
         h6: a6,
         h7: a7,
-        buf: List[int](),
+        buf: List[byte](),
         total: 0,
         khi: khi,
         klo: klo,
@@ -632,14 +632,14 @@ fn compress512(mut st: Sha512) {
     var t: int = 0
     while t < 16 {
         let off = t * 8
-        let wt = st.buf[off] as wrapping[u64] << 56 |
-            st.buf[off + 1] as wrapping[u64] << 48 |
-            st.buf[off + 2] as wrapping[u64] << 40 |
-            st.buf[off + 3] as wrapping[u64] << 32 |
-            st.buf[off + 4] as wrapping[u64] << 24 |
-            st.buf[off + 5] as wrapping[u64] << 16 |
-            st.buf[off + 6] as wrapping[u64] << 8 |
-            st.buf[off + 7] as wrapping[u64]
+        let wt = st.buf[off] as int as wrapping[u64] << 56 |
+            st.buf[off + 1] as int as wrapping[u64] << 48 |
+            st.buf[off + 2] as int as wrapping[u64] << 40 |
+            st.buf[off + 3] as int as wrapping[u64] << 32 |
+            st.buf[off + 4] as int as wrapping[u64] << 24 |
+            st.buf[off + 5] as int as wrapping[u64] << 16 |
+            st.buf[off + 6] as int as wrapping[u64] << 8 |
+            st.buf[off + 7] as int as wrapping[u64]
         push_word_halves(mut whi, mut wlo, wt)
         t = t + 1
     }
@@ -684,17 +684,15 @@ fn compress512(mut st: Sha512) {
     st.h5 = st.h5 + f
     st.h6 = st.h6 + g
     st.h7 = st.h7 + h
-    st.buf = List[int]()
+    st.buf = List[byte]()
 }
 
 /// Absorbs `data` into the running SHA-512 computation; 1024-bit
-/// blocks. Any chunking produces one digest. Traps `assert` on an
-/// element outside 0..255.
-/// ct: as `update256` — public-count branching only, plus the recorded
-/// ingestion-guard exception.
-pub fn update512(mut st: Sha512, data: List[int]) {
+/// blocks. Any chunking produces one digest. **Total** (sc35).
+/// ct: as `update256` — public-count branching only, with no exception
+/// left to record.
+pub fn update512(mut st: Sha512, data: List[byte]) {
     for byte_v in data {
-        require_byte(byte_v)
         (mut st.buf).push(byte_v)
         st.total = st.total + 1
         if st.buf.len == 128 {
@@ -711,28 +709,28 @@ pub fn update512(mut st: Sha512, data: List[int]) {
 ///
 /// ```wolf-doc-example
 /// var st = sha2.new512()
-/// sha2.update512(mut st, List[int]())
+/// sha2.update512(mut st, List[byte]())
 /// sha2.to_hex(sha2.final512(take st)) == "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
 /// ```
-pub fn final512(take st: Sha512) -> List[int] {
+pub fn final512(take st: Sha512) -> List[byte] {
     var s = st
     let total_w = s.total as wrapping[u64]
     let bits_hi = total_w >> 61
     let bits_lo = total_w << 3
-    (mut s.buf).push(0x80)
+    (mut s.buf).push(0x80 as byte)
     if s.buf.len > 112 {
         while s.buf.len < 128 {
-            (mut s.buf).push(0)
+            (mut s.buf).push(0 as byte)
         }
         compress512(mut s)
     }
     while s.buf.len < 112 {
-        (mut s.buf).push(0)
+        (mut s.buf).push(0 as byte)
     }
     push_word64_be(mut s.buf, bits_hi)
     push_word64_be(mut s.buf, bits_lo)
     compress512(mut s)
-    var out = List[int]()
+    var out = List[byte]()
     push_word64_be(mut out, s.h0)
     push_word64_be(mut out, s.h1)
     push_word64_be(mut out, s.h2)
@@ -744,14 +742,13 @@ pub fn final512(take st: Sha512) -> List[int] {
     out
 }
 
-/// The SHA-512 digest of `msg`, one shot. 64 bytes out. Traps `assert`
-/// on an element outside 0..255; total otherwise.
+/// The SHA-512 digest of `msg`, one shot. 64 bytes out. **Total** (sc35).
 /// ct: as the incremental trio.
 ///
 /// ```wolf-doc-example
 /// sha2.to_hex(sha2.sum512("abc".bytes())) == "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
 /// ```
-pub fn sum512(msg: List[int]) -> List[int] {
+pub fn sum512(msg: List[byte]) -> List[byte] {
     var st = new512()
     update512(mut st, msg)
     final512(take st)
@@ -804,30 +801,28 @@ pub fn new384() -> Sha384 {
     Sha384 { st: core }
 }
 
-/// Absorbs `data` into the running SHA-384 computation. Traps `assert`
-/// on an element outside 0..255.
+/// Absorbs `data` into the running SHA-384 computation. **Total** (sc35).
 /// ct: as `update512`.
-pub fn update384(mut st: Sha384, data: List[int]) {
+pub fn update384(mut st: Sha384, data: List[byte]) {
     update512(mut st.st, data)
 }
 
 /// Pads exactly as SHA-512 and returns the LEFT-MOST 48 digest bytes
 /// (FIPS 180-4 §6.5 step 3 / §7 truncation). Consumes the state. Total.
 /// ct: as `final512`.
-pub fn final384(take st: Sha384) -> List[int] {
+pub fn final384(take st: Sha384) -> List[byte] {
     var core = st.st
     let full = final512(take core)
     full[0..48]
 }
 
-/// The SHA-384 digest of `msg`, one shot. 48 bytes out. Traps `assert`
-/// on an element outside 0..255; total otherwise.
+/// The SHA-384 digest of `msg`, one shot. 48 bytes out. **Total** (sc35).
 /// ct: as the incremental trio.
 ///
 /// ```wolf-doc-example
 /// sha2.to_hex(sha2.sum384("abc".bytes())) == "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7"
 /// ```
-pub fn sum384(msg: List[int]) -> List[int] {
+pub fn sum384(msg: List[byte]) -> List[byte] {
     var st = new384()
     update384(mut st, msg)
     final384(take st)
@@ -843,16 +838,17 @@ pub fn sum384(msg: List[int]) -> List[int] {
 /// digest choice rides in as the already-reduced key.
 /// ct: pads and XORs every key byte unconditionally — the only
 /// key-dependent quantity in the control flow is the key's LENGTH
-/// (public per RFC 2104); no branch reads a key byte's value. The
-/// ingestion guard exception applies where the key is hashed.
-fn xor_pad(key0: List[int], block: int, pad: int) -> List[int] {
-    var out = List[int]()
+/// (public per RFC 2104); no branch reads a key byte's value. Since
+/// sc35 there is no ingestion-guard exception to apply where the key is
+/// hashed either.
+fn xor_pad(key0: List[byte], block: int, pad: int) -> List[byte] {
+    var out = List[byte]()
     for kb in key0 {
-        out = push_xored(take out, kb, pad)
+        out = push_xored(take out, kb as int, pad)
     }
     var i = out.len
     while i < block {
-        (mut out).push(pad)
+        (mut out).push(pad as byte)
         i = i + 1
     }
     out
@@ -862,25 +858,25 @@ fn xor_pad(key0: List[int], block: int, pad: int) -> List[int] {
 /// `int` costs the checked lane, F-0026; on wrapping it is the module's
 /// ambient dialect). Returns the list to keep the caller's loop a
 /// single expression.
-fn push_xored(take out: List[int], b: int, pad: int) -> List[int] {
+fn push_xored(take out: List[byte], b: int, pad: int) -> List[byte] {
     var xs = out
     let x = (b as wrapping[u64] ^ pad as wrapping[u64]) & 0xff
-    (mut xs).push(x as int)
+    (mut xs).push(x as int as byte)
     xs
 }
 
 /// HMAC-SHA-256 (FIPS 198-1; RFC 2104). Any key length; keys longer
 /// than the 64-byte block are reduced by one SHA-256 first (FIPS 198-1
-/// §4 step 2). 32 bytes out. Traps `assert` on a non-byte element in
-/// key or message; total otherwise.
+/// §4 step 2). 32 bytes out. **Total** (sc35: a non-byte element is a
+/// type error now, not a trap).
 /// ct: see `xor_pad` — key-length-dependent control flow only; no
-/// branch or index reads a key byte. (The 0..255 ingestion guard is the
-/// module's recorded exception.)
+/// branch or index reads a key byte, and since sc35 the module has no
+/// recorded exception at all.
 ///
 /// ```wolf-doc-example
 /// sha2.to_hex(sha2.hmac256("key".bytes(), "The quick brown fox jumps over the lazy dog".bytes())) == "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
 /// ```
-pub fn hmac256(key: List[int], msg: List[int]) -> List[int] {
+pub fn hmac256(key: List[byte], msg: List[byte]) -> List[byte] {
     var key0 = key
     if key0.len > 64 {
         key0 = sum256(key0)
@@ -898,10 +894,9 @@ pub fn hmac256(key: List[int], msg: List[int]) -> List[int] {
 }
 
 /// HMAC-SHA-384 (FIPS 198-1; RFC 2104). The block is SHA-384's 128
-/// bytes. 48 bytes out. Traps `assert` on a non-byte element; total
-/// otherwise.
+/// bytes. 48 bytes out. **Total** (sc35).
 /// ct: as `hmac256`.
-pub fn hmac384(key: List[int], msg: List[int]) -> List[int] {
+pub fn hmac384(key: List[byte], msg: List[byte]) -> List[byte] {
     var key0 = key
     if key0.len > 128 {
         key0 = sum384(key0)
@@ -919,10 +914,9 @@ pub fn hmac384(key: List[int], msg: List[int]) -> List[int] {
 }
 
 /// HMAC-SHA-512 (FIPS 198-1; RFC 2104). The block is SHA-512's 128
-/// bytes. 64 bytes out. Traps `assert` on a non-byte element; total
-/// otherwise.
+/// bytes. 64 bytes out. **Total** (sc35).
 /// ct: as `hmac256`.
-pub fn hmac512(key: List[int], msg: List[int]) -> List[int] {
+pub fn hmac512(key: List[byte], msg: List[byte]) -> List[byte] {
     var key0 = key
     if key0.len > 128 {
         key0 = sum512(key0)
@@ -952,9 +946,9 @@ pub fn hmac512(key: List[int], msg: List[int]) -> List[int] {
 /// ct: HMAC's obligations, unchanged.
 ///
 /// ```wolf-doc-example
-/// sha2.hkdf256_extract(List[int](), "secret".bytes()).len == 32
+/// sha2.hkdf256_extract(List[byte](), "secret".bytes()).len == 32
 /// ```
-pub fn hkdf256_extract(salt: List[int], ikm: List[int]) -> List[int] {
+pub fn hkdf256_extract(salt: List[byte], ikm: List[byte]) -> List[byte] {
     hmac256(salt, ikm)
 }
 
@@ -972,15 +966,15 @@ pub fn hkdf256_extract(salt: List[int], ikm: List[int]) -> List[int] {
 /// sha2.hkdf256_expand(prk, "info".bytes(), 42).len == 42
 /// sha2.hkdf256_expand(prk, "info".bytes(), 0).len == 0
 /// ```
-pub fn hkdf256_expand(prk: List[int], info: List[int], n: int) -> List[int] {
+pub fn hkdf256_expand(prk: List[byte], info: List[byte], n: int) -> List[byte] {
     if n < 0 {
         assert(false, "sha2: hkdf length is negative")
     }
     if n > 255 * 32 {
         assert(false, "sha2: hkdf length exceeds 255 * hash length")
     }
-    var okm = List[int]()
-    var t = List[int]()
+    var okm = List[byte]()
+    var t = List[byte]()
     var i: int = 1
     while okm.len < n {
         var block = new256()
@@ -1003,8 +997,8 @@ pub fn hkdf256_expand(prk: List[int], info: List[int], n: int) -> List[int] {
 /// the expand loop reads as the RFC's equation.
 fn counter_absorb256(take block: Sha256, i: int) -> Sha256 {
     var st = block
-    var one = List[int]()
-    (mut one).push(i % 256)
+    var one = List[byte]()
+    (mut one).push((i % 256) as byte)
     update256(mut st, one)
     st
 }
@@ -1012,7 +1006,7 @@ fn counter_absorb256(take block: Sha256, i: int) -> Sha256 {
 /// The outer half of the T(i) HMAC: finish the inner hash, then run the
 /// opad pass. `hmac256` cannot be reused directly because the inner
 /// hash absorbs three pieces incrementally.
-fn finish_hmac256(prk: List[int], take inner: Sha256) -> List[int] {
+fn finish_hmac256(prk: List[byte], take inner: Sha256) -> List[byte] {
     let inner_digest = final256(take inner)
     var outer = new256()
     update256(mut outer, xor_pad(prk, 64, 0x5c))
@@ -1027,39 +1021,39 @@ fn finish_hmac256(prk: List[int], take inner: Sha256) -> List[int] {
 /// ```wolf-doc-example
 /// sha2.hkdf256("salt".bytes(), "ikm".bytes(), "info".bytes(), 16).len == 16
 /// ```
-pub fn hkdf256(salt: List[int], ikm: List[int], info: List[int], n: int) -> List[int] {
+pub fn hkdf256(salt: List[byte], ikm: List[byte], info: List[byte], n: int) -> List[byte] {
     let prk = hkdf256_extract(salt, ikm)
     hkdf256_expand(prk, info, n)
 }
 
 /// HKDF-Extract over HMAC-SHA-384 (RFC 5869 §2.2). 48-byte PRK out.
 /// ct: HMAC's obligations, unchanged.
-pub fn hkdf384_extract(salt: List[int], ikm: List[int]) -> List[int] {
+pub fn hkdf384_extract(salt: List[byte], ikm: List[byte]) -> List[byte] {
     hmac384(salt, ikm)
 }
 
 /// HKDF-Expand over HMAC-SHA-384 (RFC 5869 §2.3); the cap is 255 * 48.
 /// Traps and totality as `hkdf256_expand`.
 /// ct: as `hkdf256_expand`.
-pub fn hkdf384_expand(prk: List[int], info: List[int], n: int) -> List[int] {
+pub fn hkdf384_expand(prk: List[byte], info: List[byte], n: int) -> List[byte] {
     if n < 0 {
         assert(false, "sha2: hkdf length is negative")
     }
     if n > 255 * 48 {
         assert(false, "sha2: hkdf length exceeds 255 * hash length")
     }
-    var okm = List[int]()
-    var t = List[int]()
+    var okm = List[byte]()
+    var t = List[byte]()
     var i: int = 1
     while okm.len < n {
-        var chunk = List[int]()
+        var chunk = List[byte]()
         for b in t {
             (mut chunk).push(b)
         }
         for b in info {
             (mut chunk).push(b)
         }
-        (mut chunk).push(i % 256)
+        (mut chunk).push((i % 256) as byte)
         t = hmac384(prk, chunk)
         for b in t {
             if okm.len < n {
@@ -1073,39 +1067,39 @@ pub fn hkdf384_expand(prk: List[int], info: List[int], n: int) -> List[int] {
 
 /// HKDF over HMAC-SHA-384, extract-then-expand in one call.
 /// ct: the composition of the two halves' obligations.
-pub fn hkdf384(salt: List[int], ikm: List[int], info: List[int], n: int) -> List[int] {
+pub fn hkdf384(salt: List[byte], ikm: List[byte], info: List[byte], n: int) -> List[byte] {
     let prk = hkdf384_extract(salt, ikm)
     hkdf384_expand(prk, info, n)
 }
 
 /// HKDF-Extract over HMAC-SHA-512 (RFC 5869 §2.2). 64-byte PRK out.
 /// ct: HMAC's obligations, unchanged.
-pub fn hkdf512_extract(salt: List[int], ikm: List[int]) -> List[int] {
+pub fn hkdf512_extract(salt: List[byte], ikm: List[byte]) -> List[byte] {
     hmac512(salt, ikm)
 }
 
 /// HKDF-Expand over HMAC-SHA-512 (RFC 5869 §2.3); the cap is 255 * 64.
 /// Traps and totality as `hkdf256_expand`.
 /// ct: as `hkdf256_expand`.
-pub fn hkdf512_expand(prk: List[int], info: List[int], n: int) -> List[int] {
+pub fn hkdf512_expand(prk: List[byte], info: List[byte], n: int) -> List[byte] {
     if n < 0 {
         assert(false, "sha2: hkdf length is negative")
     }
     if n > 255 * 64 {
         assert(false, "sha2: hkdf length exceeds 255 * hash length")
     }
-    var okm = List[int]()
-    var t = List[int]()
+    var okm = List[byte]()
+    var t = List[byte]()
     var i: int = 1
     while okm.len < n {
-        var chunk = List[int]()
+        var chunk = List[byte]()
         for b in t {
             (mut chunk).push(b)
         }
         for b in info {
             (mut chunk).push(b)
         }
-        (mut chunk).push(i % 256)
+        (mut chunk).push((i % 256) as byte)
         t = hmac512(prk, chunk)
         for b in t {
             if okm.len < n {
@@ -1119,7 +1113,7 @@ pub fn hkdf512_expand(prk: List[int], info: List[int], n: int) -> List[int] {
 
 /// HKDF over HMAC-SHA-512, extract-then-expand in one call.
 /// ct: the composition of the two halves' obligations.
-pub fn hkdf512(salt: List[int], ikm: List[int], info: List[int], n: int) -> List[int] {
+pub fn hkdf512(salt: List[byte], ikm: List[byte], info: List[byte], n: int) -> List[byte] {
     let prk = hkdf512_extract(salt, ikm)
     hkdf512_expand(prk, info, n)
 }
@@ -1131,21 +1125,22 @@ pub fn hkdf512(salt: List[int], ikm: List[int], info: List[int], n: int) -> List
 /// `b` as lowercase hexadecimal, two digits per byte — this module's
 /// own rendering so its tests and examples import exactly one module
 /// (the `std.bytes.from_str` precedent); `std.hex.encode` is the facade
-/// spelling. Traps `assert` (via the slice) only on a non-byte element,
-/// which no digest this module returns can contain.
+/// spelling. **Total** — the slice's own `assert` on a non-byte element
+/// is unreachable since sc35, and was already unreachable in practice
+/// because no digest this module returns could contain one.
 /// ct: NOT constant-time — the alphabet slice is indexed by each byte's
 /// VALUE, a secret-dependent memory index. Render public values with
 /// it; a constant-time encoder is c28-tier work.
 ///
 /// ```wolf-doc-example
 /// sha2.to_hex(sha2.sum256("abc".bytes()))[0..8] == "ba7816bf"
-/// sha2.to_hex(List[int]()) == ""
+/// sha2.to_hex(List[byte]()) == ""
 /// ```
-pub fn to_hex(b: List[int]) -> str {
+pub fn to_hex(b: List[byte]) -> str {
     let alphabet = "0123456789abcdef"
     var out = ""
-    for v in b {
-        require_byte(v)
+    for raw in b {
+        let v = raw as int
         let hi = v / 16
         let lo = v % 16
         let hd = alphabet[hi..hi + 1]
