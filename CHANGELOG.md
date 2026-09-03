@@ -1,5 +1,48 @@
 # Changelog
 
+## sc35 — 2026-09-03 — the rename, the second gate, and the release that opened it
+
+**SECOND BUMP, same day. lupin 0.1.23 -> 0.1.25 (is36 ships `[type.byte]`
+in the mirror) and wolf `0.2.3+dev.4230b00` -> the **v0.2.4 TAG**
+(`982f857`), data pin with it — five commits whose whole diff touches
+eight files and NOT ONE `.rs`. Drift predicted zero from the wolf half
+over a span with no compiler in it, and measured zero: anchors **417 ->
+417, +0/-0** with the vendored snapshot BYTE-IDENTICAL (the first bump
+here where only `PIN` moves), corpus 511 -> 511.
+
+**All three pins read one sha for the first time in this repository's
+history** — wolf's, lupin's and `vendor/upstream/PIN` are all `982f857`.
+sc30 pulled them apart, sc33 suspended the invariant, sc34 restored it
+between the binary and the data pin; this adds the interpreter. **And the
+dev stamp retires**: v0.2.4 is the first tag that carries s135 and s136
+together, so the `+dev.<commit>` mechanism r03 built for exactly this gap
+was used for precisely as long as the gap lasted. wolf's pairing line
+still names `lupin 0.1.24 … pin 3befc3e` (r07's release-time PAIRING
+record) against an installed 0.1.25 — reported, not gated (F-0064).
+
+**F-0108 CLOSES, one day after filing, by the release it named as its own
+exit.** 181 of 181 dark rows returned (122 exit / 48 unsupported / 11
+trap), 87 of 87 doc blocks returned, **zero residual refusals** — and not
+one lane word in `tests/ledger.toml` had to be corrected for any of them.
+A ledger left honestly wrong, with its own block note naming the count
+and the cause, needed no repair when the cause left.
+
+What remains is **eight rows with a legal word**. lupin 0.1.25 has the
+byte TYPE but not the byte DOMAIN — `push(256)` into a `List[byte]` still
+stores 256 — so where both compilers refuse at typecheck the interpreter
+runs the program. That is `divergent(…)`, F-0098's word, used outside the
+take-mode pair for the first time: five `divergent(exit(0))`, two
+`divergent(exit(1))`, one `divergent(trap(assert))`, plus two ordinary
+`unsupported`. Filed as **wolf-interp#62** (is37's). `hex`'s
+`byte_digits` assert is the one to read twice — unreachable on both wolf
+lanes and still firing under lupin, so a sentence that was true of the
+compilers and false of the reference machine now lives in the divergence
+ledger instead of in an unchecked claim.
+
+**`cargo xtask ci`: GREEN, exit 0** — 376 tests, 700 forward tags, 201
+conservatism entries, 0 unstable, 0 slow, **8 divergent**; doc-examples
+414 blocks GREEN; ulp 200 rows GREEN on all three lanes.
+
 ## sc35 — 2026-09-03 — the rename, and the second gate
 
 Binary and DATA pin move together **31170d1 -> 4230b00** (20 commits),
