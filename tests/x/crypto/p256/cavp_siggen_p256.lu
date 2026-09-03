@@ -23,9 +23,9 @@ use std.hex
 use std.x.crypto.p256
 
 fn vrf(qx: str, qy: str, msg: str, r: str, s: str) -> bool {
-    let pk = hex.decode("04{qx}{qy}") else List[int]()
-    let sig = hex.decode("{r}{s}") else List[int]()
-    p256.verify(pk, hex.decode(msg) else List[int](), sig)
+    let pk = hex.decode("04{qx}{qy}") else List[byte]()
+    let sig = hex.decode("{r}{s}") else List[byte]()
+    p256.verify(pk, hex.decode(msg) else List[byte](), sig)
 }
 
 fn main() -> int {

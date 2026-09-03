@@ -18,15 +18,15 @@ use std.hex
 use std.x.crypto.chacha20
 
 fn aead_matches(key_hex: str, iv_hex: str, aad_hex: str, msg_hex: str, box_hex: str) -> bool {
-    let key = hex.decode(key_hex) else List[int]()
-    let iv = hex.decode(iv_hex) else List[int]()
-    let aad = hex.decode(aad_hex) else List[int]()
-    let msg = hex.decode(msg_hex) else List[int]()
+    let key = hex.decode(key_hex) else List[byte]()
+    let iv = hex.decode(iv_hex) else List[byte]()
+    let aad = hex.decode(aad_hex) else List[byte]()
+    let msg = hex.decode(msg_hex) else List[byte]()
     let boxed = chacha20.seal(key, iv, aad, msg)
     if !(chacha20.to_hex(boxed) == box_hex) {
         return false
     }
-    let opened = chacha20.open(key, iv, aad, boxed) else List[int]()
+    let opened = chacha20.open(key, iv, aad, boxed) else List[byte]()
     chacha20.to_hex(opened) == msg_hex
 }
 

@@ -25,10 +25,10 @@ use std.hex
 use std.x.crypto.chacha20
 
 fn open_verdict(key_hex: str, iv_hex: str, aad_hex: str, box_hex: str) -> int {
-    let key = hex.decode(key_hex) else List[int]()
-    let iv = hex.decode(iv_hex) else List[int]()
-    let aad = hex.decode(aad_hex) else List[int]()
-    let boxed = hex.decode(box_hex) else List[int]()
+    let key = hex.decode(key_hex) else List[byte]()
+    let iv = hex.decode(iv_hex) else List[byte]()
+    let aad = hex.decode(aad_hex) else List[byte]()
+    let boxed = hex.decode(box_hex) else List[byte]()
     let opened = chacha20.open(key, iv, aad, boxed) else |_| {
         return -1
     }

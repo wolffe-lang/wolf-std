@@ -21,9 +21,9 @@ use std.hex
 use std.x.crypto.sha2
 
 fn okm_matches(ikm_hex: str, salt_hex: str, info_hex: str, n: int, want: str) -> bool {
-    let ikm = hex.decode(ikm_hex) else List[int]()
-    let salt = hex.decode(salt_hex) else List[int]()
-    let info = hex.decode(info_hex) else List[int]()
+    let ikm = hex.decode(ikm_hex) else List[byte]()
+    let salt = hex.decode(salt_hex) else List[byte]()
+    let info = hex.decode(info_hex) else List[byte]()
     sha2.to_hex(sha2.hkdf384(salt, ikm, info, n)) == want
 }
 
