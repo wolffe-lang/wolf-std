@@ -69,13 +69,32 @@
 //!
 //! **THE TYPE IS `List[int]`, AND THAT IS A RECORDED INTERIM** (§11's byte
 //! currency, the same one `std.hex` and `std.base64` carry). A real `Bytes`
-//! wants two things this pin has not got: a byte-width element type, and a
-//! type that can hold invalid UTF-8 while `str` cannot. Every signature
-//! below keeps its shape when `Bytes` lands — `List[int]` becomes `Bytes`
-//! and nothing else moves. The ELEMENT CONTRACT is 0..255 per element, and
-//! it matters to exactly one function here (`is_utf8`, which answers
-//! `false` rather than trapping — see its doc); the container operations do
-//! not inspect values at all.
+//! wanted two things: a byte-width element type, and a type that can hold
+//! invalid UTF-8 while `str` cannot. Every signature below keeps its shape
+//! when it lands — `List[int]` becomes the byte type and nothing else
+//! moves. The ELEMENT CONTRACT is 0..255 per element, and it matters to
+//! exactly one function here (`is_utf8`, which answers `false` rather than
+//! trapping — see its doc); the container operations do not inspect values
+//! at all.
+//!
+//! **THE TYPE EXISTS NOW AND THIS MODULE STILL CANNOT USE IT (sc34).**
+//! D72 / wolf-lang s135 landed `[type.byte]` — an 8-bit unsigned octet
+//! whose `List[byte]` strides by 1 — and this repo measured what it is
+//! worth: a 64 KiB byte buffer charges **131,120 native and 65,536
+//! checked** where the same buffer as `List[int]` charges 1,048,560 and
+//! 1,048,576. **16.0x -> 2.0x native, 16.0x -> 1.0x checked.** The
+//! substitution is still not made here, and the reason is measured rather
+//! than cautious: **s135 gave the language a byte type and no byte-typed
+//! BUILTIN.** `s.bytes()` still hands back `List[int]`, `str_from_utf8`
+//! still takes one, and so do all six `fs`/`net` byte builtins. Every
+//! function below is a thin wrapper over one of them, so a signature moved
+//! to `List[byte]` would have to CONVERT elementwise against a builtin —
+//! and the region ledger is cumulative, so the list it converted from stays
+//! charged: a substituted reader measures **17.0x checked / 18.0x native**,
+//! WORSE than the 16.0x it replaces. Filed as wolf-lang#231; when the eight
+//! builtin signatures move, this module's change is the rename it was
+//! always designed to be. See F-0104 (closed) and F-0106 in
+//! `docs/findings.md`.
 //!
 //! **Why these five duplicate `std.list`'s names, and why that is right.**
 //! `len`, `is_empty`, `at`, `find`, `starts_with` and `ends_with` all have
