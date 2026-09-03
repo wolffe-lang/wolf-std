@@ -6314,3 +6314,15 @@ identical working tree it measured, so each one is exit-code-green by
 construction rather than by a re-run per commit — stated rather than
 assumed, because "the gauntlet must cover the edits" is a lesson this
 repo paid for.
+
+**A third gauntlet, over the COMMITTED tree**: `cargo xtask ci` exit
+code **0**, `ci: GREEN`, **22:54:21 -> 23:11:50 EDT**, run after the
+chunked commits from a clean working tree (`git status` shows only the
+untracked `.docs` checkout, which is nobody's input). Same numbers a
+third time: `std-test: 376 test(s); forward tags: 697; conservatism
+ledger: 200 entries; unstable rows: 0; slow skips: 0; divergent rows:
+0`, `doc-examples: 414 block(s), GREEN`, `ulp: 200 reference row(s),
+GREEN`. So the claim "every commit is a subset of a green tree" is not
+only an argument from mtimes — the tree the commits actually produce
+was measured on its own. The only byte written after that run is this
+paragraph, in a file ci reads for no verdict.
