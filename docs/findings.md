@@ -7053,3 +7053,26 @@ not one program moved during the run. `tests/ledger.toml`'s only edits
 are the eight renamed keys and the block note — no lane word was changed
 anywhere in the file, which is what makes the wolf-lane flatness a
 zero-motion measurement rather than an assertion.
+
+### The second gauntlet, over the COMMITTED tree
+
+`cargo xtask ci` exit code **1**, **05:18:07 -> 05:21:56 EDT**, run after
+the chunked commits from a clean working tree (`git status` shows only
+the untracked `.docs` checkout, which is nobody's input). Identical
+numbers: `std-test: 376 test(s); forward tags: 700; conservatism ledger:
+153 entries; unstable rows: 0; slow skips: 0; divergent rows: 0`, and
+**182 red rows, every one `[lupin]`, zero on `wolfc`, zero on
+`native`** — the third time that reading has come back from a different
+code path. So "every commit is a subset of the measured tree" is not
+only an argument from mtimes: the tree the commits actually produce was
+measured on its own.
+
+### The either/or, resolved at 05:22 EDT
+
+`lupin 0.1.25` **had not been tagged** when this sprint finished.
+`wolf-interp` trunk sits at `bd42cc2` — one commit past the 0.1.24
+release, working on D74's lex codes — and the installed binary is still
+`lupin 0.1.23 (wolf-interp, reference interpreter at pin 8cda3aa)`. So
+the branch is handed over with the lupin lane dark, its 182 rows and 87
+doc blocks counted by name above, and the flip owed to the bump that
+installs is36's release. Re-measure then; do not assume.
