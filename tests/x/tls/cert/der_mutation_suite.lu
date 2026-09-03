@@ -16,19 +16,19 @@
 use std.hex
 use std.x.tls.cert
 
-fn bytes_of(h: str) -> List[int] {
-    hex.decode(h) else List[int]()
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
 }
 
-fn parses(b: List[int]) -> bool {
+fn parses(b: List[byte]) -> bool {
     let c = cert.parse(b) else |_| {
         return false
     }
     c.version > 0
 }
 
-fn keep_first(b: List[int], n: int) -> List[int] {
-    var out = List[int]()
+fn keep_first(b: List[byte], n: int) -> List[byte] {
+    var out = List[byte]()
     var i = 0
     for v in b {
         if i < n {
@@ -39,12 +39,12 @@ fn keep_first(b: List[int], n: int) -> List[int] {
     out
 }
 
-fn set_byte(b: List[int], at: int, v: int) -> List[int] {
-    var out = List[int]()
+fn set_byte(b: List[byte], at: int, v: int) -> List[byte] {
+    var out = List[byte]()
     var i = 0
     for x in b {
         if i == at {
-            (mut out).push(v)
+            (mut out).push(v as byte)
         } else {
             (mut out).push(x)
         }
@@ -63,14 +63,14 @@ fn main() -> int {
     let hi = leaf[3]
     assert(!parses(set_byte(leaf, 3, hi + 10)), "overrun length rejects")
     assert(!parses(set_byte(leaf, 1, 255)), "reserved length octet rejects")
-    var trailing = List[int]()
+    var trailing = List[byte]()
     for v in leaf {
         (mut trailing).push(v)
     }
-    (mut trailing).push(0)
+    (mut trailing).push(0 as byte)
     assert(!parses(trailing), "trailing garbage rejects")
     assert(!parses(keep_first(leaf, 1)), "one-byte input rejects")
-    assert(!parses(List[int]()), "empty input rejects")
+    assert(!parses(List[byte]()), "empty input rejects")
     print(
         "mutations: truncated, indefinite, overrun, reserved, trailing, tiny, empty all reject der",
     )

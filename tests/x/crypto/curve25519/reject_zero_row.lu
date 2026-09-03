@@ -16,13 +16,13 @@ use std.x.crypto.curve25519
 
 fn main() -> !int {
     let scalar = "alice's own 32-byte x25519 key!!".bytes()
-    var zero_u = List[int]()
+    var zero_u = List[byte]()
     var i: int = 0
     while i < 32 {
-        (mut zero_u).push(0)
+        (mut zero_u).push(0 as byte)
         i = i + 1
     }
-    let fallback = curve25519.x25519(scalar, zero_u) else List[int]()
+    let fallback = curve25519.x25519(scalar, zero_u) else List[byte]()
     print("witness: fallback empty")
     if !(fallback.len == 0) {
         print("LEAK: {fallback.len}")

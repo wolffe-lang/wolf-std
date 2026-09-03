@@ -37,7 +37,7 @@ fn offset_of_last_lead(s: str) -> int {
     var i = 0
     while i < n {
         let b = s.bytes()[i]
-        if b < 128 || b > 191 {
+        if b < 128 as byte || b > 191 as byte {
             at = i
         }
         i = i + 1
@@ -50,8 +50,8 @@ fn lead_bytes_by_get(s: str) -> int {
     var leads = 0
     var i = 0
     while i < n {
-        let b = s.bytes().get(i) else 0
-        if b < 128 || b > 191 {
+        let b = s.bytes().get(i) else 0 as byte
+        if b < 128 as byte || b > 191 as byte {
             leads = leads + 1
         }
         i = i + 1
@@ -68,7 +68,7 @@ fn main() -> !int {
     // a miss rather than a fault.
     if lead_bytes_by_get("héllo") == 5 {} else { return 5 }
     if lead_bytes_by_get("é🐺") == 2 {} else { return 6 }
-    if ("wolf".bytes().get(9) else 0 - 1) == 0 - 1 {} else { return 7 }
+    if ("wolf".bytes().get(9) else (0 - 1) as byte) == (0 - 1) as byte {} else { return 7 }
     // `count` agrees with `len`, which is the position that never needed
     // a finding.
     if "héllo".bytes().count() == 6 {} else { return 8 }

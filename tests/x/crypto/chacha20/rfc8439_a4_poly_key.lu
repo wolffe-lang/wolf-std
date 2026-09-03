@@ -12,8 +12,8 @@ use std.hex
 use std.x.crypto.chacha20
 
 fn otk_matches(key_hex: str, nonce_hex: str, want: str) -> bool {
-    let key = hex.decode(key_hex) else List[int]()
-    let nonce = hex.decode(nonce_hex) else List[int]()
+    let key = hex.decode(key_hex) else List[byte]()
+    let nonce = hex.decode(nonce_hex) else List[byte]()
     chacha20.to_hex(chacha20.poly_key(key, nonce)) == want
 }
 

@@ -32,15 +32,15 @@ use std.fs
 
 fn main() -> !int {
     let p = "not-text.bin"
-    var raw = List[int]()
-    (mut raw).push(119)
-    (mut raw).push(128)
-    (mut raw).push(102)
+    var raw = List[byte]()
+    (mut raw).push(119 as byte)
+    (mut raw).push(128 as byte)
+    (mut raw).push(102 as byte)
     fs.write_bytes(p, raw)?
     // The byte tier carries it fine — the miss is the DECODE, not the read.
     let bytes_back = fs.read_bytes(p)?
     if bytes_back.len != 3 { return 1 }
-    if bytes_back[1] != 128 { return 2 }
+    if bytes_back[1] != 128 as byte { return 2 }
     let text = fs.read_text(p) else |_| "fallback"
     print("handled: {text}")
     let strict = fs.read_text(p)?

@@ -39,8 +39,8 @@ fn main() -> !int {
         return 10
     }
     // A match inside a code point — legal here, impossible over `str`.
-    var continuation = List[int]()
-    (mut continuation).push(169)
+    var continuation = List[byte]()
+    (mut continuation).push(169 as byte)
     if (bytes.find(bytes.from_str("é"), continuation) else 0 - 1) == 1 {} else { return 11 }
     if bytes.starts_with(bytes.from_str("wolf"), bytes.from_str("wo")) {} else { return 12 }
     if bytes.starts_with(bytes.from_str("wolf"), bytes.from_str("wolf")) {} else { return 13 }

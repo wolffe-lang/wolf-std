@@ -35,18 +35,18 @@ use std.fs
 
 fn main() -> !int {
     // A file the TEXT tier cannot read: 0x80 begins no UTF-8 sequence.
-    var raw = List[int]()
-    (mut raw).push(128)
-    (mut raw).push(129)
+    var raw = List[byte]()
+    (mut raw).push(128 as byte)
+    (mut raw).push(129 as byte)
     let p = "append-binary.tmp"
     fs.write_bytes(p, raw)?
     if (fs.read_text(p) else "not-text") != "not-text" { return 1 }
     fs.append_text(p, "tail\n")?
     let back = fs.read_bytes(p)?
     if back.len != 7 { return 2 }
-    if back[0] != 128 { return 3 }
-    if back[1] != 129 { return 4 }
-    if back[2] != 116 { return 5 }
+    if back[0] != 128 as byte { return 3 }
+    if back[1] != 129 as byte { return 4 }
+    if back[2] != 116 as byte { return 5 }
     if (fs.size(p) else 0 - 1) != 7 { return 6 }
 
     // An absent file: created by the append itself, no probe in front.

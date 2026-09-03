@@ -40,13 +40,13 @@ fn main() -> !int {
     if bytes.len(s.bytes()) != 7 { return 2 }
     if bytes.is_empty(s.bytes()) { return 3 }
     if !bytes.is_empty("".bytes()) { return 4 }
-    if bytes.at(s.bytes(), 0) != 119 { return 5 }
-    if bytes.at(s.bytes(), 5) != 195 { return 6 }
+    if bytes.at(s.bytes(), 0) != 119 as byte { return 5 }
+    if bytes.at(s.bytes(), 5) != 195 as byte { return 6 }
     if bytes.at(s.bytes(), 5) != bytes.at(owned, 5) { return 7 }
 
     let cut = bytes.slice(s.bytes(), 0, 4)
     if bytes.len(cut) != 4 { return 8 }
-    if bytes.at(cut, 3) != 102 { return 9 }
+    if bytes.at(cut, 3) != 102 as byte { return 9 }
 
     if (bytes.find(s.bytes(), "lf".bytes()) else 0 - 1) != 2 { return 10 }
     if (bytes.find(s.bytes(), "zz".bytes()) else 0 - 1) != 0 - 1 { return 11 }

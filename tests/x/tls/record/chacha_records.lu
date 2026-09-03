@@ -16,8 +16,8 @@
 use std.hex
 use std.x.tls.record
 
-fn bytes_of(h: str) -> List[int] {
-    hex.decode(h) else List[int]()
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
 }
 
 fn seal_matches(key_hex: str, iv_hex: str, seq: int, ct: int, content_hex: str, pad: int, want: str) -> bool {
@@ -31,7 +31,7 @@ fn opens_to(key_hex: str, iv_hex: str, seq: int, rec_hex: str, want_ct: int, wan
     let key = bytes_of(key_hex)
     let iv = bytes_of(iv_hex)
     let rec = bytes_of(rec_hex)
-    let inner = record.open(key, iv, seq, rec) else List[int]()
+    let inner = record.open(key, iv, seq, rec) else List[byte]()
     if !(record.content_type_of(inner) == want_ct) {
         return false
     }

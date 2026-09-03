@@ -9,7 +9,7 @@
 
 use std.base64
 
-fn same(a: List[int], b: List[int]) -> bool {
+fn same(a: List[byte], b: List[byte]) -> bool {
     if a.len == b.len {} else {
         return false
     }
@@ -24,41 +24,41 @@ fn same(a: List[int], b: List[int]) -> bool {
 }
 
 fn main() -> !int {
-    var empty = List[int]()
+    var empty = List[byte]()
     if base64.encode(empty) == "" {} else { return 1 }
     if same(base64.decode("") else copy empty, empty) {} else { return 2 }
     // RFC 4648's vectors: one, two and three bytes.
-    var one = List[int]()
-    (mut one).push(77)
+    var one = List[byte]()
+    (mut one).push(77 as byte)
     if base64.encode(one) == "TQ==" {} else { return 3 }
-    var two = List[int]()
-    (mut two).push(77)
-    (mut two).push(97)
+    var two = List[byte]()
+    (mut two).push(77 as byte)
+    (mut two).push(97 as byte)
     if base64.encode(two) == "TWE=" {} else { return 4 }
-    var three = List[int]()
-    (mut three).push(77)
-    (mut three).push(97)
-    (mut three).push(110)
+    var three = List[byte]()
+    (mut three).push(77 as byte)
+    (mut three).push(97 as byte)
+    (mut three).push(110 as byte)
     if base64.encode(three) == "TWFu" {} else { return 5 }
     if same(base64.decode("TQ==") else copy empty, one) {} else { return 6 }
     if same(base64.decode("TWE=") else copy empty, two) {} else { return 7 }
     if same(base64.decode("TWFu") else copy empty, three) {} else { return 8 }
     // Every byte value, both directions, exercising all three remainders
     // by taking prefixes of 256, 257 and 258 bytes.
-    var all = List[int]()
+    var all = List[byte]()
     var i: int = 0
     while i < 256 {
-        (mut all).push(i)
+        (mut all).push(i as byte)
         i = i + 1
     }
     let text = base64.encode(all)
     let round = base64.decode(text) else copy empty
     if same(round, all) {} else { return 9 }
     if base64.encode(round) == text {} else { return 10 }
-    (mut all).push(0)
+    (mut all).push(0 as byte)
     let text257 = base64.encode(all)
     if same(base64.decode(text257) else copy empty, all) {} else { return 11 }
-    (mut all).push(255)
+    (mut all).push(255 as byte)
     let text258 = base64.encode(all)
     if same(base64.decode(text258) else copy empty, all) {} else { return 12 }
     // Output length is always a multiple of four.

@@ -15,8 +15,8 @@ use std.hex
 use std.base64
 use std.x.jose
 
-fn bs(h: str) -> List[int] {
-    hex.decode(h) else List[int]()
+fn bs(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
 }
 
 fn main() -> int {
@@ -26,11 +26,11 @@ fn main() -> int {
 
     // No padding out (JOSE takes RFC 4648 §5's padding sentence), and it
     // round-trips — the two bytes whose STANDARD encoding uses `+` and `/`.
-    var two = List[int]()
-    (mut two).push(255)
-    (mut two).push(239)
+    var two = List[byte]()
+    (mut two).push(255 as byte)
+    (mut two).push(239 as byte)
     assert(base64.url_encode(two) == "_-8", "nopad")
-    let rt = base64.url_decode(base64.url_encode(two)) else List[int]()
+    let rt = base64.url_decode(base64.url_encode(two)) else List[byte]()
     assert(rt.len == 2, "rt")
 
     // The alphabets are kept strictly apart. A `+/` input to the URL
@@ -38,12 +38,12 @@ fn main() -> int {
     // standard decoder likewise. This is the negative that a base64
     // -standard reuse would fail — and a signature built on it would be
     // silently wrong.
-    assert((base64.url_decode("/+8=") else List[int]()).len == 0, "urlrej")
-    assert((base64.decode("_-8=") else List[int]()).len == 0, "stdrej")
+    assert((base64.url_decode("/+8=") else List[byte]()).len == 0, "urlrej")
+    assert((base64.decode("_-8=") else List[byte]()).len == 0, "stdrej")
 
     // The empty sequence is the empty string: a JWS with an empty payload
     // (ACME POST-as-GET) has an empty middle segment.
-    var empty = List[int]()
+    var empty = List[byte]()
     assert(base64.url_encode(empty) == "", "empty")
     assert(jose.signing_input("{{\"alg\":\"EdDSA\"}}", empty) == "eyJhbGciOiJFZERTQSJ9.", "si_empty")
     0

@@ -14,7 +14,7 @@ use std.x.crypto.sha2
 fn main() -> int {
     let prk = sha2.hkdf256_extract("salt".bytes(), "ikm".bytes())
     print("extracted {prk.len}")
-    let okm = sha2.hkdf256_expand(prk, List[int](), 8161)
+    let okm = sha2.hkdf256_expand(prk, List[byte](), 8161)
     print("unreachable: {okm.len}")
     0
 }

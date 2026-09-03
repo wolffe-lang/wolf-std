@@ -38,7 +38,7 @@ fn view_len(s: str) -> int {
 
 fn first_byte(s: str) -> int {
     for b in s.bytes() {
-        return b
+        return b as int
     }
     0 - 1
 }
@@ -46,7 +46,7 @@ fn first_byte(s: str) -> int {
 fn count_leads(s: str) -> int {
     var seen = 0
     for b in s.bytes() {
-        if b < 128 || b > 191 {
+        if b < 128 as byte || b > 191 as byte {
             seen = seen + 1
         }
     }

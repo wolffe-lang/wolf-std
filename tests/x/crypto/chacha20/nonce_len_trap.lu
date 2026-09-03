@@ -17,7 +17,7 @@ use std.x.crypto.chacha20
 fn main() -> int {
     let key = "wolf sc17: a 32-byte chacha key!".bytes()
     print("reached the call")
-    let boxed = chacha20.seal(key, "8 bytes!".bytes(), List[int](), "msg".bytes())
+    let boxed = chacha20.seal(key, "8 bytes!".bytes(), List[byte](), "msg".bytes())
     print("unreachable: {boxed.len}")
     0
 }

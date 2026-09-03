@@ -15,8 +15,8 @@
 use std.hex
 use std.x.tls.record
 
-fn bytes_of(h: str) -> List[int] {
-    hex.decode(h) else List[int]()
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
 }
 
 fn main() -> !int {
@@ -24,8 +24,8 @@ fn main() -> !int {
     let iv = bytes_of("5d313eb2671276ee13000b30")
     // Seal an inner of a single zero octet: content type 0, no content,
     // no padding — a well-authenticated but content-type-less record.
-    let rec = record.seal(key, iv, 0, 0, List[int](), 0)
-    let hush = record.open(key, iv, 0, rec) else List[int]()
+    let rec = record.seal(key, iv, 0, 0, List[byte](), 0)
+    let hush = record.open(key, iv, 0, rec) else List[byte]()
     assert(hush.len == 0, "no-content-type record yields zero plaintext")
     print("witness: fallback empty")
     let never = record.open(key, iv, 0, rec)?

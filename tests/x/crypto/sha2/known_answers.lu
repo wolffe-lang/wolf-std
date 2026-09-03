@@ -14,7 +14,7 @@ use std.x.crypto.sha2
 
 fn main() -> int {
     let abc = "abc".bytes()
-    let empty = List[int]()
+    let empty = List[byte]()
 
     // SHA-256 (FIPS 180-4 §6.2, the "abc" example)
     let d256 = sha2.sum256(abc)
@@ -74,12 +74,12 @@ fn main() -> int {
     assert(i512 == h512, "sha512 incremental == one-shot")
 
     var s3 = sha2.new384()
-    sha2.update384(mut s3, List[int]())
+    sha2.update384(mut s3, List[byte]())
     sha2.update384(mut s3, "abc".bytes())
     let i384 = sha2.to_hex(sha2.final384(take s3))
     assert(i384 == h384, "sha384 incremental == one-shot")
 
     // to_hex renders the empty sequence as the empty string.
-    assert(sha2.to_hex(List[int]()) == "", "to_hex empty")
+    assert(sha2.to_hex(List[byte]()) == "", "to_hex empty")
     0
 }

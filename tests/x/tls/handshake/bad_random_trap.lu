@@ -11,12 +11,12 @@
 use std.x.tls.handshake as hs
 
 fn main() -> int {
-    var short = List[int]()
+    var short = List[byte]()
     var i = 0
     while i < 12 {
-        (mut short).push(0)
+        (mut short).push(0 as byte)
         i = i + 1
     }
-    let _ = hs.client_hello(short, List[int](), List[int](), List[int]())
+    let _ = hs.client_hello(short, List[byte](), List[byte](), List[byte]())
     0
 }

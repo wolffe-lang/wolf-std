@@ -11,26 +11,26 @@
 use std.base64
 
 fn main() -> !int {
-    var b = List[int]()
-    (mut b).push(255)
-    (mut b).push(239)
+    var b = List[byte]()
+    (mut b).push(255 as byte)
+    (mut b).push(239 as byte)
     // The two bytes whose standard encoding uses both special characters.
     if base64.encode(b) == "/+8=" {} else { return 1 }
     if base64.url_encode(b) == "_-8" {} else { return 2 }
-    let round = base64.url_decode(base64.url_encode(b)) else List[int]()
+    let round = base64.url_decode(base64.url_encode(b)) else List[byte]()
     if round.len == 2 {} else { return 3 }
-    if round[0] == 255 {} else { return 4 }
-    if round[1] == 239 {} else { return 5 }
+    if round[0] == 255 as byte {} else { return 4 }
+    if round[1] == 239 as byte {} else { return 5 }
     // url_decode takes padding too, since other encoders emit it.
-    let padded = base64.url_decode("_-8=") else List[int]()
+    let padded = base64.url_decode("_-8=") else List[byte]()
     if padded.len == 2 {} else { return 6 }
     // Mixing the alphabets misses, both ways.
-    let mixed = base64.url_decode("/+8=") else List[int]()
+    let mixed = base64.url_decode("/+8=") else List[byte]()
     if mixed.len == 0 {} else { return 7 }
-    let mixed_back = base64.decode("_-8=") else List[int]()
+    let mixed_back = base64.decode("_-8=") else List[byte]()
     if mixed_back.len == 0 {} else { return 8 }
     // The empty sequence is empty in both variants.
-    var empty = List[int]()
+    var empty = List[byte]()
     if base64.url_encode(empty) == "" {} else { return 9 }
     0
 }

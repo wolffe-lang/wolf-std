@@ -34,15 +34,15 @@ fn main() -> !int {
     // the same bytes. The other direction needs `bytes.to_str`, which is
     // still a contract (F-0057), and this module says so rather than
     // shipping an ASCII-only inverse.
-    let back = hex.decode(hex.encode_str("wolf")) else List[int]()
+    let back = hex.decode(hex.encode_str("wolf")) else List[byte]()
     if back.len != 4 { return 10 }
-    if back[0] != 119 { return 11 }
-    if back[3] != 102 { return 12 }
+    if back[0] != 119 as byte { return 11 }
+    if back[3] != 102 as byte { return 12 }
 
-    let wide = hex.decode(hex.encode_str("é")) else List[int]()
+    let wide = hex.decode(hex.encode_str("é")) else List[byte]()
     if wide.len != 2 { return 13 }
-    if wide[0] != 195 { return 14 }
-    if wide[1] != 169 { return 15 }
+    if wide[0] != 195 as byte { return 14 }
+    if wide[1] != 169 as byte { return 15 }
 
     // Uppercase is the caller's `.upper()`, not a second function.
     if hex.encode_str("wolf").upper() != "776F6C66" { return 16 }

@@ -19,12 +19,12 @@ fn main() -> !int {
     var srv = net.listen(net.loopback(0))?
     let p = net.port(srv)?
     var cli = net.connect(net.loopback(p))?
-    var msg = List[int]()
-    (mut msg).push(0)
-    (mut msg).push(255)
-    (mut msg).push(128)
-    (mut msg).push(7)
-    (mut msg).push(10)
+    var msg = List[byte]()
+    (mut msg).push(0 as byte)
+    (mut msg).push(255 as byte)
+    (mut msg).push(128 as byte)
+    (mut msg).push(7 as byte)
+    (mut msg).push(10 as byte)
     net.write_bytes(mut cli, msg)?
     var conn = net.accept(mut srv)?
     let got = net.read_bytes(mut conn, 16)?
@@ -33,10 +33,10 @@ fn main() -> !int {
         line = "{line} {b}"
     }
     print("got:{line}")
-    var reply = List[int]()
-    (mut reply).push(254)
-    (mut reply).push(0)
-    (mut reply).push(253)
+    var reply = List[byte]()
+    (mut reply).push(254 as byte)
+    (mut reply).push(0 as byte)
+    (mut reply).push(253 as byte)
     net.write_bytes(mut conn, reply)?
     let back = net.read_bytes(mut cli, 16)?
     print("back: {back.len}")
