@@ -117,7 +117,7 @@
 //! - ~~Byte-level `read_bytes`/`write_bytes`~~ — **HERE now (sc29).**
 //!   F-0080 predicted the fix's exact shape from the fs tier's (s90) and
 //!   s106 shipped it: `net_read_bytes`/`net_write_bytes` carry
-//!   `List[int]` with no `utf8` row anywhere — a lone `0x80` is data —
+//!   `List[byte]` with no `utf8` row anywhere — a lone `0x80` is data —
 //!   and the wrappers below adopt them verbatim. This is what makes a
 //!   BINARY protocol over TCP writable at all (`std.x.tls.client` is the
 //!   first consumer: a TLS record is not text). The one lane cost is
@@ -357,7 +357,7 @@ pub fn write(mut s: Socket, text: str) -> () ! {closed, io} {
     net_write(s.fd, text)?
 }
 
-/// Read up to `max` BYTES from `s` as a `List[int]` — the binary read.
+/// Read up to `max` BYTES from `s` as a `List[byte]` — the binary read.
 ///
 /// Bytes are bytes: there is no `utf8` row here and can never be one
 /// (the fs byte tier's posture, adopted verbatim per F-0080's ask —
@@ -384,18 +384,18 @@ pub fn write(mut s: Socket, text: str) -> () ! {closed, io} {
 /// var srv = net.listen("127.0.0.1:0")?
 /// let p = net.port(srv)?
 /// var cli = net.connect("127.0.0.1:{p}")?
-/// var msg = List[int]()
-/// (mut msg).push(0)
-/// (mut msg).push(255)
+/// var msg = List[byte]()
+/// (mut msg).push(0 as byte)
+/// (mut msg).push(255 as byte)
 /// net.write_bytes(mut cli, msg)?
 /// var conn = net.accept(mut srv)?
-/// let got = net.read_bytes(mut conn, 8) else List[int]()
+/// let got = net.read_bytes(mut conn, 8) else List[byte]()
 /// got.len == 2
 /// net.close(take cli)?
 /// net.close(take conn)?
 /// net.close_listener(take srv)?
 /// ```
-pub fn read_bytes(mut s: Socket, max: int) -> List[int] ! {closed, timeout, io} {
+pub fn read_bytes(mut s: Socket, max: int) -> List[byte] ! {closed, timeout, io} {
     net_read_bytes(s.fd, max)?
 }
 
@@ -405,12 +405,15 @@ pub fn read_bytes(mut s: Socket, max: int) -> List[int] ! {closed, timeout, io} 
 /// whole list is written or the call raises, so there is no partial
 /// write to observe.
 ///
-/// Rows: `closed` when the peer has gone away; **`invalid` when an
-/// element of `b` is not a byte** — outside 0..255 — the same
-/// pre-write check and the same tag as `fs.write_bytes` (§14's os-tier
-/// vocabulary, adopted verbatim: nothing is masked, truncated or sent
-/// before the reject); `io` for a host failure or a bad handle. Never
-/// traps.
+/// Rows: `closed` when the peer has gone away; **`invalid` — declared
+/// and UNREACHABLE from typed code since sc35**, the same tag and the
+/// same posture as `fs.write_bytes` (§14's os-tier vocabulary, adopted
+/// verbatim). It named an element of `b` outside 0..255, rejected whole
+/// before anything reached the wire; `b` is a `List[byte]` now and
+/// cannot hold one, and the tag stays because the vocabulary is the
+/// toolchain's (wolf-lang#231 kept `invalid` on `net_write_bytes` for
+/// the FFI caller it is still true of). `io` for a host failure or a
+/// bad handle. Never traps.
 ///
 /// `mut s` because writing advances the stream (§14).
 ///
@@ -422,17 +425,17 @@ pub fn read_bytes(mut s: Socket, max: int) -> List[int] ! {closed, timeout, io} 
 /// var srv = net.listen("127.0.0.1:0")?
 /// let p = net.port(srv)?
 /// var cli = net.connect("127.0.0.1:{p}")?
-/// var msg = List[int]()
-/// (mut msg).push(128)
+/// var msg = List[byte]()
+/// (mut msg).push(128 as byte)
 /// net.write_bytes(mut cli, msg)?
 /// net.close(take cli)?
 /// var conn = net.accept(mut srv)?
-/// let got = net.read_bytes(mut conn, 8) else List[int]()
+/// let got = net.read_bytes(mut conn, 8) else List[byte]()
 /// got.len == 1
 /// net.close(take conn)?
 /// net.close_listener(take srv)?
 /// ```
-pub fn write_bytes(mut s: Socket, b: List[int]) -> () ! {closed, invalid, io} {
+pub fn write_bytes(mut s: Socket, b: List[byte]) -> () ! {closed, invalid, io} {
     net_write_bytes(s.fd, b)?
 }
 
