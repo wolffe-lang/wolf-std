@@ -1120,7 +1120,85 @@ capability's life.
   the sc13 failure mode, so each of the six sites now reads "was refused
   when this was written, closed at the sc12 pin, kept because".
 
+**§14 amendment (sc36): a second ADDRESS FAMILY, and the first std surface
+that leaves a filesystem object behind.** `std.net.unix` is the ninth
+module of this section and the first that is a sibling of another module
+rather than a new tier. Five additions.
+
+- **A second family is a second MODULE, not a suffixed verb.** wolf has no
+  overloading, so `listen` and `connect` cannot mean two things in
+  `std.net` — §1's rule, and the same one that put the `f64` family in
+  `std.math.float`. The alternative spelling (`net.listen_unix`) was
+  costed and refused: it puts the type in the name, which §1 spends
+  elsewhere, and it would have to be repeated for every family that
+  follows. What the split obliges instead is that the two modules share
+  their VALUE types — `std.net.unix.listen` answers a `net.Listener` —
+  because a second handle type would double every operation the family did
+  not change. The rule: **a new address family adds address calls and
+  nothing else**, and the day it needs a second `read` it is not a family,
+  it is a tier.
+- **A row that is a property of the HOST is documented as one, in those
+  words.** `unsupported` does not depend on the arguments: on a host that
+  raises it, every call raises it, always, for every path. That is
+  materially different from every other row in this section — `not_found`
+  is about the path, `denied` about the caller, `io` about the moment —
+  and a caller acts on it once at startup rather than per call. Say which
+  kind a row is when a surface carries both, because the handling shape
+  differs: one arm chooses a transport, the other retries or reports.
+- **The tag exists because a bare `io` is unactionable, and that is the
+  whole argument for any new tag.** `[os.net.unix]` was filed
+  (wolf-lang#227) precisely so a program could tell "this machine has no
+  AF_UNIX" from "that path is wrong"; a consumer that cannot tell them
+  apart cannot choose a fallback transport. §12's "one tag per failure
+  mode the caller can ACT on" reads in this direction too: the action is
+  the evidence, and here the action is a different transport.
+- **A capability that CREATES a filesystem object states its cleanup
+  posture in the module header, as rules a program can follow.** Binding a
+  unix listener makes a file. Who removes it, when, and what happens if
+  nobody does are not implementation notes — they are the contract a
+  second process depends on. std's posture is the runtime's, restated so
+  it can be relied on: the closer unlinks what the binder created, a
+  stream's close touches no name, a dead process leaves the file, the next
+  bind refuses it, and the unlink is best effort so a moved path never
+  turns a close into a failure. Each sentence has a relation in
+  `tests/net/unix/cleanup.lu` or `refused_row.lu`; none of them is
+  asserted in prose alone.
+- **§4's one-module note can cost a whole module its fenced examples, and
+  the answer is still prose.** Every member of `std.net.unix` returns a
+  value only `std.net` can operate on, so no example here can get past the
+  first line and the extractor imports exactly one module. The
+  `std.str.to_strbuf` precedent applies at module scale: both functions
+  carry a PROSE example naming what happens, and each names the runnable
+  witness by path. What is refused is the alternative — writing the
+  example against the raw builtins — because an example that teaches
+  `net_close` where the module teaches `net.close_listener` is a doc that
+  is true and useless.
+
 ## Review record
+
+- 2026-09-03, sc36 (§1's no-overloading rule and §14's os posture, applied
+  to a second ADDRESS FAMILY): three readings recorded because each could
+  have gone the other way. First, **the family is a module and its values
+  are `std.net`'s**. The split follows §1 (`listen` cannot mean two things
+  in one module) and the SHARED types follow §14's handle rule read
+  forward: `accept`, `read`, `write`, the byte pair, both deadlines and
+  both closers are the same operations on the same host object, so a
+  second `Listener` type would have been a second copy of a surface the
+  family does not change. Measured rather than assumed —
+  `tests/net/unix/stream_surface.lu` runs the byte pair and both deadlines
+  over a socket path on all three lanes. Second, **`unsupported` is a row
+  and not a trap, and it is the HOST's row.** §2's rule decides the first
+  half (the caller could not have checked, so it is not a contract
+  violation); what is new is naming the second: a row that cannot vary
+  with the arguments is acted on once, at startup, and the doc says so in
+  those words so a reader does not write the arm per call. Third, **the
+  cleanup posture is contract, not implementation.** A `net` surface that
+  creates a file is the one place in this section where what happens
+  AFTER a close is another process's business, so the four sentences of
+  `[os.net.unix]`'s posture are restated on the module and each is held by
+  a relation in a test — including the one a reader would not think to
+  ask about, that the unlink is best effort and a moved path still closes
+  clean.
 
 - 2026-09-02, sc32 (§2's trap rule and §12's mark casing, applied to a
   failure the RUNTIME reports — `std.mem.budget`): the region-budget
