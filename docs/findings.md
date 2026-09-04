@@ -7624,8 +7624,10 @@ pipe (the standing lesson).
 | 1 | every sprint edit in place, `net/unix/cleanup.lu` and `refused_row.lu` UNGUARDED | **1** | `xtask: RED` — four reds and nothing else: `cleanup.lu [wolfc]`, `cleanup.lu [native]`, `refused_row.lu [wolfc]`, `refused_row.lu [native]`, each *directive mismatch — expected exit(0), observed exit(3)*. F-0109, found by the rig |
 | 2 | the two guards added | **0** | `ci: GREEN` |
 | 3 | over the COMMITTED tree, `8c93bfa` | **0** | `ci: GREEN` |
+| 4 | over the FULLY committed tree, `4832e44` (this register and the CHANGELOG in) | **0** | `ci: GREEN` — identical numbers, which is the assertion that the last two commits are inert to the rig rather than the assumption |
 
-**Run 3's numbers, and the deltas against sc35's:**
+**Runs 3 and 4's numbers — byte-identical to each other — and the deltas
+against sc35's:**
 
 | measure | sc35 | sc36 | delta |
 |---|---|---|---|
