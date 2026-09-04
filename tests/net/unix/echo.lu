@@ -1,0 +1,78 @@
+//! check: run(exit=0, stdout="echo: true | port_is_io: true | second: true")
+//! phase: run
+//! conforms: std.net.unix, std.net, err.row, err.propagate
+//!
+//! **The flagship witness: a unix-domain socket is a `std.net` stream.**
+//! `unix.listen` binds a PATH, `unix.connect` dials it, and from there
+//! every operation is `std.net`'s own — `accept`, `write`, `read`,
+//! `close`, `close_listener` — used exactly as `net/echo_round_trip.lu`
+//! uses them over TCP. A second dial on the same listener pins the
+//! property `accept(mut l)` is spelled `mut` for, and `net.port` on a
+//! listener that has no port is the `io` row the clause names.
+//!
+//! **The stdout is the same on every host BY CONSTRUCTION**, which is the
+//! construction `corpus/net/unix_echo.lu` uses upstream and the reason
+//! this file can sit in a rig whose CI matrix includes windows. A host
+//! that SERVES the family (linux, macOS) runs the echo and the three
+//! relations are measured; a host that does not must refuse BY NAME —
+//! the `unsupported` row — and the three relations then hold vacuously.
+//! A bind that fails with a PATH row on a serving host is the failure
+//! this witness exists to catch: exit 3, and no relation is printed.
+//!
+//! **The path is relative and short** (§14, and `sun_path` is ~104 bytes
+//! on macOS): it lands in the rig's per-test working directory, which
+//! staging wipes before every run. Nothing here removes it afterwards —
+//! `net.close_listener` does, which `cleanup.lu` is the assertion about.
+//!
+//! Dial-first, as every net test: the connection waits in the host's
+//! backlog and no `accept` blocks on a peer that is not coming.
+
+use std.net
+use std.net.unix
+
+fn main() -> !int {
+    let path = "echo.sock"
+    var served = true
+    var srv = unix.listen(path) else |e| match e {
+        unsupported => {
+            served = false
+            net.Listener { fd: 0 - 1 }
+        },
+        exists => { return 3 },
+        not_found => { return 3 },
+        denied => { return 3 },
+        io => { return 3 },
+    }
+    var echo = true
+    var port_is_io = true
+    var second = true
+    if served {
+        port_is_io = false
+        let p = net.port(srv) else |_| {
+            port_is_io = true
+            0
+        }
+        var cli = unix.connect(path)?
+        net.write(mut cli, "ping")?
+        var conn = net.accept(mut srv)?
+        let got = net.read(mut conn, 16)?
+        net.write(mut conn, "pong {got}")?
+        let reply = net.read(mut cli, 16)?
+        echo = got == "ping" && reply == "pong ping"
+        net.close(take cli)?
+        net.close(take conn)?
+        // The listener is still listening: a second dial gets a second
+        // socket, exactly as it does over TCP.
+        var cli2 = unix.connect(path)?
+        net.write(mut cli2, "two")?
+        var conn2 = net.accept(mut srv)?
+        second = (net.read(mut conn2, 16) else "?") == "two"
+        net.close(take cli2)?
+        net.close(take conn2)?
+        net.close_listener(take srv)?
+    }
+    print("echo: {echo} | port_is_io: {port_is_io} | second: {second}")
+    if !echo { return 1 }
+    if !port_is_io { return 2 }
+    0
+}

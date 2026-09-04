@@ -3204,3 +3204,76 @@ native = "run"
 lupin = "run"
 wolfc = "run"  # sc32: three lanes despite its sibling's C1 refusal — the guard traps before the `spawn proc` is reached, and C1 is raised at execution
 native = "run"
+
+# ---- sc36: std.net.unix — the second address family, and the FIRST
+# capability block in this file whose three-lane story is decided by
+# something other than the capability itself.
+#
+# `[os.net.unix]` (s136, wolf-lang#227) lands on all three lanes at these
+# pins: the checked and native rungs since s136, and lupin since is36's
+# 0.1.25. That is worth stating plainly because it contradicts the shape
+# every other os block here has — lupin declines `std.fs` by design and
+# has no `std.io`, so a filesystem-flavoured surface is normally a
+# two-lane block. A unix socket is NOT a file the machine has to read: it
+# is a host object the machine asks the host for, and the reference
+# machine binds and dials one exactly as the compilers do (measured, this
+# sprint, byte-identical stdout on all three).
+#
+# SO THE SPLIT BELOW IS ABOUT THE ASSERTIONS, NOT THE FAMILY. Four rows
+# are three-lane because nothing in them touches a file. Two are
+# compiler-lanes-only because they ASSERT ABOUT THE PATH — the cleanup
+# posture (`fs.exists`) and the stale-socket `refused` recipe
+# (`fs.move_file`) — and the fs tier is what lupin declines, at
+# `resolve`, with its own words. The family runs there; the ASSERTION
+# cannot be made there.
+#
+# One lupin limit is named rather than met: an absolute path, or one that
+# climbs out of the working directory, is `unsupported` by name on the
+# reference machine (wolf-interp#18 item 6 — "a unix socket path is a
+# host filesystem object"). §14's relative-path rule already forbids
+# every spelling that would reach it, and `sun_path`'s ~104-byte ceiling
+# on macOS is the second reason the rule exists.
+#
+# `conforms:` on these six files names `std.net.unix` and NOT
+# `os.net.unix`, which is the clause they actually hold. `os` is in the
+# pinned registry (17 anchors) and not in `[conf.anchor.ns]`, so the tag
+# would be a CI failure — F-0099's gap, re-counted at four namespaces
+# this sprint and asked for upstream on the #120 precedent. ----
+
+[tests."net/unix/echo.lu"]
+lupin = "run"   # sc36: is36's unix family — binds, dials, accepts and echoes over a PATH with no filesystem behind it
+wolfc = "run"
+native = "run"
+
+[tests."net/unix/rows.lu"]
+lupin = "run"   # sc36: the path rows are the host's answers, not the fs tier's — `exists` and both `not_found`s land here too
+wolfc = "run"
+native = "run"
+
+[tests."net/unix/stream_surface.lu"]
+lupin = "run"   # sc36: the byte pair (is30) and `net_deadline` (is18) both serve a unix stream on the reference machine
+wolfc = "run"
+native = "run"
+
+# The two that assert about the PATH. lupin's refusal is the fs tier's
+# and arrives at `resolve` — and it arrives LAZILY, after the bind has
+# already run, so the staged directory can be left holding a socket file.
+# Harmless (staging wipes before every run) and recorded because it is
+# the sort of thing that looks like a leak when it is a lane word.
+[tests."net/unix/cleanup.lu"]
+lupin = "unsupported"  # sc36: `fs_exists` — "this machine has no filesystem (or injectable stdin) by design, so the fs tier is declined rather than mocked". Every relation in the file is an `fs.exists` reading
+wolfc = "run"
+native = "run"
+
+[tests."net/unix/refused_row.lu"]
+lupin = "unsupported"  # sc36: `fs_rename` does not resolve — the stale-socket recipe is a rename, so the row that needs it is compiler-lanes-only
+wolfc = "run"
+native = "run"
+
+# D33 held as a rejection, one level down at the builtins for
+# `net/comptime_refuses.lu`'s reason (F-0051): E0701 twice, once per
+# call. lupin has no comptime tier at all and says so.
+[tests."net/unix/comptime_refuses.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

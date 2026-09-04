@@ -1,0 +1,85 @@
+//! check: run(exit=0, stdout="close_after_rename: ok | bound_path_gone: true | stale_file_survives: true | dial_stale: refused")
+//! phase: run
+//! conforms: std.net.unix, std.fs, err.row
+//!
+//! **`refused` — the stale socket, and the reason it is not `not_found`.**
+//! A unix-domain client meets three different absences and the clause
+//! gives each its own tag: nothing at the path is `not_found`, a path
+//! that is not a socket at all is `io` (`rows.lu` and the module header),
+//! and a SOCKET FILE with nobody listening on it is `refused`. The third
+//! is what a client sees when the server died without closing, which is
+//! the case an operator has to recognise from a log line, so it earns a
+//! witness of its own.
+//!
+//! **How a stale socket is built without a second process.** The obvious
+//! recipe — bind, then kill the binder — needs a process this rig cannot
+//! spawn. The recipe here is one call: bind at `live.sock`, RENAME the
+//! socket file to `stale.sock`, then close the listener. The listener's
+//! close unlinks the path it BOUND (which the rename emptied), so the
+//! renamed inode is left behind exactly as a dead process would leave it,
+//! and the socket it belonged to is closed. Dialling it is the real
+//! condition, reached deterministically.
+//!
+//! **A second property falls out and is asserted beside it: the unlink is
+//! BEST EFFORT.** `net.close_listener` on a listener whose path was moved
+//! out from under it answers `ok`, not `io` — the runtime tries to remove
+//! the name it made and does not turn a failure to find it into a failure
+//! to close. A close that could fail on a vanished path would make every
+//! program that shares a directory with an operator's `rm` unreliable.
+//!
+//! **Lanes: the compiler rungs only** — `fs.move_file` is the recipe and
+//! lupin declines the filesystem tier (§14). The family itself runs there;
+//! `echo.lu` and `rows.lu` are the three-lane witnesses.
+
+use std.fs
+use std.net
+use std.net.unix
+
+fn main() -> !int {
+    let live = "live.sock"
+    let stale = "stale.sock"
+    // The owner's idiom at the door, for `cleanup.lu`'s reason (F-0109):
+    // one staged directory serves all three lanes, and lupin's lazy
+    // refusal lands after the bind has made a file.
+    if fs.exists(live) { fs.remove(live)? }
+    if fs.exists(stale) { fs.remove(stale)? }
+    var served = true
+    var srv = unix.listen(live) else |e| match e {
+        unsupported => {
+            served = false
+            net.Listener { fd: 0 - 1 }
+        },
+        exists => { return 3 },
+        not_found => { return 3 },
+        denied => { return 3 },
+        io => { return 3 },
+    }
+    var close_after_rename = "ok"
+    var bound_path_gone = true
+    var stale_file_survives = true
+    var dial_stale = "refused"
+    if served {
+        fs.move_file(live, stale)?
+        net.close_listener(take srv) else |_| {
+            close_after_rename = "io"
+        }
+        bound_path_gone = !fs.exists(live)
+        stale_file_survives = fs.exists(stale)
+        dial_stale = "dialled"
+        var s = unix.connect(stale) else |e| match e {
+            unsupported => { dial_stale = "unsupported"; net.Socket { fd: 0 - 1 } },
+            refused => { dial_stale = "refused"; net.Socket { fd: 0 - 1 } },
+            not_found => { dial_stale = "not_found"; net.Socket { fd: 0 - 1 } },
+            denied => { dial_stale = "denied"; net.Socket { fd: 0 - 1 } },
+            io => { dial_stale = "io"; net.Socket { fd: 0 - 1 } },
+        }
+        if dial_stale == "dialled" {
+            net.close(take s) else |_| {}
+        }
+        fs.remove(stale)?
+    }
+    print(
+        "close_after_rename: {close_after_rename} | bound_path_gone: {bound_path_gone} | stale_file_survives: {stale_file_survives} | dial_stale: {dial_stale}",
+    )
+    0
+}

@@ -1,0 +1,97 @@
+//! check: run(exit=0, stdout="bound_made_file: true | stream_close_keeps_path: true | listener_close_unlinks: true | stale_blocks_bind: true | owner_idiom_rebinds: true")
+//! phase: run
+//! conforms: std.net.unix, std.fs, err.row
+//!
+//! **The cleanup posture, asserted rather than described.** This is the
+//! one std surface where a socket leaves a filesystem object behind, so
+//! the clause's four sentences each get a relation here:
+//!
+//! 1. binding CREATES the file — a unix listener has a name;
+//! 2. closing a connected STREAM never touches it — a connection is not
+//!    a name, so the accepted end and the dialled end both close with the
+//!    path still there;
+//! 3. closing the LISTENER unlinks it — the runtime made the file, so the
+//!    runtime removes it, and a caller who unlinks after closing is racing
+//!    the next bind rather than tidying up;
+//! 4. a file left behind by a process that died BLOCKS the next bind with
+//!    `exists` — never a silent takeover (the nginx/haproxy posture) —
+//!    and the owner's escape is the two-line idiom in `unix.listen`'s doc:
+//!    remove it first, then bind.
+//!
+//! Step 4 uses an ordinary file rather than a stale socket, because what
+//! the runtime refuses to clobber is a PATH and not a kind; the stale
+//! SOCKET is `refused_row.lu`'s subject, on the dialling side where the
+//! difference shows.
+//!
+//! **Lanes: the compiler rungs only.** Every relation here is an
+//! `fs.exists` reading, and lupin declines the filesystem tier by design
+//! (§14's honestly-unequal-lanes rule) — the family itself runs there,
+//! which `echo.lu` and `rows.lu` measure.
+
+use std.fs
+use std.net
+use std.net.unix
+
+fn main() -> !int {
+    let path = "cleanup.sock"
+    // The owner's idiom, at the door and for a reason this file
+    // discovered (F-0109): the rig stages ONE directory per test and runs
+    // all three lanes in it, and lupin resolves module bodies lazily — so
+    // its `fs.exists` refusal arrives AFTER `unix.listen` has already
+    // bound a real socket, leaving the file behind for the next lane.
+    // This is the shape `unix.listen`'s doc prescribes for a path the
+    // program owns, so the fix and the documented practice are the same
+    // two lines.
+    if fs.exists(path) { fs.remove(path)? }
+    var served = true
+    var srv = unix.listen(path) else |e| match e {
+        unsupported => {
+            served = false
+            net.Listener { fd: 0 - 1 }
+        },
+        exists => { return 3 },
+        not_found => { return 3 },
+        denied => { return 3 },
+        io => { return 3 },
+    }
+    var bound_made_file = true
+    var stream_close_keeps_path = true
+    var listener_close_unlinks = true
+    var stale_blocks_bind = true
+    var owner_idiom_rebinds = true
+    if served {
+        bound_made_file = fs.exists(path)
+        var cli = unix.connect(path)?
+        var conn = net.accept(mut srv)?
+        net.close(take cli)?
+        net.close(take conn)?
+        stream_close_keeps_path = fs.exists(path)
+        net.close_listener(take srv)?
+        listener_close_unlinks = !fs.exists(path)
+
+        // A path this program does not own: the bind refuses rather than
+        // clobbering it.
+        fs.write_text(path, "left behind")?
+        stale_blocks_bind = false
+        var blocked = unix.listen(path) else |e| match e {
+            unsupported => { net.Listener { fd: 0 - 1 } },
+            exists => {
+                stale_blocks_bind = true
+                net.Listener { fd: 0 - 1 }
+            },
+            not_found => { net.Listener { fd: 0 - 1 } },
+            denied => { net.Listener { fd: 0 - 1 } },
+            io => { net.Listener { fd: 0 - 1 } },
+        }
+
+        // The owner's idiom, verbatim from `unix.listen`'s doc.
+        if fs.exists(path) { fs.remove(path)? }
+        var again = unix.listen(path)?
+        owner_idiom_rebinds = fs.exists(path)
+        net.close_listener(take again)?
+    }
+    print(
+        "bound_made_file: {bound_made_file} | stream_close_keeps_path: {stream_close_keeps_path} | listener_close_unlinks: {listener_close_unlinks} | stale_blocks_bind: {stale_blocks_bind} | owner_idiom_rebinds: {owner_idiom_rebinds}",
+    )
+    0
+}

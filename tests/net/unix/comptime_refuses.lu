@@ -1,0 +1,36 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.net.unix, comptime.sandbox, comptime.sandbox.net
+//!
+//! **D33, held as a rejection: no unix-domain sockets at compile time
+//! either.** `std.net.unix` carries the same capability `std.net` does
+//! (`net`, per I13) and it is refused in the comptime sandbox for the same
+//! reason — `wolf add` must never mean arbitrary code opens a listener
+//! with the builder's credentials. The address family does not change the
+//! answer, and a reader who assumed it might (a unix socket reaches no
+//! network interface) is exactly who this file is for.
+//!
+//! **Why the refused call is the BUILTIN, and why there is no import.**
+//! `tests/net/comptime_refuses.lu` explains the first half: a `comptime
+//! fn` cannot call across a module boundary at this pin (F-0051), so the
+//! refusal is witnessed one level down at the builtin the facade
+//! delegates to. The second half is this module's own: `std.net` keeps its
+//! import alive by calling the pure `net.loopback` at run time, and
+//! `std.net.unix` HAS no pure member to call — both of its functions reach
+//! the host. An import with nothing to use is `E0305`, so this file
+//! imports nothing and names the module in `conforms:` instead.
+
+comptime fn probe_bind(path: str) -> int ! {unsupported, exists, not_found, denied, io} {
+    net_listen_unix(path)
+}
+
+comptime fn probe_dial(path: str) -> int ! {unsupported, refused, not_found, denied, io} {
+    net_connect_unix(path)
+}
+
+fn main() -> !int {
+    const BOUND = probe_bind("comptime.sock") else |_| 0
+    const DIALLED = probe_dial("comptime.sock") else |_| 0
+    print("bound: {BOUND} dialled: {DIALLED}")
+    0
+}

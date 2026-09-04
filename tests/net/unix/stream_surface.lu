@@ -1,0 +1,100 @@
+//! check: run(exit=0, stdout="bytes: 0 255 128 7 10 | back: 3 | read_deadline: timeout | accept_deadline: timeout")
+//! phase: run
+//! conforms: std.net.unix, std.net, err.row, err.propagate
+//!
+//! **"The rest of `std.net` serves it call for call" — measured, not
+//! claimed.** `std.net.unix` ships two functions and the module header
+//! rests the whole design on the promise that everything else in
+//! `std.net` works on what they return. The two operations that would
+//! most plausibly NOT work are the ones with their own builtin pair and
+//! their own timing machinery, so those are the ones asserted here over a
+//! socket PATH:
+//!
+//! - the byte tier — `net.write_bytes`/`net.read_bytes` carry a
+//!   `List[byte]` with no `utf8` row, so 0x00, 0xff, a lone 0x80 and a
+//!   bare LF ride a unix stream unchanged;
+//! - the deadlines — `net.set_deadline` turns a silent peer into
+//!   `timeout` on a unix stream, and `net.set_listener_deadline` turns a
+//!   peer-less `accept` into `timeout` on a unix listener, which is what
+//!   keeps a mistake in a control-plane server from hanging forever.
+//!
+//! Three lanes: lupin 0.1.25 has the byte tier (is30's socket bytes) and
+//! arms `net_deadline`, and it serves the unix family, so nothing here
+//! needs the filesystem and every relation is measured on the reference
+//! machine too.
+//!
+//! The budgets are 150ms, `net/read_deadline_row.lu`'s figure: long
+//! enough that a loaded machine does not report a spurious timeout on
+//! the operations BEFORE them, short enough that the two waits cost a
+//! third of a second.
+
+use std.net
+use std.net.unix
+
+fn main() -> !int {
+    let path = "stream.sock"
+    var served = true
+    var srv = unix.listen(path) else |e| match e {
+        unsupported => {
+            served = false
+            net.Listener { fd: 0 - 1 }
+        },
+        exists => { return 3 },
+        not_found => { return 3 },
+        denied => { return 3 },
+        io => { return 3 },
+    }
+    var line = " 0 255 128 7 10"
+    var back = 3
+    var read_deadline = "timeout"
+    var accept_deadline = "timeout"
+    if served {
+        var cli = unix.connect(path)?
+        var msg = List[byte]()
+        (mut msg).push(0 as byte)
+        (mut msg).push(255 as byte)
+        (mut msg).push(128 as byte)
+        (mut msg).push(7 as byte)
+        (mut msg).push(10 as byte)
+        net.write_bytes(mut cli, msg)?
+        var conn = net.accept(mut srv)?
+        let got = net.read_bytes(mut conn, 16)?
+        line = ""
+        for b in got {
+            line = "{line} {b}"
+        }
+        var reply = List[byte]()
+        (mut reply).push(254 as byte)
+        (mut reply).push(0 as byte)
+        (mut reply).push(253 as byte)
+        net.write_bytes(mut conn, reply)?
+        back = (net.read_bytes(mut cli, 16)?).len
+
+        // The peer is alive and says nothing: without a budget this read
+        // never returns.
+        net.set_deadline(mut conn, 150)?
+        read_deadline = "no-row"
+        let _text = net.read(mut conn, 4) else |e| match e {
+            closed => { read_deadline = "closed"; "" },
+            timeout => { read_deadline = "timeout"; "" },
+            utf8 => { read_deadline = "utf8"; "" },
+            io => { read_deadline = "io"; "" },
+        }
+        net.close(take cli)?
+        net.close(take conn)?
+
+        // Nobody is dialling: without a budget this accept never returns.
+        net.set_listener_deadline(mut srv, 150)?
+        accept_deadline = "no-row"
+        var idle = net.accept(mut srv) else |e| match e {
+            timeout => { accept_deadline = "timeout"; net.Socket { fd: 0 - 1 } },
+            io => { accept_deadline = "io"; net.Socket { fd: 0 - 1 } },
+        }
+        if accept_deadline == "no-row" {
+            net.close(take idle) else |_| {}
+        }
+        net.close_listener(take srv)?
+    }
+    print("bytes:{line} | back: {back} | read_deadline: {read_deadline} | accept_deadline: {accept_deadline}")
+    0
+}
