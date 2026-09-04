@@ -7613,3 +7613,61 @@ unmoved by the run rather than assumed.
 reference interpreter at pin 982f857)`, `vendor/upstream/PIN`
 `982f857` — all three on ONE sha, the invariant sc35 restored, held
 through a sprint that added a module.
+
+## The gauntlet — three runs, and the middle one is the finding
+
+The exit code was read from the process on every run and never through a
+pipe (the standing lesson).
+
+| run | tree | exit | verdict |
+|---|---|---|---|
+| 1 | every sprint edit in place, `net/unix/cleanup.lu` and `refused_row.lu` UNGUARDED | **1** | `xtask: RED` — four reds and nothing else: `cleanup.lu [wolfc]`, `cleanup.lu [native]`, `refused_row.lu [wolfc]`, `refused_row.lu [native]`, each *directive mismatch — expected exit(0), observed exit(3)*. F-0109, found by the rig |
+| 2 | the two guards added | **0** | `ci: GREEN` |
+| 3 | over the COMMITTED tree, `8c93bfa` | **0** | `ci: GREEN` |
+
+**Run 3's numbers, and the deltas against sc35's:**
+
+| measure | sc35 | sc36 | delta |
+|---|---|---|---|
+| tests | 376 | **382** | +6, all `net/unix/` |
+| forward tags | 700 | **719** | +19 |
+| conservatism ledger | 201 | **204** | +3 — the three lupin `unsupported` rows this sprint adds |
+| unstable rows | 0 | **0** | — |
+| slow skips | 0 | **0** | — |
+| divergent rows | 8 | **8** | — the same eight, each observed matching its recorded observation (wolf-interp#62) |
+| doc-examples | 414 GREEN | **414 GREEN** | **+0**, and the zero is the point (below) |
+| ulp | 200 GREEN | **200 GREEN** | — |
+
+**The +0 on doc-examples is a designed zero, not an oversight.**
+`std.net.unix` ships no fenced example, because every member returns a
+value only `std.net` can operate on and the extractor imports exactly the
+documented module (§4's one-module note). Both functions carry PROSE
+examples naming the outcome and the runnable witness by path — the
+`std.str.to_strbuf` precedent applied at a whole module's scale. The two
+alternatives were costed and refused: writing the examples against the
+raw builtins would document `net_close` where the module teaches
+`net.close_listener`, and growing the extractor a second import would be
+a harness change made to serve a doc. This is worth flagging to review
+because it is the first core module in this repository with zero doc
+blocks, and a reader counting blocks per module should find the reason
+here rather than infer neglect.
+
+**The six rows as the ledger records them**, and the lane split is the
+sprint's shape in one table:
+
+| witness | lupin | wolfc | native | why |
+|---|---|---|---|---|
+| `net/unix/echo.lu` | run | run | run | no filesystem call |
+| `net/unix/rows.lu` | run | run | run | no filesystem call |
+| `net/unix/stream_surface.lu` | run | run | run | no filesystem call |
+| `net/unix/cleanup.lu` | unsupported | run | run | every relation is an `fs.exists` reading |
+| `net/unix/refused_row.lu` | unsupported | run | run | the stale-socket recipe is `fs.move_file` |
+| `net/unix/comptime_refuses.lu` | unsupported | run | run | lupin has no comptime tier; both wolf rungs give `E0701` twice |
+
+**The mtime audit.** All six witnesses, `std/net/unix/unix.lu`,
+`std/net/net.lu`, `tests/ledger.toml` and `xtask/src/anchors.rs` were
+last modified before run 2 began and none was touched between runs 2 and
+3; run 3 ran over the committed tree at `8c93bfa` with a clean working
+directory. Run 3 is therefore a measurement of what is on the branch and
+not of what was on disk while it was being edited (the gauntlets-must-
+cover-the-edits lesson).
