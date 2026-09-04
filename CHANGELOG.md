@@ -1,5 +1,101 @@
 # Changelog
 
+## sc36 — 2026-09-03 — the socket surface: a second address family, and a lane nobody predicted
+
+**NO BUMP, and the prediction for that was written first.** sc35's second
+bump left all three pins on one sha and installed the interpreter that
+matched it, so sc36 opened against `wolf 0.2.4 (wolfgang, pin 982f857)`,
+`lupin 0.1.25 (pin 982f857)` and `vendor/upstream/PIN 982f857` — the
+one-sha invariant, held through a sprint that adds a module. Both of the
+contract's either/ors resolved to their SECOND arm, checked twice each:
+**s137 item 1 has not merged** (wolf-lang trunk is `1323c4e` at both
+readings; `net_listen_with`/`os_spawn_with`/`net_adopt_listener` do not
+exist at this pin), so `std.net.listen_with`/`adopt` is not written and
+the ask **stands on wolf-std#6**; and **is37 did not tag** (`wolf-interp`
+is at `ae34115`, newest tag `v0.1.25`), so the eight byte-domain
+`divergent(…)` rows citing wolf-interp#62 stand verbatim — proven
+unmoved by the run rather than assumed, since a divergent row that stops
+matching its observation is a RED here.
+
+**`std.net.unix` — two functions, and that is the whole module.**
+`unix.listen(path) -> net.Listener ! {unsupported, exists, not_found,
+denied, io}` and `unix.connect(path) -> net.Socket ! {unsupported,
+refused, not_found, denied, io}` over `[os.net.unix]` (s136,
+wolf-lang#227). They return `std.net`'s OWN types, so `accept`, the str
+and byte read/write pairs, both deadlines and both closers serve a unix
+socket call for call — measured over a socket path, not asserted. A
+separate module because wolf has no overloading and `listen` cannot mean
+two things in one (§1, the `std.math.float` rule). Two `std.net`
+functions behave differently on a unix value and both now say so: `port`
+is `io` (a path has no port) and `close_listener` UNLINKS the path.
+
+**The finding of the sprint is a lane word.** Every os block in this
+ledger has the same shape — the wolf rungs run it, lupin declines the
+capability — and the prediction written before the first probe was a
+two-lane module, because the reference machine has no filesystem.
+**lupin 0.1.25 serves the whole family.** A unix socket is not a file the
+machine has to READ; it is a host object it asks the host for. Four of
+six witnesses are THREE-LANE; the two that are not assert about the path
+with `fs.exists`/`fs.move_file`, which is what lupin actually declines.
+Its one named limit is a path that climbs out of the working directory
+(`unsupported` by name, wolf-interp#18 item 6) — a spelling §14's
+relative-path rule already forbids, and `sun_path`'s ~104 bytes on macOS
+is the second reason to keep that rule.
+
+**F-0109 — the rig stages ONE directory for THREE lanes, and the machine
+with no filesystem is the one that left a file in it.** Found by a RED:
+the first gauntlet failed on exactly two rows, `exit(3)` where `exit(0)`
+was expected. lupin resolves bodies LAZILY, so `unix.listen` — a call it
+SERVES — created a real socket file before the next line's `fs.exists`
+was declined, and wolfc's bind then answered `exists`. Every previous
+capability module made the two facts coincide (no fs, so no file); this
+one separates them, because the call that creates the file is a `net`
+call. The fix is the practice the module already documents — the owner's
+idiom, `if fs.exists(path) { fs.remove(path)? }`, on the first line — so
+the refusal now lands before the bind.
+
+**One row std deliberately does NOT promise, and it came from reading
+somebody else's tests.** A dial of a path that is not a socket at all is
+neither of the clause's two dial cases: macOS answers `ENOTSOCK` → `io`,
+linux answers `ECONNREFUSED` → `refused`. is36 found that on a CI runner
+after every developer machine had agreed on `io`, and wolf-interp's own
+`net_unix.rs` now accepts either. std adopted the posture rather than
+pinning macOS: **when the tag is the kernel's and the kernels disagree,
+promise the CLASS and not the member** — it is a row, never a trap — and
+`rows.lu` pins the four rows the clause rules and deliberately not the
+fifth. `denied` is the other honest edge: measured out of band on all
+three lanes (a mode-000 directory, at bind AND at dial), declared in both
+signatures, and with no hermetic witness because there is no `chmod`
+builtin.
+
+**F-0103 re-probed at `982f857` — unmoved, predicted from a span with no
+`.rs` in it.** f18/f19, character-identical but for a loop bound: the one
+whose row is TAKEN is `unsupported — control flow in an argument` at
+`mem` on the checked lane, the one that does not take it runs on all
+three. wolf-lang#201 stays OPEN and the sharpened warning is repeated on
+its thread. Residues at their tenth pin: the chars-pairs tuple list, and
+F-0096 — both refused verbatim; `in(r)`'s wolf-rung reading is
+re-confirmed and LUPIN'S WORDING moved (a better sentence, same verdict,
+recorded so the next re-probe compares against the right string); a `str`
+still charges no named region's ledger on any tier.
+
+**F-0099 re-counted at FOUR namespaces and the bill came due.** The
+pinned registry publishes 417 anchors in eleven namespaces;
+`[conf.anchor.ns]` admits seven. `os`, `type`, `ct` and `diag` are not
+among them — so **sc36 implements `[os.net.unix]` and none of its six
+witnesses can cite the clause it conforms to**. Filed upstream as
+wolf-lang#239 on the #120 precedent; the rig now pins the gap as a unit
+test whose failure message says to retire F-0099. One lag in the other
+direction fixed here: `test` was reserved by the clause at s39 and this
+rig's `FORWARD_NS` never followed.
+
+**`cargo xtask ci`: GREEN, exit 0** over the committed tree — 382 tests
+(376 -> 382), 719 forward tags, 204 conservatism entries, 0 unstable, 0
+slow, **8 divergent** (the same eight); doc-examples **414 blocks GREEN,
++0** — a designed zero, because §4's one-module note leaves this module
+prose examples and the reason is on both functions; ulp 200 rows GREEN on
+all three lanes.
+
 ## sc35 — 2026-09-03 — the rename, the second gate, and the release that opened it
 
 **SECOND BUMP, same day. lupin 0.1.23 -> 0.1.25 (is36 ships `[type.byte]`
