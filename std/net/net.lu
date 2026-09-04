@@ -64,6 +64,18 @@
 //! the pure address helpers. The LANGUAGE owns nothing here; there is no
 //! socket syntax.
 //!
+//! **The SECOND address family lives in `std.net.unix` (sc36).** This
+//! module is TCP over `"host:port"`; `[os.net.unix]`'s stream socket over
+//! a filesystem PATH is `std.net.unix.listen`/`connect`, and it is a
+//! separate module for §1's reason — wolf has no overloading, so `listen`
+//! and `connect` cannot mean two things here. What that module returns is
+//! one of THESE types: a unix listener is a `Listener`, a unix connection
+//! is a `Socket`, and every function below serves them call for call
+//! (`tests/net/unix/stream_surface.lu` measures the byte pair and both
+//! deadlines over a socket path). Two functions behave differently on
+//! one, and both say so in their own docs: `port` answers `io` because a
+//! path has no port, and `close_listener` UNLINKS the path it bound.
+//!
 //! **Blocking, and what that means for a program.** Every operation blocks
 //! the whole process: `accept` waits for a connection, `read` waits for
 //! bytes. There is no reactor, no task parking and no `select` at this tier
@@ -138,8 +150,13 @@
 //! of the module keeps its lane. Comptime refuses the whole capability
 //! everywhere (D33).
 
-/// A bound TCP listener: the host socket this process accepts connections
-/// on.
+/// A bound listener: the host socket this process accepts connections on.
+///
+/// TCP when `listen` made it, unix-domain when `std.net.unix.listen` did,
+/// and nothing in the value records which — the operations are identical
+/// once the socket exists, which is why there is one type (sc36). The two
+/// places the family shows through are `port` and `close_listener`, and
+/// both are documented where they are.
 ///
 /// The field is an `int` because that is what the builtin tier hands out —
 /// a small non-negative index into the machine's socket table, never a
@@ -156,12 +173,14 @@ pub struct Listener {
     fd: int,
 }
 
-/// A connected TCP socket: one end of an established stream, whichever
-/// side opened it.
+/// A connected socket: one end of an established stream, whichever side
+/// opened it and whichever address family carried it.
 ///
-/// `accept` and `connect` both answer one of these, and nothing about the
-/// value records which — the operations are identical once the connection
-/// exists, which is the whole point of the type. The field is an `int` for
+/// `accept`, `connect` and `std.net.unix.connect` all answer one of these,
+/// and nothing about the value records which — the operations are
+/// identical once the connection exists, which is the whole point of the
+/// type. No function here behaves differently on a unix-domain stream:
+/// `close` never touches a path, because the LISTENER owns the name. The field is an `int` for
 /// the reasons `Listener`'s is, and `close` consumes the value for the same
 /// reason `close_listener` does.
 pub struct Socket {
@@ -201,6 +220,13 @@ pub fn listen(addr: str) -> Listener ! {io} {
 /// Read mode: asking a listener its port does not change it. The answer is
 /// the LOCAL port only; there is no peer or full-address accessor at this
 /// pin (see the module header).
+///
+/// **On a `std.net.unix` listener this is `io`, always** — a path has no
+/// port, and the `io` row is the builtin tier's own answer rather than a
+/// check std adds (`[os.net.unix]`, measured on all three lanes and
+/// pinned in `tests/net/unix/echo.lu`). A program that binds either
+/// family and reports its address asks `port` and falls back to the path
+/// it passed.
 ///
 /// Capability `net`; refused at comptime (D33). Delegates to `net_port`.
 ///
@@ -548,6 +574,13 @@ pub fn close(take s: Socket) -> () ! {io} {
 ///
 /// `take` for `close`'s reason: the handle is gone afterwards, and using
 /// it is a static use-after-move.
+///
+/// **On a `std.net.unix` listener this call also UNLINKS the socket
+/// path** — the runtime made the file, so the runtime removes it. Nothing
+/// about the signature changes and no row is added: the unlink is best
+/// effort, so a path that has already been moved or removed still closes
+/// clean (`tests/net/unix/cleanup.lu` and `refused_row.lu`). A TCP
+/// listener has no name and this sentence does not apply to one.
 ///
 /// Capability `net`; refused at comptime (D33). Delegates to `net_close`.
 ///
