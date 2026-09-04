@@ -18,12 +18,28 @@ use std::path::Path;
 // snapshot while [conf.anchor.ns] does not admit `type` — filed as
 // F-0099 rather than added here, because this rig mirrors the clause's
 // LETTER, not the extractor's output.
+//
+// sc36 re-counted F-0099's gap at the 982f857 snapshot and it is FOUR
+// namespaces, not one: `type` (24 anchors, s121), `os` (17, s38 onward),
+// `ct` (14) and `diag` (10) are all in `anchors.json` and none is admitted
+// by `[conf.anchor.ns]`. The cost is now concrete rather than theoretical
+// — sc36 implements `[os.net.unix]` and its six witnesses CANNOT cite the
+// clause they conform to, because `os` is neither registered nor reserved
+// and `classify` would fail CI on the tag. Still not added here: the fix
+// is the #120 append upstream (the precedent that admitted `pkg`), asked
+// for on wolf-lang, and this list follows the clause the day it lands.
 pub const REGISTERED_NS: &[&str] = &["gram", "mem", "conc", "abi", "conf", "proto", "pkg"];
 
 /// Reserved forward namespaces, same clause.
+// `test` was appended to the clause on 2026-08-11 by s39 (the built-in
+// test framework's litmus tier, D34/D36) and this list never followed —
+// a lag in the OTHER direction from `pkg`'s, and one that would have
+// rejected a legal tag rather than accepted an unregistered one. Added at
+// sc36 against the clause's own letter at 982f857; no anchor in the
+// snapshot uses it, so nothing in this repository changes verdict.
 pub const FORWARD_NS: &[&str] = &[
     "str", "err", "task", "proc", "sync", "generics", "arith", "ffi", "unsafe", "comptime", "perf",
-    "mod", "std", "ty",
+    "mod", "std", "ty", "test",
 ];
 
 pub struct Registry {
@@ -102,6 +118,35 @@ mod tests {
         assert!(matches!(r.classify("std.prelude"), Ok(TagClass::Forward)));
         assert!(r.classify("gram.not.registered").is_err());
         assert!(r.classify("bogus.ns").is_err());
+    }
+
+    /// `test` is reserved by `[conf.anchor.ns]` (appended 2026-08-11 by
+    /// s39) and this rig lagged it until sc36.
+    #[test]
+    fn test_namespace_is_reserved() {
+        assert!(matches!(
+            reg().classify("test.litmus"),
+            Ok(TagClass::Forward)
+        ));
+    }
+
+    /// F-0099's gap, pinned as a test so it cannot be forgotten: the
+    /// pinned registry publishes `os.*`, `type.*`, `ct.*` and `diag.*`
+    /// anchors that `[conf.anchor.ns]` does not admit, so a `conforms:`
+    /// tag naming one is a CI failure here. sc36's own clause
+    /// (`[os.net.unix]`) is in that set. When the upstream append lands
+    /// (the #120 precedent), these four move to `REGISTERED_NS` and this
+    /// test flips to `Ok(Registered)` deliberately.
+    #[test]
+    fn f0099_the_four_unadmitted_namespaces_still_fail() {
+        let r = reg();
+        for tag in ["os.net.unix", "type.byte", "ct.eval", "diag.code"] {
+            assert!(
+                r.classify(tag).is_err(),
+                "`{tag}` classified — has [conf.anchor.ns] admitted its namespace? \
+                 Then move it to REGISTERED_NS and retire F-0099."
+            );
+        }
     }
 
     #[test]
