@@ -7278,3 +7278,398 @@ at the new pins, the second over the tree the commits actually produce.**
 The branch's own history is the record of why that took two bumps —
 sixteen commits red on one lane by construction, with the count and the
 cause written down, then four commits that closed it.
+
+## sc36 — `std.net.unix` lands three-laned, and the reference machine is the surprise
+
+**The pins did not move and the prediction for that was written first.**
+sc35's second bump put all three pins on one sha (`982f857` = the
+`v0.2.4` tag) and installed `lupin 0.1.25`; sc36 opened against exactly
+those and there was nothing to bump to. The drift prediction for a
+no-op bump is trivially zero, and it is stated anyway because the
+alternative is a sprint that never says which binaries it measured:
+`wolf 0.2.4 (wolfgang, pin 982f857)` and `lupin 0.1.25 (wolf-interp,
+reference interpreter at pin 982f857)`, macOS arm64, both on `PATH`
+throughout. The one thing worth re-reading at this pin is that wolf's
+own pairing line still names `lupin 0.1.24 … pin 3befc3e` (r07's
+release-time PAIRING record) against an installed 0.1.25 — reported,
+not gated (F-0064), unchanged from sc35.
+
+**The finding of the sprint is a lane word nobody predicted.** Every os
+block in `tests/ledger.toml` has the same shape: the wolf rungs run it
+and lupin declines the capability by design. `std.net.unix` binds a
+socket at a FILESYSTEM PATH, so the expectation going in — written down
+before the first probe — was a two-lane module with a lupin column of
+`unsupported`. **lupin 0.1.25 serves the whole family**, and the reason
+is worth stating because it generalises: a unix socket is not a file the
+machine has to READ, it is a host object the machine asks the host for.
+The reference interpreter declines `std.fs` because it has no
+filesystem model to be honest about; it has no such problem with
+`bind(2)`. Measured, byte-identical stdout on all three lanes:
+
+| probe | lupin 0.1.25 | wolf `--checked` | wolf `--native` |
+|---|---|---|---|
+| echo over a socket path (`listen`/`connect`/`accept`/`read`/`write`) | `exit(0)` | `exit(0)` | `exit(0)` |
+| `net_port` on a unix listener | `io` | `io` | `io` |
+| second bind of a live path | `exists` | `exists` | `exists` |
+| bind under a missing directory | `not_found` | `not_found` | `not_found` |
+| dial of a path with nothing at it | `not_found` | `not_found` | `not_found` |
+| dial under a missing directory | `not_found` | `not_found` | `not_found` |
+| the byte pair over a unix stream | `exit(0)` | `exit(0)` | `exit(0)` |
+| `net_deadline` on a unix stream / listener | `timeout` / `timeout` | same | same |
+| bind and dial under a mode-000 directory | `denied` / `denied` | same | same |
+
+So four of the six witnesses this sprint ships are THREE-LANE, and the
+two that are not are two-lane for a reason that has nothing to do with
+sockets: they assert about the path with `fs.exists` and `fs.move_file`,
+and the fs tier is what lupin declines.
+
+**lupin's one named limit, and §14 already forbids the spelling that
+reaches it.** An absolute path, or one that climbs out of the working
+directory, is refused BY NAME on the reference machine:
+
+    net_listen_unix("/sc36-denied-probe.sock")
+      -> unsupported: "names a path outside the working directory; a unix
+         socket path is a host filesystem object, and this machine's
+         declined fs surface (wolf-interp#18 item 6) admits only a
+         relative path that does not climb out — the shape is refused by
+         name rather than observed"
+
+That is a good refusal — it is the machine saying which question it
+declines instead of guessing — and §14's relative-path rule already
+forbids every spelling that would reach it. There is a second reason to
+keep the rule that is the host's rather than the rig's: `sun_path` is
+about 104 bytes on macOS and 108 on linux, so an absolute path under a
+deep scratch directory is a length failure waiting for a different
+machine. Both reasons are in the module header.
+
+## F-0109 — the rig stages ONE directory for THREE lanes, and sc36 is the first sprint where the reference machine can leave a file in it
+
+**Found by a RED, and the RED is the useful part.** The first gauntlet
+over this sprint's tree failed on `net/unix/cleanup.lu` and
+`net/unix/refused_row.lu` with `0 lane(s) observed` and a directive
+mismatch on both compiler lanes: the tests expected `exit(0)` and got
+`exit(3)`, the arm each file uses to say *the bind failed with a PATH
+row on a host that serves the family*.
+
+**The mechanism, and why it has never fired before.** `stage_test` is
+called ONCE per test (`runner.rs`, the per-test loop) and all three
+lanes are then invoked in that same staged package root — which is
+correct and deliberate: staging copies the whole `std/` tree, and doing
+it three times per test would triple the rig's IO for 376 tests. The
+invariant it rests on is that a lane which DECLINES a capability leaves
+nothing behind. That invariant has held for every os module in this
+repository because lupin's refusal has always arrived at the FIRST call
+of the declined tier, before any side effect. It does not hold here:
+
+1. lupin resolves module bodies LAZILY, so `main` starts running;
+2. `unix.listen(path)` is a call lupin SERVES — it binds a real
+   `AF_UNIX` socket and creates a real file in the staged root;
+3. the next line is `fs.exists(path)`, which lupin declines, and the
+   record says `unsupported` at `resolve`;
+4. the socket file is still there. wolfc runs next, in the same
+   directory, and its bind answers `exists`.
+
+**So the reference machine — the one with no filesystem — is the lane
+that left a file behind.** That sentence is the finding. Every previous
+capability module made the two facts coincide: lupin has no fs, so lupin
+touches no file. `std.net.unix` separates them, because the call that
+creates the file is a `net` call.
+
+**The fix is the practice the module already documents**, which is why
+this is filed as a finding rather than a rig change. Both files now open
+with the owner's idiom from `unix.listen`'s doc:
+
+    if fs.exists(path) { fs.remove(path)? }
+
+and lupin's refusal now lands on that FIRST line, before the bind, so
+nothing is created and the record is the same `unsupported` it always
+was. Re-measured with all three lanes run in ONE directory, lupin first
+(the rig's own order): `unsupported` / `exit(0)` / `exit(0)`, no
+leftover.
+
+**The general rule, for the next sprint that ships a capability whose
+side effect precedes its refusal.** A test's lanes share a directory, so
+a test is responsible for its own ground: if a program can be
+interrupted between a side effect and the call that declines, it must
+start by putting the ground back. Do not read a green rig as evidence
+that the lanes are independent — they are independent in what they
+OBSERVE and shared in what they TOUCH. The rig change that would remove
+the hazard (re-stage per lane) is priced at three `std/` tree copies per
+test and is not worth it for a hazard one line of ordinary wolf pays
+for.
+
+## The row the KERNELS disagree about, adopted from is36 rather than re-discovered
+
+A dial of a path that names something which is not a socket at all is
+neither of `[os.net.unix]`'s two dial cases. It was measured here on
+macOS first — `io`, from `ENOTSOCK`, on both compiler lanes — and the
+module's doc said so in those words for about an hour. wolf-interp's own
+`tests/net_unix.rs` had already found the other half on a CI runner
+(`d76e56a`, is36): **linux answers `ECONNREFUSED`, which is the
+`refused` row**, and no developer's machine had said it. The upstream
+test now reads the row and accepts either.
+
+std adopted that posture rather than pinning macOS's answer, and the
+rule it leaves is worth more than the datum: **when the tag is the
+kernel's and the kernels disagree, promise the CLASS and not the
+member.** `unix.connect`'s doc says it is a row and never a trap — which
+is the part that IS true on both hosts and is the part a caller needs —
+and tells anyone who must distinguish "not a socket" from "a dead
+server" to ask `std.fs` about the path instead of the network.
+`tests/net/unix/rows.lu` pins the four rows the clause rules and
+deliberately does not pin the fifth, so the file cannot become a red on
+a linux runner.
+
+This is also the second time in three sprints that a per-host difference
+was found by CI and not by a developer, and the first where the fix was
+free because the upstream repository had already paid for it. Reading
+the implementation's own test suite for the surface you are wrapping is
+cheaper than measuring it twice.
+
+## `denied`, measured out of band, and the row set's honest edges
+
+`denied` is in both signatures and no test in this repository can reach
+it: it needs a directory the caller lacks permission on, and there is no
+`chmod` builtin at this pin (nor an `fs` surface for one). Measured out
+of band instead, with a mode-000 directory made by the shell —
+
+    net_listen_unix("target/locked/x.sock")   -> denied
+    net_connect_unix("target/locked/x.sock")  -> denied
+
+— byte-identical on all three lanes, and both ends of the family answer
+it. It is declared in both signatures for §14's reason: the vocabulary
+is the toolchain's, not std's, and a tag a program cannot reach HERE is
+documented, never omitted. The shipped test states its own incompleteness
+rather than letting a green rig imply coverage.
+
+`unsupported` is the other unreachable one — windows's answer, and this
+rig's implementation lanes are dark on windows. It is held by
+CONSTRUCTION instead: all six witnesses branch on it and print relations
+that hold vacuously on a host that refuses the family, which is
+`corpus/net/unix_echo.lu`'s construction upstream. The cost is about
+eight lines a file and the benefit is that the day a windows lane lights
+up, none of these six is a red.
+
+**And one measured property that is not a row at all: the unlink is BEST
+EFFORT.** `net.close_listener` on a listener whose path was moved out
+from under it answers `ok`, not `io` (`refused_row.lu` asserts it beside
+the `refused` it was written for). That matters more than it looks: a
+close that failed on a vanished path would make every program sharing a
+directory with an operator's `rm` unreliable, and it is the property
+that lets the stale-socket recipe exist at all.
+
+## F-0099 re-counted — the gap is FOUR namespaces, and sc36 is the sprint that pays for it
+
+sc34 filed F-0099 when `type.*` anchors appeared in the pinned registry
+while `[conf.anchor.ns]` did not admit the namespace, and refused to add
+it to `xtask`'s `REGISTERED_NS` because this rig mirrors the clause's
+LETTER, not the extractor's output. Re-counted at the `982f857`
+snapshot, the registry publishes 417 anchors in ELEVEN namespaces and
+the clause admits SEVEN:
+
+| namespace | anchors | admitted by `[conf.anchor.ns]` |
+|---|---|---|
+| `mem` 115, `conc` 76, `gram` 69, `conf` 27, `proto` 26, `abi` 23, `pkg` 16 | 352 | yes |
+| **`type`** | 24 | no (F-0099, s121) |
+| **`os`** | 17 | no |
+| **`ct`** | 14 | no |
+| **`diag`** | 10 | no |
+
+**The cost is no longer theoretical: sc36 implements `[os.net.unix]` and
+its six witnesses cannot cite the clause they conform to.** A
+`conforms: os.net.unix` line is a hard CI failure here — "namespace `os`
+is neither registered nor reserved" — so every unix test names the
+forward tag `std.net.unix` instead, and the clause it actually holds is
+recorded in the ledger block and in this register rather than in the
+directive that was built to carry exactly that. §13's rule ("every test
+names its anchors") is satisfied in letter and defeated in substance.
+
+The fix is upstream and has a precedent: #120 appended `pkg` to the
+clause in 2026-08-27 for exactly this reason, additively, nothing
+renumbered. Asked for on wolf-lang; the rig follows the clause the day
+it lands, and `xtask/src/anchors.rs` now carries a unit test
+(`f0099_the_four_unadmitted_namespaces_still_fail`) whose failure
+message says so — the flip is deliberate, not a discovery.
+
+**One lag in the OTHER direction, fixed here.** `[conf.anchor.ns]`
+reserved `test` on 2026-08-11 (s39, the built-in test framework's litmus
+tier) and this rig's `FORWARD_NS` never followed, so a legal tag would
+have been rejected. Added at sc36 against the clause's own letter; no
+anchor in the snapshot uses it, so nothing in this repository changes
+verdict. The pair is the lesson: a hand-copied list of a clause's terms
+drifts BOTH ways, and only one of the two directions announces itself.
+
+## F-0103 re-probed at `982f857` — the path property holds, and the prediction was written from the SPAN
+
+**The prediction, written before the probe.** The compiler did not move
+this sprint: sc35 measured the re-characterisation at
+`wolf 0.2.3+dev.4230b00` and the second bump took the `v0.2.4` tag
+(`982f857`), five commits whose whole diff touches eight files and not
+one `.rs`. So the prediction is *unmoved, byte-identical*, and it is
+made from the span rather than from hope — the same discipline a pin
+bump's drift prediction uses. A re-probe that confirms a prediction made
+from the diff is worth ten minutes; a re-probe with no prediction beside
+it is a coin toss reported as a measurement.
+
+**Measured, each probe in its own directory, macOS arm64:**
+
+| probe | argument | takes the row? | lupin | wolfc `--checked` | wolf `--native` |
+|---|---|---|---|---|---|
+| f19 | `narrow(k)`, `k = 2` built by a `while` loop | no | `exit(0)` `alpha:2` | `exit(0)` `alpha:2` | `exit(0)` `alpha:2` |
+| f18 | character-identical to f19 except the loop bound, `k = 10` | **yes** | `exit(0)` `alpha:0` | **`unsupported` — `control flow in an argument`, phase `mem`, span `[263, 272]`** | `exit(0)` `alpha:0` |
+
+sc35's one-sentence trigger stands verbatim: *the checked machine
+refuses an unhandled raising call in argument position when the row is
+taken on the reachable path — regardless of whether the callee reads the
+parameter, whether it is generic, and whether it is in another module.*
+And so does the consequence that makes it worth more than a lowering
+gap: **`unsupported` here is a property of an EXECUTION, not of a
+program.** Two files differing in one digit; one runs on the checked
+lane and one does not.
+
+Downstream state unchanged, and the gauntlet is the control:
+`tests/option/or_else_default.lu`, `exists_marking.lu` and
+`is_none_marking.lu` keep `wolfc = "unsupported"` — a row answering
+deeper is a RED in this rig, so a green run over an untouched ledger is
+the assertion. wolf-lang#201 is OPEN. `std.x.tls.client`'s header keeps
+teaching **bind, then name**, and sc35's warning to anyone re-measuring
+at the next pin is repeated here because it has now cost two published
+false heals: **assert that the probe TAKES the row.** The two-file
+reproducer is f18/f19 above.
+
+## The residues, re-probed at `982f857` / `0.1.25`
+
+- **The chars-pairs tuple list is refused at its TENTH consecutive
+  pin.** `List[(int, int)]()` is `unsupported — this prelude container
+  instantiation (generic data)` at `resolve` on both wolf rungs (span
+  `[33, 51]`), and lupin runs it (`pairs: 1`). Ten pins. The span since
+  the last probe contains no compiler at all, so this one is a formality
+  — recorded because a residue that skips a sprint is a residue nobody
+  re-probes at the sprint that matters. Dated in the str header.
+- **F-0096 refuses verbatim.** `s.get(0..^2)` is `unsupported —
+  open-ended or end-relative ranges (slicing)` at `resolve` on both
+  rungs (span `[56, 61]`); lupin runs it and prints `hel`.
+- **`in(r)` — the wolf rungs agree with sc35, and LUPIN'S WORDING
+  MOVED.** Both spellings — `(mut xs).in(r)` over a bound list and
+  `List[int]().in(r)` over a constructor call — are `unsupported —
+  methods on generic std data (the std surface)` at `resolve` on both
+  wolf rungs (spans `[72, 86]` and `[52, 69]`), which is exactly sc35's
+  reading, re-confirmed. What is new is the reference machine's message:
+  where sc35 recorded a bare `unsupported`, 0.1.25 says **"`List` has no
+  method `in` in this machine's std subset"**. Same verdict, a better
+  sentence — is36 improved the refusal text — and it is recorded because
+  the NEXT re-probe should compare against this string and not against
+  "unsupported", or it will report motion that is only prose.
+- **`reserve(n)` is unmoved and owes no probe**: nothing in the span is
+  a capacity or string-backing commit. F-0104's after-table still prices
+  the preallocation half of #203 at exactly 65,536 ledger units on a
+  64 KiB buffer natively and nothing on the checked tier.
+- **`graphemes` owes no probe**: a segmentation TABLES tier, and nothing
+  in the span brings it closer.
+- **A `str` still charges NO named region's ledger on ANY tier.** 200
+  fresh interpolated strings built inside `region r { … }` leave
+  `region_bytes(r)` at **0** — `before 0 after 0 sink 2490`,
+  byte-identical stdout across lupin, checked and native, the same three
+  numbers sc35 measured. `[mem.region.account.1]` still scopes the gap
+  to the NATIVE tier alone; it remains true of every tier.
+- **The eight `divergent(…)` rows are unmoved, and this is the sprint's
+  either/or resolving to its second arm** — see below.
+- **The four `divergent(…)`-era addresses stay healed.**
+
+## The two either/ors the contract named, both resolved to their second arm
+
+**1. `std.net.listen_with` / `adopt` — the ask STANDS.** The contract
+made item 2 conditional on s137 item 1 (`net_listen_with(addr, opts)`,
+`os_spawn_with(inherit)`, `net_adopt_listener(fd)`) having MERGED to
+wolf-lang trunk by this sprint's second gauntlet. Checked twice, at the
+sprint's open and again immediately before the second gauntlet:
+wolf-lang trunk is `1323c4e` (the r07 merge) on both readings, the local
+`s137` branch has no commit beyond it, and no `s137` branch exists on
+the remote. **Nothing landed, so nothing is wrapped**, and the reason is
+the same one sc34 gave for the byte type: a facade written against a
+builtin that does not exist is a facade nobody can measure. wolf-std#6
+stays OPEN with its two-shape ask unchanged
+(`net.listen_with(addr, opts: ListenOpts)` with `reuse_port`, and
+`net.adopt_listener(fd)` paired with whatever `std.process` grows for
+passing handles), and the one row question it raises for §12 stays with
+it: a worker that retries a bind while a sibling holds the port wants
+`in_use` beside `io`, IF the builtin ever distinguishes `EADDRINUSE`.
+lobo's ws16 measurement is the consumer report behind all of it.
+
+**2. lupin 0.1.26 — is37 did not tag mid-wave, so the eight
+`divergent(…)` rows stand.** The contract's condition was a fresh-inode
+install and a re-measure if is37 tagged before this sprint's final
+gauntlet. `wolf-interp` is at `ae34115` (is36's last commit) with
+`v0.1.25` the newest tag; there is no `v0.1.26`. So `lupin 0.1.25` is
+the pin sc36 measured on, the eight byte-domain rows citing
+wolf-interp#62 keep their `divergent(…)` words verbatim, and the
+gauntlet's `divergent rows: 8` line below is the same eight sc35 filed.
+Nothing was flipped hopefully: a `divergent(…)` row that stops matching
+its recorded observation is a RED in this rig, so the eight are proven
+unmoved by the run rather than assumed.
+
+**The pins, for the record, unchanged from sc35's second bump:**
+`wolf 0.2.4 (wolfgang, pin 982f857)`, `lupin 0.1.25 (wolf-interp,
+reference interpreter at pin 982f857)`, `vendor/upstream/PIN`
+`982f857` — all three on ONE sha, the invariant sc35 restored, held
+through a sprint that added a module.
+
+## The gauntlet — three runs, and the middle one is the finding
+
+The exit code was read from the process on every run and never through a
+pipe (the standing lesson).
+
+| run | tree | exit | verdict |
+|---|---|---|---|
+| 1 | every sprint edit in place, `net/unix/cleanup.lu` and `refused_row.lu` UNGUARDED | **1** | `xtask: RED` — four reds and nothing else: `cleanup.lu [wolfc]`, `cleanup.lu [native]`, `refused_row.lu [wolfc]`, `refused_row.lu [native]`, each *directive mismatch — expected exit(0), observed exit(3)*. F-0109, found by the rig |
+| 2 | the two guards added | **0** | `ci: GREEN` |
+| 3 | over the COMMITTED tree, `8c93bfa` | **0** | `ci: GREEN` |
+| 4 | over the FULLY committed tree, `4832e44` (this register and the CHANGELOG in) | **0** | `ci: GREEN` — identical numbers, which is the assertion that the last two commits are inert to the rig rather than the assumption |
+
+**Runs 3 and 4's numbers — byte-identical to each other — and the deltas
+against sc35's:**
+
+| measure | sc35 | sc36 | delta |
+|---|---|---|---|
+| tests | 376 | **382** | +6, all `net/unix/` |
+| forward tags | 700 | **719** | +19 |
+| conservatism ledger | 201 | **204** | +3 — the three lupin `unsupported` rows this sprint adds |
+| unstable rows | 0 | **0** | — |
+| slow skips | 0 | **0** | — |
+| divergent rows | 8 | **8** | — the same eight, each observed matching its recorded observation (wolf-interp#62) |
+| doc-examples | 414 GREEN | **414 GREEN** | **+0**, and the zero is the point (below) |
+| ulp | 200 GREEN | **200 GREEN** | — |
+
+**The +0 on doc-examples is a designed zero, not an oversight.**
+`std.net.unix` ships no fenced example, because every member returns a
+value only `std.net` can operate on and the extractor imports exactly the
+documented module (§4's one-module note). Both functions carry PROSE
+examples naming the outcome and the runnable witness by path — the
+`std.str.to_strbuf` precedent applied at a whole module's scale. The two
+alternatives were costed and refused: writing the examples against the
+raw builtins would document `net_close` where the module teaches
+`net.close_listener`, and growing the extractor a second import would be
+a harness change made to serve a doc. This is worth flagging to review
+because it is the first core module in this repository with zero doc
+blocks, and a reader counting blocks per module should find the reason
+here rather than infer neglect.
+
+**The six rows as the ledger records them**, and the lane split is the
+sprint's shape in one table:
+
+| witness | lupin | wolfc | native | why |
+|---|---|---|---|---|
+| `net/unix/echo.lu` | run | run | run | no filesystem call |
+| `net/unix/rows.lu` | run | run | run | no filesystem call |
+| `net/unix/stream_surface.lu` | run | run | run | no filesystem call |
+| `net/unix/cleanup.lu` | unsupported | run | run | every relation is an `fs.exists` reading |
+| `net/unix/refused_row.lu` | unsupported | run | run | the stale-socket recipe is `fs.move_file` |
+| `net/unix/comptime_refuses.lu` | unsupported | run | run | lupin has no comptime tier; both wolf rungs give `E0701` twice |
+
+**The mtime audit.** All six witnesses, `std/net/unix/unix.lu`,
+`std/net/net.lu`, `tests/ledger.toml` and `xtask/src/anchors.rs` were
+last modified before run 2 began and none was touched between runs 2 and
+3; run 3 ran over the committed tree at `8c93bfa` with a clean working
+directory. Run 3 is therefore a measurement of what is on the branch and
+not of what was on disk while it was being edited (the gauntlets-must-
+cover-the-edits lesson).

@@ -1,0 +1,121 @@
+Drafted Guide entries for AN_AGENTS_GUIDE_TO_WRITING_GOOD_WOLF.md —
+append the dated section verbatim at merge (the guide is untracked in
+the main checkout, so a worktree sprint hands its entries over as this
+file; delete the file once appended). No amendments to earlier
+sections this sprint.
+
+## 2026-09-03 (sc36) — the second address family, and the lane that surprised its own ledger
+
+- THE CAPABILITY A MACHINE DECLINES IS NOT THE CAPABILITY YOUR SURFACE
+  USES — PROBE THE LANES BEFORE YOU WRITE THE LEDGER. This sprint's
+  surface binds a socket at a filesystem PATH, and the prediction
+  written before the first probe was the obvious one: a two-lane module,
+  because the reference interpreter declines the filesystem tier by
+  design. It serves the whole family. A unix socket is not a file the
+  machine has to READ; it is a host object it asks the host for, and the
+  machine's refusal was never about paths, it was about having no
+  filesystem MODEL to be honest with. Four of six witnesses landed
+  three-lane. The general move: name the capability your calls actually
+  reach, not the one your vocabulary sounds like, and let a fifteen-line
+  probe settle it before a ledger block encodes the guess.
+
+- A TEST'S LANES SHARE A DIRECTORY, SO A DECLINED LANE CAN STILL BE A
+  WRITER. The rig stages one package root per test and runs all three
+  implementations in it — correct, and resting on an invariant nobody
+  had written down: a lane that declines a capability leaves nothing
+  behind. That held for every previous os module because the refusal
+  always arrived at the FIRST call of the declined tier. It broke the
+  moment the call that creates the file belonged to a DIFFERENT tier
+  than the call that gets refused: lazy body resolution ran the bind,
+  the next line was the declined one, and the machine with no filesystem
+  left a socket file for the next lane to trip over. If a program can be
+  interrupted between a side effect and the refusal, it is responsible
+  for its own ground — put the ground back on the first line. The lanes
+  are independent in what they OBSERVE and shared in what they TOUCH.
+
+- WHEN THE TAG IS THE KERNEL'S AND THE KERNELS DISAGREE, PROMISE THE
+  CLASS AND NOT THE MEMBER. One dial shape here answers `io` on macOS
+  (`ENOTSOCK`) and `refused` on linux (`ECONNREFUSED`). Pinning the
+  answer measured on the developer's machine would have shipped a
+  document that is false on half the hosts and a test that reds on a CI
+  runner. What is true of both — it is a ROW, never a trap — is also the
+  part a caller needs, so that is what the doc promises, and the caller
+  who must distinguish the two conditions is told to ask a different
+  surface. Say which of your promises are the platform's.
+
+- READ THE IMPLEMENTATION'S OWN TEST SUITE FOR THE SURFACE YOU ARE
+  WRAPPING. The host divergence above was not discovered here; it was
+  already fixed upstream, with a commit message explaining which kernel
+  says what and why the assertion now accepts either. Finding it cost
+  one `git log` in the interpreter's repository and saved shipping a
+  wrong sentence. A wrapper's cheapest source of truth about a builtin
+  is the test the builtin's author wrote for it.
+
+- A ROW THAT CANNOT VARY WITH ITS ARGUMENTS IS A DIFFERENT KIND OF ROW,
+  AND THE DOC SHOULD SAY SO. `unsupported` here is a property of the
+  HOST: on a machine that raises it, every call raises it, always, for
+  every path. Every other row on the same signature is about the path,
+  the caller or the moment. The distinction is not pedantry — it decides
+  the SHAPE of correct handling: one arm is a startup decision and a
+  fallback transport, the others are a retry or a report. When a
+  signature carries both kinds, label them.
+
+- A SECOND ADDRESS FAMILY ADDS ADDRESS CALLS AND NOTHING ELSE. The
+  temptation is a parallel module with its own handle type, its own
+  `read`, its own `close`. Resist it: if the family changed how you read
+  or close, it would not be a family, it would be a tier. Here the new
+  module ships two functions and returns the OLD module's types, so
+  every operation, every deadline and both closers came free and were
+  measured rather than re-implemented. The two places the family shows
+  through got one paragraph each in the functions that already existed.
+
+- THE ONE-MODULE DOC-EXAMPLE RULE CAN COST A WHOLE MODULE ITS FENCED
+  EXAMPLES, AND PROSE IS STILL THE RIGHT ANSWER. Every member of this
+  module returns a value only its SIBLING can operate on, and the
+  extractor imports exactly one module — so no fenced example can get
+  past its first line. The alternatives were both worse: write the
+  example against the raw builtins (true, and it teaches the wrong
+  call), or grow the extractor a second import (a harness change to
+  serve a doc). Prose plus a named runnable witness is the existing
+  precedent, and it scales from one function to a whole module without
+  changing meaning.
+
+- BUILD THE HARD PRECONDITION OUT OF A CALL YOU ALREADY HAVE. The
+  `refused` row needs a socket file whose listener is gone — the state a
+  process leaves when it dies without closing, and there was no second
+  process to kill. One rename did it: bind the path, MOVE the socket
+  file, then close the listener, which unlinks the name it bound and
+  leaves the moved inode behind with its socket closed. Deterministic,
+  hermetic, three lines. Before reaching for a subprocess or a sleep,
+  ask which single call already produces the state you want as a side
+  effect.
+
+- AN UNREACHABLE ROW GETS MEASURED OUT OF BAND AND SAID SO, IN THE TEST
+  THAT COULD NOT HOLD IT. Two of six rows here have no hermetic witness:
+  one needs a permission the rig cannot create, the other needs a host
+  the rig cannot run. Both were measured anyway — by hand, once, with
+  the reading written down — and the test file that covers the other
+  four opens by naming the two it does not and why. A test that states
+  its own incompleteness is worth more than a green rig that implies
+  coverage it does not have.
+
+- A CLEANUP POSTURE IS A CONTRACT, NOT AN IMPLEMENTATION NOTE. This
+  surface creates a filesystem object, so who removes it, when, and what
+  happens when nobody does are things a SECOND process depends on. Four
+  sentences, four relations in tests — including the one no reader would
+  think to ask about, that the unlink is best effort and a listener
+  whose path was moved still closes clean. That last one is what makes
+  every program that shares a directory with an operator's `rm`
+  reliable, and it would never have been written down if the posture had
+  been described instead of asserted.
+
+- A HAND-COPIED LIST OF A CLAUSE'S TERMS DRIFTS BOTH WAYS, AND ONLY ONE
+  DIRECTION ANNOUNCES ITSELF. A rig here mirrors a spec clause's list of
+  legal namespaces. It had fallen behind in two directions at once: four
+  namespaces the registry publishes are not admitted by the clause (so a
+  legal-looking tag is a CI failure — this sprint could not cite its own
+  clause), and one namespace the clause reserved was missing from the
+  mirror (so a legal tag would have been rejected). Only the first kind
+  ever gets noticed, because it fires when someone tries to use it. When
+  you copy a list out of a document, copy it with a test that fails when
+  the document moves — and put the reason in the failure message.

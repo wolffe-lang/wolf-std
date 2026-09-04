@@ -1,0 +1,230 @@
+//! member: true
+//!
+//! std.net.unix — the second address family: a stream socket bound to a
+//! filesystem PATH instead of a host and a port (`AF_UNIX`).
+//! Stability tier: core.
+//!
+//! **Two functions, and that is the whole module.** `listen(path)` binds
+//! and listens; `connect(path)` dials. What either answers is an ORDINARY
+//! `std.net` value — `listen` returns a `net.Listener`, `connect` returns
+//! a `net.Socket` — so `net.accept`, `net.read`/`net.write`, the byte pair,
+//! `net.set_deadline`/`net.set_listener_deadline`, `net.close` and
+//! `net.close_listener` serve a unix socket call for call, with the
+//! semantics their own docs state. There is no unix-flavoured read, no
+//! unix-flavoured close, and no second handle type: the address family is
+//! the only thing that differs, so the address call is the only thing this
+//! module adds (`[os.net.unix]`, s136 / wolf-lang#227).
+//!
+//! **Why it is a module and not two more functions in `std.net`.** wolf
+//! has no overloading, so `listen` and `connect` cannot mean two things in
+//! one module — the same rule that put the `f64` family in
+//! `std.math.float` (API-CONVENTIONS §1). Spelling them
+//! `net.listen_unix`/`net.connect_unix` would have kept one import at the
+//! cost of a name that says its type in its suffix, which §1 spends
+//! elsewhere. The cost of the split is stated rather than hidden: an
+//! example here cannot show the accept-and-read half, because the
+//! extractor imports exactly the documented module (§4's one-module note),
+//! so both functions below carry PROSE examples and name the tests that
+//! run the real thing — the `std.str.to_strbuf` precedent, at a whole
+//! module's scale.
+//!
+//! **Errors are rows, never traps** (D30, §2, §14). The vocabulary is the
+//! builtin tier's, adopted verbatim — std adds no translation layer:
+//!
+//! - `unsupported` — THE HOST does not serve the family. This is the tag
+//!   the rest of the module's vocabulary exists to be distinguished from,
+//!   and it is the reason `[os.net.unix]` was filed at all: a program that
+//!   cannot tell "this machine has no AF_UNIX" from "that path is wrong"
+//!   cannot choose a fallback transport, and a bare `io` for the first
+//!   condition is exactly the answer #227 refused to ship. It is a
+//!   PROPERTY OF THE HOST, not of the arguments: on a host that raises it,
+//!   every call here raises it, always, for every path
+//! - `exists` — a path is already there at bind. The runtime never
+//!   clobbers a path it did not bind (see the cleanup posture below)
+//! - `not_found` — at bind, a directory on the way to `path` is missing;
+//!   at dial, there is no socket file at `path`
+//! - `refused` — at dial only: there IS a socket file and nobody is
+//!   listening on it. The stale-socket case, and the commonest failure a
+//!   unix-domain client meets
+//! - `denied` — the caller lacks the filesystem permission the call needs
+//! - `io` — every other host failure, coarsened to one tag because no
+//!   caller can act differently on them yet (§12's rule 3)
+//!
+//! **One dial shape is the KERNEL's answer and the two hosts disagree, so
+//! neither row is promised for it.** A path that names something which is
+//! not a socket at all is neither of the clause's two dial cases: macOS
+//! answers `ENOTSOCK` and you get `io`; linux answers `ECONNREFUSED` and
+//! you get `refused` (is36 found this on a CI runner and no developer's
+//! machine — wolf-interp's `net_unix.rs` reads the row and accepts
+//! either). Both are rows and neither is a trap, which is the part std
+//! DOES promise. A program that must distinguish "not a socket" from "a
+//! dead server" cannot do it from the row on both hosts, and should ask
+//! `std.fs` about the path instead of the network.
+//!
+//! **Capability: `net` (I13)** — the same capability `std.net` carries,
+//! for the same reason and with the same refusal: both functions are
+//! tagged `net` in the toolchain's sandbox table and are categorically
+//! refused at comptime (D33, `E0701`). A unix socket reaches no network
+//! interface, but it is a socket, it is the transport a control plane
+//! runs on, and a capability that changed meaning with the address family
+//! would be a capability nobody could audit.
+//!
+//! **The cleanup posture, stated because it is the surprise.** Binding
+//! CREATES a filesystem object, so this is the one std surface where a
+//! socket leaves something behind. The clause's rule and the measured
+//! behaviour agree on all three lanes:
+//!
+//! - `net.close_listener` of a unix listener UNLINKS its path. The runtime
+//!   made the file, so the runtime removes it — you do not unlink it
+//!   yourself after closing, and a `fs.remove` that follows a close is a
+//!   `not_found` row waiting to happen
+//! - `net.close` of an accepted or dialled STREAM never touches any path.
+//!   A connection is not a name
+//! - a process that DIES without closing leaves the file. The next bind
+//!   answers `exists` — never a silent takeover — which is the
+//!   nginx/haproxy posture: a stale socket is the operator's to remove.
+//!   A program that OWNS its path removes it before binding, with
+//!   `std.fs.remove`, and `fs.exists` is the guard that makes that
+//!   idempotent
+//! - the unlink is BEST EFFORT and never turns a close into a failure: a
+//!   listener whose path was renamed out from under it still closes
+//!   `ok` (measured), and the renamed file survives as a stale socket
+//!
+//! **What is deliberately absent.**
+//!
+//! - `remove_stale(path)` / any unlink helper — it would be
+//!   `std.fs.remove` under another name, and it would put the `fs`
+//!   capability on a `net` module so that an audit of either would have to
+//!   read the other. The two-line idiom is in `listen`'s doc and in
+//!   `tests/net/unix/cleanup.lu`; the day a program wants it as one call,
+//!   it belongs to the caller or to `std.fs`, not here
+//! - an abstract-namespace (`"\0name"`, linux) address — a wolf `str` is
+//!   UTF-8 and the builtin takes a path; the clause names no abstract
+//!   form, so std does not invent a spelling for one
+//! - a `supported()` predicate — there is no builtin to ask, and a probe
+//!   that binds a temporary path to find out would answer a different
+//!   question (it would fold `denied` and `exists` into "no"). The row IS
+//!   the predicate: call `listen`, handle `unsupported`, and the answer
+//!   costs nothing on a host that serves the family
+//! - `net.port` on a unix listener — it is `std.net`'s function and it
+//!   answers `io` here, because a path has no port. Measured on all three
+//!   lanes and pinned in `tests/net/unix/echo.lu`; nothing in this module
+//!   shadows it
+//!
+//! **Paths.** §14's rule, unchanged: a path is a `str`, the separator is
+//! `/`, and every test and example here uses a RELATIVE path in the
+//! program's own working directory. There is a second reason beyond
+//! §14's here, and it is the host's: `sun_path` is about 104 bytes on
+//! macOS and 108 on linux, so an absolute path under a deep scratch
+//! directory is a length failure waiting for a different machine. A
+//! relative path is also the only spelling lupin serves (below).
+//!
+//! **Lanes (measured at the sc36 pin, wolf v0.2.4 + lupin 0.1.25).** All
+//! three lanes serve the family: the checked and native rungs since s136,
+//! and lupin since is36 — the reference machine has no filesystem, and
+//! still binds and dials a socket path, because a unix socket is a host
+//! object rather than a file the machine has to read. Its one limit is
+//! stated by name: a path that is absolute or climbs out of the working
+//! directory is `unsupported` at resolve there (wolf-interp#18 item 6),
+//! which the relative-path discipline above already satisfies. What lupin
+//! does NOT have is `std.fs`, so the two witnesses that ASSERT about the
+//! path — the cleanup posture and the stale-socket `refused` row — are
+//! compiler-lanes-only, and the ledger says so on those rows alone.
+//!
+//! **Hosts.** linux and macOS serve the family on every tier. Windows
+//! answers `unsupported` at this pin, BY NAME: `AF_UNIX` has existed there
+//! since Win10 1803 and the toolchain measures the kernel's answer on the
+//! runner, but the runtime carries no winsock binding for it, and the
+//! clause names the serving rung for a later campaign rather than
+//! claiming it. A program that must run on all three hosts writes the
+//! `unsupported` arm and falls back to loopback TCP; a program that has
+//! no fallback should say so at startup rather than at first connection.
+
+use std.net
+
+/// Bind a listening socket to the filesystem path `path` and return it.
+///
+/// `path` is a path as the host understands it, relative and
+/// forward-slashed (see the module header). The answer is an ordinary
+/// `net.Listener`: `net.accept` takes connections from it,
+/// `net.set_listener_deadline` arms its budget, and `net.close_listener`
+/// closes it — and UNLINKS `path`, which is the one thing about this
+/// listener that a TCP one does not do.
+///
+/// Rows: `unsupported` when the HOST does not serve the family (windows at
+/// this pin) — refused by name, never a bare `io`, which is the whole
+/// point of the tag; `exists` when something is already at `path` (a live
+/// socket, a stale one, or an ordinary file — the runtime never clobbers a
+/// path it did not bind); `not_found` when a directory on the way to
+/// `path` is missing; `denied` when the caller lacks permission to create
+/// it; `io` for every other host failure. Never traps.
+///
+/// **The idiom for a path a program owns**, and it is two lines because
+/// the third — deciding whether the socket at that path is somebody
+/// else's — is not a decision a library can make for you:
+///
+///     if fs.exists(path) { fs.remove(path)? }
+///     var srv = unix.listen(path)?
+///
+/// Removing unconditionally is right for a path this program's own
+/// configuration names, and WRONG for a path an operator might be sharing;
+/// `exists` is the row that lets a careful program stop instead.
+///
+/// The listener starts accepting immediately: a peer may connect before
+/// `net.accept` is ever called and waits in the host's backlog.
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_listen_unix`.
+///
+/// **No fenced example**: exercising a listener needs `std.net`'s
+/// `accept`/`read`/`close_listener`, and the extractor imports exactly the
+/// documented module (§4's one-module note) — the `std.str.to_strbuf`
+/// precedent. In prose: after `var srv = unix.listen("ctl.sock")?` the
+/// file `ctl.sock` exists and a peer can dial it, a second
+/// `unix.listen("ctl.sock")` is `exists`, `net.port(srv)` is `io`, and
+/// `net.close_listener(take srv)?` removes the file again. The runnable
+/// versions are `tests/net/unix/echo.lu` (three lanes) and
+/// `tests/net/unix/cleanup.lu`.
+pub fn listen(path: str) -> net.Listener ! {unsupported, exists, not_found, denied, io} {
+    net.Listener { fd: net_listen_unix(path)? }
+}
+
+/// Dial the unix-domain socket at `path` and return the connected socket.
+///
+/// The answer is an ordinary `net.Socket`, indistinguishable from a dialled
+/// TCP one: `net.read`/`net.write`, the byte pair, `net.set_deadline` and
+/// `net.close` all serve it, and `net.close` never touches `path` — the
+/// listener owns the name, a connection does not.
+///
+/// Rows: `unsupported` when the HOST does not serve the family (windows at
+/// this pin), refused by name; `not_found` when there is no file at
+/// `path`; `refused` when there IS a socket file and nobody is listening
+/// on it — the stale-socket case, and the row a client meets when the
+/// server died without closing; `denied` when the caller lacks permission;
+/// `io` for every other host failure. Never traps.
+///
+/// **A `path` that names something which is not a socket at all is the
+/// KERNEL's call, and the hosts differ**: macOS answers `ENOTSOCK`, which
+/// arrives as `io`, and linux answers `ECONNREFUSED`, which arrives as
+/// `refused` (is36's measurement, on a linux runner). It is neither of
+/// the two dial cases `[os.net.unix]` rules, so std promises only what is
+/// true of both: a row, never a trap. Do not branch on which.
+///
+/// **This blocks until the connection completes or fails.** There is no
+/// name to resolve and no network to cross, so the wait is the host's
+/// alone; a connect deadline has no arming surface here for `net.connect`'s
+/// reason — `net.set_deadline` needs the `Socket` this call has not yet
+/// produced.
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_connect_unix`.
+///
+/// **No fenced example**, for `listen`'s reason (§4's one-module note). In
+/// prose: `unix.connect("ctl.sock")` answers a `net.Socket` when a
+/// listener is bound at `ctl.sock`, `not_found` when nothing is there, and
+/// `refused` when the file is a socket whose listener has gone. The
+/// runnable versions are `tests/net/unix/echo.lu`,
+/// `tests/net/unix/rows.lu` and `tests/net/unix/refused_row.lu`.
+pub fn connect(path: str) -> net.Socket ! {unsupported, refused, not_found, denied, io} {
+    net.Socket { fd: net_connect_unix(path)? }
+}

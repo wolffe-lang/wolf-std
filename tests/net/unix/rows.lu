@@ -1,0 +1,105 @@
+//! check: run(exit=0, stdout="rebind: exists | bind_missing_dir: not_found | dial_missing: not_found | dial_missing_dir: not_found")
+//! phase: run
+//! conforms: std.net.unix, err.row
+//!
+//! **The path rows, one per condition, on both ends of the family.** The
+//! clause's whole point is that a caller can tell the HOST's refusal
+//! (`unsupported`) from the PATH's — so the path rows have to be
+//! measurable, and this file measures the four a program can reach without
+//! a filesystem: `exists` when something is already at the bind path,
+//! `not_found` when a directory on the way is missing (bind), and
+//! `not_found` at dial for a path with nothing at it and for a path under
+//! a directory that is not there.
+//!
+//! **These are the FOUR the clause rules, and the fifth shape is
+//! deliberately absent.** A dial of a path that is not a socket at all is
+//! neither of `[os.net.unix]`'s two dial cases and the hosts disagree
+//! about it — macOS `io`, linux `refused` (is36 measured it on a runner).
+//! Pinning either here would make this file a red on the other host, so
+//! it pins what the clause rules and the module header carries the
+//! reading. That is the same posture wolf-interp's own `net_unix.rs`
+//! takes to the shape.
+//!
+//! **The two clause rows this file does NOT hold, and why, so nobody
+//! reads the set as complete.** `refused` needs a socket file whose
+//! listener is gone: `refused_row.lu` builds one with `fs.move_file`,
+//! which costs the lupin lane. `denied` needs a directory the caller
+//! cannot write, and there is no `chmod` builtin at this pin — the row is
+//! measured out of band (a mode-000 directory answers `denied` at bind
+//! AND at dial, byte-identical on all three lanes; sc36's findings
+//! register carries the reading) and is declared in both signatures
+//! because the vocabulary is the toolchain's, not std's (§14: a tag a
+//! program cannot reach here is documented, never omitted). `unsupported` is the windows
+//! row and this file's `served` guard is where it would be observed.
+//!
+//! Three lanes: nothing here touches a file, so lupin serves it too —
+//! `unix.listen` on the reference machine binds a real host socket even
+//! though that machine declines `std.fs` entirely.
+
+use std.net
+use std.net.unix
+
+fn main() -> !int {
+    let path = "rows.sock"
+    var served = true
+    var srv = unix.listen(path) else |e| match e {
+        unsupported => {
+            served = false
+            net.Listener { fd: 0 - 1 }
+        },
+        exists => { return 3 },
+        not_found => { return 3 },
+        denied => { return 3 },
+        io => { return 3 },
+    }
+    var rebind = "exists"
+    var bind_missing_dir = "not_found"
+    var dial_missing = "not_found"
+    var dial_missing_dir = "not_found"
+    if served {
+        rebind = bind_tag(path)
+        bind_missing_dir = bind_tag("no-such-dir/rows.sock")
+        dial_missing = dial_tag("absent.sock")
+        dial_missing_dir = dial_tag("no-such-dir/absent.sock")
+        net.close_listener(take srv)?
+    }
+    print(
+        "rebind: {rebind} | bind_missing_dir: {bind_missing_dir} | dial_missing: {dial_missing} | dial_missing_dir: {dial_missing_dir}",
+    )
+    0
+}
+
+/// The tag `unix.listen` answers for `path`, or `"bound"` if it succeeded
+/// — in which case the listener is closed (and its path unlinked) so that
+/// a caller's next probe sees the ground it expects.
+fn bind_tag(path: str) -> str {
+    var tag = "bound"
+    var l = unix.listen(path) else |e| match e {
+        unsupported => { tag = "unsupported"; net.Listener { fd: 0 - 1 } },
+        exists => { tag = "exists"; net.Listener { fd: 0 - 1 } },
+        not_found => { tag = "not_found"; net.Listener { fd: 0 - 1 } },
+        denied => { tag = "denied"; net.Listener { fd: 0 - 1 } },
+        io => { tag = "io"; net.Listener { fd: 0 - 1 } },
+    }
+    if tag == "bound" {
+        net.close_listener(take l) else |_| {}
+    }
+    tag
+}
+
+/// The tag `unix.connect` answers for `path`, or `"dialled"` if it
+/// succeeded — in which case the socket is closed.
+fn dial_tag(path: str) -> str {
+    var tag = "dialled"
+    var s = unix.connect(path) else |e| match e {
+        unsupported => { tag = "unsupported"; net.Socket { fd: 0 - 1 } },
+        refused => { tag = "refused"; net.Socket { fd: 0 - 1 } },
+        not_found => { tag = "not_found"; net.Socket { fd: 0 - 1 } },
+        denied => { tag = "denied"; net.Socket { fd: 0 - 1 } },
+        io => { tag = "io"; net.Socket { fd: 0 - 1 } },
+    }
+    if tag == "dialled" {
+        net.close(take s) else |_| {}
+    }
+    tag
+}
