@@ -308,3 +308,54 @@ spawns, and `tests/mem/budget/negative_cap_trap.lu` holds it. `cap: 0`
 is not in this family — the clause makes it a legal budget every charge
 breaches, so it answers the row, and `breach_is_a_row.lu` pins that
 half beside it.
+
+## sc36 (19-the-socket-surface): one mark for the HOST, and the row set of a second address family
+
+`std.net.unix` ships two functions and six distinct tags across them, and
+five of the six are already in this document — `exists` and `not_found`
+from the fs surface (sc12), `refused` and `io` from the net surface
+(sc08), `denied` from the io tier (sc07). The vocabulary is the builtin
+tier's and std adds nothing to it, so the audit below has one new row.
+
+| tag | sites | payload | verdict |
+|---|---|---|---|
+| `unsupported` | 2 (`unix.listen`, `unix.connect`) | never — the answer is "not on this machine", and there is nothing to carry | conforming, and the tag whose absence the clause was FILED about (wolf-lang#227). One mark for one actionable mode: the host does not serve `AF_UNIX`, and the only thing a caller does about it is choose another transport. The name was checked both ways per sc14's symmetric rule — no module, function, binding or prelude name in std collides with `unsupported`, and the collision worth naming is not a name at all: the rig's ledger word `unsupported` is a LANE verdict about a program the implementation declined, and this is a row a running program handles. They never meet in a source file, but a reader of `tests/ledger.toml` beside `std/net/unix/unix.lu` will see the word twice meaning two things, and that is recorded here rather than left to be discovered |
+
+**Why this row is different from every other one in this document, and
+why the difference is written on the function.** Each of the other os
+tags varies with something the caller passed or something that happened:
+`not_found` is about the path, `denied` about the caller's permissions,
+`refused` about who is listening, `io` about the moment. `unsupported` is
+about the MACHINE. On a host that raises it, every call raises it,
+always, for every argument. That changes the shape of correct handling —
+it is a startup decision and a fallback transport, not a retry — so
+`std.net.unix`'s header and both functions say "the host" in the tag's
+own sentence. The general rule went into API-CONVENTIONS §14's sc36
+amendment: when a surface carries both kinds, say which kind each row is.
+
+**Two rows in the set that no test in this repository can reach, stated
+per §14's rule rather than omitted.** `unsupported` itself is windows's
+answer at this pin and this rig's implementation lanes are dark on
+windows, so the tag is held by CONSTRUCTION instead: every unix witness
+branches on it and prints relations that hold vacuously, which is the
+construction `corpus/net/unix_echo.lu` uses upstream. `denied` needs a
+directory the caller cannot write and there is no `chmod` builtin — it
+was measured out of band this sprint (a mode-000 directory answers
+`denied` at bind AND at dial, byte-identical on all three lanes; the
+findings register carries the reading) and is declared in both signatures
+because the vocabulary is the toolchain's, not std's.
+
+**And one condition std deliberately promises NO tag for.** A dial of a
+path that names something which is not a socket at all is neither of the
+two dial cases `[os.net.unix]` rules, and the two hosts answer
+differently: macOS returns `ENOTSOCK`, which arrives as `io`; linux
+returns `ECONNREFUSED`, which arrives as `refused`. is36 found this on a
+CI runner after every developer machine had agreed on `io`, and the
+reference interpreter's own test now reads the row and accepts either.
+This document's rule for that shape: **when the tag is the kernel's and
+the kernels disagree, promise the CLASS and not the member** — it is a
+row, never a trap, and both halves of that are worth as much to a caller
+as a tag would be. `refused` keeps its own meaning, which is the one an
+operator acts on: a socket file whose listener has gone. Both readings
+are on `unix.connect` so that a caller reading the row list does not
+infer a recovery from a tag that does not travel.
