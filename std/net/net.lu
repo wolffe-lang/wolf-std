@@ -785,3 +785,229 @@ pub fn endpoint(host: str, port_number: int) -> str {
 pub fn loopback(port_number: int) -> str {
     endpoint("127.0.0.1", port_number)
 }
+
+/// The options `listen_with` takes: what a prefork server needs and
+/// nothing else.
+///
+/// Two fields, both public and both meaningful on their own, so a caller
+/// writes the literal directly — `net.ListenOpts { reuse_port: true,
+/// backlog: 128 }` — or starts from `listen_opts()` below and edits. There
+/// is no builder here because there are two options; a `Command`-shaped
+/// builder for two booleans-and-an-int would be ceremony (§1).
+///
+/// `reuse_port` sets `SO_REUSEPORT` **before** the bind. That "before" is
+/// why this is a call and not a post-bind setter on a `Listener`: after
+/// the bind the option is too late, and a setter that silently did
+/// nothing is the API this shape exists to avoid.
+///
+/// `backlog` is the `listen(2)` queue hint. `<= 0` asks for the
+/// runtime's default, which is 128 — std's own number, stated here so a
+/// caller who wants it can say so explicitly rather than by omission.
+/// The host clamps any hint to its own `somaxconn`, so this is a hint in
+/// the honest sense: you may ask, the kernel decides.
+pub struct ListenOpts {
+    reuse_port: bool,
+    backlog: int,
+}
+
+/// The options that make `listen_with` behave exactly like `listen`.
+///
+/// `listen_with(addr, listen_opts())` is `listen(addr)` call for call —
+/// the clause says so of the builtin (`net_listen_with(addr, false, 0)`
+/// is `net_listen(addr)`), and this is that sentence made reachable. Use
+/// it as the base you edit one field of.
+///
+/// Total: no rows, no traps. Pure and comptime-safe — building options
+/// binds nothing.
+///
+/// ```wolf-doc-example
+/// let o = net.listen_opts()
+/// o.reuse_port == false
+/// o.backlog == 0
+/// ```
+pub fn listen_opts() -> ListenOpts {
+    ListenOpts { reuse_port: false, backlog: 0 }
+}
+
+/// Bind a listening socket to `addr` with `opts` and return it.
+///
+/// **This is an ACQUISITION call and nothing else.** What it answers is
+/// the ordinary `Listener` every other function in this module already
+/// serves — `port`, `accept`, `set_listener_deadline`, `close_listener`
+/// — so the surface does not grow by one function for one more way to
+/// get a listener. That is the same rule `std.net.unix` follows and the
+/// reason it needed only an address call.
+///
+/// **What `reuse_port` buys, and what it does NOT promise.** With the
+/// option set, N listeners — in one process or across N processes — may
+/// hold one address at once, every member of the group carrying the
+/// option. What the KERNEL then does with the group is the host's, and
+/// this module states it rather than promising it: **linux** distributes
+/// accepts across the group by a 4-tuple hash, so every hand accepts;
+/// **macOS** hands every SYN to the newest bound socket and falls to a
+/// survivor when that socket closes — the port is shared and failover is
+/// gap-free, but accepts are NOT distributed. A program that assumes
+/// distribution is a program that works on one of this project's two
+/// serving hosts. Both hosts guarantee exactly two things, and they are
+/// the two a caller may build on: **every dial is accepted by SOME
+/// member**, and **the survivor takes every dial after the others
+/// close**. `tests/net/reuse_port.lu` is the assertion about precisely
+/// those two and deliberately asserts nothing about which hand.
+///
+/// Rows, and this call has more of them than `listen` on purpose:
+/// `unsupported` when THE HOST does not serve an option asked for —
+/// windows, by name, for `reuse_port`, because its `SO_REUSEADDR` lets
+/// any process take a bound port and then delivers every dial to the
+/// first socket bound, so the second binds and serves nothing; that is
+/// refused rather than aliased. `exists` when another socket already
+/// holds the address without the option on both sides — the "already in
+/// use" answer, spelled in the vocabulary `[os.net.unix]` gave this
+/// family rather than a new tag. `denied` for a privileged port the
+/// caller may not bind. `io` for the rest. Never traps.
+///
+/// **`listen`'s own row stays `{io}`** — its lowering coarsens — so a
+/// program that wants the distinction calls this one even with default
+/// options. That is a real reason to prefer `listen_with`, and the only
+/// one.
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_listen_with`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen_with(net.loopback(0), net.listen_opts())?
+/// (net.port(srv) else 0) > 0
+/// net.close_listener(take srv)?
+/// ```
+pub fn listen_with(addr: str, opts: ListenOpts) -> Listener ! {unsupported, exists, denied, io} {
+    Listener { fd: net_listen_with(addr, opts.reuse_port, opts.backlog)? }
+}
+
+/// Adopt a listening socket this process was HANDED rather than bound.
+///
+/// This is the child's half of descriptor inheritance: a parent spawns
+/// with a set of listeners and the child receives them as descriptors
+/// `3, 4, …` in the order given, so `adopt_listener(3)` is "the first
+/// listener my parent handed me" and no number ever has to be told to
+/// the child out of band. An ACQUISITION call, like `listen_with`: what
+/// it answers is the ordinary `Listener`, so accept, both deadlines and
+/// the closer come free.
+///
+/// **The runtime asks the KERNEL what the number is** rather than
+/// trusting the caller: a stream socket with no peer, and, where the
+/// kernel keeps a listening flag, that flag. Anything else — not a
+/// socket, a connected stream, a family the table does not serve, a
+/// number this process already adopted, a negative or absurd number — is
+/// the `io` row. **Never a trap, and never a wrapped stranger**; a
+/// forged descriptor is a checkable condition, which is the same
+/// posture `Listener`'s own doc takes about a hand-built handle.
+///
+/// **Ownership at close, which is the sentence a prefork master needs.**
+/// An adopted descriptor belongs to exactly one wolf handle, and
+/// `close_listener` on that handle **does close the inherited fd**. The
+/// adopter owns the number from the adopt on; a second adopt of a
+/// still-live number is `io` rather than a double close waiting to
+/// happen, and closing the handle releases the number so a freshly
+/// handed one adopts again.
+///
+/// **What the adopter does NOT own is anything OUTSIDE the descriptor.**
+/// An adopted `AF_UNIX` listener **does not unlink its socket file at
+/// close**. `std.net.unix`'s cleanup posture belongs to the process that
+/// BOUND the path — for an inherited listener, the parent. A child that
+/// unlinked the path would delete the address its siblings are still
+/// serving on, and this is the one place where an adopted listener and a
+/// bound one behave differently at `close_listener`.
+///
+/// An adopted descriptor is marked close-on-exec on adoption, so this
+/// process's own children inherit only what it hands them in turn.
+///
+/// Rows: `unsupported` where the host or the tier does not serve the
+/// call, BY NAME — windows (a `SOCKET` is not a small stable number a
+/// parent can name by position) and the CHECKED machine, which refuses
+/// it because it is the `wolf` binary interpreting a program, so a
+/// descriptor handed to "the program's child" would be handed to the
+/// compiler's child. `io` for every failed check above. Never traps.
+///
+/// **There is no `std.process` half of this pair at this pin.** The
+/// builtin `os_spawn_with` exists upstream; wrapping it is a
+/// `std.process` change with its own `Command` question (whether a
+/// `Command` grows an inherit set or the spawn takes one), and sc37
+/// landed the acquisition half alone rather than guess at the builder.
+/// Until it lands, the parent half of a prefork server is reachable only
+/// through the builtin. Recorded as a residue, not a design.
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_adopt_listener`.
+///
+/// A prose example, because a doc example cannot spawn its own parent:
+/// a child started by `os_spawn_with(exe, args, [srv])` reaches its
+/// inherited listener with `let srv = net.adopt_listener(3)?` and from
+/// there uses `net.accept` exactly as the binder would.
+/// `tests/net/adopt_rows.lu` is the witness.
+pub fn adopt_listener(fd: int) -> Listener ! {unsupported, io} {
+    Listener { fd: net_adopt_listener(fd)? }
+}
+
+/// Which of `fds` can be read WITHOUT blocking, as a subset in the
+/// caller's order.
+///
+/// Every other blocking call in this module waits on ONE socket. This is
+/// the one that waits on many, and it is what a serving loop that spawns
+/// no tasks has instead of a scheduler: without it a single-loop server
+/// must time-slice — a short deadline on the listener, another on every
+/// open connection, every idle pass — and spends its life waking up to
+/// learn that nothing happened.
+///
+/// **An EMPTY answer is the deadline expiring with nothing ready. That
+/// is an ANSWER, not a failure**, and a loop that treats it as one is
+/// the mistake this sentence exists to prevent. `wait` returns a
+/// possibly-empty `List[int]`; it does not raise when nothing is ready.
+///
+/// **It takes raw descriptors, not handles, and that is deliberate.** A
+/// ready set mixes listeners and streams — that is the whole point of it
+/// — and wolf has no sum type that could hold both at this pin. So the
+/// argument is the `fd` field both `Listener` and `Socket` publish, and
+/// the idiom is to build the list from them:
+///
+///     var set = List[int]()
+///     (mut set).push(srv.fd)
+///     (mut set).push(cli.fd)
+///     let ready = net.wait(set, 50)?
+///
+/// The answer is a list of those same numbers, so a caller matches each
+/// against the handle it came from. Reading `.fd` is legal by the
+/// `Listener` doc's own rule; nothing here forges one.
+///
+/// **`deadline_ms`**: negative waits until something is ready, `0` asks
+/// and returns at once, positive is milliseconds.
+///
+/// **Readiness is level-triggered**: asking consumes nothing, so two
+/// waits with the same set answer the same until the program actually
+/// reads or accepts. A stream whose peer has CLOSED is READY — the
+/// `read` that follows is what reports `closed`, which is how a loop
+/// learns to drop it.
+///
+/// Rows: `io` for a forged or closed handle anywhere in the set (nothing
+/// is waited on), for an EMPTY set with an unbounded deadline (nothing
+/// could ever end that wait — a program that means to sleep says
+/// `time.sleep_ms`), and for a failure of the poll itself. An empty set
+/// with a `0` or positive deadline is fine and answers empty. Never
+/// traps.
+///
+/// The call does not interact with the task layer: it neither parks a
+/// task nor disturbs the reactor's registrations, so a program may mix
+/// it with `spawn` freely. Every tier-1 host answers this question and
+/// every tier serves it.
+///
+/// Capability `net`; refused at comptime (D33). Delegates to `net_wait`.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen(net.loopback(0))?
+/// var set = List[int]()
+/// (mut set).push(srv.fd)
+/// let ready = net.wait(set, 0)?
+/// net.close_listener(take srv)?
+/// ready.len == 0
+/// ```
+pub fn wait(fds: List[int], deadline_ms: int) -> List[int] ! {io} {
+    net_wait(fds, deadline_ms)?
+}
