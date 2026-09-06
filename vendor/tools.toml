@@ -435,7 +435,35 @@
 #   exact pair of pins.
 # - **A parse divergence, filed**: `trait T { fn f(self) -> str }` on one
 #   line parses here and E0201s under wolfc (F-0083).
-version = "0.1.25"
+# sc37 THIRD ACQUISITION (0.1.25 -> 0.1.26), and it is the release the
+# ledger had already staked ten rows on. is37 ships wolf-interp#62: the
+# byte's DOMAIN, not only its type name. `push(256)` into a `List[byte]`
+# is now `E0401` at RESOLVE with span parity against wolfc, where 0.1.25
+# stored 256 dynamically and executed the program to its honest end.
+# Tag `v0.1.26` = wolf-interp `5e774a2`.
+#
+# **THE BRIEF THIS LANE WAS HANDED SAID THE MACHINE ALREADY RAN 0.1.26.
+# IT DID NOT.** Measured at lane start: `lupin 0.1.25 (wolf-interp,
+# reference interpreter at pin 982f857)`, inode 132528014, mtime
+# 2026-09-03 17:57. wolf-std#7's own text was the accurate one ("this
+# repo's gauntlet runs against the MACHINE lupin, still 0.1.25"). So
+# sc37 BUILT it and installed it fresh-inode per the sc26 SIGKILL rule:
+# inode 132528014 -> 135873958, and this entry records that acquisition.
+#
+# **ITS CONFORMANCE PIN IS NOW BEHIND THIS REPO'S DATA PIN — the exact
+# REVERSAL of the note sc35 wrote below.** lupin 0.1.26 conforms to
+# `982f857` = wolf-lang v0.2.4, which sc35 recorded as FIVE commits
+# AHEAD of the data pin. sc37's wolf bump moves the data pin to
+# `6ade878` = v0.2.5, so the same lupin pin is now 42 commits BEHIND.
+# Nothing is red about that: the two binaries may lawfully sit at
+# different wolf-lang pins (two moving upstreams) and doctor reports the
+# pairing without gating it (F-0064). What it COSTS is concrete and has
+# a name — F-0110: s137's five builtins exist on both wolf lanes and on
+# neither rung of the reference machine, so every witness sc37 adds for
+# them carries `lupin = "unsupported"` for a reason that is a release
+# DATE and not a semantics. It retires at the first lupin conforming
+# past 6ade878, with no edit to any test.
+version = "0.1.26"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -444,6 +472,8 @@ version = "0.1.25"
 # pin = "2bfbe5e6e877d3b6b43a9d8a68b56b1ef74c21c4"  (superseded, sc32 era — is33's s132-merge pin)
 # pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc33/sc34/sc35-bump era — is34's v0.2.2-tag pin, held while wolf ran 71 commits ahead)
 pin = "982f857885b991e686c6b045de213d10cab013c1"
+# (UNCHANGED at sc37: 0.1.26 conforms to the same wolf-lang commit
+#  0.1.25 did — is37 was an interpreter release, not a pin chase.)
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
