@@ -1,0 +1,69 @@
+//! check: run(exit=0, stdout="served: true | port_ok: true | echo: true | backlog_hint: true")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate
+//!
+//! **`listen_with(addr, listen_opts())` is `listen(addr)` call for
+//! call.** The clause says that of the builtin — `net_listen_with(addr,
+//! false, 0)` is `net_listen(addr)` — and this file is that sentence
+//! made observable: bind with default options, learn the port, dial,
+//! accept, echo, close. Every operation after the bind is `std.net`'s
+//! own, which is the ACQUISITION rule: a new way to GET a listener adds
+//! one call and nothing else.
+//!
+//! **`backlog_hint` is a hint, asserted as one.** A positive backlog is
+//! a `listen(2)` queue hint the host clamps to its own `somaxconn`, so
+//! the only honest relation is that asking for one still yields a
+//! working listener — not that the queue is any particular depth. A
+//! test that asserted a depth would be measuring the kernel's
+//! `somaxconn` and calling it wolf's contract.
+//!
+//! The `unsupported` branch keeps the stdout host-invariant, the
+//! `std.net.unix` construction. Default options ask no option of the
+//! host, so no tier-1 host is expected to take that branch here — it is
+//! present because the row is in the signature and a witness that
+//! cannot express a row in its signature is a witness that would trap
+//! on it.
+
+use std.net
+
+fn main() -> !int {
+    var served = true
+    var srv = net.listen_with(net.loopback(0), net.listen_opts()) else |e| match e {
+        unsupported => {
+            served = false
+            net.Listener { fd: 0 - 1 }
+        },
+        exists => { return 3 },
+        denied => { return 3 },
+        io => { return 3 },
+    }
+    var port_ok = true
+    var echo = true
+    var backlog_hint = true
+    if served {
+        let p = net.port(srv)?
+        port_ok = p > 0
+        var cli = net.connect(net.endpoint("127.0.0.1", p))?
+        net.write(mut cli, "ping")?
+        var conn = net.accept(mut srv)?
+        let got = net.read(mut conn, 16)?
+        net.write(mut conn, "pong {got}")?
+        let reply = net.read(mut cli, 16)?
+        echo = got == "ping" && reply == "pong ping"
+        net.close(take cli)?
+        net.close(take conn)?
+        net.close_listener(take srv)?
+        // A backlog hint is asked for, never asserted as a depth.
+        var deep = net.listen_opts()
+        deep.backlog = 128
+        var srv2 = net.listen_with(net.loopback(0), deep)?
+        let q = net.port(srv2)?
+        backlog_hint = q > 0
+        net.close_listener(take srv2)?
+    }
+    print("served: {served} | port_ok: {port_ok} | echo: {echo} | backlog_hint: {backlog_hint}")
+    if !port_ok { return 1 }
+    if !echo { return 2 }
+    if !backlog_hint { return 4 }
+    0
+}

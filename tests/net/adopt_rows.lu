@@ -1,0 +1,80 @@
+//! check: run(exit=0, stdout="not_a_socket: true | negative: true | absurd: true | own_handle: true")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate
+//!
+//! **What this witness can reach, and what it honestly cannot.**
+//! `adopt_listener` is the CHILD's half of descriptor inheritance: the
+//! numbers it is meant for are the `3, 4, …` a parent hands across
+//! `os_spawn_with`, and this rig runs one program per test with no
+//! parent of its own. So the adoptable case is not reachable here and
+//! this file does not pretend to it. What IS reachable is every
+//! REFUSAL, which is the half a program actually has to survive, and
+//! `[os.proc.inherit]` is specific about it: the runtime asks the KERNEL
+//! what the number is rather than trusting the caller.
+//!
+//! **Four numbers, one row.** A descriptor that is not a socket
+//! (`0` — this process's stdin), a negative number, an absurd number,
+//! and — the interesting one — **this process's own `Listener` handle**.
+//! That last is the trap a reader is most likely to fall into: a
+//! `Listener`'s `fd` field is a small non-negative index into the
+//! machine's socket table, NOT an OS descriptor, so handing it to
+//! `adopt_listener` is handing over a number that means something else.
+//! It is `io`, like every other number the kernel does not recognise as
+//! a listening socket with no peer. **Never a trap, and never a wrapped
+//! stranger** — that is the whole promise.
+//!
+//! **The lane words here are the most uneven in the repository and
+//! every one of them is named.** The CHECKED machine refuses adoption
+//! BY NAME — "listener adoption in checked execution" — because it is
+//! the `wolf` binary interpreting a program, so a descriptor handed to
+//! "the program's child" would go to the compiler's child; that is a
+//! whole-program `unsupported`, not a catchable row, so the ledger says
+//! `unsupported` for `wolfc`. The reference machine is `unsupported`
+//! for the unrelated reason that lupin 0.1.26 conforms to a pin older
+//! than the call (F-0110). The NATIVE lane is the one that measures the
+//! rows, and it is enough: these are the runtime's own checks.
+
+use std.net
+
+fn main() -> !int {
+    var not_a_socket = false
+    let a = net.adopt_listener(0) else |e| match e {
+        unsupported => { net.Listener { fd: 0 - 1 } },
+        io => {
+            not_a_socket = true
+            net.Listener { fd: 0 - 1 }
+        },
+    }
+    var negative = false
+    let b = net.adopt_listener(0 - 5) else |e| match e {
+        unsupported => { net.Listener { fd: 0 - 1 } },
+        io => {
+            negative = true
+            net.Listener { fd: 0 - 1 }
+        },
+    }
+    var absurd = false
+    let c = net.adopt_listener(999999) else |e| match e {
+        unsupported => { net.Listener { fd: 0 - 1 } },
+        io => {
+            absurd = true
+            net.Listener { fd: 0 - 1 }
+        },
+    }
+    var own_handle = false
+    var srv = net.listen(net.loopback(0))?
+    let d = net.adopt_listener(srv.fd) else |e| match e {
+        unsupported => { net.Listener { fd: 0 - 1 } },
+        io => {
+            own_handle = true
+            net.Listener { fd: 0 - 1 }
+        },
+    }
+    net.close_listener(take srv)?
+    print("not_a_socket: {not_a_socket} | negative: {negative} | absurd: {absurd} | own_handle: {own_handle}")
+    if !not_a_socket { return 1 }
+    if !negative { return 2 }
+    if !absurd { return 3 }
+    if !own_handle { return 4 }
+    0
+}

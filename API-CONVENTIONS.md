@@ -1174,6 +1174,68 @@ rather than a new tier. Five additions.
   `net_close` where the module teaches `net.close_listener` is a doc that
   is true and useless.
 
+### §14 amendments (sc37): acquisition calls, host postures, and the module for the machine
+
+- **AN ACQUISITION CALL ADDS ONE FUNCTION AND NOTHING ELSE.** A new way
+  to OBTAIN a handle answers the handle the module already serves, so
+  the operations on it do not fork. `net.listen_with` and
+  `net.adopt_listener` both return the ordinary `net.Listener`, which
+  means `port`, `accept`, both deadlines and `close_listener` serve them
+  unchanged and no parallel accept/close family is written. This is the
+  same rule `std.net.unix` follows — the address FAMILY differed, so the
+  address call was the only thing that module added — generalised to the
+  case where what differs is the OPTIONS or the PROVENANCE. A second
+  handle type here would have doubled a nine-function surface to say one
+  new thing.
+- **WHERE THE KERNELS DIFFER IN DEGREE RATHER THAN IN ROW, DOCUMENT
+  BOTH AND PROMISE ONLY THE INTERSECTION.** sc36's rule covered a tag
+  the hosts disagree about. This is its sibling: `reuse_port` is SERVED
+  on both linux and macOS and behaves differently on each — linux
+  distributes accepts across the group by a 4-tuple hash, macOS hands
+  every SYN to the newest bound socket. Neither is a row, so no
+  vocabulary can express the difference. The surface therefore states
+  both postures by name and promises exactly the two guarantees both
+  hosts make (every dial is accepted by SOME member; the survivor takes
+  every dial after the others close), and the witness asserts those two
+  and nothing about WHICH member. A test that pinned the developer's
+  host's scheduling would pass here and fail on the other tier-1 host,
+  and would have encoded a kernel's policy as the language's contract.
+- **A TIER'S REFUSAL IS A STATED POSTURE, NOT A GAP, WHEN THE TIER SAYS
+  WHY.** The checked machine refuses `net_adopt_listener` and a
+  non-empty `os_spawn_with` BY NAME, with the construct named, because
+  it is the `wolf` binary interpreting a program: a descriptor handed to
+  "the program's child" would be handed to the compiler's child. That is
+  a `wolfc = "unsupported"` ledger word with a REASON in the clause, and
+  it must be recorded as such rather than as a hole waiting on a fix.
+  **Probe it with `wolf conform-run --checked` and never with `wolf run
+  --checked`**, which runs the native build: sc37 nearly filed a false
+  spec divergence off the second spelling.
+- **A LANE WORD MAY BE OWED TO A RELEASE DATE, AND MUST SAY SO.** When a
+  builtin lands in a wolf tag that the reference interpreter's newest
+  release does not yet conform to, the reference machine does not
+  DECLINE the call — it has never been shown it. The ledger word is
+  `unsupported`, the comment names the finding and the two pins, and the
+  word is NOT `divergent(…)`: divergence means the machines disagree
+  about a program's meaning, and here one of them has not been given the
+  program. See F-0110.
+- **A MODULE MAY EXIST FOR ONE FUNCTION WHEN ITS SUBJECT IS ITS OWN.**
+  `std.os` holds `cpus()` alone. `std.env` is what the program was
+  HANDED (arguments, environment); `std.process` STARTS and reaps
+  children; the size of the machine is neither, and upstream's own spec
+  gives it a section of its own ("The machine's size"). Prefer a small
+  honest namespace to a function filed under a neighbour whose header
+  then has to apologise for it. State the judgement in the module header
+  so a reader meets the reasoning and not just the result.
+- **A ROW THAT EXISTS TO PREVENT A SILENT DEFAULT MUST NOT BE DEFAULTED
+  BY std EITHER.** `os_cpus` answers `io` rather than a quiet `1`
+  precisely so a program resolving "workers auto" can say it did not
+  learn the number. `std.os.cpus` therefore propagates `io` and supplies
+  no fallback: `else 1` belongs in the CALLER's source where a reader
+  can see it. A convenience default in the facade would have deleted the
+  distinction the clause was written to create — and the witness asserts
+  the `else` arm was never taken, so the property is measured and not
+  merely promised.
+
 ## Review record
 
 - 2026-09-03, sc36 (§1's no-overloading rule and §14's os posture, applied

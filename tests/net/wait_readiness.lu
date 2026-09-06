@@ -1,0 +1,95 @@
+//! check: run(exit=0, stdout="empty_is_answer: true | listener_ready: true | level_triggered: true | closed_peer_ready: true | order_kept: true | unbounded_empty_io: true")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate
+//!
+//! **`wait` answers a SUBSET, and an empty subset is an ANSWER.** That
+//! is the sentence `[os.net.wait]` writes in bold and the mistake it
+//! exists to prevent: a loop that treats "nothing was ready before the
+//! deadline" as a failure will restart its server every idle pass. The
+//! first relation here is a listener nobody has dialled, asked with
+//! deadline `0` — the answer is the empty list and the call does NOT
+//! raise.
+//!
+//! **`level_triggered` is the property that makes a serving loop
+//! writable.** Asking consumes nothing, so two waits with the same set
+//! answer the same until the program actually accepts or reads. If
+//! readiness were edge-triggered, a loop that asked twice before acting
+//! would lose the connection between the two asks.
+//!
+//! **`closed_peer_ready`**: a stream whose peer has closed is READY.
+//! The `read` that follows is what reports `closed` — that is how a loop
+//! learns to drop a connection, and it is why readiness cannot mean
+//! "has bytes".
+//!
+//! **`order_kept`**: the answer is in the CALLER's order, not the
+//! host's. A caller matches each returned number against the handle it
+//! came from, so an answer in poll order would silently mispair them.
+//!
+//! **`unbounded_empty_io` is the one row.** An empty set with a negative
+//! (unbounded) deadline is `io`, because nothing could ever end that
+//! wait — a program that means to sleep says `time.sleep_ms`. Alone in
+//! s137 this clause names no host refusal, so there is no `unsupported`
+//! branch here and no vacuous construction: every tier-1 host answers.
+//!
+//! The `.fd` reads are the documented idiom — `wait` takes descriptors
+//! because a ready set mixes listeners and streams and wolf has no sum
+//! type that could hold both at this pin.
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+
+    // An idle listener, asked with deadline 0: the empty answer.
+    var idle = List[int]()
+    (mut idle).push(srv.fd)
+    let none_yet = net.wait(idle, 0)?
+    let empty_is_answer = none_yet.len == 0
+
+    // A dial makes the listener ready, and asking twice does not consume
+    // the readiness.
+    var cli = net.connect(net.endpoint("127.0.0.1", p))?
+    let first = net.wait(idle, 2000)?
+    let second = net.wait(idle, 0)?
+    let listener_ready = first.len == 1 && first[0] == srv.fd
+    let level_triggered = second.len == 1 && second[0] == srv.fd
+
+    var conn = net.accept(mut srv)?
+
+    // The caller's order is the answer's order.
+    var both = List[int]()
+    (mut both).push(conn.fd)
+    (mut both).push(srv.fd)
+    net.write(mut cli, "hi")?
+    let ordered = net.wait(both, 2000)?
+    let order_kept = ordered.len == 1 && ordered[0] == conn.fd
+
+    // A peer that has CLOSED is ready; the read that follows is what
+    // says `closed`.
+    let got = net.read(mut conn, 8)?
+    net.close(take cli)?
+    var one = List[int]()
+    (mut one).push(conn.fd)
+    let after = net.wait(one, 2000)?
+    let closed_peer_ready = after.len == 1 && got == "hi"
+
+    // The row: an empty set that could never be ended.
+    var nothing = List[int]()
+    var unbounded_empty_io = false
+    let never = net.wait(nothing, 0 - 1) else |_| {
+        unbounded_empty_io = true
+        List[int]()
+    }
+
+    net.close(take conn)?
+    net.close_listener(take srv)?
+    print("empty_is_answer: {empty_is_answer} | listener_ready: {listener_ready} | level_triggered: {level_triggered} | closed_peer_ready: {closed_peer_ready} | order_kept: {order_kept} | unbounded_empty_io: {unbounded_empty_io}")
+    if !empty_is_answer { return 1 }
+    if !listener_ready { return 2 }
+    if !level_triggered { return 3 }
+    if !closed_peer_ready { return 4 }
+    if !order_kept { return 5 }
+    if !unbounded_empty_io { return 6 }
+    0
+}

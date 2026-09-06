@@ -1,0 +1,81 @@
+//! member: true
+//!
+//! std.os — what this program can learn about the MACHINE it is running
+//! on. Stability tier: core.
+//!
+//! **One function, and that is the whole module at this pin.** `cpus()`
+//! answers how many cores this process may actually be scheduled on.
+//! That is the only question in the `[os.cpus]` clause and the only one
+//! this module answers; it is a module rather than a function in
+//! `std.env` because `std.env` is the program's ARGUMENTS and the host's
+//! ENVIRONMENT — things the program was handed — and the core count is
+//! neither. It is a property of the machine, which is what upstream's
+//! own spec calls it: §5 of `11-os.md`, "The machine's size".
+//!
+//! **Why not `std.process`.** `std.process` starts and reaps children.
+//! Asking how many to start is the question you ask BEFORE you build a
+//! `Command`, and answering it there would have made `std.process` the
+//! module you import to learn a number while starting nothing.
+//!
+//! **Errors are rows, never traps** (D30, §2, §14). One tag:
+//!
+//! - `io` — the host cannot answer. It is a ROW and not a silent `1` on
+//!   purpose, and the clause is unusually explicit about why: a program
+//!   resolving `workers auto` must be able to say it did not learn the
+//!   number, instead of quietly running one worker and looking healthy.
+//!   **This module will never default to 1 for you.** If you want that
+//!   fallback you write it, and it is then in your source where a reader
+//!   can see it — `let n = os.cpus() else 1`.
+//!
+//! **Capability: `env` (I13)** — the same capability `os_cwd` and
+//! `os_exe` carry, and for the clause's own reason: the number is
+//! MACHINE STATE, so it is not comptime-readable and the call is
+//! categorically refused at comptime (D33, `E0701`). A `comptime fn`
+//! that could read the builder's core count would bake the builder's
+//! machine into the artifact.
+//!
+//! **The lanes disagree at this pin, and the reason is a release date.**
+//! `os_cpus` arrives in wolf-lang v0.2.5 (s137, wolf-lang#233). The
+//! reference interpreter's newest release, lupin 0.1.26, conforms to
+//! `982f857` = v0.2.4, so it does not resolve the name at all and the
+//! whole module is `unsupported` there. That is F-0110: a lane word
+//! owed to release ORDERING and not to semantics. It retires at the
+//! first lupin that conforms past `6ade878`, with no edit here.
+
+
+/// The number of cores this process may actually be scheduled on.
+///
+/// **"Schedulable", not "installed"**, and that distinction is the whole
+/// content of the clause. On linux the answer honours a cgroup cpu quota
+/// and a cpu affinity mask, so a container given two cpus of quota on a
+/// sixty-four-core host answers `2` — where counting `processor` rows in
+/// `/proc/cpuinfo`, which is what a program had to do before this call
+/// existed, answers `64` and starts sixty-two workers that will never
+/// get a core between them. macOS reads `hw.ncpu`, windows
+/// `GetSystemInfo`.
+///
+/// **The answer is always `>= 1` when it answers**, so a caller never
+/// has to defend against `0`.
+///
+/// Rows: `io` when the host cannot answer, propagated from the builtin
+/// tier unchanged and never swallowed — see the module header on why
+/// this is not a silent `1`. Never traps.
+///
+/// Every tier answers from the same source, so the native lanes and the
+/// checked machine agree on one host. That matters more than it looks:
+/// this number decides how many PROCESSES a program starts, and two
+/// tiers that disagreed would start different servers from one source.
+///
+/// A conformance witness pins the RELATION and never the value — the
+/// number is the runner's, and `tests/os/cpus.lu` asserts `>= 1` and
+/// cross-lane agreement rather than any particular count.
+///
+/// Capability `env`; refused at comptime (D33). Delegates to `os_cpus`.
+///
+/// ```wolf-doc-example
+/// let n = os.cpus()?
+/// n >= 1
+/// ```
+pub fn cpus() -> int ! {io} {
+    os_cpus()?
+}

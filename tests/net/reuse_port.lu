@@ -1,0 +1,127 @@
+//! check: run(exit=0, stdout="served: true | second_bind: true | some_member: true | survivor: true | double_bind_exists: true")
+//! phase: run
+//! conforms: std.net, err.row, err.propagate
+//!
+//! **The two guarantees, and deliberately not the third.** `reuse_port`
+//! lets N listeners hold one address at once, and what the KERNEL does
+//! with that group is the HOST's — linux distributes accepts by a
+//! 4-tuple hash, macOS hands every SYN to the newest bound socket. This
+//! file asserts only the two things BOTH serving hosts promise:
+//! **every dial is accepted by SOME member**, and **the survivor takes
+//! every dial after the others close**. It does NOT assert which hand
+//! got the connection, because that assertion would pass on linux and
+//! fail here, and a test that pins a host's scheduling as if it were the
+//! language's contract is the exact mistake `[os.net.listen.opts]`
+//! writes three sentences to prevent.
+//!
+//! **`some_member` is measured through `net.wait`, not through
+//! `accept`.** Accept blocks, and the whole question is WHICH listener
+//! it would block on; asking readiness over the pair answers that
+//! without guessing. That is also what a real prefork worker does.
+//!
+//! **The stdout is the same on every host BY CONSTRUCTION**, the
+//! `std.net.unix` construction: a host that does not serve the option
+//! must refuse BY NAME — windows, per the clause — and the four
+//! relations then hold vacuously. A serving host that fails a relation
+//! is the failure this witness exists to catch.
+//!
+//! **`double_bind_exists` is the row half.** Two binds on one address
+//! WITHOUT the option on both sides is `exists` — the "already in use"
+//! answer wolf-lang#234 asked for, spelled in the vocabulary
+//! `[os.net.unix]` gave this family rather than a new `in_use` tag. It
+//! is the reason `listen_with` is worth calling with default options:
+//! `listen`'s own row coarsens to `io`.
+//!
+//! Port 0 for the first bind and the learned port for the second, as
+//! every net test in this rig.
+
+use std.net
+
+fn main() -> !int {
+    var served = true
+    var opts = net.listen_opts()
+    opts.reuse_port = true
+    var a = net.listen_with(net.loopback(0), opts) else |e| match e {
+        unsupported => {
+            served = false
+            net.Listener { fd: 0 - 1 }
+        },
+        exists => { return 3 },
+        denied => { return 3 },
+        io => { return 3 },
+    }
+    var second_bind = true
+    var some_member = true
+    var survivor = true
+    var double_bind_exists = true
+    if served {
+        let p = net.port(a)?
+        var b = net.listen_with(net.endpoint("127.0.0.1", p), opts) else |_| {
+            second_bind = false
+            net.Listener { fd: 0 - 1 }
+        }
+        if second_bind {
+            // GUARANTEE ONE: a dial is accepted by SOME member.
+            var cli = net.connect(net.endpoint("127.0.0.1", p))?
+            var set = List[int]()
+            (mut set).push(a.fd)
+            (mut set).push(b.fd)
+            let ready = net.wait(set, 2000)?
+            some_member = ready.len == 1 &&
+                (ready[0] == a.fd || ready[0] == b.fd)
+            net.close(take cli)?
+            // Drain whichever member took it, so the survivor probe
+            // below measures a fresh dial and not this one.
+            if some_member {
+                if ready[0] == a.fd {
+                    var conn = net.accept(mut a)?
+                    net.close(take conn)?
+                } else {
+                    var conn = net.accept(mut b)?
+                    net.close(take conn)?
+                }
+            }
+            // GUARANTEE TWO: the survivor takes every dial after the
+            // others close. `b` is the newest bound socket, which is the
+            // one macOS was handing every SYN to.
+            net.close_listener(take b)?
+            var cli2 = net.connect(net.endpoint("127.0.0.1", p))?
+            var set2 = List[int]()
+            (mut set2).push(a.fd)
+            let ready2 = net.wait(set2, 2000)?
+            survivor = ready2.len == 1
+            if survivor {
+                var conn2 = net.accept(mut a)?
+                net.close(take conn2)?
+            }
+            net.close(take cli2)?
+        }
+        net.close_listener(take a)?
+        // THE ROW: two binds on one address without the option is
+        // `exists`, not `io` and not a trap.
+        var d = net.listen(net.loopback(0))?
+        let q = net.port(d)?
+        double_bind_exists = false
+        let dup_addr = net.endpoint("127.0.0.1", q)
+        var dup = net.listen_with(dup_addr, net.listen_opts()) else |e| match e {
+                exists => {
+                    double_bind_exists = true
+                    net.Listener { fd: 0 - 1 }
+                },
+                unsupported => { net.Listener { fd: 0 - 2 } },
+                denied => { net.Listener { fd: 0 - 2 } },
+                io => { net.Listener { fd: 0 - 2 } },
+            }
+        // `dup` is read rather than discarded: the `exists` arm is the
+        // only one that hands back the sentinel, so this is the same
+        // assertion said twice and no binding goes unused.
+        double_bind_exists = double_bind_exists && dup.fd == 0 - 1
+        net.close_listener(take d)?
+    }
+    print("served: {served} | second_bind: {second_bind} | some_member: {some_member} | survivor: {survivor} | double_bind_exists: {double_bind_exists}")
+    if !second_bind { return 1 }
+    if !some_member { return 2 }
+    if !survivor { return 4 }
+    if !double_bind_exists { return 5 }
+    0
+}

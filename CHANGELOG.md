@@ -1,5 +1,123 @@
 # Changelog
 
+## sc37 — 2026-09-06 — the words came true: ten stale rows, a pin bump, and the server surface
+
+**THE BUMP, AND ALL THREE WOLF-SIDE PINS LAND ON ONE SHA AGAIN.**
+`982f857` (v0.2.4) → `6ade878` (v0.2.5), 42 commits: the binary's own
+`--version` pin, `vendor/tools.toml` and `vendor/upstream/PIN` (with the
+submodule at the same commit) all read `6ade878`, and the native rung is
+lit at it. Anchors **417 → 422**, `+5 / −0` with both directions checked
+— `os.cpus`, `os.net.listen.opts`, `os.net.wait`, `os.proc`,
+`os.proc.inherit`. **The drift was predicted in writing before any
+measurement and the prediction held exactly**: s137's five builtins are
+NEW surface that no std file could have been calling, so zero existing
+ledger rows moved on any of the three columns. The one commit in the
+span with power to move a row — `6f57ee0`, a diagnostic underline clamp
+(#238) — was named in the prediction as the first place to look, and it
+moved nothing, because the wolfc column's vocabulary is an error CODE
+and directives read program output rather than compiler stderr.
+
+**wolf-std#7 — THE RED CAME FIRST, AND THAT IS THE PROOF.** lupin
+0.1.25 → **0.1.26** (wolf-interp `v0.1.26` = `5e774a2`), installed
+fresh-inode (132528014 → 135873958). The gauntlet was then run with
+**not one word of the ledger touched**, and it was RED on **ten** rows —
+eight `divergent(…)` carriers saying *the divergence moved*, and two
+corpus twins saying *deeper than the ledger claims*. Only then were the
+words rewritten. is37 closed wolf-interp#62: the byte's DOMAIN is a
+resolve-time refusal now and not only the type name, so all ten
+directives (`check: fail(E0401)`, `phase: typecheck`) are satisfied and
+all ten rows become **`run`**. **`divergent(…)` returns to ZERO
+carriers** — the second time in its life, and the second time it retired
+on a release exactly as designed. A ledger edited before the measurement
+would have gone green and proved nothing.
+
+**Two of the ten were NOT predicted, and the miss is recorded rather
+than tidied.** sc37 predicted the two corpus twins would not move,
+reasoning that is37 had described a change of MECHANISM in them and not
+of observed word. Wrong: a program refused at `typecheck` never reaches
+the tier that was declining it, so `unsupported` became `run`. A row's
+word is what the runner OBSERVES, never what the mechanism story
+predicts.
+
+**THE BRIEF WAS WRONG ABOUT THE MACHINE AND THE ISSUE WAS RIGHT.** The
+lane was told "the machine already runs wolf 0.2.5 and lupin 0.1.26 —
+verify, don't rebuild". `wolf` was 0.2.5 and was left alone. `lupin` was
+**0.1.25**, and wolf-std#7's own text said so. A lane that had trusted
+the brief would have measured against 0.1.25, seen green, and closed #7
+as needing no work. Verification is the instruction that paid.
+
+**FOUR NEW STD SURFACES over s137's builtins**, and all four house
+shapes sc36 named survived contact with the runtime unchanged:
+
+- **`net.listen_with(addr, opts) -> Listener ! {unsupported, exists,
+  denied, io}`** with `ListenOpts { reuse_port, backlog }` and
+  `listen_opts()`. An ACQUISITION call and nothing else: it answers the
+  ordinary `Listener`, so `port`, `accept`, both deadlines and
+  `close_listener` come free. `listen`'s own row stays `{io}` because
+  its lowering coarsens, which is the one real reason to prefer this
+  call even with default options.
+- **`net.adopt_listener(fd) -> Listener ! {unsupported, io}`** — the
+  CHILD's half of descriptor inheritance. `close_listener` **does**
+  close an inherited fd, and an adopted `AF_UNIX` listener **does not**
+  unlink its path: that belongs to the process that BOUND it.
+- **`net.wait(fds, deadline_ms) -> List[int] ! {io}`** — readiness over
+  a set. **An empty answer is an ANSWER, not a failure.** Takes raw
+  descriptors because a ready set mixes listeners and streams and wolf
+  has no sum type that could hold both at this pin.
+- **`std.os.cpus() -> int ! {io}`** in a NEW one-function module.
+  Propagates `io` and **never defaults to 1** — a program resolving
+  "workers auto" must be able to say it did not learn the number.
+
+**F-0110 — the first lane word this repo has owed to a release DATE.**
+lupin 0.1.26 conforms to `982f857` = v0.2.4; s137's builtins land in
+v0.2.5. The reference machine does not decline the new calls, it has
+never been shown them (`unsupported: \`os_cpus\` does not resolve`). So
+all six new witnesses carry `lupin = "unsupported"` for a reason that is
+a calendar and not a semantics, and three doc-example blocks re-arm
+`LUPIN_TIER_WAIVERS` — the mechanism whose own doc predicted this case
+and said it would cost "a finding name, not plumbing". It is **not** a
+`divergent(…)`: the machines do not disagree about a program's meaning,
+one has not been given the program. Retires at the first lupin past
+`6ade878`, touching no test.
+
+**`net/adopt_rows.lu` is the most uneven row in the repository**, and
+every column has its own reason: lupin is F-0110's calendar, the CHECKED
+machine refuses adoption BY NAME (its own clause — it is the `wolf`
+binary interpreting a program, so a descriptor handed to "the program's
+child" would go to the compiler's child), and the NATIVE lane measures
+the four `io` refusals. The adoptable case is unreachable in a rig with
+no parent process, and the file says so rather than faking one.
+
+**`reuse_port` pins two guarantees and deliberately not a third.** Every
+dial is accepted by SOME member, and the survivor takes every dial after
+the others close — asserted; WHICH member — never. linux distributes by
+a 4-tuple hash, macOS hands every SYN to the newest bound socket, and a
+witness that pinned either would be pinning a host's scheduling as if it
+were the language's contract.
+
+**A near-miss worth publishing.** Probing the inherit pair with `wolf
+run --checked` answered `io` and `spawned`, which reads as a flat
+contradiction of `[os.proc.inherit]` and was one step from being filed
+upstream. **`wolf run --checked` is not the checked machine** — it runs
+the native build. Under the rig's own `wolf conform-run --checked` both
+calls refuse by name with the construct named. The clause is correct in
+every particular.
+
+**Residues, re-probed at a pin whose span actually contains a
+compiler** (unlike sc36's): chars-pairs `List[(int, int)]()` refused at
+its **eleventh** consecutive pin; F-0096 verbatim; `in(r)` unmoved on
+both wolf rungs AND lupin's wording compared against sc36's recorded
+STRING rather than the bare verdict, as sc36 instructed — byte-identical.
+A `str` still charges no named region's ledger on any tier. F-0103
+re-probed and unmoved, with the probe asserting that it TOOK the row
+(`alpha:0`) — the check sc35 paid for twice. wolf-lang#201 is OPEN.
+
+**F-0099 re-counted: four namespaces, 70 anchors** (was 65), and all
+five of this sprint's new anchors landed in `os` — precisely the
+namespace sc36 already could not cite. None of sc37's six witnesses may
+name the clause it conforms to; they carry `std.net`/`std.os` forward
+tags instead.
+
 ## sc36 — 2026-09-03 — the socket surface: a second address family, and a lane nobody predicted
 
 **NO BUMP, and the prediction for that was written first.** sc35's second

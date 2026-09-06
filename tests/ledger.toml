@@ -1,4 +1,50 @@
 # =====================================================================
+# sc37 — THE WORDS CAME TRUE, AND THERE WERE TEN OF THEM, NOT EIGHT.
+#
+# The block below (sc35's) ends with a promise: "When it closes, all
+# eight red on the same day and flip to `run` deliberately, which is
+# what the word is for." That is exactly what happened, and this block
+# is the receipt, because a promise kept is worth as much history as a
+# promise made.
+#
+# is37 shipped **lupin 0.1.26** (`v0.1.26` = wolf-interp `5e774a2`,
+# conformance pin `982f857`), closing **wolf-interp#62**: the byte's
+# DOMAIN is a resolve-time refusal now and not only the type name, so
+# `push(256)` into a `List[byte]` is `E0401` at `resolve` — with span
+# parity against wolfc — instead of a dynamic store the interpreter
+# executed to its honest end.
+#
+# **THE ORDER MATTERS AND IT WAS FOLLOWED.** sc37 installed 0.1.26
+# fresh-inode and ran `xtask std-test` BEFORE touching one word in this
+# file. It was RED, and red on exactly the rows the ledger had staked:
+# eight saying `ledger says divergent(…), observed fail(E0401) — the
+# divergence moved`, and two more (below) saying `deeper than the
+# ledger claims`. THAT RED IS THE PROOF. A ledger that had been edited
+# first would have gone green and proved nothing; the red is what makes
+# the flip a measurement rather than a decision. Ten rows re-measured
+# and flipped in one deliberate commit, and the count of `divergent(…)`
+# carriers returns to **ZERO**.
+#
+# **TWO OF THE TEN WERE NOT PREDICTED, AND THAT IS RECORDED RATHER
+# THAN TIDIED.** sc37 wrote its drift prediction before measuring and
+# said the two corpus twins — `fs/invalid_row` and
+# `p256/non_byte_refused` — would NOT move, on the reasoning that
+# is37 described a change of MECHANISM in them (the refusal now
+# arrives ahead of their unrelated decline) and not a change of
+# observed word. That was wrong. The mechanism change IS a word
+# change: a program refused at `typecheck` never reaches the tier that
+# was declining it, so `unsupported` became `run`. The lesson is the
+# one the ledger keeps teaching — a row's word is what the runner
+# OBSERVES, never what the mechanism story predicts — and it is left
+# here in the file that caught it.
+#
+# `divergent(…)` now has zero carriers for the second time in its life
+# (sc28 emptied it, sc35 refilled it). It stays in the vocabulary: it
+# is the word for a real and recurring shape, and the two times it has
+# been used it retired on a release, on purpose, exactly as designed.
+# =====================================================================
+#
+# =====================================================================
 # sc35 — THE LUPIN COLUMN IS TRUE AGAIN, AND THE 181 DARK ROWS CAME BACK
 # THE SAME DAY. This block replaces a note that said the opposite; the
 # history is worth two paragraphs because the shape recurs.
@@ -1206,7 +1252,7 @@ wolfc = "run"  # sc07 pin bump (f0da6e6)
 native = "run"  # sc08 pin bump (13b811f)
 
 [tests."hex/encode_non_byte_refused.lu"]
-lupin = "divergent(trap(assert))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to hex's own `byte_digits` assert, which the wolf lanes can no longer reach. F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. The row AGREES: sc35's `divergent(trap(assert))` retires here — the interpreter no longer reaches hex's own `byte_digits` assert, because the program is refused before it runs. Observed as the runner's designed red at the heal and flipped on it.
 wolfc = "run"  # sc07 pin bump (f0da6e6)
 native = "run"  # sc08 pin bump (13b811f)
 
@@ -1433,7 +1479,7 @@ wolfc = "run"
 native = "run"
 
 [tests."net/write_bytes_invalid_row.lu"]
-lupin = "divergent(exit(1))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to the `invalid` row it always raised. F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. The row AGREES: `divergent(exit(1))` retires — the refusal now arrives ahead of the `invalid` row the interpreter always raised. Observed as the designed red at the heal and flipped on it.
 wolfc = "run"
 native = "run"
 
@@ -1983,7 +2029,7 @@ wolfc = "run"
 native = "run"
 
 [tests."fs/invalid_row.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. Was `unsupported` (the fs tier is declined on the reference machine, "no filesystem by design"); the E0401 refusal now arrives BEFORE that decline can be reached, so the row AGREES at `typecheck` and never gets as far as the fs question. sc37 predicted this row would NOT move and it did — the prediction is recorded with the miss.
 wolfc = "run"
 native = "run"
 
@@ -2052,7 +2098,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/non_byte_refused.lu"]
-lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0): with the guard retired, 256 digests as itself here. F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. The row AGREES: `divergent(exit(0))` retires. Observed as the designed red at the heal and flipped on it.
 wolfc = "run"
 native = "run"
 
@@ -2267,7 +2313,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/chacha20/non_byte_refused.lu"]
-lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0). F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. The row AGREES: `divergent(exit(0))` retires. Observed as the designed red at the heal and flipped on it.
 wolfc = "run"
 native = "run"
 
@@ -2485,7 +2531,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/curve25519/non_byte_refused.lu"]
-lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0). F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. The row AGREES: `divergent(exit(0))` retires. Observed as the designed red at the heal and flipped on it.
 wolfc = "run"
 native = "run"
 
@@ -2668,7 +2714,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/tls/record/non_byte_refused.lu"]
-lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0). F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. The row AGREES: `divergent(exit(0))` retires. Observed as the designed red at the heal and flipped on it.
 wolfc = "run"
 native = "run"
 
@@ -2740,7 +2786,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/tls/handshake/non_byte_refused.lu"]
-lupin = "divergent(exit(0))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(0). F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. The row AGREES: `divergent(exit(0))` retires. Observed as the designed red at the heal and flipped on it.
 wolfc = "run"
 native = "run"
 
@@ -2858,7 +2904,7 @@ wolfc = "unsupported"
 native = "run"
 
 [tests."x/tls/cert/non_byte_refused.lu"]
-lupin = "divergent(exit(1))"  # sc35 (lupin 0.1.25): the compilers refuse this program at typecheck (E0401 — a `List[byte]` cannot hold a non-byte); lupin is dynamically typed and executes it to exit(1) — the DER reject. F-0098's word, its first use outside the take-mode pair. Retires when the interpreter models the byte DOMAIN and not only the type name (wolf-interp#62, is37's — not is36's).
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. The row AGREES: `divergent(exit(1))` retires — the DER reject is no longer reached. Observed as the designed red at the heal and flipped on it.
 wolfc = "run"
 native = "run"
 
@@ -2966,7 +3012,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/p256/non_byte_refused.lu"]
-lupin = "unsupported"  # sc35 (lupin 0.1.25): the module still declines at resolve here — the ladder is outside the modelled surface, not a byte question
+lupin = "run"  # sc37 pin bump (lupin 0.1.26): is37 closes wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not only the type name, so the interpreter answers E0401 at `resolve` with span parity against wolfc. Was `unsupported` (p256 declines on the reference machine); the refusal now arrives BEFORE that decline, so the row AGREES at `typecheck`. The second of the two corpus twins sc37 predicted would not move.
 wolfc = "run"
 native = "run"
 
@@ -3274,6 +3320,78 @@ native = "run"
 # `net/comptime_refuses.lu`'s reason (F-0051): E0701 twice, once per
 # call. lupin has no comptime tier at all and says so.
 [tests."net/unix/comptime_refuses.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# =====================================================================
+# sc37 — s137's SURFACE, AND THE FIRST TIME A ROW SAYS `unsupported` FOR
+# A RELEASE DATE. All six rows below are `lupin = "unsupported"` and NOT
+# ONE of them is a semantic claim about the reference machine: lupin
+# 0.1.26 conforms to `982f857` = wolf-lang v0.2.4, and s137's builtins
+# land in v0.2.5. The interpreter does not decline these calls, it has
+# never been shown them — `os_cpus does not resolve`. That is F-0110,
+# and it retires at the first lupin conforming past `6ade878` with no
+# edit to any file here. It is emphatically NOT a `divergent(…)`: the
+# lanes do not disagree about a program's meaning, one of them has not
+# been given the program yet.
+# =====================================================================
+
+# `listen_with(addr, listen_opts())` is `listen(addr)` call for call —
+# the acquisition rule, observed: bind, port, dial, accept, echo, close,
+# with every operation after the bind being std.net's own.
+[tests."net/listen_with_default.lu"]
+lupin = "unsupported"  # sc37: F-0110 — `net_listen_with` does not resolve at lupin 0.1.26's pin
+wolfc = "run"
+native = "run"
+
+# The two guarantees BOTH serving hosts make, and deliberately not the
+# third: every dial is accepted by SOME member, and the survivor takes
+# every dial after the others close. macOS hands every SYN to the newest
+# bound socket and linux distributes by a 4-tuple hash, so which hand
+# accepts is asserted NOWHERE in this file — that is the whole design of
+# the witness. Also carries the `exists` row for a double bind without
+# the option.
+[tests."net/reuse_port.lu"]
+lupin = "unsupported"  # sc37: F-0110 — `net_listen_with` does not resolve at lupin 0.1.26's pin
+wolfc = "run"
+native = "run"
+
+# The empty answer is an ANSWER, readiness is level-triggered, a closed
+# peer is READY, the subset comes back in the CALLER's order, and an
+# empty set with an unbounded deadline is the clause's one `io` row.
+[tests."net/wait_readiness.lu"]
+lupin = "unsupported"  # sc37: F-0110 — `net_wait` does not resolve at lupin 0.1.26's pin
+wolfc = "run"
+native = "run"
+
+# THE MOST UNEVEN ROW IN THE FILE, and every column has its own reason.
+# The CHECKED machine refuses adoption BY NAME — "listener adoption in
+# checked execution" — because it is the wolf binary interpreting a
+# program, so a descriptor handed to "the program's child" would go to
+# the compiler's child; that is a whole-program `unsupported` and not a
+# catchable row. lupin is F-0110's release date. The NATIVE lane is the
+# one that measures the four `io` refusals, and it is enough: they are
+# the runtime's own kernel checks. The ADOPTABLE case is unreachable in
+# a rig that runs one program per test with no parent, and the file says
+# so rather than faking a parent.
+[tests."net/adopt_rows.lu"]
+lupin = "unsupported"  # sc37: F-0110 — `net_adopt_listener` does not resolve at lupin 0.1.26's pin
+wolfc = "unsupported"  # sc37: the checked machine refuses adoption BY NAME, `[os.proc.inherit]`'s own clause — not a gap, a stated posture
+native = "run"
+
+# The relation, never the value: `>= 1`, stable across two calls, and
+# the `else` arm never taken on a host that answers — which is the
+# clause's whole point, since `os.cpus` is a ROW rather than a silent 1.
+[tests."os/cpus.lu"]
+lupin = "unsupported"  # sc37: F-0110 — `os_cpus` does not resolve at lupin 0.1.26's pin
+wolfc = "run"
+native = "run"
+
+# D33 held as a rejection: the machine's size is not a compile-time
+# constant. One level down at the builtin for `net/comptime_refuses.lu`'s
+# reason (F-0051). lupin has no comptime tier at all and says so.
+[tests."os/comptime_refuses.lu"]
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
