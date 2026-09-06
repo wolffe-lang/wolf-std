@@ -610,7 +610,43 @@ pin = "982f857885b991e686c6b045de213d10cab013c1"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.4"
+version = "0.2.5"
+# sc37 BUMP: 982f857 (v0.2.4) -> 6ade878 (v0.2.5), 42 commits, and ALL
+# THREE WOLF-SIDE PINS LAND ON ONE SHA AGAIN — the binary's own
+# `--version` pin, this entry, and `vendor/upstream/PIN` (with the
+# submodule at the same commit, which is what `sync-pin` proves).
+#
+# The machine was ALREADY running it when the lane opened: `wolf 0.2.5
+# (wolfgang, pin 6ade878)`, installed by the orchestrator, inode
+# 135428876, mtime 2026-09-04 05:35, with `libwolf_rt.a` beside it at
+# the same mtime — so the native rung is lit at the new pin and nothing
+# was rebuilt. This entry records the acquisition; it does not claim to
+# have made it.
+#
+# **THE DRIFT WAS PREDICTED IN WRITING BEFORE ANY MEASUREMENT, AND THE
+# PREDICTION HELD.** s137's five builtins — `net_listen_with`,
+# `net_adopt_listener`, `os_spawn_with`, `net_wait`, `os_cpus` — are NEW
+# SURFACE: no std file at c0f75e8 called any of them, because they did
+# not exist to call. Predicted: zero motion in every existing ledger row
+# on all three columns, and anchors 417 -> 422. Measured: exactly that.
+# Zero rows moved on account of this bump, and the anchor registry gains
+# five and loses NONE (both directions checked, per the lesson that a
+# regen can silently DROP anchors): `os.cpus`, `os.net.listen.opts`,
+# `os.net.wait`, `os.proc`, `os.proc.inherit`.
+#
+# The one commit in the span with any power to move a row was
+# `6f57ee0 fix(diag): an underline clamps into the window at BOTH ends`
+# (#238), a diagnostic RENDERING fix. It was named in the prediction as
+# the first place to look if a row moved, and it moved nothing — the
+# wolfc column's vocabulary is an error CODE, never rendered text, and
+# directives read program output rather than compiler stderr.
+#
+# **What the bump COSTS is the reference machine's reach.** F-0110: the
+# five new builtins land here and in NEITHER rung of lupin 0.1.26, whose
+# conformance pin (982f857) is now 42 commits behind this data pin. See
+# the `[lupin]` entry above for the reversal that represents.
+# (superseded values, kept in the history block)
+# pin = "982f857885b991e686c6b045de213d10cab013c1"  (superseded, sc35/sc36 era — r07's v0.2.4-tag pin, the first time all three landed on one sha)
 # sc35 SECOND bump: THE DEV STAMP RETIRES, AND ALL THREE PINS LAND ON ONE
 # SHA FOR THE FIRST TIME. r07 shipped `v0.2.4` = `982f857` and installed
 # it over this branch's dev-stamped build mid-sprint; the branch STOPPED
@@ -1539,4 +1575,4 @@ version = "0.2.4"
 # pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc32/sc33 era — the v0.2.2 tag acquisition, held across sc33 while the data pin ran ahead)
 # pin = "31170d119379086f6242cd88d4f4e5386f6aef23"  (superseded, sc34 era — the s135-merge dev-stamped acquisition, the byte TYPE)
 # pin = "4230b008e39d6541f31ac9858057e4345a337271"  (superseded, sc35 first bump — the s136-merge dev-stamped acquisition, the byte PRODUCERS)
-pin = "982f857885b991e686c6b045de213d10cab013c1"
+pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"
