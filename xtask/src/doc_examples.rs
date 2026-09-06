@@ -128,7 +128,40 @@ const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "process
 /// the mechanism itself deliberately stays: a std surface will land on
 /// the wolf lanes ahead of a lupin release again, and the next entry
 /// costs a finding name, not plumbing.
-const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[];
+/// **THREE ENTRIES at the sc37 pin, one debt with one name shared by
+/// all: F-0110** — and this is the case the paragraph above predicted
+/// in so many words ("a std surface will land on the wolf lanes ahead
+/// of a lupin release again"). s137's builtins arrive in wolf-lang
+/// v0.2.5 (`6ade878`); lupin 0.1.26, the newest release there is,
+/// conforms to `982f857` = v0.2.4. So `net_listen_with`, `net_wait` and
+/// `os_cpus` do not RESOLVE on the reference machine — it does not
+/// decline them, it has never been shown them — and the three examples
+/// that call them are honestly `unsupported` on that lane while running
+/// on both wolf lanes. Each needle keys the CALL whose refusal is
+/// waived, never a module: `std.net`'s other examples, and `listen_opts`
+/// (which is pure std code and runs everywhere), stay gated on all
+/// three lanes. Dies at the first lupin conforming past `6ade878`,
+/// re-measured at that bump before the entries leave.
+const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[
+    (
+        "net",
+        "net.listen_with",
+        "F-0110 — lupin 0.1.26 conforms to 982f857 (wolf-lang v0.2.4); \
+         net_listen_with lands at 6ade878 (v0.2.5)",
+    ),
+    (
+        "net",
+        "net.wait",
+        "F-0110 — lupin 0.1.26 conforms to 982f857 (wolf-lang v0.2.4); \
+         net_wait lands at 6ade878 (v0.2.5)",
+    ),
+    (
+        "os",
+        "os.cpus",
+        "F-0110 — lupin 0.1.26 conforms to 982f857 (wolf-lang v0.2.4); \
+         os_cpus lands at 6ade878 (v0.2.5)",
+    ),
+];
 
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
@@ -596,12 +629,24 @@ mod tests {
                 "a needle keys a CALL, never a module ({m}: {needle})"
             );
         }
-        assert!(
-            LUPIN_TIER_WAIVERS.is_empty(),
-            "the sc24 char-surface waivers died at the sc25 bump (lupin \
-             0.1.15 carries is26); a new entry needs its own finding and \
-             dies at the release that resolves it"
-        );
+        // sc37 RE-ARMS the list for the third time, with the case the
+        // constant's own doc predicted: three calls, one finding name
+        // (F-0110), a release-ordering debt rather than a semantic one.
+        // The invariants above still bind every entry — each names a
+        // finding, and each needle keys a CALL — so this assertion moves
+        // from "empty" to "every entry is a NAMED, NARROW debt", which is
+        // what the emptiness was standing in for.
+        assert_eq!(LUPIN_TIER_WAIVERS.len(), 3);
+        for (_, needle, finding) in LUPIN_TIER_WAIVERS {
+            assert!(
+                finding.contains("F-0110"),
+                "sc37's entries share one finding name"
+            );
+            assert!(
+                needle.starts_with("net.") || needle.starts_with("os."),
+                "a needle names a call in the module it waives"
+            );
+        }
         let waived = |module: &str, line: &str| {
             LUPIN_TIER_WAIVERS
                 .iter()
