@@ -1,0 +1,35 @@
+//! check: run(exit=0, stdout="ge_one: true | agrees: true | fallback_unused: true")
+//! phase: run
+//! conforms: std.os, err.row, err.propagate
+//!
+//! **The relation, never the value.** `[os.cpus]` says a conformance
+//! witness pins the RELATION and never the number, for the obvious
+//! reason: the count is the runner's, and a test that asserted `8` would
+//! be a test about one laptop. So this file asserts the three things the
+//! clause actually promises — the answer is `>= 1` when it answers, it
+//! is stable across two calls in one process, and it is a ROW rather
+//! than a silent default.
+//!
+//! **`fallback_unused` is the third relation and the point of the
+//! clause.** `os.cpus() else 0` would answer `0` only if the call raised
+//! `io`; on a host that answers, the `else` arm is never taken, and the
+//! difference between "the module told me" and "the module quietly said
+//! 1" is exactly what wolf-lang#233 refused to ship. std does not
+//! default for you — see the module header. This relation is what makes
+//! that visible in a test rather than only in prose.
+//!
+//! **Every tier answers from the same source**, so the checked machine
+//! and the native lane agree on this host; the ledger records that they
+//! do. The reference machine is `unsupported` here for a reason that is
+//! not semantic at all — lupin 0.1.26 conforms to `982f857` (wolf-lang
+//! v0.2.4) and `os_cpus` lands in v0.2.5 — which is F-0110.
+
+use std.os
+
+fn main() -> !int {
+    let n = os.cpus()?
+    let m = os.cpus()?
+    let guarded = os.cpus() else 0
+    print("ge_one: {n >= 1} | agrees: {n == m} | fallback_unused: {guarded == n}")
+    0
+}

@@ -1,0 +1,31 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.os, comptime.sandbox
+//!
+//! **D33, held as a rejection: the machine's size is not a compile-time
+//! constant.** `os_cpus` carries the `env` capability — the same one
+//! `os_cwd` and `os_exe` carry — and the clause is explicit about why it
+//! is refused in the comptime sandbox rather than merely discouraged:
+//! the number is MACHINE STATE. A `comptime fn` that could read it would
+//! bake the BUILDER's core count into the artifact, and a program that
+//! sized its worker pool at compile time would ship a pool sized for
+//! whichever machine ran `wolf add`.
+//!
+//! **Why the refused call is the BUILTIN and why there is no import.**
+//! The same two reasons `tests/net/unix/comptime_refuses.lu` gives: a
+//! `comptime fn` cannot call across a module boundary at this pin
+//! (F-0051), so the refusal is witnessed one level down at the builtin
+//! the facade delegates to; and `std.os` has no pure member to call at
+//! run time, so an import here would have nothing to use and `E0305`
+//! would fire before `E0701` could. The module is named in `conforms:`
+//! instead.
+
+comptime fn probe_cpus() -> int ! {io} {
+    os_cpus()
+}
+
+fn main() -> !int {
+    const N = probe_cpus() else |_| 0
+    print("cpus: {N}")
+    0
+}
