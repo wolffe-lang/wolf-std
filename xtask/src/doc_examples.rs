@@ -142,26 +142,18 @@ const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "process
 /// (which is pure std code and runs everywhere), stay gated on all
 /// three lanes. Dies at the first lupin conforming past `6ade878`,
 /// re-measured at that bump before the entries leave.
-const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[
-    (
-        "net",
-        "net.listen_with",
-        "F-0110 — lupin 0.1.26 conforms to 982f857 (wolf-lang v0.2.4); \
-         net_listen_with lands at 6ade878 (v0.2.5)",
-    ),
-    (
-        "net",
-        "net.wait",
-        "F-0110 — lupin 0.1.26 conforms to 982f857 (wolf-lang v0.2.4); \
-         net_wait lands at 6ade878 (v0.2.5)",
-    ),
-    (
-        "os",
-        "os.cpus",
-        "F-0110 — lupin 0.1.26 conforms to 982f857 (wolf-lang v0.2.4); \
-         os_cpus lands at 6ade878 (v0.2.5)",
-    ),
-];
+/// **EMPTIED A THIRD TIME at sc38**, and one release earlier than the
+/// letter above predicted. lupin **0.1.27** (is38, "the cores in the
+/// mirror") conforms AT `6ade878`, not past it — and that is enough,
+/// because `6ade878` IS v0.2.5, the release s137's builtins land in.
+/// The letter was a proxy for the condition that actually mattered
+/// (has the reference machine been SHOWN these calls), and re-measuring
+/// beat re-reading it: all three needles reach `exit(0)` under lupin
+/// 0.1.27, so all three entries leave. The mechanism stays, for the
+/// fourth time — and this time it leaves a GATE behind it as well
+/// (`waiver_fired` above), because nothing here could ever have noticed
+/// that a waiver had gone inert.
+const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[];
 
 struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
@@ -196,7 +188,16 @@ pub fn doc_examples() -> Result<(), String> {
         }
     }
     let ceiling = Duration::from_secs(exec::timeout_secs());
-    let mut reds = Vec::new();
+    let mut reds: Vec<String> = Vec::new();
+    // wolf-lang#177's lesson, mechanized on this side too (is38 built the
+    // same gate for `differ::retired_waivers`): a waiver that outlives
+    // its refusal is a HOLE exactly where a gate used to be. Nothing
+    // below can notice on its own — `tier_waived` fires only on
+    // `Unsupported`, so a lane that starts RUNNING makes the entry
+    // silently inert while the list goes on asserting a refusal that no
+    // longer happens. Both times this list emptied (sc14, sc25) a HUMAN
+    // noticed at a bump; sc38 is the third and it is a gate instead.
+    let mut waiver_fired = vec![false; LUPIN_TIER_WAIVERS.len()];
     for (k, b) in blocks.iter().enumerate() {
         for line in &b.lines {
             validate_line(line, &b.origin)?;
@@ -242,6 +243,11 @@ pub fn doc_examples() -> Result<(), String> {
                 && matches!(&verdict, Verdict::Unsupported);
             if tier_waived {
                 tier_waived_here = true;
+                if let Some(i) = tier_waiver
+                    .and_then(|w| LUPIN_TIER_WAIVERS.iter().position(|e| std::ptr::eq(e, w)))
+                {
+                    waiver_fired[i] = true;
+                }
             }
             let ok = waived
                 || tier_waived
@@ -297,6 +303,21 @@ pub fn doc_examples() -> Result<(), String> {
                  somewhere (§4)",
                 b.origin
             ));
+        }
+    }
+    // Only meaningful when the lupin lane actually ran: with no binary
+    // there is nothing a waiver could have fired against.
+    if lanes.iter().any(|(imp, _)| matches!(imp, Impl::Lupin)) {
+        for (i, fired) in waiver_fired.iter().enumerate() {
+            if !*fired {
+                let (m, needle, finding) = LUPIN_TIER_WAIVERS[i];
+                reds.push(format!(
+                    "LUPIN_TIER_WAIVERS[{i}] ({m}: `{needle}`, {finding}) never fired — the \
+                     reference machine no longer refuses that call, so the entry asserts a \
+                     refusal that does not happen. RETIRE IT in the same commit as the bump \
+                     that healed it (wolf-lang#177's lesson)."
+                ));
+            }
         }
     }
     if reds.is_empty() {
@@ -629,24 +650,16 @@ mod tests {
                 "a needle keys a CALL, never a module ({m}: {needle})"
             );
         }
-        // sc37 RE-ARMS the list for the third time, with the case the
+        // sc37 RE-ARMED the list for the third time, with the case the
         // constant's own doc predicted: three calls, one finding name
         // (F-0110), a release-ordering debt rather than a semantic one.
-        // The invariants above still bind every entry — each names a
-        // finding, and each needle keys a CALL — so this assertion moves
-        // from "empty" to "every entry is a NAMED, NARROW debt", which is
-        // what the emptiness was standing in for.
-        assert_eq!(LUPIN_TIER_WAIVERS.len(), 3);
-        for (_, needle, finding) in LUPIN_TIER_WAIVERS {
-            assert!(
-                finding.contains("F-0110"),
-                "sc37's entries share one finding name"
-            );
-            assert!(
-                needle.starts_with("net.") || needle.starts_with("os."),
-                "a needle names a call in the module it waives"
-            );
-        }
+        // sc38 EMPTIED it again at lupin 0.1.27, measured before the
+        // entries left (all three needles reach exit(0) there). The
+        // invariants above bind every FUTURE entry — each names a
+        // finding, each needle keys a CALL — and they are the half of
+        // this test that must never be deleted, because the list is
+        // empty far more often than it is armed.
+        assert!(LUPIN_TIER_WAIVERS.is_empty());
         let waived = |module: &str, line: &str| {
             LUPIN_TIER_WAIVERS
                 .iter()
