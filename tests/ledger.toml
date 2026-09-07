@@ -1493,6 +1493,19 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# sc38 — wolf-std#8's witness, added beside the row it completes. The
+# deadline file above rides the `timeout` OUT of main; this one CATCHES
+# it and keeps going, because the property `[os.net.accept]` gives a
+# prefork hand is that a lost race costs the budget and NOTHING ELSE —
+# the listener is unharmed and the next accept takes a real connection.
+# Also holds the poll half (`wait` with deadline 0 on an undialled
+# listener answers empty and does not raise), which is the sentence the
+# old clause denied in so many words.
+[tests."net/accept_bounded_and_pollable.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
 # ---- sc09: std.str's census flip and std.bytes' first code ----
 # Sixteen new rows and every one of them is `run` on ALL THREE LANES — the
 # first time a sprint has landed a clean three-lane block, and the reason is
@@ -3336,12 +3349,37 @@ native = "run"
 # lanes do not disagree about a program's meaning, one of them has not
 # been given the program yet.
 # =====================================================================
+#
+# ---- sc38: F-0110 IS PAID, AND THE LETTER OF ITS EXIT WAS WRONG. ----
+# lupin 0.1.27 (is38) conforms AT `6ade878`, not PAST it — and that is
+# enough, because `6ade878` IS v0.2.5, the release the builtins land in.
+# The exit condition above was a proxy for the one that mattered (has
+# the reference machine been SHOWN these calls) and re-measuring beat
+# re-reading it. FOUR of the five rows flip `unsupported` -> `run` at
+# FIRST SIGHT, against sc37 bodies not touched by a character — the
+# F-0049 pattern, a row declared against a fix and healed by it:
+#   net/listen_with_default  exit(0)  served/port_ok/echo/backlog_hint
+#   net/reuse_port           exit(0)  served/second_bind/some_member/survivor
+#   net/wait_readiness       exit(0)  all six relations
+#   os/cpus                  exit(0)  ge_one/agrees/fallback_unused
+# THE FIFTH DOES NOT, AND ITS WORD NOW MEANS SOMETHING ELSE ENTIRELY.
+# `net/adopt_rows.lu` stays `unsupported` at `resolve`, but is38 no
+# longer fails to resolve the call — it DECLINES it by name, in the
+# checked machine's own construct string verbatim:
+#   x-unsupported: "listener adoption in checked execution"
+# The reason is the reason, not the calendar: lupin is a binary
+# INTERPRETING a program, so a descriptor handed to "the program's
+# child" goes to the interpreter's child; and the handoff needs the
+# `unsafe` this crate forbids. So the row's WORD did not move and its
+# MEANING did — from "not yet released" to "stated posture" — which is
+# the one motion a lane word can make that a ledger diff cannot show.
+# It is written here because nothing else would ever say it.
 
 # `listen_with(addr, listen_opts())` is `listen(addr)` call for call —
 # the acquisition rule, observed: bind, port, dial, accept, echo, close,
 # with every operation after the bind being std.net's own.
 [tests."net/listen_with_default.lu"]
-lupin = "unsupported"  # sc37: F-0110 — `net_listen_with` does not resolve at lupin 0.1.26's pin
+lupin = "run"   # sc38: F-0110 PAID — `net_listen_with` resolves at lupin 0.1.27's pin (6ade878 = v0.2.5). Flipped at FIRST SIGHT, sc37 body untouched
 wolfc = "run"
 native = "run"
 
@@ -3353,7 +3391,7 @@ native = "run"
 # the witness. Also carries the `exists` row for a double bind without
 # the option.
 [tests."net/reuse_port.lu"]
-lupin = "unsupported"  # sc37: F-0110 — `net_listen_with` does not resolve at lupin 0.1.26's pin
+lupin = "run"   # sc38: F-0110 PAID — `net_listen_with` resolves at lupin 0.1.27's pin (6ade878 = v0.2.5). Flipped at FIRST SIGHT, sc37 body untouched
 wolfc = "run"
 native = "run"
 
@@ -3361,7 +3399,7 @@ native = "run"
 # peer is READY, the subset comes back in the CALLER's order, and an
 # empty set with an unbounded deadline is the clause's one `io` row.
 [tests."net/wait_readiness.lu"]
-lupin = "unsupported"  # sc37: F-0110 — `net_wait` does not resolve at lupin 0.1.26's pin
+lupin = "run"   # sc38: F-0110 PAID — `net_wait` resolves at lupin 0.1.27's pin (6ade878 = v0.2.5). Flipped at FIRST SIGHT, sc37 body untouched
 wolfc = "run"
 native = "run"
 
@@ -3376,7 +3414,7 @@ native = "run"
 # a rig that runs one program per test with no parent, and the file says
 # so rather than faking a parent.
 [tests."net/adopt_rows.lu"]
-lupin = "unsupported"  # sc37: F-0110 — `net_adopt_listener` does not resolve at lupin 0.1.26's pin
+lupin = "unsupported"  # sc38: NOT F-0110 any more — is38 DECLINES adoption by name, "listener adoption in checked execution", the checked machine's string verbatim: a binary interpreting a program, and `unsafe` its crate forbids. Same word, different reason
 wolfc = "unsupported"  # sc37: the checked machine refuses adoption BY NAME, `[os.proc.inherit]`'s own clause — not a gap, a stated posture
 native = "run"
 
@@ -3384,7 +3422,7 @@ native = "run"
 # the `else` arm never taken on a host that answers — which is the
 # clause's whole point, since `os.cpus` is a ROW rather than a silent 1.
 [tests."os/cpus.lu"]
-lupin = "unsupported"  # sc37: F-0110 — `os_cpus` does not resolve at lupin 0.1.26's pin
+lupin = "run"   # sc38: F-0110 PAID — `os_cpus` resolves at lupin 0.1.27's pin (6ade878 = v0.2.5). Flipped at FIRST SIGHT, sc37 body untouched
 wolfc = "run"
 native = "run"
 

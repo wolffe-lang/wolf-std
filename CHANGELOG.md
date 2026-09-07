@@ -1,5 +1,147 @@
 # Changelog
 
+## sc38 — 2026-09-07 — the waiver retires, and so does the pin that could not see it
+
+**F-0099 IS RETIRED, AND THE RED CAME FIRST.** wolf-lang **v0.2.6**
+(`a369b22`, [#239] — and **[#165], this repo's own filing**, the same gap
+filed twice ten days apart by two lanes that never found each other)
+appends `diag`, `ct`, `type` and `os` to `[conf.anchor.ns]`, on #120's
+precedent exactly: additive, nothing renumbered, `[conf.anchor.stable]`
+untouched — because an anchor's namespace IS its leading segment, so
+MOVING the anchors would have renumbered 71 published ones and dragged
+**3,273 citations across nine repositories** with them, against one
+paragraph. A new `[conf.anchor.ns.admit]` writes down the rule the four
+misses shared: a namespace is admitted **in one change or not at all**,
+and the gap is **silent on whichever side is permissive**.
+
+The red, captured at the v0.2.6 snapshot with `REGISTERED_NS` still at
+seven:
+
+> the pinned registry publishes **71** anchors in namespace(s)
+> `{ct, diag, os, type}` that REGISTERED_NS does not admit —
+> `[conf.tag.valid]` makes citing any one of them a CI failure here.
+
+71 is upstream's own count at the same head, reached from the other side.
+
+**AND THE PIN sc36 ARMED FOR EXACTLY THIS DID NOT MOVE.** Measured
+first, deliberately: `f0099_the_four_unadmitted_namespaces_still_fail`
+was **GREEN** at that same snapshot, with the gap already closed
+upstream. Its failure message said "has `[conf.anchor.ns]` admitted its
+namespace? Then retire F-0099" — and it could never have asked, because
+it asked a hardcoded **two-anchor mock**, where `classify("os.net.unix")`
+errs whether `os` is unregistered (the gap) or registered-with-no-such-
+anchor (the mock). **A gap pinned against a mock cannot see the event it
+pins**, and the failure message reads like a gate while being none. The
+replacement asks the PINNED REGISTRY
+(`every_published_anchor_sits_in_a_registered_namespace`) and reds at the
+next bump that publishes an unadmitted namespace, which is
+`[conf.anchor.ns.admit]`'s downstream half.
+
+**The bill sc36 said would come due is paid, in the same commit.**
+Seventeen files now cite the clause they hold instead of a stand-in: the
+six `[os.net.unix]` witnesses; ten `ty.byte` -> **`type.byte`**; sc24's
+char surface citing `type.char.cast` / `.interp` / `.order` beside
+`mem.str.chars`; and sc37's four os rows citing `os.net.wait`,
+`os.net.listen.opts`, `os.proc.inherit`, `os.cpus`. **`ty` stays
+RESERVED**, and is reserved-and-USED here where upstream calls it
+reserved-and-unused: `ty.match.exhaustive` and `ty.method.receiver-mode`
+name clauses no document has written. Withdrawing a reservation is the
+one direction that can reject legal input, and those two tags are the
+concrete reason not to.
+
+**F-0110 RETIRES ONE RELEASE EARLIER THAN ITS OWN LETTER SAID, AND THE
+LETTER IS THE LESSON.** lupin **0.1.26 -> 0.1.27** (is38, pin `982f857`
+-> `6ade878`). F-0110's exit was written "the first lupin conforming
+**past** `6ade878`"; 0.1.27 conforms **at** `6ade878` — and that is
+enough, because `6ade878` IS v0.2.5, the release the builtins land in.
+The written condition was a PROXY for the one that mattered (has the
+reference machine been SHOWN these calls) and it was off by a release.
+**Re-measuring beat re-reading it.** Four of the five rows flip
+`unsupported` -> `run` at FIRST SIGHT against sc37 bodies untouched by a
+character (the F-0049 pattern): `net/listen_with_default`,
+`net/reuse_port`, `net/wait_readiness`, `os/cpus`.
+`LUPIN_TIER_WAIVERS` empties for the **third** time in its life.
+
+**The fifth row did not move and its word now means something else.**
+`net/adopt_rows.lu` stays `lupin = "unsupported"`, but is38 no longer
+fails to RESOLVE the call — it DECLINES it, `x-unsupported: "listener
+adoption in checked execution"`, the checked machine's own construct
+string verbatim, for the checked machine's own reason. The word is
+identical; the reason moved from a CALENDAR to a STATED POSTURE. That is
+the one motion a lane word can make that **no ledger diff can show**, so
+it is written into the ledger's sc37 block rather than left to inference.
+
+**And the mechanism leaves a gate behind it.** Nothing in
+`doc_examples.rs` could ever have noticed a waiver going inert —
+`tier_waived` fires only on `Unsupported`, so a lane that starts RUNNING
+makes the entry silently dead while the list goes on asserting a refusal
+that no longer happens. Both previous emptyings (sc14, sc25) were caught
+by a human at a bump. sc38 adds `waiver_fired`: **a waiver that never
+fires is a RED naming itself** — wolf-lang#177's lesson mechanized on
+this side, the same gate is38 built for `differ::retired_waivers`.
+
+**wolf-std#8 — this rig's own clause bug, fixed with a gate on the
+prose.** `std.net.accept`'s clause said "There is no non-blocking accept
+and no way to poll … waits forever". Written at sc08, true then, and
+false on both halves by the time lobo's ws18 read it: sc37 landed
+`net.wait` **thirty lines below it in the same file**, and wolf-lang#242
+(`[os.net.accept]`, new at v0.2.6) bounded the park. The clause now says
+what the upstream clause says — an armed deadline **BOUNDS** the call,
+`net.wait` is the poll answer by name, a readiness wake **is not a
+claim**, and a lost race re-waits against the **same budget** and answers
+`timeout`, which on N hands is the NORMAL outcome for N-1 of them.
+`set_listener_deadline` gains the second line ws18 asked for: on a shared
+listener the deadline is the mechanism, not the net for a mistake.
+
+Two witnesses keep them from drifting again, because **prose is what no
+gauntlet reads**: `net_accept_clause_agrees_with_os_net_accept` lints the
+clause for the two retracted phrases and the five it must keep, and reds
+if `os.net.accept` ever stops being a published anchor at the pin; and
+`tests/net/accept_bounded_and_pollable.lu` proves the three live
+sentences on three lanes — a listener CAN be polled before it is dialled,
+an armed budget bounds the park, and **a `timeout` leaves the listener
+unharmed**, which is the property the losing hand depends on. A rig
+running one program cannot LOSE a race (that witness is upstream's
+`corpus/net/accept_race.lu`); it can prove that going round the loop
+again costs nothing.
+
+**THE PIN, classified before it was measured.** `6ade878` (v0.2.5) ->
+`398e5f5` (v0.2.6), 5 commits under two merges. #239 MECHANICAL upstream
+/ BEHAVIOURAL for this rig's CI gate; #242 BEHAVIOURAL; #243
+DIAGNOSTIC-ONLY. Predicted zero `.lu` behaviour motion and zero ledger
+motion from all three, and measured zero of all three — every ledger row
+that moved this sprint moved on the **lupin** bump, not the wolf one.
+Anchors **422 -> 424**, key sets diffed BOTH ways (F-0100/#177): added
+`{conf.anchor.ns.admit, os.net.accept}`, dropped `{}`, owners moved
+`{}`. **The prediction missed one and the miss is recorded rather than
+tidied**: +1 was predicted from #239's own commit message, +2 measured,
+because **#242 publishes an anchor as well as changing behaviour**. A
+spec delta classified as behavioural is still a registry delta, and the
+both-ways diff is what caught it.
+
+**Verify the machine, never the brief.** The lane opened with a written
+claim that wolf v0.2.6 pairs with lupin 0.1.26. It does — the pairing
+line says so — and the machine was running **0.1.27**, because is38
+shipped after r09 cut the tag. Read from `--version`, not from the
+paragraph (F-0064: the pairing line is reported, never gated).
+
+**wolf-std#6 closed as DELIVERED, with the residue split out rather than
+orphaned.** Everything #6 asked for at the std tier shipped at sc37,
+including the §12 row question it raised in passing (`listen_with`
+declares **`exists`** for a bind a sibling holds). lobo declined to CALL
+the surface for three reasons of its own — a raw-fd serving loop, the
+inherit pair splitting across tiers, four pure delegates — and those are
+reasons a consumer does not call a surface, not reasons the surface is
+missing. The one genuinely unmet piece, the `std.process` half of the
+inherit pair, is **wolf-std#9**, carrying lobo's answer to the shape
+question sc37 asked by name: **the inherit set goes on the SPAWN, not on
+a `Command` builder**, because the listener set is a property of the
+master and each spawn merely borrows it — a `Command` that remembers
+descriptors is a `Command` that can hand a stale one down.
+
+[#239]: https://github.com/wolffe-lang/wolf-lang/issues/239
+[#165]: https://github.com/wolffe-lang/wolf-lang/issues/165
+
 ## sc37 — 2026-09-06 — the words came true: ten stale rows, a pin bump, and the server surface
 
 **THE BUMP, AND ALL THREE WOLF-SIDE PINS LAND ON ONE SHA AGAIN.**

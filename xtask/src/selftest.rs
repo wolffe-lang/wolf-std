@@ -68,6 +68,82 @@ fn std_tree_files_are_members() {
     }
 }
 
+/// **wolf-std#8's gate.** `std.net.accept`'s clause and upstream's
+/// `[os.net.accept]` describe the same call from two repositories, and
+/// for one release they disagreed: the clause was written at sc08 ("no
+/// non-blocking accept and no way to poll … waits forever"), sc37 landed
+/// `net.wait` thirty lines below it in the same file, and wolf-lang#242
+/// bounded the park at v0.2.6. Nothing could see the drift — the words
+/// are prose, and prose is what no gauntlet reads — so lobo's ws18 found
+/// it by writing a prefork server against it.
+///
+/// This holds the four things the corrected clause must keep saying, and
+/// the two retracted sentences it must never say again. It is a LINT on
+/// wording, which is unusual here and deliberate: the alternative is the
+/// clause rotting silently a second time. If a future edit rewords it
+/// legitimately, this test changes in that same commit — which is the
+/// point, because then a human has read both halves together.
+///
+/// The registry half is the other direction: `os.net.accept` must still
+/// be a published anchor at the pin. If upstream ever tombstones or
+/// renumbers it, `vendor/upstream/anchors.json` changes at the bump and
+/// this reds there rather than leaving a citation pointing at nothing.
+#[test]
+fn net_accept_clause_agrees_with_os_net_accept() {
+    let repo = repo_root();
+    let src = std::fs::read_to_string(repo.join("std/net/net.lu")).unwrap();
+    let start = src
+        .find("pub fn accept(")
+        .expect("std/net/net.lu: no `pub fn accept(`");
+    // The doc block is everything from the previous function's closing
+    // brace to the signature; `///` lines only.
+    let head = &src[..start];
+    let clause: String = head
+        .lines()
+        .rev()
+        .take_while(|l| l.trim_start().starts_with("///") || l.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(!clause.is_empty(), "accept's doc block did not parse");
+
+    for retracted in ["no way to poll", "waits forever"] {
+        assert!(
+            !clause.contains(retracted),
+            "std.net.accept's clause says {retracted:?} — wolf-std#8. \
+             `net.wait` polls a listener (sc37) and an armed \
+             `set_listener_deadline` bounds the park ([os.net.accept], \
+             wolf-lang#242)."
+        );
+    }
+    for required in [
+        "[os.net.accept]", // the upstream clause it must agree with
+        "net.wait",        // the poll answer, by name
+        "BOUNDS",          // an armed deadline bounds the call
+        "not a claim",     // a readiness wake is not exclusive
+        "same budget",     // a lost race re-waits inside the armed budget
+    ] {
+        assert!(
+            clause.contains(required),
+            "std.net.accept's clause no longer says {required:?} — \
+             wolf-std#8 asked for it and `[os.net.accept]` still says it. \
+             If the clause was reworded deliberately, move this needle in \
+             the SAME commit."
+        );
+    }
+
+    let text = std::fs::read_to_string(repo.join("vendor/upstream/anchors.json")).unwrap();
+    let reg = anchors::Registry::from_json(&text).unwrap();
+    assert!(
+        matches!(
+            reg.classify("os.net.accept"),
+            Ok(anchors::TagClass::Registered)
+        ),
+        "`os.net.accept` is not a registered anchor at this pin — the \
+         clause above cites it and tests/net/accept_bounded_and_pollable.lu \
+         tags it"
+    );
+}
+
 /// The staging round-trip the rig exists to prove: the exemplar entry
 /// FAILS to resolve its module in place (no std root, and the package
 /// root — the entry file's directory — holds no modules), and runs green
