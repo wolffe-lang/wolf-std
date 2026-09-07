@@ -1,0 +1,84 @@
+//! check: run(exit=0, stdout="pollable: true | bounded: true | ready_after_dial: true | takes_after_a_timeout: hi")
+//! phase: run
+//! conforms: std.net, os.net.accept, os.net.wait, err.row, err.else
+//!
+//! **The three sentences wolf-std#8 says `accept`'s clause got wrong**,
+//! held as a test so the clause and `[os.net.accept]` cannot drift apart
+//! again. Until sc38 the clause read "There is no non-blocking accept and
+//! no way to poll, so a program that accepts before anyone dials waits
+//! forever" — written at sc08, true then, and false on both halves by the
+//! time lobo's ws18 read it: sc37 landed `net.wait` thirty lines further
+//! down this module, and wolf-lang#242 (`[os.net.accept]`, v0.2.6) bounded
+//! the park.
+//!
+//! **`pollable`** is the first half. A listener nobody has dialled,
+//! asked with deadline `0`, answers the empty set and does NOT raise —
+//! so a program CAN ask "is there a connection" without committing to
+//! the wait, which is precisely what the retracted sentence denied.
+//!
+//! **`bounded`** is the second. With `set_listener_deadline` armed and no
+//! peer coming, `accept` resolves `timeout` — the row is caught by name
+//! here rather than ridden out of `main` (`accept_deadline_row.lu` does
+//! the ride-out; this file needs the program to keep going afterwards).
+//! The park is bounded by the budget, not forever.
+//!
+//! **`takes_after_a_timeout`** is the third and the one that matters to a
+//! prefork server. `[os.net.accept]` says a hand that loses the race
+//! waits again against THE SAME budget — the one computed when the call
+//! began, never a fresh one — and eventually answers `timeout`, which on
+//! N hands is the normal outcome for N-1 of them. That means a `timeout`
+//! is not a state change: the listener it came from is unharmed, still
+//! armed, and the very next `accept` takes a real connection and echoes
+//! over it. A rig that runs one program with no siblings cannot LOSE a
+//! race — the two-hand witness is upstream's `corpus/net/accept_race.lu`
+//! — but it can prove the property the losing hand depends on, which is
+//! that going round the loop again costs nothing.
+//!
+//! `ready_after_dial` closes the poll half against a real connection: the
+//! same set that answered empty now names the listener, which is how a
+//! serving loop knows to call `accept` at all.
+//!
+//! The `.fd` reads are `wait`'s documented idiom (a ready set mixes
+//! listeners and streams and wolf has no sum type that could hold both at
+//! this pin). The sentinel `Socket` in the handler is `refused_row.lu`'s
+//! shape: `accept`'s success type is a struct, so a caught row must name
+//! a value, and a negative `fd` is never a live descriptor.
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+
+    var set = List[int]()
+    (mut set).push(srv.fd)
+    let idle = net.wait(set, 0)?
+    let pollable = idle.len == 0
+
+    net.set_listener_deadline(mut srv, 150)?
+    let missed = net.accept(mut srv) else |e| match e {
+        timeout => net.Socket { fd: 0 - 1 },
+        io => net.Socket { fd: 0 - 9 },
+    }
+    let bounded = missed.fd == 0 - 1
+
+    var cli = net.connect(net.loopback(p))?
+    let ready = net.wait(set, 500)?
+    let ready_after_dial = ready.len == 1
+
+    var conn = net.accept(mut srv)?
+    net.write(mut cli, "hi")?
+    let got = net.read(mut conn, 8) else "?"
+
+    print("pollable: {pollable} | bounded: {bounded} | ready_after_dial: {ready_after_dial} | takes_after_a_timeout: {got}")
+
+    net.close(take conn)?
+    net.close(take cli)?
+    net.close_listener(take srv)?
+
+    if !pollable { return 1 }
+    if !bounded { return 2 }
+    if !ready_after_dial { return 3 }
+    if got != "hi" { return 4 }
+    0
+}
