@@ -247,10 +247,37 @@ pub fn port(l: Listener) -> int ! {io} {
 /// under F-0049 for nine sprints) — and `io` when the handle is closed,
 /// forged or the host failed. Never traps.
 ///
-/// **This blocks until a peer connects.** There is no non-blocking accept
-/// and no way to poll, so a program that accepts before anyone dials waits
-/// forever; a test connects first and lets the backlog hold the connection
-/// (which is exactly what the doc example below does).
+/// **This parks until a connection is yours, and an armed deadline BOUNDS
+/// the park** (`[os.net.accept]`, wolf-lang#242). With a budget armed by
+/// `set_listener_deadline`, the call returns inside it — the connection,
+/// or `timeout`. With no budget armed it parks indefinitely, in the
+/// runtime's own wait rather than the kernel's, so a program that accepts
+/// before anyone dials still waits; the dial-first test discipline stays
+/// and the doc example below keeps it.
+///
+/// **To ask WITHOUT committing to the wait, use `net.wait`** — thirty
+/// lines down this file, `[os.net.wait]`. A loop that multiplexes this
+/// listener with its open connections asks `wait` for the ready set and
+/// calls `accept` only when the answer names `l.fd`. That is the shape
+/// `wait` exists for, and it is the answer to "can I poll a listener".
+///
+/// **A readiness wake is not a claim, and a `timeout` here can mean
+/// someone else took it.** On a listener several processes share — the
+/// prefork arrangement `[os.proc.inherit]` invites, and the one `wait`'s
+/// clause points at — one arriving connection wakes EVERY hand and
+/// exactly one of them takes it. A hand that loses the race finds nothing
+/// there and waits again **against the same budget**, the one computed
+/// when its call began and never a fresh one, so a lost race costs at
+/// most the budget it already armed. What it eventually answers is
+/// `timeout`, and on N hands that is the NORMAL outcome for N-1 of them:
+/// not a failure to report, not a state change, just the connection this
+/// hand did not get. A serving loop treats it as "go round again". This
+/// is why a shared-listener hand arms a SHORT budget: there, a deadline
+/// is the mechanism and not merely the net for a mistake that
+/// `set_listener_deadline`'s own clause describes.
+///
+/// The accepted socket is BLOCKING whatever posture the listener holds,
+/// so nothing about `read`/`write` changes.
 ///
 /// `mut l` because accepting ADVANCES the listener: the connection this
 /// call takes is one the next call will not see, which is state the value
@@ -514,6 +541,13 @@ pub fn set_deadline(mut s: Socket, ms: int) -> () ! {io} {
 /// "an accept with no peer coming never returns" hazard the module
 /// header documented from sc08 on; the dial-first test discipline
 /// stays (a deadline is a net for a mistake, not a license to block).
+///
+/// **On a listener several processes accept from, it is the mechanism
+/// rather than the net.** `[os.net.accept]` bounds a lost race by the
+/// budget armed when the call began, so a prefork hand arms a SHORT one
+/// deliberately: that budget is the most a connection taken by a sibling
+/// can cost it before it goes round its loop again. See `accept`'s clause
+/// for what the `timeout` means there.
 ///
 /// Rows: `io` — a forged, closed or wrong-kind handle. Never traps.
 ///
