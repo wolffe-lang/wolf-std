@@ -463,7 +463,27 @@
 # them carries `lupin = "unsupported"` for a reason that is a release
 # DATE and not a semantics. It retires at the first lupin conforming
 # past 6ade878, with no edit to any test.
-version = "0.1.26"
+#
+# sc38 BUMP: 0.1.26 -> 0.1.27, pin 982f857 (v0.2.4) -> 6ade878 (v0.2.5).
+# is38 "the cores in the mirror" takes the v0.2.5 TAG and mirrors s137's
+# five anchors at once. READ THE LETTER OF F-0110 AGAINST THIS: it said
+# "retires at the first lupin conforming PAST 6ade878", and 0.1.27
+# conforms AT 6ade878 — but the letter was a proxy for the condition
+# that actually matters, which is whether the reference machine has been
+# SHOWN s137's builtins. v0.2.5 is where they land, so it has. The
+# calendar debt is paid; what remains on `net/adopt_rows.lu` is not a
+# date, it is is38 declining listener adoption BY NAME in the checked
+# machine's own words ("listener adoption in checked execution"),
+# because the interpreter is a binary interpreting a program and the
+# handoff needs `unsafe` this crate forbids. See F-0110's retirement
+# note in docs/findings.md for the row-by-row measurement.
+#
+# The machine was ALREADY running it when the lane opened (0.1.27,
+# installed by the orchestrator); this entry records the acquisition.
+# Verified from `--version`, not from the brief: wolf 0.2.6's PAIRING
+# line still names lupin 0.1.26 at 982f857, because is38 shipped after
+# r09 cut the tag. The pairing line is not the machine (F-0064).
+version = "0.1.27"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -471,9 +491,13 @@ version = "0.1.26"
 # pin = "b80d239e2d1edf5d767108f8c01b98a7709bf35d"  (superseded, sc31 era — is31's s130-merge pin)
 # pin = "2bfbe5e6e877d3b6b43a9d8a68b56b1ef74c21c4"  (superseded, sc32 era — is33's s132-merge pin)
 # pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc33/sc34/sc35-bump era — is34's v0.2.2-tag pin, held while wolf ran 71 commits ahead)
-pin = "982f857885b991e686c6b045de213d10cab013c1"
-# (UNCHANGED at sc37: 0.1.26 conforms to the same wolf-lang commit
-#  0.1.25 did — is37 was an interpreter release, not a pin chase.)
+# pin = "982f857885b991e686c6b045de213d10cab013c1"  (superseded, sc35-second/sc36/sc37 era — is36's v0.2.4-tag pin, held across sc37)
+pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"
+# (sc37: UNCHANGED — 0.1.26 conformed to the same wolf-lang commit 0.1.25
+#  did, is37 was an interpreter release, not a pin chase. sc38: it IS a
+#  pin chase — 0.1.27 crosses to v0.2.5 and this is the pin that pays
+#  F-0110. It sits ONE RELEASE BEHIND the data pin below, which is the
+#  ordinary posture and not the sc35 inversion.)
 #
 # The sc14-bump note, kept for the history it records:
 # What the bump changes for this repo, re-measured one call at a time:
@@ -610,7 +634,32 @@ pin = "982f857885b991e686c6b045de213d10cab013c1"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.5"
+version = "0.2.6"
+# sc38 BUMP: 6ade878 (v0.2.5) -> 398e5f5 (v0.2.6), 5 commits under two
+# merges. Three deltas, classified BEFORE they were measured:
+#   #239 / a369b22  MECHANICAL upstream, BEHAVIOURAL for this rig's CI
+#     gate — `[conf.anchor.ns]` admits `diag`, `ct`, `type`, `os`, and
+#     a new `[conf.anchor.ns.admit]` writes down how the next one is
+#     admitted. Nothing legal becomes illegal; tags this rig REJECTED
+#     become legal. F-0099 retires here. Predicted zero .lu behaviour
+#     motion and zero ledger motion; measured zero of both.
+#   #242 / 55c364b  BEHAVIOURAL — `net_accept` takes without blocking
+#     and re-waits a lost race against the SAME budget. Predicted zero
+#     wolf-std source motion (no test here races two hands on one
+#     listener; the witness is upstream's corpus/net/accept_race.lu, and
+#     `net/accept_deadline_row.lu` is a PEER-LESS accept where there is
+#     no race to lose). Measured zero. What it DID cost is a clause:
+#     wolf-std#8, fixed this lane.
+#   #243 / bd74f63  DIAGNOSTIC-ONLY — a keyword-named parameter with no
+#     `:` is one report, not two. Predicted zero; measured zero (no
+#     wolf-std source has the shape; every file here compiles).
+# anchors.json 422 -> 424, key sets diffed BOTH ways (F-0100/#177):
+# added {conf.anchor.ns.admit, os.net.accept}, dropped {}, owners moved
+# {}. THE PREDICTION MISSED ONE: +1 was predicted from #239's own commit
+# message and +2 measured, because #242 PUBLISHES AN ANCHOR as well as
+# changing behaviour — a spec delta classified as behavioural is still a
+# registry delta, and the both-ways diff is what caught it.
+#
 # sc37 BUMP: 982f857 (v0.2.4) -> 6ade878 (v0.2.5), 42 commits, and ALL
 # THREE WOLF-SIDE PINS LAND ON ONE SHA AGAIN — the binary's own
 # `--version` pin, this entry, and `vendor/upstream/PIN` (with the
@@ -1575,4 +1624,5 @@ version = "0.2.5"
 # pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc32/sc33 era — the v0.2.2 tag acquisition, held across sc33 while the data pin ran ahead)
 # pin = "31170d119379086f6242cd88d4f4e5386f6aef23"  (superseded, sc34 era — the s135-merge dev-stamped acquisition, the byte TYPE)
 # pin = "4230b008e39d6541f31ac9858057e4345a337271"  (superseded, sc35 first bump — the s136-merge dev-stamped acquisition, the byte PRODUCERS)
-pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"
+# pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"  (superseded, sc37 era — the v0.2.5 tag acquisition, s137's five builtins)
+pin = "398e5f547a65308c6a3e88fee632563e87afd217"
