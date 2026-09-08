@@ -1643,63 +1643,62 @@ Retirements and re-verifications, each re-measured rather than assumed:
 ## F-0049 — the net builtin tier, and the deadline that exists but cannot be armed
 
 Seven builtins (`net_listen`, `net_port`, `net_accept`, `net_connect`,
-`net_read`, `net_write`, `net_close`) carry the whole of `std.net`, over the
+`net_read`, `net_write`, `net_close`) are the whole of `std.net`, over the
 row vocabulary `{refused, timeout, closed, utf8, io}`. They are enough for a
-TCP echo — the module's eight tests and ten doc examples prove it on the
-checked lane — and the shape of what is missing is one theme: **nothing can
-wait with a bound, and nothing can say less than "closed" or more than "the
-local port".**
+TCP echo; the module's eight tests and ten doc examples prove it on the
+checked lane. What is missing has one theme: nothing can wait with a bound,
+and nothing can say less than "closed" or more than "the local port".
 
-- **`timeout` is declared and unreachable.** `wolf_rt`'s net table implements
+- `timeout` is declared and unreachable. `wolf_rt`'s net table implements
   a per-socket deadline (`set_deadline`, with its own unit tests, including
   one named `timeout_row_reachable`), and no builtin exposes it. The
   executing lane does not even go through that table: the checked machine
   opens plain blocking `std::net` sockets directly, so a deadline armed by
-  some future builtin would have to be plumbed there too. Consequence for a
-  program: `accept` with no peer coming, `connect` to a black hole and `read`
-  from a silent peer all block forever, and there is no `select` at this tier
-  to race them against a timer (X6's composition story is s35's). Every
-  `std.net` signature already carries the tag, so the fix is additive — but
-  every std TEST has to be written so that the peer is the program itself,
-  which is a discipline the rig cannot enforce.
-- **No `shutdown`.** Closing the socket is the only way to tell a peer "I am
-  done sending", so a request/response protocol where the client signals
-  end-of-request by half-closing cannot be written, and `read`-to-close on
-  the other end is the only termination signal there is.
-- **No address surface beyond the local port.** `net_port` answers an `int`
-  for the local end; there is no peer address, no local address string, no
-  family. A server cannot log who connected.
-- **No byte-level read or write**, which is why `read` carries a `utf8` row
+  some future builtin would have to be plumbed there too. In a program,
+  `accept` with no peer coming, `connect` to a black hole and `read` from a
+  silent peer all block forever, with no `select` at this tier to race them
+  against a timer (X6's composition story is s35's). Every `std.net`
+  signature already has the tag, so the fix is additive, but every std test
+  has to be written so that the peer is the program itself, and the rig
+  cannot enforce that discipline.
+- There is no `shutdown`. Closing the socket is the only way to tell a peer
+  "I am done sending", so a request/response protocol where the client
+  signals end-of-request by half-closing cannot be written, and
+  `read`-to-close on the other end is the only termination signal there is.
+- There is no address surface beyond the local port. `net_port` answers an
+  `int` for the local end; there is no peer address, no local address string,
+  no family. A server cannot log who connected.
+- There is no byte-level read or write, which is why `read` has a `utf8` row
   at all (a chunk boundary inside a code point is a miss and the bytes are
   gone) and why the line-protocol helper is F-0050.
-- **No UDP, no name resolution as an operation.** `net_connect` hands its
-  string to the host, so a hostname WOULD resolve through the host resolver —
-  which std neither uses nor tests, because the no-external-network law is
-  absolute here.
-- **Two tags std documents and cannot test**: `timeout` (above) and `utf8`
-  (it needs a peer that writes bytes that are not UTF-8, and nothing in wolf
-  can write them — the compiler's own s39 test spawns a Rust thread to do it).
+- There is no UDP and no name resolution as an operation. `net_connect` hands
+  its string to the host, so a hostname would resolve through the host
+  resolver, which std neither uses nor tests, because the no-external-network
+  law is absolute here.
+- std documents two tags it cannot test: `timeout` (above) and `utf8` (it
+  needs a peer that writes bytes that are not UTF-8, and nothing in wolf can
+  write them; the compiler's own s39 test spawns a Rust thread to do it).
   Both are documented per function and no test claims to have observed them.
 
 ## F-0050 — a line protocol needs a byte read, not a buffer
 
 The obvious blocker for `read_line`-over-a-socket is state, and state turns
 out to be free: a public struct with a `str` field, mutated through a `mut`
-parameter across a module boundary, WORKS on both executing lanes
-(measured — `stash(mut r, text)` then two `take_line(mut r)` calls returning
-`one`/`two` and then missing, identically under lupin 0.1.5 and the checked
-tier). So a buffered reader is writable in principle.
+parameter across a module boundary, works on both executing lanes (measured:
+`stash(mut r, text)` then two `take_line(mut r)` calls returning `one`/`two`
+and then missing, identically under lupin 0.1.5 and the checked tier). So a
+buffered reader is writable in principle.
 
-What is not writable is FILLING the buffer. Every read is a byte count over
+What is not writable is filling the buffer. Every read is a byte count over
 a `str`, and a chunk that ends inside a code point raises `utf8` with the
-bytes already consumed — so a line reader is correct only while the stream
-is ASCII, and silently loses data the moment it is not. §9's rule decides
-it: a function that is right on ASCII and corrupts on text is not a partial
-function, it is a broken one. `std.net` ships the contract in its header.
+bytes already consumed, so a line reader is correct only while the stream is
+ASCII and loses data the moment it is not. §9's rule decides it: a function
+that is right on ASCII and corrupts on text is broken. `std.net` ships the
+contract in its header.
 
 The ask, in the order std would spend it: (1) a read that returns bytes
 (`net_read_bytes(fd, max) -> List[int]`, or the `Bytes` type of F-0035);
-(2) failing that, a read that leaves an undecodable tail IN the socket rather
+(2) failing that, a read that leaves an undecodable tail in the socket rather
 than consuming it, which makes a re-read with a larger `max` a correct
 recovery; (3) a `net_read_line` builtin, which is the least general and would
 still be worth having.
@@ -1707,9 +1706,9 @@ still be worth having.
 ## F-0051 — a `comptime fn` cannot call across a module boundary
 
 A capability module's D33 refusal is supposed to be witnessable: §14 requires
-every os-facing function to say that comptime refuses it, and a claim in a doc
-that nothing tests is a claim. It cannot be witnessed through the facade at
-this pin.
+every os-facing function to say that comptime refuses it, and a doc sentence
+no test checks is only a sentence. It cannot be witnessed through the facade
+at this pin.
 
 ```
 comptime fn probe() -> int ! {refused, timeout, io} {
@@ -1717,30 +1716,32 @@ comptime fn probe() -> int ! {refused, timeout, io} {
 }
 ```
 
-The same shape one level down is exactly right — a `comptime fn` calling
-`net_connect` directly is `fail(E0701)` at typecheck on both compiler rungs,
-with the catalog's "reaches the network, which comptime code can never touch"
-— so the sandbox table is doing its job and the CALL is what fails first.
-Measured with no capability involved at all: a `comptime fn` returning
+The same shape one level down works. A `comptime fn` calling `net_connect`
+directly is `fail(E0701)` at typecheck on both compiler rungs, with the
+catalog's "reaches the network, which comptime code can never touch", so the
+sandbox table is doing its job and the call is what fails first. Measured
+with no capability involved at all: a `comptime fn` returning
 `net.endpoint("127.0.0.1", 0)`, a pure string function, is also `unsupported`
-at resolve. So this is the engine's cross-module call, not the sandbox.
+at resolve. So the engine's cross-module call is what breaks here, and the
+sandbox is not involved.
 
 Two asks: make the comptime engine resolve and evaluate a std module's
-functions (pure ones at least — a comptime `fs.join` or `net.endpoint` is
-ordinary metaprogramming), and give the checked record's `unsupported`
+functions (pure ones at least, since a comptime `fs.join` or `net.endpoint`
+is ordinary metaprogramming), and give the checked record's `unsupported`
 verdict a reason string, because at this pin the record says nothing about
-WHY and the human-readable output says nothing either.
+why and the human-readable output says nothing either.
 
 `tests/net/comptime_refuses.lu` therefore witnesses the builtin, and its
-header says so rather than implying the facade was tested.
+header says which one, so nobody reads it as a test of the facade.
 
 ## F-0052 — a `match` in a handler matches its first arm, on the lane that executes
 
-**This is F-0043's successor, and it is worse than its predecessor, because a
-rejection cannot ship and this can.** sc07 recorded two rejections: a `match`
-inside an `else` handler was `E0201`, and a payload pattern was `E0806`. The
-first is gone at this pin and what replaced it is a silent wrong answer; the
-second is unmoved (re-measured on `tests/errors/coarsen_and_chain.lu`).
+This is F-0043's successor, and it is worse than its predecessor, because a
+rejection cannot ship and this can. The sc07 sprint recorded two rejections:
+a `match` inside an `else` handler was `E0201`, and a payload pattern was
+`E0806`. The first is gone at this pin and what replaced it is a silent wrong
+answer; the second is unmoved (re-measured on
+`tests/errors/coarsen_and_chain.lu`).
 
 ```
 fn miss_io()  -> str ! {eof, io} { return io }
@@ -1751,44 +1752,44 @@ miss_eof() else |e| match e { io => "said-io", eof => "said-eof", _ => "?" }
 ```
 
 The checked lane prints `said-eof` for the first and `said-io` for the second:
-**the first arm matches whatever the tag is.** Swap the arms and the answers
-swap with them, which is the measurement that rules out any reading other than
-"a bare-identifier arm binds". No diagnostic, on either line.
+the first arm matches whatever the tag is. Swap the arms and the answers swap
+with them, which rules out any reading other than "a bare-identifier arm
+binds". Neither line produces a diagnostic.
 
 lupin 0.1.5 and the native rung both answer correctly (`said-io`,
-`said-eof`). So this is also a three-lane DIVERGENCE on a program every lane
-runs — the shape spec/06's differential protocol exists to catch, and the
-shape this rig's own divergence gate would fail on if the program were a test.
-It is not one: a test that passed by agreeing with the wrong answer would
-fossilize the bug, so `tests/net/closed_row.lu` deliberately contains no
-discriminating handler and says why in its header.
+`said-eof`). So this is also a three-lane divergence on a program every lane
+runs, the shape spec/06's differential protocol exists to catch, and the shape
+this rig's own divergence gate would fail on if the program were a test. It is
+not one: a test that passed by agreeing with the wrong answer would fossilize
+the bug, so `tests/net/closed_row.lu` carries no discriminating handler and
+says why in its header.
 
 What it costs, concretely:
 
-- **`std.net.read_all` is NOT WRITTEN.** It was written, tested and withdrawn
+- `std.net.read_all` is not written. It was written, tested and withdrawn
   inside this sprint: the loop must stop on `closed` and re-raise
   `timeout`/`utf8`/`io` unchanged, and on the executing lane it would take the
-  `closed` arm for every one of them — a silent truncation of a caller's
-  stream, which §14 forbids in the same words it used for `std.io.input_all`.
-- **`std.io.input_all` stays a contract** for the same reason, one sprint
+  `closed` arm for every one of them, silently truncating a caller's stream,
+  which §14 forbids in the same words it used for `std.io.input_all`.
+- `std.io.input_all` stays a contract for the same reason, one sprint
   after being blocked on the opposite problem.
-- **A tag's identity is still witnessable only by propagating it out of
-  `main`**, where the process outcome prints `error: <tag>`. Six of this
+- A tag's identity is still witnessable only by propagating it out of
+  `main`, where the process outcome prints `error: <tag>`. Six of this
   repo's row litmuses are written that way and none of them can be written
   any other way.
-- **API-CONVENTIONS §13's row-expectation convention is still a rejection.**
+- API-CONVENTIONS §13's row-expectation convention is still a rejection.
   `else |Tag(p)|` is still `E0806` ("this pattern can fail to match, but a
-  binding cannot") on both compiler lanes, so the convention sc06 wrote and
-  sc07 could not use is unusable for a third sprint — and this finding says
-  that even if it compiled, the arm-matching semantics beneath it would need
-  re-measuring before std leaned on them.
+  binding cannot") on both compiler lanes, so the convention written at sc06
+  and unusable at sc07 is unusable for a third sprint. And even if it
+  compiled, the arm-matching semantics beneath it would need re-measuring
+  before std leaned on them.
 
 The ask, in order: (1) resolve a bare identifier in a handler's `match` arm
-against the operand row's TAGS before treating it as a binding, which is the
-same rule wolfc already applies at a RAISE site (wolf-lang#30, closed); (2)
+against the operand row's tags before treating it as a binding, which is the
+same rule wolfc already applies at a raise site (wolf-lang#30, closed); (2)
 failing that, diagnose the shadowing, because a pattern that silently catches
 everything is the one failure mode a reader cannot see; (3) and either way,
-make the three lanes agree — one program, one meaning.
+make the three lanes agree.
 
 ## F-0053 — the warning signal covers the entry file only
 
@@ -1798,66 +1799,67 @@ the flag exists on `wolf build` and now on `wolf test`), so the signal is
 still read from the record's `warnings` array. At this pin that array turns
 out to be narrower than the claim it was used to support.
 
-Measured over all 144 staged programs (each staged exactly as the rig stages
-it: entry file plus the whole `std/` tree, `--std-root` at the staged root):
-the array reports diagnostics from the ENTRY file only. `std/math/float/float.lu`
-carries more than forty `0.0 - x` sites — deliberately, per sc04's own
-reasoning, and one of them is the literal `0.0 - 1.0` that W0402 flags 26
-times when it appears in a test — and not one importing test surfaces a
-single warning. So "the std tree is warning-clean" is not a claim this signal
-can make; "no staged ENTRY file warns" is.
+Measured over all 144 staged programs (each staged the way the rig stages it:
+entry file plus the whole `std/` tree, `--std-root` at the staged root): the
+array reports diagnostics from the entry file only. `std/math/float/float.lu`
+has more than forty `0.0 - x` sites, on purpose, per sc04's own reasoning, and
+one of them is the literal `0.0 - 1.0` that W0402 flags 26 times when it
+appears in a test. Not one importing test surfaces a single warning. So this
+signal cannot say "the std tree is warning-clean"; what it can say is "no
+staged entry file warns".
 
-Recorded with it, because it is the same wave: **W0402 earned its keep on its
-first run.** `tests/testing/near_and_ulps.lu` said in its header that it
+Recorded with it, because it is the same wave: W0402 earned its keep on its
+first run. `tests/testing/near_and_ulps.lu` said in its header that it
 asserted "the two signed zeros (one step apart, not zero — they are distinct
 bit patterns)" and asserted `0.0 - 0.0` against `0.0`, which is `+0.0` against
-`+0.0` — the exact wrong result sc04 wrote a guide entry about and this repo
-then committed anyway. The lint found it; the test now writes `-0.0`.
+`+0.0`, the wrong result the sc04 guide entry warned about and this repo then
+committed anyway. The lint found it; the test now writes `-0.0`.
 
 Two asks: `--deny-warnings` on `conform-run` (F-0046's item, restated because
-it is now the only thing standing between this repo and a warning GATE), and
-warnings collected for every module in the staged package, not only the entry
-— a library's own source is exactly where a lint like W0402 pays.
+it is now the only thing standing between this repo and a warning gate), and
+warnings collected for every module in the staged package, not only the entry,
+since a library's own source is where a lint like W0402 pays.
 
 ## F-0054 — the pin's ritual gates are load-flaky
 
-F-0024 gave this repo a two-gate pin ritual: `cargo test --workspace` AND
+F-0024 gave this repo a two-gate pin ritual: `cargo test --workspace` and
 `cargo run -p xtask -- ci`, both in a clean scratch clone at the sha. At
 `13b811f` each gate failed once and passed on re-run, and both failures were
 in the same place:
 
-- `wolf_rt::task::proc::tests::seam_observes_proc_events` — the observed
+- `wolf_rt::task::proc::tests::seam_observes_proc_events`: the observed
   scheduler-event set was missing `ProcExit { kind: 2 }` (release profile, full
   workspace run), with a `Box<dyn Any>` panic logged from `task/pool.rs:150`
   alongside it.
-- `wolf_rt::task::proc::tests::killed_proc_skips_defers_and_frees_regions` —
+- `wolf_rt::task::proc::tests::killed_proc_skips_defers_and_frees_regions`:
   `assert_eq!(left: 0, right: 1)` (debug profile, `xtask ci`'s test step).
 
 Run alone the crate is green 14 times out of 14 (8 single-test runs plus 6
 whole-crate runs), and the whole workspace is green on its second attempt, so
 the failures are timing under the parallelism of a full `cargo test`. That
-makes a "green trunk" claim probabilistic exactly where F-0024's lesson tried
-to make it deterministic: a pin verified by two runs that each fail ~half the
-time on a busy machine is not verified.
+makes a "green trunk" claim probabilistic just where F-0024's lesson tried to
+make it deterministic: two runs that each fail about half the time on a busy
+machine do not verify a pin.
 
 The ask: make the proc seam tests wait on the event they assert rather than on
 elapsed time (or serialize them), so that a red gate means a red pin. This
-repo's own posture in the meantime is to state the re-run in the pin's
-`vendor/tools.toml` note rather than quietly re-running until green.
+repo's posture in the meantime is to state the re-run in the pin's
+`vendor/tools.toml` note instead of re-running until green and saying
+nothing.
 
 ## F-0055 — the empty needle is three different things — **CLOSED at the sc11 pin**
 
-**Ruled by s71** (`[mem.str.empty]`, wolf-lang#56): an empty needle counts 0,
+Ruled by s71 (`[mem.str.empty]`, wolf-lang#56): an empty needle counts 0,
 splits to one whole piece, and replaces nothing. Measured on all three lanes
 at the sc11 pin, where two of them used to refuse the call as `unsupported`
-and the third answered. The six guards `std.str` carried are deleted —
+and the third answered. The six guards `std.str` carried are deleted.
 `count`, `split` and `replace` delegate, and the three functions std writes
-itself (`splitn`, `rsplit`, `replacen`) state the ruled answer explicitly
-because they walk `find`, which answers 0 for an empty needle forever. Nothing
-in `std.str` traps on an empty argument any more, and the two `…_trap.lu`
-files that held the guards are `split_empty_separator.lu` and
-`replace_empty_pattern.lu`, holding the ruling instead. The record below is
-the original.
+itself (`splitn`, `rsplit`, `replacen`) state the ruled answer, because they
+walk `find`, which answers 0 for an empty needle forever. Nothing in
+`std.str` traps on an empty argument any more, and the two `…_trap.lu` files
+that held the guards are now `split_empty_separator.lu` and
+`replace_empty_pattern.lu`, holding the ruling. The record below is the
+original.
 
 
 The sprint that spends F-0018's prize found the prize has one hole in it,
@@ -1877,29 +1879,28 @@ needle")` for the same call. So this is not a bug in one lane: it is an
 unruled semantics with two implementations of "we decided not to decide"
 and one implementation of a decision.
 
-**Why `unsupported` is the worst of the three answers.** A trap would be a
-program outcome a test can name; a defined answer would be a contract a
-library can delegate to. `unsupported` is neither — it says "this
-implementation cannot do this", which is plainly false (all three can), and
-it takes a whole ledger row with it: a std function that reached this shape
-would be `unsupported` on two lanes for one branch of one input.
+Of the three answers `unsupported` is the worst. A trap would be a program
+outcome a test can name; a defined answer would be a contract a library can
+delegate to. `unsupported` is neither, and it says "this implementation
+cannot do this", which is false, since all three can. It also takes a whole
+ledger row with it: a std function that reached this shape would be
+`unsupported` on two lanes for one branch of one input.
 
-**What std did.** Every `std.str` function that takes a separator or a
-pattern guards before it delegates:
+Every `std.str` function that takes a separator or a pattern guards before it
+delegates:
 
-- `count(s, "")` returns 0 — the reviewed contract's answer ("a count of
+- `count(s, "")` returns 0, the reviewed contract's answer ("a count of
   nothing is nothing"), and now std's own rather than the builtin's;
 - `split`, `splitn`, `rsplit`, `replace`, `replacen` trap `assert` on an
-  empty separator — also the reviewed contract's, and held as
+  empty separator, also the reviewed contract's, and held as
   `tests/str/split_empty_separator_trap.lu` and
   `tests/str/replace_empty_pattern_trap.lu` on all three lanes;
 - `split_once`/`rsplit_once`/`find_all` are defined over `find`/`rfind`
-  instead, which ARE defined for the empty needle (0 and `len`
+  instead, which are defined for the empty needle (0 and `len`
   respectively, on every lane), and each says so in its doc.
 
-The cost is six guards and a branch per call. The benefit is that
-`std.str`'s answer to an empty separator is the same sentence on every
-lane, which is the only thing a library can honestly promise.
+The cost is six guards and a branch per call. In exchange, `std.str`'s answer
+to an empty separator is the same sentence on every lane.
 
 Asks, in order: rule the semantics (native's answers are the obvious
 ruling) and make the other two lanes obey; failing that, make it a `trap`
@@ -1908,44 +1909,44 @@ leave a shape where two rungs refuse and one answers.
 
 ## F-0056 — `repeat(-1)` traps, and the doc that said otherwise rotted — **CLOSED at the sc11 pin**
 
-**Ruled by s71** (`[mem.str.repeat]`, wolf-lang#57): a negative repeat count
-is a caller contract violation, so the kind is `assert` and not `bounds`.
-Measured on all three lanes. The claim has now changed twice — `""` under the
-sc03 interpreter, `trap(bounds)` everywhere at sc09, `trap(assert)` everywhere
-at sc11 — and the second change was caught by the rig within a minute of the
-pin bump because sc09 wrote `tests/str/repeat_negative_trap.lu` instead of a
-sentence. That is the whole argument for §13's rule, paid back with interest.
-The record below is the original.
+Ruled by s71 (`[mem.str.repeat]`, wolf-lang#57): a negative repeat count is a
+caller contract violation, so the kind is `assert` and not `bounds`. Measured
+on all three lanes. The claim has now changed twice: `""` under the sc03
+interpreter, `trap(bounds)` everywhere at sc09, `trap(assert)` everywhere at
+sc11. The second change was caught by the rig within a minute of the pin bump,
+because the sc09 sprint wrote `tests/str/repeat_negative_trap.lu` instead of a
+sentence, which is the argument for §13's rule. The record below is the
+original.
 
 
 At this pin `"ab".repeat(0 - 1)` is `trap(bounds)` with clause
 `[mem.ub.defined]` on all three lanes ("a repeat count cannot be
-negative"). sc03 measured it as `""` under the interpreter and wrote that
-into `std.str.repeat`'s doc — "the implementation's answer, recorded
-because it is observable (`"ab".repeat(0 - 1)` is `""`, not a trap)" —
-where it sat for five sprints and four pin bumps.
+negative"). The sc03 sprint measured it as `""` under the interpreter and
+wrote that into `std.str.repeat`'s doc ("the implementation's answer,
+recorded because it is observable (`"ab".repeat(0 - 1)` is `""`, not a
+trap)"), where it sat for five sprints and four pin bumps.
 
 Three things are wrong here and only one of them is upstream's.
 
-1. **Ours**: a doc claimed an implementation's observable behaviour and no
+1. Ours: a doc claimed an implementation's observable behaviour and no
    test held it, so the claim rotted silently. Fixed by
    `tests/str/repeat_negative_trap.lu`, which names the kind. The general
-   rule, now in the guide: a sentence about what an implementation ANSWERS
+   rule, now in the guide: a sentence about what an implementation answers
    is a test, or it is a rumour.
-2. **The spec's**: nothing says a negative repeat count is a fault, or
+2. The spec's: nothing says a negative repeat count is a fault, or
    which kind it raises. `[conf.trap.set]` lists the kinds and
    `[mem.ub.defined]` is what the implementations cite, but no clause
    connects the two for this operation.
-3. **Arguably the kind's**: a negative count is a caller contract violation
-   — `[conf.trap.map]`'s `assert` — not an out-of-range access. And the
-   agreement is fragile: `wolf_rt::__wolf_rt_str_repeat` clamps with
+3. Arguably the kind's: a negative count is a caller contract violation,
+   `[conf.trap.map]`'s `assert`, and not an out-of-range access. The
+   agreement is also fragile: `wolf_rt::__wolf_rt_str_repeat` clamps with
    `count.max(0)` and would have returned `""`, so the native lane traps
-   above the runtime rather than in it. Three lanes agreeing by
-   construction is the state that drifts.
+   above the runtime instead of in it, and agreement built that way is what
+   drifts.
 
-std does NOT guard this one, deliberately: the trap is the right answer for
-a contract violation the caller could have checked (§2), and a guard would
-hide the one place the implementations agree.
+std does not guard this one, on purpose: the trap is the right answer for a
+contract violation the caller could have checked (§2), and a guard would hide
+the one place the implementations agree.
 
 ## F-0057 — a byte view with no way back
 
@@ -1957,12 +1958,12 @@ ninth is the important one and it has no spelling at all:
 to_str(b: Bytes) -> str ! {utf8}
 ```
 
-Nothing in the language builds a `str` from a number. There is no `char`,
-no `from_utf8` builtin, no `strbuf.push_byte` — so the VALIDATION half is
+Nothing in the language builds a `str` from a number. There is no `char`, no
+`from_utf8` builtin, no `strbuf.push_byte`, so the validation half is
 writable in wolf source (and is written: `bytes.is_utf8`, 31 rows on three
-lanes, rejecting stray continuations, truncations, overlong forms,
-surrogates and scalars above U+10FFFF) while the MATERIALIZATION half has
-nowhere to happen.
+lanes, rejecting stray continuations, truncations, overlong forms, surrogates
+and scalars above U+10FFFF) while the materialization half has nowhere to
+happen.
 
 An ASCII-only `to_str` would be a border post that refuses text, which §9
 forbids std from shipping, so the function stays a contract in the module
@@ -1973,20 +1974,20 @@ as a builtin (the validity check belongs where the invariant lives);
 `strbuf.push_byte` plus a validating `finish`; or the `char` type F-0018
 already asks for, with a scalar-to-`str` constructor.
 
-Two notes for whoever takes it. The decoder in `bytes.is_utf8` is written
-in divisions and range comparisons rather than masks because `&`, `|`, `^`
-and `>>` on a plain `int` are still `unsupported` on the checked lane
-(F-0026) — a `to_str` in library code would pay the same tax, which is one
-more argument for the builtin. And the io tier will want this the moment
-`fs_read_bytes` lands (F-0044): a byte read with no way back to text is a
-byte read nobody can use.
+Two notes for whoever takes it. The decoder in `bytes.is_utf8` is written in
+divisions and range comparisons rather than masks because `&`, `|`, `^` and
+`>>` on a plain `int` are still `unsupported` on the checked lane (F-0026),
+and a `to_str` in library code would pay the same tax, which is one more
+argument for the builtin. The io tier will want this the moment
+`fs_read_bytes` lands (F-0044), since a byte read with no way back to text is
+one nobody can use.
 
-**sc10 addendum — this finding blocks a second function, and nobody
-expected it to.** sc09 re-owned `std.json.unescape` to a json sprint on the
+An sc10 addendum: this finding blocks a second function, and nobody expected
+it to. The sc09 sprint re-owned `std.json.unescape` to a json sprint on the
 grounds that F-0018 had retired and a scanner over arbitrary text was
-writable. It is; the scanner is not the problem. `unescape` has to DECODE
-`\uXXXX`, which means building `"é"` from the number 233 — the same
-materialization half F-0057 is about, arrived at from text rather than from
+writable. It is; the scanner is not the problem. `unescape` has to decode
+`\uXXXX`, which means building `"é"` from the number 233, the same
+materialization half F-0057 is about, arrived at from text instead of from
 bytes. An ASCII-only `unescape` would be a border post that refuses text
 (§9 forbids it), so the contract stays, and its tag moves from the interim
 `boundary` to `parse` because the boundary condition really is gone and
@@ -1994,107 +1995,104 @@ what is left is ordinary bad data.
 
 Two consequences worth carrying. First, the ask list above gains a
 motivation: `str.from_utf8` or a scalar-to-`str` constructor unblocks JSON
-unescaping, not just byte IO. Second, the general lesson, which is now in
-the guide: a finding that blocks "bytes to text" blocks every ESCAPE
-FORMAT too — json, url-encoding, `\x` escapes, HTML entities — because
-every one of them decodes a number into a character. That is a family, not
-a function, and it is worth knowing before the next census predicts one of
-them writable.
+unescaping as well as byte IO. Second, the general lesson, which is now in
+the guide: a finding that blocks "bytes to text" blocks every escape format
+too (json, url-encoding, `\x` escapes, HTML entities), because every one of
+them decodes a number into a character. That covers a whole family of
+functions, which the next census should know before it predicts one of them
+writable.
 
 ## Retirements and movements at the sc10 pins
 
-The pin bump is wolf `8321aba` → trunk **`e94b879`** ("merge s69: the idiom
+The pin bump is wolf `8321aba` → trunk `e94b879` ("merge s69: the idiom
 arbiter — c16-warnings closes"), three merged waves in one step (s40, s70,
-s69), with lupin **HELD at 0.1.6**. Both ritual gates were run in a clean
-scratch clone at the sha and both are green on their FIRST attempt — the
-second clean pair in a row, which is why F-0054 stays open rather than
-retiring: two clean pairs are not proof a timing dependence is gone, and the
-posture this repo keeps is to state the attempt count.
+s69), with lupin held at 0.1.6. Both ritual gates were run in a clean scratch
+clone at the sha and both are green on their first attempt, the second clean
+pair in a row, which is why F-0054 stays open: two clean pairs are not proof a
+timing dependence is gone, and the posture this repo keeps is to state the
+attempt count.
 
-v0.1.7 of lupin exists and was deliberately not chased. The consequence is
-the widest two-upstream drift this repo has recorded — the interpreter's
-conformance pin (`13b811f`) is three waves behind the compiler's — and it is
-the whole explanation for sc10's lupin column: lupin has no `time_*`, no
-`env_*` and no `json_*` builtins because they did not exist at its pin. That
-is a DRIFT, not a design refusal like `fs`/`net`, and it closes on a release
-rather than on a decision. The ledger says so where it would otherwise read
-like a capability posture.
+v0.1.7 of lupin exists and was not chased. The consequence is the widest
+two-upstream drift this repo has recorded (the interpreter's conformance pin,
+`13b811f`, is three waves behind the compiler's), and it explains sc10's lupin
+column: lupin has no `time_*`, no `env_*` and no `json_*` builtins because
+they did not exist at its pin. That is drift and not a design refusal like
+`fs`/`net`, so it closes on a release rather than on a decision. The ledger
+says so where it would otherwise read like a capability posture.
 
 ### F-0052 is CLOSED, and it is the biggest thing in this bump
 
 For two sprints the guide called `v else |e| match e { … }` the most
 dangerous shape in the language: it compiled, it ran, and on wolfc's checked
-lane it matched its FIRST ARM whatever the tag was, silently, against two
-lanes that got it right. s70's match tier fixed it upstream (wolf-lang#48 —
+lane it matched its first arm whatever the tag was, silently, against two
+lanes that got it right. The s70 match tier fixed it upstream (wolf-lang#48,
 "handler matches resolve bare idents against the scrutinee's tags before
 binding"), and it is re-measured here on all three lanes with the arms
-written in BOTH orders, which is the experiment that found the bug in sc08
-run in reverse.
+written in both orders, which is the sc08 experiment run in reverse.
 
-It is held as `tests/errors/handler_discriminates.lu` rather than only
-believed, per sc09's rule that a claim about what an implementation answers
-is a test or it is a rumour. Three lanes, `run`.
+It is held as `tests/errors/handler_discriminates.lu`, per sc09's rule that a
+claim about what an implementation answers is a test or it is a rumour. Three
+lanes, `run`.
 
-**What it unblocks and what sc10 deliberately did not do with it.** Two
-functions were written and withdrawn on this finding — `std.io.input_all`
-(sc07) and `std.net.read_all` (sc08) — and both are now writable: a loop
-over a rowed read can stop on `eof`/`closed` and re-raise the others, which
-is the only thing that ever blocked them. Neither is in this sprint's
-contract and neither is written; both module headers still say "blocked",
-and the sprint that reconsiders them owns the change. `std.x.json` uses the
-shape nowhere either: its one place for it (`float_at`'s two-tag delegate)
-turned out to have a simpler answer, because the kernel's guarantee makes
-one of the two tags unreachable and a wildcard says exactly that without
-claiming to tell tags apart.
+Here is what it unblocks, and what sc10 did not do with it. Two functions
+were written and withdrawn on this finding, `std.io.input_all` (sc07) and
+`std.net.read_all` (sc08), and both are now writable: a loop over a rowed
+read can stop on `eof`/`closed` and re-raise the others, which is the only
+thing that ever blocked them. Neither is in this sprint's contract and
+neither is written; both module headers still say "blocked", and the sprint
+that reconsiders them owns the change. `std.x.json` uses the shape nowhere
+either: its one place for it (`float_at`'s two-tag delegate) turned out to
+have a simpler answer, because the kernel's guarantee makes one of the two
+tags unreachable and a wildcard says so without claiming to tell tags apart.
 
 ### Re-verified UNMOVED, each re-measured rather than assumed
 
-- **F-0037** — an enum returned through an error row still takes the miss
+- F-0037: an enum returned through an error row still takes the miss
   path on every call (`fn id(v: V) -> V ! {none} { v }`, one line, no
-  diagnostic). This is now the sole blocker on `std.json.parse`: sc09
-  retired its F-0018 half and re-owned the census row to a json sprint, and
-  the sprint that took the row found the OTHER finding still standing. That
-  is why the DOM half of json is still write-only and why the query half
-  lives in the nursery over a different tier entirely.
-- **F-0046 / F-0053** — `conform-run` still rejects `--deny-warnings`
+  diagnostic). This is now the sole blocker on `std.json.parse`: the sc09
+  sprint retired its F-0018 half and re-owned the census row to a json
+  sprint, and the sprint that took the row found the other finding still
+  standing. That is why the DOM half of json is still write-only and why the
+  query half lives in the nursery over a different tier entirely.
+- F-0046 / F-0053: `conform-run` still rejects `--deny-warnings`
   (`unknown flag`, re-measured at this sha), and the record's `warnings`
   array still covers the entry file only. The rig denies warnings itself, on
   every lane that reports one, and it stayed green across 175 tests and 317
-  doc-example blocks at this pin. s69 landed eleven NEW lints
-  (W0310–W0316, W0602–W0604, W1002, W1003), several policing exactly what
-  API-CONVENTIONS §1 already requires — no `get_` prefix, `is_` answers
+  doc-example blocks at this pin. The s69 wave landed eleven new lints
+  (W0310–W0316, W0602–W0604, W1002, W1003), several policing what
+  API-CONVENTIONS §1 already requires: no `get_` prefix, `is_` answers
   `bool`, `as_` borrows rather than consumes, bare `get` carries a row, a
   `pub` item is documented. Nothing in `std/` trips one that this rig can
   see, and F-0053 is the reason that is not the same sentence as "nothing in
   `std/` trips one".
-- **F-0034** — module identity is still the last path segment, and it now
-  costs a module PAIR rather than a name: see F-0058.
-- **F-0026** — the checked tier's f64 ceiling is unmoved in the one body
+- F-0034: module identity is still the last path segment, and it now
+  costs a module pair rather than a name: see F-0058.
+- F-0026: the checked tier's f64 ceiling is unmoved in the one body
   that matters here, and it cost a function this sprint: see F-0061.
-- **F-0016** — `wolf fmt` still splits a dotted call under a `//` comment.
+- F-0016: `wolf fmt` still splits a dotted call under a `//` comment.
   Fifth sprint running; it bit three of sc10's test files within a minute of
   their existing, and all three now carry the note in the file header, which
   is the documented dodge and is getting old.
-- **F-0043's `E0806` half**, F-0004, F-0011, F-0012, F-0014, F-0025's last
+- F-0043's `E0806` half, F-0004, F-0011, F-0012, F-0014, F-0025's last
   third, F-0027, F-0029, F-0030, F-0035 (the byte-type half), F-0038,
   F-0039, F-0040, F-0044, F-0045, F-0047, F-0049, F-0050, F-0051, F-0054,
   F-0055, F-0056, F-0057: all retested, all open.
 
 ### The ledger movement
 
-Fifteen new rows and no existing row moved — the first pin bump in this
-repo's history where a three-wave jump advanced nothing already recorded.
-That is not a disappointment, it is what the wave was: s40 added builtin
-families std had never wrapped, s70 fixed a shape std had refused to write,
-and s69 added lints std already obeyed. Nothing in the existing 160 tests
-touches any of the three.
+Fifteen new rows and no existing row moved, the first pin bump in this repo's
+history where a three-wave jump advanced nothing already recorded. That is
+what the wave was: new builtin families from s40 that std had never wrapped,
+a fix from s70 for a shape std had refused to write, and lints from s69 that
+std already obeyed. Nothing in the existing 160 tests touches any of the
+three.
 
 ## F-0058 — the nursery's first tenant cannot be imported beside its facade
 
-D31's graduation mechanism is a MOVE: `std.x.foo` becomes `std.foo`, and
-because the path is the API, the move is the whole release note. F-0034 says
-module identity is the LAST path segment. Put those together and a resident
-and its facade successor are the same name:
+D31's graduation mechanism is a move: `std.x.foo` becomes `std.foo`, and
+because the path is the API, the move is the release note. F-0034 says module
+identity is the last path segment. Put those together and a resident and its
+facade successor have the same name:
 
 ```
 use std.json
@@ -2103,27 +2101,26 @@ use std.x.json          // fail(E0306) on both compiler rungs
 ```
 
 Measured at these pins with two one-function probe modules, so the result is
-about the paths and not about either module's contents. Importing EITHER on
+about the paths and not about either module's contents. Importing either on
 its own resolves and runs, which is what lets `std.x.json` keep the name
 upstream's prelude comment gives it.
 
-**Why it matters beyond a naming annoyance.** The nursery exists so that a
-module can be USED while it is still moving (D31: the residents are not
-experiments, they are complete bodies kept out of the facade for a measured
-reason). A program that wants both halves of json today — the DOM to build a
-document, the query kernel to read one — cannot have them, and neither
-module can grow toward the other by depending on it. `std.json` and
-`std.x.json` therefore divide the work strictly by direction, each says so
-in its header, and every test and doc example in the repository imports
-exactly one.
+It matters beyond a naming annoyance. The nursery exists so that a module can
+be used while it is still moving (D31: the residents are not experiments,
+they are complete bodies kept out of the facade for a measured reason). A
+program that wants both halves of json today, the DOM to build a document and
+the query kernel to read one, cannot have them, and neither module can grow
+toward the other by depending on it. `std.json` and `std.x.json` therefore
+divide the work strictly by direction, each says so in its header, and every
+test and doc example in the repository imports exactly one.
 
-**The second half of this filing is the query tier's own hole**, and it is
-the one that makes `std.x.json` a query surface rather than a reader: there
-is no key ENUMERATION. `json_len` counts an object's members and nothing
-names them, so an object can be counted and not walked. `keys(doc, path)` is
-a reviewed contract in the module header, blocked rather than unwritten, and
+The second half of this filing is the query tier's own hole, and it is the
+one that makes `std.x.json` a query surface rather than a reader: there is no
+key enumeration. `json_len` counts an object's members and nothing names
+them, so an object can be counted and not walked. `keys(doc, path)` is a
+reviewed contract in the module header, blocked rather than unwritten, and
 until it lands a program can only ask about keys it already knew. (An array
-CAN be walked — `json_len` plus `child_index` plus `get` — and `items` is
+can be walked, with `json_len` plus `child_index` plus `get`, and `items` is
 left out for a different reason, stated in the header: it would re-parse the
 document once per element.)
 
@@ -2137,31 +2134,31 @@ identity being the full path); and grow the query tier a key enumerator.
 They are enough for `std.time`'s twenty-four functions and the shape of what
 is missing is three themes.
 
-- **Milliseconds are the floor of the resolution.** A `_ns` face over a
+- Milliseconds are the floor of the resolution. A `_ns` face over a
   `_ms` source would report a thousand-fold lie, so `std.time` ships no
   nanosecond anything. Benchmarking, latency histograms and anything that
-  wants to see a fast function are out of reach — and D36's bench format is
-  a stdc02+ item that will want exactly this.
-- **Nothing arms a deadline, anywhere in the toolchain.** F-0049 filed this
+  wants to see a fast function are out of reach, and D36's bench format is
+  a stdc02+ item that will want this.
+- Nothing arms a deadline, anywhere in the toolchain. F-0049 filed this
   for sockets, where `wolf_rt` has a per-socket deadline no builtin
-  exposes; s40 makes it general. `std.time` cannot ship a `Deadline` type or
-  a `with_timeout` combinator, because there is nothing to arm and no
+  exposes; the s40 wave makes it general. `std.time` cannot ship a `Deadline`
+  type or a `with_timeout` combinator, because there is nothing to arm and no
   `select` to race a timer against work (X6's composition story is s35's and
-  has not reached std). Every operation in std that could block — `accept`,
-  `read`, `connect`, `sleep` — blocks unboundedly.
-- **A monotonic reading has no identity.** `time_now_ms` counts from an
-  arbitrary process-local anchor, which is correct; nothing marks WHICH
+  has not reached std). Every operation in std that could block (`accept`,
+  `read`, `connect`, `sleep`) blocks unboundedly.
+- A monotonic reading has no identity. `time_now_ms` counts from an
+  arbitrary process-local anchor, which is correct; nothing says which
   anchor, so two `Instant`s from different processes subtract to a number
   that means nothing and no code can detect it. `std.time` documents the
-  hazard, which is all a library can do — the fix is a clock id in the ABI,
+  hazard, which is all a library can do. The fix is a clock id in the ABI,
   or a `SystemTime`/`Instant` distinction the tier itself understands.
 
 One more, and it is the one that makes timing tests unprincipled here: the
-s36 clock-hook seam does not reach clock READS yet, so `--schedules` and
+s36 clock-hook seam does not reach clock reads yet, so `--schedules` and
 `--replay` cannot virtualize time. A test over a sleep is therefore a
 predicate over a real host clock (`elapsed >= 3`) with no deterministic
 mode, which is why `tests/time/monotonic.lu` asserts only inequalities and
-why every exact assertion in the module is against the PURE renderer
+why every exact assertion in the module is against the pure renderer
 instead.
 
 ## F-0060 — a pure builtin family is refused at comptime with no diagnostic
@@ -2171,8 +2168,8 @@ capability, no sandbox category, nothing reached, so a package that uses
 only them declares no capability at all. That is the right design and this
 finding does not argue with it.
 
-What it argues with is the refusal. The comptime engine still refuses them —
-correctly, there is no json evaluator in the D33 allowlist at v0 — and the
+What it argues with is the refusal. The comptime engine still refuses them,
+correctly, since there is no json evaluator in the D33 allowlist at v0. The
 refusal is `unsupported` at resolve, with no code, no reason string and
 nothing in the record's `diagnostics` array:
 
@@ -2193,8 +2190,8 @@ kind named in the directive), and it cannot hold one for json, because
 `unsupported` is a ledger row rather than a directive.
 
 The ask: a diagnostic for "this builtin has no comptime evaluator at v0",
-distinct from the capability refusal — because the two are different
-sentences and one of them is temporary.
+distinct from the capability refusal, because the two are different sentences
+and one of them is temporary.
 
 ## F-0061 — `parse_float` is unsupported on both compiler rungs, and it cost a function
 
@@ -2204,21 +2201,21 @@ integers` at the mem tier on the checked lane and on the native rung
 unmoved at this pin). For five sprints that was one `unsupported` row among
 several and nothing depended on it.
 
-sc10 is where it stopped being free. `std.x.json.float_at` — the number
-reader every JSON caller reaches for second — was written, tested and
-withdrawn inside the sprint, and the arithmetic is simple: the checked tier
-is `std.x.json`'s ONLY executing lane (the native rung refuses the json
-builtins by name, lupin is behind the pin), and `parse_float` is refused on
-exactly that lane. So the function would have had zero lanes: no test could
-run it, no doc example could be fenced, and §14's doc-truth floor — at least
-one lane reaches `exit(0)` — would have been missed on every example it had.
+It stopped being free at sc10. `std.x.json.float_at`, the number reader every
+JSON caller reaches for second, was written, tested and withdrawn inside the
+sprint, and the arithmetic is simple: the checked tier is `std.x.json`'s only
+executing lane (the native rung refuses the json builtins, lupin is behind
+the pin), and `parse_float` is refused on that same lane. So the function
+would have had zero lanes: no test could run it, no doc example could be
+fenced, and §14's doc-truth floor (at least one lane reaches `exit(0)`) would
+have been missed on every example it had.
 
 It is a reviewed contract in the module header with this filing beside it,
 and its body is four lines waiting for either compiler rung to execute
 `parse_float`. Nothing about the signature changes when it lands.
 
 The general shape, worth stating because it will recur: a refusal that costs
-one lane is a ledger row, and a refusal that costs a module's ONLY lane is a
+one lane is a ledger row, and a refusal that costs a module's only lane is a
 withdrawn function. The nursery is full of modules with one lane by
 construction, so every dependency a resident takes should be checked against
 that lane before it is written, not after.
@@ -2226,20 +2223,20 @@ that lane before it is written, not after.
 ## F-0062 — two keywords ate two std names, and one of them reported it badly
 
 wolf has 50 reserved keywords, no raw identifiers, and two of them are words
-the process tier wants: **`spawn`** (it opens a task, `s.spawn(fn() { … })`,
-and a supervised proc, `spawn proc`) and **`handle`** (the pool tier's
+the process tier wants: `spawn` (it opens a task, `s.spawn(fn() { … })`,
+and a supervised proc, `spawn proc`) and `handle` (the pool tier's
 two-phase reserve/init value).
 
 Both refusals are correct and neither is the finding. `pub fn spawn` is a
-clean `E0008` with a fix-it — "`spawn_` is the usual dodge, or a more
-specific word" — exactly as `copy`/`copy_file` was in sc07, and
-`std.process.start` is the better name anyway: a child process and a task are
-different things with different failure models, and borrowing the keyword's
-word for the other one would have invited the confusion the type system then
-has to unpick. Recorded so the next author checks the list first.
+clean `E0008` with a fix-it ("`spawn_` is the usual dodge, or a more specific
+word"), as `copy`/`copy_file` was in sc07, and `std.process.start` is the
+better name anyway: a child process and a task are different things with
+different failure models, and borrowing the keyword's word for the other one
+would have invited the confusion the type system then has to unpick. Recorded
+so the next author checks the list first.
 
-**The finding is the OTHER diagnostic.** A keyword used as a STRUCT FIELD
-name splits the implementations, and the compiler's half is much the worse:
+The finding is the other diagnostic. A keyword used as a struct field name
+splits the implementations, and the compiler's half is much the worse:
 
 ```
 pub struct Child { handle: int }
@@ -2249,15 +2246,15 @@ pub struct Child { handle: int }
 
 `E0201: expected a field initializer` points at `handle` and says nothing
 about keywords, so the reader's first hypothesis is a typo in the struct
-literal three lines below — which is where the second error appears. lupin
-names the cause in five words; wolfc names a symptom. The same asymmetry
-appears at the USE site: `var forged = process.Child { handle: 4242 }` is
-lupin's keyword error and wolfc's "expected a field initializer".
+literal three lines below, which is where the second error appears. lupin
+says what the cause is in five words; wolfc reports a symptom. The same
+asymmetry appears at the use site: `var forged = process.Child { handle: 4242 }`
+is lupin's keyword error and wolfc's "expected a field initializer".
 
 The ask: the keyword check that produces `E0008` for an item name should
-produce it for a field name too — one code, one sentence, both positions.
-The generalization for wolf-std: check every new field name against the
-keyword list, not just every new function name.
+produce it for a field name too, with the same code and the same sentence in
+both positions. The generalization for wolf-std: check every new field name
+against the keyword list as well as every new function name.
 
 ## F-0063 — trunk's tip failed the pin ritual's first gate, and the fix is a `read_dir`
 
@@ -2270,27 +2267,27 @@ panicked at crates/wolf_fmt/tests/properties.rs:187:
 read regression: Os { code: 21, kind: IsADirectory, message: "Is a directory" }
 ```
 
-The commit adds one file — `tests/regressions/unfixed/idem_class_six.lu.pending`,
-an unfixed fmt fuzz class banked deliberately — and its message says "the
+The commit adds one file, `tests/regressions/unfixed/idem_class_six.lu.pending`,
+an unfixed fmt fuzz class banked on purpose, and its message says "the
 .pending suffix keeps it out of the regression sweep". The suffix does; the
-enclosing DIRECTORY does not. `fuzz_regressions` walks the corpus with
+enclosing directory does not. `fuzz_regressions` walks the corpus with
 `read_dir` and calls `fs::read` on every entry, so the new subdirectory is
 read as a file and the sweep panics before it checks anything.
 
-Consequences worth naming: the sweep's own assertion ("the regression corpus
-never shrinks") cannot fail because the loop cannot finish, and every
-regression in the corpus goes unchecked on that run.
+The consequences: the sweep's own assertion ("the regression corpus never
+shrinks") cannot fail because the loop cannot finish, and every regression in
+the corpus goes unchecked on that run.
 
-The ask: filter to files, or to the `.lu` extension, before reading — and
-consider asserting on the count of files SKIPPED, since the corpus now has a
-deliberate skip category.
+The ask: filter to files, or to the `.lu` extension, before reading, and
+consider asserting on the count of files skipped, since the corpus now has an
+intentional skip category.
 
 This repository's response is the pin ritual working as designed: the sha is
 held one commit back at `0b4e79c`, which is green on both gates on the first
 attempt and contains every wave sc11 needed. Recorded here because a pin that
 was chosen for a reason should say what the reason was, and because "trunk
-HEAD is green" is exactly the kind of assumption F-0024 taught this repo to
-stop making.
+HEAD is green" is the kind of assumption F-0024 taught this repo to stop
+making.
 
 ## F-0064 — a pairing line is not a pin, and it broke doctor
 
@@ -2303,16 +2300,16 @@ paired with lupin 0.1.8 (reference interpreter), pin 7886559
 
 This repository's `cargo xtask doctor` verifies a binary's self-reported pin
 against `vendor/tools.toml`, and its parser read the whole output as one
-line: name `wolf`, version `0.1.0`, and — from the second line — pin
-`7886559`. That sha is lupin's own commit in the **wolf-interp** repository,
-so doctor compared two repositories' histories and failed the bump with
+line: name `wolf`, version `0.1.0`, and, from the second line, pin
+`7886559`. That sha is lupin's own commit in the wolf-interp repository, so
+doctor compared two repositories' histories and failed the bump with
 "`--version` names pin 7886559, recorded pin is 0b4e79c".
 
-Not an upstream bug: the pairing is exactly the right thing for a release
-binary to report, and the rig was reading it wrong. Fixed here — identity
-comes from the first line, the remainder is captured as `pairing` and PRINTED
-by doctor without gating — with the two-line shape held as a unit test so the
-next release cannot break it silently.
+This is not an upstream bug: the pairing is the right thing for a release
+binary to report, and the rig was reading it wrong. Fixed here, so identity
+comes from the first line and the remainder is captured as `pairing` and
+printed by doctor without gating, with the two-line shape held as a unit test
+so the next release cannot break it silently.
 
 Recorded as a finding anyway, for two reasons. It is the first time a
 tool's `--version` has grown a line, so any other consumer of that output has
@@ -2328,32 +2325,32 @@ the answer to "are these two binaries meant to be used together" that
 caller then cannot do. Every item is a reviewed contract in the module
 header; none is a workaround std can write.
 
-1. **No stdio.** `os_spawn` wires all three of the child's streams to the
-   host's null device, so `output(c) -> str` — the single most-reached-for
-   operation in any process API — has nothing to read, and `stdin_text` has
+1. There is no stdio. `os_spawn` wires all three of the child's streams to
+   the host's null device, so `output(c) -> str`, the single most-reached-for
+   operation in any process API, has nothing to read, and `stdin_text` has
    nowhere to write. The book's pargrep chapter will feel this first. The ask
    is a piped-stdio spawn plus a read on the pipe; the s38 io traits are the
    natural shape, and `wolf_rt` already has the reactor (s35) that would
    serve it.
-2. **No child environment or working directory.** `os_spawn(argv)` takes one
-   argument and the child inherits both from the parent. A caller who must
-   change them can only change its OWN with `env_set` first, which is a
+2. There is no child environment or working directory. `os_spawn(argv)` takes
+   one argument and the child inherits both from the parent. A caller who
+   must change them can only change its own with `env_set` first, which is a
    different operation with a different meaning (it is not scoped to the
    child, and it races every task in this process).
-3. **No non-blocking wait and no deadline.** `os_wait` blocks, so
-   `try_wait` — "has it finished?" — has no honest implementation, and
+3. There is no non-blocking wait and no deadline. `os_wait` blocks, so
+   `try_wait` ("has it finished?") cannot be implemented, and
    `wait_timeout` is the same missing deadline as the net tier's (F-0049).
    With no way to poll, the only way to stop a runaway child is a kill from
    another task.
-4. **No real process id.** The `int` `os_spawn` hands back is the machine's
-   own child-table index, so a `pid` accessor would name something this tier
-   does not have. A program that must be reported to an operator, or written
-   into a pid file, cannot be.
+4. There is no real process id. The `int` `os_spawn` hands back is the
+   machine's own child-table index, so a `pid` accessor would refer to
+   something this tier does not have. A program that must be reported to an
+   operator, or written into a pid file, cannot be.
 
-One thing the trio gets exactly right, recorded so it is not lost in a list
-of gaps: **argv-array only, with no shell-string spawn anywhere.** That is a
-design decision std would have had to fight if it had gone the other way,
-and it makes command injection structurally impossible rather than a
+One thing the trio gets right, recorded so it is not lost in a list of gaps:
+argv-array only, with no shell-string spawn anywhere. That is a design
+decision std would have had to fight if it had gone the other way, and it
+makes command injection structurally impossible instead of a
 quoting-discipline problem. `std.process` has no `shell` function and its
 header says it never will.
 
@@ -2362,57 +2359,57 @@ header says it never will.
 `std.process` ships six functions and this repository cannot write a single
 test that starts a real program, because three things are missing at once:
 
-- **No program exists on every tier-1 host.** `/bin/sh` is not on windows,
+- No program exists on every tier-1 host. `/bin/sh` is not on windows,
   `cmd.exe` is not on linux or macOS. The toolchain's own process tests are
   `#[cfg(unix)]`-gated and use `/bin/sh`, which is the right answer for a
   Rust test suite and unavailable to a `.lu` file.
-- **A wolf program cannot learn its own path.** `env_args` drops argv[0] by
+- A wolf program cannot learn its own path. `env_args` drops argv[0] by
   design ("the program name is not the program's input"), and there is no
   `os_exe`/`current_exe`. So the one program guaranteed to exist and be
-  executable — the test itself — cannot be named.
-- **The directive schema has no per-platform gate.** A test is `run` or it is
+  executable, the test itself, cannot be named.
+- The directive schema has no per-platform gate. A test is `run` or it is
   not; there is no `platform: unix` to make a unix-only witness legal, and
   the ledger's three columns are implementations rather than hosts.
 
 The rows are all witnessable and they are what `tests/process/` holds: an
 empty argv and a name no host has are both `not_found`, a forged handle is
 `io`, and none of them starts anything. What cannot be held here is the
-central claim of the module — that a child's exit code comes back, and that
-a killed child answers `signal` — so those two sentences rest on the
-toolchain's unix-gated tests, which is a weaker place for them than this
-repo's usual standard (§13: a claim about what an implementation answers is a
-test or it is a rumour).
+central claim of the module, that a child's exit code comes back and that a
+killed child answers `signal`, so those two sentences rest on the toolchain's
+unix-gated tests, which is a weaker place for them than this repo's usual
+standard (§13: a claim about what an implementation answers is a test or it
+is a rumour).
 
 The ask, cheapest first: (1) an `os_exe`-style builtin, which would let a
-test spawn ITSELF with an argument that makes it exit with a chosen code —
-this single addition closes the whole finding, portably, with no fixture;
+test spawn itself with an argument that makes it exit with a chosen code;
+that single addition closes the whole finding, portably, with no fixture;
 (2) failing that, a `platform:` directive key so a unix-gated witness can
-live in the corpus honestly; (3) failing both, a documented fixture program
-the toolchain guarantees on every tier-1 host.
+live in the corpus without misrepresenting itself; (3) failing both, a
+documented fixture program the toolchain guarantees on every tier-1 host.
 
 ## F-0067 — `os_cwd` has no home in std, because `chdir` does not exist
 
 The s40 os family is now split across two std modules: the `env_*` four are
 `std.env`'s and the process trio plus `os_exit` are `std.process`'s (as
-`exit`). One builtin is left over — `os_cwd` — and sc11 declines to place it
-rather than placing it badly.
+`exit`). One builtin is left over, `os_cwd`, and the sc11 sprint declines to
+place it rather than placing it badly.
 
-Why it is awkward. It carries the `env` capability, not `exec`, so it is not
-`std.process`'s by the capability table. It is a query about this program's
-own situation exactly as `args` and `vars` are, so `std.env.cwd()` is the
-obvious home. But the operation a caller reaches for next does not exist:
-there is no `os_chdir` at the builtin tier, so std would ship a directory
-READ with no directory WRITE beside it — and a program that wants to resolve
-a relative path against the working directory can do it, while a program that
+Why it is awkward. It has the `env` capability and not `exec`, so the
+capability table does not make it `std.process`'s. It is a query about this
+program's own situation just as `args` and `vars` are, so `std.env.cwd()` is
+the obvious home. But the operation a caller reaches for next does not exist:
+there is no `os_chdir` at the builtin tier, so std would ship a directory read
+with no directory write beside it, and a program that wants to resolve a
+relative path against the working directory can do it, while a program that
 wants to run in another directory cannot, and neither can it ask a child to
 (F-0065's item 2).
 
 The ask: `os_chdir(path) -> () ! {not_found, denied, io}`, at which point
 `std.env.cwd`/`chdir` land together as a pair and this finding closes. If the
-answer is that a process-wide chdir is deliberately absent — a defensible
-position, since it races every task in the process and is the reason
-per-child working directories exist — then say so, and `cwd` lands alone with
-that reason quoted, which is a decision rather than an oversight.
+answer is that a process-wide chdir is absent on purpose (a defensible
+position, since it races every task in the process and is the reason per-child
+working directories exist), then say so, and `cwd` lands alone with that
+reason quoted, so a reader can see it was decided.
 
 ## F-0068 — `conform-run <file>` with no directory component says the wrong thing
 
@@ -2426,17 +2423,17 @@ $ wolf conform-run --checked ./main.lu
 The file exists, is in the working directory, and is the only `.lu` file
 there. The package root is evidently derived from the argument's parent
 directory, and a bare file name's parent is the empty string rather than
-`.`, so the loader looks in nowhere and reports the one thing that is
-certainly not true.
+`.`, so the loader looks in nowhere and reports something that is certainly
+not true.
 
-No cost to this rig — it passes absolute paths (`stage::Staged::entry`) and
-always has — and no cost to `wolf test`, which takes a directory. The cost is
-to a person at a prompt, which is where every first impression of a
-toolchain is formed, and the message is actively misleading: it describes a
+There is no cost to this rig, which passes absolute paths
+(`stage::Staged::entry`) and always has, and none to `wolf test`, which takes
+a directory. The cost falls on a person at a prompt, where first impressions
+of a toolchain get formed, and the message misleads there: it describes a
 package problem for what is a path-normalization bug.
 
-The ask: normalize the argument (`Path::parent` of a bare name is `Some("")`
-— treat it as `.`), and consider naming the root that was searched in the
+The ask: normalize the argument (`Path::parent` of a bare name is `Some("")`,
+so treat it as `.`), and consider naming the root that was searched in the
 message, since a diagnostic that says where it looked cannot be this wrong.
 
 ## F-0069 — `?` inside a `comptime fn` is `unsupported`, and it MASKS the capability refusal
@@ -2455,37 +2452,37 @@ comptime fn probe(x: int) -> int ! {io} { let v = inner(x)?  v }
 // checked: unsupported (phase_reached=resolve), diagnostics: []
 ```
 
-So `?` — the language's ordinary propagation, and the first thing anyone
-writes — is outside the comptime engine's subset, while the raise and the
+So `?`, the language's ordinary propagation and the first thing anyone
+writes, is outside the comptime engine's subset, while the raise and the
 `else` are inside it. That alone would be an ordinary NotYet. What makes it a
 finding is the interaction with D33.
 
 `tests/process/comptime_refuses.lu` holds the `Exec` refusal, and the natural
 spelling of its witness is `os_kill(slot)?` inside a `comptime fn`. Written
-that way the file answers **`unsupported`, not `fail(E0701)`** — the engine
-refuses the propagation at resolve, so the capability check never runs, and a
-rejection test that was supposed to prove "compiling a package can never kill
-a process" proves nothing at all while looking healthy in a ledger. The
-bare-call version (`os_kill(slot)` with the row discarded) reaches E0701 and
-then trips `W0601`, which this rig denies. Only the third spelling —
-`os_kill(slot) else |_| { }` — both reaches the refusal and warns about
-nothing.
+that way the file answers `unsupported` where it should answer
+`fail(E0701)`: the engine refuses the propagation at resolve, so the
+capability check never runs, and a rejection test that was supposed to prove
+"compiling a package can never kill a process" proves nothing at all while
+looking healthy in a ledger. The bare-call version (`os_kill(slot)` with the
+row discarded) reaches E0701 and then trips `W0601`, which this rig denies.
+Only the third spelling, `os_kill(slot) else |_| { }`, both reaches the
+refusal and warns about nothing.
 
 Two asks, in order:
 
-1. **Support `?` in the comptime engine**, or refuse it with a diagnostic that
-   names it (`E`-coded, "`?` has no comptime evaluator yet"). A bare
+1. Support `?` in the comptime engine, or refuse it with a diagnostic that
+   says so (`E`-coded, "`?` has no comptime evaluator yet"). A bare
    `unsupported` with an empty `diagnostics` array is the shape F-0060 already
    asked about for the json family: the author cannot tell "not implemented"
    from "you wrote something wrong".
-2. **Decide the ORDER between the sandbox check and the subset check.** A
+2. Decide the order between the sandbox check and the subset check. A
    capability refusal is permanent and a subset gap is temporary, so the
    permanent one should win: `os_kill` in a `comptime fn` should be `E0701`
    whatever surrounds it. Today the temporary answer hides the permanent one,
    which is the wrong way round for anything a security posture rests on.
 
 The general lesson for this repository, recorded in the guide: when a
-rejection test's verdict changes because you changed something UNRELATED to
+rejection test's verdict changes because you changed something unrelated to
 the rejection, the test has stopped witnessing what its header says.
 
 ## F-0070 — lupin 0.1.8 has four fifths of the os/env builtin family
@@ -2500,68 +2497,68 @@ $ lupin conform-run env_vars.lu
 unsupported: `env_vars` does not resolve
 ```
 
-It is not a declined surface — the other four env calls run, and the refusals
-this machine DOES make by design (`fs_*`, `net_*`, `json_*`, the process trio)
-all carry a sentence explaining themselves. `env_vars` just is not there, with
-the generic "does not resolve" that any unknown name gets, so it reads as an
-oversight rather than a posture.
+This is not a declined surface: the other four env calls run, and the refusals
+this machine does make by design (`fs_*`, `net_*`, `json_*`, the process trio)
+all come with a sentence explaining themselves. `env_vars` just is not there,
+with the generic "does not resolve" that any unknown name gets, so it reads as
+an oversight rather than a posture.
 
 The cost here is one ledger row: `tests/env/args_and_vars.lu` asserts the
 `K=V` listing round trip and stays `unsupported` on the interpreter lane while
 its four siblings advanced at this bump. Small, and worth filing for the
 sentence it produced: this sprint nearly wrote "lupin has the env family now"
 into three documents on the strength of `env_get` working, and the correct
-record needed five separate one-call probes. **A builtin FAMILY is not a unit
-of evidence; a builtin is.**
+record needed five separate one-call probes. A builtin family is too coarse to
+be evidence; each builtin has to be probed.
 
-The ask: implement `env_vars` (sorted `K=V` lines, non-UTF-8 entries skipped —
+The ask: implement `env_vars` (sorted `K=V` lines, non-UTF-8 entries skipped;
 the semantics `wolf_mem`'s `os_builtin` already pins and `std.env.vars`
 documents), or decline it with a reason the way the other refusals do.
 
 ## Retirements and movements at the sc12 pins
 
-The pin bump is wolf `0b4e79c` → trunk **`f8dca42`** (ten commits: s74, s53,
-s75, s78, s76, s77 and the rt test gating), with lupin **0.1.8 → 0.1.10**,
+The pin bump is wolf `0b4e79c` → trunk `f8dca42` (ten commits: s74, s53,
+s75, s78, s76, s77 and the rt test gating), with lupin 0.1.8 → 0.1.10,
 skipping 0.1.9. Both ritual gates were run in a clean scratch clone at the sha
-and both are green on their FIRST attempt — the fourth clean pair in a row, so
+and both are green on their first attempt, the fourth clean pair in a row, so
 F-0054 stays open on the reasoning it has always stayed open on: a clean run is
 not proof that a timing dependence is gone, and the posture is to state the
 attempt count.
 
 The pin is trunk's tip, which is a change from sc11 (where the tip was red,
-F-0063). Three compiler sprints — s79 bench, s80 token audit, s81 str
-equality — were in flight during this sprint and none of them is in this pin,
-deliberately: the pin is taken once and held.
+F-0063). Three compiler sprints, s79 bench, s80 token audit and s81 str
+equality, were in flight during this sprint and none of them is in this pin:
+the pin is taken once and held.
 
 ### F-0037 is CLOSED, and it is the biggest thing in the interpreter's half
 
-For five sprints a function whose return type was an ENUM and whose signature
-carried an error row took the MISS path on every call — `fn id(v: W) -> W !
+For five sprints a function whose return type was an enum and whose signature
+had an error row took the miss path on every call: `fn id(v: W) -> W !
 {none} { v }` raised instead of returning `v`, in one line, with no
 diagnostic. wolf-interp#16 fixed it at 0.1.10 ("an enum variant is a value,
-not a raise": `ErrorValue` records where its name resolved, and `is_error` —
-the only question `?` and `else` ask — reads it). Re-measured here with the
-finding's own reproducer, on the lane that matters:
+not a raise"), so `ErrorValue` records where its name resolved, and
+`is_error`, the only question `?` and `else` ask, reads it. Re-measured here
+with the finding's own reproducer, on the lane that matters:
 
 ```
 $ lupin ./main.lu
 value path wins
 ```
 
-**What it unblocks, and what this sprint deliberately did not do with it.**
+Here is what it unblocks, and what this sprint did not do with it.
 `std.json.parse`, `json.get` and `json.at` were written, tested and withdrawn
-to reviewed contracts on this finding — `parse`'s signature is `-> Value !
-{syntax, deep}`, an enum through a row — and the interpreter is `std.json`'s
+to reviewed contracts on this finding (`parse`'s signature is `-> Value !
+{syntax, deep}`, an enum through a row), and the interpreter is `std.json`'s
 only executing lane, so the module's DOM half becomes writable for the first
 time. None of it is in this sprint's contract and none of it is written; the
 module header still says blocked, and the sprint that owns the json row owns
-the change. sc10's rule applies to itself here: "the blocker retired" is not
-"writable" until every finding on the SIGNATURE has been re-measured, and the
+the change. The sc10 rule applies to itself here: "the blocker retired" is not
+"writable" until every finding on the signature has been re-measured, and the
 sprint that takes it should re-measure F-0039 (nested rows) and F-0029
 (cross-module enum consumption) before writing a line.
 
-API-CONVENTIONS §11's rule — "No std accessor returns an enum through an error
-row" — was written as an interim with this finding as its exit, and the exit
+API-CONVENTIONS §11's rule, "No std accessor returns an enum through an error
+row", was written as an interim with this finding as its exit, and the exit
 has arrived.
 
 ### F-0032 is closed too
@@ -2575,29 +2572,29 @@ opens gets.
 
 ### Re-verified UNMOVED, each re-measured rather than assumed
 
-- **F-0057** — the four probes sc11 used, run again at this pin:
+- F-0057: the four probes sc11 used, run again at this pin:
   `str.from_utf8(b)` "does not resolve", `(mut b).push_byte(104)` is
   "`StrBuf` has no method `push_byte` in this machine's std subset", `'h'` is
-  `E0101` at the LEXER, `bytes_to_str` "does not resolve". `std.bytes.to_str`
-  is a reviewed contract for the fourth sprint running. What is NEW is
-  agreement about the shape of the fix: s77's lowering says the byte view
+  `E0101` at the lexer, `bytes_to_str` "does not resolve". `std.bytes.to_str`
+  is a reviewed contract for the fourth sprint running. What is new is
+  agreement about the shape of the fix: the s77 lowering says the byte view
   "cannot become a `str` … a `List[int] -> str` conversion would have to
   VALIDATE (wolf-std's `bytes.to_str`, still blocked, and this is why: it
   wants a checked primitive, not a cast)". The view is now bit-identical to a
   `str`, which makes an unchecked conversion look one instruction away, and
   the compiler names that as the forging hole rather than taking it.
-- **F-0070** — `env_vars` still "does not resolve" under lupin 0.1.10, so
+- F-0070: `env_vars` still "does not resolve" under lupin 0.1.10, so
   `tests/env/args_and_vars.lu` keeps its dark interpreter column while its
   four siblings run. Two releases later, unmoved.
-- **F-0046 / F-0053** — `conform-run` still rejects `--deny-warnings`
+- F-0046 / F-0053: `conform-run` still rejects `--deny-warnings`
   (`unknown flag`, re-measured at this sha) and the record's `warnings` array
   still covers the entry file only. The rig denies warnings itself and stayed
   green across 185 tests and 317 doc-example blocks.
-- **F-0016** — `wolf fmt` still splits a dotted call under a `//` comment.
+- F-0016: `wolf fmt` still splits a dotted call under a `//` comment.
   Sixth sprint running; this sprint's rewrites carry their notes in `///` docs
   instead, which is the documented dodge and is now simply how this repository
   writes.
-- **F-0026's checked-tier ceiling** is what F-0071 is a new face of: the tier
+- F-0026's checked-tier ceiling is what F-0071 is a new face of: the tier
   models a subset of the machine, and the subset is where std has to live.
 - F-0004, F-0011, F-0012, F-0025's last third, F-0027, F-0029, F-0030,
   F-0035 (the byte-type half), F-0038, F-0039, F-0040, F-0044, F-0045,
@@ -2606,48 +2603,47 @@ opens gets.
 
 ### The ledger movement
 
-**Zero rows moved and two rows were added.** The 183 tests this repo carried
-into the bump answer exactly what they answered at the sc11 pin — 144 / 149 /
+Zero rows moved and two rows were added. The 183 tests this repo carried
+into the bump answer just what they answered at the sc11 pin (144 / 149 /
 97 `run` on lupin / checked / native, with 39 / 30 / 82 `unsupported` and
-0 / 4 / 4 held rejections — and the two new sc12 rows are the byte-view pair
+0 / 4 / 4 held rejections), and the two new sc12 rows are the byte-view pair
 (`str/byte_view_walk.lu` three lanes, `str/byte_view_index.lu` two).
 
-That is the honest report and it is the second time this repo has recorded it
-(sc10 was the first). The reason is structural rather than lucky: s77 changed
-the LOWERING of `bytes()` and not its surface, s76 and s75 changed where and
-how containers allocate and not what they answer, and the seven std bodies
+That is the report, and it is the second time this repo has recorded it (sc10
+was the first). The reason is structural rather than lucky: s77 changed the
+lowering of `bytes()` and not its surface, s76 and s75 changed where and how
+containers allocate and not what they answer, and the seven std bodies
 rewritten this sprint were rewritten to keep the lanes they had. A wave that
-makes existing code faster moves no ledger row by construction — the ledger
-measures depth, not cost — which is worth stating plainly, because a sprint
-whose whole subject is a performance primitive and whose ledger is unchanged
-looks like a sprint that did nothing.
+makes existing code faster moves no ledger row by construction, since the
+ledger measures depth and not cost. It is worth saying, because a sprint
+whose subject is a performance primitive and whose ledger is unchanged looks
+like a sprint that did nothing.
 
 ## F-0071 — the checked tier models two of the byte view's seven positions
 
-**CLOSED at the sc12 (02-os) pin** (s88, wolf-lang#85 — "a temporary can be
+**CLOSED at the sc12 (02-os) pin** (s88, wolf-lang#85, "a temporary can be
 read from"). Re-measured one shape at a time on the checked tier at
 `02c1e88`: `"wolf".bytes()[1]` is 111, `.get(1)` is 111, `.first()` is 119,
-`.last()` is 102, `.count()` is 4 — five verdicts where every one of them
-used to be `unsupported` at `mem`. `tests/str/byte_view_index.lu` advanced
+`.last()` is 102, `.count()` is 4. Every one of those five verdicts used to
+be `unsupported` at `mem`. `tests/str/byte_view_index.lu` advanced
 `unsupported` -> `run` on that lane and now asserts indexing, `get` and
 `count` together.
 
-Two things worth recording beside the closure. **std did not undo the
-rewrites**: `str.code_points`' one-pass state machine is shorter than the
-random-access walk it replaced, and a constraint that forced a better
-algorithm is not one to reverse the day it lifts — what the closure buys is
-that a FUTURE body may index a view without paying a lane. And **half of
-the finding survives on the other machine**: lupin has no `first` and no
-`last` on a `List` at all ("`List` has no method `last` in this machine's
-std subset"), which is a gap in its container surface rather than anything
-about views, and it is held as its own ledger row
-(`tests/str/byte_view_first_last.lu`) rather than left inside a closed
-finding where nothing would measure it.
+Two things worth recording beside the closure. std did not undo the rewrites:
+`str.code_points`' one-pass state machine is shorter than the random-access
+walk it replaced, and a constraint that forced a better algorithm is not one
+to reverse the day it lifts. What the closure buys is that a future body may
+index a view without paying a lane. Half of the finding also survives on the
+other machine: lupin has no `first` and no `last` on a `List` at all
+("`List` has no method `last` in this machine's std subset"), which is a gap
+in its container surface rather than anything about views, and it is held as
+its own ledger row (`tests/str/byte_view_first_last.lu`) instead of being
+left inside a closed finding where nothing would measure it.
 
 The filing as it stood:
 
-s77 (#80) makes `s.bytes()` the receiver's own `{ptr, len}` pair and reads it
-in place wherever the call is CONSUMED. The lowering names seven such
+The s77 wave (#80) makes `s.bytes()` the receiver's own `{ptr, len}` pair and
+reads it in place wherever the call is consumed. The lowering lists seven such
 positions: iteration, indexing, and the `len`/`count`/`is_empty`/`get`/`first`/
 `last` queries. `wolf conform-run --checked` models two.
 
@@ -2662,21 +2658,21 @@ let bs = s.bytes(); bs[i]   run, all three lanes (the materialized shape)
 ```
 
 The last line is what makes this a gap rather than a design: the checked tier
-indexes a byte LIST perfectly well. What it does not model is the temporary.
+indexes a byte list perfectly well. What it does not model is the temporary.
 
-**The cost, measured in bodies rather than in nanoseconds.** wolf-std cannot
-spend an execution lane on a performance shape — that is §14's honesty applied
-to an optimization instead of to a capability — so this sprint's seven
-rewrites are all on the two-position subset:
+The cost shows up in bodies rather than in nanoseconds. wolf-std cannot spend
+an execution lane on a performance shape, which applies §14's standard to an
+optimization instead of to a capability, so this sprint's seven rewrites are
+all on the two-position subset:
 
-- `str.char_count`, `str.is_ascii` — `for` over the view, one of them
+- `str.char_count`, `str.is_ascii`: `for` over the view, one of them
   returning out of the loop;
-- `str.char_offsets` — `for` plus a counter, where the natural body indexes;
-- `str.code_points` — the UTF-8 decoder rewritten from a random-access walk
+- `str.char_offsets`: `for` plus a counter, where the natural body indexes;
+- `str.code_points`: the UTF-8 decoder rewritten from a random-access walk
   (`bs[i + 1]`, `bs[i + 2]`, `bs[i + 3]`) into a one-pass state machine with a
-  pending-continuation count, because lookahead is exactly what a view cannot
-  do on this lane;
-- `fmt.digit_of`, `hex.digit_of`, `base64.value_of` — each takes its first
+  pending-continuation count, because lookahead is what a view cannot do on
+  this lane;
+- `fmt.digit_of`, `hex.digit_of`, `base64.value_of`: each takes its first
   byte by iterating and returning out of the first iteration.
 
 Every one of those is a fine body. The rule they add up to is not fine: an
@@ -2684,7 +2680,7 @@ algorithm that needs genuine random access over bytes must keep materializing
 or drop a lane, and the next one might not have a one-pass form.
 
 Two asks, either of which closes it: model the view's indexing and query
-family in the checked tier, or — if the temporary is deliberate there — say so
+family in the checked tier, or, if the temporary is intentional there, say so
 in the refusal. `unsupported — List method on a temporary` is a place-model
 sentence that never mentions views, and learning that `for` was the shape to
 keep took a four-program bisect.
@@ -2694,38 +2690,38 @@ Held as `tests/str/byte_view_index.lu` (`lupin=run`, `wolfc=unsupported`,
 
 ## F-0072 — a byte view cannot cross a function boundary
 
-**CLOSED at the sc12 (02-os) pin** (s89, wolf-lang#86 — "a byte view that
+**CLOSED at the sc12 (02-os) pin** (s89, wolf-lang#86, "a byte view that
 can cross a call"). The answer is the one the filing asked for, in the shape
-it asked for it: not a new type, but the region checker's argument one scale
+it asked for it: no new type, just the region checker's argument one scale
 down. A `List[int]` parameter whose every use is one of s77's read positions
-(or a re-lend into another such parameter) is **Lendable**, and the caller
-hands over the string's own `{ptr, len}`; anything unproven is **Opaque** and
-materializes exactly as before, which is never wrong and only slower; a use
-that provably outlives the call is **E1015** with the one-word fix in the
-diagnostic (bind first — a `let` materializes). Eight of `std.bytes`' nine
+(or a re-lend into another such parameter) is Lendable, and the caller
+hands over the string's own `{ptr, len}`; anything unproven is Opaque and
+materializes as before, which is never wrong and only slower; a use that
+provably outlives the call is E1015 with the one-word fix in the diagnostic
+(bind first, since a `let` materializes). Eight of `std.bytes`' nine
 functions are lendable; `to_str` is not, because it hands its parameter to
 `str_from_utf8` and a builtin consumer materializes.
 
 What this repository can and cannot say about it: the no-copy half is an IR
 property, pinned upstream in `wolf_wir`'s `lower_shapes` suite and
 `wolf_mem`'s `byteview` tests, and no lane here observes an allocation. So
-`tests/bytes/lend_across_calls.lu` asserts the half that IS observable — the
+`tests/bytes/lend_across_calls.lu` asserts the half that is observable (the
 same nine calls through a view and through an owned list must agree, on all
-three lanes — and its header cites the other half rather than restating it
+three lanes), and its header cites the other half rather than restating it
 (§9's sc12 rule). The `Bytes` type this repository has wanted since sc05 is
 still open on its own merits; the lend is what stopped the interim currency
 costing a copy per call.
 
 The filing as it stood:
 
-s77's own comment states the boundary: every position that is not consuming —
-a `let` binding, an argument, a return — materializes through
+The s77 comment states the boundary: every position that is not consuming (a
+`let` binding, an argument, a return) materializes through
 `__wolf_rt_str_bytes`. That is the right conservative default, and this
 finding is about what it costs a library, so the cost is on the record when
 the `Bytes` question is decided.
 
 `std.bytes` is nine functions whose first parameter is `List[int]`, so every
-one of them receives its bytes as an ARGUMENT and every call from a string
+one of them receives its bytes as an argument and every call from a string
 copies the string first:
 
 ```wolf
@@ -2737,12 +2733,12 @@ Same kind of work; one of them is free. The difference is the parameter, not
 the implementation, and std cannot fix it from its side: there is no signature
 that accepts a view, and inlining the byte tier into `std.str` to get the win
 would duplicate the module and destroy the split `std.bytes` exists for
-(bytes a program HOLDS, versus bytes it walks through once).
+(bytes a program holds, versus bytes it walks through once).
 
 The ask is a design one: the `Bytes` type this repo has documented as an
 interim since sc05, or a parameter mode that lets a callee borrow `{ptr, len}`
-without materializing — which a `str` parameter already is, so the machinery
-exists and only the name is missing — plus a spec rule about which positions
+without materializing (which a `str` parameter already is, so the machinery
+exists and only the name is missing), plus a spec rule about which positions
 materialize, since today that is discoverable only from a comment in
 `wolf_wir::lower`.
 
@@ -2759,20 +2755,20 @@ paired with lupin 0.1.8 (reference interpreter), pin 7886559
 ```
 
 Measured at trunk `f8dca42` (2026-08-13), one day after lupin 0.1.10 shipped
-(2026-08-12) — and 0.1.10's own conformance pin is `613c3dc`, a wolf-lang
-commit ten commits behind this sha. So the two binaries this repo pins really
-are meant to be used together, the drift really is the narrowest it has ever
-been, and the line still names the release before last.
+(2026-08-12). 0.1.10's own conformance pin is `613c3dc`, a wolf-lang commit
+ten commits behind this sha. So the two binaries this repo pins really are
+meant to be used together, the drift really is the narrowest it has ever been,
+and the line still names the release before last.
 
 r01 introduced the line and F-0064 taught this repo's doctor to read it:
 identity from the first line, the pairing reported and never gated. It is
-useful — it answers "are these two meant to be used together?", which
-`vendor/tools.toml` had been answering in prose for ten sprints. That is
-exactly why it needs a mechanism: a claim that comes out of a binary is
-trusted more than a note, and this one has nothing keeping it true.
+useful, since it answers "are these two meant to be used together?", which
+`vendor/tools.toml` had been answering in prose for ten sprints. That is why
+it needs a mechanism: a claim that comes out of a binary is trusted more than
+a note, and this one has nothing keeping it true.
 
 The ask: make the pairing a value the release process writes, or state it with
-the DATE of the differential run that established it, so that a stale line
+the date of the differential run that established it, so that a stale line
 reads as history rather than as a claim about now.
 
 ## F-0074 — the reference lane builds every list quadratically
@@ -2783,9 +2779,9 @@ per-test ceiling during a `cargo xtask ci` run, having passed three
 `std-test` runs the same hour. Chasing the timeout produced a much larger
 answer than the flake it started as.
 
-The canonical list-building loop — the one every `std` function returning a
-`List` writes, because pushing into a fresh list is the portable spelling
-(sc04's rule: index assignment executes on one lane only) — is quadratic
+The canonical list-building loop, the one every `std` function returning a
+`List` writes because pushing into a fresh list is the portable spelling
+(sc04's rule: index assignment executes on one lane only), is quadratic
 under lupin:
 
 | N pushes | lupin 0.1.10 | wolf `--checked` | wolf `--native` |
@@ -2800,25 +2796,25 @@ rather than an amortized doubling. Both compiler rungs are flat at the same
 sizes, so this is the interpreter's list representation and not a cost the
 language imposes.
 
-**Two suspects cleared before filing**, both measured rather than reasoned
+Two suspects were cleared before filing, both measured rather than reasoned
 about, and both worth recording because a std scanner does them constantly:
 
-- suffix slicing (`rest = rest[1..]` until empty) is LINEAR: 2 000 / 4 000 /
+- suffix slicing (`rest = rest[1..]` until empty) is linear: 2 000 / 4 000 /
   8 000 / 16 000 bytes → 0.008 / 0.013 / 0.025 / 0.055 s;
 - `starts_with` is O(1) in the receiver: 200 000 probes cost 0.73 s against a
   16-byte string and 0.80 s against an 8 192-byte one.
 
-So a scanner that walks a string is fine here; a scanner that BUILDS
+So a scanner that walks a string is fine here; a scanner that builds
 something is not.
 
-**What it costs this repository.** `hex.decode`, `base64.decode`,
+Here is what it costs this repository. `hex.decode`, `base64.decode`,
 `str.split`/`find_all`/`char_offsets`/`code_points`, `list.map`/`filter`/
 `concat`, `sort`'s merge passes and `fmt.decimal`'s big-integer limb
 arithmetic are all quadratic in their output size on the reference machine.
 The visible symptom is the slowest test sitting at 28-35 s against a 60 s
-ceiling — which is why it fell over once under load — and the invisible one
-is that this repository has been describing those functions' costs in terms
-of the algorithm rather than the machine.
+ceiling, which is why it fell over once under load, and the invisible one is
+that this repository has been describing those functions' costs in terms of
+the algorithm rather than the machine.
 
 Also measured while isolating it: lupin 0.1.10 is consistently ~15% slower
 than 0.1.8 on that test (28.3 / 35.3 s versus 24.0 / 31.0 s, alternating
@@ -2826,30 +2822,29 @@ runs, one staged std tree). Reported with the filing, not separately: a
 release that adds analyses may legitimately cost time, and 15% is not the
 story next to a quadratic.
 
-The ask is amortized growth, or — if the representation is deliberately
-persistent — a sentence saying so, because the shape wolf-std has
-standardized on is that representation's worst case.
+The ask is amortized growth, or, if the representation is persistent on
+purpose, a sentence saying so, because the shape wolf-std has standardized on
+is that representation's worst case.
 
-**What this sprint did NOT do about it.** Nothing in `std/` changed for it.
-The portable spelling is still the portable spelling, the alternative
-(index assignment) still costs a lane, and rewriting the library around one
-implementation's data structure is precisely the workaround
-`CONTRIBUTING.md` forbids. It is filed, it is measured, and the two numbers
-that matter — the ceiling and the doubling — are here so the next sprint
-that sees a timeout knows within a minute whether it has found a new
+This sprint did nothing about it in `std/`. The portable spelling is still
+the portable spelling, the alternative (index assignment) still costs a lane,
+and rewriting the library around one implementation's data structure is the
+workaround `CONTRIBUTING.md` forbids. It is filed, it is measured, and the
+two numbers that matter (the ceiling and the doubling) are here so the next
+sprint that sees a timeout knows within a minute whether it has found a new
 problem or this one.
 
 ## Retirements and movements at the sc13 pins
 
-The pin bump is wolf `f8dca42` → trunk **`4e316ad`** ("snapshots: s81's two
+The pin bump is wolf `f8dca42` → trunk `4e316ad` ("snapshots: s81's two
 str shapes carry s80's role immediate"), three merged waves in one step
-(s79 bench, s80 token audit, s81 str equality) — the three sc12 named as in
-flight and deliberately did not chase. lupin goes **0.1.10 → 0.1.11**.
+(s79 bench, s80 token audit, s81 str equality), the three the sc12 record
+named as in flight and did not chase. lupin goes 0.1.10 → 0.1.11.
 
 Both ritual gates were run in a clean scratch clone at the sha and both are
-green on their FIRST attempt (`cargo test --workspace` = 0,
+green on their first attempt (`cargo test --workspace` = 0,
 `cargo run -p xtask -- ci` = 0, exit codes printed rather than read off a
-summary line — F-0063's lesson). Fifth clean pair in a row, so F-0054 stays
+summary line, F-0063's lesson). Fifth clean pair in a row, so F-0054 stays
 open on the same reasoning it has stayed open on since sc09: five clean
 pairs are not proof a timing dependence is gone, and the posture is to state
 the attempt count.
@@ -2858,7 +2853,7 @@ the attempt count.
 
 For four sprints `std.bytes.to_str` was a reviewed contract because nothing
 in the language built a `str` from a number: no `char`, no `from_utf8`, no
-`strbuf.push_byte`, probed four ways at four consecutive pins. s81
+`strbuf.push_byte`, probed four ways at four consecutive pins. The s81 wave
 (wolf-lang#58) landed `str_from_utf8(b: List[int]) -> str ! {utf8}` in the
 prelude, and it is the function the contract described rather than the cast
 the representation invited:
@@ -2877,35 +2872,35 @@ interior NUL (77 00 66)         accepted — a str carries its length
 
 `std.bytes.to_str` is four lines over it, its row is the primitive's own
 (§14's verbatim-adoption rule, applied to a pure tier), and the sc05
-contract needed no amendment to land — which is the thing worth recording.
+contract needed no amendment to land, which is the thing worth recording.
 std refused to ship an ASCII-only border post for four sprints and the
 toolchain refused to ship an unchecked cast; both refusals were right and
 the function they produced is the one both descriptions asked for.
 
-What it does NOT close: `str_from_utf8` is the compiler's prelude only
-(F-0075 below), so the function has two lanes. And its own family stays
-open — `fs_read_bytes` (F-0044) is still unwritten, so a byte read still has
-no producer to hand `to_str`.
+What it does not close: `str_from_utf8` is the compiler's prelude only
+(F-0075 below), so the function has two lanes. And its own family stays open:
+`fs_read_bytes` (F-0044) is still unwritten, so a byte read still has no
+producer to hand `to_str`.
 
 ### F-0037's closure is SPENT: the json DOM has its navigation
 
-sc12 measured F-0037 closed and deliberately did not write the functions,
-per sc10's rule that every finding on the SIGNATURE gets re-measured first.
+The sc12 sprint measured F-0037 closed and did not write the functions,
+per sc10's rule that every finding on the signature gets re-measured first.
 This sprint did that re-measurement before writing a line:
 
-- **F-0037** — `fn id(v: V) -> V ! {none} { v }` under lupin 0.1.11 prints
+- F-0037: `fn id(v: V) -> V ! {none} { v }` under lupin 0.1.11 prints
   `value path wins 7`. Closed, re-measured at the new release rather than
   inherited from sc12's note.
-- **F-0029** — UNMOVED, and it is the finding the design already lives
-  with. An enum VALUE crosses a module boundary (and now crosses one
+- F-0029: unmoved, and it is the finding the design already lives
+  with. An enum value crosses a module boundary (and now crosses one
   through an error row); a `match` in the importer is still
   `unsupported: no `match` arm applied; exhaustiveness is the type
   checker's`. `std.json` keeps every inspection inside the declaring module
   (`type_name`, `as_*`, `is_null`), so `get` and `at` hand an importer a
-  value it can only read through this module — which is exactly what the
-  four sc05 accessors already did.
-- **F-0039** — UNMOVED. `int ! {none} ! {none}` runs under lupin 0.1.11 and
-  is `fail(E0201)` at PARSE on both compiler rungs, re-measured with a
+  value it can only read through this module, which is what the four sc05
+  accessors already did.
+- F-0039: unmoved. `int ! {none} ! {none}` runs under lupin 0.1.11 and
+  is `fail(E0201)` at parse on both compiler rungs, re-measured with a
   fresh reproducer. It touches neither getter: one `!` per type is the
   portable budget and both signatures spend exactly one.
 
@@ -2914,32 +2909,32 @@ wrote, unchanged. The module's lanes are unchanged too (F-0029 + `Map`), so
 the two new rows are `run / unsupported / unsupported` beside the four the
 module already had.
 
-**What is left, and it is now a debt rather than a wall.** `parse` and
-`unescape` have both had every finding on them re-measured and both are
-UNBLOCKED at these pins — `parse` by F-0037's closure, `unescape` by
-F-0057's. §14's rule says a contract ships in the sprint AFTER its blocker
-closes, which is one sprint of grace and no more, so both are owed next
-sprint and both module headers say so with the clause. `escape`'s totality
-rides with them, because it changes `stringify`'s row.
+What is left is a debt rather than a wall. `parse` and `unescape` have both
+had every finding on them re-measured and both are unblocked at these pins,
+`parse` by F-0037's closure and `unescape` by F-0057's. §14's rule says a
+contract ships in the sprint after its blocker closes, which is one sprint of
+grace and no more, so both are owed next sprint and both module headers say
+so with the clause. `escape`'s totality rides with them, because it changes
+`stringify`'s row.
 
 ### Re-verified UNMOVED, each re-measured rather than assumed
 
-- **F-0073** — the `--version` pairing line still says "paired with lupin
+- F-0073: the `--version` pairing line still says "paired with lupin
   0.1.8" at `4e316ad`, three releases after 0.1.8. Filed as wolf-lang#87,
   unmoved, and doctor still reports it without gating it.
-- **F-0046 / F-0053** — `conform-run` still rejects `--deny-warnings`, and
+- F-0046 / F-0053: `conform-run` still rejects `--deny-warnings`, and
   the record's `warnings` array still covers the entry file only. The rig
   denies warnings itself and stayed green.
-- **F-0074** — measured again, because this sprint's rig went RED on it
+- F-0074: measured again, because this sprint's rig went red on it
   once. `fmt/decimal/shortest_round_trip.lu` under lupin 0.1.11 takes
-  24.8 / 25.3 / 26.8 / 27.7 s on an idle machine and **116.6 s on a loaded
-  one** — the same program, the same staged tree, five runs. The 60 s
-  per-test ceiling is therefore not a margin the test has, it is a margin
-  the MACHINE has, and sc12's "a CI timeout is a bisect, not a flake" reads
-  one notch stronger from here: the bisect was already done, the mechanism
-  is known, and what a red run means now is "this host was busy", which is
-  a scheduling fact and not new evidence. Nothing in `std/` changed for it,
-  for sc12's reason.
+  24.8 / 25.3 / 26.8 / 27.7 s on an idle machine and 116.6 s on a loaded
+  one, on the same program, the same staged tree, five runs. The 60 s
+  per-test ceiling is therefore a margin the machine has rather than one the
+  test has, and sc12's "a CI timeout is a bisect, not a flake" reads one
+  notch stronger from here: the bisect was already done, the mechanism is
+  known, and a red run now means "this host was busy", which is a scheduling
+  fact and not new evidence. Nothing in `std/` changed for it, for sc12's
+  reason.
 - F-0004, F-0011, F-0012, F-0016, F-0025's last third, F-0026, F-0027,
   F-0029, F-0030, F-0035 (the byte-type half), F-0038, F-0039, F-0040,
   F-0044, F-0045, F-0047, F-0049, F-0050, F-0051, F-0054, F-0058, F-0060,
@@ -2948,49 +2943,50 @@ rides with them, because it changes `stringify`'s row.
 
 ### The ledger movement
 
-**Four rows added, zero rows moved.** 185 → 189. The two json rows are
+Four rows added, zero rows moved. 185 → 189. The two json rows are
 one-lane (`run / unsupported / unsupported`) and the two bytes rows are
 two-lane the other way (`unsupported / run / run`), which is the sprint in
 one sentence: both halves are a closure being spent, and they have opposite
 lane shapes because one is blocked by an interpreter-only enum property and
 the other by a compiler-only prelude name.
 
-No existing row changed verdict across the bump. s81 changed the LOWERING
-of `str` equality and ADDED a prelude function; s80 fixed a miscompile no
-lane here observes; s79 is a benchmark wave. That is the third time this
-repository has recorded "the ledger is unchanged and that is the expected
-result" (sc10, sc12, sc13), and the reason is the same one every time: the
-ledger measures how deep each implementation gets, not what it costs.
+No existing row changed verdict across the bump. The s81 wave changed the
+lowering of `str` equality and added a prelude function, s80 fixed a
+miscompile no lane here observes, and s79 is a benchmark wave. That is the
+third time this repository has recorded "the ledger is unchanged and that is
+the expected result" (sc10, sc12, sc13), and the reason is the same one every
+time: the ledger measures how deep each implementation gets, not what it
+costs.
 
 ## F-0075 — the interpreter has no `str_from_utf8`
 
-s81 put the language's first bytes-to-str primitive in the compiler's
-prelude. lupin 0.1.11, whose own conformance pin is `f8dca42` — the commit
-before s81 merged — does not have it:
+The s81 wave put the language's first bytes-to-str primitive in the
+compiler's prelude. lupin 0.1.11, whose own conformance pin is `f8dca42` (the
+commit before s81 merged), does not have it:
 
 ```text
 $ lupin conform-run ./main.lu
 unsupported: `str_from_utf8` does not resolve
 ```
 
-That is the GENERIC unknown-name refusal. It is not the reasoned decline
+That is the generic unknown-name refusal, and not the reasoned decline
 this machine gives the four tiers it has decided about (`fs_*`: no
 filesystem by design; `net_*`: no sockets; `json_*`: "declines the surface
 rather than risk a second, guessed RFC 8259 reading"; the process trio:
 "runs no child processes by design"). A pure, total, table-free function
-that turns a `List[int]` into a `str` is nothing like those four — there is
+that turns a `List[int]` into a `str` is nothing like those four: there is
 no capability to decline and no second reading to risk, since RFC 3629 is
 one page and this repository has already implemented it twice (once in
 `bytes.is_utf8`, once in `str.code_points`). So this reads as drift, which
-is F-0070's shape a second time, and F-0070's lesson holds: a builtin
-FAMILY is not a unit of evidence, a builtin is.
+is F-0070's shape a second time, and F-0070's lesson holds: a builtin family
+is too coarse to be evidence, and each builtin has to be probed.
 
-**The cost, in this repository:** `std.bytes.to_str` lands with two lanes
+The cost in this repository: `std.bytes.to_str` lands with two lanes
 instead of three, and `tests/bytes/to_str_border.lu` and
 `to_str_row.lu` carry dark interpreter columns while the module's eight
 other rows stay three-lane (lupin resolves module bodies lazily, so nothing
 else in `std.bytes` pays). It also decided a design question:
-`bytes.is_utf8` did NOT become a one-line call to the primitive, because
+`bytes.is_utf8` did not become a one-line call to the primitive, because
 that would have traded the predicate's third lane for a tautology. The two
 decoders stay independent and a test asserts they agree, which is the
 better arrangement anyway and would not have been chosen without this
@@ -3000,10 +2996,10 @@ The ask is the builtin, at the release that re-pins past `4e316ad`.
 
 ## F-0076 — the native rung cannot compare two `bool`s
 
-**CLOSED at the sc12 (02-os) pin** (s88, wolf-lang#100 — "native: two bools
+**CLOSED at the sc12 (02-os) pin** (s88, wolf-lang#100, "native: two bools
 can be compared"). `tests/fmt/parse_bool.lu`'s native column advanced
 `unsupported` -> `run`, six sprints after it went dark and two after the
-mechanism was named. std's bodies are unchanged: `!p` instead of
+mechanism was identified. std's bodies are unchanged: `!p` instead of
 `p == false`, and a branch instead of `p == q`, cost nothing and reverting
 them would be churn with no reader-visible gain.
 
@@ -3023,19 +3019,19 @@ n == 3          run
 x == 1.5        run
 ```
 
-The refusal's parenthetical is "(str/enum compares, c06/std)", which names
-the two cases it was written for and does not name `bool` — and that is why
-this has gone six sprints undiagnosed. `tests/fmt/parse_bool.lu` is ten
+The refusal's parenthetical is "(str/enum compares, c06/std)", which lists
+the two cases it was written for and says nothing about `bool`, and that is
+why this has gone six sprints undiagnosed. `tests/fmt/parse_bool.lu` is ten
 `== true`/`== false` assertions and has carried `native = "unsupported"`
 since sc05 with no explanation beside it; that row is this finding, and it
 is where the claim is now held.
 
 Writing around it is trivial: `!p` instead of `p == false`, and a branch
-instead of `p == q`. That is the argument FOR fixing it rather than
-against. Nothing about comparing two `i1`s is hard, the checked tier and
-the interpreter both do it, and what a library pays today is a lane for a
-spelling — which is the same shape as F-0071 and gets the same response
-here: write the form that keeps every lane, and file the one that does not.
+instead of `p == q`. That is an argument for fixing it. Nothing about
+comparing two `i1`s is hard, the checked tier and the interpreter both do it,
+and what a library pays today is a lane for a spelling, the same shape as
+F-0071, and it gets the same response here: write the form that keeps every
+lane, and file the one that does not.
 
 ## F-0077 — a `comptime fn` cannot build a `List`
 
@@ -3047,29 +3043,29 @@ comptime fn probe() -> int { let b = List[int]()  b.len }     unsupported @resol
 comptime fn probe() -> int { str_from_utf8(List[int]()) … }   unsupported @resolve
 ```
 
-Both compiler rungs, no code and no reason string in the record — F-0051's
+Both compiler rungs, no code and no reason string in the record: F-0051's
 silence, which is why this needed a bisect rather than a reading. The
-refusal is the `List`, not the builtin and not the row.
+refusal is about the `List`, not the builtin and not the row.
 
-The consequence is a rule and not an inconvenience: **a pure builtin whose
+The consequence is a rule and not an inconvenience: a pure builtin whose
 argument is a `List` is unreachable at comptime, whatever the sandbox
-thinks.** `str_from_utf8` is the first such builtin and `std.bytes.to_str`
+thinks. `str_from_utf8` is the first such builtin and `std.bytes.to_str`
 is the first std function whose comptime story has to be written as "the
 D33 sandbox has no objection — it carries no capability and no sandbox
 category — and the engine cannot get there anyway". That sentence is in the
 function's doc, measured rather than inferred, because the alternative was
 to write "pure and comptime-safe" and be wrong in a way no test here would
 have caught (§13, sc09's rule: a doc sentence about what an implementation
-answers is a test or it is a rumour — and when it cannot be a test, it is a
+answers is a test or it is a rumour, and when it cannot be a test, it is a
 measurement with its date on it).
 
 The ask: `List` construction and indexing inside the comptime engine (s16's
-own scope), or a named refusal so a package author learns why — F-0060 and
+own scope), or a named refusal so a package author learns why. F-0060 and
 F-0069 have asked for the second half twice, and this is the third caller.
 
 ## F-0078 — the reference lane reads a list as slowly as it used to build one
 
-wolf-interp#24 (F-0074) is FIXED at 0.1.12, and the fix is worth stating
+wolf-interp#24 (F-0074) is fixed at 0.1.12, and the fix is worth stating
 because it explains what is left: the cost was never in `push`, it was in
 `eval_method` copying the receiver out of its slot, copying it again to
 compare against, comparing two whole values to decide whether the method
@@ -3077,7 +3073,7 @@ had written, and copying the result back. Four traversals per append. The
 fix lends the receiver instead. Upstream measures 32k pushes at 30.33s
 before and 0.191s after.
 
-**The index read gets none of that**, measured here at the new pin, release
+The index read gets none of that, measured here at the new pin, release
 build, same program at four sizes:
 
 | N | `xs[i]` in a loop | `for v in xs` |
@@ -3088,34 +3084,34 @@ build, same program at four sizes:
 | 16 000 | 3.442 s | 0.107 s |
 
 Four times the work per doubling against twice. And a read-mode `List`
-ARGUMENT copies as well, so the two costs compound: 20 000 calls of
+argument copies as well, so the two costs compound: 20 000 calls of
 `fn value_at(bs: List[int], at: int) -> int { bs[at] }` over a
-20 000-element list is **58.1 s**, where the same index read written inline
+20 000-element list is 58.1 s, where the same index read written inline
 in the loop is 5.3 s and a `str` read-mode argument at the same size is
 0.33 s. It is the container, not argument passing in general.
 
-**What it cost this sprint, in the design rather than in the clock.**
+It cost this sprint something in the design rather than in the clock.
 `std.json.parse` was going to materialize `s.bytes()` once (the shape
 F-0071 says runs everywhere) and index it. That is quadratic in the
-document on the module's ONLY executing lane, so the scanner reads through
+document on the module's only executing lane, so the scanner reads through
 `text.get(i..i + 1)` and takes the first byte with a one-element `for`
-instead — measured at 0.876s for 40 000 steps against the index walk's
+instead, measured at 0.876s for 40 000 steps against the index walk's
 curve above. The shape is fine and the body is no worse for it, but it was
 chosen for one implementation's cost, which is the thing this repository's
 house rule tries not to do. Saying so here is the alternative to pretending
 it was a language-level preference.
 
-**What it explains.** `fmt/decimal/shortest_round_trip.lu` is this repo's
-slowest test (26–43s against a 60s ceiling on a host running three other
-sprints' cargo jobs) and it is base-10⁹ limbs in a `List[int]` indexed in
-the inner loop. The push fix made it about 20% faster — 41.5s → 33.5s and
-33.1s → 25.9s, two pairs of runs, same host, same load — and not 100×,
-which is exactly what this finding predicts and is the reason to state the
-mechanism rather than to celebrate the release and move on.
+It also explains this repo's slowest test.
+`fmt/decimal/shortest_round_trip.lu` (26–43s against a 60s ceiling on a host
+running three other sprints' cargo jobs) is base-10⁹ limbs in a `List[int]`
+indexed in the inner loop. The push fix made it about 20% faster (41.5s →
+33.5s and 33.1s → 25.9s, two pairs of runs, same host, same load) and not
+100×, which is what this finding predicts and the reason to state the
+mechanism rather than celebrate the release and move on.
 
 ## F-0079 — a handler cannot tell an imported module's tags apart
 
-**Silent wrong answer**, and the mirror of F-0052 (which was the compiler's
+A silent wrong answer, and the mirror of F-0052 (which was the compiler's
 checked lane doing the same thing until s70).
 
 ```wolf
@@ -3132,79 +3128,79 @@ tagmod.miss(k) else |e| match e { alpha => 10, beta => 20, gamma => 30 }
 | wolf `--checked` | `10 20 30` | `10 20 30` | ✓ |
 | wolf `--native` | `10 20 30` | `10 20 30` | ✓ |
 
-Exit 0, no diagnostic, both arm orders measured — which is the experiment
+Exit 0, no diagnostic, both arm orders measured, which is the experiment
 that tells "first arm always" from "one tag happened to be right", and it
-is sc08's experiment run again on the other machine. The tag is NOT lost on
+is sc08's experiment run again on the other machine. The tag is not lost on
 the way out: the same call propagated out of `main` prints `error: beta`
-correctly, and a wildcard `else |_| { … }` behaves. It is the arm
-resolution against an IMPORTED callee's row.
+correctly, and a wildcard `else |_| { … }` behaves. What breaks is arm
+resolution against an imported callee's row.
 
-The same shape over a row raised in the ENTRY FILE discriminates correctly
-here — `tests/errors/handler_discriminates.lu` is three-lane green at this
-pin, re-run — so the two files together say exactly where the line is.
+The same shape over a row raised in the entry file discriminates correctly
+here (`tests/errors/handler_discriminates.lu` is three-lane green at this
+pin, re-run), so the two files together show where the line falls.
 
-**How it was found**, which is the part worth keeping: a 66-level document
-made `std.json.parse` raise `deep`, and the test's handler printed
-`syntax`. The reproducer that mattered was not the handler but the
-alternative witness — the same document with the tag ridden out of `main`
-printed `error: deep`, and the disagreement between those two readings is
-what turned "my parser has a bug" into "the handler is lying". When two
-ways of observing the same value disagree, bisect the OBSERVERS before the
-code (sc12's rule, arriving from a new direction).
+How it was found is the part worth keeping. A 66-level document made
+`std.json.parse` raise `deep`, and the test's handler printed `syntax`. The
+reproducer that mattered was the alternative witness: the same document with
+the tag ridden out of `main` printed `error: deep`, and the disagreement
+between those two readings is what turned "my parser has a bug" into "the
+handler is lying". When two ways of observing the same value disagree,
+bisect the observers before the code (sc12's rule, arriving from a new
+direction).
 
-**The cost here**: `std.json.parse`'s number branch uses a wildcard
+The cost here: `std.json.parse`'s number branch uses a wildcard
 `else |_| { return overflow }` rather than the two-arm handler it wants
-(honest, because the grammar has already been checked and only one tag is
-reachable — but chosen for this and not only for that), and `deep` and
-`overflow` each get their own test file so the record names the tag instead
-of a handler asserting it. §14's "a wildcard that claims nothing is the
-right handler when the module cannot act on the difference" now has a
-second clause: it is also the right handler when the module cannot SEE the
+(defensible, because the grammar has already been checked and only one tag
+is reachable, though chosen for this reason and not only for that), and
+`deep` and `overflow` each get their own test file so the record states the
+tag instead of a handler asserting it. §14's "a wildcard that claims nothing
+is the right handler when the module cannot act on the difference" now has a
+second clause: it is also the right handler when the module cannot see the
 difference.
 
-**CLOSED at lupin 0.1.13 (wolf-interp#29, the is13 arm-selection pass,
-released 2026-08-15 against pin 02c1e88 — the RECORDED pin).** The row
+**CLOSED at lupin 0.1.13** (wolf-interp#29, the is13 arm-selection pass,
+released 2026-08-15 against pin 02c1e88, the recorded pin). The row
 now travels with the raised value, so arm resolution asks the value
 which row it came from instead of the entry file's own declarations.
-`tests/json/parse_misses.lu` witnessed the fix where the bug lived, and
-sc22 re-confirmed it with a NINE-arm handler over
-`std.x.tls.cert.validate_chain`'s row — every tag answered correctly
-across the module boundary. What lagged was THIS REGISTER: the closure
+`tests/json/parse_misses.lu` witnessed the fix where the bug lived, and the
+sc22 sprint re-confirmed it with a nine-arm handler over
+`std.x.tls.cert.validate_chain`'s row: every tag answered correctly
+across the module boundary. What lagged was this register. The closure
 was upstream in the very release wolf-std pinned, the counterparty's
 changelog names the F-number, and two shipped files already relied on
 the fix while this entry still read as open (the sc12 changelog rule,
 missed for eight sprints and caught by the sc22 re-measure). The
 prose that survives it: the ride-the-tag-out-of-main witness stays the
-STRONGEST row evidence and every sc22 row test still uses it.
+strongest row evidence and every sc22 row test still uses it.
 
 ## F-0080 — the net tier has no byte-level read or write
 
 `net_read(fd, max) -> str ! {closed, timeout, utf8, io}`. TCP delivers
 whatever has arrived, so a stream carrying non-ASCII text splits a code
-point across two reads and the second sequence is a `utf8` miss — and there
+point across two reads and the second sequence is a `utf8` miss, and there
 is nothing a caller can do about it, because the two halves it would join
-never become values. `std.net.read`'s doc has said so since sc08 and
-`std.net.read_all` is honest only over ASCII.
+never become values. `std.net.read`'s doc has said so since sc08, and
+`std.net.read_all` is correct only over ASCII.
 
-**This used to be the same gap as `std.fs`'s, and it is not any more.** s90
-gave the fs tier `fs_read_bytes`/`fs_write_bytes` (whole file) and
-`fs_read_chunk`/`fs_write_chunk` (handle), all carrying `List[int]`, with no
-`utf8` row anywhere and an `invalid` row for an element that is not a byte —
+This used to be the same gap as `std.fs`'s, and it is not any more. The s90
+wave gave the fs tier `fs_read_bytes`/`fs_write_bytes` (whole file) and
+`fs_read_chunk`/`fs_write_chunk` (handle), all in `List[int]`, with no
+`utf8` row anywhere and an `invalid` row for an element that is not a byte,
 so `std.fs.copy_file` is a byte copy and a file holding a lone `0x80`
 survives it. The shape of the fix is therefore settled, implemented,
 lowered on both compiler rungs and shipped one tier over.
 
-**The ask**: `net_read_bytes(fd, max) -> List[int] ! {closed, timeout, io}`
+The ask: `net_read_bytes(fd, max) -> List[int] ! {closed, timeout, io}`
 and `net_write_bytes(fd, b) -> () ! {closed, invalid, io}`, the same
 currency and the same rows the fs chunk pair uses. Then a reader joins
-chunks and validates once with `str_from_utf8`, where the validation belongs
-— over the whole message, rather than once per arbitrary boundary the
+chunks and validates once with `str_from_utf8`, where the validation
+belongs, over the whole message rather than once per arbitrary boundary the
 network chose.
 
 Why it matters more than a `utf8` row usually would: the fs tier's version
 of this bug was silent corruption of a caller's data (`copy_file` refusing a
 binary file), and the net tier's version is worse, because the boundary is
-not the caller's chunk size but the network's packetization — the same
+the network's packetization rather than the caller's chunk size: the same
 program is correct on a fast loopback and wrong across a link that
 fragments. `std.net`'s header records the gap and cites this finding where
 it used to cite F-0044.
