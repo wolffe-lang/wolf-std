@@ -790,95 +790,94 @@ all three lanes.
 
 ## sc32 — 2026-09-02 — the budget has a shape
 
-Pins advance to wolf **v0.2.2** at 8cda3aa (THE LEARNERS' RELEASE) and
-lupin **v0.1.22** at conformance pin 2bfbe5e, both real tags, both
-`--version`-bare. The span is 35 commits — the largest this repo has
-crossed in one bump — and the gap between the two pins is named: a
-windows native bring-up, an LSP navigation trio and four letters, not
-lowering debt. Drift was predicted ZERO and measured ZERO over 373x3,
-the second consecutive empty drift list, with anchors 404 -> 411 (+7:
-`mem.region.account{,.1,.2}` and `mem.region.cap{,.1,.2,.3}`) in the
-first re-vendor that actually moves bytes since sc27. The 0.1.20 doctor
-pin retires.
+Pins advance to wolf v0.2.2 at 8cda3aa (THE LEARNERS' RELEASE) and
+lupin v0.1.22 at conformance pin 2bfbe5e, both real tags, both
+`--version`-bare. The span is 35 commits, the largest this repo has
+crossed in one bump, and the gap between the two pins is named: a
+windows native bring-up, an LSP navigation trio and four letters, none
+of it lowering debt. Drift was predicted at zero and measured zero over
+373x3, the second consecutive empty drift list, with anchors 404 -> 411
+(+7: `mem.region.account{,.1,.2}` and `mem.region.cap{,.1,.2,.3}`) in the
+first re-vendor to move bytes since sc27. The 0.1.20 doctor pin retires.
 
-**`std.mem.budget` lands**: `charged(r)` and `live()` name the region
-ledger's two queries (three lanes, including a `region` passed across a
-module boundary — affine values are RETAINED by a `read` parameter, and
-that took a probe to know), and `with_cap(n, f)` collapses D68's whole
-containment join — spawn, monitor, `select`, `is_alloc_contract()` —
-into one call whose failure is the ordinary row `exhausted`. That is
-the shape lobo's per-request 503 consumes. Fifteen probes ran before a
-line of the module was written and five of them changed it: a region
-may be taken but not RETURNED (native refuses `-> region`), the work's
-value cannot come back at all (a channel in a std signature is refused
-on BOTH wolf rungs), the checked tier's C1 refusal is reached at
-EXECUTION rather than statically (so one function yields two different
-checked columns across three witnesses), and the trap-shaped runner is
-not shipped because it is `region r(cap: n)` with a library in the way.
-The row carries no payload because `[mem.region.cap.3]`'s
-free-then-deliver teardown makes the dead proc's charge unobservable by
-contract; a negative budget traps at the door so a caller's arithmetic
-mistake is not answered with a recoverable value.
+`std.mem.budget` lands. `charged(r)` and `live()` are the region ledger's
+two queries (three lanes, including a `region` passed across a module
+boundary; a `read` parameter retains an affine value, and that took a
+probe to know), and `with_cap(n, f)` collapses D68's containment join,
+spawn, monitor, `select` and `is_alloc_contract()`, into one call whose
+failure is the ordinary row `exhausted`. That is the shape lobo's
+per-request 503 consumes. Fifteen probes ran before a line of the module
+was written and five of them changed it: a region may be taken and never
+returned (native refuses `-> region`); the work's value cannot come back
+at all (a channel in a std signature is refused on both wolf rungs); the
+checked tier's C1 refusal is reached at execution and not statically (so
+one function yields two different checked columns across three
+witnesses); and the trap-shaped runner is not shipped because it is
+`region r(cap: n)` with a library in the way. The row carries no payload
+because `[mem.region.cap.3]`'s free-then-deliver teardown makes the dead
+proc's charge unobservable by contract; a negative budget traps at the
+door, so a caller's arithmetic mistake is answered with a trap and not
+with a recoverable value.
 
-**wolf-lang#203's evidence is measured and written** (F-0104), not
-built: a `List[int]` byte buffer charges exactly **16x** its payload on
-both wolf tiers at every size from 1 KiB to 64 KiB — reproducing
-lobo's numbers to the byte from a different program — and **32x** under
-lupin, a multiplier the issue does not carry. A fourth measurement
-rides along: a `str` charges NO named region's ledger on ANY tier,
-where `[mem.region.account.1]` scopes that gap to the native one. The
-recommendation is a language byte-width element type behind std's
-already-documented `Bytes`, because every byte signature in std is
-monomorphic over `List[int]` today and keeps its shape when it lands.
+wolf-lang#203's evidence is measured and written up (F-0104) instead of
+built: a `List[int]` byte buffer charges 16x its payload on both wolf
+tiers at every size from 1 KiB to 64 KiB, reproducing lobo's numbers to
+the byte from a different program, and 32x under lupin, a multiplier the
+issue does not carry. A fourth measurement rides along: a `str` charges
+no named region's ledger on any tier, where `[mem.region.account.1]`
+scopes that gap to the native one. The recommendation is a language
+byte-width element type behind std's already-documented `Bytes`, because
+every byte signature in std is monomorphic over `List[int]` today and
+keeps its shape when it lands.
 
-F-0103 re-measured verbatim and NOT adopted — wolf-lang#201 has not
-ruled, and nothing in 35 commits touches `mem`'s argument handling, so
+F-0103 re-measured verbatim and not adopted: wolf-lang#201 has not ruled,
+and nothing in 35 commits touches `mem`'s argument handling, so
 `bind, then name` stands. Residues re-dated: the chars-pairs tuple list
-refuses at its **sixth** consecutive pin, F-0096 verbatim, and
-`strbuf.in(r)` was RE-PROBED rather than argued for the first time —
-the span moved regions for real, so the placement syntax was measured
-(absent on every lane, `fail(E0201)` at parse for the struct form)
-instead of reasoned from the commit list.
+refuses at its sixth consecutive pin, F-0096 verbatim, and `strbuf.in(r)`
+was re-probed for the first time instead of argued, because the span
+moved regions, so the placement syntax was measured (absent on every
+lane, `fail(E0201)` at parse for the struct form) instead of reasoned
+from the commit list.
 
 ## sc31 — 2026-09-01 — the row gets a name
 
-Pins advance to wolf **v0.2.1** at 75fd2d0 (a real release tag again —
-the sc30 dev stamp retires, `wolf --version` answers bare) and lupin
-**v0.1.20** at conformance pin b80d239, four commits behind the data
-pin with the gap named: r04's four measured letters. Drift was
-predicted ZERO and measured ZERO over 372x3 — the first sc bump whose
-drift list came back empty — with anchors held at 404.
+Pins advance to wolf v0.2.1 at 75fd2d0 (a real release tag again, so the
+sc30 dev stamp retires and `wolf --version` answers bare) and lupin
+v0.1.20 at conformance pin b80d239, four commits behind the data pin
+with the gap named: r04's four measured letters. Drift was predicted at
+zero and measured zero over 372x3, the first sc bump whose drift list
+came back empty, with anchors held at 404.
 
 `std.x.tls.client` answers its first consumer's ask (wolf-std#3):
 `named` coarsens the module's twenty-row vocabulary into one
-payload-carrying tag whose payload is the refusing row's own NAME, so
+payload-carrying tag whose payload is the refusing row's own name, so
 a caller writes one handler arm instead of twenty and never forges a
 dead `Client`; `row_name` is its marking face. The call-site spelling
 is `bind, then name`, and the module header says why. Adopted at the
 negative battery's three naming sites with byte-identical stdout on
 all three lanes. F-0103 filed (wolf-lang#201): the checked tier
 refuses a raising call passed straight into a row-typed parameter
-where lupin and the native rung both run it — the long-unexplained
+where lupin and the native rung both run it, the long-unexplained
 cause of three `std.option` ledger rows. The client's lane note now
-states what a handshake COSTS: seconds, not milliseconds, at
-unoptimized tiers.
+states what a handshake costs at unoptimized tiers: seconds, not
+milliseconds.
 
 ## sc30 — 2026-08-31 — the slice comes home
 
 Pins advance to wolf b80d239 (the s129/s130 merges; a dev-stamped
 build whose `+dev.b80d239` identity carries the pin clause doctor
-gates — no release tag exists past v0.2.0, and D57's honest answer is
-the dev brand) and lupin v0.1.19 at conformance pin 83f83bb, one
+gates, since no release tag exists past v0.2.0 and D57's answer is the
+dev brand) and lupin v0.1.19 at conformance pin 83f83bb, one
 merge behind the data pin with the gap named. Drift predicted two
 movers and measured three, all lupin, all deeper: the sc29 byte-tier
-rows go three-lane (F-0102 paid exactly as filed) and
-`loopback_handshake`'s lupin lane RUNS the full TLS 1.3 handshake
-inside the 50M step budget — sc29's "and the step budget" was an
+rows go three-lane (F-0102 paid as filed) and
+`loopback_handshake`'s lupin lane runs the full TLS 1.3 handshake
+inside the 50M step budget, where sc29's "and the step budget" was an
 inference the resolve refusal had shadowed, and the measurement
 outvoted it. F-0101 closes the sc28 arc: `bytes.slice` re-adopts
 `b[from..to]` (the retreat commit reverses) and the one row the sc28
-adoption moved holds `run` on every lane with the range spelling —
-found, filed, fixed, re-adopted. Struct patterns adopted where the
+adoption moved holds `run` on every lane with the range spelling,
+found, filed, fixed and re-adopted. Struct patterns adopted where the
 struct is born: 14 patterns at 8 files, probe-proven compositions
 first, ledger flat throughout. The chars-pairs tuple list refused at
 its fourth consecutive pin; F-0096 verbatim; anchors 404
@@ -888,11 +887,11 @@ its fourth consecutive pin; F-0096 verbatim; anchors 404
 
 std.x.tls.client lands: a TLS 1.3 client over the library's proven
 halves, two-phase begin/complete for the single-threaded reality,
-CertificateVerify VERIFIES (ed25519 + ecdsa-p256; sc21's
-verify-nothing retires), the eleven-shape negative battery refuses by
-name, and the loopback flagship shakes hands with a server half built
-from the same primitives. std.net gains `read_bytes`/`write_bytes`
-and the deadline pair — F-0049's `timeout` tag reachable at last.
+CertificateVerify verifies (ed25519 + ecdsa-p256; sc21's
+verify-nothing retires), the eleven-shape negative battery refuses with
+the row named, and the loopback flagship shakes hands with a server half
+built from the same primitives. std.net gains `read_bytes`/`write_bytes`
+and the deadline pair, making F-0049's `timeout` tag reachable.
 F-0102 filed (wolf-interp#52): the byte tier dark under lupin 0.1.18.
 
 ## sc28 — 2026-08-30 — the library writes the new words
