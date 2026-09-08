@@ -6339,40 +6339,40 @@ a file ci reads for no verdict.
 
 ## The sc35 pin bump — the producers speak bytes, and the blast radius is the point
 
-**The drift prediction, written 2026-09-03 03:58 EDT, BEFORE the binary
-was installed and BEFORE any gauntlet at the new pins** (the ritual, per
+The drift prediction was written 2026-09-03 03:58 EDT, before the binary
+was installed and before any gauntlet at the new pins (the ritual, per
 sc30/sc33/sc34: the whole `31170d1..4230b00` span read commit by commit;
-both upstream trees counted and the anchor key SETS diffed BOTH WAYS at
+both upstream trees counted and the anchor key sets diffed both ways at
 the two data-pin shas before the run; the repo grepped for every new
-surface's SHAPE; and the BEFORE side measured on the binary about to be
+surface's shape; and the before side measured on the binary about to be
 replaced).
 
-**This is the first bump in this repo's history whose prediction is NOT
-a zero, and that is the whole point of the sprint.** sc31/sc32/sc33/sc34
-each predicted and defended zero verdict movers over 376x3. sc35 predicts
-a WALL OF RED at the bump, names its cause, counts it, and then cures it
-— because the change being pinned is a change to the type of eight
-builtins this library is a thin wrapper over.
+This is the first bump in this repo's history whose prediction is not a
+zero, and the sprint was built around that. The sc31/sc32/sc33/sc34
+sprints each predicted and defended zero verdict movers over 376x3. The
+sc35 prediction is a wall of red at the bump, with the cause named and
+counted and then cured, because the change being pinned is a change to
+the type of eight builtins this library is a thin wrapper over.
 
 ### The pins
 
-- **The wolf BINARY moves 31170d1 -> 4230b00**, a dev-stamped build at
-  trunk: `wolf 0.2.3+dev.4230b00 (wolfgang, pin 4230b00)`. **20 commits.**
-  The tag is still unavailable for the same reason sc34 recorded and a
-  stronger one: `v0.2.3` = `3befc3e` sits twelve commits before s135 (no
-  `byte` lowering at all) and thirty-two before s136 (no byte-typed
+- The wolf binary moves 31170d1 -> 4230b00 and is a dev-stamped build
+  at trunk: `wolf 0.2.3+dev.4230b00 (wolfgang, pin 4230b00)`, 20 commits.
+  The tag is still unavailable for the same reason sc34 recorded and for
+  a stronger one: `v0.2.3` = `3befc3e` sits twelve commits before s135
+  (no `byte` lowering at all) and thirty-two before s136 (no byte-typed
   builtin). Built at the sha with the stamp applied
   (`WOLF_COMMIT=4230b00 cargo build --release -p wolf_driver -p wolf_rt`)
-  and installed through **fresh inodes** (the sc26 SIGKILL rule).
-- **The DATA pin moves 31170d1 -> 4230b00**, the same 20 commits, the
-  same sha. The one-sha invariant sc34 restored is **held**.
-- **The lupin BINARY does NOT move: 0.1.23 (`127b6fa`), conformance pin
-  `8cda3aa`.** See "the lupin lane" below — including why the 0.1.24
-  that exists is not chased here.
+  and installed through fresh inodes (the sc26 SIGKILL rule).
+- The data pin moves 31170d1 -> 4230b00 over the same 20 commits and to
+  the same sha. The one-sha invariant sc34 restored holds.
+- The lupin binary does not move: 0.1.23 (`127b6fa`), conformance pin
+  `8cda3aa`. See "the lupin lane" below, including why the 0.1.24 that
+  exists is not chased here.
 
 ### The span, surface by surface — three carriers and seventeen non-carriers
 
-**The carrier, and it is the sprint's subject.** `46b504d` moves the
+The carrier is the sprint's subject. `46b504d` moves the
 eight byte producers/consumers to `List[byte]` through one
 `byte_list_ty()` in `wolf_sema/src/check.rs`; `9c9e1f2` mints them in the
 native rt through `list::from_bytes` (one 1-byte-element buffer at exact
@@ -6380,118 +6380,118 @@ capacity, one memcpy) and reads them through `u8_elems`; `78c4f6a` gives
 the checked machine `Value::Byte` lists and models a consumed
 `s.bytes()` view as uncharged; `ca645ec` yields the I8 cell from
 `for b in s.bytes()`, `s.bytes()[i]` and the `get`/`first`/`last` family,
-and keys the s89 lend on `List[byte]` parameters. **Every one of std's
+and keys the s89 lend on `List[byte]` parameters. Every one of std's
 sixteen byte-tier functions is a thin wrapper over one of those eight
-builtins, so every one of them stops typechecking at this bump.** That is
-not a regression: it is F-0106's cure arriving, and the refusal is the
-compiler telling the library to finish the rename.
+builtins, so every one of them stops typechecking at this bump. This is not a regression. It is F-0106's cure arriving, and
+the refusal is the compiler telling the library to finish the rename.
 
-**Predicted blast radius, from #231's own measurement against this
-tree: 198 unique refusal sites over 45 files**, in six shapes —
+The predicted blast radius comes from #231's own measurement against
+this tree: 198 unique refusal sites over 45 files, in six shapes.
 59 `b == <literal>` comparisons, 28 producer results bound or returned
 as `List[int]`, ~90 `List[byte]` values handed to std's own
 `List[int]`-typed functions (the rename proper), 10 a `byte` where an
 `int` is required, 6 a `byte` pushed into a `List[int]`, 3 `else`
 fallbacks producing an int literal against a byte. Code E0401 with one
-E0805 shape possible; **the note names the fix by name** (`b as int`,
-or `as byte` on the other side), which is the diagnostic doing the work
-D72 designed it to do.
+E0805 shape possible; the note names the fix (`b as int`, or `as byte`
+on the other side), which is the diagnostic doing the work D72 designed
+it to do.
 
-**Predicted ledger movement: catastrophic and uncountable-in-advance on
-the two wolf lanes, ZERO on lupin.** A refusal inside a std MODULE
+Predicted ledger movement is catastrophic and uncountable-in-advance on
+the two wolf lanes, and zero on lupin. A refusal inside a std module
 refuses every test that imports it, and the byte tier reaches
 `std.bytes`, `std.fs`, `std.net`, `std.hex`, `std.base64`, `std.json`,
 `std.x.jose`, `std.x.crypto.{sha2,chacha20,curve25519,p256}` and
-`std.x.tls.{cert,handshake,record,client}` — so the count is not "the 40
-rows that name the tier" (sc34's flip-set number) but "every row that
-reaches any of those modules". This is why **the bump cannot stand as
-its own green commit** and why the discipline is stated rather than
-quietly bent: one gauntlet is run over the WHOLE tree with the rename in
-place, and every chunked commit is a subset of that green tree, exactly
-as sc34's were.
+`std.x.tls.{cert,handshake,record,client}`, so the count covers every
+row that reaches any of those modules, well past the 40 rows that name
+the tier (sc34's flip-set number). That is why the bump cannot stand as
+its own green commit, and why the discipline is spelled out here: one
+gauntlet runs over the whole tree with the rename in place, and every
+chunked commit is a subset of that green tree, as sc34's were.
 
-**The seventeen non-carriers, each checked by shape rather than
-categorically:**
+Each of the seventeen non-carriers was checked by its shape:
 
-- **#227 / `[os.net.unix]` (`8b3b641`) has no carrier.** Two new
-  builtins (`net_listen_unix`, `net_connect_unix`); `grep -rn
-  "listen_unix\|connect_unix\|AF_UNIX" std/ tests/` returns **nothing**.
+- #227 / `[os.net.unix]` (`8b3b641`) has no carrier. It adds two new
+  builtins (`net_listen_unix`, `net_connect_unix`), and `grep -rn
+  "listen_unix\|connect_unix\|AF_UNIX" std/ tests/` returns nothing.
   std.net's surface is the TCP pair and this sprint does not widen it.
-  This is the commit that moves the anchors, not any std row.
-- **D74's string-layout codes (`dddc15e`) have ONE potential carrier and
-  it is well-formed.** E0103 becomes the delimiter rule (opening AND
+  This commit moves the anchors and no std row.
+- D74's string-layout codes (`dddc15e`) have one potential carrier and
+  it is well-formed. E0103 becomes the delimiter rule (opening and
   closing `"""` sharing a line), E0104 the margin rule only, E0102 takes
   the bare `{` in a plain string, E0107 a BOM anywhere but byte 0. The
-  tree holds exactly **two** files with a `"""` at all, and only one is
-  executable: `tests/str/interpolation_interplay.lu`, whose opener and
-  closer each sit alone on their own line and whose body is indented
-  past the closer's column — neither new rule's shape. Its `{{literal}}`
-  is escaped, so E0102 has nothing to reach either. **Not one file in
-  `std/` or `tests/` begins with a BOM** (checked byte-for-byte, all 424
-  `.lu` files). And that test is the strongest witness in the tree
-  because its **stdout hash is pinned in its own directive** — if the
-  multiline's dedent moved by one column the row would red on the hash,
-  not on a code. Predicted unmoved.
-- **`5a005ad` (`Sock::raw` becomes a reactor-host method) is a freebsd
-  tier-2 cross-check fix**; the host is macOS arm64 and the unix family
+  tree holds two files with a `"""` at all, and only one is executable:
+  `tests/str/interpolation_interplay.lu`, whose opener and closer each
+  sit alone on their own line and whose body is indented past the
+  closer's column, which is neither new rule's shape. Its `{{literal}}`
+  is escaped, so E0102 has nothing to reach either. No file in `std/` or
+  `tests/` begins with a BOM (checked byte-for-byte, all 424 `.lu`
+  files). That test is the strongest witness in the tree because its
+  stdout hash is pinned in its own directive: if the multiline's dedent
+  moved by one column the row would red on the hash before it reached a
+  code. Predicted unmoved.
+- `5a005ad` (`Sock::raw` becomes a reactor-host method) is a freebsd
+  tier-2 cross-check fix; the host is macOS arm64 and the unix family
   itself stays `cfg(unix)`.
-- **The gate/corpus/doc commits move nothing this rig reads**: `351d739`
+- The gate/corpus/doc commits move nothing this rig reads: `351d739`
   and `318243d` (upstream's own corpus witnesses), `908dfd6` (upstream's
   crate tests and completions), `c08cec6` and `ef9e1a7` (snapshots and
   the diagnostics catalog), `8b90019` and `ec7effc` (upstream's ir-volume
-  ceiling and lane floors — gates on upstream's corpus, not on this
-  tree), `c8e2f3a` (bench/kernels, which macOS skips by name under D5),
-  `54de098` / `4230b00` (the 2026-09-03 ledger ritual). **This rig runs
-  exactly `wolf conform-run [--checked|--native] --std-root <dir>` and
-  `lupin conform-run`** — it has never run a package verb, a bench gate
+  ceiling and lane floors, gates on upstream's corpus and not on this
+  tree), `c8e2f3a` (bench/kernels, which macOS skips under D5),
+  `54de098` / `4230b00` (the 2026-09-03 ledger ritual). This rig runs
+  `wolf conform-run [--checked|--native] --std-root <dir>` and
+  `lupin conform-run`, and it has never run a package verb, a bench gate
   or a spec-extract, so none of those can reach it.
 
 ### The anchors, set-diffed both ways (the hole-177 lesson)
 
-**415 -> 417, +2 / -0.** Added: `os.net`, `os.net.unix`. **Dropped:
-nothing** — the key sets were diffed in BOTH directions at `31170d1` and
-`4230b00` before the snapshot was re-vendored, because a regen that
-silently drops an anchor is a thing this ecosystem has actually shipped
-(wolf-lang#177). The two new keys are #227's; not one anchor in the
-`type.byte` family moved, which is the right answer: s136 changed what
-the BUILTINS are typed as, and `[type.byte]` already said what a byte is.
-Corpus **499 -> 511** files (+12, s136's witnesses).
+Anchors go 415 -> 417, +2 / -0. `os.net` and `os.net.unix` were added
+and nothing was dropped: the key sets were diffed in both directions at
+`31170d1` and `4230b00` before the snapshot was re-vendored, because a
+regen that silently drops an anchor is a thing this ecosystem has
+actually shipped (wolf-lang#177). The two new keys are #227's, and no
+anchor in the `type.byte` family moved, which is the right answer, since
+s136 changed what the builtins are typed as and `[type.byte]` already
+said what a byte is. Corpus goes 499 -> 511 files (+12, s136's
+witnesses).
 
 ### The lupin lane — 0.1.23 held, and the 0.1.24 that exists is not chased
 
-`lupin 0.1.24` was tagged 2026-09-02 (is35, `294e75c`) and **is not
-installed on this machine and is not taken here.** Three reasons, stated
-because a skipped chase is exactly the kind of thing a later sprint
+`lupin 0.1.24` was tagged 2026-09-02 (is35, `294e75c`) and is not
+installed on this machine and not taken here. There are three reasons,
+written down because a skipped chase is the kind of thing a later sprint
 should not have to reconstruct:
 
-1. **It cannot change this sprint's answer.** 0.1.24's conformance pin is
-   `3befc3e` — the v0.2.3 tag, TWELVE commits before s135. There is no
+1. It cannot change this sprint's answer. 0.1.24's conformance pin is
+   `3befc3e`, the v0.2.3 tag, twelve commits before s135. There is no
    `byte` lowering behind that pin, so `as byte` refuses at 0.1.24 for
    the same reason and with the same code it refuses at 0.1.23. Its own
    release note says every one of the 482 files carried over from 0.1.23
    is verdict-identical class for class; the release is about E0101 and
-   the escape's number, not about a scalar type.
-2. **The quiet-rig rule.** is36 is building in `wolf-interp` right now,
-   and that release's binary would have to be built in its rig.
-3. **A lupin bump is its own ritual.** Chasing a release means its own
-   drift prediction over its own span, and sc35's contract pins the DATA
+   the escape's number, and not about a scalar type.
+2. The quiet-rig rule. The is36 sprint is building in `wolf-interp`
+   right now, and that release's binary would have to be built in its
+   rig.
+3. A lupin bump is its own ritual. Chasing a release means its own
+   drift prediction over its own span, and sc35's contract pins the data
    pin to s136's trunk sha and says nothing about the interpreter. The
-   chase belongs to whoever takes 0.1.25 — which is is36's own
-   deliverable and the release that actually moves this answer.
+   chase belongs to whoever takes 0.1.25: is36's own deliverable, and
+   the release that actually moves this answer.
 
-**So the lupin baseline is measured, not assumed:** at 0.1.23,
-`let b = 65 as byte` is `fail(E0301)` at phase **resolve** —
+So the lupin baseline was measured. At 0.1.23, `let b = 65 as byte` is
+`fail(E0301)` at phase resolve,
 `nothing with this name is in scope, so this cast names no target type …
-[mod.scope] at 2:19` — byte-identical to sc34's reading. **This is the
-before AND after picture on that lane, because the binary does not move.**
+[mod.scope] at 2:19`, byte-identical to sc34's reading. Since the binary
+does not move, that is both the before and the after picture on that
+lane.
 
 ### The BEFORE side, measured on the binary about to be replaced
 
 The sc33 lesson (measure the before-picture on the binary you are about
 to delete) applied to this sprint's headline. `fs.write_bytes` a payload,
 then `fs.read_bytes` it back inside a fresh first-class `region`, reading
-`budget.charged(r)` after the block — the io sites, through std, at
-`wolf 0.2.3+dev.31170d1`:
+`budget.charged(r)` after the block. These are the io sites, through std,
+at `wolf 0.2.3+dev.31170d1`:
 
 | payload | checked | native |
 |---|---|---|
@@ -6502,29 +6502,28 @@ then `fs.read_bytes` it back inside a fresh first-class `region`, reading
 
 16.0x on both tiers at every size, reproducing sc33's io half and sc34's
 after-table's before-column to the byte for the third sprint running.
-**The lupin column does not exist and the reason is worth one line: at
-0.1.23 this probe is `unsupported` at `resolve` — `fs_write_bytes` does
-not resolve** — the interpreter has no fs byte builtins at all, so the io
-half has always been a two-lane measurement.
+There is no lupin column: at 0.1.23 this probe is `unsupported` at
+`resolve` (`fs_write_bytes` does not resolve), because the interpreter
+has no fs byte builtins at all, so the io half has always been a two-lane
+measurement.
 
 ### The doctor prediction
 
 `version = "0.2.3+dev.4230b00"` and `pin = 4230b00…` recorded. Doctor
 gates the binary's self-declared version and pin against
 `vendor/tools.toml` and never reads `vendor/upstream/PIN`; `sync-pin`
-gates the vendored snapshot against the SUBMODULE. Predicted GREEN on
+gates the vendored snapshot against the submodule. Predicted green on
 both binaries, with wolf's line 1 read as the dev identity and the
 pairing line (`lupin 0.1.23 … pin 8cda3aa`) reported and not gated
-(F-0064). **The pairing gap widens rather than closes**: lupin's
-conformance pin is now **71 commits** behind wolf's own — 51 at sc34 plus
-this bump's 20 — the largest this repo has recorded, and every one of
-them is a compiler the interpreter has not chased. is36 is where it
-closes.
+(F-0064). The pairing gap widens here: lupin's conformance pin is now 71
+commits behind wolf's own (51 at sc34 plus this bump's 20), the largest
+this repo has recorded, and every one of them is a compiler the
+interpreter has not chased. The is36 release is where it closes.
 
 ### The measurement at the bump — the blast radius, predicted and measured
 
-`cargo xtask doctor` **exit 0**, and it reads the dev stamp exactly as sc34's
-note predicted:
+`cargo xtask doctor` exits 0 and reads the dev stamp as sc34's note
+predicted:
 
     doctor: lupin — /Users/…/.local/bin/lupin (source: PATH)
             version: lupin 0.1.23
@@ -6536,29 +6535,28 @@ note predicted:
     doctor: native rung — libwolf_rt.a … (lane lit)
 
 `sync-pin` green: PIN `4230b008e39d6541f31ac9858057e4345a337271`, snapshot ==
-submodule at pin, **anchors 417**.
+submodule at pin, and 417 anchors.
 
-**The blast radius at the bump: 149 unique E0401 sites over 35 files**
+The blast radius at the bump is 149 unique E0401 sites over 35 files
 (55 sites in 11 std modules, 94 in 24 test rows), measured by
 conform-running all 376 rows on the native lane at `4230b00` over the
-UNTOUCHED library and collecting unique `file:line:col` refusal sites.
+untouched library and collecting unique `file:line:col` refusal sites.
 Predicted 198 / 45 from #231's own count.
 
-**The gap is not a disagreement, it is masking, and the mechanism is worth
-recording because it will mislead the next person who counts a blast
-radius.** A refusal inside a std module aborts the program that imports
-it, so the sites in the TEST are never reached and never reported: the
-compiler prints `std://fs/fs.lu`'s four and stops before it can see the
-test's ten. #231's number was measured against a wolf-std whose modules
-still typechecked (only the BUILTINS had moved), so its counter could
-reach every test site; this repo's number was measured with the modules
-already refusing. **A blast radius measured from the outside is a FLOOR,
-and the deeper the library, the further below the truth it sits.** The
-true radius only becomes countable as the fix proceeds: with std repaired
-and the tests untouched, the same scan found **910 sites over 172 files**
-— 4.6x the first reading and 4.6x #231's. Both numbers are honest; they
-answer different questions ("what refuses today" versus "what the rename
-has to touch"), and only the second one sizes the work.
+The gap is masking, and the mechanism will mislead the next person who
+counts a blast radius. A refusal inside a std module aborts the program
+that imports it, so the sites in the test are never reached and never
+reported: the compiler prints `std://fs/fs.lu`'s four and stops before it
+can see the test's ten. #231's number was measured against a wolf-std
+whose modules still typechecked (only the builtins had moved), so its
+counter could reach every test site; this repo's number was measured with
+the modules already refusing. A blast radius measured from the outside is
+a floor, and the deeper the library, the further below the truth it sits.
+The true radius only becomes countable as the fix proceeds: with std
+repaired and the tests untouched, the same scan found 910 sites over 172
+files, 4.6x the first reading and 4.6x #231's. Both numbers are correct
+and they answer different questions ("what refuses today" versus "what
+the rename has to touch"); the second one sizes the work.
 
 The seven non-E0401 sites in the bump scan are the tree's pre-existing
 designed refusals, unmoved: four `E0701` comptime rows
@@ -6568,8 +6566,8 @@ designed refusals, unmoved: four `E0701` comptime rows
 ## The rename, module by module
 
 Nineteen std modules moved. `sigs` counts the `fn` signatures now naming
-`List[byte]`; the cast columns are the NET change in spelled casts, which
-is the honest measure of what the rename cost in ceremony.
+`List[byte]`; the cast columns are the net change in spelled casts, which
+is how much ceremony the rename cost.
 
 | module | signatures | `as byte` | `as int` |
 |---|---|---|---|
@@ -6593,46 +6591,46 @@ is the honest measure of what the rename cost in ceremony.
 | `io`, `mem.budget` | 0 (prose) | +0 | +0 |
 | **total** | **233** | **+430** | **+225** |
 
-Test side: **166 files, 240 `as byte`, 11 `as int`** (1,047 insertions /
+Test side: 166 files, 240 `as byte`, 11 `as int` (1,047 insertions /
 876 deletions), plus ten witness conversions described below.
 
-**Four things this table says.**
+The table says four things.
 
-1. **`std.bytes`, `std.fs` and `std.net` are PURE RENAMES.** Not one
-   executable `as byte` entered any of them — their `as byte` count is
-   doc examples only — because every one of their sixteen functions is a
-   thin wrapper over a builtin that now speaks the right type. That is
-   #231's "`fs.read_bytes` is a rename" claim, verified from the library
-   side: `read_bytes` is still `fs_read_bytes(path)?`, `from_str` is
-   still `s.bytes()`, `to_str` is still `str_from_utf8(b)?`.
-2. **The cast ceremony is concentrated in the ARITHMETIC modules, and it
-   is narrowing rather than widening.** p256's 176 `as byte` are its four
-   big-endian constant tables and its serializers pushing computed octets;
-   curve25519's 72 are `fe_tobytes` and `sc_reduce`. Nothing in that
-   column is a conversion between representations — it is
+1. `std.bytes`, `std.fs` and `std.net` are pure renames. No executable
+   `as byte` entered any of them (their `as byte` count is doc examples
+   only), because every one of their sixteen functions is a thin wrapper
+   over a builtin that now speaks the right type. That is #231's
+   "`fs.read_bytes` is a rename" claim, verified from the library side:
+   `read_bytes` is still `fs_read_bytes(path)?`, `from_str` is still
+   `s.bytes()`, `to_str` is still `str_from_utf8(b)?`.
+2. The cast ceremony is concentrated in the arithmetic modules, and it
+   is narrowing rather than widening. p256's 176 `as byte` are its four
+   big-endian constant tables and its serializers pushing computed
+   octets; curve25519's 72 are `fe_tobytes` and `sc_reduce`. Nothing in
+   that column converts between representations; the column is
    `[type.byte.op]`'s rule that an arithmetic result is an `int`, and
    `[type.byte.cast]`'s that narrowing is spelled.
-3. **`x.tls.cert` took NO `as byte` at all** — 15 signatures and 19
-   widenings — because a DER parser only ever reads octets and compares
+3. `x.tls.cert` took no `as byte` at all (15 signatures and 19
+   widenings), because a DER parser only ever reads octets and compares
    them to constants. It is the cleanest module in the set and the best
    evidence that the ceremony is a property of what a module computes,
-   not of the rename.
-4. **Five `require_byte` guards are DELETED, and each was promised.**
+   and not of the rename.
+4. Five `require_byte` guards are deleted, and each was promised.
    `sha2`, `chacha20`, `curve25519`, `p256`, `x.tls.record`,
    `x.tls.handshake`, `x.tls.cert` and `x.tls.client` each carried a
    private 0..255 ingestion guard, and four of them carried it as the
-   module's ONE RECORDED CONSTANT-TIME EXCEPTION with the words "it
+   module's one recorded constant-time exception, with the words "it
    leaves with F-0035's real byte type" in the header. It left. The
-   digest, cipher and ladder paths now have **no value-dependent branch
-   at all**, which is a constant-time improvement the type paid for and
-   no amount of library work could have.
+   digest, cipher and ladder paths now have no value-dependent branch at
+   all, a constant-time improvement the type paid for and no amount of
+   library work could have.
 
 ## F-0104's after-table AT THE IO SITES — the headline, and it is 1.00x
 
 Measured 2026-09-03 at `wolf 0.2.3+dev.4230b00`, macOS arm64, through
-`std.fs` rather than synthetically: `fs.write_bytes` a payload, then
+`std.fs` and not a synthetic probe: `fs.write_bytes` a payload, then
 `fs.read_bytes` it back inside a fresh first-class `region`, reading
-`budget.charged(r)` after the block. The BEFORE column was measured on
+`budget.charged(r)` after the block. The before column was measured on
 the binary this bump replaced, in the same shape, hours earlier.
 
 | payload | before (checked / native) | after — READ (checked / native) | after ÷ payload |
@@ -6642,60 +6640,59 @@ the binary this bump replaced, in the same shape, hours earlier.
 | 16,384 | 262,144 / 262,128 | **16,384 / 16,432** | **1.00x / 1.003x** |
 | **65,536** | **1,048,576 / 1,048,560** | **65,536 / 65,584** | **1.00x / 1.001x** |
 
-**16.0x -> 1.00x on BOTH tiers at the io sites, at every size.** The
-native residue is exactly `payload + 48` — one list header, constant from
-1 KiB to 64 KiB — and the checked machine charges the payload to the byte.
+16.0x -> 1.00x on both tiers at the io sites, at every size. The native
+residue is `payload + 48`, one list header, constant from 1 KiB to
+64 KiB, and the checked machine charges the payload to the byte.
 
-**This beats the sprint contract's own prediction, and the reason is
-s136's rather than this library's.** The contract said "16x -> ~2x native
+This beats the sprint contract's own prediction, and the credit goes to
+s136 rather than to this library. The contract said "16x -> ~2x native
 / 1x checked", and sc34's after-table measured `2 x payload + 48`
 natively for a `List[byte]`. That 2x is the push-growth history
-`[mem.region.account.1]` keeps charged — and **a PRODUCER has none**:
-s136 mints its list through one `list::from_bytes` at exact capacity, one
-memcpy, no doubling. The 2x is still real and still measurable; it is
-just not what the io path pays. Same program, same region, same run:
+`[mem.region.account.1]` keeps charged, and a producer has none: s136
+mints its list through one `list::from_bytes` at exact capacity, one
+memcpy, no doubling. The 2x is still real and still measurable; the io
+path simply does not pay it. Same program, same region, same run:
 
 | 65,536 bytes | checked | native |
 |---|---|---|
 | read by `fs.read_bytes` | **65,536** | **65,584** (payload + 48) |
 | built by 65,536 `push`es | **65,536** | **131,120** (2 x payload + 48) |
 
-So the honest one-line summary for a caller sizing a budget is the one
-`std.mem.budget`'s header now carries: **read a buffer with a producer
-and you pay the payload; build one by pushing and you pay it twice on the
-tier that ships.** `std.mem.budget`'s 16x caveat retires to that, and its
-sc34 paragraph is kept as history rather than deleted.
+So the one-line summary for a caller sizing a budget is the one
+`std.mem.budget`'s header now carries: read a buffer with a producer and
+you pay the payload; build one by pushing and you pay it twice on the
+tier that ships. `std.mem.budget`'s 16x caveat retires to that, and its
+sc34 paragraph is kept as history.
 
 ## F-0106 CLOSES — the producers moved, and the substitution was the rename it was designed to be
 
-**Status: CLOSED.** sc34 filed F-0106 because "s135 gave the language a
-byte type and gave it no byte-typed builtin", measured that a substituted
-`fs.read_bytes` would charge **18.0x native / 17.0x checked** — worse
-than the 16.0x it replaced — and declined the substitution with the
-numbers. s136 (wolf-lang#231) moved the eight builtin signatures, which is
-exactly and only what F-0106 asked for, and every prediction in it holds:
+Status: closed. The sc34 sprint filed F-0106 because "s135 gave the
+language a byte type and gave it no byte-typed builtin", measured that a
+substituted `fs.read_bytes` would charge 18.0x native / 17.0x checked,
+worse than the 16.0x it replaced, and declined the substitution with the
+numbers. s136 (wolf-lang#231) moved the eight builtin signatures, which
+is what F-0106 asked for, and every prediction in it holds:
 
-- `fs.read_bytes` **is** a rename (`fs_read_bytes(path)?`, unchanged);
-- `bytes.from_str` **is** `s.bytes()`, unchanged;
-- `bytes.to_str` **is** `str_from_utf8(b)?`, unchanged;
+- `fs.read_bytes` is a rename (`fs_read_bytes(path)?`, unchanged);
+- `bytes.from_str` is `s.bytes()`, unchanged;
+- `bytes.to_str` is `str_from_utf8(b)?`, unchanged;
 - every call site kept its shape;
-- and the 16x became **1.00x**, better than the 2.0x/1.0x F-0106
-  predicted, because the fix arrived with a preallocating producer
-  attached.
+- and the 16x became 1.00x, better than the 2.0x/1.0x F-0106 predicted,
+  because the fix arrived with a preallocating producer attached.
 
 The intermediate-list column that made the substitution cost more than it
-saved does not exist any more: there is no intermediate. **A sprint that
-refuses a change with numbers and files the one upstream fix that would
-make it free is the cheapest kind of sprint there is**, and this is the
-measurement that says so.
+saved does not exist any more: there is no intermediate. Refusing the
+change with numbers and filing the one upstream fix that would make it
+free is why the cure came free, and this is the measurement that says
+so.
 
 ## F-0107 CLOSES — the checked machine's phantom 16x is gone
 
-sc34 filed this because `for b in s.bytes()` over a 65,536-byte `str`,
-allocating nothing, charged **1,048,576** under `--checked` where native
-and lupin charged **0**. s136's `eval_bytes_view` models s77's consumed
-positions as the receiver's own storage. Re-run at `4230b00`, same
-four-line probe, same 65,536-byte string:
+The sc34 sprint filed this because `for b in s.bytes()` over a
+65,536-byte `str`, allocating nothing, charged 1,048,576 under
+`--checked`; native and lupin charged 0 there. s136's `eval_bytes_view`
+models s77's consumed positions as the receiver's own storage. Re-run at
+`4230b00`, same four-line probe, same 65,536-byte string:
 
 | lane | `region_bytes(r)` |
 |---|---|
@@ -6703,27 +6700,27 @@ four-line probe, same 65,536-byte string:
 | lupin 0.1.23 | **0** |
 | wolf `--checked` | **0** — was 1,048,576 |
 
-**Three lanes, one number, and the number is zero.** The `region r(cap: n)`
-mis-fire this finding warned about — a cap derived from a checked reading
-being 16x too generous natively — is gone with it, on the one idiom
-`std.bytes`' header teaches. wolf-lang#232 closes; the OTHER half of that
+Three lanes, one number, and the number is zero. The `region r(cap: n)`
+mis-fire this finding warned about (a cap derived from a checked reading
+being 16x too generous natively) is gone with it, on the one idiom
+`std.bytes`' header teaches. wolf-lang#232 closes; the other half of that
 finding (the `str` gap `[mem.region.account.1]` scopes to the native
 tier) is re-probed below and is unmoved.
 
 ## F-0108 — the byte tier is three-laned only if the REFERENCE INTERPRETER has a byte, and at 0.1.23 it does not: 182 rows and 87 doc blocks, one cause
 
-**This sprint's headline finding, and it is the mirror of F-0106 one
-layer out.** sc34 refused the substitution because the PRODUCERS were
-missing and measured the cost. sc35 makes the substitution, measures it
-correct and complete on both wolf lanes — and finds the second gate:
-**`lupin 0.1.23` refuses `as byte` by name, so a byte tier written the
+This is the sprint's headline finding, the mirror of F-0106 one layer
+out. The sc34 sprint refused the substitution because the producers were
+missing, and measured the cost. The sc35 sprint makes the substitution
+and measures it correct and complete on both wolf lanes, then finds the
+second gate: `lupin 0.1.23` refuses `as byte`, so a byte tier written the
 way `[type.byte.cast]` requires cannot execute on the reference
-machine.**
+machine.
 
 ### The measurement
 
 `let b = 65 as byte` under lupin 0.1.23 is `fail(E0301)` at phase
-**resolve** — *"nothing with this name is in scope, so this cast names no
+resolve, *"nothing with this name is in scope, so this cast names no
 target type … [mod.scope]"*. That is unchanged from sc34 and it is the
 same at 0.1.24 (whose conformance pin, `3befc3e`, is the v0.2.3 tag,
 twelve commits before s135 landed `byte` at all). Over the renamed tree,
@@ -6735,25 +6732,25 @@ every one of the 376 rows conform-run under lupin:
 | `exit(…)` / `trap(…)` | 170 |
 | `unsupported` | 25 |
 
-Of the 181, **134 were ledgered `run`** and **47 were ledgered
-`unsupported`** — both are reds, because `unsupported` and a static
-rejection are different achievements. `std-test` reports **182** reds, all on this lane and all this cause:
-the 181 plus one — `net/write_bytes_invalid_row.lu`, whose converted
-directive now expects `fail(E0401)` and whose lupin lane RUNS the
-program to `exit(1)` instead. Every one is the same cause and no other cause appears.
+Of the 181, 134 were ledgered `run` and 47 were ledgered `unsupported`;
+both count as reds, because `unsupported` and a static rejection are
+different achievements. `std-test` reports 182 reds, all on this lane and
+all from this cause: the 181 plus `net/write_bytes_invalid_row.lu`, whose
+converted directive now expects `fail(E0401)` and whose lupin lane runs
+the program to `exit(1)` instead. No other cause appears.
 
-**Where the 181 come from, by the module whose `as byte` they reach:**
+Where the 181 come from, by the module whose `as byte` they reach:
 `x.crypto.curve25519` 31, `x.crypto.sha2` 28, `x.crypto.chacha20` 24,
 `x.tls.cert` 17, `x.crypto.p256` 17, `x.tls.record` 12,
 `x.tls.handshake` 10, `json` 9, `bytes` 7, `hex` 6, `x.jose` 5,
 `x.tls.client` 4, `fs` 4, `str` 3, `base64` 3, `net` 1.
 
-sc34 counted the floor at **32** ("the ceiling is higher, because a cast
-inside a std module refuses at resolve for every test that imports it").
-The ceiling, measured: **181, 5.7x the floor.** The reason the ceiling is
-so much higher than the flip set is that `std.json`'s `utf8_of` builds a
-UTF-8 sequence with four `as byte` — so the whole json tier, which has
-nothing to do with the byte tier, goes dark with it.
+The sc34 sprint counted the floor at 32 ("the ceiling is higher, because
+a cast inside a std module refuses at resolve for every test that imports
+it"). The measured ceiling is 181, 5.7x the floor. It runs so far above
+the flip set because `std.json`'s `utf8_of` builds a UTF-8 sequence with
+four `as byte`, so the whole json tier, which has nothing to do with the
+byte tier, goes dark with it.
 
 ### THREE gates say the same thing, and none of them can be bent
 
@@ -6761,77 +6758,76 @@ This is what makes it a finding rather than a chore. The rename is
 blocked by three independent mechanisms in this repository, each written
 years apart, each saying the same sentence:
 
-1. **`tests/ledger.toml` has no lupin word for a static rejection.**
+1. `tests/ledger.toml` has no lupin word for a static rejection.
    `parse_expect` accepts `run | unsupported | slow | divergent(…)` for
-   lupin and REFUSES `fail(E…)` by name ("`fail(…)` is a wolfc
-   expectation"). `divergent(…)`'s own vocabulary is
-   `stdout | exit(N) | trap(kind)` — the three shapes an EXECUTING lane
-   can produce. **The divergence vocabulary is one-directional**: it has
-   a word for "the compilers reject statically and the interpreter runs"
-   (F-0098's shape, and the ten witnesses below use it) and none for
-   "the interpreter rejects statically and the compilers run", because
-   until sc35 that had never happened.
-2. **`doc-examples` has no waiver for a `fail(E…)` on lupin.** Its
-   header rule is "lupin must reach `exit(0)` — a documented example the
+   lupin and refuses `fail(E…)` ("`fail(…)` is a wolfc expectation").
+   `divergent(…)`'s own vocabulary is `stdout | exit(N) | trap(kind)`,
+   the three shapes an executing lane can produce. The divergence
+   vocabulary runs one way only: it has a word for "the compilers reject
+   statically and the interpreter runs" (F-0098's shape, and the ten
+   witnesses below use it) and none for "the interpreter rejects
+   statically and the compilers run", because until sc35 that had never
+   happened.
+2. `doc-examples` has no waiver for a `fail(E…)` on lupin. Its header
+   rule is "lupin must reach `exit(0)` — a documented example the
    reference machine cannot execute truthfully is a doc bug", and it
    says in the same paragraph that a static rejection is a doc bug too.
-   `LUPIN_TIER_WAIVERS` — the mechanism built at sc13 for exactly this
-   situation, emptied at sc14, re-armed at sc24 for is26, emptied at
-   sc25, and whose own doc says "a std surface will land on the wolf
-   lanes ahead of a lupin release again, and the next entry costs a
-   finding name, not plumbing" — waives an `unsupported` VERDICT. It
-   cannot waive a refusal. **87 of the tree's 414 doc blocks** fail on
-   lupin at this tree, every one `fail(E0301)`, over the twelve modules
+   `LUPIN_TIER_WAIVERS`, the mechanism built at sc13 for this situation,
+   emptied at sc14, re-armed at sc24 for is26, emptied at sc25, and
+   whose own doc says "a std surface will land on the wolf lanes ahead
+   of a lupin release again, and the next entry costs a finding name,
+   not plumbing", waives an `unsupported` verdict. It cannot waive a
+   refusal. 87 of the tree's 414 doc blocks fail on lupin at this tree,
+   every one `fail(E0301)`, over the twelve modules
    whose examples reach an `as byte`: `json` 26, `sha2` 13, `jose` 10,
    `chacha20` 7, `curve25519` 7, `base64` 5, `hex` 5, `x.tls.client` 4,
    `bytes` 3, `fs` 3, `net` 2, `p256` 2. Both wolf lanes run all 414.
-3. **§9/§12's three-lane parity** is the rule both mechanisms exist to
+3. §9/§12's three-lane parity is the rule both mechanisms exist to
    enforce.
 
-**So the library will not ship a two-laned byte tier, and it says so in
-three places.** Bending any of them would be the workaround sc00 forbids
+So the library will not ship a two-laned byte tier, and it says so in
+three places. Bending any of them would be the workaround sc00 forbids
 ("a gap in what the language can express is a finding, never a workaround
-invented here") — and here the gap is in what the reference
-IMPLEMENTATION can execute, which is the same rule one level out.
+invented here"), and here the gap is in what the reference
+implementation can execute, which is the same rule one level out.
 
 ### What sc35 did about it, stated plainly
 
-**Nothing is worked around and nothing is invented.** The rename is
+Nothing is worked around and nothing is invented. The rename is
 complete, correct and measured on the two wolf lanes; the branch is
-pushed and unmerged; and **it is gated on `lupin 0.1.25`**, which is
-is36's deliverable and was NOT tagged when this was written
-(`wolf-interp` trunk sits at `bd42cc2`, one commit past the 0.1.24
-release, working on D74's lex codes — the byte is still ahead of it).
-The either/or the contract asked for, resolved: **0.1.25 had not landed,
-so the lupin lane is dark and this section is the count.** When it lands,
-the flip is measured rather than assumed — install, re-run `std-test`
-and `doc-examples`, and every one of the 181 should answer as it did
-before the rename, because nothing about their semantics changed.
+pushed and unmerged; and it is gated on `lupin 0.1.25`, which is is36's
+deliverable and was not tagged when this was written (`wolf-interp` trunk
+sits at `bd42cc2`, one commit past the 0.1.24 release, working on D74's
+lex codes, so the byte is still ahead of it). That resolves the either/or
+the contract asked for: 0.1.25 had not landed, so the lupin lane is dark
+and this section is the count. When it lands, the flip gets measured.
+Install, re-run `std-test` and `doc-examples`, and every one of the 181
+should answer as it did before the rename, because nothing about their
+semantics changed.
 
-The ledger's lupin column is left UNTOUCHED for those rows, and that is a
-deliberate choice with a reason: the alternatives were to write a word
-the grammar rejects, to invent one, or to write `unsupported` — which
-would be a lie about the interpreter's semantics (lupin does not decline
-the byte tier; it fails to resolve a cast). A ledger that is wrong in a
+The ledger's lupin column is left untouched for those rows, and the
+reason is that the alternatives were to write a word the grammar
+rejects, to invent one, or to write `unsupported`, which would misstate
+the interpreter's semantics (lupin does not decline the byte tier; it
+fails to resolve a cast). A ledger that is wrong in a
 way its own block note names, with the count and the cause and the
 release that fixes it, is worth more than a ledger bent to be green.
 
-Filed as **wolf-std F-0108**; the interpreter half is is36's own work and
-needs no new upstream issue (the ask is `[type.byte]` in the mirror, which
-is what is36 is for). **The one thing that IS worth filing upstream is
-the divergence vocabulary's one-directionality** — a rig can only record
-a divergence it has a word for, and this rig discovered its blind spot by
-walking into it.
+Filed as wolf-std F-0108; the interpreter half is is36's own work and
+needs no new upstream issue (the ask is `[type.byte]` in the mirror,
+which is what is36 is for). What does belong upstream is the divergence
+vocabulary's one-directionality: a rig can only record a divergence it
+has a word for, and this rig found its blind spot by walking into it.
 
 ## The ten witnesses that moved with their contract
 
-A contract that becomes STATIC does not lose its witness; the witness
-changes phase. Ten rows in this tree pinned a RUNTIME consequence of the
+A contract that becomes static does not lose its witness; the witness
+changes phase. Ten rows in this tree pinned a runtime consequence of the
 0..255 element contract, and at sc35 the type holds that contract, so the
-programs are refused at `typecheck` with **E0401** instead. Each keeps
-its subject and loses a name that promised the old outcome — the sc28
-precedent verbatim (`use_after_final_trap.lu` -> `use_after_final.lu`,
-§13's name-promise).
+programs are refused at `typecheck` with E0401 instead. Each keeps its
+subject and loses a name that promised the old outcome, following the
+sc28 precedent verbatim (`use_after_final_trap.lu` ->
+`use_after_final.lu`, §13's name-promise).
 
 | was | is | what it pinned | now |
 |---|---|---|---|
@@ -6847,17 +6843,17 @@ precedent verbatim (`use_after_final_trap.lu` -> `use_after_final.lu`,
 | `net/write_bytes_invalid_row.lu` | (kept) | the `invalid` ROW raised | same |
 
 The two `invalid` rows keep their names because the name promises a
-SUBJECT, not an outcome, and the subject is unchanged: `invalid` stays
-DECLARED on both byte writes and on both builtins, exactly as
-wolf-lang#231 ruled ("the vocabulary is stable, an FFI caller's
-wrong-width list still earns it, typed code can no longer reach it").
-Dropping a tag a caller may have written a handler for is a breaking
-change this rename is not.
+subject and not an outcome, and the subject is unchanged: `invalid` stays
+declared on both byte writes and on both builtins, as wolf-lang#231 ruled
+("the vocabulary is stable, an FFI caller's wrong-width list still earns
+it, typed code can no longer reach it"). Dropping a tag a caller may have
+written a handler for would be a breaking change, and this rename is not
+one.
 
-**Two more cases retired inside otherwise-unchanged tests**, and they are
-recorded here because a deleted assertion is the easiest thing in a diff
-to miss: `tests/bytes/utf8_validation.lu` loses its two "an element
-outside 0..255 answers `false`" cases (300 and -1), and
+Two more cases retired inside otherwise-unchanged tests, recorded here
+because a deleted assertion is the easiest thing in a diff to miss:
+`tests/bytes/utf8_validation.lu` loses its two "an element outside
+0..255 answers `false`" cases (300 and -1),
 `tests/bytes/to_str_border.lu` loses the same pair, and
 `tests/fs/chunk_stream.lu` loses its `write_chunk` `invalid` probe. All
 four are unreachable through a `List[byte]`, all four would now be E0401
@@ -6866,11 +6862,11 @@ static witness that took the job.
 
 ## F-0103 RE-CHARACTERISED — the trigger is not a shape at all, it is a PATH, and four sprints of "minimal shape" were probe artifacts
 
-**This is the sprint's second finding and the more useful one for
-wolf-lang#201.** Four sprints have carried a description of this refusal
-and each was sharpened by the next. sc35's probes say every one of them —
-including sc34's own sharpening — was an artifact of the value the probe
-passed, and the real condition is one sentence.
+This is the sprint's second finding and the more useful one for
+wolf-lang#201. Four sprints have carried a description of this refusal
+and each was sharpened by the next. sc35's probes say every one of them,
+including sc34's own sharpening, was an artifact of the value the probe
+passed, and the real condition fits in one sentence.
 
 Measured at `wolf 0.2.3+dev.4230b00`, each probe in its own directory,
 checked lane (the native lane runs every one of them):
@@ -6885,110 +6881,107 @@ checked lane (the native lane runs every one of them):
 | f19 | callee consumes, generic, cross-module | `narrow(k)`, `k = 2` **built by a `while` loop** — does not take | `exit(0)` |
 | f18 | identical to f19 | `narrow(k)`, `k = 10` **built by a `while` loop** — takes | **`unsupported`** |
 
-**f18 against f19 is the whole finding.** The two programs are
+f18 against f19 is the finding. The two programs are
 character-identical except for the loop bound; neither passes a literal;
 the value reaches the raising call through ten iterations of a `while`.
-One runs and one is refused. **So the checked lane's `mem` phase is not
-declining a SHAPE it can see in the source — it is abstract-interpreting
-the program and declining the control-flow edge on the path where the row
-is ACTUALLY TAKEN.**
+One runs and one is refused. So the checked lane's `mem` phase is
+abstract-interpreting the program and declining the control-flow edge on
+the path where the row is taken, and it is not declining a shape it can
+see in the source.
 
-**Everything else the register has said about this refusal falls away:**
+Everything else the register has said about this refusal falls away:
 
-- **sc31/sc32/sc33's "an unhandled raising call passed straight into a
-  row-typed parameter"** — f13, f15 and f19 are exactly that shape and
-  they RUN.
-- **sc34's sharpening, "the row must be CONSUMED in the callee"** —
-  f21's callee never reads its parameter and it is REFUSED. sc34
+- sc31/sc32/sc33's "an unhandled raising call passed straight into a
+  row-typed parameter": f13, f15 and f19 are that shape and they run.
+- sc34's sharpening, "the row must be consumed in the callee": f21's
+  callee never reads its parameter and it is refused. The sc34 sprint
   measured its f1 as `run` and concluded the callee's use was the
-  trigger; f1 passed `narrow(1)`, which does not raise. **The sharpening
-  was the same false lead one turn further in**, and sc35 walked into it
+  trigger; f1 passed `narrow(1)`, which does not raise. The sharpening
+  was the same false lead one turn further in, and sc35 walked into it
   too (a first probe with `narrow(1)` reported a clean heal on all three
   lanes before f18/f19 found the floor).
-- **Genericity and the module boundary are both irrelevant**: f21/f22
-  are same-file and non-generic and refuse; f13/f15/f19 are generic and
+- Genericity and the module boundary are both irrelevant: f21/f22 are
+  same-file and non-generic and refuse; f13/f15/f19 are generic and
   cross-module and run.
 
-**The one-sentence trigger, as it should go on #201:** *the checked
+The one-sentence trigger, as it should go on #201: *the checked
 machine refuses an unhandled raising call in argument position when the
 row is taken on the reachable path — regardless of whether the callee
 reads the parameter, whether it is generic, and whether it is in another
 module.*
 
-**Two consequences worth more than the trigger itself.**
+Two consequences matter more than the trigger itself.
 
-1. **`unsupported` here is a property of an EXECUTION, not of a
-   program.** The same source is `run` on the checked lane for one input
-   and `unsupported` for another. That is a materially more serious
-   thing than "a shape wolfc cannot lower": it means the checked lane's
-   coverage of a program depends on its data, and a corpus that only
-   exercises the non-raising path will report the lane green for code
-   the lane cannot run.
-2. **A probe that does not TAKE the row reports a false heal**, and this
+1. `unsupported` here is a property of an execution, not of a program.
+   The same source is `run` on the checked lane for one input and
+   `unsupported` for another. That is more serious than "a shape wolfc
+   cannot lower": the checked lane's coverage of a program depends on
+   its data, and a corpus that only exercises the non-raising path will
+   report the lane green for code the lane cannot run.
+2. A probe that does not take the row reports a false heal, and this
    register has now published two of them. Anyone re-measuring #201 at
-   the next pin should assert the row is taken — the two-file reproducer
-   is f18/f19 above and is four lines longer than the one that lies.
+   the next pin should assert the row is taken; the two-file reproducer
+   is f18/f19 above, four lines longer than the one that lies.
 
-Downstream state unchanged, and this is the control that proves the
-probes rather than the other way round: `tests/option/or_else_default.lu`,
-`exists_marking.lu` and `is_none_marking.lu` keep
+Downstream state unchanged, and it is the control on the probes:
+`tests/option/or_else_default.lu`, `exists_marking.lu` and
+`is_none_marking.lu` keep
 `wolfc = "unsupported"` with `control flow in an argument` at `mem`
 (re-measured this sprint; the refused span in `or_else_default` is bytes
 `[646, 666]` = `find_positive(0 - 3)`, the call that takes the row, and
-NOT the `find_positive(5)` beside it). wolf-lang#201 is OPEN and the
+not the `find_positive(5)` beside it). wolf-lang#201 is open and the
 re-characterisation is posted to its thread.
-`std.x.tls.client`'s header keeps teaching **bind, then name**.
+`std.x.tls.client`'s header keeps teaching bind, then name.
 
 ## The residues, re-probed at 4230b00 / 0.1.23
 
-- **The chars-pairs tuple list is refused at its NINTH consecutive pin.**
+- The chars-pairs tuple list is refused at its ninth consecutive pin.
   `List[(int, int)]()` is `unsupported — this prelude container
   instantiation (generic data)` at `resolve` on both wolf rungs (span
   `[32, 50]`), and lupin runs it. Nine pins, and this one crossed a
   compiler span that moved eight builtin signatures and a whole element
-  type — which strengthens sc34's reading rather than weakening it: it
-  will move the sprint someone lowers generic container instantiation on
-  purpose and not one day sooner. Dated in the str header.
-- **F-0096 refuses verbatim.** `s.get(0..^2)` is `unsupported —
+  type, which strengthens sc34's reading: it will move the sprint
+  someone lowers generic container instantiation on purpose and not one
+  day sooner. Dated in the str header.
+- F-0096 refuses verbatim. `s.get(0..^2)` is `unsupported —
   open-ended or end-relative ranges (slicing)` at `resolve` on both
   rungs (span `[57, 62]`); lupin runs it and prints `hel`.
-- **`in(r)` re-probed, and one reading MOVED — a correction to sc34's
-  record rather than a heal.** sc34 reported `List[int].in(r)` as
+- `in(r)` re-probed, and one reading moved. It is a correction to sc34's
+  record and not a heal. The sc34 sprint reported `List[int].in(r)` as
   `unsupported — a std/prelude stub without a signature`. At this pin
-  BOTH spellings answer the same arm: `xs.in(r)` over a bound list and
+  both spellings answer the same arm: `xs.in(r)` over a bound list and
   `List[int]().in(r)` over a constructor call are each `unsupported —
   methods on generic std data (the std surface)` at `resolve` on both
   wolf rungs and `unsupported` on lupin. Either the arm merged in this
-  span or sc34's two spellings were not the two it named; the honest
-  record is what is measured here, and the sc34 line should be read with
+  span or sc34's two spellings were not the two it named; what is
+  measured here is the record, and the sc34 line should be read with
   that caveat.
-- **`reserve(n)` is unmoved and now has a PRICE, which is new.** F-0104's
-  after-table separates the two halves of #203 for the first time: the
-  element width is retired everywhere, and the preallocation half is
-  worth exactly the difference between a producer's `payload + 48` and a
-  push-built list's `2 x payload + 48` — **65,536 ledger units on a
-  64 KiB buffer, natively, and nothing at all on the checked tier.**
-  That is what `reserve` would buy and it is now a number rather than an
-  argument.
-- **`graphemes` owes no probe**: a segmentation TABLES tier, and nothing
-  in the span brings it closer.
-- **A `str` still charges NO named region's ledger on ANY tier.** 200
-  fresh interpolated strings built inside `region r { … }` leave
-  `region_bytes(r)` at **0** — `before 0 after 0 sink 2490`,
-  byte-identical stdout across lupin, checked and native.
-  `[mem.region.account.1]` still scopes the gap to the NATIVE tier alone;
-  it remains true of every tier. Its mirror image, F-0107, CLOSED this
-  sprint — so the clause now has one blind spot recorded against it
-  rather than two, and the surviving one is the one the clause names.
-- **The four `divergent(…)`-era addresses stay healed.**
+- `reserve(n)` is unmoved and now has a price. F-0104's after-table
+  separates the two halves of #203 for the first time: the element width
+  is retired everywhere, and the preallocation half is worth the
+  difference between a producer's `payload + 48` and a push-built list's
+  `2 x payload + 48`, which is 65,536 ledger units on a 64 KiB buffer
+  natively and nothing on the checked tier. That is what `reserve` would
+  buy, and it is now a number.
+- `graphemes` owes no probe: a segmentation tables tier, and nothing in
+  the span brings it closer.
+- A `str` still charges no named region's ledger on any tier. 200 fresh
+  interpolated strings built inside `region r { … }` leave
+  `region_bytes(r)` at 0: `before 0 after 0 sink 2490`, byte-identical
+  stdout across lupin, checked and native. `[mem.region.account.1]` still
+  scopes the gap to the native tier alone; it remains true of every tier.
+  Its mirror image, F-0107, closed this sprint, so the clause now has one
+  blind spot recorded against it instead of two, and the survivor is the
+  one the clause names.
+- The four `divergent(…)`-era addresses stay healed.
 
 ## The gauntlet — what is green, what is red, and the ledger-flat proof
 
-`cargo xtask ci` exit code **1**, `xtask: RED`, 2026-09-03 05:06 EDT, over
+`cargo xtask ci` exited 1 with `xtask: RED` at 2026-09-03 05:06 EDT, over
 the tree with every sprint edit in place. The exit code was read directly
 from the process and not through a pipe (the gauntlet's standing lesson).
-**Every step before `std-test` is GREEN, and inside `std-test` every red
-is on the lupin lane:**
+Every step before `std-test` is green, and inside `std-test` every red is
+on the lupin lane:
 
     ==> fmt                 clean
     ==> clippy              clean (-D warnings)
@@ -7008,46 +7001,46 @@ is on the lupin lane:**
 
 ### The ledger-flat proof, and it is exact
 
-**Not one red on `wolfc` and not one on `native`, over 376 rows.** That is
-the "ledger flat for non-byte rows" the contract asked to be PROVEN, and
-it is stronger than asked: the wolf lanes are flat over EVERY row, byte
-and non-byte alike, with the ten deliberate witness conversions landing
-as `run` because their directives moved to `fail(E0401)` and both
-compilers deliver exactly that. Three independent measurements agree:
+No red on `wolfc` and none on `native`, over 376 rows. That is the
+"ledger flat for non-byte rows" the contract asked to be proven, and it
+is stronger than asked: the wolf lanes are flat over every row, byte and
+non-byte alike, with the ten witness conversions landing as `run` because
+their directives moved to `fail(E0401)` and both compilers deliver that.
+Three independent measurements agree:
 
-1. `std-test`'s own comparator, above — 182 reds, zero of them on a wolf
-   lane;
+1. `std-test`'s own comparator, above, with 182 reds and none of them on
+   a wolf lane;
 2. an independent three-lane scan of all 376 rows through
    `conform-run --native` / `--checked`, verdict and stdout hash captured
    per row, cross-checked against `tests/ledger.toml`: the only wolf-lane
    deltas are the ten converted witnesses;
-3. `ulp`, whose 200 reference rows reproduce exactly on all three lanes
-   — INCLUDING lupin, because `std.math` reaches no `as byte`, which is
-   the control that keeps the lupin story honest: the interpreter is not
-   broken, it is missing one cast target.
+3. `ulp`, whose 200 reference rows reproduce exactly on all three lanes,
+   including lupin, because `std.math` reaches no `as byte`. That is the
+   control on the lupin story: the interpreter is not broken, it is
+   missing one cast target.
 
-**The conservatism-ledger arithmetic re-proves the lupin count.** sc34's
-entry count was 200; sc35's is **153**, and 200 − 153 = **47** — exactly
-the 47 rows that were ledgered `unsupported` on lupin and now answer
-`fail(E0301)`, which the runner counts as a red rather than a
+The conservatism-ledger arithmetic re-proves the lupin count. sc34's
+entry count was 200 and sc35's is 153; 200 − 153 = 47 and those are the
+47 rows that were ledgered `unsupported` on lupin and now answer
+`fail(E0301)`, which the runner counts as a red instead of a
 conservatism entry. The other 134 were `run` rows and were never in that
 tally. The two numbers were measured by different code paths and agree to
 the entry.
 
-`forward tags` moves 697 -> **700** (+3): the ten converted witnesses
+`forward tags` moves 697 -> 700 (+3): the ten converted witnesses
 swapped `conf.trap.set` / `err.*` tags for `ty.byte`. `unstable rows: 0`,
-`slow skips: 0`, `divergent rows: 0` — unchanged.
+`slow skips: 0` and `divergent rows: 0` are unchanged.
 
 ### Why this branch is committed red, stated rather than implied
 
 The standing discipline is `ci` exit-code-green before every commit, and
-sc35 cannot satisfy it. The reason is F-0108 and nothing else: 182 rows
-and 87 doc blocks, one cause, on one lane, retiring at one release. The
-three ways to make the gauntlet green were to write a ledger word the
-grammar rejects, to invent one, or to write a legal word that is false —
-each of which ends with a repository that lies about what it measured.
-**Every commit on this branch is a subset of the tree measured above**,
-which is green on both compiler lanes and red on the reference
+the sc35 sprint cannot satisfy it. The reason is F-0108: 182 rows and
+87 doc blocks, one cause, on one lane, retiring at one release. The three
+ways to make the gauntlet green were to write a ledger word the grammar
+rejects, to invent one, or to write a legal word that is false, and each
+of them ends with a repository that lies about what it measured. Every
+commit on this branch is a subset of the tree measured above, which is
+green on both compiler lanes and red on the reference
 interpreter for a reason stated at the top of `tests/ledger.toml`, in
 this register, in `CHANGELOG.md` and in wolf-lang#231's thread. The
 branch is pushed and unmerged, and the merge is is36's release to
@@ -7059,97 +7052,96 @@ Every byte this sprint wrote predates the `ci` run at 05:06:07 except
 this section of `docs/findings.md` and the CHANGELOG's correction of one
 count, both of which `ci` reads for no verdict.
 `find std tests xtask -newermt "05:06:07"` returns nothing executable, so
-not one program moved during the run. `tests/ledger.toml`'s only edits
-are the eight renamed keys and the block note — no lane word was changed
-anywhere in the file, which is what makes the wolf-lane flatness a
-zero-motion measurement rather than an assertion.
+no program moved during the run. `tests/ledger.toml`'s only edits are the
+eight renamed keys and the block note, and no lane word was changed
+anywhere in the file, which makes the wolf-lane flatness a measurement of
+zero motion.
 
 ### The second gauntlet, over the COMMITTED tree
 
-`cargo xtask ci` exit code **1**, **05:18:07 -> 05:21:56 EDT**, run after
+`cargo xtask ci` exit code 1 again, 05:18:07 -> 05:21:56 EDT, run after
 the chunked commits from a clean working tree (`git status` shows only
 the untracked `.docs` checkout, which is nobody's input). Identical
 numbers: `std-test: 376 test(s); forward tags: 700; conservatism ledger:
 153 entries; unstable rows: 0; slow skips: 0; divergent rows: 0`, and
-**182 red rows, every one `[lupin]`, zero on `wolfc`, zero on
-`native`** — the third time that reading has come back from a different
-code path. So "every commit is a subset of the measured tree" is not
-only an argument from mtimes: the tree the commits actually produce was
-measured on its own.
+182 red rows, every one `[lupin]`, zero on `wolfc`, zero on `native`,
+the third time that reading has come back from a different code path. So
+"every commit is a subset of the measured tree" rests on more than the
+mtimes: the tree the commits actually produce was measured on its own.
 
 ### The either/or, resolved at 05:22 EDT
 
-`lupin 0.1.25` **had not been tagged** when this sprint finished.
-`wolf-interp` trunk sits at `bd42cc2` — one commit past the 0.1.24
-release, working on D74's lex codes — and the installed binary is still
+`lupin 0.1.25` had not been tagged when this sprint finished.
+`wolf-interp` trunk sits at `bd42cc2`, one commit past the 0.1.24
+release, working on D74's lex codes, and the installed binary is still
 `lupin 0.1.23 (wolf-interp, reference interpreter at pin 8cda3aa)`. So
 the branch is handed over with the lupin lane dark, its 182 rows and 87
-doc blocks counted by name above, and the flip owed to the bump that
-installs is36's release. Re-measure then; do not assume.
+doc blocks counted above, and the flip owed to the bump that installs
+is36's release. Re-measure then; do not assume.
 
 ## The sc35 SECOND bump — lupin 0.1.25 arrives, wolf takes its tag, and all three pins land on one sha
 
-**F-0108 was filed at 05:22 EDT with the branch dark on one lane and the
-exit named as a release. The release landed the same day.** This section
-is the re-measure that finding asked for, plus a second pin move it did
-not ask for and got anyway.
+F-0108 was filed at 05:22 EDT with the branch dark on one lane and the
+exit named as a release. The release landed the same day. This section is
+the re-measure that finding asked for, plus a second pin move it did not
+ask for and got anyway.
 
 ### What moved, and the drift prediction written 2026-09-03 18:34 EDT, BEFORE the bare `ci`
 
-- **lupin 0.1.23 -> 0.1.25**, TWO releases in one chase (0.1.24 was
-  never installed here — see `vendor/tools.toml`). Tag `v0.1.25` =
-  wolf-interp `ae34115`; is36 ships `[type.byte]` in the mirror.
-  Installed by the orchestrator through fresh inodes.
-- **wolf `0.2.3+dev.4230b00` -> `0.2.4` (the TAG, `982f857`)**, and the
-  DATA pin moves with it, `4230b00 -> 982f857`, five commits. This was
-  not sc35's plan: r07 merged and installed v0.2.4 over the dev build at
+- lupin 0.1.23 -> 0.1.25 is two releases in one chase (0.1.24 was never
+  installed here; see `vendor/tools.toml`). Tag `v0.1.25` = wolf-interp
+  `ae34115`; is36 ships `[type.byte]` in the mirror. Installed by the
+  orchestrator through fresh inodes.
+- wolf `0.2.3+dev.4230b00` -> `0.2.4` (the tag, `982f857`), and the data
+  pin moves with it, `4230b00 -> 982f857`, five commits. This was not
+  sc35's plan: the r07 merge installed v0.2.4 over the dev build at
   05:49, which is a lane other than lupin moving under a pushed branch,
-  so the sprint STOPPED and reported rather than accommodating it. The
-  re-pin is authorised, and it is the good outcome: **the dev stamp goes
-  away.** sc34 and sc35's first bump both had to build off trunk because
-  no tagged wolf could compile a byte; v0.2.4 is the first tag that can,
-  so the `+dev.` suffix retires after two sprints.
+  so the sprint stopped and reported instead of accommodating it. The
+  re-pin is authorised, and it is the good outcome, because the dev stamp
+  goes away. sc34 and sc35's first bump both had to build off trunk
+  because no tagged wolf could compile a byte; v0.2.4 is the first tag
+  that can, so the `+dev.` suffix retires after two sprints.
 
-**Predicted: ZERO row motion on every lane from the WOLF half, and every
-byte row returning on the LUPIN half.** The wolf half's prediction is the
-cheapest kind this register has ever recorded, and for once that is a
-fact rather than an argument:
+The prediction was zero row motion on every lane from the wolf half, and
+every byte row returning on the lupin half. The wolf half's prediction is
+the cheapest kind this register has ever recorded, and the span is why:
 
-- **`git diff --name-only 4230b00 982f857` touches EIGHT files and NOT
-  ONE OF THEM IS A `.rs`.** The count is literally zero. The span is
+- `git diff --name-only 4230b00 982f857` touches eight files and none of
+  them is a `.rs`. The count is zero. The span is
   `867accf` (a `.github/workflows/release.yml` addition), `2201426`
   (README prose), `281e3b2` (`crates/wolf_driver/PAIRING`, a data file),
   `a504e09` (CHANGELOG prose) and `982f857` (the version bump:
   `Cargo.toml`, both lockfiles, README, and one `wolf_sema` test
-  SNAPSHOT that embeds the version string by design). There is no
+  snapshot that embeds the version string by design). There is no
   compiler in this span. A prediction of zero over a span with no source
-  is not a judgement call, and the only honest way to get it wrong would
-  be to have miscounted — so the count is quoted rather than described.
-- **`spec/` and `corpus/` are untouched: 0 files.** Anchors **417 ->
-  417**, key sets diffed BOTH ways, **+0 / -0** — the first bump in this
-  repo's history where the anchor snapshot is BYTE-IDENTICAL to the one
-  already vendored, so `vendor/upstream/anchors.json` does not change at
-  all and only `PIN` moves. Corpus **511 -> 511**.
-- **The lupin half is predicted to return all 181 dark rows and all 87
-  dark doc blocks**, because F-0108's cause was one cast target and is36
-  ships it. Predicted NOT to return: the ten converted witnesses, whose
-  directives expect `fail(E0401)` — a type refusal the interpreter has
-  no reason to make. Those were measured before this prediction was
-  written (they are what the ledger words below record), so they are
-  stated as a known rather than claimed as a forecast.
-- **The doctor prediction, and it is the headline of this section: ALL
-  THREE PINS ON ONE SHA.** `vendor/tools.toml` records wolf `0.2.4` /
+  is not a judgement call, and the only way to get it wrong would be to
+  have miscounted, so the count is quoted here.
+- `spec/` and `corpus/` are untouched, 0 files. Anchors 417 -> 417 with
+  the key sets diffed both ways, +0 / -0; the first bump in this repo's
+  history where the anchor snapshot is byte-identical to the one already
+  vendored, so `vendor/upstream/anchors.json` does not change at all and
+  only `PIN` moves. Corpus 511 -> 511 too.
+- The lupin half is predicted to return all 181 dark rows and all 87
+  dark doc blocks, because F-0108's cause was one cast target and is36
+  ships it. The ten converted witnesses are predicted not to return,
+  since their directives expect `fail(E0401)`, a type refusal the
+  interpreter has no reason to make. Those were measured before this
+  prediction was written (they are what the ledger words below record),
+  so they are stated as a known and not claimed as a forecast.
+- The doctor prediction is the headline of this section: all three pins
+  on one sha. `vendor/tools.toml` records wolf `0.2.4` /
   `982f857` and lupin `0.1.25` / `982f857`; `vendor/upstream/PIN` records
   `982f857`. Doctor gates the two binaries' self-declared identity and
   `sync-pin` gates the snapshot against the submodule, so all four
   numbers should be the same sha for the first time in this repository's
-  history. sc34 restored the one-sha invariant between the wolf BINARY
-  and the DATA pin; this is the first time the INTERPRETER joins them.
-- **The pairing line will still mismatch, and that is correct.**
+  history. The sc34 sprint restored the one-sha invariant between the
+  wolf binary and the data pin; this is the first time the interpreter
+  joins them.
+- The pairing line will still mismatch, and that is correct.
   `crates/wolf_driver/PAIRING` was set to `lupin-version = 0.1.24` /
-  `lupin-pin = 3befc3e` in `281e3b2` — r07's release-time record — so the
+  `lupin-pin = 3befc3e` in `281e3b2` (r07's release-time record), so the
   v0.2.4 binary's line 2 names 0.1.24 while the installed interpreter is
-  0.1.25. Reported and NOT gated (F-0064: the rig reads identity from
+  0.1.25. Reported and not gated (F-0064: the rig reads identity from
   line 1). Predicted to appear in doctor's output and to move nothing.
 
 ### The BEFORE side
@@ -7160,14 +7152,14 @@ knowledge, so the before side is this morning's own three gauntlets at
 `4230b00` / 0.1.23, recorded above: `376 test(s); forward tags 700;
 conservatism 153; unstable 0; slow 0; divergent 0`, 182 reds all on
 `[lupin]`, `doc-examples` 87 of 414 red, `ulp` GREEN. Three identical
-readings from two code paths. **That is a complete before side, and it is
-worth naming why it survives the accident: it was written down.**
+readings from two code paths. That is a complete before side, and it
+survives the accident because it was written down.
 
 ### The measurement — `ci: GREEN`, and the prediction exact on both halves
 
-`cargo xtask ci` exit code **0**, `ci: GREEN`, **18:36:01 -> 18:54:37
-EDT**, bare, the exit code read directly from the process and not through
-a pipe.
+`cargo xtask ci` exited 0 with `ci: GREEN`, 18:36:01 -> 18:54:37 EDT,
+bare, the exit code read directly from the process and not through a
+pipe.
 
     sync-pin: PIN 982f857885b991e686c6b045de213d10cab013c1
               anchors.json snapshot parses (registry v1)
@@ -7188,39 +7180,38 @@ a pipe.
     doc-examples: 414 block(s), GREEN
     ulp: 200 reference row(s), GREEN
 
-**ALL THREE PINS READ ONE SHA, AND IT IS THE FIRST TIME.** `982f857` is
+All three pins read one sha, for the first time. `982f857` is
 the wolf binary's self-declared pin, the lupin binary's self-declared
-pin, and `vendor/upstream/PIN`. sc30 pulled the pins apart, sc33 suspended
-the invariant, sc34 restored it between the BINARY and the DATA pin, and
-this bump adds the interpreter. It is also the first bump in this repo
-where `vendor/upstream/anchors.json` did not change one byte: `spec/` is
-untouched in the span, so anchors are **417 -> 417, +0/-0**, corpus
-**511 -> 511**, and only `PIN` moved.
+pin, and `vendor/upstream/PIN`. The sc30 sprint pulled the pins apart,
+sc33 suspended the invariant, sc34 restored it between the binary and the
+data pin, and this bump adds the interpreter. It is also the first bump
+in this repo where `vendor/upstream/anchors.json` did not change one
+byte: `spec/` is untouched in the span, so anchors are 417 -> 417, +0/-0;
+corpus 511 -> 511 as well, and only `PIN` moved.
 
-**And `version: wolf 0.2.4` has no `+dev.` suffix.** Two sprints of
-dev-stamped builds end here, exactly as r03's design intended: sc34 and
+And `version: wolf 0.2.4` has no `+dev.` suffix. Two sprints of
+dev-stamped builds end here, as r03's design intended: sc34 and
 sc35's first bump both had to build off trunk because no tag could
 compile a `byte`, and v0.2.4 is the first tag that carries s135 and s136
-together. The mechanism was used for precisely as long as the gap it was
-built for.
+together. The mechanism lasted as long as the gap it was built for.
 
-**The pairing line mismatches and doctor is right not to care.** wolf's
-line 2 says `lupin 0.1.24 … pin 3befc3e` — r07's release-time
-`crates/wolf_driver/PAIRING` record, frozen in `281e3b2` — while the
+The pairing line mismatches and doctor is right not to care. wolf's
+line 2 says `lupin 0.1.24 … pin 3befc3e` (r07's release-time
+`crates/wolf_driver/PAIRING` record, frozen in `281e3b2`) while the
 installed interpreter is 0.1.25 conforming to `982f857`. Reported, not
 gated (F-0064). Predicted above; observed verbatim; moved nothing.
 
-**Zero row motion from the wolf half, as predicted over a span with no
-compiler in it.** Every wolf-lane word in `tests/ledger.toml` is
+Zero row motion from the wolf half, as predicted over a span with no
+compiler in it. Every wolf-lane word in `tests/ledger.toml` is
 unchanged and every one still holds; `ulp`'s 200 rows reproduce exactly
 on all three lanes; `gen-vectors --check` and `lint-conventions` are
 unmoved. The only numbers that move are the lupin half's, below.
 
 ## F-0108 CLOSES — 181 of 181 rows returned, and what is left has a word
 
-**Status: CLOSED, one day after filing, by the release it named as its
-own exit.** lupin 0.1.25 (is36) ships `[type.byte]` in the mirror.
-Re-measured over all 376 rows with `lupin conform-run`:
+Status: closed, one day after filing, by the release it named as its own
+exit. lupin 0.1.25 (is36) ships `[type.byte]` in the mirror. Re-measured
+over all 376 rows with `lupin conform-run`:
 
 | | at 0.1.23 (this morning) | at 0.1.25 |
 |---|---|---|
@@ -7228,25 +7219,24 @@ Re-measured over all 376 rows with `lupin conform-run`:
 | doc blocks refused | **87 of 414** | **0 of 414** |
 | `std-test` reds | **182**, all `[lupin]` | **0** |
 
-**Zero residual refusals.** The 181 come back as 122 `exit`, 48
-`unsupported` and 11 `trap` — and **not one lane word in
-`tests/ledger.toml` had to be corrected for any of them.** That is the
-strongest thing this section can say: the column had been right all along
-about what the interpreter is FOR, and wrong only about what it could
-reach for one morning. A ledger left honestly wrong, with its own note
-naming the count and the cause, needed no repair when the cause left.
+Zero residual refusals. The 181 come back as 122 `exit`, 48
+`unsupported` and 11 `trap`, and no lane word in `tests/ledger.toml` had
+to be corrected for any of them. The column had been right all along
+about what the interpreter is for, and wrong only about what it could
+reach for one morning. A ledger left wrong, with its own note naming the
+count and the cause, needed no repair when the cause left.
 
-`conservatism ledger` moves **153 -> 201**. sc34's baseline was 200, so
+`conservatism ledger` moves from 153 to 201; sc34's baseline was 200, so
 the tier is +1 and the one entry is `x/crypto/p256/non_byte_refused.lu`,
 whose lupin lane declines at `resolve` (the ladder is outside the
-modelled surface — not a byte question).
+modelled surface, which is not a byte question).
 
 ### What remains: eight rows, one mechanism, and now a legal word
 
-The ten witnesses sc35 converted expect `fail(E0401)`. **lupin 0.1.25 has
-the byte TYPE but not the byte DOMAIN**: `push(256)` into a `List[byte]`
+The ten witnesses sc35 converted expect `fail(E0401)`. lupin 0.1.25 has
+the byte type and not the byte domain: `push(256)` into a `List[byte]`
 still stores 256 dynamically, so where both compilers refuse at typecheck
-the interpreter executes the program to its honest end.
+the interpreter executes the program to its end.
 
 | row | lupin 0.1.25 | ledger word |
 |---|---|---|
@@ -7257,63 +7247,63 @@ the interpreter executes the program to its honest end.
 | `fs/invalid_row` | `unsupported` @ resolve | `unsupported` |
 | `x/crypto/p256/non_byte_refused` | `unsupported` @ resolve | `unsupported` |
 
-**`divergent rows: 0 -> 8`, and this is F-0098's word used outside the
-take-mode pair for the first time.** This morning the same finding had NO
-legal spelling and the reds were left standing; the release did not just
-return the rows, it moved the residue into a shape the rig can carry —
-loud (the divergence ledger names all eight every run), out of the
-cross-lane differ, and armed to RED the day it heals. Filed as
-**wolf-interp#62** (is37's, not is36's) and cited on every row.
+`divergent rows: 0 -> 8`, and this is F-0098's word used outside the
+take-mode pair for the first time. This morning the same finding had no
+legal spelling and the reds were left standing; the release returned the
+rows and moved the residue into a shape the rig can carry: the divergence
+ledger names all eight every run, they are out of the cross-lane differ,
+and they are armed to red the day it heals. Filed as wolf-interp#62
+(is37's, not is36's) and cited on every row.
 
-**`hex/encode_non_byte_refused` is the one worth reading twice.** Its
-`byte_digits` assert — which sc35 documented as "now provably unreachable
-from every door in this module" — is unreachable on the two wolf lanes
-and **still fires under lupin**, because the interpreter can still hand
+`hex/encode_non_byte_refused` is the one worth reading twice. Its
+`byte_digits` assert, which sc35 documented as "now provably unreachable
+from every door in this module", is unreachable on the two wolf lanes
+and still fires under lupin, because the interpreter can still hand
 it a 256. The sentence was true of the compilers and false of the
 reference machine, and the divergence ledger is where that difference now
-lives rather than in a claim nobody re-checked.
+lives, instead of in a claim nobody re-checked.
 
 ### The gauntlet over the COMMITTED tree
 
-`cargo xtask ci` exit code **0**, `ci: GREEN`, **18:57:36 -> 19:15:43
-EDT**, run after the four chunked commits from a clean working tree
+`cargo xtask ci` exited 0 with `ci: GREEN`, 18:57:36 -> 19:15:43 EDT,
+run after the four chunked commits from a clean working tree
 (`git status` shows only the untracked `.docs` checkout, which is
 nobody's input). Identical numbers: `sync-pin: PIN 982f857…`;
 `std-test: 376 test(s); forward tags: 700; conservatism ledger: 201
 entries; unstable rows: 0; slow skips: 0; divergent rows: 8` — GREEN;
 `doc-examples: 414 block(s), GREEN`; `ulp: 200 reference row(s), GREEN`.
 
-So sc35 ends the way its first half could not: **two consecutive greens
-at the new pins, the second over the tree the commits actually produce.**
-The branch's own history is the record of why that took two bumps —
-sixteen commits red on one lane by construction, with the count and the
-cause written down, then four commits that closed it.
+So the sc35 sprint ends the way its first half could not, with two
+consecutive greens at the new pins, the second over the tree the commits
+actually produce. The branch's own history records why that took two
+bumps: sixteen commits red on one lane by construction, with the count
+and the cause written down, then four commits that closed it.
 
 ## sc36 — `std.net.unix` lands three-laned, and the reference machine is the surprise
 
-**The pins did not move and the prediction for that was written first.**
+The pins did not move, and the prediction for that was written first.
 sc35's second bump put all three pins on one sha (`982f857` = the
-`v0.2.4` tag) and installed `lupin 0.1.25`; sc36 opened against exactly
-those and there was nothing to bump to. The drift prediction for a
-no-op bump is trivially zero, and it is stated anyway because the
-alternative is a sprint that never says which binaries it measured:
+`v0.2.4` tag) and installed `lupin 0.1.25`; the sc36 sprint opened
+against those and there was nothing to bump to. The drift prediction for
+a no-op bump is trivially zero, and it is written down anyway so that the
+sprint says which binaries it measured:
 `wolf 0.2.4 (wolfgang, pin 982f857)` and `lupin 0.1.25 (wolf-interp,
 reference interpreter at pin 982f857)`, macOS arm64, both on `PATH`
 throughout. The one thing worth re-reading at this pin is that wolf's
 own pairing line still names `lupin 0.1.24 … pin 3befc3e` (r07's
-release-time PAIRING record) against an installed 0.1.25 — reported,
+release-time PAIRING record) against an installed 0.1.25: reported,
 not gated (F-0064), unchanged from sc35.
 
-**The finding of the sprint is a lane word nobody predicted.** Every os
+The finding of the sprint is a lane word nobody predicted. Every os
 block in `tests/ledger.toml` has the same shape: the wolf rungs run it
 and lupin declines the capability by design. `std.net.unix` binds a
-socket at a FILESYSTEM PATH, so the expectation going in — written down
-before the first probe — was a two-lane module with a lupin column of
-`unsupported`. **lupin 0.1.25 serves the whole family**, and the reason
-is worth stating because it generalises: a unix socket is not a file the
-machine has to READ, it is a host object the machine asks the host for.
+socket at a filesystem path, so the expectation going in, written down
+before the first probe, was a two-lane module with a lupin column of
+`unsupported`. lupin 0.1.25 serves the whole family, and the reason
+generalises: a unix socket is a host object the machine asks the host
+for, and not a file the machine has to read.
 The reference interpreter declines `std.fs` because it has no
-filesystem model to be honest about; it has no such problem with
+filesystem model to describe; it has no such problem with
 `bind(2)`. Measured, byte-identical stdout on all three lanes:
 
 | probe | lupin 0.1.25 | wolf `--checked` | wolf `--native` |
@@ -7328,14 +7318,14 @@ filesystem model to be honest about; it has no such problem with
 | `net_deadline` on a unix stream / listener | `timeout` / `timeout` | same | same |
 | bind and dial under a mode-000 directory | `denied` / `denied` | same | same |
 
-So four of the six witnesses this sprint ships are THREE-LANE, and the
+So four of the six witnesses this sprint ships are three-lane, and the
 two that are not are two-lane for a reason that has nothing to do with
 sockets: they assert about the path with `fs.exists` and `fs.move_file`,
 and the fs tier is what lupin declines.
 
-**lupin's one named limit, and §14 already forbids the spelling that
-reaches it.** An absolute path, or one that climbs out of the working
-directory, is refused BY NAME on the reference machine:
+lupin has one named limit, and §14 already forbids the spelling that
+reaches it. An absolute path, or one that climbs out of the working
+directory, is refused on the reference machine:
 
     net_listen_unix("/sc36-denied-probe.sock")
       -> unsupported: "names a path outside the working directory; a unix
@@ -7344,66 +7334,66 @@ directory, is refused BY NAME on the reference machine:
          relative path that does not climb out — the shape is refused by
          name rather than observed"
 
-That is a good refusal — it is the machine saying which question it
-declines instead of guessing — and §14's relative-path rule already
-forbids every spelling that would reach it. There is a second reason to
-keep the rule that is the host's rather than the rig's: `sun_path` is
+That is a good refusal, since the machine says which question it
+declines instead of guessing, and §14's relative-path rule already
+forbids every spelling that would reach it. The second reason to keep the
+rule is the host's rather than the rig's: `sun_path` is
 about 104 bytes on macOS and 108 on linux, so an absolute path under a
 deep scratch directory is a length failure waiting for a different
 machine. Both reasons are in the module header.
 
 ## F-0109 — the rig stages ONE directory for THREE lanes, and sc36 is the first sprint where the reference machine can leave a file in it
 
-**Found by a RED, and the RED is the useful part.** The first gauntlet
+A red found this, and the red is the useful part. The first gauntlet
 over this sprint's tree failed on `net/unix/cleanup.lu` and
 `net/unix/refused_row.lu` with `0 lane(s) observed` and a directive
 mismatch on both compiler lanes: the tests expected `exit(0)` and got
-`exit(3)`, the arm each file uses to say *the bind failed with a PATH
+`exit(3)`, the arm each file uses to say *the bind failed with a path
 row on a host that serves the family*.
 
-**The mechanism, and why it has never fired before.** `stage_test` is
-called ONCE per test (`runner.rs`, the per-test loop) and all three
-lanes are then invoked in that same staged package root — which is
-correct and deliberate: staging copies the whole `std/` tree, and doing
+Here is the mechanism, and why it has never fired before. `stage_test` is
+called once per test (`runner.rs`, the per-test loop) and all three
+lanes are then invoked in that same staged package root, which is
+correct: staging copies the whole `std/` tree, and doing
 it three times per test would triple the rig's IO for 376 tests. The
-invariant it rests on is that a lane which DECLINES a capability leaves
+invariant it rests on is that a lane which declines a capability leaves
 nothing behind. That invariant has held for every os module in this
-repository because lupin's refusal has always arrived at the FIRST call
+repository because lupin's refusal has always arrived at the first call
 of the declined tier, before any side effect. It does not hold here:
 
-1. lupin resolves module bodies LAZILY, so `main` starts running;
-2. `unix.listen(path)` is a call lupin SERVES — it binds a real
+1. lupin resolves module bodies lazily, so `main` starts running;
+2. `unix.listen(path)` is a call lupin serves: it binds a real
    `AF_UNIX` socket and creates a real file in the staged root;
 3. the next line is `fs.exists(path)`, which lupin declines, and the
    record says `unsupported` at `resolve`;
 4. the socket file is still there. wolfc runs next, in the same
    directory, and its bind answers `exists`.
 
-**So the reference machine — the one with no filesystem — is the lane
-that left a file behind.** That sentence is the finding. Every previous
+So the reference machine, the one with no filesystem, is the lane that
+left a file behind. That sentence is the finding. Every previous
 capability module made the two facts coincide: lupin has no fs, so lupin
 touches no file. `std.net.unix` separates them, because the call that
 creates the file is a `net` call.
 
-**The fix is the practice the module already documents**, which is why
-this is filed as a finding rather than a rig change. Both files now open
+The fix is the practice the module already documents, which is why this
+is filed as a finding and not as a rig change. Both files now open
 with the owner's idiom from `unix.listen`'s doc:
 
     if fs.exists(path) { fs.remove(path)? }
 
-and lupin's refusal now lands on that FIRST line, before the bind, so
+and lupin's refusal now lands on that first line, before the bind, so
 nothing is created and the record is the same `unsupported` it always
-was. Re-measured with all three lanes run in ONE directory, lupin first
+was. Re-measured with all three lanes run in one directory, lupin first
 (the rig's own order): `unsupported` / `exit(0)` / `exit(0)`, no
 leftover.
 
-**The general rule, for the next sprint that ships a capability whose
-side effect precedes its refusal.** A test's lanes share a directory, so
-a test is responsible for its own ground: if a program can be
+Here is the general rule, for the next sprint that ships a capability
+whose side effect precedes its refusal. A test's lanes share a directory,
+so a test is responsible for its own ground: if a program can be
 interrupted between a side effect and the call that declines, it must
 start by putting the ground back. Do not read a green rig as evidence
-that the lanes are independent — they are independent in what they
-OBSERVE and shared in what they TOUCH. The rig change that would remove
+that the lanes are independent; they are independent in what they
+observe and shared in what they touch. The rig change that would remove
 the hazard (re-stage per lane) is priced at three `std/` tree copies per
 test and is not worth it for a hazard one line of ordinary wolf pays
 for.
@@ -7412,22 +7402,22 @@ for.
 
 A dial of a path that names something which is not a socket at all is
 neither of `[os.net.unix]`'s two dial cases. It was measured here on
-macOS first — `io`, from `ENOTSOCK`, on both compiler lanes — and the
+macOS first (`io`, from `ENOTSOCK`, on both compiler lanes) and the
 module's doc said so in those words for about an hour. wolf-interp's own
 `tests/net_unix.rs` had already found the other half on a CI runner
-(`d76e56a`, is36): **linux answers `ECONNREFUSED`, which is the
-`refused` row**, and no developer's machine had said it. The upstream
+(`d76e56a`, is36): linux answers `ECONNREFUSED`, which is the
+`refused` row, and no developer's machine had said it. The upstream
 test now reads the row and accepts either.
 
-std adopted that posture rather than pinning macOS's answer, and the
-rule it leaves is worth more than the datum: **when the tag is the
-kernel's and the kernels disagree, promise the CLASS and not the
-member.** `unix.connect`'s doc says it is a row and never a trap — which
-is the part that IS true on both hosts and is the part a caller needs —
-and tells anyone who must distinguish "not a socket" from "a dead
+std adopted that posture instead of pinning macOS's answer, and the
+rule it leaves is worth more than the datum: when the tag is the
+kernel's and the kernels disagree, promise the class and not the
+member. `unix.connect`'s doc says it is a row and never a trap, which
+is true on both hosts and is the part a caller needs,
+and it tells anyone who must distinguish "not a socket" from "a dead
 server" to ask `std.fs` about the path instead of the network.
 `tests/net/unix/rows.lu` pins the four rows the clause rules and
-deliberately does not pin the fifth, so the file cannot become a red on
+does not pin the fifth, so the file cannot become a red on
 a linux runner.
 
 This is also the second time in three sprints that a per-host difference
@@ -7448,20 +7438,20 @@ of band instead, with a mode-000 directory made by the shell —
 
 — byte-identical on all three lanes, and both ends of the family answer
 it. It is declared in both signatures for §14's reason: the vocabulary
-is the toolchain's, not std's, and a tag a program cannot reach HERE is
-documented, never omitted. The shipped test states its own incompleteness
-rather than letting a green rig imply coverage.
+is the toolchain's and not std's, and a tag a program cannot reach here
+is documented rather than omitted. The shipped test states its own
+incompleteness, so a green rig does not imply coverage.
 
-`unsupported` is the other unreachable one — windows's answer, and this
+`unsupported` is the other unreachable one, windows's answer, and this
 rig's implementation lanes are dark on windows. It is held by
-CONSTRUCTION instead: all six witnesses branch on it and print relations
+construction instead: all six witnesses branch on it and print relations
 that hold vacuously on a host that refuses the family, which is
 `corpus/net/unix_echo.lu`'s construction upstream. The cost is about
 eight lines a file and the benefit is that the day a windows lane lights
 up, none of these six is a red.
 
-**And one measured property that is not a row at all: the unlink is BEST
-EFFORT.** `net.close_listener` on a listener whose path was moved out
+One measured property is not a row at all: the unlink is best effort.
+`net.close_listener` on a listener whose path was moved out
 from under it answers `ok`, not `io` (`refused_row.lu` asserts it beside
 the `refused` it was written for). That matters more than it looks: a
 close that failed on a vanished path would make every program sharing a
@@ -7470,12 +7460,12 @@ that lets the stale-socket recipe exist at all.
 
 ## F-0099 re-counted — the gap is FOUR namespaces, and sc36 is the sprint that pays for it
 
-sc34 filed F-0099 when `type.*` anchors appeared in the pinned registry
-while `[conf.anchor.ns]` did not admit the namespace, and refused to add
-it to `xtask`'s `REGISTERED_NS` because this rig mirrors the clause's
-LETTER, not the extractor's output. Re-counted at the `982f857`
-snapshot, the registry publishes 417 anchors in ELEVEN namespaces and
-the clause admits SEVEN:
+The sc34 sprint filed F-0099 when `type.*` anchors appeared in the
+pinned registry while `[conf.anchor.ns]` did not admit the namespace, and
+refused to add it to `xtask`'s `REGISTERED_NS` because this rig mirrors
+the clause's letter and not the extractor's output. Re-counted at the
+`982f857` snapshot, the registry publishes 417 anchors in eleven
+namespaces and the clause admits seven:
 
 | namespace | anchors | admitted by `[conf.anchor.ns]` |
 |---|---|---|
@@ -7485,43 +7475,43 @@ the clause admits SEVEN:
 | **`ct`** | 14 | no |
 | **`diag`** | 10 | no |
 
-**The cost is no longer theoretical: sc36 implements `[os.net.unix]` and
-its six witnesses cannot cite the clause they conform to.** A
-`conforms: os.net.unix` line is a hard CI failure here — "namespace `os`
-is neither registered nor reserved" — so every unix test names the
+The cost is no longer theoretical: the sc36 sprint implements
+`[os.net.unix]` and its six witnesses cannot cite the clause they conform
+to. A `conforms: os.net.unix` line is a hard CI failure here ("namespace
+`os` is neither registered nor reserved"), so every unix test names the
 forward tag `std.net.unix` instead, and the clause it actually holds is
-recorded in the ledger block and in this register rather than in the
-directive that was built to carry exactly that. §13's rule ("every test
+recorded in the ledger block and in this register instead of in the
+directive that was built to carry it. §13's rule ("every test
 names its anchors") is satisfied in letter and defeated in substance.
 
 The fix is upstream and has a precedent: #120 appended `pkg` to the
-clause in 2026-08-27 for exactly this reason, additively, nothing
+clause in 2026-08-27 for this reason, additively, nothing
 renumbered. Asked for on wolf-lang; the rig follows the clause the day
 it lands, and `xtask/src/anchors.rs` now carries a unit test
 (`f0099_the_four_unadmitted_namespaces_still_fail`) whose failure
-message says so — the flip is deliberate, not a discovery.
+message says so, so the flip will be a decision and not a discovery.
 
-**One lag in the OTHER direction, fixed here.** `[conf.anchor.ns]`
+One lag in the other direction is fixed here. `[conf.anchor.ns]`
 reserved `test` on 2026-08-11 (s39, the built-in test framework's litmus
 tier) and this rig's `FORWARD_NS` never followed, so a legal tag would
 have been rejected. Added at sc36 against the clause's own letter; no
 anchor in the snapshot uses it, so nothing in this repository changes
 verdict. The pair is the lesson: a hand-copied list of a clause's terms
-drifts BOTH ways, and only one of the two directions announces itself.
+drifts both ways, and only one of the two directions announces itself.
 
 ## F-0103 re-probed at `982f857` — the path property holds, and the prediction was written from the SPAN
 
-**The prediction, written before the probe.** The compiler did not move
+The prediction was written before the probe. The compiler did not move
 this sprint: sc35 measured the re-characterisation at
 `wolf 0.2.3+dev.4230b00` and the second bump took the `v0.2.4` tag
 (`982f857`), five commits whose whole diff touches eight files and not
-one `.rs`. So the prediction is *unmoved, byte-identical*, and it is
-made from the span rather than from hope — the same discipline a pin
-bump's drift prediction uses. A re-probe that confirms a prediction made
-from the diff is worth ten minutes; a re-probe with no prediction beside
-it is a coin toss reported as a measurement.
+one `.rs`. So the prediction is *unmoved, byte-identical*, and it comes
+from the span, the same discipline a pin bump's drift prediction uses. A
+re-probe that confirms a prediction made from the diff is worth ten
+minutes; a re-probe with no prediction beside it is a coin toss reported
+as a measurement.
 
-**Measured, each probe in its own directory, macOS arm64:**
+Measured, each probe in its own directory, macOS arm64:
 
 | probe | argument | takes the row? | lupin | wolfc `--checked` | wolf `--native` |
 |---|---|---|---|---|---|
@@ -7533,81 +7523,81 @@ refuses an unhandled raising call in argument position when the row is
 taken on the reachable path — regardless of whether the callee reads the
 parameter, whether it is generic, and whether it is in another module.*
 And so does the consequence that makes it worth more than a lowering
-gap: **`unsupported` here is a property of an EXECUTION, not of a
-program.** Two files differing in one digit; one runs on the checked
+gap: `unsupported` here is a property of an execution, not of a
+program. Two files differing in one digit; one runs on the checked
 lane and one does not.
 
 Downstream state unchanged, and the gauntlet is the control:
 `tests/option/or_else_default.lu`, `exists_marking.lu` and
-`is_none_marking.lu` keep `wolfc = "unsupported"` — a row answering
-deeper is a RED in this rig, so a green run over an untouched ledger is
-the assertion. wolf-lang#201 is OPEN. `std.x.tls.client`'s header keeps
-teaching **bind, then name**, and sc35's warning to anyone re-measuring
+`is_none_marking.lu` keep `wolfc = "unsupported"`, and a row answering
+deeper is a red in this rig, so a green run over an untouched ledger is
+the assertion. wolf-lang#201 is open. `std.x.tls.client`'s header keeps
+teaching bind, then name, and sc35's warning to anyone re-measuring
 at the next pin is repeated here because it has now cost two published
-false heals: **assert that the probe TAKES the row.** The two-file
+false heals: assert that the probe takes the row. The two-file
 reproducer is f18/f19 above.
 
 ## The residues, re-probed at `982f857` / `0.1.25`
 
-- **The chars-pairs tuple list is refused at its TENTH consecutive
-  pin.** `List[(int, int)]()` is `unsupported — this prelude container
+- The chars-pairs tuple list is refused at its tenth consecutive pin.
+  `List[(int, int)]()` is `unsupported — this prelude container
   instantiation (generic data)` at `resolve` on both wolf rungs (span
   `[33, 51]`), and lupin runs it (`pairs: 1`). Ten pins. The span since
-  the last probe contains no compiler at all, so this one is a formality
-  — recorded because a residue that skips a sprint is a residue nobody
-  re-probes at the sprint that matters. Dated in the str header.
-- **F-0096 refuses verbatim.** `s.get(0..^2)` is `unsupported —
+  the last probe contains no compiler at all, so this one is a
+  formality, recorded because a residue that skips a sprint is a residue
+  nobody re-probes at the sprint that matters. Dated in the str header.
+- F-0096 refuses verbatim. `s.get(0..^2)` is `unsupported —
   open-ended or end-relative ranges (slicing)` at `resolve` on both
   rungs (span `[56, 61]`); lupin runs it and prints `hel`.
-- **`in(r)` — the wolf rungs agree with sc35, and LUPIN'S WORDING
-  MOVED.** Both spellings — `(mut xs).in(r)` over a bound list and
-  `List[int]().in(r)` over a constructor call — are `unsupported —
+- `in(r)`: the wolf rungs agree with sc35, and lupin's wording moved.
+  Both spellings, `(mut xs).in(r)` over a bound list and
+  `List[int]().in(r)` over a constructor call, are `unsupported —
   methods on generic std data (the std surface)` at `resolve` on both
-  wolf rungs (spans `[72, 86]` and `[52, 69]`), which is exactly sc35's
-  reading, re-confirmed. What is new is the reference machine's message:
-  where sc35 recorded a bare `unsupported`, 0.1.25 says **"`List` has no
-  method `in` in this machine's std subset"**. Same verdict, a better
-  sentence — is36 improved the refusal text — and it is recorded because
-  the NEXT re-probe should compare against this string and not against
-  "unsupported", or it will report motion that is only prose.
-- **`reserve(n)` is unmoved and owes no probe**: nothing in the span is
+  wolf rungs (spans `[72, 86]` and `[52, 69]`), which is sc35's
+  reading re-confirmed. What is new is the reference machine's message:
+  where sc35 recorded a bare `unsupported`, 0.1.25 says "`List` has no
+  method `in` in this machine's std subset". Same verdict, a better
+  sentence, since is36 improved the refusal text, and it is recorded
+  because the next re-probe should compare against this string and not
+  against "unsupported", or it will report motion that is only prose.
+- `reserve(n)` is unmoved and owes no probe: nothing in the span is
   a capacity or string-backing commit. F-0104's after-table still prices
-  the preallocation half of #203 at exactly 65,536 ledger units on a
+  the preallocation half of #203 at 65,536 ledger units on a
   64 KiB buffer natively and nothing on the checked tier.
-- **`graphemes` owes no probe**: a segmentation TABLES tier, and nothing
+- `graphemes` owes no probe: a segmentation tables tier, and nothing
   in the span brings it closer.
-- **A `str` still charges NO named region's ledger on ANY tier.** 200
+- A `str` still charges no named region's ledger on any tier. 200
   fresh interpolated strings built inside `region r { … }` leave
-  `region_bytes(r)` at **0** — `before 0 after 0 sink 2490`,
+  `region_bytes(r)` at 0: `before 0 after 0 sink 2490`,
   byte-identical stdout across lupin, checked and native, the same three
   numbers sc35 measured. `[mem.region.account.1]` still scopes the gap
-  to the NATIVE tier alone; it remains true of every tier.
-- **The eight `divergent(…)` rows are unmoved, and this is the sprint's
-  either/or resolving to its second arm** — see below.
-- **The four `divergent(…)`-era addresses stay healed.**
+  to the native tier alone; it remains true of every tier.
+- The eight `divergent(…)` rows are unmoved, and this is the sprint's
+  either/or resolving to its second arm; see below.
+- The four `divergent(…)`-era addresses stay healed.
 
 ## The two either/ors the contract named, both resolved to their second arm
 
-**1. `std.net.listen_with` / `adopt` — the ask STANDS.** The contract
+1. `std.net.listen_with` / `adopt`: the ask stands. The contract
 made item 2 conditional on s137 item 1 (`net_listen_with(addr, opts)`,
-`os_spawn_with(inherit)`, `net_adopt_listener(fd)`) having MERGED to
+`os_spawn_with(inherit)`, `net_adopt_listener(fd)`) having merged to
 wolf-lang trunk by this sprint's second gauntlet. Checked twice, at the
 sprint's open and again immediately before the second gauntlet:
 wolf-lang trunk is `1323c4e` (the r07 merge) on both readings, the local
 `s137` branch has no commit beyond it, and no `s137` branch exists on
-the remote. **Nothing landed, so nothing is wrapped**, and the reason is
+the remote. Nothing landed, so nothing is wrapped, and the reason is
 the same one sc34 gave for the byte type: a facade written against a
 builtin that does not exist is a facade nobody can measure. wolf-std#6
-stays OPEN with its two-shape ask unchanged
+stays open with its two-shape ask unchanged
 (`net.listen_with(addr, opts: ListenOpts)` with `reuse_port`, and
 `net.adopt_listener(fd)` paired with whatever `std.process` grows for
 passing handles), and the one row question it raises for §12 stays with
 it: a worker that retries a bind while a sibling holds the port wants
-`in_use` beside `io`, IF the builtin ever distinguishes `EADDRINUSE`.
+`in_use` beside `io`, if the builtin ever distinguishes `EADDRINUSE`.
 lobo's ws16 measurement is the consumer report behind all of it.
 
-**2. lupin 0.1.26 — is37 did not tag mid-wave, so the eight
-`divergent(…)` rows stand.** The contract's condition was a fresh-inode
+2. lupin 0.1.26: is37 did not tag mid-wave, so the eight
+`divergent(…)` rows stand. The contract's condition was a fresh-inode
 install and a re-measure if is37 tagged before this sprint's final
 gauntlet. `wolf-interp` is at `ae34115` (is36's last commit) with
 `v0.1.25` the newest tag; there is no `v0.1.26`. So `lupin 0.1.25` is
@@ -7615,13 +7605,13 @@ the pin sc36 measured on, the eight byte-domain rows citing
 wolf-interp#62 keep their `divergent(…)` words verbatim, and the
 gauntlet's `divergent rows: 8` line below is the same eight sc35 filed.
 Nothing was flipped hopefully: a `divergent(…)` row that stops matching
-its recorded observation is a RED in this rig, so the eight are proven
-unmoved by the run rather than assumed.
+its recorded observation is a red in this rig, so the run proves the
+eight unmoved.
 
-**The pins, for the record, unchanged from sc35's second bump:**
+The pins, for the record, unchanged from sc35's second bump:
 `wolf 0.2.4 (wolfgang, pin 982f857)`, `lupin 0.1.25 (wolf-interp,
 reference interpreter at pin 982f857)`, `vendor/upstream/PIN`
-`982f857` — all three on ONE sha, the invariant sc35 restored, held
+`982f857`, all three on one sha, the invariant sc35 restored, held
 through a sprint that added a module.
 
 ## The gauntlet — three runs, and the middle one is the finding
@@ -7636,8 +7626,8 @@ pipe (the standing lesson).
 | 3 | over the COMMITTED tree, `8c93bfa` | **0** | `ci: GREEN` |
 | 4 | over the FULLY committed tree, `4832e44` (this register and the CHANGELOG in) | **0** | `ci: GREEN` — identical numbers, which is the assertion that the last two commits are inert to the rig rather than the assumption |
 
-**Runs 3 and 4's numbers — byte-identical to each other — and the deltas
-against sc35's:**
+Runs 3 and 4's numbers are byte-identical to each other, and these are
+the deltas against sc35's:
 
 | measure | sc35 | sc36 | delta |
 |---|---|---|---|
@@ -7650,21 +7640,21 @@ against sc35's:**
 | doc-examples | 414 GREEN | **414 GREEN** | **+0**, and the zero is the point (below) |
 | ulp | 200 GREEN | **200 GREEN** | — |
 
-**The +0 on doc-examples is a designed zero, not an oversight.**
+The +0 on doc-examples is a designed zero and not an oversight.
 `std.net.unix` ships no fenced example, because every member returns a
-value only `std.net` can operate on and the extractor imports exactly the
-documented module (§4's one-module note). Both functions carry PROSE
-examples naming the outcome and the runnable witness by path — the
+value only `std.net` can operate on and the extractor imports only the
+documented module (§4's one-module note). Both functions carry prose
+examples naming the outcome and the runnable witness by path, the
 `std.str.to_strbuf` precedent applied at a whole module's scale. The two
 alternatives were costed and refused: writing the examples against the
 raw builtins would document `net_close` where the module teaches
 `net.close_listener`, and growing the extractor a second import would be
-a harness change made to serve a doc. This is worth flagging to review
+a harness change made to serve a doc. This is flagged for review
 because it is the first core module in this repository with zero doc
 blocks, and a reader counting blocks per module should find the reason
-here rather than infer neglect.
+here.
 
-**The six rows as the ledger records them**, and the lane split is the
+The six rows as the ledger records them, with the lane split as the
 sprint's shape in one table:
 
 | witness | lupin | wolfc | native | why |
@@ -7676,7 +7666,7 @@ sprint's shape in one table:
 | `net/unix/refused_row.lu` | unsupported | run | run | the stale-socket recipe is `fs.move_file` |
 | `net/unix/comptime_refuses.lu` | unsupported | run | run | lupin has no comptime tier; both wolf rungs give `E0701` twice |
 
-**The mtime audit.** All six witnesses, `std/net/unix/unix.lu`,
+The mtime audit. All six witnesses, `std/net/unix/unix.lu`,
 `std/net/net.lu`, `tests/ledger.toml` and `xtask/src/anchors.rs` were
 last modified before run 2 began and none was touched between runs 2 and
 3; run 3 ran over the committed tree at `8c93bfa` with a clean working
@@ -7686,46 +7676,47 @@ cover-the-edits lesson).
 
 ## sc37 — wolf-std#7: the RED came first, and that is the whole proof
 
-**The order was the deliverable, not a formality.** wolf-std#7 asked for
+The order was the deliverable. wolf-std#7 asked for
 one thing before any edit: install lupin 0.1.26 fresh-inode and
-RE-MEASURE, so that the stale words are caught by the runner rather than
-corrected by a lane that already knew the answer. That is what happened,
-and the sequence is worth stating precisely because a reader who sees
+re-measure, so that the runner catches the stale words before a lane
+that already knew the answer can correct them. That is what happened,
+and the sequence is stated precisely because a reader who sees
 only the final green cannot tell the difference between a ledger that
 was measured and a ledger that was decided.
 
-1. Verified the machine: `wolf 0.2.5 (wolfgang, pin 6ade878)` — already
-   installed, not rebuilt. `lupin 0.1.25 … at pin 982f857`, inode
-   132528014, mtime 2026-09-03 17:57.
+1. Verified the machine: `wolf 0.2.5 (wolfgang, pin 6ade878)` was already
+   installed and was not rebuilt.
+   `lupin 0.1.25 … at pin 982f857`, inode 132528014, mtime
+   2026-09-03 17:57.
 2. Built wolf-interp `v0.1.26` = `5e774a2` and installed it fresh-inode
-   (the sc26 SIGKILL rule): **inode 132528014 → 135873958**, size
+   (the sc26 SIGKILL rule): inode 132528014 → 135873958 and size
    5043664 → 5089584. `lupin 0.1.26 (wolf-interp, reference interpreter
    at pin 982f857)`.
-3. Ran `cargo xtask std-test` with **not one word of `tests/ledger.toml`
-   touched**. It was **RED**, and the last line was `xtask: RED`.
+3. Ran `cargo xtask std-test` with not one word of `tests/ledger.toml`
+   touched. It was red, and the last line was `xtask: RED`.
 4. Only then were the words rewritten.
 
-**THE BRIEF THIS LANE WAS HANDED WAS WRONG ABOUT THE MACHINE, AND THE
-ISSUE WAS RIGHT.** The orchestrator's instruction said "the machine
+The brief this lane was handed was wrong about the machine and the
+issue was right. The orchestrator's instruction said "the machine
 already runs wolf 0.2.5 and lupin 0.1.26 — verify both and record, don't
 rebuild what is already correct". Half of that was true. `wolf` was
-0.2.5 and was left alone; `lupin` was **0.1.25**, three days old.
-wolf-std#7's own text had it exactly right — "this repo's gauntlet runs
-against the MACHINE lupin, still 0.1.25" — so the instruction to
+0.2.5 and was left alone; `lupin` was 0.1.25 and three days old.
+wolf-std#7's own text had it right, "this repo's gauntlet runs
+against the MACHINE lupin, still 0.1.25", so the instruction to
 *verify* is the instruction that paid. A lane that had taken "already
 runs it" on trust would have run the gauntlet against 0.1.25, seen
-green, and reported wolf-std#7 as needing no work at all. **Recorded as
-the sprint's first flagged ambiguity**: verify beats accept, and the
+green, and reported wolf-std#7 as needing no work at all. Recorded as
+the sprint's first flagged ambiguity: verify beats accept, and the
 issue beat the brief.
 
 A second false start is recorded for the same reason. Probing
-`net_adopt_listener` and `os_spawn_with` with **`wolf run --checked`**
-answered `io` and `spawned` — which reads as a flat contradiction of
+`net_adopt_listener` and `os_spawn_with` with `wolf run --checked`
+answered `io` and `spawned`, which reads as a flat contradiction of
 `[os.proc.inherit]`'s "the checked machine refuses both BY NAME", and
 was one step away from being filed upstream as a spec/implementation
-divergence. `wolf run --checked` **is not the checked machine**: it runs
+divergence. `wolf run --checked` is not the checked machine: it runs
 the native build. The rig's own lane is `wolf conform-run --checked`,
-and under it both calls refuse by name, with the construct named, at
+and under it both calls refuse, with the construct named, at
 phase `mem`:
 
 - `unsupported — fd inheritance across os_spawn_with in checked execution`
@@ -7737,7 +7728,7 @@ reaches for `conform-run` and not for `run`.
 
 ### The RED, quoted, and the ten rows it named
 
-The runner named **ten** rows, in two distinct shapes:
+The runner named ten rows, in two shapes:
 
 ```
 tests/hex/encode_non_byte_refused.lu [lupin]: ledger says `divergent(trap(assert))`,
@@ -7748,32 +7739,33 @@ tests/fs/invalid_row.lu [lupin]: ledger says `unsupported`, observed `run`
   tests/ledger.toml in its own commit)
 ```
 
-**Eight `divergent(…)` carriers**, every one of them saying *the
-divergence moved* — `hex/encode_non_byte_refused`,
+Eight `divergent(…)` carriers, every one of them saying *the
+divergence moved*: `hex/encode_non_byte_refused`,
 `net/write_bytes_invalid_row`, `x/crypto/sha2/non_byte_refused`,
 `chacha20/non_byte_refused`, `curve25519/non_byte_refused`,
 `x/tls/record/non_byte_refused`, `handshake/non_byte_refused`,
 `cert/non_byte_refused`.
 
-**Two corpus twins**, saying *deeper than the ledger claims* —
+Two corpus twins say *deeper than the ledger claims*:
 `fs/invalid_row` and `x/crypto/p256/non_byte_refused`.
 
 All ten directives are `check: fail(E0401)` at `phase: typecheck`, so
-the honest new word for all ten is the same: **`run`**. is37 closed
-wolf-interp#62 — the byte's DOMAIN is a resolve-time refusal now and not
-only the type name — so `push(256)` into a `List[byte]` is `E0401` at
-`resolve`, with span parity against wolfc, where 0.1.25 stored 256
-dynamically and executed the program to its honest end.
+the new word for all ten is the same, `run`. is37 closed
+wolf-interp#62, so the byte's domain is a resolve-time refusal now and
+not only the type name, and `push(256)` into a `List[byte]` is `E0401`
+at `resolve`, with span parity against wolfc, where 0.1.25 stored 256
+dynamically and executed the program to its end.
 
-`divergent(…)` returns to **ZERO carriers**, the second time in its life
-(sc28 emptied it, sc35 refilled it). The word stays in the vocabulary:
-twice used, twice retired on a release, on purpose.
+`divergent(…)` returns to zero carriers, the second time in its life
+(sc28 emptied it, sc35 refilled it). The word stays in the vocabulary,
+twice used and twice retired on a release.
 
 ### The prediction was written first, and TWO of the ten were missed
 
-sc37 wrote its drift prediction before running anything. On the eight it
-was exact — the rows, the direction, and the reason. On the two corpus
-twins **it was wrong**, and the miss is more instructive than the hits:
+The sc37 sprint wrote its drift prediction before running anything. On
+the eight it was exact: the rows, the direction, and the reason. On the
+two corpus twins it was wrong, and the miss is more instructive than the
+hits:
 
 > PREDICT the two corpus twins (`fs/invalid_row`,
 > `p256/non_byte_refused`) are already `unsupported`/ordinary words and
@@ -7781,10 +7773,10 @@ twins **it was wrong**, and the miss is more instructive than the hits:
 > unrelated decline, which is a change in MECHANISM, not in the observed
 > word.
 
-The mechanism change **is** a word change. A program refused at
+The mechanism change is a word change. A program refused at
 `typecheck` never reaches the tier that was declining it, so
 `unsupported` became `run`. The reasoning was about how the interpreter
-gets to its answer; the ledger records what the runner OBSERVES. Those
+gets to its answer; the ledger records what the runner observes. Those
 are not the same thing, and this file has now paid for the distinction
 twice (sc35's `divergent` vocabulary was the first time). The lesson is
 recorded in `tests/ledger.toml`'s own sc37 header, where the next lane
@@ -7792,7 +7784,7 @@ will meet it.
 
 ## sc37 — the wolf bump: predicted in writing, and the prediction held
 
-**`982f857` (v0.2.4) → `6ade878` (v0.2.5), 42 commits.** The prediction
+`982f857` (v0.2.4) → `6ade878` (v0.2.5), 42 commits. The prediction
 was written before any measurement and is reproduced here verbatim in
 its operative half:
 
@@ -7806,14 +7798,14 @@ its operative half:
 > the wolfc column's vocabulary is an error CODE, never rendered
 > diagnostic text.
 
-**Measured:** zero existing rows moved, on any of the three columns.
-Anchors **417 → 422**, `+5 / −0` — and *both directions were checked*,
-because a regen can silently DROP an anchor (the lesson wolf-lang#177
+Measured: zero existing rows moved, on any of the three columns.
+Anchors 417 → 422 at `+5 / −0`, and *both directions were checked*,
+because a regen can silently drop an anchor (the lesson wolf-lang#177
 paid for). The five added are `os.cpus`, `os.net.listen.opts`,
-`os.net.wait`, `os.proc`, `os.proc.inherit`. #238 moved nothing, exactly
-as predicted and for the predicted reason.
+`os.net.wait`, `os.proc`, `os.proc.inherit`. #238 moved nothing, as
+predicted and for the predicted reason.
 
-**The doctor's reading, and the three pins.**
+Here is the doctor's reading, and the three pins.
 
 ```
 doctor: lupin — /Users/mfwolffe/.local/bin/lupin (source: PATH)
@@ -7826,17 +7818,17 @@ doctor: wolf — /Users/mfwolffe/.local/bin/wolf (source: PATH)
 doctor: native rung — libwolf_rt.a at … (lane lit)
 ```
 
-**All three WOLF-side pins land on one sha again**: the binary's own
+All three wolf-side pins land on one sha again: the binary's own
 `--version` pin, `vendor/tools.toml`, and `vendor/upstream/PIN` with the
 submodule at the same commit (`sync-pin: snapshot == submodule at pin —
 OK`). The native rung is lit at the new pin.
 
-**lupin does not join them, and the sc35 note is REVERSED.** sc35
-recorded, in capitals, that lupin's conformance pin was AHEAD of this
-repo's data pin for the first time ever — five commits ahead. lupin
+lupin does not join them, and the sc35 note is reversed. The sc35 sprint
+recorded, in capitals, that lupin's conformance pin was ahead of this
+repo's data pin for the first time ever, five commits ahead. lupin
 0.1.26 conforms to the same `982f857`, and the data pin has now moved 42
-commits past it, so the same relationship is inverted: the reference
-machine is **42 commits behind** the data pin. Nothing is red about it
+commits past it, so the relationship is inverted: the reference
+machine is 42 commits behind the data pin. Nothing is red about it
 (two moving upstreams; doctor reports the pairing and never gates it,
 F-0064) but it has a concrete cost with a name, and that cost is F-0110.
 
@@ -7848,7 +7840,7 @@ have. It now describes the truth.
 ## F-0110 — the first lane word owed to a release DATE
 
 The four std surfaces sc37 lands are reachable on both wolf lanes and on
-**neither rung** of the reference machine, because lupin 0.1.26 conforms
+neither rung of the reference machine, because lupin 0.1.26 conforms
 to `982f857` and s137 landed after it. The refusal is not a decline:
 
 ```
@@ -7858,28 +7850,28 @@ unsupported: `net_listen_with` does not resolve
 
 The interpreter has never been shown these names. That makes six ledger
 rows read `lupin = "unsupported"` for a reason that is a calendar, and
-it is **not** a `divergent(…)`: the two machines do not disagree about
+it is not a `divergent(…)`: the two machines do not disagree about
 what a program means; one of them has not been given the program.
 
-It also **re-arms `LUPIN_TIER_WAIVERS`** for the third time in the
+It also re-arms `LUPIN_TIER_WAIVERS` for the third time in the
 list's life, with three entries sharing one finding name. That constant's
-own doc block predicted this exact case and said what it would cost:
+own doc block predicted this case and said what it would cost:
 
 > the mechanism itself deliberately stays: a std surface will land on the
 > wolf lanes ahead of a lupin release again, and the next entry costs a
 > finding name, not plumbing.
 
-It cost a finding name and not plumbing. The needles key CALLS
+It cost a finding name and not plumbing. The needles key calls
 (`net.listen_with`, `net.wait`, `os.cpus`) and never modules, so
-`std.net`'s other doc examples — and `net.listen_opts`, which is pure std
-code and runs on all three lanes — stay gated everywhere. The list's unit
+`std.net`'s other doc examples, and `net.listen_opts`, which is pure std
+code and runs on all three lanes, stay gated everywhere. The list's unit
 test moved from asserting emptiness to asserting that every entry is a
-NAMED, NARROW debt, which is what the emptiness was standing in for.
+named, narrow debt, which is what the emptiness was standing in for.
 
 F-0110 retires at the first lupin conforming past `6ade878`, and retiring
 it touches no test and no witness: six ledger words and three waiver
-entries. Not filed upstream — nothing is defective, and is38's release is
-the exit.
+entries. It is not filed upstream, because nothing is defective, and
+is38's release is the exit.
 
 ## sc37 — the four surfaces, and the house shapes held
 
@@ -7893,58 +7885,59 @@ runtime; not one had to be renegotiated.
 | `os.cpus` propagates `io` and never defaults to 1 | yes | `tests/os/cpus.lu`'s third relation, `fallback_unused`, exists only to make that visible |
 | `wait` returns a possibly-empty list, not an error | yes | `tests/net/wait_readiness.lu`'s first relation, `empty_is_answer` |
 
-**`std.os` is a new module for one function, and that is a deliberate
-call.** `[os.cpus]` is §5 of upstream's `11-os.md`, "The machine's
-size". `std.env` is the program's ARGUMENTS and the host's ENVIRONMENT —
-things the program was handed — and a core count is neither.
+`std.os` is a new module for one function, and that is a judgement
+call. `[os.cpus]` is §5 of upstream's `11-os.md`, "The machine's
+size". `std.env` is the program's arguments and the host's environment,
+things the program was handed, and a core count is neither.
 `std.process` starts and reaps children, and "how many should I start"
-is the question asked BEFORE a `Command` exists. So the count went to a
-module named for the machine rather than into either neighbour. Flagged
-as a judgement call, not a derivation: the contract named `std.os.cpus`
-and the spec's own section heading agrees, which is the whole of the
-argument.
+is the question asked before a `Command` exists. So the count went to a
+module named for the machine instead of into either neighbour. Flagged
+as a judgement call and not a derivation: the contract named
+`std.os.cpus` and the spec's own section heading agrees, which is the
+whole of the argument.
 
-**`net.wait` takes raw descriptors, and that is forced rather than
-chosen.** A ready set mixes listeners and streams — that is the point of
-it — and wolf has no sum type at this pin that could hold both. So the
+`net.wait` takes raw descriptors, and that is forced rather than
+chosen. A ready set mixes listeners and streams, which is the point of
+it, and wolf has no sum type at this pin that could hold both. So the
 argument is the `fd` field both `Listener` and `Socket` already publish
 (reading it is legal by `Listener`'s own doc), and the module documents
-the idiom rather than hiding it. `[os.net.wait]`'s own signature is
+the idiom instead of hiding it. `[os.net.wait]`'s own signature is
 `List[int]` for the same reason.
 
-**`reuse_port` asserts TWO guarantees and deliberately not a third.**
+`reuse_port` asserts two guarantees and not a third.
 `tests/net/reuse_port.lu` pins *every dial is accepted by SOME member*
 and *the survivor takes every dial after the others close*, and asserts
-nothing about WHICH member — because linux distributes accepts by a
+nothing about which member, because linux distributes accepts by a
 4-tuple hash while macOS hands every SYN to the newest bound socket.
-Measured on this runner, macOS's posture is exactly as the clause states
+Measured on this runner, macOS's posture is as the clause states
 it: with two listeners sharing a port, `net.wait` over the pair answered
-a single-element subset naming the SECOND (newest) socket every time.
+a single-element subset naming the second (newest) socket every time.
 A witness that asserted distribution would pass on linux and fail here,
 and pinning a host's scheduling as if it were the language's contract is
 the mistake the clause spends three sentences preventing. The `some_member`
-relation is measured through `net.wait` rather than `accept` precisely
-because accept blocks and the whole question is which listener it would
+relation is measured through `net.wait` and not `accept`, because
+accept blocks and the question is which listener it would
 block on.
 
-**`adopt_rows.lu` is the most uneven row in the repository and every
-column has its own reason.** The adoptable case is genuinely unreachable
+`adopt_rows.lu` is the most uneven row in the repository and every
+column has its own reason. The adoptable case is genuinely unreachable
 in a rig that runs one program per test with no parent to hand it a
-descriptor, and the file says so rather than faking a parent. What IS
-reachable is every refusal, which is the half a program has to survive:
-a non-socket (`0`), a negative number, an absurd number, and — the trap
-a reader is likeliest to fall into — **this process's own `Listener`
-handle**, which is a small index into the machine's socket table and not
+descriptor, and the file says so instead of faking a parent. Every
+refusal is reachable, which is the half a program has to survive:
+a non-socket (`0`), a negative number, an absurd number, and the trap
+a reader is likeliest to fall into, this process's own `Listener`
+handle, which is a small index into the machine's socket table and not
 an OS descriptor at all. All four are `io`, never a trap and never a
 wrapped stranger.
 
-**There is no `std.process` half of the inherit pair at this pin.**
-`os_spawn_with` exists upstream and is deliberately not wrapped: it is a
-`std.process` change with its own `Command` question — whether a
-`Command` grows an inherit set or the spawn takes one — and sc37 landed
-the acquisition half alone rather than guess at the builder. Until it
-lands, the PARENT half of a prefork server is reachable only through the
-builtin. Recorded as a residue, not a design.
+There is no `std.process` half of the inherit pair at this pin.
+`os_spawn_with` exists upstream and is not wrapped: it is a
+`std.process` change with its own `Command` question (whether a
+`Command` grows an inherit set or the spawn takes one), and the sc37
+sprint landed the acquisition half alone instead of guessing at the
+builder. Until it lands, the parent half of a prefork server is
+reachable only through the builtin. Recorded as a residue and not a
+design.
 
 ### The six witnesses as the ledger records them
 
@@ -7959,18 +7952,19 @@ builtin. Recorded as a residue, not a design.
 
 ## F-0103 re-probed at `6ade878` — unmoved, and this time the span had a compiler in it
 
-**The prediction, written from the span before the probe.** sc36 could
-call its own re-probe a formality because the v0.2.3..v0.2.4 span
-touched not one `.rs`. This span is different: 42 commits across sema,
-wir, codegen, rt and the checked machine. So "unmoved" was a real
-prediction, and it was made by reading the span — everything in it is
-s137's server surface plus a diagnostic underline clamp, a `zext from
+The prediction was written from the span before the probe. The sc36
+sprint could call its own re-probe a formality because the
+v0.2.3..v0.2.4 span touched not one `.rs`. This span is different: 42
+commits across sema, wir, codegen, rt and the checked machine. So
+"unmoved" was a real prediction, and it was made by reading the span.
+Everything in it is s137's server surface plus a diagnostic underline
+clamp, a `zext from
 bool` verification fix, a `channel[bool]` ICE fix, and `net_wait`'s poll
-moving beside the reactor. **Nothing in it touches mem-phase ARGUMENT
-lowering.**
+moving beside the reactor. Nothing in it touches mem-phase argument
+lowering.
 
-**Measured, each probe in its own directory, macOS arm64.** The two
-files differ in exactly one character — the loop bound — which was
+Measured, each probe in its own directory, macOS arm64. The two
+files differ in one character, the loop bound, and that was
 verified mechanically rather than by eye:
 
 | probe | loop bound | takes the row? | lupin | wolfc `--checked` | wolf `--native` |
@@ -7979,80 +7973,79 @@ verified mechanically rather than by eye:
 | f18 | `k < 10` | **yes** | `exit(0)` `alpha:0` | **`unsupported` — `control flow in an argument`, phase `mem`** | `exit(0)` `alpha:0` |
 
 sc35's trigger sentence stands verbatim at a third pin, and so does the
-consequence that makes it more than a lowering gap: **`unsupported` here
-is a property of an EXECUTION, not of a program.** Two files differing
+consequence that makes it more than a lowering gap: `unsupported` here
+is a property of an execution, not of a program. Two files differing
 in one digit; one runs on the checked lane and one does not.
 
-**The warning sc35 paid for twice was honoured.** `alpha:0` on lupin and
-native is the proof the probe TOOK the row; had it printed `alpha:2`,
+The warning sc35 paid for twice was honoured. `alpha:0` on lupin and
+native is the proof the probe took the row; had it printed `alpha:2`,
 the probe would have missed and any "heal" read off it would have been
-the third published false heal. wolf-lang#201 is **OPEN**. Downstream
+the third published false heal. wolf-lang#201 is open. Downstream
 state unchanged: `tests/option/or_else_default.lu`, `exists_marking.lu`
 and `is_none_marking.lu` keep `wolfc = "unsupported"`, and a green
 gauntlet over that untouched ledger is the assertion.
-`std.x.tls.client`'s header keeps teaching **bind, then name**.
+`std.x.tls.client`'s header keeps teaching bind, then name.
 
 ## The residues, re-probed at `6ade878` / `0.1.26`
 
-- **The chars-pairs tuple list is refused at its ELEVENTH consecutive
-  pin.** `List[(int, int)]()` is `unsupported — this prelude container
+- The chars-pairs tuple list is refused at its eleventh consecutive
+  pin. `List[(int, int)]()` is `unsupported — this prelude container
   instantiation (generic data)` at `resolve` on both wolf rungs; lupin
   runs it (`pairs: 1`). Eleven pins. Unlike sc36's re-probe this one was
-  not a formality — the span contains a compiler — and the construct
+  no formality, because the span contains a compiler, and the construct
   string is byte-identical to the one sc36 recorded.
-- **F-0096 refuses verbatim.** `s.get(0..^2)` is `unsupported —
+- F-0096 refuses verbatim. `s.get(0..^2)` is `unsupported —
   open-ended or end-relative ranges (slicing)` at `resolve` on both
   rungs; lupin runs it and prints `hel`.
-- **`in(r)` — both wolf rungs unmoved, and LUPIN'S WORDING IS UNMOVED
-  TOO, which is the thing sc36 asked to be checked.** Both spellings are
+- `in(r)`: both wolf rungs unmoved, and lupin's wording is unmoved too,
+  which is the thing sc36 asked to be checked. Both spellings are
   `unsupported — methods on generic std data (the std surface)` at
   `resolve` on both wolf rungs. sc36 warned that the next re-probe must
-  compare lupin against the STRING and not against a bare "unsupported",
+  compare lupin against the string and not against a bare "unsupported",
   or it would report motion that is only prose. Compared against the
-  string: lupin 0.1.26 still says **"`List` has no method `in` in this
-  machine's std subset"**, byte-identical. The instruction was followed
+  string: lupin 0.1.26 still says "`List` has no method `in` in this
+  machine's std subset", byte-identical. The instruction was followed
   and it is recorded that it was.
-- **A `str` still charges NO named region's ledger on ANY tier.** 200
+- A `str` still charges no named region's ledger on any tier. 200
   fresh interpolated strings built inside `region r { … }` leave
-  `region_bytes(r)` at **0**: `before 0 after 0`, byte-identical stdout
+  `region_bytes(r)` at 0: `before 0 after 0`, byte-identical stdout
   across lupin, checked and native. (The `sink` total differs from
-  sc36's because the probe's string literals differ; the load-bearing
-  numbers are the two zeroes and the three-lane identity, not the sink.)
-  `[mem.region.account.1]` still scopes the gap to the NATIVE tier
-  alone; it remains true of every tier.
-- **`reserve(n)`, `graphemes` — no probe owed.** Nothing in the span is
+  sc36's because the probe's string literals differ; the numbers that
+  matter are the two zeroes and the three-lane identity, and not the
+  sink.) `[mem.region.account.1]` still scopes the gap to the native
+  tier alone; it remains true of every tier.
+- `reserve(n)` and `graphemes` owe no probe. Nothing in the span is
   a capacity, string-backing or segmentation-tables commit.
-- **The `divergent(…)` residue is DISCHARGED, not carried** — see
+- The `divergent(…)` residue is discharged rather than carried; see
   wolf-std#7 above. This is the first sprint in three that hands its
   successor no `divergent` row.
 
 ## F-0099 re-counted at the new pin — the gap grew by five, and sc37 pays it again
 
-sc36 re-counted F-0099's gap at four namespaces and 65 anchors. At
-`6ade878` it is **four namespaces and 70**: `type` 24, **`os` 22** (was
-17), `ct` 14, `diag` 10 — every one of them in `anchors.json` and none
-admitted by `[conf.anchor.ns]`. All five of the sprint's new anchors
-landed in `os`, which is precisely the namespace sc36 was already unable
-to cite.
+The sc36 sprint re-counted F-0099's gap at four namespaces and 65
+anchors. At `6ade878` it is four namespaces and 70: `type` 24, `os` 22
+(was 17), `ct` 14, `diag` 10; every one of them in `anchors.json` and
+none admitted by `[conf.anchor.ns]`. All five of the sprint's new anchors
+landed in `os`, the namespace sc36 was already unable to cite.
 
-The cost is the same as sc36's and one sprint more concrete: sc37
-implements `[os.net.listen.opts]`, `[os.net.wait]`, `[os.proc.inherit]`
-and `[os.cpus]`, and **not one of its six witnesses may cite the clause
-it conforms to.** They carry the forward tags `std.net` and `std.os`
-instead, exactly as sc36's unix witnesses carry `std.net.unix`. Still
-not fixed here: the fix is the #120 append upstream (the precedent that
-admitted `pkg`), and this list follows the clause the day it lands.
+The cost is the same as sc36's and one sprint more concrete: the sc37
+sprint implements `[os.net.listen.opts]`, `[os.net.wait]`,
+`[os.proc.inherit]` and `[os.cpus]`, and none of its six witnesses may
+cite the clause it conforms to. They carry the forward tags `std.net`
+and `std.os` instead, as sc36's unix witnesses carry `std.net.unix`. The
+fix is still the #120 append upstream (the precedent that admitted
+`pkg`), and this list follows the clause the day it lands.
 
 ## A rig-hygiene note: the shared scratchpad is not durable
 
-sc37 wrote its drift prediction to the session scratchpad before
-measuring, which is the discipline. Mid-sprint a CONCURRENT LANE pruned
-that directory — 792 entries to 575 — deleting both the prediction file
-and a running gauntlet's redirected log out from under an open file
-descriptor. The prediction was reconstructed verbatim into a private
-directory and is quoted in this file, which is the durable copy that
-actually matters; the log had to be re-derived from the runner's exit
+The sc37 sprint wrote its drift prediction to the session scratchpad
+before measuring, which is the discipline. Mid-sprint a concurrent lane
+pruned that directory from 792 entries to 575 and deleted both the
+prediction file and a running gauntlet's redirected log out from under an
+open file descriptor. The prediction was reconstructed verbatim into a
+private directory and is quoted in this file, which is the durable copy;
+the log had to be re-derived from the runner's exit
 status. Recorded because the quiet-rig convention says nothing about the
-scratchpad being SHARED, and a lane whose evidence lives only there can
-lose it without noticing. **Evidence that matters belongs in the
-repository, in a commit — not in `/tmp`.**
+scratchpad being shared, and a lane whose evidence lives only there can
+lose it without noticing. Evidence that matters belongs in the
+repository, in a commit, and not in `/tmp`.
