@@ -1236,6 +1236,55 @@ rather than a new tier. Five additions.
   the `else` arm was never taken, so the property is measured and not
   merely promised.
 
+### §14 amendments (sc39): a set on the call, and a pair that names itself
+
+- **WHEN A SURFACE IS A BORROWED SET RATHER THAN A CONFIGURED ONE, PUT IT
+  ON THE CALL AND NOT ON THE BUILDER.** `process.start_with(c, inherit)`
+  takes its listeners as an argument of the spawn; a `Command` never
+  holds them. The test is LIFETIME, not taste: the set belongs to the
+  master for its whole life and every spawn is an event that borrows it,
+  so a builder would have to be reset per spawn and a reused one would
+  carry state the second spawn never asked for. Say it as a rule — **a
+  builder field that must be cleared between uses is the wrong shape for
+  that value.** Secondary and pointing the same way: where the ORDER of a
+  collection is the contract (`[os.proc.inherit]` numbers descriptors
+  `3, 4, …` in the order given), an ordered argument at the call is where
+  a reader looks for it and a builder field is not.
+- **A TYPED CONTAINER IS RIGHT WHEN THE SET CANNOT MIX, AND THE
+  EXCEPTION HAS TO BE STATED WHERE IT DIFFERS.** `net.wait` takes
+  `List[int]` because a ready set mixes listeners and streams and wolf
+  has no sum type that can hold both; `start_with` takes
+  `List[net.Listener]` because the only thing a child can do with a
+  handed-down descriptor is adopt it as a listener. Two neighbouring
+  calls with different containers is a smell unless the reason is written
+  ON both, so it is — and the day a sum type exists, both change
+  together rather than one at a time.
+- **LINT A CLAUSE PAIR FROM BOTH ENDS, NOT ONE.** sc38's retracted-
+  sentence lint watched one clause. A PAIR spanning two modules can rot
+  from either side and no gauntlet reads either sentence:
+  `net.adopt_listener` said "there is no `std.process` half of this pair"
+  for two sprints after `[os.proc.inherit]`'s parent half was decided.
+  When a surface exists only as half of a handshake, **each half's doc
+  must name the other's function and a test must hold both needles**, so
+  that withdrawing or rewording one forces a human to read the other in
+  the same commit.
+- **A REFUSAL CAN BE A ROW ON ONE HOST AND A WHOLE-PROGRAM VERDICT ON
+  ANOTHER, AND A WITNESS MUST BE WRITTEN FOR BOTH.** A non-empty inherit
+  set is a catchable `unsupported` ROW on windows and a whole-program
+  `unsupported` on the two machines that INTERPRET a program (the
+  descriptor would go to the interpreter's child). So the handler carries
+  an `unsupported` arm the measuring lane never takes — dead code where
+  it runs, and the only honest shape for the hosts where it is not.
+  Declare the row; write the arm; name all three postures in the ledger.
+- **A CLAIM ABOUT A LANE NOTHING LIGHTS IS NOT A CONTRACT, IT IS A
+  RUMOUR.** `std.process` asserted for four sprints that a child's stdio
+  was null-wired. Nothing could check it, because no test in the
+  repository ran a child (F-0066), and the first test that did — written
+  for something else — falsified it in one line (F-0111). **When a module
+  documents behaviour of a tier no witness reaches, mark the sentence as
+  unmeasured rather than stating it flat**, and treat lighting that lane
+  as the occasion to re-read every such sentence in the file.
+
 ## Review record
 
 - 2026-09-03, sc36 (§1's no-overloading rule and §14's os posture, applied
