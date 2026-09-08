@@ -1,11 +1,11 @@
 # Phase A census — stdc01-core, sc01 through sc06
 
 The campaign's closing count, written at the sc06 pins (wolfc trunk
-`29a9d9c`, lupin 0.1.4). Three questions, answered with numbers that can
+`29a9d9c`, lupin 0.1.4). It answers three questions with numbers that can
 be re-derived from the tree: what shipped, what is blocked and on what,
-and what each upstream fix would unblock. The last one is the point — the
-fan-out sprints should be able to read this file and know the size of
-their own prize.
+and what each upstream fix would unblock. The third one matters most to
+the fan-out sprints, which should be able to read this file and know the
+size of their own prize.
 
 ## 1. Headline
 
@@ -21,11 +21,10 @@ their own prize.
 | fenced doc examples, extracted and RUN | **211** |
 | findings filed | **42** — 15 retired/closed, 1 narrowed, 2 part-retired, 24 open |
 
-The planned inventory across the six sprint contracts was **303**
+The planned inventory across the six sprint contracts was 303
 (30 + 68 + 64 + 74 + 48 + 19). Delivered-with-a-body is 253 free
-functions; the gap is not slippage but the blocked inventory below, every
-item of which is a reviewed contract in a module header with a finding
-behind it.
+functions, and the gap is the blocked inventory below: every item of it
+is a reviewed contract in a module header with a finding behind it.
 
 ## 2. Per sprint
 
@@ -40,13 +39,14 @@ behind it.
 
 ## 3. The blocked inventory, by blocker
 
-98 named functions have a reviewed contract and no body. Grouped by what
-would unblock them — this is the table a fan-out sprint should read.
+98 named functions have a reviewed contract and no body. They are grouped
+here by what would unblock them, which is the table a fan-out sprint
+should read.
 
 ### wolf-lang#17 — the boundary primitive (F-0018 / F-0035) · **30 functions**
 
-The largest prize in the campaign, and one primitive buys all of it:
-`str.get(a..b) -> str ! {none}`, or a byte accessor, or `chars()`.
+This is the largest prize in the campaign, and one primitive buys all of
+it: `str.get(a..b) -> str ! {none}`, or a byte accessor, or `chars()`.
 
 - `std.str` (15): `find`, `rfind`, `count`, `split`, `split_once`,
   `rsplit_once`, `ends_with`, `strip_suffix`, `replace`, `replacen`,
@@ -57,9 +57,9 @@ The largest prize in the campaign, and one primitive buys all of it:
 - `std.strbuf` (1): `push(c: char)` · `std.unicode` (1): `char.code`
 - `std.fmt` (1): `truncate_to` · `std.hex` (1): `encode(str)`
 
-It also has a **resolve-level half** that costs lanes rather than
-functions: a builtin `str` method anywhere in an imported module makes
-every importer `unsupported` at resolve under wolfc. That is why all 13
+It also has a resolve-level half, and what that one costs is lanes: a
+builtin `str` method anywhere in an imported module makes every importer
+`unsupported` at resolve under wolfc. That is why all 13
 `std.str`/`strbuf` tests are lupin-only and why sc06's
 `assert_starts_with` sits in the nursery.
 
@@ -73,28 +73,29 @@ cannot be declared at all.
   `symmetric_difference`, `is_subset`, `is_disjoint`
 - `std.deque` (10, the whole module): `push_back`, `push_front`,
   `pop_back`, `pop_front`, `front`, `back`, `len`, `is_empty`, `clear`,
-  `to_list` — with `std/x/deque_int` as the running monomorphic proof
+  `to_list`, with `std/x/deque_int` as the running monomorphic proof
 - `std.pool` (4): `has`, `len`, `capacity`, `clear` (the builtin exposes
   no liveness probe, length, capacity or iteration)
 - `std.list` (1): `reserve`
 
 ### c05 — closures · **23 functions**
 
-Not a finding; a campaign dependency. `std.list` 11 (`map`, `filter`,
-`fold`, `any`, `all`, `each`, `retain`, `count_if`, `min_by`, `max_by`,
-`position`), `std.map` 5 (`each`, `map_values`, `retain`, `merge`,
-`entry`), `std.search` 4 (`min_by`, `max_by`, `sum_by`,
-`partition_point`), `std.sort` 3 (`sort_by_key`, `sort_unstable`,
-`sort_dedup`).
+Closures have no finding of their own; they are a campaign dependency.
+`std.list` 11 (`map`, `filter`, `fold`, `any`, `all`, `each`, `retain`,
+`count_if`, `min_by`, `max_by`, `position`), `std.map` 5 (`each`,
+`map_values`, `retain`, `merge`, `entry`), `std.search` 4 (`min_by`,
+`max_by`, `sum_by`, `partition_point`), `std.sort` 3 (`sort_by_key`,
+`sort_unstable`, `sort_dedup`).
 
 ### wolf-lang#5 / #12 — trait dispatch (F-0002 / F-0004) · **8 functions blocked, 16 more non-executing**
 
-Blocked outright: `std.cmp.min_of`, `max_of` (reclassified this sprint —
-their original blocker F-0005 retired at the sc03 pin; what stops them
-now is `Ord.cmp` dispatch), and `std.list`'s six element-comparing
-functions, whose bodies live in `std/x/list_eq` and execute nowhere.
+Blocked outright are `std.cmp.min_of`, `max_of` (reclassified this
+sprint: their original blocker F-0005 retired at the sc03 pin, and what
+stops them now is `Ord.cmp` dispatch), and `std.list`'s six
+element-comparing functions, whose bodies live in `std/x/list_eq` and
+execute nowhere.
 
-Written but executing NOWHERE for the same reason: `std.sort.sort`,
+Written but executing nowhere for the same reason: `std.sort.sort`,
 `sort_by`, `is_sorted_by`, `std.search.binary_search_by`, and seven of
 `std.testing`'s thirteen assertions (`assert_eq`, `assert_ne`,
 `assert_lt`, `assert_le`, `assert_gt`, `assert_ge`, `assert_contains`).
@@ -109,7 +110,7 @@ the `limit`-not-`take` naming already ruled at wolf-lang#16).
 
 ### wolf-interp#16 — enum through a row (F-0037) · **2 functions**
 
-`std.json.get` and `std.json.at`, written, tested and WITHDRAWN because
+`std.json.get` and `std.json.at`, written, tested and withdrawn because
 every call missed, including the hits.
 
 ### wolf-lang#34, #35 — sc06's own two (F-0039, F-0040) · **2 functions, relocated not blocked**
@@ -122,7 +123,7 @@ stops its diagnostic firing.
 ### Others · **2 functions**
 
 `std.strbuf.in(r)` (s37 region-placement plumbing) and
-`std.strbuf.reserve` (API-CONVENTIONS §8 — no capacity API without a
+`std.strbuf.reserve` (API-CONVENTIONS §8: no capacity API without a
 capacity, and the builtin exposes none). A third,
 `std.testing.assert_starts_with`, is relocated rather than blocked: it is
 written and executing in `std/x/testing_text`, counted with the nursery.
@@ -142,40 +143,40 @@ The four `fail` rows are the campaign's held divergences, one per
 finding: `list/mutate_while_iterating.lu` (E1001, F-0014),
 `range/is_empty.lu` (E0301, F-0030),
 `x/option_flatten/flatten_propagate.lu` (E0201, F-0039),
-`x/option_expect/expect_trap.lu` (E0401, F-0040). A rejection held as a
-ledger row is a finding that cannot rot.
+`x/option_expect/expect_trap.lu` (E0401, F-0040). Each one is held as a
+ledger row so that the finding behind it cannot rot.
 
-Most common lane triple: `run` / `unsupported` / `unsupported`, 65 tests
-— the shape of a library written against one executing implementation
-and two honest refusals. 13 tests run on all three.
+The most common lane triple is `run` / `unsupported` / `unsupported`, at
+65 tests, which is the shape of a library written against one executing
+implementation and two refusals. 13 tests run on all three.
 
-Beyond the ledger: 211 doc examples extracted from module docs and run
-(lupin must reach `exit(0)`; a compiler rung may refuse honestly, and a
+Beyond the ledger there are 211 doc examples extracted from module docs
+and run (lupin must reach `exit(0)`; a compiler rung may refuse, and a
 static rejection is a doc bug), and 200 pinned ulp reference values that
 both executing lanes reproduce bit-for-bit.
 
 ## 5. The findings ledger
 
-42 filed. **15 retired or closed upstream**: F-0001, F-0002, F-0003,
+42 filed. 15 retired or closed upstream: F-0001, F-0002, F-0003,
 F-0005, F-0006, F-0007, F-0008, F-0009, F-0010, F-0013, F-0017, F-0020,
-F-0021, F-0022, F-0023. **1 narrowed**: F-0012. **2 part-retired**:
-F-0024 (its lesson applied — the pin ritual's second gate, used three
-times now) and F-0025 (two of its three shapes fixed at lupin 0.1.4).
-**24 open**: F-0004, F-0011, F-0014, F-0015, F-0016, F-0018, F-0019,
+F-0021, F-0022, F-0023. 1 narrowed: F-0012. 2 part-retired: F-0024 (its
+lesson applied in the pin ritual's second gate, used three times now)
+and F-0025 (two of its three shapes fixed at lupin 0.1.4). 24 open:
+F-0004, F-0011, F-0014, F-0015, F-0016, F-0018, F-0019,
 F-0026, F-0027, F-0028, F-0029, F-0030, F-0031, F-0032, F-0033, F-0034,
 F-0035, F-0036, F-0037, and sc06's five new ones F-0038 through F-0042.
 
-Four of them are **silent wrong answers**, the class this track exists to
-catch, and all four were found by writing library code rather than by
-testing the implementation: F-0027 (`!=` on f64 is ordered natively),
-F-0036 (a colliding row tag rides out as a value), F-0037 (an enum
-through a row always misses), and lupin's own #15 (a mode-wrong call ran
-with no writeback), which the interpreter fixed at this sprint's pin.
+Four of them are silent wrong answers, the class this track exists to
+catch, and all four turned up while writing library code rather than
+while testing the implementation: F-0027 (`!=` on f64 is ordered
+natively), F-0036 (a colliding row tag rides out as a value), F-0037 (an
+enum through a row always misses), and lupin's own #15 (a mode-wrong call
+ran with no writeback), which the interpreter fixed at this sprint's pin.
 
-Six are **decision requests or amendments** rather than defects — the
-track's other output: F-0008 (the iterator protocol, adopted), F-0011
-(builtin versus std), F-0019 (the unicode tables budget, ruled), F-0028
-(the transcendentals and the intrinsics ask), F-0033 (spec §7.4 with a
+Six are decision requests or amendments rather than defects, the track's
+other output: F-0008 (the iterator protocol, adopted), F-0011 (builtin
+versus std), F-0019 (the unicode tables budget, ruled), F-0028 (the
+transcendentals and the intrinsics ask), F-0033 (spec §7.4 with a
 running reference implementation), F-0041 (the error-set alias surface).
 
 ## 6. The nursery clock
@@ -195,25 +196,25 @@ each has a named graduation trigger.
 | `x.option_expect` | 1 | a bottom type, or a divergence rule (wolf-lang#35) |
 | `x.testing_text` | 1 | `str` methods resolve in wolfc (wolf-lang#17) |
 
-If a resident is still here at the stdc02 closeout, D31 says delete it —
-and the reviewed contract in its header is what survives.
+If a resident is still here at the stdc02 closeout, D31 says delete it;
+the reviewed contract in its header survives.
 
 ## Postscript — what the sc07 pin bump did to this census
 
-Written at the sc06 pins and left as the historical record; one pin bump
-later (wolf trunk `f0da6e6`, sc07) three of its blockers moved, and
-`phase-b-census.md` carries the numbers:
+This census was written at the sc06 pins and left as the historical
+record. One pin bump later (wolf trunk `f0da6e6`, sc07) three of its
+blockers moved, and `phase-b-census.md` has the numbers:
 
-- **F-0015 retired** — a row raise executes across a module boundary, so
+- F-0015 retired: a row raise executes across a module boundary, so
   §4's "the shape of a library written against one executing
-  implementation" is no longer the whole story: the wolfc column went from
-  40 `run` rows to 100.
-- **F-0018's compiler half retired** — the boundary primitive landed as
+  implementation" is no longer the whole story, and the wolfc column went
+  from 40 `run` rows to 100.
+- F-0018's compiler half retired: the boundary primitive landed as
   `s.get(a..b) -> str ! {none}` inside an 18-method builtin `str` set, so
-  §3's 30-function prize is claimable on ONE lane (lupin's `str` subset has
+  §3's 30-function prize is claimable on one lane (lupin's `str` subset has
   not caught up). It is the next `std.str` sprint's to spend, and the
   Phase-B census records the decision that comes with it.
-- **F-0031 and F-0036's compiler half retired** (the format spec, and a
+- F-0031 and F-0036's compiler half retired (the format spec, and a
   colliding row tag riding out as a value). F-0036's interpreter half is
   now reproduced with a printed function value.
 
