@@ -42,8 +42,28 @@ use std::path::Path;
 // that can reject legal input. The two lists are different names and
 // both stand — `no_namespace_is_registered_and_reserved_at_once` holds
 // them apart.
+//
+// AND AGAIN, TWO DAYS LATER — `sched`, the twelfth, at wolf-lang `ed8f526`
+// (s139/#246). `spec/07-schedule-points.md` was ruled NORMATIVE and its
+// seven anchors published: 424 -> 431, additive, none dropped, no owner
+// moved. This one arrived the way `[conf.anchor.ns.admit]` says an
+// admission should: the re-vendored snapshot landed first and
+// `every_published_anchor_sits_in_a_registered_namespace` went RED naming
+// `sched` and 7 — upstream's own count, reached from the other side,
+// BEFORE a human read the issue. sc38 wrote that gate after finding
+// sc36's mock-backed pin was green and always would have been; one pin
+// bump later it fired on its first real event. The append and the
+// re-vendor are one commit, per the clause.
+//
+// Upstream fixed the ROOT CAUSE in the same change: four hand-copied
+// namespace lists there (link_check's owner map, anchor_index's ownership
+// match, its own REGISTERED_NS, spec_extract's document list) collapsed
+// into one NS_OWNERS table. This rig keeps ONE list and derives nothing
+// from it, so it has no copies to drift — what it lacked was the second
+// direction of the check, added below as
+// `every_registered_namespace_publishes_at_least_one_anchor`.
 pub const REGISTERED_NS: &[&str] = &[
-    "gram", "diag", "mem", "conc", "abi", "conf", "proto", "pkg", "ct", "type", "os",
+    "gram", "diag", "mem", "conc", "abi", "conf", "proto", "pkg", "ct", "type", "os", "sched",
 ];
 
 /// Reserved forward namespaces, same clause.
@@ -188,6 +208,43 @@ mod tests {
              of them a CI failure here. If [conf.anchor.ns] admits them upstream, \
              append them here in the SAME change ([conf.anchor.ns.admit]) and retire \
              F-0099."
+        );
+    }
+
+    /// The admission gate's OTHER half, and the direction r09's guards
+    /// could not see: a name in `REGISTERED_NS` that the pinned registry
+    /// publishes nothing for. That is the permissive side of
+    /// `[conf.anchor.ns.admit]` — it rejects nothing and fails nothing, so
+    /// it can only be found by asking. Two ways to get there: a name
+    /// appended here speculatively before upstream published it (an
+    /// admission running AHEAD of the clause instead of behind it, which
+    /// is how `pkg` lagged nine sprints in the mirror), or a pin bump that
+    /// withdraws a namespace's last anchor and leaves the entry stranded.
+    /// Either way the list has stopped describing the registry, which is
+    /// the only thing it is for. sc39 added this beside `sched`'s
+    /// admission because the issue that asked for `sched` asked for this
+    /// in the same breath, and because upstream's own s139 fix was
+    /// structural rather than instance-shaped.
+    #[test]
+    fn every_registered_namespace_publishes_at_least_one_anchor() {
+        let r = Registry::load(&crate::repo_root()).unwrap();
+        let published: BTreeSet<&str> = r
+            .anchors
+            .iter()
+            .filter_map(|a| a.split('.').next())
+            .collect();
+        let barren: Vec<&&str> = REGISTERED_NS
+            .iter()
+            .filter(|ns| !published.contains(*ns as &str))
+            .collect();
+        assert!(
+            barren.is_empty(),
+            "REGISTERED_NS admits namespace(s) {barren:?} that the pinned registry \
+             publishes NO anchor for — either the admission ran ahead of \
+             `[conf.anchor.ns]` (a name added here before upstream published it) or \
+             a pin bump withdrew the last anchor and stranded the entry. A namespace \
+             with nothing in it registers nothing; move it to FORWARD_NS if it is a \
+             reservation, or drop it."
         );
     }
 
