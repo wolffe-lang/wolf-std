@@ -1,7 +1,20 @@
 //! member: true
 //!
-//! std.process — build a command as an argument VECTOR, start it, wait for
-//! its exit code, kill it, and end this process. Stability tier: core.
+//! std.process — build a command as an argument VECTOR, start it — alone,
+//! or with a set of listeners handed down to it — wait for its exit code,
+//! kill it, and end this process. Stability tier: core.
+//!
+//! **The PARENT half of descriptor inheritance lives here** (`start_with`,
+//! sc39), and the child half is `std.net.adopt_listener` (sc37). A prefork
+//! master binds its listeners once, spawns each worker with the set, and
+//! each worker adopts by POSITION — descriptors `3, 4, …` in the order
+//! given, `[os.proc.inherit]`. Until sc39 that handshake was written
+//! across two tiers, the parent through the builtin and the child through
+//! `std.net`, which is the one thing wolf-std#6's consumer named that was
+//! wolf-std's to fix rather than a consumer's to accept (wolf-std#9). **The
+//! set is an argument of the SPAWN and never a field of the `Command`** —
+//! the reasoning is on `start_with`, and it is about lifetime: a listener
+//! set belongs to the master and each spawn borrows it.
 //!
 //! **There is no shell here, and there never will be.** The builtin tier
 //! takes an argv ARRAY and nothing else (`os_spawn(List[str])`), so a
@@ -67,15 +80,30 @@
 //! `0..255` on every tier-1 host, with `0` meaning success (`is_success`
 //! says so once so that no caller writes the convention out).
 //!
-//! **The stdio of a child is CLOSED at this pin** — `os_spawn` wires all
-//! three streams to the host's null device, so a child cannot read the
-//! parent's input and neither its output nor its diagnostics reach the
-//! parent's streams. That is a real limitation and not a simplification:
-//! it means this module can start a program and learn only how it EXITED.
-//! Pipes need a builtin surface that does not exist (F-0065), and every
-//! plausible workaround — a temporary file, a shell redirect — is either
-//! the shell this module refuses or a different program's business
-//! (`std.fs`).
+//! **A child's stdio is INHERITED, and this paragraph said the opposite
+//! for four sprints.** It was headed "the stdio of a child is CLOSED at
+//! this pin" and said `os_spawn` wired all three streams to the host's
+//! null device, so nothing a child wrote reached the parent's streams.
+//! **Measured at sc39 and false**: a self-spawned child's `print` lands
+//! in the PARENT's stdout on the native lane, and on the checked lane the
+//! child's diagnostics land on the parent's stderr. Both spawn builtins
+//! behave this way, with an empty inherit set and with a non-empty one.
+//! The claim was never checkable here, because until sc39 no test in this
+//! repository ran a child at all (F-0066); `tests/process/prefork_handoff.lu`
+//! is the first, and it is what caught this.
+//!
+//! So: a child's output and diagnostics go WHERE THIS PROGRAM'S GO, and a
+//! child can read this program's input. A library that spawns a helper is
+//! putting that helper's chatter into its caller's streams — plan for it.
+//! **What is still missing is CAPTURE, and F-0065 is unchanged in that
+//! half**: no builtin wires a pipe, so `output(c) -> str` has nowhere to
+//! read FROM even though the child is speaking. Inheriting is not
+//! capturing, and the two were being confused by one wrong sentence.
+//! Filed upstream as [wolf-lang#256](https://github.com/wolffe-lang/wolf-lang/issues/256):
+//! `[os.proc]` never states the posture, and `[os.proc.inherit]`'s
+//! "descriptors 0, 1 and 2 are the spawn's ordinary stdio" is the only
+//! sentence in the spec that touches it — "ordinary" being precisely the
+//! adjective that does not decide the question.
 //!
 //! **Waiting is what reaps, and the handle is consumed by it** (§14's
 //! handle rule, in its second home). `wait(take ch)` ends the `Child`'s
@@ -96,11 +124,12 @@
 //! ```text
 //! output(c: Command) -> str ! {not_found, denied, signal, io}
 //! stdin_text(mut c: Command, text: str)
-//!     A child's captured stdout, and text written to its stdin. No
-//!     builtin wires a pipe (F-0065): v0 stdio is null-wired, so there
-//!     is nothing to read and nowhere to write. This is the single
-//!     biggest hole in the module and the one the book's pargrep chapter
-//!     will feel first.
+//!     A child's CAPTURED stdout, and text written to its stdin. No
+//!     builtin wires a pipe (F-0065). The child's stdio is inherited,
+//!     not closed (sc39's correction above), so the child is speaking —
+//!     into this program's own streams, where nothing can read it back.
+//!     Inheriting is not capturing. Still the single biggest hole in the
+//!     module and the one the book's pargrep chapter will feel first.
 //! env_for(mut c: Command, name: str, value: str)
 //! current_dir(mut c: Command, path: str)
 //!     A child's environment and working directory. `os_spawn` inherits
@@ -122,18 +151,43 @@
 //!     Which signal killed it. The `signal` row carries no payload
 //!     because the builtin reports none; the day it does, the tag gains
 //!     a payload rather than a sibling (§12).
+//! run_with(c: Command, inherit: List[net.Listener]) -> int ! {…}
+//!     `start_with` + `wait`, the way `run` is `start` + `wait`. Absent
+//!     because the ONLY reason to hand a listener down is that the child
+//!     goes on serving after the parent returns to its loop, and a call
+//!     that blocks until the child exits is the opposite of that. `run`
+//!     earns its place for the commonest case; this one would have no
+//!     case at all, and a convenience nobody can use is surface (sc39).
 //! ```
 //!
-//! **Lanes, and one of them is dark by design.** The compiler's checked
-//! tier is the only lane that STARTS a process: it spawns real children.
-//! The native rung refuses the tier by name ("process builtins in native
-//! lowering (checked lane only at s40)") and refuses the whole module with
-//! it, including the pure builder, because lowering budgets a module by
-//! more than the body it needs. lupin declines the surface by design and
-//! says so — *this machine runs no child processes by design, so the tier
-//! is declined rather than mocked* — but it resolves module bodies LAZILY,
-//! so a program that only BUILDS commands runs there, which is why
-//! `tests/process/builder.lu` has two lanes where everything else has one.
+//! **Lanes, and the paragraph that used to stand here was out of date.**
+//! It said the checked tier was the only lane that starts a process and
+//! that the native rung refused the whole module by name ("process
+//! builtins in native lowering (checked lane only at s40)"). Both were
+//! true when written and neither is now: **s107 (`1b149ba`) crossed the
+//! process trio natively**, and the ledger has said `native = "run"` for
+//! every file in `tests/process/` since. lupin was declined by design at
+//! s40 and its conformance pin now carries the whole os family, so
+//! `not_found_row`, `forged_handle_io_rows`, `use_after_wait`,
+//! `exit_code` and `builder` are all THREE-lane today. The stale sentence
+//! survived four sprints because prose is what no gauntlet reads (sc38's
+//! lesson, one module over); it is corrected here at sc39 against the
+//! ledger, which is the artifact that measured.
+//!
+//! **`start_with` is the one function whose lanes are still uneven, and
+//! every word of it is a stated posture rather than a gap.** An EMPTY
+//! inherit set runs on all three lanes — `[os.proc.inherit]` makes it
+//! `os_spawn` with the program named apart, served everywhere. A
+//! NON-EMPTY set is refused BY NAME by two of them, in one construct
+//! string they both print verbatim — *fd inheritance across
+//! os_spawn_with in checked execution* — because each is a binary
+//! INTERPRETING a program, so a descriptor handed to "the program's
+//! child" would be handed to the interpreter's child. That is a
+//! whole-program `unsupported`, not a catchable row, so the non-empty
+//! witness is native-only; windows is the host that would answer the
+//! catchable `unsupported` ROW instead, for a different reason again (a
+//! `SOCKET` is not a small stable number a parent can name by position).
+//! Three refusals, three reasons, and none of them a calendar.
 //!
 //! **No test and no doc example in this module starts a real program**, and
 //! that is a portability statement rather than a shortcut: there is no
@@ -164,6 +218,8 @@
 //! nowhere at this pin: nothing in the library needs it, and a
 //! `process.exe()` whose only caller would be a test this module still
 //! cannot write is surface without a use.
+
+use std.net
 
 /// A program and its arguments, as the argument VECTOR the host receives.
 ///
@@ -298,9 +354,12 @@ pub fn argv(c: Command) -> List[str] {
 /// execute it; `io` for every other host failure. Never traps.
 ///
 /// The child inherits this process's environment and working directory,
-/// and its three standard streams are wired to the host's null device
-/// (F-0065): nothing it writes is visible to this program, and it cannot
-/// read this program's input. A started child MUST be waited for —
+/// and its three standard streams as well: its output and its
+/// diagnostics go where THIS program's go, and it can read this
+/// program's input (measured at sc39; the clause that said "null device"
+/// here was wrong, see the module header). What no caller can do is
+/// CAPTURE any of it — no builtin wires a pipe (F-0065).
+/// A started child MUST be waited for —
 /// `wait(take ch)` is what reaps it — or it stays a zombie on every unix
 /// until this process exits.
 ///
@@ -322,6 +381,126 @@ pub fn argv(c: Command) -> List[str] {
 /// ```
 pub fn start(c: Command) -> Child ! {not_found, denied, io} {
     Child { slot: os_spawn(c.argv)? }
+}
+
+/// Start `c` with `inherit` handed down to the child, and answer the
+/// child's handle WITHOUT waiting for it — the PARENT half of descriptor
+/// inheritance, whose child half is `std.net.adopt_listener`.
+///
+/// **The child receives the listeners as descriptors `3, 4, …` in the
+/// order given**, and that numbering is the whole contract
+/// (`[os.proc.inherit]`). The parent never learns an OS descriptor
+/// number and the child never has to be told one out of band: "the
+/// listener is 3" is true by position, so a master hands its argv a
+/// COUNT and never a descriptor. Descriptors 0, 1 and 2 are the spawn's
+/// ordinary stdio — INHERITED from this process, exactly as they are for
+/// `start` — and nothing above `2 + inherit.len` is open in the child
+/// that the runtime put there. `tests/process/prefork_handoff.lu`
+/// witnesses that upper bound from inside the child: with one listener in
+/// the set, descriptor 3 adopts and descriptor 4 answers `io`.
+///
+/// **The set is on the SPAWN and not on the `Command`, and that is the
+/// one design decision in this function.** It was asked as a question at
+/// sc37 and answered from real code by the consumer that needed it
+/// (lobo, ws18): a master binds its listeners ONCE and keeps them for
+/// its whole life, because a REPLACEMENT worker has to inherit the same
+/// socket; it then spawns worker 1, worker 2, … and re-spawns worker 2
+/// after a `kill -9`. The listener set is a property of the MASTER and
+/// each spawn is an EVENT THAT BORROWS IT. A `Command` that accumulated
+/// an inherit set would have to be rebuilt or reset per spawn, and one
+/// reused across spawns would silently carry state the second spawn
+/// never asked for — a `Command` that remembers descriptors is a
+/// `Command` that can hand a stale one down. The call-argument shape
+/// makes the borrow visible at every site and has no state to get wrong.
+/// Pointing the same way: the ORDER of the set IS the contract, and an
+/// ordered argument at the call is where a reader looks for that; a
+/// builder field is not.
+///
+/// **Why `List[net.Listener]` and not `List[int]`, when `net.wait` took
+/// the ints.** `wait`'s ready set mixes listeners and streams and wolf
+/// has no sum type that can hold both at this pin, so `wait` had no
+/// typed container to take. An inherit set has one: the only thing the
+/// child can DO with a handed-down descriptor is `net.adopt_listener`,
+/// so at this pin the set is listeners or it is nothing. Unwrapping to
+/// the builtin's `List[int]` is this function's job rather than the
+/// caller's, which is the point of a typed tier. If a future pin grows
+/// an adopt for connected sockets, the container question reopens with
+/// the sum type — the same language dependency `wait` is waiting on, and
+/// the two should be answered together rather than one at a time.
+///
+/// **An EMPTY set is not a special form.** `start_with(c,
+/// List[net.Listener]())` is `start(c)` with the program named apart
+/// from its arguments, served on every host and every tier — including
+/// the two that decline the non-empty case. A prefork master that has
+/// not bound anything yet, or a caller that just wants the same spawn,
+/// writes the empty list and gets an answer rather than an
+/// `unsupported`.
+///
+/// Rows: `unsupported` where the host or the tier does not serve a
+/// NON-EMPTY set, BY NAME — windows (handle inheritance exists there,
+/// but a `SOCKET` is not a small stable number a parent can name by
+/// position) and the CHECKED machine, which refuses it because it is the
+/// `wolf` binary interpreting a program, so a descriptor handed to "the
+/// program's child" would be handed to the compiler's child;
+/// `not_found` when no such program exists — and for an EMPTY argv,
+/// which names no program at all, raised here rather than delegated
+/// because `os_spawn_with` takes the program apart and an empty vector
+/// has none to give; `denied` when the host refuses to execute it; `io`
+/// for a bad SET as well as for every other host failure. Never traps.
+///
+/// **A bad set spawns NOTHING, and the ordering is load-bearing.** A
+/// forged or closed listener anywhere in `inherit`, or more than 64 of
+/// them, is `io` BEFORE any child exists: the runtime maps handles to
+/// descriptors first, so a caller that gets `io` from this call knows no
+/// program was started and has nothing to reap.
+/// `tests/process/start_with_inherit_rows.lu` witnesses exactly that,
+/// with a forged listener and a program name no host has — the row is
+/// `io` and not `not_found`, which is the mapping happening first.
+///
+/// **What the parent keeps.** Handing a listener down does not consume
+/// it and does not close it: `inherit` is READ, the master's listeners
+/// are still the master's after the call, and a master serving N workers
+/// hands the same `Listener` to each spawn in turn. The child's copy is
+/// a separate descriptor that the CHILD owns from its `adopt_listener`
+/// on — `net.close_listener` there closes the inherited fd and does not
+/// unlink an `AF_UNIX` path, because the path belongs to the process
+/// that bound it.
+///
+/// A started child MUST be waited for — `wait(take ch)` is what reaps it
+/// — exactly as for `start`.
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to
+/// `os_spawn_with`.
+///
+/// A prose example, because a doc example imports exactly the documented
+/// module (§4) and cannot reach `std.net` to bind a listener. A prefork
+/// master binds once, then spawns each worker with the set:
+/// `let srv = net.listen(net.loopback(8080))?`, build `workers` as a
+/// `List[net.Listener]` holding `srv`, and
+/// `let w = process.start_with(cmd, workers)?` — the worker reads
+/// `net.adopt_listener(3)?` and accepts. `tests/process/start_with_empty_rows.lu`
+/// and `tests/process/start_with_inherit_rows.lu` are the witnesses.
+pub fn start_with(
+    c: Command,
+    inherit: List[net.Listener],
+) -> Child ! {unsupported, not_found, denied, io} {
+    var exe = ""
+    var args = List[str]()
+    var named = false
+    for a in c.argv {
+        if named {
+            (mut args).push(a)
+        } else {
+            exe = a
+            named = true
+        }
+    }
+    if !named { return not_found }
+    var fds = List[int]()
+    for l in inherit {
+        (mut fds).push(l.fd)
+    }
+    Child { slot: os_spawn_with(exe, args, fds)? }
 }
 
 /// Wait for `ch` to finish and answer its exit code, consuming the handle.

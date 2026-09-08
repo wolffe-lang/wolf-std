@@ -1,0 +1,91 @@
+//! check: run(exit=0, stdout="child said: 0")
+//! phase: run
+//! conforms: std.process, std.net, os.proc.inherit, err.row, err.propagate
+//!
+//! **A PARENT AND A CHILD, IN ONE TEST, FOR THE FIRST TIME IN THIS
+//! REPOSITORY.** Every earlier process and net witness here proves a
+//! REFUSAL, because the rig runs one program per test and no program
+//! could start a useful second one: `net/adopt_rows.lu` says in as many
+//! words that it cannot reach the adoptable case, and F-0066 records why
+//! the happy path of a spawn was unwitnessable at all. Both halves of
+//! `[os.proc.inherit]` now exist at the std tier — `process.start_with`
+//! (sc39) and `net.adopt_listener` (sc37) — and with `os_exe` (s90) a
+//! program can spawn ITSELF, which is the third thing the handshake
+//! needed. So this file runs the whole prefork handoff end to end.
+//!
+//! **The proof is the PORT.** The parent binds an ephemeral loopback
+//! listener, reads its port, and spawns itself with that port as its one
+//! argument and the listener as its one inherit entry. The child adopts
+//! descriptor **3** — "the listener is 3" is true by position, which is
+//! the clause's whole contract — reads the port off what it adopted, and
+//! exits `0` only if the two numbers agree. Nothing is told to the child
+//! out of band except the number it must MATCH, so an accidental pass is
+//! not available: a child that adopted something else, or nothing, cannot
+//! produce the parent's ephemeral port.
+//!
+//! **The second assertion is the BOUND, and nothing else witnesses it.**
+//! `[os.proc.inherit]` says "nothing above `2 + len(inherit)` is open in
+//! the child that the runtime put there". The set here has ONE entry, so
+//! descriptor **4** must not be an adoptable listener — the child asks
+//! for it and requires `io`. That sentence is a promise about what is
+//! ABSENT, and a test is the only place a promise about absence can live.
+//!
+//! **Exit codes are the channel, deliberately.** The child's verdict
+//! comes back as its exit code (`0` agree, `7` port mismatch, `8`
+//! descriptor 4 adopted something) and the parent prints only what it was
+//! handed. Two negative controls were run against this shape before it
+//! landed and both behaved: handing the child a port one digit off makes
+//! it exit `7`, and spawning with an EMPTY inherit set makes its
+//! `adopt_listener(3)` answer `io` and ride out of `main`. The file
+//! cannot hold either control — a witness gets one program — so they are
+//! recorded here, which is the only place they can be.
+//!
+//! **Native only, and the two reasons are different.** A non-empty
+//! inherit set is refused by name on the checked machine and on lupin
+//! ("fd inheritance across os_spawn_with in checked execution"), so
+//! neither lane reaches the spawn. Underneath that there is a SECOND
+//! reason a self-spawn is native-only, worth writing down because it will
+//! bite the next person who tries this shape: **under an interpreter
+//! `os_exe` names the INTERPRETER, not the program.** Measured at sc39 —
+//! on the checked lane the "child" is the `wolf` binary handed an
+//! argument it does not know, which prints a usage line and exits 2; on
+//! lupin the same, exit 2. A self-spawn witness is only meaningful where
+//! the running executable IS the program, which is the native rung alone.
+
+use std.env
+use std.net
+use std.process
+
+fn main() -> !int {
+    let argv = env.args()
+    if argv.len > 0 {
+        let want = argv[0]
+        var adopted = net.adopt_listener(3)?
+        let got = net.port(adopted)?
+        net.close_listener(take adopted)?
+        if "{got}" != want { return 7 }
+        var past_the_set = false
+        let over = net.adopt_listener(4) else |e| match e {
+            unsupported => { net.Listener { fd: 0 - 1 } },
+            io => {
+                past_the_set = true
+                net.Listener { fd: 0 - 1 }
+            },
+        }
+        if !past_the_set { return 8 }
+        if over.fd != 0 - 1 { return 9 }
+        return 0
+    }
+    var srv = net.listen(net.loopback(0))?
+    let port = net.port(srv)?
+    var set = List[net.Listener]()
+    (mut set).push(srv)
+    var cmd = process.command(os_exe()?)
+    process.push_arg(mut cmd, "{port}")
+    var ch = process.start_with(cmd, set)?
+    let code = process.wait(take ch)?
+    net.close_listener(take srv)?
+    print("child said: {code}")
+    if code != 0 { return code }
+    0
+}

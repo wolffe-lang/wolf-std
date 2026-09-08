@@ -144,6 +144,87 @@ fn net_accept_clause_agrees_with_os_net_accept() {
     );
 }
 
+/// **wolf-std#9's gate, and the second use of sc38's shape.** The first
+/// retracted-sentence lint was written after a clause went stale for a
+/// whole sprint with the call that falsified it thirty lines below.
+/// `net.adopt_listener`'s clause went stale the same way and faster: it
+/// said "There is no `std.process` half of this pair at this pin", which
+/// was true when sc37 wrote it and false the moment `process.start_with`
+/// landed. Nothing could have seen it — the two halves are in different
+/// modules and no test reads either sentence.
+///
+/// So the pair is linted from BOTH ends, which is the half sc38's lint
+/// did not have: each clause must name the other's function. A future
+/// lane that deletes one half has to answer for the other's doc in the
+/// same commit, and a legitimate rewording moves these needles where a
+/// human reads both together.
+#[test]
+fn the_inherit_pair_names_itself_from_both_ends() {
+    let repo = repo_root();
+
+    let net = std::fs::read_to_string(repo.join("std/net/net.lu")).unwrap();
+    let adopt = doc_block_before(&net, "pub fn adopt_listener(");
+    assert!(
+        !adopt.contains("no `std.process` half"),
+        "std.net.adopt_listener's clause still says there is no \
+         `std.process` half — `process.start_with` is that half \
+         (wolf-std#9, sc39). If the wrapper was WITHDRAWN, this needle \
+         moves in the same commit that withdraws it."
+    );
+    for required in ["process.start_with", "borrows"] {
+        assert!(
+            adopt.contains(required),
+            "std.net.adopt_listener's clause no longer says {required:?} — \
+             it is the CHILD half of a pair and must name its parent half, \
+             or the next reader writes the handshake through the builtin \
+             again (which is exactly what wolf-std#9 was)."
+        );
+    }
+
+    let proc = std::fs::read_to_string(repo.join("std/process/process.lu")).unwrap();
+    let start_with = doc_block_before(&proc, "pub fn start_with(");
+    for required in [
+        "net.adopt_listener",      // the child half, by name
+        "[os.proc.inherit]",       // the clause both halves conform to
+        "3, 4, …",                 // the numbering that IS the contract
+        "BORROWS",                 // why the set is on the spawn, not the builder
+        "EMPTY set",               // the case served on every host and tier
+        "BEFORE any child exists", // a bad set spawns nothing
+    ] {
+        assert!(
+            start_with.contains(required),
+            "std.process.start_with's clause no longer says {required:?} — \
+             each of these is a promise `[os.proc.inherit]` makes that a \
+             caller cannot discover from the signature. Reword deliberately \
+             and move the needle here."
+        );
+    }
+
+    let text = std::fs::read_to_string(repo.join("vendor/upstream/anchors.json")).unwrap();
+    let reg = anchors::Registry::from_json(&text).unwrap();
+    assert!(
+        matches!(
+            reg.classify("os.proc.inherit"),
+            Ok(anchors::TagClass::Registered)
+        ),
+        "`os.proc.inherit` is not a registered anchor at this pin — both \
+         clauses cite it and both witnesses tag it"
+    );
+}
+
+/// The `///` doc block immediately above `sig` in `src`.
+fn doc_block_before(src: &str, sig: &str) -> String {
+    let start = src.find(sig).unwrap_or_else(|| panic!("no `{sig}`"));
+    let block: String = src[..start]
+        .lines()
+        .rev()
+        .take_while(|l| l.trim_start().starts_with("///") || l.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(!block.is_empty(), "`{sig}`'s doc block did not parse");
+    block
+}
+
 /// The staging round-trip the rig exists to prove: the exemplar entry
 /// FAILS to resolve its module in place (no std root, and the package
 /// root — the entry file's directory — holds no modules), and runs green

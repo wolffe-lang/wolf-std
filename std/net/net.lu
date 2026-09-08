@@ -961,13 +961,15 @@ pub fn listen_with(addr: str, opts: ListenOpts) -> Listener ! {unsupported, exis
 /// descriptor handed to "the program's child" would be handed to the
 /// compiler's child. `io` for every failed check above. Never traps.
 ///
-/// **There is no `std.process` half of this pair at this pin.** The
-/// builtin `os_spawn_with` exists upstream; wrapping it is a
-/// `std.process` change with its own `Command` question (whether a
-/// `Command` grows an inherit set or the spawn takes one), and sc37
-/// landed the acquisition half alone rather than guess at the builder.
-/// Until it lands, the parent half of a prefork server is reachable only
-/// through the builtin. Recorded as a residue, not a design.
+/// **The `std.process` half of this pair is `process.start_with(c,
+/// inherit)`** (sc39, wolf-std#9). This clause said there was none for
+/// two sprints, which was true when sc37 wrote it and stopped being true
+/// the day the wrapper landed — the pair is whole at the std tier now
+/// and a prefork handshake no longer splits across tiers. The `Command`
+/// question that held it up was answered by the consumer that needed it:
+/// the inherit set is an argument of the SPAWN, never a field of the
+/// builder, because the listeners belong to the master for its whole
+/// life and each spawn borrows them.
 ///
 /// Capability `net`; refused at comptime (D33). Delegates to
 /// `net_adopt_listener`.
