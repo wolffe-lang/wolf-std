@@ -59,7 +59,6 @@ Phase A closed with sc06: 253 public functions across 26 facade modules and
 named-and-unbuilt functions whose blockers are filed upstream and counted by
 blocker in `docs/phase-a-census.md`.
 
-Sprint plan: the `std` track (`scNN`) in the wolf metarepo.
 Licensed under [GPL-3.0-or-later](LICENSE) with the
 [wolf Runtime Library Exception](LICENSE-EXCEPTION): the standard library compiles into
 your programs, and your programs are yours.
