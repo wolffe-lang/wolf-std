@@ -988,20 +988,20 @@ ledger word is born for rows whose wrongness is the counterparty's.
 
 - sc15 — the DOM half: std.json gains a checked handle over the
   declared json kernels, rows verbatim.
-- **sc14** (2026-08-24) — each word, without the list: `each_word` as
+- sc14 (2026-08-24) — each word, without the list: `each_word` as
   the lazy walk and `words_count` as the counting fold.
-- **sc13** (2026-08-21) — the callable core, std's first higher-order
+- sc13 (2026-08-21) — the callable core, std's first higher-order
   tier: list predicates and relations as `fn` values; both F-0052
   wildcard handlers retire (the arms discriminate at lupin 0.1.13),
   the json F-0079 split retires and its witness catches the sequel
   (F-0084); F-0082–F-0086 filed from the sprint's probes.
-- **sc14** (2026-08-14) — the four owed contracts, all paid:
+- sc14 (2026-08-14) — the four owed contracts, all paid:
   `json.parse`, `json.unescape`, `escape`'s totality, and
   `hex.decode_str`.
-- **sc13** (2026-08-13) — the json DOM, and a way back from bytes:
+- sc13 (2026-08-13) — the json DOM, and a way back from bytes:
   `bytes.to_str` lands on s81's `str_from_utf8` (F-0057 closed after
   four sprints of refusing an ASCII-only border post).
-- **sc12** (2026-08-13) — eight functions walk the s77 byte view
+- sc12 (2026-08-13) — eight functions walk the s77 byte view
   instead of copying.
 
 (The ids sc13 and sc14 were each used twice in the track's history;

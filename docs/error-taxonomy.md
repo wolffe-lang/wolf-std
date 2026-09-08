@@ -89,7 +89,7 @@ across `fmt`, `hex` and `base64` so that the family stays one shape.
 They are stated normatively in API-CONVENTIONS §12; the short form:
 
 1. Marks are lowercase and payload-free; payload-carrying tags are
-   CapCase and name a payload TYPE.
+   CapCase and name a payload type.
 2. Payloads carry data (position, limit, the offending kind), never
    pre-rendered strings. `describe` is the only place words are made.
 3. One tag per failure mode a caller can act on. Call sites and internal
