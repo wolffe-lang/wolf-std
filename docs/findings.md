@@ -1588,7 +1588,7 @@ all in one column: 44 rows moved, 41 of them native.
   the vocabulary now, as intended: it was a truthful record of one pin
   rather than a lane.
 
-Retirements and re-verifications, each re-measured rather than assumed:
+Retirements and re-verifications, each one re-measured:
 
 - F-0018's interpreter half is RETIRED. lupin 0.1.5 answers `find`,
   `rfind`, `split`, `get`, `ends_with`, `strip_prefix`, `strip_suffix`,
@@ -2796,8 +2796,8 @@ rather than an amortized doubling. Both compiler rungs are flat at the same
 sizes, so this is the interpreter's list representation and not a cost the
 language imposes.
 
-Two suspects were cleared before filing, both measured rather than reasoned
-about, and both worth recording because a std scanner does them constantly:
+Two suspects were cleared before filing, both by measurement, and both
+recorded because a std scanner does them constantly:
 
 - suffix slicing (`rest = rest[1..]` until empty) is linear: 2 000 / 4 000 /
   8 000 / 16 000 bytes → 0.008 / 0.013 / 0.025 / 0.055 s;
@@ -3053,7 +3053,7 @@ thinks. `str_from_utf8` is the first such builtin and `std.bytes.to_str`
 is the first std function whose comptime story has to be written as "the
 D33 sandbox has no objection — it carries no capability and no sandbox
 category — and the engine cannot get there anyway". That sentence is in the
-function's doc, measured rather than inferred, because the alternative was
+function's doc and was measured, because the alternative was
 to write "pure and comptime-safe" and be wrong in a way no test here would
 have caught (§13, sc09's rule: a doc sentence about what an implementation
 answers is a test or it is a rumour, and when it cannot be a test, it is a
@@ -5693,7 +5693,7 @@ both are outside everything ci reads for a verdict: `docs/findings.md`
 first-parent count corrected from 3 to 4; `git diff` shows that single
 line and no `version`/`pin` change). So the second gauntlet covers the
 functional tree completely, and the edits it does not cover could not
-have changed a verdict. Written down rather than assumed, because "the
+have changed a verdict. Written down here, because "the
 gauntlet must cover the edits" is a lesson this repo paid for.
 
 The s134 checkpoint was re-taken at the second gauntlet as the contract
@@ -5857,7 +5857,7 @@ the work has to be done:
   verbatim. F-0103's asymmetry lives in `mem`-phase argument lowering;
   nothing in 51 commits touches argument lowering, and
   `wolf_wir/src/lower.rs`'s 76 changed lines are the byte cast/op
-  bridges. Re-probed as its own item below rather than assumed, and
+  bridges. Re-probed as its own item below, and
   unlike at sc33 the binary did move this time, so the probe is
   evidence and not a formality.
 

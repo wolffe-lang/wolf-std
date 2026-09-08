@@ -517,8 +517,8 @@ paragraphs, and the claims were updated rather than left standing.
 Two rows did not move and both are worth naming. `env/args_and_vars.lu` stays
 lupin-dark because one builtin of the five is missing: `env_vars` "does not
 resolve" at 0.1.8 while `env_args`, `env_get`, `env_set`, `os_cwd` and
-`os_exit` all run (F-0070, measured one call at a time rather than inferred
-from the family, which is how a wrong sentence nearly reached this file).
+`os_exit` all run (F-0070, measured one call at a time; inferring from the
+family is how a wrong sentence nearly reached this file).
 The three `x/json/*` rows stay dark for a new reason: lupin 0.1.8 declines
 the json surface by design ("rather than risk a second, guessed RFC 8259
 reading"), so what the sc10 census recorded as drift is now a posture. A
@@ -877,7 +877,7 @@ refused natively) and is the second instance of F-0071's lesson: write the
 form that keeps every lane, file the one that does not. F-0077 costs a
 sentence in a doc: a pure builtin whose argument is a `List` cannot be
 reached at comptime, so `to_str`'s comptime story is "the sandbox has no
-objection and the engine cannot get there", measured rather than inferred.
+objection and the engine cannot get there", which was measured.
 
 ## 12. sc14 — the debt clause paid in full, and one lane arrives just in time
 

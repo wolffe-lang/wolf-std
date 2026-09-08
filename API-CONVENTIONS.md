@@ -1297,7 +1297,7 @@ rather than a new tier. Five additions.
   forward: `accept`, `read`, `write`, the byte pair, both deadlines and
   both closers are the same operations on the same host object, so a
   second `Listener` type would have been a second copy of a surface the
-  family does not change. It is measured rather than assumed:
+  family does not change. A measurement backs it:
   `tests/net/unix/stream_surface.lu` runs the byte pair and both deadlines
   over a socket path on all three lanes. Second, `unsupported` is a row
   and not a trap, and it is the host's row. §2's rule decides the first
@@ -1316,7 +1316,7 @@ rather than a new tier. Five additions.
 - 2026-09-02, sc32 (§2's trap rule and §12's mark casing, applied to a
   failure the runtime reports, `std.mem.budget`): the region-budget
   breach is the first failure std surfaces that it does not itself
-  detect, and three readings are recorded rather than assumed. First,
+  detect, and three readings are recorded here. First,
   the row is a payload-free lowercase mark (`exhausted`), and the
   reason is stronger than §12's default: the payload a reader reaches
   for ("how much did it want?") is *unobservable by contract*,
@@ -1352,7 +1352,7 @@ rather than a new tier. Five additions.
   payload-carrying tag `Row(str)` that the value rides through on
   success) and `row_name`, its marking face, both thin over one
   match, just as `std.option`'s six are thin over `else`. Two
-  readings are recorded rather than assumed. First, §12's "a payload
+  readings are recorded here. First, §12's "a payload
   is data, never a rendered string" is read as forbidding a rendered
   sentence (this library's wording, an unrecoverable position); a row
   tag's own name is neither: it is the tag's identity, the finest
