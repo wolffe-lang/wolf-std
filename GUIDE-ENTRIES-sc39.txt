@@ -1,0 +1,65 @@
+## 2026-09-08 (sc39) — the first child, and what it said about the docs
+
+- **WHEN AN ISSUE AND ITS CORRECTION DISAGREE, THE GATE IS THE THIRD
+  WITNESS — AND IT IS THE ONLY ONE THAT MEASURED.** wolf-std#10's filed
+  text said the registry list was "five namespaces behind"; a correction
+  on the issue said one. Both were prose written by someone reading a
+  file at some moment. The re-vendor landed and sc38's registry gate
+  answered on its own: *7 anchors in namespace(s) {"sched"}*. Do not
+  arbitrate between two documents about the state of an artifact. Change
+  the artifact and let the gate name the delta — then check the delta
+  against both documents, in that order.
+- **A GATE'S FIRST REAL EVENT IS THE ONLY PROOF IT IS A GATE.** sc38
+  replaced a pin that was green and always would have been, and wrote in
+  its own doc comment that the replacement "reds at the NEXT pin bump
+  that publishes a namespace this rig has not admitted". That next bump
+  was one sprint later and it red. Until a pin has fired once on a real
+  event, "it would have caught it" is a hypothesis about your own code.
+  When you write one, note the event you expect to fire it; when that
+  event arrives, capture the message verbatim before you fix anything.
+- **CHECK MVS AGAINST THE COMPILER BEFORE YOU DESIGN AN API AROUND IT.**
+  The whole `start_with(cmd, inherit)` shape depends on a master keeping
+  its listeners across many spawns. Two things had to be true and both
+  were worth ten minutes of measurement rather than an afternoon of
+  reasoning: `(mut xs).push(v)` does not consume `v` (push then
+  `take v` compiles and runs), and a default-mode (`read`) `List`
+  parameter does not consume its argument (one binding served two calls
+  and the listener still answered `port` afterwards). Had either moved,
+  the consumer's requested shape would have been unwritable in wolf and
+  the design conversation would have been a different one.
+- **ARRANGE TWO POSSIBLE FAILURES WHEN THE QUESTION IS *WHICH ONE*.** To
+  measure that a runtime validates an argument SET before it reaches for
+  the program, hand it a bad set AND a program no host has. One row comes
+  back and it names the check that ran first. A "simpler" test with a
+  program that exists proves nothing about ordering. Write the two-row
+  setup down at the test, or the next reader simplifies it away.
+- **A CLAIM ABOUT A LANE NOTHING LIGHTS IS A RUMOUR, NOT A CONTRACT.**
+  A module header asserted for four sprints that a spawned child's stdio
+  was wired to the null device. No test in the repository could start a
+  child, so nothing could check it, and a downstream finding quoted it
+  forward as a premise. The first test that ran a child — written for a
+  completely different purpose — falsified it in one line: the child's
+  output was in the parent's stdout the whole time. **When a doc
+  describes a tier no witness reaches, mark the sentence as unmeasured
+  rather than stating it flat**, and treat the day that lane lights as
+  the occasion to re-read every such sentence in the file.
+- **INHERITING IS NOT CAPTURING, AND ONE WRONG SENTENCE CAN CONFLATE
+  THEM FOR FOUR SPRINTS.** The correction did not delete the gap it was
+  hiding: no builtin wires a pipe, so a child's output still cannot be
+  read back. What changed is where the output GOES, which is the half a
+  caller plans around. When you correct a doc, separate the claim that
+  was wrong from the limitation it was standing in for, and keep the
+  second one.
+- **LINT A CLAUSE PAIR FROM BOTH ENDS.** sc38's retracted-sentence lint
+  watched one clause in one file. A pair spanning two modules rots from
+  either side and no gauntlet reads either sentence — one half said
+  "there is no other half" for two sprints after the other half's design
+  was decided. If a surface exists only as half of a handshake, make each
+  half's doc name the other's function and hold both needles in one test.
+- **UNDER AN INTERPRETER, "THE RUNNING EXECUTABLE" IS THE INTERPRETER.**
+  `os_exe` names `wolf` on the checked lane and `lupin` on the reference
+  one, so a program that spawns ITSELF spawns the tool instead — which
+  answers a usage line and exit 2, not a diagnostic that says what
+  happened. Self-spawn is a native-lane shape and there is no way to make
+  it portable. Two independent reasons can pin a test to one lane; say
+  both, because retiring one of them does not move the test.
