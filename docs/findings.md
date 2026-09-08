@@ -4857,13 +4857,13 @@ the word "additive".
 wolf-lang s131 + s132 landed the whole region-budget pipe at this
 sprint's pin (the query `region_bytes(r)` / `live_region_bytes()`, the
 creation-time cap `region r(cap: n)`, `trap(alloc-contract)` at the
-allocating site, and D68's containment — `fault(kind)` at a proc's
-join). sc31's register ended by naming this as "the NEXT sc bump's
-first measurement". This is that measurement, and it is written before
-the module because the module is what fell out of it.
+allocating site, and D68's containment, `fault(kind)` at a proc's
+join). The sc31 register ended by calling this "the NEXT sc bump's
+first measurement". This is that measurement. It is written before the
+module because the module fell out of it.
 
-**Fifteen probes, each in its own directory** (D32: two probe files in
-one scratch dir are ONE module — the sc30 lesson), all at
+Fifteen probes, each in its own directory (D32: two probe files in one
+scratch dir are one module, the sc30 lesson), all at
 `wolf 0.2.2 (wolfgang, pin 8cda3aa)` / `lupin 0.1.22 (pin 2bfbe5e)`:
 
 | probe | shape | lupin | wolfc `--checked` | wolf `--native` |
@@ -4887,94 +4887,95 @@ one scratch dir are ONE module — the sc30 lesson), all at
 Five things the table settles that prose would have guessed at, and
 each of them changed the shipped surface:
 
-1. **A `region` in ARGUMENT position is read, not consumed** (p1/p14).
-   Region values are affine — `[mem.region.create.2]` says they move
-   and are never copied — so the reasonable expectation is that
-   `charged(r)` eats its argument and the query is useless as a std
-   function. It does not, on any lane: two calls in a row answer the
-   same number and the region is still usable after both. The licence
-   is `[mem.tier0.mode.read]`, whose sentence is exactly this ("the
-   callee reads a value that is immutable for the whole call; the
-   caller retains it") and which nobody had ever tested against a
-   region. That one probe is the difference between a `charged(r)` std
-   can ship and a `charged(r)` it cannot.
-2. **A region may be TAKEN but not RETURNED** (p4). The native rung
-   refuses `-> region` by name — "first-class region values beyond
-   local bindings (c05)" — where lupin and the checked rung run it. So
-   there is no `capped(n) -> region` constructor in the module even
-   though it is two lines: the value form `region(cap: n)` stays the
-   language's, at the caller's own site, where it is three lanes.
-3. **THE VALUE CANNOT COME BACK, and it takes three measurements to
-   close the door** (p9/p10/p11). The obvious signature is
+1. A `region` in argument position is read, and the call leaves it
+   intact (p1/p14). Region values are affine, and
+   `[mem.region.create.2]` says they move and are never copied, so the
+   reasonable expectation is that `charged(r)` eats its argument and
+   the query is useless as a std function. It does not, on any lane:
+   two calls in a row answer the same number and the region is still
+   usable after both. The licence is `[mem.tier0.mode.read]`, whose
+   sentence covers this case ("the callee reads a value that is
+   immutable for the whole call; the caller retains it") and which
+   nobody had ever tested against a region. That one probe is the
+   difference between a `charged(r)` std can ship and a `charged(r)` it
+   cannot.
+2. A region may be taken as an argument but not returned (p4). The
+   native rung refuses `-> region` with "first-class region values
+   beyond local bindings (c05)", where lupin and the checked rung run
+   it. So there is no `capped(n) -> region` constructor in the module
+   even though it is two lines: the value form `region(cap: n)` stays
+   the language's, at the caller's own site, where it is three lanes.
+3. The value cannot come back, and it takes three measurements to
+   close the door (p9/p10/p11). The obvious signature is
    `with_cap[T](n, f) -> T ! {exhausted}`. A proc is a failure domain
    with no shared address space (`[conc.proc.1]`), so the only licensed
-   way out is a channel; a `channel[int]` in a std SIGNATURE is refused
-   on **both** wolf rungs (the F-0026 monomorphization family,
-   reported at the caller's instantiation site); and a channel kept
-   inside a std BODY is refused on the checked rung. The helper
-   therefore answers a question rather than producing a value — which
-   costs less than it reads, because `[conc.proc.kill]` bulk-frees the
-   proc's regions before the reason delivers, so nothing the work
-   ALLOCATED could have survived the call under any signature. Only a
-   scalar was ever crossing, and lobo's request path already carries
-   its region results out as scalars by hand for the same reason.
-4. **The C1 refusal is reached at EXECUTION, not statically** (p15,
-   against p6/p8/p12/p13). A `with_cap` call behind a runtime-false
-   branch compiles and runs to `exit(0)` on the checked rung. That is
-   why this module ships three witnesses with two different checked
-   columns from one function: `negative_cap_trap.lu` is `run` on all
-   three lanes because its guard traps before the `spawn proc` is
-   reached, and `breach_is_a_row.lu` is `unsupported` because it
-   reaches it. A caller may link this module on the checked tier and
-   pay only for the paths that actually spawn — worth knowing, and not
-   a thing anyone would have predicted from "the checked tier defers
-   the task layer".
-5. **The trap-shaped runner is not std's to ship** (p3/p7). Running a
-   fn value inside a capped region, with the breach left as the
-   process-ending trap, is three lanes — and it is also
-   `region r(cap: n) { … }` with a library in the way. What a caller
-   cannot write in one line is the CONTAINED form, so that is the only
-   runner in the module.
+   way out is a channel; a `channel[int]` in a std signature is refused
+   on both wolf rungs (the F-0026 monomorphization family, reported at
+   the caller's instantiation site); and a channel kept inside a std
+   body is refused on the checked rung. The helper therefore answers a
+   question and hands back no value, which costs less than it reads:
+   `[conc.proc.kill]` bulk-frees the proc's regions before the reason
+   delivers, so nothing the work allocated could have survived the call
+   under any signature. Only a scalar was ever crossing, and lobo's
+   request path already carries its region results out as scalars by
+   hand for the same reason.
+4. The C1 refusal waits for execution and is never reached statically
+   (p15, against p6/p8/p12/p13). A `with_cap` call behind a
+   runtime-false branch compiles and runs to `exit(0)` on the checked
+   rung. That is why this module ships three witnesses with two
+   different checked columns from one function: `negative_cap_trap.lu`
+   is `run` on all three lanes because its guard traps before the
+   `spawn proc` is reached, and `breach_is_a_row.lu` is `unsupported`
+   because it reaches it. So a caller may link this module on the
+   checked tier and pay only for the paths that actually spawn, which
+   is not what "the checked tier defers the task layer" leads you to
+   expect.
+5. The trap-shaped runner is not std's to ship (p3/p7). Running a fn
+   value inside a capped region, with the breach left as the
+   process-ending trap, is three lanes, and it is also
+   `region r(cap: n) { … }` with a library in the way. The contained
+   form is the one a caller cannot write in a line, so that is the
+   only runner in the module.
 
-**What landed.** `std.mem.budget`, three functions: `charged(r)` and
-`live()` naming the two queries (three lanes), and
-`with_cap(n, f: fn()) -> () ! {exhausted}` collapsing the spawn /
+What landed: `std.mem.budget`, three functions. `charged(r)` and
+`live()` are the two queries (three lanes), and
+`with_cap(n, f: fn()) -> () ! {exhausted}` collapses the spawn /
 monitor / `select` / `is_alloc_contract()` join into one call whose
 failure is an ordinary row (lupin + native). The row is the payload-free
-mark `exhausted` per API-CONVENTIONS §12, and the reason it carries no
-number is not modesty — `[mem.region.cap.3]`'s free-then-deliver
-teardown makes the dead proc's charge **unobservable by contract**, so
-a payload would have to be invented. A negative budget traps `assert`
-at the door rather than riding out as a row, because
-`[mem.region.cap.2]`'s own `trap(alloc-contract)` would fire inside the
-proc, be contained, and answer a caller's arithmetic mistake with a
-recoverable value — the exact failure §2's trap rule exists to prevent.
+mark `exhausted` per API-CONVENTIONS §12. It carries no number because
+`[mem.region.cap.3]`'s free-then-deliver teardown makes the dead proc's
+charge unobservable by contract, so a payload would have to be
+invented. A negative budget traps `assert` at the door instead of
+riding out as a row: `[mem.region.cap.2]`'s own `trap(alloc-contract)`
+would otherwise fire inside the proc, be contained, and answer a
+caller's arithmetic mistake with a recoverable value, which is the
+failure §2's trap rule exists to prevent.
 
-**The witnesses, and the one test-design decision that mattered.** The
-ledger's numbers are per-tier measured facts and NOT comparison surface
-(`[mem.region.account.1]`), and this repo's rig compares a `stdout=`
-hash across lanes — so a witness that printed a count would be a
-per-lane file. Measured, to make the point concrete: the same
-100-element `List[int]` reads **4064** under lupin, **2032** native and
-**1600** on the checked machine. Every row therefore prints RELATIONS —
-zero at creation, monotone, stable between allocations, the live total
-rising and returning wholesale, birth-region attribution, the breach
-contained, the memory already back — and one hash covers every lane the
-row runs on (`ledger_relations.lu`
+The witnesses, and the one test-design decision that mattered: the
+ledger's numbers are per-tier measured facts and not comparison surface
+(`[mem.region.account.1]`), while this repo's rig compares a `stdout=`
+hash across lanes, so a witness that printed a count would be a
+per-lane file. Measured, to make that concrete: the same 100-element
+`List[int]` reads 4064 under lupin, 2032 native and 1600 on the checked
+machine. Every row therefore prints relations (zero at creation,
+monotone, stable between allocations, the live total rising and
+returning wholesale, birth-region attribution, the breach contained,
+the memory already back), and one hash covers every lane the row runs
+on (`ledger_relations.lu`
 `2a60aeaecaed6c6bbc2b5d957fe06236be0e95748179ba8629acd3dc8b5de1ff`
 three lanes; `breach_is_a_row.lu`
 `05c2dc7adf52121ef88612a33e8ecd5c7cc8adc45c3774e50633309507419e37`
 lupin + native).
 
-One shape cost a red before it was written down, and it is worth the
-sentence: growing a root-born `List` INSIDE a `region scratch { … }`
-block is **E1010** on both wolf rungs ("`root_born` still holds a value
-allocated in region `scratch` when the region is freed"), where lupin's
-birth-region attribution runs it happily. The attribution half of the
-witness is therefore written the way wolf-lang's own
-`memory/region_bytes_value.lu` writes it — the push sits AFTER the
-`in r { … }` block, not inside it. Copying a corpus witness's shape is
-not laziness when the shape is the part that was measured.
+One shape cost a red before it was written down: growing a root-born
+`List` inside a `region scratch { … }` block is E1010 on both wolf
+rungs ("`root_born` still holds a value allocated in region `scratch`
+when the region is freed"), where lupin's birth-region attribution runs
+it happily. The attribution half of the witness is therefore written
+the way wolf-lang's own `memory/region_bytes_value.lu` writes it, with
+the push after the `in r { … }` block rather than inside it. The shape
+was copied from that corpus witness because the shape is the part that
+was measured.
 
 ## F-0103 re-measured at the sc32 pin — #201 has NOT ruled, and the residue is re-dated
 
@@ -4986,79 +4987,79 @@ Re-probed 2026-09-02 at `wolf 0.2.2 (wolfgang, pin 8cda3aa)` /
 | f1 | `row_name(narrow(1))` — a raising call STRAIGHT into a row-typed parameter | `exit(0)` `alpha` | **`unsupported` — `control flow in an argument` @`mem`, `@575..584`** | `exit(0)` `alpha` |
 | f2 | `let r = narrow(1)` then `row_name(r)` — the BOUND form | `exit(0)` `alpha` | `exit(0)` `alpha` | `exit(0)` `alpha` |
 
-**Verbatim. Nothing moved, and wolf-lang#201 is still OPEN — no
-ruling, so there is nothing to adopt.** The residue is re-dated rather
-than retired, and the reason is checked per surface the way the drift
-prediction's are: the v0.2.1..v0.2.2 span is a windows native bring-up
-(a different backend on a host this machine is not), an LSP navigation
-trio (a `wolf_query` surface, not a lowering), the region ledger and
-its cap (new `mem` capability, no change to `mem`'s ARGUMENT handling),
+Verbatim: nothing moved, and wolf-lang#201 is still open, with no
+ruling to adopt. The residue is re-dated instead of retired, and the
+reason is checked per surface the way the drift prediction's are: the
+v0.2.1..v0.2.2 span is a windows native bring-up (a different backend
+on a host this machine is not), an LSP navigation trio (a `wolf_query`
+surface, not a lowering), the region ledger and its cap (new `mem`
+capability, no change to `mem`'s argument handling),
 D69's separator tightening (a parser rule) and four letters. Not one
 commit in 35 touches how the checked tier lowers an unhandled raising
 call in argument position.
 
-So `std.x.tls.client`'s header keeps its **bind, then name** sentence
+So `std.x.tls.client`'s header keeps its "bind, then name" sentence
 unamended, and the three `std.option` rows this finding explains
 (`or_else_default.lu`, `exists_marking.lu`, `is_none_marking.lu`) keep
 their `wolfc = "unsupported"` with the cause still named. The new
 module inherits the lesson without paying it: `std.mem.budget` has no
-row-typed parameter, so nothing in it needed the workaround — which is
+row-typed parameter, so nothing in it needed the workaround. That is
 the second time in two sprints that reading F-0103 first changed a
 signature before it cost a ledger row.
 
 ## The residues, re-probed at 8cda3aa, one line each
 
-- **The chars-pairs tuple list is refused at its SIXTH consecutive
-  pin.** `List[(int, int)]()` is `unsupported — this prelude container
+- The chars-pairs tuple list is refused at its sixth consecutive pin.
+  `List[(int, int)]()` is `unsupported — this prelude container
   instantiation (generic data)` at resolve on both wolf rungs,
-  `@72..90`, lupin runs it. Six pins is long enough to state the shape
-  rather than re-argue it each time: this refusal has never moved as a
-  SIDE EFFECT of anything, and it will move the sprint someone lowers
-  generic container instantiation on purpose. Dated in the str header.
-- **F-0096 refuses verbatim.** `s.get(0..^2)` is `unsupported —
+  `@72..90`, and lupin runs it. Six pins is long enough to state the
+  shape once instead of re-arguing it each time: this refusal has never
+  moved as a side effect of anything, and it will move the sprint
+  someone lowers generic container instantiation on purpose. Dated in
+  the str header.
+- F-0096 refuses verbatim. `s.get(0..^2)` is `unsupported —
   open-ended or end-relative ranges (slicing)` at resolve on both
-  rungs, `@103..108`, against `[mem.str.get]`'s own sentence, lupin
+  rungs, `@103..108`, against `[mem.str.get]`'s own sentence, and lupin
   runs it. Dated in the str header beside the row that flips at its
   closure (`tests/str/end_relative_get.lu`).
-- **`strbuf.in(r)` was RE-PROBED this time rather than argued from the
-  span, and it is the one residue whose method had to change.** Every
+- `strbuf.in(r)` was re-probed this time instead of argued from the
+  span, and it is the one residue whose method had to change. Every
   previous bump could say "regions did not move" from the commit list;
   this span moved regions more than any since regions landed. So the
   placement syntax itself was measured, both shapes: `List[int].in(r)`
   is `unsupported — a std/prelude stub without a signature` at resolve
   on both wolf rungs and refused by lupin too, and `Buf.in(r) { … }`
-  over a plain struct is `fail(E0201)` at PARSE on all three — the form
-  is not in the grammar. s131/s132 gave regions an ACCOUNTING surface
-  and a BUDGET and gave them no placement plumbing; the two are
+  over a plain struct is `fail(E0201)` at parse on all three, because
+  the form is not in the grammar. s131/s132 gave regions an accounting
+  surface and a budget and gave them no placement plumbing; the two are
   different work, and a reader of the strbuf header can now see that
-  the distinction was measured and not assumed.
-- **`reserve(n)` is unmoved**, and its forward-looking sentence is
-  ANSWERED rather than carried: no capacity or string-backing commit
+  the distinction was measured.
+- `reserve(n)` is unmoved, and its forward-looking sentence now has an
+  answer instead of being carried: no capacity or string-backing commit
   exists anywhere in `75fd2d0..8cda3aa` or `0.1.20..0.1.22`, and the
   region accounting surface sc31's header pointed the next lane at
   landed in this span, was consumed at sc32, and lives in
-  `std.mem.budget`. It bought `strbuf` nothing — a ledger says what a
-  buffer COST and a cap says when to stop, and neither is a capacity
+  `std.mem.budget`. It bought `strbuf` nothing: a ledger says what a
+  buffer cost and a cap says when to stop, and neither is a capacity
   you can reserve.
-- **`graphemes` owes no probe**: a segmentation TABLES tier, and
-  nothing in either span brings it closer.
-- **The four `divergent(…)`-era addresses stay healed** (re-observed
-  green in both sc32 gauntlets).
+- `graphemes` owes no probe: a segmentation tables tier, and nothing in
+  either span brings it closer.
+- The four `divergent(…)`-era addresses stay healed (re-observed green
+  in both sc32 gauntlets).
 
 ## F-0104 — the byte-buffer cost, measured from the library's side (wolf-lang#203's evidence)
 
-The sprint contract asked for the #203 ask's EVIDENCE rather than its
-fix: measure what a `bytes`-tier io buffer would cost against
+The sprint contract asked for evidence on the #203 ask and left the fix
+alone: measure what a `bytes`-tier io buffer would cost against
 `List[int]` in std's own readers, recommend, and build nothing. Filed
 here as a finding because it is a measurement this repo owns and will
 be re-run at every bump until the ask lands.
 
-**Method.** `region_bytes` over a fresh region per size, a `List[int]`
-filled by `push` to N elements — the exact shape every byte-producing
-surface in std hands back (`fs.read_bytes`, `fs.read_chunk`,
-`net.read_bytes`, `bytes.from_str`, `str.bytes()` materialized). Three
-lanes, 2026-09-02, at wolf 0.2.2/8cda3aa and lupin 0.1.22/pin 2bfbe5e,
-macOS arm64.
+Method: `region_bytes` over a fresh region per size, a `List[int]`
+filled by `push` to N elements, the shape every byte-producing surface
+in std hands back (`fs.read_bytes`, `fs.read_chunk`, `net.read_bytes`,
+`bytes.from_str`, `str.bytes()` materialized). Three lanes, 2026-09-02,
+at wolf 0.2.2/8cda3aa and lupin 0.1.22/pin 2bfbe5e, macOS arm64.
 
 | payload bytes | lupin ledger | checked ledger | native ledger | native ÷ payload |
 |---|---|---|---|---|
@@ -5070,140 +5071,136 @@ macOS arm64.
 | 32,768 | 1,048,544 | 524,288 | 524,272 | 16.0x |
 | **65,536** | **2,097,120** | **1,048,576** | **1,048,560** | **16.0x** |
 
-**Three things this table says that #203 could not.**
+Three things this table says that #203 could not:
 
-1. **It reproduces lobo's numbers to the byte, from a different
-   program, at a later pin.** The issue reports 1,048,560 native and
-   1,048,576 checked for a 64 KiB chunk; this repo measures exactly
-   those two numbers with no lobo code involved. The 16x is a property
-   of the representation, not of one consumer's loop.
-2. **It is linear and clean at every scale**, from 1 KiB to 64 KiB —
+1. It reproduces lobo's numbers to the byte, from a different program,
+   at a later pin. The issue reports 1,048,560 native and 1,048,576
+   checked for a 64 KiB chunk; this repo measures those same two
+   numbers with no lobo code involved. The 16x belongs to the
+   representation; one consumer's loop has nothing to do with it.
+2. It is linear and clean at every scale, from 1 KiB to 64 KiB:
    `ledger = 16 x payload` on both wolf tiers, with the native tier
-   sixteen bytes under (one allocation header). So a fix is worth
-   exactly its multiplier: a byte-width element type takes every row
-   in this table down 8x, and preallocation from a known length takes
-   the remainder down 2x. Neither is a rounding error at any size a
-   server sees.
-3. **The reference interpreter is 32x, not 16x — a multiplier #203
-   does not carry.** lupin's own documented geometry is a 16-byte value
-   slot (against the wolf tiers' 8), so the element-width half of the
-   cost is 16x there and the growth history doubles it again. Every
-   number in the lupin column is exactly 2x its checked twin. That
+   sixteen bytes under (one allocation header). So a fix is worth its
+   multiplier: a byte-width element type takes every row in this table
+   down 8x, and preallocation from a known length takes the remainder
+   down 2x. Neither is a rounding error at any size a server sees.
+3. The reference interpreter is 32x where the wolf tiers are 16x, a
+   multiplier #203 does not carry. lupin's own documented geometry is a
+   16-byte value slot (against the wolf tiers' 8), so the element-width
+   half of the cost is 16x there and the growth history doubles it
+   again. Every number in the lupin column is 2x its checked twin. That
    matters to the ask: a portable program deriving a budget from a
    measured `region_bytes` reading is fine (the clause's own advice),
    but a program that hard-codes a per-tier constant is out by 2x
    between the two machines before it is out by 16x against its
    payload.
 
-**And a fourth measurement, which is a finding in its own right: a
-`str` charges NO named region's ledger on ANY tier at this pin.**
-`[mem.region.account.1]` names this gap and scopes it to the NATIVE
+And a fourth measurement, which is a finding in its own right: a `str`
+charges no named region's ledger on any tier at this pin.
+`[mem.region.account.1]` records this gap and scopes it to the native
 tier ("the native tier realizes `str` materialization's ambient region
 as the process root — wolf-lang#191, the c09 seam — so string bytes
 appear in no named region's ledger THERE today"). Measured: 200 fresh
 interpolated strings built inside `in r { … }` leave `region_bytes(r)`
-at **0** under lupin, on the checked machine and natively alike. The
-clause's own warning — "programs must not read this clause as `str`
-never charges" — is currently true of every tier, not one, and the
-sentence should either widen or the two non-native tiers should charge.
-This is the half of lobo's memory story that no ledger can see, and
-it means an operator reading `region_bytes` as "what this request
-cost" is missing string bytes entirely on every machine.
+at 0 under lupin, on the checked machine and natively alike. The
+clause's own warning ("programs must not read this clause as `str`
+never charges") holds on every tier rather than one, so the sentence
+should either widen or the two non-native tiers should charge. An
+operator reading `region_bytes` as "what this request cost" is missing
+string bytes entirely on every machine, and this is the half of lobo's
+memory story that no ledger can see.
 
-**The recommendation, in the ask's own terms.** #203 asks for one of
-two properties and says either alone helps. Both are worth having and
-they are separable work:
+The recommendation, in the ask's own terms. #203 asks for one of two
+properties and says either alone helps. Both are worth having and they
+are separable work:
 
-- **One byte per byte** is the bigger win (8x, and it is the half that
-  makes the type honest about what it holds — a byte buffer that cannot
-  hold invalid UTF-8 is not a byte buffer). std has documented `Bytes`
-  as an interim since sc05, and `std.bytes`' header already states the
-  landing shape: **every signature keeps its form — `List[int]` becomes
-  `Bytes` and nothing else moves.** That is a real, checked property of
-  the existing surface, not a hope: all nine functions in `std.bytes`,
-  plus `fs.read_bytes`/`read_chunk`/`write_bytes`/`write_chunk` and
+- One byte per byte is the bigger win (8x, and it is the half that
+  makes the type say what it holds: a byte buffer that cannot hold
+  invalid UTF-8 is not a byte buffer). std has documented `Bytes` as an
+  interim since sc05, and `std.bytes`' header already states the
+  landing shape, that every signature keeps its form and `List[int]`
+  becomes `Bytes` with nothing else moving. That is a checked property
+  of the existing surface: all nine functions in `std.bytes`, plus
+  `fs.read_bytes`/`read_chunk`/`write_bytes`/`write_chunk` and
   `net.read_bytes`/`write_bytes`, are monomorphic over `List[int]`
-  today precisely so they run on all three lanes (F-0026), and a
-  byte-width nominal type keeps that property where a generic would
-  lose it.
-- **Preallocation from a known length** is the smaller win (2x) and the
+  today so that they run on all three lanes (F-0026), and a byte-width
+  nominal type keeps that property where a generic would lose it.
+- Preallocation from a known length is the smaller win (2x) and the
   cheaper one: `fs_read_chunk(fd, n)` and `net_read_bytes(s, max)` both
-  KNOW their bound at the call. A buffer sized from that argument
-  rather than grown by doubling reports the buffer instead of the
-  buffer's history, and it needs no new type at all.
+  know their bound at the call. A buffer sized from that argument
+  instead of grown by doubling reports the buffer and not the buffer's
+  history, and it needs no new type at all.
 
-**Recommendation: a std `Bytes` over a language byte-width element
-type, not a std-only wrapper.** std cannot fix this from its own side
-and should not pretend to: a `struct Bytes { xs: List[int] }` would
-change no allocation, hide the cost behind a nicer name, and cost a
-lane (a wrapper's methods are methods on a std type, and this sprint's
-own probes just measured what the checked rung does with those). The
-element-width half is a language change by construction. What std can
-do, and did at this sprint, is make the cost VISIBLE and keep every
-signature in the landing shape so the fix is a pure substitution when
-it comes — the F-0049 lesson (declare against the fix; the fix is then
-an addition) applied to a type rather than to a row.
+Recommendation: a std `Bytes` over a language byte-width element type,
+with no std-only wrapper. std cannot fix this from its own side: a
+`struct Bytes { xs: List[int] }` would change no allocation, hide the
+cost behind a nicer name, and cost a lane (a wrapper's methods are
+methods on a std type, and this sprint's own probes just measured what
+the checked rung does with those). The element-width half is a language
+change by construction. What std can do, and did at this sprint, is
+make the cost visible and keep every signature in the landing shape so
+the fix is a pure substitution when it comes. That is the F-0049 lesson
+(declare against the fix; the fix is then an addition) applied to a
+type instead of to a row.
 
-**No build. Nothing in this repo is worked around** — the byte
-surfaces keep their shapes, the ledger did not move, and
-`std.mem.budget`'s header carries the caveat so a caller sizing a
-budget from payload arithmetic is warned at the place they would make
-the mistake.
+No build, and nothing in this repo is worked around: the byte surfaces
+keep their shapes, the ledger did not move, and `std.mem.budget`'s
+header carries the caveat so a caller sizing a budget from payload
+arithmetic is warned at the place they would make the mistake.
 
 ## Retirements and movements at the sc33 pin — the bytes get a width
 
-**The drift prediction, written 2026-09-02 07:26 EDT, BEFORE the
-binary was replaced and BEFORE any gauntlet at the new pins** (read
-first, per the ritual: lupin's 0.1.23 CHANGELOG entry at the tag
-`127b6fa`; the whole `8cda3aa..813153e` data-pin span commit by commit
-— 19 commits, 4 first-parent; both upstream trees counted and diffed
-at the two data-pin shas before the run; the repo grepped for every
-new surface's SHAPE).
+The drift prediction, written 2026-09-02 07:26 EDT, before the binary
+was replaced and before any gauntlet at the new pins (read first, per
+the ritual: lupin's 0.1.23 CHANGELOG entry at the tag `127b6fa`; the
+whole `8cda3aa..813153e` data-pin span commit by commit, 19 commits, 4
+first-parent; both upstream trees counted and diffed at the two
+data-pin shas before the run; the repo grepped for every new surface's
+shape).
 
-**Two of the three pins move, and they move in different directions.**
-This bump is the first in this repo's history where the three pins
-have to be told apart out loud:
+Two of the three pins move, and they move in different directions. This
+bump is the first in this repo's history where the three pins have to
+be told apart:
 
-- **The wolf BINARY does not move.** It stays at the v0.2.2 tag
-  (`8cda3aa`) — r06 moves it later. So the checked and native lanes
-  meet no new compiler at all, and their predicted zero is a zero **by
-  construction rather than by grep**. That is a third kind of zero
-  after sc31's (a span with no capability) and sc32's (a capability
-  with no carrier), and it is the cheapest of the three to defend:
-  nothing was measured about wolfc this bump because nothing about
-  wolfc changed.
-- **The lupin BINARY moves** 0.1.22 (`753d686`, conformance pin
-  `2bfbe5e`) **-> 0.1.23** (`127b6fa`, conformance pin `8cda3aa`). One
-  release, is34, three letters. Note what happens to the gap sc32
-  recorded as the largest this repo had ever seen: lupin's conformance
-  pin **catches up to wolf's own, 35 commits behind -> ZERO**. It
-  closes because is34 chased v0.2.2 the tag, not because either
-  machine owed the other a lowering.
-- **The DATA pin moves `8cda3aa` -> `813153e`** — trunk, no tag, the
-  sc30 dev-stamp precedent — and therefore ends up **19 commits AHEAD
-  of both binary pins**. The pin clause is written out below.
+- The wolf binary does not move. It stays at the v0.2.2 tag
+  (`8cda3aa`); r06 moves it later. So the checked and native lanes meet
+  no new compiler at all, and their predicted zero holds by
+  construction where earlier ones held by grep. That is a third kind of
+  zero after sc31's (a span with no capability) and sc32's (a
+  capability with no carrier), and it is the cheapest of the three to
+  defend: nothing was measured about wolfc this bump because nothing
+  about wolfc changed.
+- The lupin binary moves 0.1.22 (`753d686`, conformance pin `2bfbe5e`)
+  -> 0.1.23 (`127b6fa`, conformance pin `8cda3aa`). One release, is34,
+  three letters. Note what happens to the gap sc32 recorded as the
+  largest this repo had ever seen: lupin's conformance pin catches up
+  to wolf's own, 35 commits behind -> zero. It closes because is34
+  chased v0.2.2 the tag; neither machine owed the other a lowering.
+- The data pin moves `8cda3aa` -> `813153e` (trunk, no tag, the sc30
+  dev-stamp precedent) and therefore ends up 19 commits ahead of both
+  binary pins. The pin clause is written out below.
 
 ### The lupin lane, letter by letter
 
-- **#209 — a trap runs no defers, at the ROOT too. ZERO movers, and
-  this is the prediction sc32 banked coming due.** sc32 recorded this
-  as a MEASURED DIVERGENCE live at that pin (every wolfc lane
+- #209, a trap runs no defers, at the root too. Zero movers, and this
+  is the prediction sc32 banked coming due. The sc32 register recorded
+  this as a measured divergence live at that pin (every wolfc lane
   abandoned a pending root defer; lupin 0.1.22 ran it) and said in
   writing that it had nothing to ride here. 0.1.23 abandons it too, so
-  the divergence **heals** — and the carrier check is re-run rather
-  than inherited: the tree still holds exactly **ONE** executable
-  `defer` (`std/fs/fs.lu:262`, `defer fs_close(fd) else |_| {}` in
-  `append_text`) and **ZERO** `errdefer`, unchanged since sc31; the
-  rows that reach that defer propagate with `?` and never trap; and no
-  trap row in the tree has a `defer` anywhere in the trapping frame.
-  A heal with no carrier moves nothing, exactly as a divergence with
-  no carrier moved nothing.
+  the divergence heals, and the carrier check was re-run rather than
+  inherited: the tree still holds one executable `defer`
+  (`std/fs/fs.lu:262`, `defer fs_close(fd) else |_| {}` in
+  `append_text`) and zero `errdefer`, unchanged since sc31; the rows
+  that reach that defer propagate with `?` and never trap; and no trap
+  row in the tree has a `defer` anywhere in the trapping frame. A heal
+  with no carrier moves nothing, the same way a divergence with no
+  carrier moved nothing.
 
-- **#55 — the record carries the trap's output. This is the letter the
-  contract asked for a count from, and the honest answer is a number
-  and a mechanism that disagree.**
+- #55, the record carries the trap's output. This is the letter the
+  contract asked for a count from, and the answer is a number and a
+  mechanism that disagree.
 
-  **Eleven std rows trap AFTER printing.** Grepped by shape over all
+  Eleven std rows trap after printing. Grepped by shape over all
   56 `*_trap.lu`/`*_traps.lu` files, then read to confirm the print
   precedes the trapping call, then checked against the ledger to
   confirm the lane actually runs them (a row `unsupported` on lupin
@@ -5223,40 +5220,39 @@ have to be told apart out loud:
   | `x/tls/record/negative_seq_trap.lu` | `"reached the call"` |
   | `x/tls/record/non_byte_trap.lu` | `"reached the call"` |
 
-  Three more trap rows contain a `print(` and are **not** in the list,
-  which is why the grep had to be read rather than counted:
+  Three more trap rows contain a `print(` and are missing from the
+  list, which is why the grep had to be read and not just counted:
   `x/crypto/p256/non_byte_trap.lu`, `x/crypto/p256/private_key_trap.lu`
-  and `x/tls/cert/non_byte_trap.lu` each hold exactly one print, and it
-  sits AFTER the trapping call as the `"unreachable: …"` guard. Those
+  and `x/tls/cert/non_byte_trap.lu` each hold one print, and it sits
+  after the trapping call as the `"unreachable: …"` guard. Those
   programs write nothing before they die, so their records carry null
-  at 0.1.23 exactly as at 0.1.22. The other 42 trap rows print nothing
-  at all.
+  at 0.1.23 just as at 0.1.22. The other 42 trap rows print nothing at
+  all.
 
-  **Predicted verdict movers from those eleven: ZERO.** Their lupin
-  RECORDS change — `stdout_sha256` and `stdout_inline` go from `null`
-  to the real digest and text — and no row in the ledger moves,
-  because this rig never looks at a trap's stdout. Three independent
-  reasons, each read out of the rig's own source rather than assumed:
+  Predicted verdict movers from those eleven: zero. Their lupin records
+  change, with `stdout_sha256` and `stdout_inline` going from `null` to
+  the real digest and text, and no row in the ledger moves, because
+  this rig never looks at a trap's stdout. Three independent reasons,
+  each read out of the rig's own source:
 
-  1. `classify` (`xtask/src/runner.rs`) — the Trap arm destructures
-     `Check::Run { exit: ExitExpect::Trap(want), .. }`. The stdout
-     field is discarded **by the pattern**; a trap row is satisfied by
-     KIND alone.
-  2. `diff_class` (`xtask/src/runner.rs`) — compares `stdout_sha256`
+  1. `classify` (`xtask/src/runner.rs`): the Trap arm destructures
+     `Check::Run { exit: ExitExpect::Trap(want), .. }`. The pattern
+     discards the stdout field; a trap row is satisfied by kind alone.
+  2. `diff_class` (`xtask/src/runner.rs`) compares `stdout_sha256`
      only under `matches!(a.verdict, Verdict::Exit(_))`. A pair of trap
      records never reaches the stdout arm at all.
-  3. Lint **R3** (`xtask/src/runner.rs`) — rejects `stdout=` beside a
-     trap expectation outright ("a trap record carries no stdout, so
-     the hash would never be compared"), so not one trap row in the
-     tree even CARRIES an expectation the change could contradict.
+  3. Lint R3 (`xtask/src/runner.rs`) rejects `stdout=` beside a trap
+     expectation outright ("a trap record carries no stdout, so the
+     hash would never be compared"), so not one trap row in the tree
+     carries an expectation the change could contradict.
 
   So this repo's rig already implements `[proto.cmp.phase]`'s "for
-  `trap`, compare kind only" — the same posture lupin's own differ
-  keeps, and the one wolf-lang#216 is filed to widen. **The letter
-  changes what the record SAYS, not what any lane CONCLUDES.**
+  `trap`, compare kind only", the same posture lupin's own differ
+  keeps, and the one wolf-lang#216 is filed to widen. The letter
+  changes what the record says; what any lane concludes is untouched.
 
-  **The before-picture, measured at 0.1.22 before the binary was
-  replaced**, because a claim about what a bump changes is worth more
+  The before-picture was measured at 0.1.22 before the binary was
+  replaced, because a claim about what a bump changes is worth more
   with both sides of it observed. A three-lane witness that prints and
   then divides by zero:
 
@@ -5266,27 +5262,27 @@ have to be told apart out loud:
   | wolf 0.2.2 `--checked` | `trap(div-zero)` | `5726e3cf…` | `"reached the call\n"` |
   | wolf 0.2.2 `--native` | `trap(div-zero)` | `5726e3cf…` | `"reached the call\n"` |
 
-  **The asymmetry was always on lupin's side alone** — the two wolf
-  lanes have carried trap stdout all along — and it stayed invisible
-  for exactly the reason it is harmless here: the comparator does not
-  look. Predicted at 0.1.23: lupin joins with the **same digest**, the
-  three lanes agree field for field, and the rig notices nothing.
+  The asymmetry was always on lupin's side alone (the two wolf lanes
+  have carried trap stdout all along) and it stayed invisible for the
+  same reason it is harmless here: the comparator does not look.
+  Predicted at 0.1.23: lupin joins with the same digest, the three
+  lanes agree field for field, and the rig notices nothing.
 
-- **#56 — the comma refusals teach the comma. ZERO.** Diagnostic
-  WORDING plus an additive `help` line, and D22 puts wording outside
-  the differential protocol; lupin's own release measured that no
-  record moved and asserted span parity structurally. This repo
-  compares verdicts and diagnostic CODES, never message text, and no
-  ledger row pins a message. Zero by shape as well as by protocol:
-  sc32 swept all 420 `.lu` files for the D67/D69 separator forms and
-  found none, and the tree has not gained one since.
+- #56, the comma refusals teach the comma. Zero. Diagnostic wording
+  plus an additive `help` line, and D22 puts wording outside the
+  differential protocol; lupin's own release measured that no record
+  moved and asserted span parity structurally. This repo compares
+  verdicts and diagnostic codes, never message text, and no ledger row
+  pins a message. Zero by shape as well as by protocol: the sc32 sweep
+  covered all 420 `.lu` files for the D67/D69 separator forms and found
+  none, and the tree has not gained one since.
 
-- **is34's remaining items are lupin-internal or corpus-only. ZERO.**
+- is34's remaining items are lupin-internal or corpus-only. Zero.
   #198's string half lands two upstream corpus witnesses (re-grepped
   here: the tree's maximum `\u{…}` is still six digits, and no row
   pins E0110 or E0101); wolf-interp#57 is a declared conservatism with
   a standing test on lupin's side; DIV-2026-020 (wolf-lang#220) is a
-  span-WIDTH class over eight upstream `grammar/` files, and this
+  span-width class over eight upstream `grammar/` files, and this
   repo pins no spans.
 
 ### The data pin, `8cda3aa` -> `813153e`
@@ -5294,33 +5290,32 @@ have to be told apart out loud:
 19 commits, 4 first-parent: s60b (the windows task layer), the
 2026-09-02 ledger ritual, and an xtask dist-smoke repair.
 
-- **`spec/` moves in exactly ONE file and adds NO anchor.**
+- `spec/` moves in one file and adds no anchor.
   `git diff 8cda3aa..813153e -- spec corpus` is a single hunk in
-  `spec/11-os.md`, +15/-6, all of it prose INSIDE the already-existing
+  `spec/11-os.md`, +15/-6, all of it prose inside the already-existing
   `[os.signal.platform]` clause, recording that windows console-control
   delivery landed and that `os_signal_raise` there is an in-process
   delivery.
-- **Anchors 411, and `spec/anchors.json` is byte-identical between the
-  two shas** — `git diff` reports nothing for that file. So the
-  re-vendor moves no bytes and the F-0100 both-ways key-set diff is a
-  formality this time. Said out loud rather than skipped: sc32's was
-  load-bearing (404 -> 411, the first byte-moving re-vendor since
-  sc27), this one is not, and knowing which you have is the point of
-  doing it either way.
-- **`corpus/` is unchanged, 490 -> 490**, counted at both shas with
+- Anchors 411, and `spec/anchors.json` is byte-identical between the
+  two shas: `git diff` reports nothing for that file. So the re-vendor
+  moves no bytes and the F-0100 both-ways key-set diff is a formality
+  this time. It was still run and written down: sc32's diff caught real
+  motion (404 -> 411, the first byte-moving re-vendor since sc27), this
+  one caught none, and you only learn which you have by running it.
+- `corpus/` is unchanged, 490 -> 490, counted at both shas with
   `git ls-tree -r --name-only`.
-- **Zero carriers for the `[os.signal.platform]` prose**:
-  `grep -rn "os\.signal\|os_signal" std tests` finds NOTHING, and
-  nomad-1 is macOS/arm64 in any case — every new sentence in the
+- Zero carriers for the `[os.signal.platform]` prose:
+  `grep -rn "os\.signal\|os_signal" std tests` finds nothing, and
+  nomad-1 is macOS/arm64 in any case, since every new sentence in the
   clause is windows semantics.
-- **s60b is a windows RUNTIME bring-up** — Win32 workers on kernel
-  guard stacks, a VEH reporter, the WSAPoll reactor rung, the clif
-  by-name refusal table emptying — plus its CI. This repo runs
-  `conform-run` on macOS/arm64 against a compiler binary that does not
-  move this bump. Zero.
-- **`4d9683d`, the dist smoke degrading by name on unserved hosts** —
-  wolf-lang's own xtask, an archive-gap repair for the next tag. Not a
-  language surface, not consumed here. Zero.
+- s60b is a windows runtime bring-up: Win32 workers on kernel guard
+  stacks, a VEH reporter, the WSAPoll reactor rung, the clif by-name
+  refusal table emptying, plus its CI. This repo runs `conform-run` on
+  macOS/arm64 against a compiler binary that does not move this bump.
+  Zero.
+- `4d9683d`, the dist smoke degrading by name on unserved hosts:
+  wolf-lang's own xtask, an archive-gap repair for the next tag. It is
+  not a language surface and nothing here consumes it. Zero.
 
 ### The pin clause: a DATA pin ahead of BOTH binary pins
 
@@ -5333,55 +5328,54 @@ should be on record predicting it. After this bump:
 | lupin binary | `8cda3aa` (0.1.23's conformance pin) | caught up, gap 35 -> 0 |
 | **data** | **`813153e`** | **19 commits AHEAD of both** |
 
-sc30 set the precedent for a data pin that runs ahead of a binary pin
-and doctor's expected posture is REPORT, NOT GATE — the gate is on the
-binary's self-declared pin matching `vendor/tools.toml`, which is a
-different field from the vendored snapshot's. The prediction is that
-doctor is GREEN and says nothing about the 19 commits, because it has
-no field that compares them. If it does say something, that is the
-finding.
+The sc30 bump set the precedent for a data pin that runs ahead of a
+binary pin, and doctor's expected posture is to report and not gate:
+the gate is on the binary's self-declared pin matching
+`vendor/tools.toml`, which is a different field from the vendored
+snapshot's. The prediction is that doctor is green and says nothing
+about the 19 commits, because it has no field that compares them. If it
+does say something, that is the finding.
 
-**Predicted total: ZERO verdict movers over 376x3.** The baseline the
-gauntlet must reproduce exactly, counted from the untouched ledger at
-trunk `6d6b025`: lupin **304** `run` / **72** `unsupported`; wolfc
-**299** `run` / **75** `unsupported` / **2** `fail(E…)` (E1013, E0301);
-native **325** `run` / **49** `unsupported` / **2** `fail(E…)`. Anchors
-**411**, +0/-0. Corpus **490**, unchanged. (sc32's register recorded
-373x3; the +3 is `std.mem.budget`'s own rows, landed at the end of that
-sprint after its gauntlet.)
+Predicted total: zero verdict movers over 376x3. The baseline the
+gauntlet must reproduce, counted from the untouched ledger at trunk
+`6d6b025`: lupin 304 `run` / 72 `unsupported`; wolfc 299 `run` / 75
+`unsupported` / 2 `fail(E…)` (E1013, E0301); native 325 `run` / 49
+`unsupported` / 2 `fail(E…)`. Anchors 411, +0/-0. Corpus 490,
+unchanged. (The sc32 register recorded 373x3; the +3 is
+`std.mem.budget`'s own rows, landed at the end of that sprint after its
+gauntlet.)
 
-**And the sub-verdict prediction, which is this bump's actual content:
-eleven lupin records change shape and not one row moves.**
+And the sub-verdict prediction, which is this bump's actual content:
+eleven lupin records change shape and not one row moves.
 
-**The measurement (same day, untouched ledger, three lanes, idle rig):
-ZERO movers — the prediction is exact, and the eleven records changed
-shape exactly as predicted while not one row moved.** The gauntlet ran
-**07:38:43 -> 08:04:50 EDT** over files last touched at 07:25:15 (the
-prediction), 07:26:29 (the PIN) and 07:28:00 (the tools.toml record) —
-mtimes checked against the run window, the sc30 rule — with
+The measurement (same day, untouched ledger, three lanes, idle rig):
+zero movers. The prediction held, and the eleven records changed shape
+as predicted while not one row moved. The gauntlet ran
+07:38:43 -> 08:04:50 EDT over files last touched at 07:25:15 (the
+prediction), 07:26:29 (the PIN) and 07:28:00 (the tools.toml record),
+with mtimes checked against the run window per the sc30 rule, and with
 `tests/ledger.toml` untouched at 07:15:19 (the worktree's own checkout)
-and `git diff` empty on it. `cargo xtask ci` exit code **0**,
-`ci: GREEN`, the exit code read directly and **not** piped (the
-gauntlet's own standing lesson):
+and `git diff` empty on it. `cargo xtask ci` exit code 0, `ci: GREEN`,
+the exit code read directly from the process and never through a pipe
+(the gauntlet's own standing lesson):
 
 - `std-test: 376 test(s); forward tags: 697; conservatism ledger: 200
-  entries; unstable rows: 0; slow skips: 0; divergent rows: 0` —
-  `std-test: GREEN`. Every row observed exactly the verdict the
-  untouched ledger claims; a deeper answer is a designed RED here, so a
-  green run over an unedited ledger IS the zero-motion measurement.
+  entries; unstable rows: 0; slow skips: 0; divergent rows: 0`,
+  `std-test: GREEN`. Every row observed the verdict the untouched
+  ledger claims; a deeper answer is a designed red here, so a green run
+  over an unedited ledger is the zero-motion measurement.
   `ledger-check: 376 test(s), all ledgered`; `lint-conventions: 376
   test(s), all conforming (5 rules)`; `doc-examples: 414 block(s),
   GREEN`; `ulp: 200 reference row(s), GREEN` with the standing
   16-value libm note unchanged and all three lanes reproducing the 200
   recorded values exactly.
 - `sync-pin: PIN 813153ec1bdfbb85ab1b41737dafb369d052a581` /
-  `sync-pin: snapshot == submodule at pin — OK`. Anchors **411**,
+  `sync-pin: snapshot == submodule at pin — OK`. Anchors 411, and
   `vendor/upstream/anchors.json` untouched at 07:15:19 because it is
-  byte-identical to `upstream/spec/anchors.json` at 813153e — the
+  byte-identical to `upstream/spec/anchors.json` at 813153e: the
   re-vendor moved no bytes, as predicted.
-- **Doctor green, exit 0, and the data-pin sentence is the one to
-  quote**, because sc33 is the first bump where the three pins come
-  apart:
+- Doctor green, exit 0, and the data-pin sentence is the one to quote,
+  because sc33 is the first bump where the three pins come apart:
 
       doctor: lupin — /Users/…/.local/bin/lupin (source: PATH)
               version: lupin 0.1.23
@@ -5392,24 +5386,24 @@ gauntlet's own standing lesson):
               pin: 8cda3aa matches vendor/tools.toml — OK
       doctor: native rung — libwolf_rt.a at /Users/…/libwolf_rt.a (lane lit)
 
-  **Doctor says NOTHING about the data pin standing 19 commits ahead of
-  both binary pins, and that is the correct answer rather than a
-  missed one.** Predicted from the gates' source before the run and
-  confirmed by it: doctor's two gates are the binary's self-declared
-  version and its self-declared pin against `vendor/tools.toml`; it
-  never opens `vendor/upstream/PIN` at all, and `sync-pin` gates that
-  snapshot against the SUBMODULE rather than against either binary. So
-  the "one-sha invariant" the sc32 entry named is a CONVENTION recorded
-  in a comment, not a rule enforced by a gate — and suspending it costs
-  exactly nothing, by design. sc30's dev-stamp precedent holds and is
-  now understood rather than merely followed.
+  Doctor says nothing about the data pin standing 19 commits ahead of
+  both binary pins, which is the correct answer for it to give.
+  Predicted from the gates' source before the run and confirmed by it:
+  doctor's two gates are the binary's self-declared version and its
+  self-declared pin against `vendor/tools.toml`; it never opens
+  `vendor/upstream/PIN` at all, and `sync-pin` gates that snapshot
+  against the submodule instead of against either binary. So the
+  "one-sha invariant" the sc32 entry recorded is a convention written
+  in a comment and not a rule any gate enforces, and suspending it
+  costs nothing, by design. The sc30 dev-stamp precedent holds, and
+  this bump is where the reason behind it became clear.
   The pairing line goes one release stale again (`paired with lupin
   0.1.22 … pin 2bfbe5e` beside an installed 0.1.23) because r05 cut
-  v0.2.2's pairing commit before is34 released; reported, never gated
-  (F-0064), and the sc27 nuance that sc32 could report as not
+  v0.2.2's pairing commit before is34 released; it is reported and not
+  gated (F-0064), and the sc27 nuance that sc32 could report as not
   recurring does recur here.
 
-**The eleven records, confirmed changed and confirmed harmless.** The
+The eleven records were confirmed changed and confirmed harmless. The
 same three-lane witness measured before the fresh-inode install was
 re-run after it:
 
@@ -5420,17 +5414,17 @@ re-run after it:
 | wolf 0.2.2 `--checked` | `trap(div-zero)` | `5726e3cf…` | `"reached the call\n"` |
 | wolf 0.2.2 `--native` | `trap(div-zero)` | `5726e3cf…` | `"reached the call\n"` |
 
-lupin joins with the **byte-identical digest** and the three lanes now
+lupin joins with the byte-identical digest and the three lanes now
 agree field for field. The eleven std rows that trap after printing
 carry the same change; `divergent rows: 0` and a green ledger say that
-none of them moved a verdict. **A record can change shape without any
-lane changing its mind, and the two questions have to be predicted
-separately** — the release note says what an implementation EMITS, the
-rig says what you CONCLUDE.
+none of them moved a verdict. A record can change shape without any
+lane changing its mind, so the two questions have to be predicted
+separately: the release note says what an implementation emits, the rig
+says what you conclude.
 
 ## F-0104's io half — the readers measured, and the preallocation win is *entirely* unrealized
 
-sc32's table was a synthetic `List[int]` filled by `push`. The sprint
+The sc32 table was a synthetic `List[int]` filled by `push`. The sprint
 contract asked for the io readers' own cost, which is what wolf-lang
 #203 is actually about, so std's readers were measured directly: one
 fresh region per call, `region_bytes` read inside it, payload written
@@ -5443,29 +5437,29 @@ and read back from a real file.
 | 16,384 | 262,144 / **262,128** | 262,144 / **262,128** | 16.0x |
 | **65,536** | 1,048,576 / **1,048,560** | 1,048,576 / **1,048,560** | 16.0x |
 
-(checked / **native**. The lupin lane cannot run this probe —
-`fs_write_bytes` does not resolve there, the long-standing F-0081 gap:
-12 of the tree's 14 `fs` rows are `unsupported` on that lane — so its
+(checked / native. The lupin lane cannot run this probe, because
+`fs_write_bytes` does not resolve there (the long-standing F-0081 gap:
+12 of the tree's 14 `fs` rows are `unsupported` on that lane), so its
 column stays the synthetic one.)
 
-**Two findings, one of them new and sharp.**
+Two findings, one of them new and sharp.
 
-1. **The readers cost exactly what the synthetic list costs**, to the
-   byte, at every size. Native's 1,048,560 for a 64 KiB chunk is
-   lobo's own reported number, now reproduced a third time — first by
-   lobo, then by sc32's synthetic list, now through std's actual
-   reader. The 16x is the representation, not any consumer's loop and
-   not any particular allocation path.
-2. **`read_bytes` and `read_chunk` charge IDENTICALLY, and that is the
-   new result.** `fs.read_chunk(f, n)` is handed its bound `n` AT THE
-   CALL — it is the single surface in std best positioned to take
-   #203's second property (preallocate from a known length) — and it
-   charges precisely what the unbounded whole-file read charges,
-   because the buffer is still grown by doubling rather than sized
-   from the argument. So the preallocation win is not partly taken
-   today; it is **entirely** untaken, on the one call that already
-   knows the answer. That is a 2x sitting unclaimed behind no new type
-   at all, and it is the half of #203 that could land independently.
+1. The readers cost what the synthetic list costs, to the byte, at
+   every size. Native's 1,048,560 for a 64 KiB chunk is lobo's own
+   reported number, now reproduced a third time: first by lobo, then by
+   the sc32 synthetic list, now through std's actual reader. The 16x
+   belongs to the representation, and neither a consumer's loop nor a
+   particular allocation path changes it.
+2. `read_bytes` and `read_chunk` charge identically, and that is the
+   new result. `fs.read_chunk(f, n)` is handed its bound `n` at the
+   call, which makes it the single surface in std best positioned to
+   take #203's second property (preallocate from a known length), and
+   it charges what the unbounded whole-file read charges, because the
+   buffer is still grown by doubling instead of sized from the
+   argument. So the preallocation win is entirely untaken today, on the
+   one call that already knows the answer. That is a 2x sitting
+   unclaimed behind no new type at all, and it is the half of #203 that
+   could land independently.
 
 ## The #203 proposal, as filed
 
@@ -5474,56 +5468,56 @@ Filed as the recommended shape on wolf-lang#203
 above. The compiler lane decides; std builds nothing. Its spine, and
 the reason it is shaped the way it is:
 
-**The spec has no width story to extend — it has no type inventory at
-all.** Read at 813153e before the ask was written: the `[type.*]`
-family is twenty anchors in exactly three groups (`numlit`, `char`,
-`str`); there is no `[type.scalar]`, no `[type.prim]` and **no
-`[type.int]`**; `int` carries no defining clause anywhere, so its
-width, signedness and representation are all unstated (the chapter
-closes by naming the omission deliberate); there are no fixed-width
-integer types, no width vocabulary and no literal suffixes, so `1u8`
-is unspellable by the grammar; and scalar type names are not even
-keywords. So the ask is not an amendment. **It is the first clause of
-an inventory that does not exist**, which is worth knowing before
-anyone scopes it and is the honest reason this has sat in three issues
-(#80, #86, #137) without a home.
+The spec has no width story to extend, because it has no type
+inventory at all. Read at 813153e before the ask was written: the
+`[type.*]` family is twenty anchors in three groups (`numlit`, `char`,
+`str`); there is no `[type.scalar]`, no `[type.prim]` and no
+`[type.int]`; `int` carries no defining clause anywhere, so its width,
+signedness and representation are all unstated (the chapter closes by
+calling the omission deliberate); there are no fixed-width integer
+types, no width vocabulary and no literal suffixes, so `1u8` is
+unspellable by the grammar; and scalar type names are not even
+keywords. So the ask is not an amendment but the first clause of an
+inventory that does not exist, which is worth knowing before anyone
+scopes it and is why this has sat in three issues (#80, #86, #137)
+without a home.
 
-**Both cheap answers fail by the same mechanism, one measured and one
-read.** sc32 MEASURED that a std `struct Bytes { xs: List[int] }`
-changes no allocation. sc33 READ that the spec's own newtype is no
-better: `[gram.item.trait]` defines `distinct` as "same layout as the
-base, free bidirectional `as` casts", because layout preservation is
-the entire point of the construct. The library-side wrapper and the
-language-side newtype are the same non-answer from two directions —
-which is what makes the pair worth more than either alone, and what
-establishes that this genuinely cannot be absorbed by std.
+Both cheap answers fail by the same mechanism, one measured and one
+read. The sc32 sprint measured that a std
+`struct Bytes { xs: List[int] }` changes no allocation. The sc33 sprint
+read that the spec's own newtype is no better: `[gram.item.trait]`
+defines `distinct` as "same layout as the base, free bidirectional `as`
+casts", because layout preservation is what the construct is for. The
+library-side wrapper and the language-side newtype are the same
+non-answer from two directions, and the pair together is what
+establishes that std cannot absorb this.
 
-**The recommended shape is `[type.byte]` modelled on `[type.char]`,
-which already exists.** The spec contains exactly ONE clause giving a
-scalar a stated width, and it carries every part a byte type needs: a
+The recommended shape is `[type.byte]` modelled on `[type.char]`, which
+already exists. The spec contains one clause giving a scalar a stated
+width, and it carries every part a byte type needs: a
 domain, "Layout: 4 bytes, alignment 4", a `List[char]` stride, a C-seam
 rule, a no-arithmetic posture and an explicit cast bridge. And
 `[mem.str.chars]` says in as many words why the byte tier was left
 behind — "The byte tier is unchanged: `bytes()` stays `List[int]` of
 bytes — `char` is the scalar tier, **never a byte**." s121 gave the
-scalar tier a width-bearing type and consciously declined to give the
-byte tier one; the proposal is to finish that job, as `[type.byte]` /
+scalar tier a width-bearing type and declined to give the byte tier
+one; the proposal is to finish that job, as `[type.byte]` /
 `[type.byte.cast]` (with `[type.byte.lit]` separable and optional, and
 a `[mem.list.repr]`-shaped clause if element storage is to become a
-stated fact rather than a measured one). Copying `char`'s "no
+stated fact instead of a measured one). Copying `char`'s "no
 numeric-literal adoption" also sidesteps the spec's own recorded
 `i32`-vs-`int` defaulting contradiction (F-0004 gap 3, still open after
-10-types.md landed) rather than inheriting it.
+10-types.md landed) instead of inheriting it.
 
-**One correction to F-0104 as sc32 wrote it**, caught by re-measuring a
-number rather than quoting it: `std.bytes` has **TEN** public
-functions, not nine (`len`, `is_empty`, `at`, `slice`, `find`,
+One correction to F-0104 as the sc32 register wrote it, caught by
+re-measuring a number instead of quoting it: `std.bytes` has ten public
+functions rather than nine (`len`, `is_empty`, `at`, `slice`, `find`,
 `starts_with`, `ends_with`, `from_str`, `to_str`, `is_utf8`). The claim
-the count serves is unchanged and re-verified — every one is
-monomorphic over `List[int]`, as are `fs.read_bytes`/`read_chunk`/
-`write_bytes`/`write_chunk` and `net.read_bytes`/`write_bytes` — so the
-landing shape still holds: `List[int]` becomes the byte type and no
-signature changes form. But the wrong number was two keystrokes from
+the count serves is unchanged and re-verified: every one is monomorphic
+over `List[int]`, as are `fs.read_bytes`/`read_chunk`/
+`write_bytes`/`write_chunk` and `net.read_bytes`/`write_bytes`, so the
+landing shape still holds and `List[int]` becomes the byte type with no
+signature changing form. But the wrong number was two keystrokes from
 being restated in a public upstream issue as this repo's own evidence.
 
 ## The checked tier and `breach_is_a_row` — DEFERRED, with the reason and a note for s134
@@ -5531,32 +5525,31 @@ being restated in a public upstream issue as this repo's own evidence.
 The sprint contract makes this conditional: if s134's item 1 (wolf-lang
 #219) has merged by the second gauntlet, `mem/budget/breach_is_a_row.lu`
 flips from `wolfc = "unsupported"` to three-lane and takes the trunk
-sha as the data pin. **It has not merged. The flip is deferred and the
-row keeps its sc32 reason unamended.**
+sha as the data pin. It has not merged, so the flip is deferred and the
+row keeps its sc32 reason unamended.
 
 Checked at both gauntlets: `git -C ../wolf-lang log origin/trunk` is
 `813153e` at each, unmoved, with `56ed5a5` (s60b) and `f8725e7` beneath
-it — the same three commits, no s134 merge; and `gh issue view 219`
-reports **OPEN** with one comment, the ws13 bisection, and no fix
-landed. So the data pin stays at `813153e` (already the sprint's pin,
-chosen before this condition was evaluated) and the row stays two-lane.
+it, the same three commits, no s134 merge; and `gh issue view 219`
+reports open with one comment, the ws13 bisection, and no fix landed.
+So the data pin stays at `813153e` (already the sprint's pin, chosen
+before this condition was evaluated) and the row stays two-lane.
 
-**A note for s134, because this repo has a bearing on half of #219's
-bisection.** The comment observes that `wolf conform-run --checked`
+A note for s134, because this repo has a bearing on half of #219's
+bisection. The comment observes that `wolf conform-run --checked`
 refuses every proc spawn at `mem` with an empty `diagnostics` array
 while "`wolf run --checked` runs the same files to their expected
 stdout", and reads the pair as two `--checked` drivers disagreeing.
-This repo's standing operational note is that **`wolf run --checked`
-executes the native build** — the ubcheck machine answers only through
-`conform-run --json --checked` — which, if it still holds at this pin,
-would mean the second half of that pair is not evidence about the
-checked tier at all, and the two drivers are not disagreeing so much as
-one of them is not the checked tier. Not re-verified here (it is s134's
-issue and its surface, and this sprint had no reason to spend a probe
-on it), so it is offered as a lead rather than a finding. The
-`diagnostics`-should-carry-the-name half of the report stands
-regardless, and this repo would consume it: a rig cannot triage an
-empty array.
+This repo's standing operational note is that `wolf run --checked`
+executes the native build, with the ubcheck machine answering only
+through `conform-run --json --checked`. If that still holds at this
+pin, the second half of that pair is not evidence about the checked
+tier at all, and one of the two drivers simply is not the checked tier.
+It was not re-verified here (it is s134's issue and its surface, and
+this sprint had no reason to spend a probe on it), so it is offered as
+a lead and not a finding. The `diagnostics`-should-carry-the-name half
+of the report stands regardless, and this repo would consume it: a rig
+cannot triage an empty array.
 
 ## F-0103 re-measured at the sc33 pin — unmoved, and the "unmoved" is worth one sentence of trust
 
@@ -5569,35 +5562,35 @@ Re-probed 2026-09-02 at `wolf 0.2.2 (wolfgang, pin 8cda3aa)` /
 | f2 | `let r = narrow(1)` then `row_name(r)` — the BOUND form | `exit(0)` `alpha` | `exit(0)` `alpha` | `exit(0)` `alpha` |
 
 The refusal string is byte-identical to sc31's and sc32's.
-**wolf-lang#201 is still OPEN — no ruling, so there is nothing to
-adopt**, and the residue is re-dated rather than retired.
+wolf-lang#201 is still open, with no ruling to adopt, and the residue
+is re-dated instead of retired.
 
-**But the reason this bump's "unmoved" is cheap, said plainly rather
-than dressed up as evidence: the wolf binary did not move.** sc33 took
-a lupin release and a data-pin advance while holding the compiler at
-the v0.2.2 tag, so this probe ran against the SAME binary that produced
-sc32's table. It could not have moved. Previous sprints could write
-"nothing in 35 commits touches `mem`'s argument handling" and mean
-something by it; this one cannot, and reporting the result as evidence
-of stability would be overclaiming. It is re-run because the rule is to
-measure rather than assume — and the honest content of the measurement
-this time is only "the workaround is still in std's source". Recorded
-upstream in the same terms (#201 `#issuecomment-5509353963`).
+This bump's "unmoved" is cheap, and the reason is that the wolf binary
+did not move. The sc33 sprint took a lupin release and a data-pin
+advance while holding the compiler at the v0.2.2 tag, so this probe ran
+against the same binary that produced the sc32 table. It could not have
+moved. Previous sprints could write "nothing in 35 commits touches
+`mem`'s argument handling" and mean something by it; this one cannot,
+and reporting the result as evidence of stability would be
+overclaiming. It is re-run because the rule is to measure rather than
+assume, and all the measurement says this time is that the workaround
+is still in std's source. Recorded upstream in the same terms (#201
+`#issuecomment-5509353963`).
 
-So `std.x.tls.client`'s header keeps its **bind, then name** sentence
+So `std.x.tls.client`'s header keeps its "bind, then name" sentence
 unamended, and the three `std.option` rows this finding explains
 (`or_else_default.lu`, `exists_marking.lu`, `is_none_marking.lu`) keep
 their `wolfc = "unsupported"` with the cause still named.
 
 ## F-0105 — wolfc's zero-width parse span is reachable from ordinary std-side code, not just the grammar corpus
 
-is34's sixteenth corpus differential named **DIV-2026-020**
-(wolf-lang#220, ruled as **D71**) as its dominant class: eight upstream
+is34's sixteenth corpus differential called DIV-2026-020
+(wolf-lang#220, ruled as D71) its dominant class: eight upstream
 `grammar/` files where both machines agree on the code and the starting
-byte and disagree about the span's WIDTH — lupin spans the offending
-token, wolfc emits a zero-width span at its start. This repo hit the
-same class by accident while re-probing the `strbuf` placement residue,
-which makes it a second and independent witness:
+byte and disagree about the span's width, with lupin spanning the
+offending token and wolfc emitting a zero-width span at its start. This
+repo hit the same class by accident while re-probing the `strbuf`
+placement residue, which makes it a second and independent witness:
 
 ```wolf
 struct Buf { n: int, }
@@ -5616,16 +5609,16 @@ fn main() -> int {
 | wolf 0.2.2 `--checked` | `fail(E0201)` | parse | **`[88, 88]`** |
 | wolf 0.2.2 `--native` | `fail(E0201)` | parse | **`[88, 88]`** |
 
-Byte 88 is the `{`; both machines report 7:27 and E0201. **The class is
-not local to the eight corpus files** — this is an ordinary
+Byte 88 is the `{`; both machines report 7:27 and E0201. The class
+reaches past the eight corpus files: this is an ordinary
 struct-and-region program written for an unrelated purpose and it
 carries the divergence anyway, so any std-side E0201 will.
 
-**And it confirms why nothing measured it, from a second rig.** This
-repo's runner compares verdicts and diagnostic CODES and never spans
+And it confirms from a second rig why nothing measured it. This repo's
+runner compares verdicts and diagnostic codes and never spans
 (`record::parse` reads `diagnostics[].code`; `diff_class` compares
 verdict, then `stdout_sha256` for `Exit` only), so the pair is
-verdict-identical, code-identical, and passes GREEN — exactly as is34
+verdict-identical, code-identical, and passes green, just as is34
 reported of its own differ's walk, which "compares codes". Two
 independent rigs look past it for the same structural reason, which is
 a fair argument that the fix should not wait on either rig changing.
@@ -5635,52 +5628,52 @@ unaffected. Filed upstream on #220 (`#issuecomment-5509349787`).
 
 ## The residues, re-probed at 813153e / 0.1.23, one line each
 
-- **The chars-pairs tuple list is refused at its SEVENTH consecutive
-  pin.** `List[(int, int)]()` is `unsupported — this prelude container
+- The chars-pairs tuple list is refused at its seventh consecutive pin.
+  `List[(int, int)]()` is `unsupported — this prelude container
   instantiation (generic data)` at resolve on both wolf rungs,
   `@32..50`, and lupin runs it (`exit(0)`). Seven pins is long past the
   point of re-arguing it: this refusal has never moved as a side effect
   of anything, and it will move the sprint someone lowers generic
   container instantiation on purpose. Dated in the str header.
-- **F-0096 refuses verbatim.** `s.get(0..^2)` is `unsupported —
+- F-0096 refuses verbatim. `s.get(0..^2)` is `unsupported —
   open-ended or end-relative ranges (slicing)` at resolve on both
   rungs, `@57..62`, against `[mem.str.get]`'s own sentence; lupin runs
   it and prints `hel`. Dated in the str header beside the row that
   flips at its closure (`tests/str/end_relative_get.lu`).
-- **`strbuf.in(r)` re-probed in both shapes, and it earned its keep
-  this time by turning up F-0105.** `List[int].in(r)` is `unsupported —
+- `strbuf.in(r)` was re-probed in both shapes, and it earned its keep
+  this time by turning up F-0105. `List[int].in(r)` is `unsupported —
   a std/prelude stub without a signature` at resolve on both wolf rungs
   (`@51..55`) and refused by lupin too, whose reason now reads
-  ``builtin List` has no method `in` in this machine's std subset` —
-  a wording move, not a verdict move. `Buf.in(r) { … }` over a plain
-  struct is `fail(E0201)` at PARSE on all three: the form is not in the
-  grammar. Unmoved; the span disagreement inside that agreement is
-  F-0105 above.
-- **`reserve(n)` is unmoved and owes no new probe.** sc32 answered its
-  forward-looking sentence with the region accounting surface and
-  consumed it in `std.mem.budget`; nothing in `8cda3aa..813153e` or
-  `0.1.22..0.1.23` is a capacity or string-backing commit — the span is
-  a windows runtime, a ledger ritual and three letters about traps,
-  defers and commas.
-- **`graphemes` owes no probe**: a segmentation TABLES tier, and
-  nothing in either span brings it closer.
-- **A `str` still charges NO named region's ledger, on ANY tier, and
-  this one WAS re-probed rather than carried** — the lupin binary moved
-  this bump, so the tier that could have changed its answer is exactly
-  the one that got a new build. 200 fresh interpolated strings built
-  inside `region r { … }` leave `region_bytes(r)` at **0** before and
-  after, on all three lanes (`before 0 after 0 sink 9890`, byte-identical
-  stdout across lupin, checked and native). `[mem.region.account.1]`
-  still scopes this gap to the NATIVE tier alone; it remains true of
-  every tier, and the clause should either widen or the two non-native
-  tiers should charge.
-- **The four `divergent(…)`-era addresses stay healed** (re-observed
-  green in both sc33 gauntlets; `divergent rows: 0`).
+  ``builtin List` has no method `in` in this machine's std subset`, a
+  wording move with no verdict behind it. `Buf.in(r) { … }` over a
+  plain struct is `fail(E0201)` at parse on all three: the form is not
+  in the grammar. Unmoved; the span disagreement inside that agreement
+  is F-0105 above.
+- `reserve(n)` is unmoved and owes no new probe. The sc32 sprint
+  answered its forward-looking sentence with the region accounting
+  surface and consumed it in `std.mem.budget`; nothing in
+  `8cda3aa..813153e` or `0.1.22..0.1.23` is a capacity or
+  string-backing commit, since the span is a windows runtime, a ledger
+  ritual and three letters about traps, defers and commas.
+- `graphemes` owes no probe: a segmentation tables tier, and nothing in
+  either span brings it closer.
+- A `str` still charges no named region's ledger on any tier, and this
+  one was re-probed rather than carried, because the lupin binary moved
+  this bump, so the tier that could have changed its answer is the one
+  that got a new build. 200 fresh interpolated strings built inside
+  `region r { … }` leave `region_bytes(r)` at 0 before and after, on
+  all three lanes (`before 0 after 0 sink 9890`, byte-identical stdout
+  across lupin, checked and native). `[mem.region.account.1]` still
+  scopes this gap to the native tier alone; it remains true of every
+  tier, and the clause should either widen or the two non-native tiers
+  should charge.
+- The four `divergent(…)`-era addresses stay healed (re-observed green
+  in both sc33 gauntlets; `divergent rows: 0`).
 
 ## The second gauntlet, and what it does and does not cover
 
-`cargo xtask ci` exit code **0**, `ci: GREEN`, **08:18:42 -> 08:41:33
-EDT**, numbers identical to the first: `std-test: 376 test(s); forward
+`cargo xtask ci` exit code 0, `ci: GREEN`, 08:18:42 -> 08:41:33 EDT,
+numbers identical to the first: `std-test: 376 test(s); forward
 tags: 697; conservatism ledger: 200 entries; unstable rows: 0; slow
 skips: 0; divergent rows: 0`; `ledger-check: 376`;
 `lint-conventions: 376 (5 rules)`; `doc-examples: 414 block(s), GREEN`;
@@ -5688,74 +5681,72 @@ skips: 0; divergent rows: 0`; `ledger-check: 376`;
 pin — OK`. Two consecutive greens over an untouched ledger at the new
 pins.
 
-**And the mtime audit, because two identical greens are exactly the
-shape that once hid a pre-edit run.** Every ci-relevant byte predates
-the second run: `tests/ledger.toml` and `vendor/upstream/anchors.json`
-at 07:15:19 (the worktree's own checkout), `vendor/upstream/PIN` at
-07:26:29, and **zero** `.lu` files under `tests/` or `std/` touched
-after 07:16 — the whole tree is still the checkout, which is what makes
-a green run the zero-motion measurement. Two files were written after
-the run began and both are outside everything ci reads for a verdict:
-`docs/findings.md` (this register) and one comment word in
-`vendor/tools.toml` (a first-parent count corrected from 3 to 4 —
-`git diff` shows that single line and no `version`/`pin` change). So
-the second gauntlet covers the functional tree completely, and the
-edits it does not cover could not have changed a verdict. Stated rather
-than assumed, because "the gauntlet must cover the edits" is a lesson
-this repo paid for.
+And the mtime audit, because two identical greens are the shape that
+once hid a pre-edit run. Every ci-relevant byte predates the second
+run: `tests/ledger.toml` and `vendor/upstream/anchors.json` at 07:15:19
+(the worktree's own checkout), `vendor/upstream/PIN` at 07:26:29, and
+zero `.lu` files under `tests/` or `std/` touched after 07:16. The
+whole tree is still the checkout, which is what makes a green run the
+zero-motion measurement. Two files were written after the run began and
+both are outside everything ci reads for a verdict: `docs/findings.md`
+(this register) and one comment word in `vendor/tools.toml` (a
+first-parent count corrected from 3 to 4; `git diff` shows that single
+line and no `version`/`pin` change). So the second gauntlet covers the
+functional tree completely, and the edits it does not cover could not
+have changed a verdict. Written down rather than assumed, because "the
+gauntlet must cover the edits" is a lesson this repo paid for.
 
-**The s134 checkpoint, re-taken at the second gauntlet as the contract
-requires**: `git -C ../wolf-lang log origin/trunk` is still `813153e`
+The s134 checkpoint was re-taken at the second gauntlet as the contract
+requires: `git -C ../wolf-lang log origin/trunk` is still `813153e`
 (fetched fresh at 08:19:28, the same three commits beneath it) and
-`gh issue view 219` still reports **OPEN**, with no s134 branch on the
+`gh issue view 219` still reports open, with no s134 branch on the
 remote. Item 1 has not merged at either gauntlet, so
-`breach_is_a_row`'s three-lane flip is **deferred** and the data pin
-stays `813153e`.
+`breach_is_a_row`'s three-lane flip is deferred and the data pin stays
+`813153e`.
 
 ## The sc34 pin bump — the byte arrives, and the three pins come back together
 
-**The drift prediction, written 2026-09-02 21:50 EDT, BEFORE the binary
-was installed and BEFORE any gauntlet at the new pins** (read first, per
+The drift prediction, written 2026-09-02 21:50 EDT, before the binary
+was installed and before any gauntlet at the new pins (read first, per
 the ritual: the whole `8cda3aa..31170d1` binary span and the
 `813153e..31170d1` data span commit by commit; both upstream trees
 counted and diffed at the two data-pin shas before the run; the repo
-grepped for every new surface's SHAPE; and — the sc33 lesson —
-the BEFORE side measured on the binary that was about to be replaced).
+grepped for every new surface's shape; and, per the sc33 lesson, the
+before side measured on the binary that was about to be replaced).
 
-**All three pins move, and the one-sha invariant sc33 suspended is
-RESTORED.** sc33 was the first bump where the three came apart; sc34 is
-the bump that puts them back:
+All three pins move, and the one-sha invariant sc33 suspended is
+restored. The sc33 bump was the first where the three came apart; the
+sc34 bump puts them back:
 
-- **The wolf BINARY moves 8cda3aa (the v0.2.2 tag) -> 31170d1**, a
+- The wolf binary moves 8cda3aa (the v0.2.2 tag) -> 31170d1, a
   dev-stamped build at trunk: `wolf 0.2.3+dev.31170d1 (wolfgang, pin
-  31170d1)`. **51 commits — the largest binary span this repo has ever
-  crossed in one bump** (sc32's 35 was the previous record), because
-  sc33 held the compiler at its tag while the data pin ran ahead, so
-  this bump pays for two sprints of compiler at once: s60b (the windows
-  task layer), the 2026-09-02 ledger ritual, s134 (the LSP annotates,
-  #219, D71/#220), r06 (v0.2.3, #212/#214/#215) and s135 (the byte,
-  #222, #224).
-- **The DATA pin moves 813153e -> 31170d1**, 32 commits, and lands on
-  the SAME sha as the binary. The invariant is a convention, not a
-  gate (the sc33 lesson); it is honoured here because nothing this
-  sprint wants it suspended for.
-- **The lupin BINARY does NOT move**: 0.1.23 (`127b6fa`), conformance
-  pin `8cda3aa`, unchanged in `vendor/tools.toml`. Note what that does
-  to the gap sc33 recorded as CLOSED: lupin's conformance pin was zero
-  commits behind wolf's own at sc33 and is **51 behind** here, the
-  largest this repo has recorded, and every one of those 51 is a
-  compiler the interpreter has not chased yet. is36 is where it closes.
+  31170d1)`. That is 51 commits, the largest binary span this repo has
+  ever crossed in one bump (the previous record was sc32's 35), because
+  the sc33 bump held the compiler at its tag while the data pin ran
+  ahead, so this bump pays for two sprints of compiler at once: s60b
+  (the windows task layer), the 2026-09-02 ledger ritual, s134 (the LSP
+  annotates, #219, D71/#220), r06 (v0.2.3, #212/#214/#215) and s135
+  (the byte, #222, #224).
+- The data pin moves 813153e -> 31170d1, 32 commits, and lands on the
+  same sha as the binary. The invariant is a convention and not a gate
+  (the sc33 lesson); it is honoured here because this sprint has no
+  reason to suspend it.
+- The lupin binary does not move: 0.1.23 (`127b6fa`), conformance pin
+  `8cda3aa`, unchanged in `vendor/tools.toml`. Note what that does to
+  the gap sc33 recorded as closed: lupin's conformance pin was zero
+  commits behind wolf's own at sc33 and is 51 behind here, the largest
+  this repo has recorded, and every one of those 51 is a compiler the
+  interpreter has not chased yet. It closes at is36.
 
 ### Why the binary is a DEV STAMP and not the v0.2.3 tag — measured, not assumed
 
 The contract says "the machine wolf stays at v0.2.3 until r07", and it
 does: a dev build off trunk self-brands `0.2.3+dev.<commit>`, claiming
-no release. What forces the dev build rather than the tag is that
-**the v0.2.3 TAG CANNOT COMPILE THIS SPRINT'S SUBJECT.** `v0.2.3` =
-`3befc3e` sits twelve commits BEFORE s135, and at that tag
-`crates/wolf_wir/src/lower.rs:1571` reads
-`Prim::Byte => Err(refuse("byte lowering (runtime byte views, c08)", span))`
-— the type name has resolved in sema for many sprints and the lowering
+no release. What forces the dev build is that the v0.2.3 tag cannot
+compile this sprint's subject. `v0.2.3` = `3befc3e` sits twelve commits
+before s135, and at that tag `crates/wolf_wir/src/lower.rs:1571` reads
+`Prim::Byte => Err(refuse("byte lowering (runtime byte views, c08)", span))`;
+the type name has resolved in sema for many sprints and the lowering
 has always refused it. Measured on the installed tag build before it
 was replaced, in its own directory, on both wolf rungs:
 
@@ -5765,124 +5756,121 @@ was replaced, in its own directory, on both wolf rungs:
     $ wolf run --checked main.lu
     (byte-identical refusal)
 
-and `git grep "byte lowering" 31170d1` finds nothing — s135 deleted the
-refusal. So there is no tagged wolf in existence that can build a
-`List[byte]`, and the sc30 precedent is the honest answer: build at the
-sha with the stamp applied
+and `git grep "byte lowering" 31170d1` finds nothing, because s135
+deleted the refusal. So there is no tagged wolf in existence that can
+build a `List[byte]`, and the sc30 precedent gives the answer: build at
+the sha with the stamp applied
 (`WOLF_COMMIT=31170d1 cargo build --release -p wolf_driver -p wolf_rt`),
-install `wolf` + `libwolf_rt.a` to `~/.local/bin` through **fresh
-inodes** (the sc26 SIGKILL rule — never overwrite in place). The
-`+dev.<commit>` string is exactly what r03 designed for this case: it
-claims no release and still names its own pin on line 1, so doctor's
-provenance gate reads the pin clause the same way it reads a tag
-build's, and `vendor/tools.toml`'s `version` key carries the full dev
-identity (a lying binary is worse than none; an honest dev binary is
-neither).
+install `wolf` + `libwolf_rt.a` to `~/.local/bin` through fresh inodes
+(the sc26 SIGKILL rule: never overwrite in place). The `+dev.<commit>`
+string is what r03 designed for this case: it claims no release and
+still names its own pin on line 1, so doctor's provenance gate reads
+the pin clause the same way it reads a tag build's, and
+`vendor/tools.toml`'s `version` key carries the full dev identity, so
+the binary misstates nothing about what it is.
 
-**And the same measurement is the before-picture the sc33 lesson says
-to take**: lupin 0.1.23 refuses `as byte` with `fail(E0301)` at phase
-**resolve** — `nothing with this name is in scope, so this cast names
-no target type … [mod.scope]` — which is the interpreter's answer both
+The same measurement is the before-picture the sc33 lesson says to
+take: lupin 0.1.23 refuses `as byte` with `fail(E0301)` at phase
+resolve, `nothing with this name is in scope, so this cast names
+no target type … [mod.scope]`, which is the interpreter's answer both
 before and after this bump, since lupin does not move.
 
 ### The drift prediction, surface by surface
 
-**Predicted total at the bump (before any substitution): ZERO verdict
-movers over 376x3.** The baseline the gauntlet must reproduce exactly,
-counted from the untouched ledger at trunk `35f69ef`: lupin **304**
-`run` / **72** `unsupported`; wolfc **299** `run` / **75**
-`unsupported` / **2** `fail(E…)` (E1013, E0301); native **325** `run` /
-**49** `unsupported` / **2** `fail(E…)`. `std-test` should print 376
-tests, 697 forward tags, 200 conservatism entries, 0 unstable, 0 slow,
-0 divergent; `doc-examples` 414 blocks; `ulp` 200 rows. Anchors
-**411 -> 415** (+4 / -0). Corpus **490 -> 499** files.
+Predicted total at the bump (before any substitution): zero verdict
+movers over 376x3. The baseline the gauntlet must reproduce, counted
+from the untouched ledger at trunk `35f69ef`: lupin 304 `run` / 72
+`unsupported`; wolfc 299 `run` / 75 `unsupported` / 2 `fail(E…)`
+(E1013, E0301); native 325 `run` / 49 `unsupported` / 2 `fail(E…)`.
+`std-test` should print 376 tests, 697 forward tags, 200 conservatism
+entries, 0 unstable, 0 slow, 0 divergent; `doc-examples` 414 blocks;
+`ulp` 200 rows. Anchors 411 -> 415 (+4 / -0). Corpus 490 -> 499 files.
 
-This zero is a **fourth** kind, and it is the most expensive of the four
-to defend, so it gets the most words. sc31's was a span with no new
+This zero is a fourth kind, and it is the most expensive of the four to
+defend, so it gets the most words. sc31's was a span with no new
 capability; sc32's was a capability with no carrier; sc33's was a
-binary that did not move at all. sc34's is **a binary that moved
-further than any before it, across a surface every one of whose
-carriers has to be grepped for by name** — the cheap answer is not
-available and the work has to be done:
+binary that did not move at all. sc34's is a binary that moved further
+than any before it, across a surface every one of whose carriers has to
+be grepped for individually, so the cheap answer is not available and
+the work has to be done:
 
-- **`byte` itself (s135) is NEW SURFACE with no carrier at the bump.**
+- `byte` itself (s135) is new surface with no carrier at the bump.
   `grep -rn "byte" std/ tests/ --include=*.lu` finds the word only in
   prose and in identifiers (`read_bytes`, `bytes.len`, `non_byte_trap`);
   there is not one `as byte` and not one `List[byte]` in the tree when
-  the gauntlet runs. The substitution is this sprint's SECOND half and
-  is deliberately not in the bump's measurement — that is what makes
-  the bump a clean control.
-- **#219's record-shape change moves nothing, for sc33's exact
-  reason, re-read from source rather than inherited.** `conform-run`
-  now adds `x-unsupported-construct` / `x-unsupported-span` to every
+  the gauntlet runs. The substitution is this sprint's second half and
+  was kept out of the bump's measurement, which is what makes the bump
+  a clean control.
+- #219's record-shape change moves nothing, for the same reason sc33's
+  did, re-read from source rather than inherited. `conform-run` now
+  adds `x-unsupported-construct` / `x-unsupported-span` to every
   `unsupported` record (`[proto.record.ext]`). This rig's
-  `record::parse` reads a closed list — `protocol`, `impl`,
+  `record::parse` reads a closed list (`protocol`, `impl`,
   `phase_reached`, `verdict`, `stdout_sha256`, `stdout_inline`,
-  `warnings` — and **never looks at an extension key**, and `classify`
-  maps `Verdict::Unsupported` to `Achieved::Unsupported` BY PATTERN
-  without reading another field. So 75 wolfc rows and 49 native rows
-  will emit strictly richer records and not one of them can move. This
-  is the same shape as sc33's #55 and the same answer for the same
-  structural reason: predict at both levels, and the level that counts
-  is what the comparator reads.
-- **D71/#220 (a parse refusal spans its offending token) moves
-  nothing.** 35 upstream snapshots moved; this rig pins **no span
-  anywhere**. `classify` compares a `fail(E…)` row by CODE
-  (`code == want`) and `diff_class` compares verdicts and, for
-  `Exit` only, `stdout_sha256`. The tree's two `fail` rows are E1013
-  and E0301, and neither names a locus. (This was already established
-  as F-0105's aside at sc33 and is re-read, not carried, because the
-  binary that produced the spans is new here.)
-- **#222 (one path spelling across 23 pkg sites) has no carrier: this
-  rig never runs a package verb.** `runner.rs` invokes exactly
+  `warnings`) and never looks at an extension key, and `classify` maps
+  `Verdict::Unsupported` to `Achieved::Unsupported` by pattern without
+  reading another field. So 75 wolfc rows and 49 native rows will emit
+  richer records and not one of them can move. This is the same shape
+  as sc33's #55 and the same answer for the same structural reason:
+  predict at both levels, and the level that counts is what the
+  comparator reads.
+- D71/#220 (a parse refusal spans its offending token) moves nothing.
+  35 upstream snapshots moved; this rig pins no span anywhere.
+  `classify` compares a `fail(E…)` row by code (`code == want`) and
+  `diff_class` compares verdicts and, for `Exit` only, `stdout_sha256`.
+  The tree's two `fail` rows are E1013 and E0301, and neither pins a
+  locus. (This was already established as F-0105's aside at sc33 and is
+  re-read, not carried, because the binary that produced the spans is
+  new here.)
+- #222 (one path spelling across 23 pkg sites) has no carrier: this rig
+  never runs a package verb. `runner.rs` invokes only
   `wolf conform-run [--checked|--native] --std-root <dir>` and
   `lupin conform-run`; `add`/`rm`/`init`/`vendor`/`publish` are not in
   the rig's vocabulary at all.
-- **#224 (net_deadline arms on a reset socket) has no carrier, and the
-  carrier check is specific rather than categorical.** The change is
-  25 lines in `wolf_mem/src/ubcheck.rs` — the CHECKED machine only —
-  and it fires on exactly one condition: `setsockopt` answering
-  `InvalidInput` while `local_addr()` still succeeds, i.e. a socket
-  the peer RESET by closing over unread data. The tree has exactly one
-  `set_deadline` call site in a test (`tests/net/read_deadline_row.lu`)
-  and it arms the budget on a socket whose peer (`conn`) is accepted
-  and never closed, never written to and never reset — the whole point
-  of that test is a SILENT peer, not a departed one. Native's timer
-  wheel never called `setsockopt` in the first place. Both wolf lanes
-  predicted unmoved.
-- **s60b (the windows task layer) has no carrier: the host is macOS
-  arm64.** `stack_win.rs` is a new file behind a target gate, and the
+- #224 (net_deadline arms on a reset socket) has no carrier, and the
+  carrier check here is specific rather than categorical. The change is
+  25 lines in `wolf_mem/src/ubcheck.rs`, on the checked machine only,
+  and it fires on one condition: `setsockopt` answering `InvalidInput`
+  while `local_addr()` still succeeds, i.e. a socket the peer reset by
+  closing over unread data. The tree has one `set_deadline` call site
+  in a test (`tests/net/read_deadline_row.lu`) and it arms the budget
+  on a socket whose peer (`conn`) is accepted and never closed, never
+  written to and never reset; that test is about a silent peer rather
+  than a departed one. Native's timer wheel never called `setsockopt`
+  in the first place. Both wolf lanes predicted unmoved.
+- s60b (the windows task layer) has no carrier: the host is macOS
+  arm64. `stack_win.rs` is a new file behind a target gate, and the
   reactor/signal churn beside it is the same lane's. The one thing in
-  that merge that is NOT windows-only is a poller wake fix; the tree's
+  that merge that is not windows-only is a poller wake fix; the tree's
   net rows are loopback and synchronous and were green across it at
   the sc33 data pin already.
-- **s134's LSP trio (`signatureHelp`/`semanticTokens`/`inlayHint`) and
-  the binding table under it have no carrier**: `wolf_query` is an
-  editor surface, this repo runs `conform-run`.
-- **#219's LLVM half (func.addr across partitions) has no carrier: no
-  lane in this repo builds the release tier.**
-- **r06 is a version bump plus dist/release-notes plumbing**, and
-  #215's nine grammar productions are SPEC text — upstream states
-  anchors held at 411 across them, and the +4 this bump sees is
-  s135's `[type.byte]` family alone.
-- **The two `fail(E…)` rows and the three F-0103 rows are predicted
-  verbatim.** F-0103's asymmetry lives in `mem`-phase argument
-  lowering; nothing in 51 commits touches argument lowering, and
+- s134's LSP trio (`signatureHelp`/`semanticTokens`/`inlayHint`) and
+  the binding table under it have no carrier: `wolf_query` is an editor
+  surface, this repo runs `conform-run`.
+- #219's LLVM half (func.addr across partitions) has no carrier, since
+  no lane in this repo builds the release tier.
+- r06 is a version bump plus dist/release-notes plumbing, and #215's
+  nine grammar productions are spec text; upstream states anchors held
+  at 411 across them, and the +4 this bump sees is s135's `[type.byte]`
+  family alone.
+- The two `fail(E…)` rows and the three F-0103 rows are predicted
+  verbatim. F-0103's asymmetry lives in `mem`-phase argument lowering;
+  nothing in 51 commits touches argument lowering, and
   `wolf_wir/src/lower.rs`'s 76 changed lines are the byte cast/op
-  bridges. Re-probed as its own item below rather than assumed —
-  and unlike sc33, this time the binary DID move, so the probe is
-  evidence rather than a formality.
+  bridges. Re-probed as its own item below rather than assumed, and
+  unlike at sc33 the binary did move this time, so the probe is
+  evidence and not a formality.
 
-**The lupin lane is predicted UNCHANGED AT THE BUMP, and that is a
-zero of sc33's cheapest kind — the binary did not move.** No std row
-uses `byte` when the gauntlet runs, so there is nothing for lupin's
-E0301 to reach even if it could.
+The lupin lane is predicted unchanged at the bump, a zero of sc33's
+cheapest kind, since the binary did not move. No std row uses `byte`
+when the gauntlet runs, so there is nothing for lupin's E0301 to reach
+even if it could.
 
-**The doctor prediction.** Doctor gates the binary's self-declared
-version and pin against `vendor/tools.toml` and never reads
-`vendor/upstream/PIN`; `sync-pin` gates the vendored snapshot against
-the SUBMODULE. With `version = "0.2.3+dev.31170d1"` and
-`pin = 31170d1…` recorded, doctor is predicted GREEN on both binaries
+The doctor prediction: doctor gates the binary's self-declared version
+and pin against `vendor/tools.toml` and never reads
+`vendor/upstream/PIN`, while `sync-pin` gates the vendored snapshot
+against the submodule. With `version = "0.2.3+dev.31170d1"` and
+`pin = 31170d1…` recorded, doctor is predicted green on both binaries
 with wolf's line 1 read as the dev identity and the pairing line
 (`lupin 0.1.23 … pin 8cda3aa`) reported and not gated (F-0064). If
 doctor gates the `+dev.` suffix in a way sc30's note did not record,
@@ -5890,15 +5878,15 @@ that is the finding.
 
 ### The measurement at the bump — ZERO movers, the prediction exact
 
-`cargo xtask ci` exit code **0**, `ci: GREEN`, **21:52:28 -> 22:20:25
-EDT**, the exit code read directly from the process and **not** through
-a pipe (the gauntlet's standing lesson). Over the untouched ledger:
+`cargo xtask ci` exit code 0, `ci: GREEN`, 21:52:28 -> 22:20:25 EDT,
+the exit code read directly from the process and never through a pipe
+(the gauntlet's standing lesson). Over the untouched ledger:
 
 - `std-test: 376 test(s); forward tags: 697; conservatism ledger: 200
-  entries; unstable rows: 0; slow skips: 0; divergent rows: 0` —
-  `std-test: GREEN`. A row that answers DEEPER than its ledger claims
-  is a designed RED here, so a green run over an unedited
-  `tests/ledger.toml` IS the zero-motion measurement. The 200-entry
+  entries; unstable rows: 0; slow skips: 0; divergent rows: 0`,
+  `std-test: GREEN`. A row that answers deeper than its ledger claims
+  is a designed red here, so a green run over an unedited
+  `tests/ledger.toml` is the zero-motion measurement. The 200-entry
   conservatism ledger is the per-lane counts summed and therefore
   re-proves them arithmetically: 72 (lupin `unsupported`) + 75 (wolfc)
   + 49 (native) + 2 + 2 (the `fail(E…)` pairs) = 200, the sc33 baseline
@@ -5908,9 +5896,9 @@ a pipe (the gauntlet's standing lesson). Over the untouched ledger:
   GREEN`; `ulp: 200 reference row(s), GREEN` on all three lanes with
   the standing 16-value libm note unchanged.
 - `sync-pin: PIN 31170d119379086f6242cd88d4f4e5386f6aef23` /
-  `sync-pin: snapshot == submodule at pin — OK`. Anchors **415**.
-- **Doctor green, exit 0, and it reads the dev stamp exactly as sc30's
-  note predicted it would:**
+  `sync-pin: snapshot == submodule at pin — OK`. Anchors 415.
+- Doctor green, exit 0, and it reads the dev stamp as sc30's note
+  predicted it would:
 
       doctor: lupin — /Users/…/.local/bin/lupin (source: PATH)
               version: lupin 0.1.23
@@ -5922,32 +5910,32 @@ a pipe (the gauntlet's standing lesson). Over the untouched ledger:
       doctor: native rung — libwolf_rt.a … (lane lit)
 
   Both gates pass on a binary that claims no release. The pairing line
-  names the interpreter actually installed beside it, reported and not
+  reports the interpreter actually installed beside it, and is not
   gated (F-0064).
 
-**And #219's extension keys are live and confirmed unread**, which is
-the one prediction worth showing rather than asserting. A wolf
-`unsupported` record now reads:
+And #219's extension keys are live and confirmed unread, which is the
+one prediction worth showing instead of asserting. A wolf `unsupported`
+record now reads:
 
     {"commit":"31170d1", … ,"verdict":"unsupported","warnings":[],
      "x-unsupported-construct":"this prelude container instantiation (generic data)",
      "x-unsupported-span":[25,43]}
 
-Every `unsupported` record in the tree gained those two keys this bump
-— 124 of them on the wolf lanes — and `record::parse`'s key list does
-not contain either name, so all 124 changed shape and none could move.
-That is sc33's #55 lesson arriving a second time from a different
-implementation: **predict at both levels, and the level that decides is
-what your comparator reads.**
+Every `unsupported` record in the tree gained those two keys this bump,
+124 of them on the wolf lanes, and `record::parse`'s key list does not
+contain either name, so all 124 changed shape and none could move. That
+is sc33's #55 lesson arriving a second time from a different
+implementation: predict at both levels, and the level that decides is
+what your comparator reads.
 
 ## F-0104 CLOSES — the after-table, and the substitution that cannot be made yet
 
-**Status: CLOSED as a measurement.** wolf-lang#203's ask landed as D72
-/ s135's `[type.byte]`, the multiplier F-0104 filed is retired IN THE
-LANGUAGE, and this repo has now measured the after-picture from its own
-side. What does NOT close with it is the library's ability to spend the
-win, and the reason is a fact this sprint discovered rather than
-inherited — it is F-0106 below.
+Status: closed as a measurement. wolf-lang#203's ask landed as D72 /
+s135's `[type.byte]`, the multiplier F-0104 filed is retired in the
+language, and this repo has now measured the after-picture from its own
+side. What does not close with it is the library's ability to spend the
+win; the reason is a fact this sprint discovered rather than inherited,
+and it is F-0106 below.
 
 ### The after-table (native / checked), measured 2026-09-02 at `wolf 0.2.3+dev.31170d1` and `lupin 0.1.23`, macOS arm64
 
@@ -5965,94 +5953,93 @@ to N elements, `region_bytes` read inside the block.
 | 32,768 | 524,288 / **524,272** | 32,768 / **65,584** | 1.00x / **2.00x** | 557,056 / **589,856** |
 | **65,536** | 1,048,576 / **1,048,560** | **65,536** / **131,120** | **1.00x** / **2.00x** | 1,114,112 / **1,179,680** |
 
-(checked / **native**. The lupin column is gone from this table on
-purpose and is the last section below.)
+(checked / native. The lupin column is gone from this table on purpose
+and is the last section below.)
 
-**Four things the table says.**
+Four things the table says.
 
-1. **16.0x -> 2.0x native, 16.0x -> 1.0x checked, at every size.** The
-   8x element-width multiplier is retired on both wolf tiers. Natively
-   the residue is exactly `2 x payload + 48` — the 48 is one list
-   header, constant from 1 KiB to 64 KiB — so what remains is the
-   push-growth history `[mem.region.account.1]` keeps charged, which is
-   #203's separable second property and no type change can touch it.
-   **The checked machine has no growth history at all and charges the
-   payload EXACTLY**: 65,536 for 65,536 bytes, 1.00x, the first time
-   any number in this family has been 1.
-2. **The before column reproduces sc32's table to the byte at a
-   compiler 51 commits newer**, including lobo's own 1,048,560. The 16x
+1. 16.0x -> 2.0x native, 16.0x -> 1.0x checked, at every size. The 8x
+   element-width multiplier is retired on both wolf tiers. Natively the
+   residue is `2 x payload + 48`, where the 48 is one list header,
+   constant from 1 KiB to 64 KiB, so what remains is the push-growth
+   history `[mem.region.account.1]` keeps charged, which is #203's
+   separable second property and no type change can touch it. The
+   checked machine has no growth history at all and charges the payload
+   to the byte: 65,536 for 65,536 bytes, 1.00x, the first time any
+   number in this family has been 1.
+2. The before column reproduces the sc32 table to the byte at a
+   compiler 51 commits newer, including lobo's own 1,048,560. The 16x
    was the representation, and it still is wherever the representation
    is still `List[int]`.
-3. **The io readers are the same numbers, measured through std rather
-   than synthetically** — `fs.write_bytes` a payload, read it back in a
-   fresh region: 16,368 / 65,520 / 262,128 / 1,048,560 native at
+3. The io readers give the same numbers, measured through std rather
+   than synthetically: `fs.write_bytes` a payload, read it back in a
+   fresh region, giving 16,368 / 65,520 / 262,128 / 1,048,560 native at
    1 KiB / 4 KiB / 16 KiB / 64 KiB, and 16,384 / 65,536 / 262,144 /
    1,048,576 checked. Identical to F-0104's io half at sc33, and to the
    synthetic column above. Nothing about std's readers changed, which
-   is the point of the next column.
-4. **The fourth column is the finding.** `List[int]` **then converted
-   to** `List[byte]` — one list read from a producer, one list built by
-   `push`ing `x as byte` — charges **18.0x native and 17.0x checked**,
-   both **WORSE than the 16.0x it replaces**, at every size, because
-   the ledger is cumulative and the intermediate list is never
-   subtracted. That column is not a curiosity. **It is exactly what
-   every substituted signature in std would charge today**, and it is
-   why this sprint did not substitute. See F-0106.
+   is what the next column is about.
+4. The fourth column is the finding. `List[int]` then converted to
+   `List[byte]` (one list read from a producer, one list built by
+   `push`ing `x as byte`) charges 18.0x native and 17.0x checked, both
+   worse than the 16.0x it replaces, at every size, because the ledger
+   is cumulative and the intermediate list is never subtracted. That
+   column is not a curiosity: it is what every substituted signature in
+   std would charge today, and it is why this sprint did not
+   substitute. See F-0106.
 
 ### The lupin lane, and the count the flip set needs
 
-lupin 0.1.23 does not move this bump, and it **refuses `byte` by name**:
-`fail(E0301)` at phase **resolve** — `nothing with this name is in
-scope, so this cast names no target type … [mod.scope]` — measured on
+lupin 0.1.23 does not move this bump, and it refuses `byte`:
+`fail(E0301)` at phase resolve, `nothing with this name is in
+scope, so this cast names no target type … [mod.scope]`, measured on
 each probe above.
 
-**But the refusal is narrower than "every substituted row", and the
-narrowness is worth a sentence, because it changes what is36 has to
-flip and what a lane audit should count.** lupin is dynamically typed
-and **does not check a type NAME in annotation position at all**: a
-program declaring `fn blen(b: List[byte]) -> int` and calling it RUNS
-under 0.1.23 and prints its answer. What refuses is the **cast target**
-`as byte` — the one construct that names the type in a position lupin
-resolves. So:
+But the refusal is narrower than "every substituted row", and the
+narrowness changes what is36 has to flip and what a lane audit should
+count. lupin is dynamically typed and does not check a type name in
+annotation position at all: a program declaring
+`fn blen(b: List[byte]) -> int` and calling it runs under 0.1.23 and
+prints its answer. What refuses is the cast target `as byte`, the one
+construct that spells the type in a position lupin resolves. So:
 
-- a signature-only substitution would move **zero** lupin rows;
+- a signature-only substitution would move zero lupin rows;
 - and every row whose reachable source contains one `as byte` moves to
-  `fail(E0301)@resolve` — which is every row of a real substitution,
-  because with no byte-typed builtin in the language a `List[byte]` can
-  only be BUILT by casting (see F-0106), so the cast is unavoidable
-  wherever the tier is real.
+  `fail(E0301)@resolve`, which is every row of a real substitution:
+  with no byte-typed builtin in the language a `List[byte]` can only be
+  built by casting (see F-0106), so the cast is unavoidable wherever
+  the tier is real.
 
-**The is36 flip set, counted rather than estimated: 57 files and 262
-call sites carry the byte tier in this tree** (95 `.bytes()` builtin
+The is36 flip set was counted rather than estimated: 57 files and 262
+call sites carry the byte tier in this tree (95 `.bytes()` builtin
 calls, 132 `std.bytes` calls, 16 `std.fs` byte calls, 15 `std.net` byte
 calls, 4 direct `str_from_utf8`), spread over `std.bytes`, `std.fs`,
 `std.net`, `std.hex`, `std.base64`, `std.json`, `std.x.jose`,
 `std.x.crypto.{sha2,chacha20,curve25519,p256}` and
 `std.x.tls.{cert,handshake,record,client}`. Of the tree's 376 ledger
 rows, the ones a substitution would take dark on lupin are the rows
-reaching those files. Counted against the ledger: **40 of the 376
-rows sit on a test file that names the byte tier directly, and 32 of
-those 40 are `run` on lupin today** (the other 8 are already
-`unsupported` for other reasons). So a substitution's floor is **32
-lupin rows moving `run` -> `fail(E0301)@resolve`**, and the ceiling is
-higher, because a cast inside a std module refuses at resolve for every
-test that imports it, not only for the tests that name the tier.
+reaching those files. Counted against the ledger: 40 of the 376 rows
+sit on a test file that uses the byte tier directly, and 32 of those 40
+are `run` on lupin today (the other 8 are already `unsupported` for
+other reasons). So a substitution's floor is 32 lupin rows moving
+`run` -> `fail(E0301)@resolve`, and the ceiling is higher, because a
+cast inside a std module refuses at resolve for every test that imports
+it, not only for the tests that name the tier.
 
 is36 needs `byte` in type position, the two casts, operator
 widening, `Value::Byte` with 1-byte list slots and `{b}` printing the
-number; until it ships, ANY substitution here trades three lanes for
+number; until it ships, any substitution here trades three lanes for
 two on every row it touches.
 
 ## F-0106 — the byte TYPE landed; the byte PRODUCERS did not, so std's tier cannot take `List[byte]` without paying more than the type saves
 
-**This sprint's headline, and the reason target 2 was not executed as
-written.** The contract and wolf-lang#203's closing comment both call
+This is the sprint's headline, and the reason target 2 was not executed
+as written. The contract and wolf-lang#203's closing comment both call
 the std-side change "a pure substitution: `List[int]` becomes
-`List[byte]` and nothing else moves". That was true of the SHAPE of
-std's signatures — sc32 and sc33 verified the monomorphism twice and it
-still holds — and it is false of the PIPE at this pin, for a reason
-neither sprint could have known before the landing: **s135 gave the
-language a byte type and gave it no byte-typed builtin.**
+`List[byte]` and nothing else moves". That was true of the shape of
+std's signatures (sc32 and sc33 verified the monomorphism twice and it
+still holds) and it is false of the pipe at this pin, for a reason
+neither sprint could have known before the landing: s135 gave the
+language a byte type and gave it no byte-typed builtin.
 
 ### The measurement that decides it
 
@@ -6072,16 +6059,16 @@ at:
 | `net_write_bytes` | `(int, List[int]) -> () ! {…}` |
 
 `grep -n "Prim::Byte" crates/wolf_sema/src/check.rs` returns eleven
-hits and **not one of them is in the builtin signature table** — they
-are the cast kinds, the operator widenings, the diagnostic arms and one
-column-type mapping. There is **no byte-typed builtin in the language.**
+hits, none of them in the builtin signature table: they are the cast
+kinds, the operator widenings, the diagnostic arms and one column-type
+mapping. There is no byte-typed builtin in the language.
 
 Every one of std's sixteen byte-tier functions is a thin wrapper over
-one of those eight builtins — `read_bytes` is `fs_read_bytes(path)?`,
-`from_str` is `s.bytes()`, `to_str` is `str_from_utf8(b)?` — so a
-signature moved to `List[byte]` cannot be a rename. It has to CONVERT,
-elementwise, against a builtin on the other side. And the ledger is
-cumulative, so the list it converted FROM stays charged for the
+one of those eight builtins (`read_bytes` is `fs_read_bytes(path)?`,
+`from_str` is `s.bytes()`, `to_str` is `str_from_utf8(b)?`), so a
+signature moved to `List[byte]` cannot be a rename. It has to convert
+elementwise against a builtin on the other side. And the ledger is
+cumulative, so the list it converted from stays charged for the
 region's life (`[mem.region.account.1]`: "nothing is ever subtracted
 while the region lives"). Measured, at every size, in F-0104's fourth
 column:
@@ -6091,18 +6078,18 @@ column:
 | `fs.read_bytes` today (`List[int]`) | 1,048,576 (16.0x) | 1,048,560 (16.0x) |
 | **the same reader substituted to `List[byte]`** | **1,114,112 (17.0x)** | **1,179,680 (18.0x)** |
 
-**A substituted std reader charges MORE than the reader it replaces, on
-both tiers, at every size, at exactly the io sites #203 was filed
-about.** That is not a tuning question. It is the arithmetic of a
-cumulative ledger plus a producer of the wrong type.
+A substituted std reader charges more than the reader it replaces, on
+both tiers, at every size, at the io sites #203 was filed about. That
+is not a tuning question; it is the arithmetic of a cumulative ledger
+plus a producer of the wrong type.
 
 ### The one shape that could have won, and why it does not
 
 `std.bytes.from_str` is the single place std could plausibly have
-avoided the intermediate, because `s.bytes()` in a CONSUMED position is
-s77's borrow rather than a materialization — so
-`for b in s.bytes() { out.push(b as byte) }` should allocate exactly
-one list, the byte one. Measured over a 65,536-byte `str`:
+avoided the intermediate, because `s.bytes()` in a consumed position is
+s77's borrow rather than a materialization, so
+`for b in s.bytes() { out.push(b as byte) }` should allocate one list,
+the byte one. Measured over a 65,536-byte `str`:
 
 | shape | checked | native |
 |---|---|---|
@@ -6110,31 +6097,31 @@ one list, the byte one. Measured over a 65,536-byte `str`:
 | `from_str` as a walk building `List[byte]` | **1,114,112** | **131,120** |
 | `to_str`'s round trip (walk to `List[byte]`, widen back for `str_from_utf8`) | 2,162,688 | 1,179,680 |
 
-**Natively it works exactly as hoped — 131,120, a clean 8x win. On the
-checked machine it REGRESSES**, and the reason is F-0107 below. So the
-one substitution with a real win is a win on one tier and a loss on the
-other, which makes it a per-tier bet rather than an improvement, and
-this library does not ship those.
+Natively it works as hoped, 131,120, a clean 8x win. On the checked
+machine it regresses, and the reason is F-0107 below. So the one
+substitution with a real win is a win on one tier and a loss on the
+other, which makes it a per-tier bet, and this library does not ship
+those.
 
 ### What std did instead, and what would change the answer
 
-**Nothing is worked around and nothing is built** — the sc32/sc33
-posture for the third sprint running, and for the same house rule
-(sc00: a gap in what the language can express is a finding, never a
-workaround invented here). Inserting a conversion loop at every byte
-boundary in std IS a workaround, it is measurable, and the measurement
-says it costs more than it saves. The sixteen signatures keep their
-form, so the substitution stays a rename for whoever gets to make it.
+Nothing is worked around and nothing is built, which is the sc32/sc33
+posture for the third sprint running, under the same house rule (sc00:
+a gap in what the language can express is a finding, never a workaround
+invented here). Inserting a conversion loop at every byte boundary in
+std is a workaround, it is measurable, and the measurement says it
+costs more than it saves. The sixteen signatures keep their form, so
+the substitution stays a rename for whoever gets to make it.
 
-**The one change that makes target 2 a pure substitution is upstream
-and small**: move those eight builtin signatures from `List[int]` to
+The one change that makes target 2 a pure substitution is upstream and
+small: move those eight builtin signatures from `List[int]` to
 `List[byte]`. Then `fs.read_bytes` is a rename, `from_str` is
 `s.bytes()` unchanged, `to_str` is `str_from_utf8(b)?` unchanged, every
 call site keeps its shape, and the 16x becomes 2.0x/1.0x with no
-intermediate anywhere. Until then the honest reading of the landing is:
-**the type is right, it is measured, and the library cannot reach it.**
+intermediate anywhere. Until then the landing reads as: the type is
+right, it is measured, and the library cannot reach it.
 
-Filed as **wolf-lang#231**, with the std-side numbers posted to #203's
+Filed as wolf-lang#231, with the std-side numbers posted to #203's
 thread (`#issuecomment-5519440224`); sc35 or the sprint after the
 builtins move takes the substitution as the rename it was always
 designed to be.
@@ -6143,9 +6130,9 @@ designed to be.
 
 Found while measuring F-0106's one hopeful shape, and it is a finding
 on its own because it is invisible to every gauntlet: no row in this
-tree prints a ledger count (`[mem.region.account]` forbids it — the
-units are per-tier), so this divergence cannot move a verdict and will
-not be caught by the differ.
+tree prints a ledger count (`[mem.region.account]` forbids it, since
+the units are per-tier), so this divergence cannot move a verdict and
+the differ will not catch it.
 
 The probe is four lines: walk a 65,536-byte `str`'s bytes inside a
 fresh region, summing them, allocating nothing.
@@ -6165,49 +6152,47 @@ region r {
 | lupin 0.1.23 | **0** |
 | wolf `--checked` | **1,048,576** — 16.0x the payload |
 
-s77's rule is that `s.bytes()` CONSUMED on the spot is the receiver's
+s77's rule is that `s.bytes()` consumed on the spot is the receiver's
 own `{ptr, len}` and materializes only where the list must outlive the
 expression; `for b in s.bytes()` is the canonical consumed position and
 the one `std.bytes`' header teaches ("a caller who only wants to walk
-should write `for b in s.bytes()`"). **The native tier and the
-reference interpreter both honour it in the ledger. The checked
-machine's shadow model does not** — it charges a full `List[int]`,
-`16 x payload` exactly, for a walk that allocates nothing on the tier
-that ships.
+should write `for b in s.bytes()`"). The native tier and the reference
+interpreter both honour it in the ledger. The checked machine's shadow
+model charges a full `List[int]`, `16 x payload`, for a walk that
+allocates nothing on the tier that ships.
 
 Three reasons this matters beyond the curiosity:
 
-1. **It is the reason F-0106's best case fails.** The one substitution
-   with a real native win (`from_str` as a walk) reads 131,120 natively
-   and 1,114,112 checked, and the difference is precisely this
-   1,048,576.
-2. **It makes `region r(cap: n)` mis-fire between tiers on the ONE
-   idiom std recommends for byte walking.** A cap derived from a
-   checked-tier `charged` reading is 16x too generous natively; a cap
-   derived natively breaches instantly under `--checked`. D68's own
-   advice — derive budgets from measured readings — is sound, and this
-   is a case where the two measurements disagree by more than an order
-   of magnitude for a program that allocates nothing.
-3. **It is the mirror of the `str` gap already in the clause.**
-   `[mem.region.account.1]` scopes ONE known ledger blind spot to the
+1. It is the reason F-0106's best case fails. The one substitution with
+   a real native win (`from_str` as a walk) reads 131,120 natively and
+   1,114,112 checked, and the difference is this 1,048,576.
+2. It makes `region r(cap: n)` mis-fire between tiers on the one idiom
+   std recommends for byte walking. A cap derived from a checked-tier
+   `charged` reading is 16x too generous natively; a cap derived
+   natively breaches instantly under `--checked`. D68's own advice, to
+   derive budgets from measured readings, is sound, and this is a case
+   where the two measurements disagree by more than an order of
+   magnitude for a program that allocates nothing.
+3. It mirrors the `str` gap already in the clause.
+   `[mem.region.account.1]` scopes one known ledger blind spot to the
    native tier (str materialization's ambient region is the process
    root). This is a blind spot in the other direction on a different
    tier: the checked machine charging for storage the program never
-   takes. Re-measured this sprint against a NEW compiler, the `str`
-   half is unmoved — 200 fresh interpolated strings built inside
-   `region r { … }` leave `region_bytes(r)` at **0 on all three lanes**,
-   `before 0 after 0` byte-identical — so the clause's sentence should
-   still either widen or the non-native tiers should charge.
+   takes. Re-measured this sprint against a new compiler, the `str`
+   half is unmoved, with 200 fresh interpolated strings built inside
+   `region r { … }` leaving `region_bytes(r)` at 0 on all three lanes
+   and `before 0 after 0` byte-identical, so the clause's sentence
+   should still either widen or the non-native tiers should charge.
 
-Filed as **wolf-lang#232**.
+Filed as wolf-lang#232.
 
 ## F-0103 re-probed against a NEW compiler — unmoved, and the probe got sharper
 
-sc33 had to caveat this one ("the wolf binary did not move this bump,
-so it could not have moved"). **sc34 has no such caveat: the binary
-moved 51 commits, and the refusal is byte-identical.** At
-`wolf 0.2.3+dev.31170d1` / `lupin 0.1.23`, macOS arm64, each probe in
-its own directory:
+The sc33 entry had to caveat this one ("the wolf binary did not move
+this bump, so it could not have moved"). The sc34 probe has no such
+caveat: the binary moved 51 commits, and the refusal is byte-identical.
+At `wolf 0.2.3+dev.31170d1` / `lupin 0.1.23`, macOS arm64, each probe
+in its own directory:
 
 | probe | shape | lupin | wolfc `--checked` | wolf `--native` |
 |---|---|---|---|---|
@@ -6218,76 +6203,74 @@ its own directory:
 **And the probe got sharper, which is the sprint's contribution to
 #201.** The minimal shape recorded at sc31/sc32/sc33 was "an unhandled
 raising call passed straight into a row-typed parameter". That is not
-quite the boundary: f1 above is exactly that shape and it **RUNS on the
-checked lane**, because the callee never reads `v`, so no control flow
-is lowered for the argument at all. The refusal needs the ROW TO BE
-CONSUMED IN THE CALLEE. So the trigger is the pair — an unhandled
-union in an argument AND a callee that discriminates it — and a probe
-that only satisfies the first half reports a false heal. That is worth
-having on the issue, because it is exactly the probe someone
-re-measuring at the next pin would write.
+quite the boundary: f1 above is that shape and it runs on the checked lane,
+because the callee never reads `v`, so no control flow is lowered for
+the argument at all. The refusal needs the row to be consumed in the
+callee. So the trigger is a pair, an unhandled union in an argument and
+a callee that discriminates it, and a probe that only satisfies the
+first half reports a false heal. That is worth having on the issue,
+since it is the probe someone re-measuring at the next pin would write.
 
 Downstream state unchanged: `tests/option/or_else_default.lu`,
 `exists_marking.lu` and `is_none_marking.lu` keep `wolfc = "unsupported"`
 with this issue as the named cause (confirmed by the green gauntlet
-over the untouched ledger — a row answering deeper is a RED here), and
-`std.x.tls.client`'s header keeps teaching **bind, then name** as its
-call-site spelling. wolf-lang#201 is OPEN, and the sharpened trigger is
+over the untouched ledger, where a row answering deeper is a red), and
+`std.x.tls.client`'s header keeps teaching "bind, then name" as its
+call-site spelling. wolf-lang#201 is open, and the sharpened trigger is
 posted to its thread (`#issuecomment-5519442942`).
 
 ## The residues, re-probed at 31170d1 / 0.1.23 — the first re-probe against a moving compiler in three sprints
 
-- **The chars-pairs tuple list is refused at its EIGHTH consecutive
-  pin.** `List[(int, int)]()` is `unsupported — this prelude container
+- The chars-pairs tuple list is refused at its eighth consecutive pin.
+  `List[(int, int)]()` is `unsupported — this prelude container
   instantiation (generic data)` at `resolve` on both wolf rungs, and
   lupin runs it (`exit(0)`). Eight pins, and this one crossed 51
-  commits of compiler including a whole new scalar type — which is the
+  commits of compiler including a whole new scalar type, which is the
   strongest evidence yet that it will move the sprint someone lowers
   generic container instantiation on purpose and not one day sooner.
   Dated in the str header.
-- **F-0096 refuses verbatim.** `s.get(0..^2)` is `unsupported —
+- F-0096 refuses verbatim. `s.get(0..^2)` is `unsupported —
   open-ended or end-relative ranges (slicing)` at `resolve` on both
   rungs, against `[mem.str.get]`'s own sentence; lupin runs it and
   prints `hel`. Dated in the str header beside the row that flips at
   its closure (`tests/str/end_relative_get.lu`).
-- **`in(r)` re-probed in three shapes, and the third is new.**
+- `in(r)` was re-probed in three shapes, and the third is new.
   `List[int].in(r)` is `unsupported — a std/prelude stub without a
   signature` at `resolve` on both wolf rungs and `unsupported` on
-  lupin — the sc33 string verbatim. `Buf.in(r) { … }` over a plain
-  struct is `fail(E0201)` at PARSE on all three, and **F-0105 HEALS
-  here** — see below.
-  The new datum: `List[int]().in(r)` — with the constructor call — is a
-  DIFFERENT refusal, `methods on generic std data (the std surface)`,
+  lupin, the sc33 string verbatim. `Buf.in(r) { … }` over a plain
+  struct is `fail(E0201)` at parse on all three, and F-0105 heals here
+  (see below).
+  The new datum: `List[int]().in(r)`, with the constructor call, is a
+  different refusal, `methods on generic std data (the std surface)`,
   which is worth knowing because it means the two spellings are refused
   by two different arms and a probe of one says nothing about the other.
-- **`reserve(n)` is unmoved and owes no new probe.** Nothing in
-  `8cda3aa..31170d1` is a capacity or string-backing commit — the span
+- `reserve(n)` is unmoved and owes no new probe. Nothing in
+  `8cda3aa..31170d1` is a capacity or string-backing commit; the span
   is a windows runtime, an editor server, a release, a scalar type and
-  three letters. It is worth noting that the SECOND half of #203
-  (preallocate from a known length) is the same ask wearing a different
-  hat, and F-0104's after-table now prices it exactly: it is the entire
-  2.0x native residue and nothing else.
-- **`graphemes` owes no probe**: a segmentation TABLES tier, and
-  nothing in the span brings it closer.
-- **A `str` still charges NO named region's ledger on ANY tier**, and
-  this re-probe finally has teeth: the WOLF binary moved 51 commits, so
-  the tiers that could have changed their answer are the two that got a
-  new build. 200 fresh interpolated strings built inside
-  `region r { … }` leave `region_bytes(r)` at **0** — `before 0 after 0
+  three letters. The second half of #203 (preallocate from a known
+  length) is the same ask wearing a different hat, and F-0104's
+  after-table now prices it: it is the whole 2.0x native residue.
+- `graphemes` owes no probe: a segmentation tables tier, and nothing in
+  the span brings it closer.
+- A `str` still charges no named region's ledger on any tier, and this
+  re-probe finally has teeth: the wolf binary moved 51 commits, so the
+  tiers that could have changed their answer are the two that got a new
+  build. 200 fresh interpolated strings built inside `region r { … }`
+  leave `region_bytes(r)` at 0, `before 0 after 0
   sink 7690`, byte-identical stdout across lupin, checked and native.
-  `[mem.region.account.1]` still scopes the gap to the NATIVE tier
-  alone; it remains true of every tier. See F-0107 for the same clause's
-  blind spot pointing the other way.
-- **The four `divergent(…)`-era addresses stay healed** (`divergent
+  `[mem.region.account.1]` still scopes the gap to the native tier
+  alone; it remains true of every tier. See F-0107 for the same
+  clause's blind spot pointing the other way.
+- The four `divergent(…)`-era addresses stay healed (`divergent
   rows: 0` in the gauntlet).
 
 
 ## F-0105 CLOSES — the zero-width parse span is gone, on the exact reproducer
 
-sc33 filed this against `wolf 0.2.2` because an ordinary
-struct-and-region program — not a grammar-corpus file — carried
+The sc33 register filed this against `wolf 0.2.2` because an ordinary
+struct-and-region program, written outside the grammar corpus, carried
 DIV-2026-020's class: both machines agreed on E0201 and on the starting
-byte and disagreed about the WIDTH, lupin spanning the offending token
+byte and disagreed about the width, lupin spanning the offending token
 and wolfc emitting zero width at its start. D71/#220 landed in s134,
 inside this bump's binary span. The same reproducer, re-run verbatim at
 `wolf 0.2.3+dev.31170d1` / `lupin 0.1.23`:
@@ -6298,20 +6281,20 @@ inside this bump's binary span. The same reproducer, re-run verbatim at
 | wolf `--checked` | `fail(E0201)` | parse | **`[83, 84]`** |
 | wolf `--native` | `fail(E0201)` | parse | **`[83, 84]`** |
 
-**Three lanes, one span, one token wide.** `Parser::here` now answers
-the offending token's own span (`6908df7`), so the width disagreement is
-gone on the std-side witness exactly as it went on the eight corpus
-files. The finding's own sentence — that no rig here could see it,
-because this repo compares verdicts and diagnostic CODES and never
-spans — is still true and is still the argument that the fix should not
-have waited on a rig changing; it just no longer has anything to hide.
-**Two sprints from filing to healed, and the heal was measured rather
-than read off a changelog.**
+Three lanes, one span, one token wide. `Parser::here` now answers the
+offending token's own span (`6908df7`), so the width disagreement is
+gone on the std-side witness as it went on the eight corpus files. The
+finding's own sentence, that no rig here could see it because this repo
+compares verdicts and diagnostic codes and never spans, is still true
+and is still the argument that the fix should not have waited on a rig
+changing; it just no longer has anything to hide. Two sprints from
+filing to healed, and the heal was measured here rather than read off a
+changelog.
 
 ## The second gauntlet, and what it does and does not cover
 
-`cargo xtask ci` exit code **0**, `ci: GREEN`, **22:32:27 -> 22:51:05
-EDT**, over the tree with every sprint edit in place. Numbers identical
+`cargo xtask ci` exit code 0, `ci: GREEN`, 22:32:27 -> 22:51:05 EDT,
+over the tree with every sprint edit in place. Numbers identical
 to the bump run: `std-test: 376 test(s); forward tags: 697;
 conservatism ledger: 200 entries; unstable rows: 0; slow skips: 0;
 divergent rows: 0`; `ledger-check: 376`; `lint-conventions: 376 (5
@@ -6319,40 +6302,40 @@ rules)`; `doc-examples: 414 block(s), GREEN`; `ulp: 200 reference
 row(s), GREEN`; `sync-pin: snapshot == submodule at pin — OK`. Two
 consecutive greens at the new pins, the second covering the edits.
 
-**And the mtime audit, because two identical greens are exactly the
-shape that once hid a pre-edit run.** Every byte this sprint wrote
-predates 22:32:27: `std/bytes/bytes.lu` 22:29:19,
-`std/mem/budget/budget.lu` and `API-CONVENTIONS.md` 22:29:39,
-`std/str/str.lu` 22:30:06, `CHANGELOG.md` 22:30:38,
-`GUIDE-ENTRIES-sc34.txt` 22:31:17, `docs/findings.md` 22:32:20 — and
-`find std tests -name '*.lu' -newermt 22:32:27` returns **nothing**, so
-not one executable byte moved during the run. `tests/ledger.toml` is
+And the mtime audit, because two identical greens are the shape that
+once hid a pre-edit run. Every byte this sprint wrote predates
+22:32:27: `std/bytes/bytes.lu` 22:29:19, `std/mem/budget/budget.lu` and
+`API-CONVENTIONS.md` 22:29:39, `std/str/str.lu` 22:30:06,
+`CHANGELOG.md` 22:30:38, `GUIDE-ENTRIES-sc34.txt` 22:31:17,
+`docs/findings.md` 22:32:20, and
+`find std tests -name '*.lu' -newermt 22:32:27` returns nothing, so not
+one executable byte moved during the run. `tests/ledger.toml` is
 untouched at 21:39:16, the worktree's own checkout, with `git diff`
 empty on it: the ledger this sprint never edited is what makes both
 greens zero-motion measurements rather than assertions. The three
-doc-bearing `.lu` files DID change and the run covers them — that is
-the point of running it second, since `doc-examples` executes 414
+doc-bearing `.lu` files did change and the run covers them, which is
+the reason for running it second, since `doc-examples` executes 414
 blocks out of those headers. The only bytes written after the run began
 are this section of `docs/findings.md`, which ci reads for no verdict.
 
-**Every commit in this branch is a subset of that green tree.** The
-chunked commits below were made after the second gauntlet, from the
-identical working tree it measured, so each one is exit-code-green by
-construction rather than by a re-run per commit — stated rather than
-assumed, because "the gauntlet must cover the edits" is a lesson this
-repo paid for.
+Every commit in this branch is a subset of that green tree. The chunked
+commits below were made after the second gauntlet, from the identical
+working tree it measured, so each one is exit-code-green by
+construction rather than by a re-run per commit. Written down rather
+than assumed, because "the gauntlet must cover the edits" is a lesson
+this repo paid for.
 
-**A third gauntlet, over the COMMITTED tree**: `cargo xtask ci` exit
-code **0**, `ci: GREEN`, **22:54:21 -> 23:11:50 EDT**, run after the
-chunked commits from a clean working tree (`git status` shows only the
+A third gauntlet ran over the committed tree: `cargo xtask ci` exit
+code 0, `ci: GREEN`, 22:54:21 -> 23:11:50 EDT, run after the chunked
+commits from a clean working tree (`git status` shows only the
 untracked `.docs` checkout, which is nobody's input). Same numbers a
 third time: `std-test: 376 test(s); forward tags: 697; conservatism
 ledger: 200 entries; unstable rows: 0; slow skips: 0; divergent rows:
 0`, `doc-examples: 414 block(s), GREEN`, `ulp: 200 reference row(s),
-GREEN`. So the claim "every commit is a subset of a green tree" is not
-only an argument from mtimes — the tree the commits actually produce
-was measured on its own. The only byte written after that run is this
-paragraph, in a file ci reads for no verdict.
+GREEN`. So the claim "every commit is a subset of a green tree" rests
+on more than mtimes: the tree the commits actually produce was measured
+on its own. The only byte written after that run is this paragraph, in
+a file ci reads for no verdict.
 
 ## The sc35 pin bump — the producers speak bytes, and the blast radius is the point
 
