@@ -2,12 +2,12 @@
 
 ## sc39 — 2026-09-08 — the spawn takes the set, and the first child this rig ever ran told on the docs
 
-**`sched` IS ADMITTED, AND THE GATE ANNOUNCED IT BEFORE A HUMAN DID.**
-Data pin `398e5f5` (v0.2.6) -> **`ed8f526`** (merge s139, wolf-lang#246):
+`sched` is admitted, and the gate announced it before a human did.
+Data pin `398e5f5` (v0.2.6) -> `ed8f526` (merge s139, wolf-lang#246):
 `spec/07-schedule-points.md` ruled NORMATIVE and its seven anchors
-published — **424 -> 431**, additive, none dropped, no owner moved,
-verified by diffing the key sets BOTH ways. `REGISTERED_NS` takes
-`sched` as its **twelfth**, in the same commit as the re-vendor, per
+published, 424 -> 431, additive, none dropped, no owner moved, verified
+by diffing the key sets both ways. `REGISTERED_NS` takes `sched` as its
+twelfth, in the same commit as the re-vendor, per
 `[conf.anchor.ns.admit]`.
 
 The red, captured with the new snapshot in place and the append not yet
@@ -17,35 +17,34 @@ written:
 > that REGISTERED_NS does not admit — `[conf.tag.valid]` makes citing any
 > one of them a CI failure here.
 
-**The data pin now LEADS the `wolf` binary's pin, and that is legal and
-worth saying once.** `vendor/tools.toml` is unmoved — both binaries are
-where sc38 left them (`wolf 0.2.6` pin `398e5f5`, `lupin 0.1.27` pin
-`6ade878`) — so the DATA pin sits three commits ahead of the compiler
-that reads the data. Nothing in the `398e5f5..ed8f526` span is runtime
-surface: it is `spec/07`'s disposition, the anchor publication, upstream's
-own `NS_OWNERS` refactor and one corpus tag. `doctor` reports the pairing
-and does not gate it (F-0064, the two-moving-upstreams rule), and
-`sync-pin` verified snapshot == submodule at the new pin. The inverse of
-this gap has happened before, at sc35, with the reasoning recorded in
-`tools.toml`; this is the first time it points the other way.
+The data pin now leads the `wolf` binary's pin, which is legal.
+`vendor/tools.toml` is unmoved, both binaries are where sc38 left them
+(`wolf 0.2.6` pin `398e5f5`, `lupin 0.1.27` pin `6ade878`), so the data
+pin sits three commits ahead of the compiler that reads the data. Nothing
+in the `398e5f5..ed8f526` span is runtime surface: it is `spec/07`'s
+disposition, the anchor publication, upstream's own `NS_OWNERS` refactor
+and one corpus tag. `doctor` reports the pairing and does not gate it
+(F-0064, the two-moving-upstreams rule), and `sync-pin` verified
+snapshot == submodule at the new pin. The inverse of this gap happened at
+sc35, with the reasoning recorded in `tools.toml`; this is the first time
+it points the other way.
 
 That is sc38's replacement pin firing on its first real event, one pin
 bump after it was written to replace a mock-backed one that was green and
-always would have been. **And it was the only source that had the state
-right**: wolf-std#10's filed text said "five namespaces behind" (written
-before sc38 merged) and the orchestrator's correction said the work was
-one entry — the ISSUE was stale, the correction was right, and the gate
-measured it rather than either of them reading it. A gate that names its
-own count is the third witness.
+always would have been. It was also the only source with the state right:
+wolf-std#10's filed text said "five namespaces behind" (written before
+sc38 merged) and the orchestrator's correction said the work was one
+entry. The issue was stale, the correction was right, and the gate
+measured the count itself.
 
-Added while the file was open, the direction `[conf.anchor.ns.admit]`
-calls "silent on whichever side is permissive":
-**`every_registered_namespace_publishes_at_least_one_anchor`** — a name
-in this list that the registry publishes nothing for is an admission that
-ran AHEAD of the clause, or a bump that stranded an entry. Neither
+Added while the file was open, covering the direction
+`[conf.anchor.ns.admit]` calls "silent on whichever side is permissive":
+`every_registered_namespace_publishes_at_least_one_anchor`. A name in
+this list that the registry publishes nothing for is an admission that
+ran ahead of the clause, or a bump that stranded an entry. Neither
 rejects anything, so neither can be found except by asking.
 
-**THE INHERIT PAIR IS WHOLE AT THE STD TIER** (wolf-std#9). `std.net` has
+The inherit pair is whole at the std tier (wolf-std#9). `std.net` has
 had the child half since sc37 (`adopt_listener`); `std.process` now has
 the parent half:
 
@@ -54,109 +53,107 @@ pub fn start_with(c: Command, inherit: List[net.Listener])
     -> Child ! {unsupported, not_found, denied, io}
 ```
 
-**The set is on the SPAWN, not on the `Command`** — the question sc37
-asked by name, answered by the consumer that needed it from real code
-(lobo, ws18) and built here exactly as answered. The argument is
+The set is an argument to the spawn; the `Command` does not hold it.
+That is the question sc37 asked, answered by the consumer that needed it
+from real code (lobo, ws18) and built here as answered. The argument is
 lifetime: a master binds its listeners once and keeps them for life
 because a replacement worker must inherit the same socket, then spawns
 worker 1, worker 2, and re-spawns worker 2 after a `kill -9`. The set is
-a property of the MASTER and each spawn is an event that BORROWS it; a
+a property of the master and each spawn is an event that borrows it; a
 builder that accumulated one would have to be reset per spawn, and one
-reused across spawns would hand a stale descriptor down. Measured, not
-asserted: one `List[net.Listener]` binding serves two spawns and the
-listener still answers `port` and still closes afterwards.
+reused across spawns would hand a stale descriptor down. The measurement:
+one `List[net.Listener]` binding serves two spawns, and the listener
+still answers `port` and still closes afterwards.
 
-**Does the tier-split reasoning that made lobo decline the net half apply
-here? No — it is the reason to build this.** lobo's reason (2) for
-staying on the builtins was that the inherit PAIR split across tiers
-while the parent half was unwrapped. That was an argument about a gap,
-not about a wrapper, and closing the gap is what `start_with` does. The
-handshake no longer crosses tiers: parent `process.start_with`, child
-`net.adopt_listener`. lobo's other two reasons are untouched and its loop
-stays raw-fd, as it said; this surface is for the next consumer.
+The tier-split reasoning that made lobo decline the net half is the
+reason to build this one. lobo's reason (2) for staying on the builtins
+was that the inherit pair split across tiers while the parent half was
+unwrapped. That was an argument about a gap, and `start_with` closes the
+gap. The handshake no longer crosses tiers: parent `process.start_with`,
+child `net.adopt_listener`. lobo's other two reasons are untouched and
+its loop stays raw-fd, as it said; this surface is for the next consumer.
 
-`List[net.Listener]` and not `List[int]`, stated because `net.wait` went
-the other way: `wait`'s ready set MIXES listeners and streams and wolf has
-no sum type that can hold both, so it had no typed container to take. An
-inherit set has one — the only thing a child can do with a handed-down
-descriptor is `adopt_listener` — so unwrapping belongs in std, not in the
-caller. If a pin ever grows an adopt for connected sockets the container
+The parameter is `List[net.Listener]`, where `net.wait` went the other
+way with `List[int]`: `wait`'s ready set mixes listeners and streams and
+wolf has no sum type that can hold both, so it had no typed container to
+take. An inherit set has one, since the only thing a child can do with a
+handed-down descriptor is `adopt_listener`, so the unwrapping belongs in
+std. If a pin ever grows an adopt for connected sockets the container
 question reopens with the same language dependency `wait` is waiting on,
 and the two should be answered together.
 
-**THE FIRST TEST IN THIS REPOSITORY THAT RUNS A PARENT AND A CHILD.**
-`tests/process/prefork_handoff.lu`: the parent binds an ephemeral
-loopback listener, spawns ITSELF (`os_exe`, s90) with the port as its one
-argument and the listener as its one inherit entry, and the child adopts
-descriptor **3** — true by position — reads the port off what it adopted,
-and exits `0` only if the two agree. It also witnesses a promise about
-ABSENCE that nothing in either repository had witnessed: with one entry
-in the set, descriptor **4** is not adoptable (`io`), which is
+This sprint has the first test in this repository that runs a parent and
+a child. In `tests/process/prefork_handoff.lu` the parent binds an
+ephemeral loopback listener, spawns itself (`os_exe`, s90) with the port
+as its one argument and the listener as its one inherit entry; the child
+adopts descriptor 3, true by position, reads the port off what it
+adopted, and exits `0` only if the two agree. It also witnesses a promise
+about absence that nothing in either repository had witnessed: with one
+entry in the set, descriptor 4 is not adoptable (`io`), which is
 `[os.proc.inherit]`'s "nothing above `2 + len(inherit)` is open in the
-child that the runtime put there". Two negative controls were run before
-it landed and both behaved — a port one digit off makes the child exit
-`7`; an EMPTY inherit set makes its `adopt_listener(3)` answer `io`.
+child that the runtime put there". Two negative controls ran before it
+landed and both behaved: a port one digit off makes the child exit `7`,
+and an empty inherit set makes its `adopt_listener(3)` answer `io`.
 
-**F-0066's happy path is witnessed, for the first time.** All three legs
-came off in the end: `os_exe` (s90) retired the first at sc12, and sc37 +
-sc39 gave the child something to DO that the parent can verify, which is
-what "a program that spawns itself must tell the child from the parent"
-was really asking for. What remains is bounded rather than open — the
-witness is native-only, for two measured reasons that are not the same
-reason.
+F-0066's happy path is witnessed for the first time. All three legs came
+off: `os_exe` (s90) retired the first at sc12, and sc37 + sc39 gave the
+child something to do that the parent can verify, which is what "a
+program that spawns itself must tell the child from the parent" was
+asking for. What remains is bounded: the witness is native-only, for two
+measured reasons.
 
-**F-0111 — AND THE CHILD TOLD ON THE DOCS.** `std.process`'s header has
-said since sc11 that a child's stdio is "CLOSED at this pin", wired to
-the host's null device, so "neither its output nor its diagnostics reach
-the parent's streams". **False on both executing lanes**: a self-spawned
+F-0111, and the child told on the docs. `std.process`'s header has said
+since sc11 that a child's stdio is "CLOSED at this pin", wired to the
+host's null device, so "neither its output nor its diagnostics reach the
+parent's streams". That is false on both executing lanes: a self-spawned
 child's `print` lands in the parent's stdout natively, and on the checked
 lane the child's own usage line lands on the parent's stderr. Both spawn
 builtins, empty set and non-empty. The claim survived four sprints
-because it was never checkable here — F-0066 says no test could run a
-child — so it was prose over a dark lane, and the first test to light the
-lane caught it while doing something else entirely. **F-0065 does not go
-away and its shape changes: inheriting is not CAPTURING**, so `output(c)`
-still has nowhere to read from; but "nothing it writes is visible to this
-program" is the sentence a caller plans around, and a library spawning a
-helper is putting that helper's chatter into its caller's streams. Filed
+because nothing here could check it (F-0066 says no test could run a
+child), so it was prose over a dark lane, and the first test to light the
+lane caught it while doing something else. F-0065 stays open with a
+changed shape: inheriting is not capturing, so `output(c)` still has
+nowhere to read from. But "nothing it writes is visible to this program"
+is the sentence a caller plans around, and a library spawning a helper is
+putting that helper's chatter into its caller's streams. Filed
 [wolf-lang#256](https://github.com/wolffe-lang/wolf-lang/issues/256):
 `[os.proc]` states no stdio posture at all, and `[os.proc.inherit]`'s
 "descriptors 0, 1 and 2 are the spawn's ordinary stdio" is the only
-sentence in the spec that touches it — "ordinary" being exactly the
-adjective that does not decide the question. Second measurement in the
-same filing: **under an interpreter `os_exe` names the INTERPRETER**, not
-the program, which is why a self-spawn witness can only be native.
+sentence in the spec that touches it, and "ordinary" does not decide the
+question. The same filing carries a second measurement: under an
+interpreter `os_exe` names the interpreter and not the program, which is
+why a self-spawn witness can only be native.
 
-**THE RETRACTED-SENTENCE LINT GETS ITS SECOND USE, AND ITS SECOND END.**
-sc38 wrote one for `net.accept` after a clause rotted with the call that
-falsified it thirty lines below. `net.adopt_listener`'s clause said
-"There is no `std.process` half of this pair at this pin" — true when
+The retracted-sentence lint gets its second use, and ends a second rotted
+clause. sc38 wrote one for `net.accept` after a clause rotted with the
+call that falsified it thirty lines below. `net.adopt_listener`'s clause
+said "There is no `std.process` half of this pair at this pin", true when
 sc37 wrote it, false the moment `start_with` landed, and invisible to
 every gauntlet because the two halves live in different modules.
-`the_inherit_pair_names_itself_from_both_ends` lints BOTH clauses: each
+`the_inherit_pair_names_itself_from_both_ends` lints both clauses: each
 must name the other's function, and `start_with`'s must keep saying the
 six things `[os.proc.inherit]` promises that a signature cannot show.
 
-Also: `std.process`'s "lanes" paragraph corrected against the ledger —
-it claimed the native rung refused the whole module by name, which s107
-(`1b149ba`) made false four sprints ago; and `run_with` added to the
+Also: `std.process`'s "lanes" paragraph is corrected against the ledger.
+It claimed the native rung refused the whole module, which s107
+(`1b149ba`) made false four sprints ago. And `run_with` joins the
 reviewed-absent list, because the only reason to hand a listener down is
-that the child goes on serving, and a call that blocks until it exits is
-the opposite of that.
+that the child goes on serving, and a call that blocks until the child
+exits serves nobody.
 
 ## sc38 — 2026-09-07 — the waiver retires, and so does the pin that could not see it
 
-**F-0099 IS RETIRED, AND THE RED CAME FIRST.** wolf-lang **v0.2.6**
-(`a369b22`, [#239] — and **[#165], this repo's own filing**, the same gap
+F-0099 is retired, and the red came first. wolf-lang v0.2.6
+(`a369b22`, [#239], and [#165], this repo's own filing, the same gap
 filed twice ten days apart by two lanes that never found each other)
 appends `diag`, `ct`, `type` and `os` to `[conf.anchor.ns]`, on #120's
-precedent exactly: additive, nothing renumbered, `[conf.anchor.stable]`
-untouched — because an anchor's namespace IS its leading segment, so
-MOVING the anchors would have renumbered 71 published ones and dragged
-**3,273 citations across nine repositories** with them, against one
-paragraph. A new `[conf.anchor.ns.admit]` writes down the rule the four
-misses shared: a namespace is admitted **in one change or not at all**,
-and the gap is **silent on whichever side is permissive**.
+precedent: additive, nothing renumbered, `[conf.anchor.stable]`
+untouched. An anchor's namespace is its leading segment, so moving the
+anchors would have renumbered 71 published ones and dragged 3,273
+citations across nine repositories with them, against one paragraph. A
+new `[conf.anchor.ns.admit]` writes down the rule the four misses shared:
+a namespace is admitted in one change or not at all, and the gap is
+silent on whichever side is permissive.
 
 The red, captured at the v0.2.6 snapshot with `REGISTERED_NS` still at
 seven:
@@ -167,242 +164,237 @@ seven:
 
 71 is upstream's own count at the same head, reached from the other side.
 
-**AND THE PIN sc36 ARMED FOR EXACTLY THIS DID NOT MOVE.** Measured
-first, deliberately: `f0099_the_four_unadmitted_namespaces_still_fail`
-was **GREEN** at that same snapshot, with the gap already closed
-upstream. Its failure message said "has `[conf.anchor.ns]` admitted its
-namespace? Then retire F-0099" — and it could never have asked, because
-it asked a hardcoded **two-anchor mock**, where `classify("os.net.unix")`
-errs whether `os` is unregistered (the gap) or registered-with-no-such-
-anchor (the mock). **A gap pinned against a mock cannot see the event it
-pins**, and the failure message reads like a gate while being none. The
-replacement asks the PINNED REGISTRY
+The pin sc36 armed for this did not move. It was measured first:
+`f0099_the_four_unadmitted_namespaces_still_fail` was green at that same
+snapshot, with the gap already closed upstream. Its failure message said
+"has `[conf.anchor.ns]` admitted its namespace? Then retire F-0099", and
+it could never have asked, because it asked a hardcoded two-anchor mock,
+where `classify("os.net.unix")` errs whether `os` is unregistered (the
+gap) or registered-with-no-such-anchor (the mock). A gap pinned against a
+mock cannot see the event it pins, and the failure message reads like a
+gate while being none. The replacement asks the pinned registry
 (`every_published_anchor_sits_in_a_registered_namespace`) and reds at the
 next bump that publishes an unadmitted namespace, which is
 `[conf.anchor.ns.admit]`'s downstream half.
 
-**The bill sc36 said would come due is paid, in the same commit.**
-Seventeen files now cite the clause they hold instead of a stand-in: the
-six `[os.net.unix]` witnesses; ten `ty.byte` -> **`type.byte`**; sc24's
-char surface citing `type.char.cast` / `.interp` / `.order` beside
+The bill sc36 said would come due is paid in the same commit. Seventeen
+files now cite the clause they hold instead of a stand-in: the six
+`[os.net.unix]` witnesses; ten `ty.byte` -> `type.byte`; sc24's char
+surface citing `type.char.cast` / `.interp` / `.order` beside
 `mem.str.chars`; and sc37's four os rows citing `os.net.wait`,
-`os.net.listen.opts`, `os.proc.inherit`, `os.cpus`. **`ty` stays
-RESERVED**, and is reserved-and-USED here where upstream calls it
+`os.net.listen.opts`, `os.proc.inherit`, `os.cpus`. `ty` stays reserved,
+and it is reserved-and-used here where upstream calls it
 reserved-and-unused: `ty.match.exhaustive` and `ty.method.receiver-mode`
 name clauses no document has written. Withdrawing a reservation is the
 one direction that can reject legal input, and those two tags are the
-concrete reason not to.
+concrete reason to leave it standing.
 
-**F-0110 RETIRES ONE RELEASE EARLIER THAN ITS OWN LETTER SAID, AND THE
-LETTER IS THE LESSON.** lupin **0.1.26 -> 0.1.27** (is38, pin `982f857`
--> `6ade878`). F-0110's exit was written "the first lupin conforming
-**past** `6ade878`"; 0.1.27 conforms **at** `6ade878` — and that is
-enough, because `6ade878` IS v0.2.5, the release the builtins land in.
-The written condition was a PROXY for the one that mattered (has the
-reference machine been SHOWN these calls) and it was off by a release.
-**Re-measuring beat re-reading it.** Four of the five rows flip
-`unsupported` -> `run` at FIRST SIGHT against sc37 bodies untouched by a
+F-0110 retires one release earlier than its own letter said, and the
+letter is the lesson. lupin 0.1.26 -> 0.1.27 (is38, pin `982f857` ->
+`6ade878`). F-0110's exit was written "the first lupin conforming past
+`6ade878`"; 0.1.27 conforms at `6ade878`, and that is enough, because
+`6ade878` is v0.2.5, the release the builtins land in. The written
+condition was a proxy for the one that mattered (has the reference
+machine been shown these calls) and it was off by a release.
+Re-measuring beat re-reading it. Four of the five rows flip
+`unsupported` -> `run` at first sight against sc37 bodies untouched by a
 character (the F-0049 pattern): `net/listen_with_default`,
 `net/reuse_port`, `net/wait_readiness`, `os/cpus`.
-`LUPIN_TIER_WAIVERS` empties for the **third** time in its life.
+`LUPIN_TIER_WAIVERS` empties for the third time in its life.
 
-**The fifth row did not move and its word now means something else.**
-`net/adopt_rows.lu` stays `lupin = "unsupported"`, but is38 no longer
-fails to RESOLVE the call — it DECLINES it, `x-unsupported: "listener
+The fifth row did not move and its word now means something else.
+`net/adopt_rows.lu` stays `lupin = "unsupported"`, but the new machine
+resolves the call and declines it, `x-unsupported: "listener
 adoption in checked execution"`, the checked machine's own construct
-string verbatim, for the checked machine's own reason. The word is
-identical; the reason moved from a CALENDAR to a STATED POSTURE. That is
-the one motion a lane word can make that **no ledger diff can show**, so
-it is written into the ledger's sc37 block rather than left to inference.
+string verbatim,
+for the checked machine's own reason. The word is identical; the reason
+moved from a calendar to a stated posture. No ledger diff can show that
+motion, so it is written into the ledger's sc37 block.
 
-**And the mechanism leaves a gate behind it.** Nothing in
-`doc_examples.rs` could ever have noticed a waiver going inert —
-`tier_waived` fires only on `Unsupported`, so a lane that starts RUNNING
-makes the entry silently dead while the list goes on asserting a refusal
-that no longer happens. Both previous emptyings (sc14, sc25) were caught
-by a human at a bump. sc38 adds `waiver_fired`: **a waiver that never
-fires is a RED naming itself** — wolf-lang#177's lesson mechanized on
-this side, the same gate is38 built for `differ::retired_waivers`.
+The mechanism leaves a gate behind it. Nothing in `doc_examples.rs` could
+have noticed a waiver going inert: `tier_waived` fires only on
+`Unsupported`, so a lane that starts running makes the entry silently
+dead while the list goes on asserting a refusal that no longer happens.
+Both previous emptyings (sc14, sc25) were caught by a human at a bump.
+This sprint adds `waiver_fired`, so a waiver that never fires is a red
+that names itself, wolf-lang#177's lesson mechanized on this side, the
+same gate is38 built for `differ::retired_waivers`.
 
-**wolf-std#8 — this rig's own clause bug, fixed with a gate on the
-prose.** `std.net.accept`'s clause said "There is no non-blocking accept
-and no way to poll … waits forever". Written at sc08, true then, and
-false on both halves by the time lobo's ws18 read it: sc37 landed
-`net.wait` **thirty lines below it in the same file**, and wolf-lang#242
+wolf-std#8 is this rig's own clause bug, fixed with a gate on the prose.
+`std.net.accept`'s clause said "There is no non-blocking accept and no
+way to poll … waits forever". Written at sc08, true then, and false on
+both halves by the time lobo's ws18 read it: sc37 landed `net.wait`
+thirty lines below it in the same file, and wolf-lang#242
 (`[os.net.accept]`, new at v0.2.6) bounded the park. The clause now says
-what the upstream clause says — an armed deadline **BOUNDS** the call,
-`net.wait` is the poll answer by name, a readiness wake **is not a
-claim**, and a lost race re-waits against the **same budget** and answers
-`timeout`, which on N hands is the NORMAL outcome for N-1 of them.
-`set_listener_deadline` gains the second line ws18 asked for: on a shared
-listener the deadline is the mechanism, not the net for a mistake.
+what the upstream clause says: an armed deadline bounds the call,
+`net.wait` is the poll answer, a readiness wake is no claim, and a lost
+race re-waits against the same budget and answers `timeout`, which on N
+hands is the normal outcome for N-1 of them. `set_listener_deadline`
+gains the second line ws18 asked for: on a shared listener callers arm
+the deadline as the ordinary mechanism.
 
-Two witnesses keep them from drifting again, because **prose is what no
-gauntlet reads**: `net_accept_clause_agrees_with_os_net_accept` lints the
-clause for the two retracted phrases and the five it must keep, and reds
-if `os.net.accept` ever stops being a published anchor at the pin; and
+Two witnesses keep them from drifting again, since no gauntlet reads
+prose: `net_accept_clause_agrees_with_os_net_accept` lints the clause for
+the two retracted phrases and the five it must keep, and reds if
+`os.net.accept` ever stops being a published anchor at the pin; and
 `tests/net/accept_bounded_and_pollable.lu` proves the three live
-sentences on three lanes — a listener CAN be polled before it is dialled,
-an armed budget bounds the park, and **a `timeout` leaves the listener
-unharmed**, which is the property the losing hand depends on. A rig
-running one program cannot LOSE a race (that witness is upstream's
-`corpus/net/accept_race.lu`); it can prove that going round the loop
-again costs nothing.
+sentences on three lanes, that a listener can be polled before it is
+dialled, that an armed budget bounds the park, and that a `timeout`
+leaves the listener unharmed, the property the losing hand depends on. A
+rig running one program cannot lose a race (that witness is upstream's
+`corpus/net/accept_race.lu`); it can show that going round the loop again
+costs nothing.
 
-**THE PIN, classified before it was measured.** `6ade878` (v0.2.5) ->
+The pin was classified before it was measured. `6ade878` (v0.2.5) ->
 `398e5f5` (v0.2.6), 5 commits under two merges. #239 MECHANICAL upstream
 / BEHAVIOURAL for this rig's CI gate; #242 BEHAVIOURAL; #243
-DIAGNOSTIC-ONLY. Predicted zero `.lu` behaviour motion and zero ledger
-motion from all three, and measured zero of all three — every ledger row
-that moved this sprint moved on the **lupin** bump, not the wolf one.
-Anchors **422 -> 424**, key sets diffed BOTH ways (F-0100/#177): added
+DIAGNOSTIC-ONLY. All three were predicted to move no `.lu` behaviour and
+no ledger row, and all three measured that way; every ledger row that
+moved this sprint moved on the lupin bump. Anchors 422 -> 424, key sets
+diffed both ways (F-0100/#177): added
 `{conf.anchor.ns.admit, os.net.accept}`, dropped `{}`, owners moved
-`{}`. **The prediction missed one and the miss is recorded rather than
-tidied**: +1 was predicted from #239's own commit message, +2 measured,
-because **#242 publishes an anchor as well as changing behaviour**. A
-spec delta classified as behavioural is still a registry delta, and the
-both-ways diff is what caught it.
+`{}`. The prediction missed one, and the miss is recorded here: +1 was
+predicted from #239's own commit message and +2 measured, because #242
+publishes an anchor as well as changing behaviour. A spec delta
+classified as behavioural is still a registry delta, and the both-ways
+diff caught it.
 
-**Verify the machine, never the brief.** The lane opened with a written
-claim that wolf v0.2.6 pairs with lupin 0.1.26. It does — the pairing
-line says so — and the machine was running **0.1.27**, because is38
-shipped after r09 cut the tag. Read from `--version`, not from the
-paragraph (F-0064: the pairing line is reported, never gated).
+Read the version off the machine. The lane opened with a written claim
+that wolf v0.2.6 pairs with lupin 0.1.26. It does, the pairing line says
+so, and the machine was running 0.1.27, because is38 shipped after r09
+cut the tag. `--version` is the source (F-0064: the pairing line is
+reported, never gated).
 
-**wolf-std#6 closed as DELIVERED, with the residue split out rather than
-orphaned.** Everything #6 asked for at the std tier shipped at sc37,
+wolf-std#6 is closed as delivered, with the residue split into its own
+issue. Everything #6 asked for at the std tier shipped at sc37,
 including the §12 row question it raised in passing (`listen_with`
-declares **`exists`** for a bind a sibling holds). lobo declined to CALL
-the surface for three reasons of its own — a raw-fd serving loop, the
-inherit pair splitting across tiers, four pure delegates — and those are
-reasons a consumer does not call a surface, not reasons the surface is
-missing. The one genuinely unmet piece, the `std.process` half of the
-inherit pair, is **wolf-std#9**, carrying lobo's answer to the shape
-question sc37 asked by name: **the inherit set goes on the SPAWN, not on
-a `Command` builder**, because the listener set is a property of the
-master and each spawn merely borrows it — a `Command` that remembers
-descriptors is a `Command` that can hand a stale one down.
+declares `exists` for a bind a sibling holds). lobo declined to call the
+surface for three reasons of its own: a raw-fd serving loop, the inherit
+pair splitting across tiers, four pure delegates. Those are reasons a
+consumer does not call a surface, and none of them says the surface is
+missing. The one unmet piece, the `std.process` half of the inherit pair,
+is wolf-std#9, carrying lobo's answer to the shape question sc37 asked:
+the inherit set goes on the spawn and not on a `Command` builder, because
+the listener set is a property of the master and each spawn borrows it,
+and a `Command` that remembers descriptors is a `Command` that can hand
+a stale one down.
 
 [#239]: https://github.com/wolffe-lang/wolf-lang/issues/239
 [#165]: https://github.com/wolffe-lang/wolf-lang/issues/165
 
 ## sc37 — 2026-09-06 — the words came true: ten stale rows, a pin bump, and the server surface
 
-**THE BUMP, AND ALL THREE WOLF-SIDE PINS LAND ON ONE SHA AGAIN.**
-`982f857` (v0.2.4) → `6ade878` (v0.2.5), 42 commits: the binary's own
-`--version` pin, `vendor/tools.toml` and `vendor/upstream/PIN` (with the
-submodule at the same commit) all read `6ade878`, and the native rung is
-lit at it. Anchors **417 → 422**, `+5 / −0` with both directions checked
-— `os.cpus`, `os.net.listen.opts`, `os.net.wait`, `os.proc`,
-`os.proc.inherit`. **The drift was predicted in writing before any
-measurement and the prediction held exactly**: s137's five builtins are
-NEW surface that no std file could have been calling, so zero existing
-ledger rows moved on any of the three columns. The one commit in the
-span with power to move a row — `6f57ee0`, a diagnostic underline clamp
-(#238) — was named in the prediction as the first place to look, and it
-moved nothing, because the wolfc column's vocabulary is an error CODE
-and directives read program output rather than compiler stderr.
+The bump lands all three wolf-side pins on one sha again. `982f857`
+(v0.2.4) → `6ade878` (v0.2.5), 42 commits: the binary's own `--version`
+pin, `vendor/tools.toml` and `vendor/upstream/PIN` (with the submodule at
+the same commit) all read `6ade878`, and the native rung is lit at it.
+Anchors 417 → 422, `+5 / −0` with both directions checked: `os.cpus`,
+`os.net.listen.opts`, `os.net.wait`, `os.proc`, `os.proc.inherit`. The
+drift was predicted in writing before any measurement, and the prediction
+held: s137's five builtins are new surface that no std file could have
+been calling, so zero existing ledger rows moved on any of the three
+columns. The one commit in the span with power to move a row, `6f57ee0`,
+a diagnostic underline clamp (#238), was named in the prediction as the
+first place to look, and it moved nothing, because the wolfc column's
+vocabulary is an error code and directives read program output instead of
+compiler stderr.
 
-**wolf-std#7 — THE RED CAME FIRST, AND THAT IS THE PROOF.** lupin
-0.1.25 → **0.1.26** (wolf-interp `v0.1.26` = `5e774a2`), installed
-fresh-inode (132528014 → 135873958). The gauntlet was then run with
-**not one word of the ledger touched**, and it was RED on **ten** rows —
-eight `divergent(…)` carriers saying *the divergence moved*, and two
-corpus twins saying *deeper than the ledger claims*. Only then were the
-words rewritten. is37 closed wolf-interp#62: the byte's DOMAIN is a
-resolve-time refusal now and not only the type name, so all ten
-directives (`check: fail(E0401)`, `phase: typecheck`) are satisfied and
-all ten rows become **`run`**. **`divergent(…)` returns to ZERO
-carriers** — the second time in its life, and the second time it retired
-on a release exactly as designed. A ledger edited before the measurement
-would have gone green and proved nothing.
+wolf-std#7: the red came first. lupin 0.1.25 → 0.1.26 (wolf-interp
+`v0.1.26` = `5e774a2`), installed fresh-inode (132528014 → 135873958).
+The gauntlet was then run with not one word of the ledger touched, and it
+was red on ten rows: eight `divergent(…)` carriers saying *the divergence
+moved*, and two corpus twins saying *deeper than the ledger claims*. Only
+then were the words rewritten. The is37 sprint closed wolf-interp#62,
+making the byte's domain a resolve-time refusal and not only the type
+name, so all ten directives (`check: fail(E0401)`, `phase: typecheck`)
+are satisfied and all ten rows become `run`. `divergent(…)` returns to
+zero carriers, the second time in its life and the second time it retired
+on a release as designed. A ledger edited before the measurement would
+have gone green and shown nothing.
 
-**Two of the ten were NOT predicted, and the miss is recorded rather
-than tidied.** sc37 predicted the two corpus twins would not move,
-reasoning that is37 had described a change of MECHANISM in them and not
-of observed word. Wrong: a program refused at `typecheck` never reaches
-the tier that was declining it, so `unsupported` became `run`. A row's
-word is what the runner OBSERVES, never what the mechanism story
-predicts.
+Two of the ten went unpredicted, and the miss is recorded here. The
+prediction said the two corpus twins would not move, reasoning that is37
+had described a change of mechanism in them and not of observed word.
+That was wrong: a program refused at `typecheck` never reaches the tier
+that was declining it, so `unsupported` became `run`. A row's word is
+what the runner observes, and the mechanism story does not set it.
 
-**THE BRIEF WAS WRONG ABOUT THE MACHINE AND THE ISSUE WAS RIGHT.** The
-lane was told "the machine already runs wolf 0.2.5 and lupin 0.1.26 —
+The brief was wrong about the machine and the issue was right. The lane
+was told "the machine already runs wolf 0.2.5 and lupin 0.1.26 —
 verify, don't rebuild". `wolf` was 0.2.5 and was left alone. `lupin` was
-**0.1.25**, and wolf-std#7's own text said so. A lane that had trusted
-the brief would have measured against 0.1.25, seen green, and closed #7
-as needing no work. Verification is the instruction that paid.
+0.1.25, and wolf-std#7's own text said so. A lane that had trusted the
+brief would have measured against 0.1.25, seen green, and closed #7 as
+needing no work. The verification is what paid.
 
-**FOUR NEW STD SURFACES over s137's builtins**, and all four house
+Four new std surfaces sit over s137's builtins, and all four house
 shapes sc36 named survived contact with the runtime unchanged:
 
-- **`net.listen_with(addr, opts) -> Listener ! {unsupported, exists,
-  denied, io}`** with `ListenOpts { reuse_port, backlog }` and
-  `listen_opts()`. An ACQUISITION call and nothing else: it answers the
-  ordinary `Listener`, so `port`, `accept`, both deadlines and
-  `close_listener` come free. `listen`'s own row stays `{io}` because
-  its lowering coarsens, which is the one real reason to prefer this
-  call even with default options.
-- **`net.adopt_listener(fd) -> Listener ! {unsupported, io}`** — the
-  CHILD's half of descriptor inheritance. `close_listener` **does**
-  close an inherited fd, and an adopted `AF_UNIX` listener **does not**
-  unlink its path: that belongs to the process that BOUND it.
-- **`net.wait(fds, deadline_ms) -> List[int] ! {io}`** — readiness over
-  a set. **An empty answer is an ANSWER, not a failure.** Takes raw
-  descriptors because a ready set mixes listeners and streams and wolf
-  has no sum type that could hold both at this pin.
-- **`std.os.cpus() -> int ! {io}`** in a NEW one-function module.
-  Propagates `io` and **never defaults to 1** — a program resolving
-  "workers auto" must be able to say it did not learn the number.
+- `net.listen_with(addr, opts) -> Listener ! {unsupported, exists,
+  denied, io}` with `ListenOpts { reuse_port, backlog }` and
+  `listen_opts()`. An acquisition call: it answers the ordinary
+  `Listener`, so `port`, `accept`, both deadlines and `close_listener`
+  come free. `listen`'s own row stays `{io}` because its lowering
+  coarsens, which is the one real reason to prefer this call even with
+  default options.
+- `net.adopt_listener(fd) -> Listener ! {unsupported, io}`, the child's
+  half of descriptor inheritance. `close_listener` closes an inherited
+  fd, and an adopted `AF_UNIX` listener leaves its path in place, since
+  unlinking belongs to the process that bound it.
+- `net.wait(fds, deadline_ms) -> List[int] ! {io}`, readiness over a
+  set. An empty list is a successful answer. It takes raw descriptors
+  because a ready set mixes listeners and streams and wolf has no sum
+  type that could hold both at this pin.
+- `std.os.cpus() -> int ! {io}` in a new one-function module. It
+  propagates `io` and never defaults to 1, so a program resolving
+  "workers auto" can say it did not learn the number.
 
-**F-0110 — the first lane word this repo has owed to a release DATE.**
+F-0110 is the first lane word this repo has owed to a release date.
 lupin 0.1.26 conforms to `982f857` = v0.2.4; s137's builtins land in
-v0.2.5. The reference machine does not decline the new calls, it has
-never been shown them (`unsupported: \`os_cpus\` does not resolve`). So
-all six new witnesses carry `lupin = "unsupported"` for a reason that is
-a calendar and not a semantics, and three doc-example blocks re-arm
-`LUPIN_TIER_WAIVERS` — the mechanism whose own doc predicted this case
-and said it would cost "a finding name, not plumbing". It is **not** a
-`divergent(…)`: the machines do not disagree about a program's meaning,
-one has not been given the program. Retires at the first lupin past
-`6ade878`, touching no test.
+v0.2.5. The reference machine has never been shown the new calls
+(`unsupported: \`os_cpus\` does not resolve`). So all six new witnesses
+carry `lupin = "unsupported"` for a calendar reason, and three
+doc-example blocks re-arm `LUPIN_TIER_WAIVERS`, the mechanism whose own
+doc predicted this case and said it would cost "a finding name, not
+plumbing". It is no `divergent(…)`: the machines agree about the
+program's meaning, and one has not been given the program. Retires at the
+first lupin past `6ade878`, touching no test.
 
-**`net/adopt_rows.lu` is the most uneven row in the repository**, and
-every column has its own reason: lupin is F-0110's calendar, the CHECKED
-machine refuses adoption BY NAME (its own clause — it is the `wolf`
-binary interpreting a program, so a descriptor handed to "the program's
-child" would go to the compiler's child), and the NATIVE lane measures
-the four `io` refusals. The adoptable case is unreachable in a rig with
-no parent process, and the file says so rather than faking one.
+`net/adopt_rows.lu` is the most uneven row in the repository, and every
+column has its own reason: lupin is F-0110's calendar; the checked
+machine refuses adoption in its own clause, since it is the `wolf` binary
+interpreting a program, so a descriptor handed to "the program's child"
+would go to the compiler's child; and the native lane measures the four
+`io` refusals. The adoptable case is unreachable in a rig with no parent
+process, and the file says so instead of faking one.
 
-**`reuse_port` pins two guarantees and deliberately not a third.** Every
-dial is accepted by SOME member, and the survivor takes every dial after
-the others close — asserted; WHICH member — never. linux distributes by
-a 4-tuple hash, macOS hands every SYN to the newest bound socket, and a
-witness that pinned either would be pinning a host's scheduling as if it
-were the language's contract.
+`reuse_port` pins two guarantees and leaves a third alone. The witness
+asserts that every dial is accepted by some member and that the survivor
+takes every dial after the others close; which member takes a given dial
+is never asserted. linux distributes by a 4-tuple hash, macOS hands every
+SYN to the newest bound socket, and a witness that pinned either would be
+pinning a host's scheduling as if it were the language's contract.
 
-**A near-miss worth publishing.** Probing the inherit pair with `wolf
+A near-miss, published here. Probing the inherit pair with `wolf
 run --checked` answered `io` and `spawned`, which reads as a flat
 contradiction of `[os.proc.inherit]` and was one step from being filed
-upstream. **`wolf run --checked` is not the checked machine** — it runs
-the native build. Under the rig's own `wolf conform-run --checked` both
-calls refuse by name with the construct named. The clause is correct in
-every particular.
+upstream. `wolf run --checked` runs the native build and is not the
+checked machine. Under the rig's own `wolf conform-run --checked` both
+calls refuse with the construct named. The clause is correct in every
+particular.
 
-**Residues, re-probed at a pin whose span actually contains a
-compiler** (unlike sc36's): chars-pairs `List[(int, int)]()` refused at
-its **eleventh** consecutive pin; F-0096 verbatim; `in(r)` unmoved on
-both wolf rungs AND lupin's wording compared against sc36's recorded
-STRING rather than the bare verdict, as sc36 instructed — byte-identical.
-A `str` still charges no named region's ledger on any tier. F-0103
-re-probed and unmoved, with the probe asserting that it TOOK the row
-(`alpha:0`) — the check sc35 paid for twice. wolf-lang#201 is OPEN.
+Residues, re-probed at a pin whose span contains a compiler (sc36's did
+not): chars-pairs `List[(int, int)]()` refused at its eleventh
+consecutive pin; F-0096 verbatim; `in(r)` unmoved on both wolf rungs, and
+lupin's wording compared against sc36's recorded string instead of the
+bare verdict, as sc36 instructed, byte-identical. A `str` still charges
+no named region's ledger on any tier. F-0103 re-probed and unmoved, with
+the probe asserting that it took the row (`alpha:0`), the check sc35 paid
+for twice. wolf-lang#201 is OPEN.
 
-**F-0099 re-counted: four namespaces, 70 anchors** (was 65), and all
-five of this sprint's new anchors landed in `os` — precisely the
-namespace sc36 already could not cite. None of sc37's six witnesses may
-name the clause it conforms to; they carry `std.net`/`std.os` forward
-tags instead.
+F-0099 re-counted: four namespaces, 70 anchors (was 65), and all five of
+this sprint's new anchors landed in `os`, the namespace sc36 already
+could not cite. None of the six witnesses may name the clause it conforms
+to; they carry `std.net`/`std.os` forward tags instead.
 
 ## sc36 — 2026-09-03 — the socket surface: a second address family, and a lane nobody predicted
 
