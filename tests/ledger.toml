@@ -1845,6 +1845,60 @@ lupin = "run"
 wolfc = "run"
 native = "run"  # 1b149ba: s107 crossed the process trio natively
 
+# sc39, wolf-std#9 — the PARENT half of descriptor inheritance, whose child
+# half is `net/adopt_rows.lu`. The two files split on the one thing that
+# divides the lanes: the SET.
+#
+# An EMPTY inherit set is `os_spawn` with the program named apart
+# (`[os.proc.inherit]`), served on every host and every tier — so the empty
+# witness is THREE-lane, which for a process file that touches a spawn
+# builtin is the whole point of writing it. A NON-EMPTY set is refused by
+# two machines with one construct string they both print verbatim, "fd
+# inheritance across os_spawn_with in checked execution", because each is a
+# binary INTERPRETING a program: a descriptor handed to "the program's
+# child" goes to the interpreter's child. Whole-program `unsupported`, not a
+# catchable row. Not F-0110 and not a calendar — a stated posture, the same
+# shape and the same string `net/adopt_rows.lu` carries on the other end.
+[tests."process/start_with_empty_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# Native measures the rows because it is the only lane that runs the set.
+# What it measures is an ORDER as much as a vocabulary: a forged listener
+# beside a program no host has answers `io`, not `not_found`, because the
+# runtime maps handles to descriptors BEFORE it reaches for the program — so
+# a caller that gets `io` here knows no child exists. The two-row setup is
+# deliberate and must not be "simplified" to a program that exists.
+[tests."process/start_with_inherit_rows.lu"]
+lupin = "unsupported"  # sc39: declined BY NAME, "fd inheritance across os_spawn_with in checked execution" — lupin 0.1.27's own string, a posture and not a pin gap
+wolfc = "unsupported"  # sc39: the checked machine refuses a non-empty set BY NAME, `[os.proc.inherit]`'s own clause
+native = "run"
+
+# THE FIRST TEST IN THIS REPOSITORY THAT RUNS A PARENT AND A CHILD. Every
+# earlier process and net witness proves a REFUSAL, because the rig runs one
+# program per test — `net/adopt_rows.lu` says so rather than faking a parent,
+# and F-0066 records why the happy path of a spawn was unwitnessable at all.
+# Three things had to exist first and now all three do: the parent half
+# (`process.start_with`, sc39), the child half (`net.adopt_listener`, sc37),
+# and `os_exe` (s90), which lets a program spawn ITSELF. The proof is the
+# PORT — an ephemeral loopback listener handed down, adopted at descriptor 3
+# by position, and the child exits 0 only if the ports agree — plus the
+# BOUND, that descriptor 4 is not adoptable when the set holds one entry,
+# which is a promise about ABSENCE that nothing else in either repository
+# witnesses.
+#
+# Native only, for TWO reasons and they are not the same reason. The
+# non-empty set is refused by name on both interpreters (above). Underneath
+# that: under an interpreter `os_exe` names the INTERPRETER, not the program
+# — measured at sc39, the checked lane's "child" is the `wolf` binary handed
+# an argument it does not know, usage line and exit 2. A self-spawn witness
+# is only meaningful where the running executable IS the program.
+[tests."process/prefork_handoff.lu"]
+lupin = "unsupported"  # sc39: same construct string as the inherit rows; the spawn is never reached
+wolfc = "unsupported"  # sc39: same, and `os_exe` would name the wolf binary even if it were
+native = "run"
+
 # The two functions sc07 and sc08 refused to write, landed here because
 # F-0043's payload half (s71) and F-0052 (s70) are both closed: a loop over a
 # rowed read can stop on ONE tag and re-raise the others now.

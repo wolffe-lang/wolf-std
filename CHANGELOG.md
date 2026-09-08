@@ -1,5 +1,149 @@
 # Changelog
 
+## sc39 — 2026-09-08 — the spawn takes the set, and the first child this rig ever ran told on the docs
+
+**`sched` IS ADMITTED, AND THE GATE ANNOUNCED IT BEFORE A HUMAN DID.**
+Data pin `398e5f5` (v0.2.6) -> **`ed8f526`** (merge s139, wolf-lang#246):
+`spec/07-schedule-points.md` ruled NORMATIVE and its seven anchors
+published — **424 -> 431**, additive, none dropped, no owner moved,
+verified by diffing the key sets BOTH ways. `REGISTERED_NS` takes
+`sched` as its **twelfth**, in the same commit as the re-vendor, per
+`[conf.anchor.ns.admit]`.
+
+The red, captured with the new snapshot in place and the append not yet
+written:
+
+> the pinned registry publishes **7** anchors in namespace(s) `{"sched"}`
+> that REGISTERED_NS does not admit — `[conf.tag.valid]` makes citing any
+> one of them a CI failure here.
+
+**The data pin now LEADS the `wolf` binary's pin, and that is legal and
+worth saying once.** `vendor/tools.toml` is unmoved — both binaries are
+where sc38 left them (`wolf 0.2.6` pin `398e5f5`, `lupin 0.1.27` pin
+`6ade878`) — so the DATA pin sits three commits ahead of the compiler
+that reads the data. Nothing in the `398e5f5..ed8f526` span is runtime
+surface: it is `spec/07`'s disposition, the anchor publication, upstream's
+own `NS_OWNERS` refactor and one corpus tag. `doctor` reports the pairing
+and does not gate it (F-0064, the two-moving-upstreams rule), and
+`sync-pin` verified snapshot == submodule at the new pin. The inverse of
+this gap has happened before, at sc35, with the reasoning recorded in
+`tools.toml`; this is the first time it points the other way.
+
+That is sc38's replacement pin firing on its first real event, one pin
+bump after it was written to replace a mock-backed one that was green and
+always would have been. **And it was the only source that had the state
+right**: wolf-std#10's filed text said "five namespaces behind" (written
+before sc38 merged) and the orchestrator's correction said the work was
+one entry — the ISSUE was stale, the correction was right, and the gate
+measured it rather than either of them reading it. A gate that names its
+own count is the third witness.
+
+Added while the file was open, the direction `[conf.anchor.ns.admit]`
+calls "silent on whichever side is permissive":
+**`every_registered_namespace_publishes_at_least_one_anchor`** — a name
+in this list that the registry publishes nothing for is an admission that
+ran AHEAD of the clause, or a bump that stranded an entry. Neither
+rejects anything, so neither can be found except by asking.
+
+**THE INHERIT PAIR IS WHOLE AT THE STD TIER** (wolf-std#9). `std.net` has
+had the child half since sc37 (`adopt_listener`); `std.process` now has
+the parent half:
+
+```wolf
+pub fn start_with(c: Command, inherit: List[net.Listener])
+    -> Child ! {unsupported, not_found, denied, io}
+```
+
+**The set is on the SPAWN, not on the `Command`** — the question sc37
+asked by name, answered by the consumer that needed it from real code
+(lobo, ws18) and built here exactly as answered. The argument is
+lifetime: a master binds its listeners once and keeps them for life
+because a replacement worker must inherit the same socket, then spawns
+worker 1, worker 2, and re-spawns worker 2 after a `kill -9`. The set is
+a property of the MASTER and each spawn is an event that BORROWS it; a
+builder that accumulated one would have to be reset per spawn, and one
+reused across spawns would hand a stale descriptor down. Measured, not
+asserted: one `List[net.Listener]` binding serves two spawns and the
+listener still answers `port` and still closes afterwards.
+
+**Does the tier-split reasoning that made lobo decline the net half apply
+here? No — it is the reason to build this.** lobo's reason (2) for
+staying on the builtins was that the inherit PAIR split across tiers
+while the parent half was unwrapped. That was an argument about a gap,
+not about a wrapper, and closing the gap is what `start_with` does. The
+handshake no longer crosses tiers: parent `process.start_with`, child
+`net.adopt_listener`. lobo's other two reasons are untouched and its loop
+stays raw-fd, as it said; this surface is for the next consumer.
+
+`List[net.Listener]` and not `List[int]`, stated because `net.wait` went
+the other way: `wait`'s ready set MIXES listeners and streams and wolf has
+no sum type that can hold both, so it had no typed container to take. An
+inherit set has one — the only thing a child can do with a handed-down
+descriptor is `adopt_listener` — so unwrapping belongs in std, not in the
+caller. If a pin ever grows an adopt for connected sockets the container
+question reopens with the same language dependency `wait` is waiting on,
+and the two should be answered together.
+
+**THE FIRST TEST IN THIS REPOSITORY THAT RUNS A PARENT AND A CHILD.**
+`tests/process/prefork_handoff.lu`: the parent binds an ephemeral
+loopback listener, spawns ITSELF (`os_exe`, s90) with the port as its one
+argument and the listener as its one inherit entry, and the child adopts
+descriptor **3** — true by position — reads the port off what it adopted,
+and exits `0` only if the two agree. It also witnesses a promise about
+ABSENCE that nothing in either repository had witnessed: with one entry
+in the set, descriptor **4** is not adoptable (`io`), which is
+`[os.proc.inherit]`'s "nothing above `2 + len(inherit)` is open in the
+child that the runtime put there". Two negative controls were run before
+it landed and both behaved — a port one digit off makes the child exit
+`7`; an EMPTY inherit set makes its `adopt_listener(3)` answer `io`.
+
+**F-0066's happy path is witnessed, for the first time.** All three legs
+came off in the end: `os_exe` (s90) retired the first at sc12, and sc37 +
+sc39 gave the child something to DO that the parent can verify, which is
+what "a program that spawns itself must tell the child from the parent"
+was really asking for. What remains is bounded rather than open — the
+witness is native-only, for two measured reasons that are not the same
+reason.
+
+**F-0111 — AND THE CHILD TOLD ON THE DOCS.** `std.process`'s header has
+said since sc11 that a child's stdio is "CLOSED at this pin", wired to
+the host's null device, so "neither its output nor its diagnostics reach
+the parent's streams". **False on both executing lanes**: a self-spawned
+child's `print` lands in the parent's stdout natively, and on the checked
+lane the child's own usage line lands on the parent's stderr. Both spawn
+builtins, empty set and non-empty. The claim survived four sprints
+because it was never checkable here — F-0066 says no test could run a
+child — so it was prose over a dark lane, and the first test to light the
+lane caught it while doing something else entirely. **F-0065 does not go
+away and its shape changes: inheriting is not CAPTURING**, so `output(c)`
+still has nowhere to read from; but "nothing it writes is visible to this
+program" is the sentence a caller plans around, and a library spawning a
+helper is putting that helper's chatter into its caller's streams. Filed
+[wolf-lang#256](https://github.com/wolffe-lang/wolf-lang/issues/256):
+`[os.proc]` states no stdio posture at all, and `[os.proc.inherit]`'s
+"descriptors 0, 1 and 2 are the spawn's ordinary stdio" is the only
+sentence in the spec that touches it — "ordinary" being exactly the
+adjective that does not decide the question. Second measurement in the
+same filing: **under an interpreter `os_exe` names the INTERPRETER**, not
+the program, which is why a self-spawn witness can only be native.
+
+**THE RETRACTED-SENTENCE LINT GETS ITS SECOND USE, AND ITS SECOND END.**
+sc38 wrote one for `net.accept` after a clause rotted with the call that
+falsified it thirty lines below. `net.adopt_listener`'s clause said
+"There is no `std.process` half of this pair at this pin" — true when
+sc37 wrote it, false the moment `start_with` landed, and invisible to
+every gauntlet because the two halves live in different modules.
+`the_inherit_pair_names_itself_from_both_ends` lints BOTH clauses: each
+must name the other's function, and `start_with`'s must keep saying the
+six things `[os.proc.inherit]` promises that a signature cannot show.
+
+Also: `std.process`'s "lanes" paragraph corrected against the ledger —
+it claimed the native rung refused the whole module by name, which s107
+(`1b149ba`) made false four sprints ago; and `run_with` added to the
+reviewed-absent list, because the only reason to hand a listener down is
+that the child goes on serving, and a call that blocks until it exits is
+the opposite of that.
+
 ## sc38 — 2026-09-07 — the waiver retires, and so does the pin that could not see it
 
 **F-0099 IS RETIRED, AND THE RED CAME FIRST.** wolf-lang **v0.2.6**
