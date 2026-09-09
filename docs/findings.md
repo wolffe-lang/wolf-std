@@ -3918,7 +3918,15 @@ sentence (`match over this scrutinee type`, was c08's
 interpolation-in-fail), so the verdict is unchanged and the wording is
 noted on the row.
 
-F-0096 was re-probed at c1ca543 and is unhealed. `s.get(0..^1)` still
+F-0096 was re-probed at c1ca543 and is unhealed. (A note on the probe
+spelling, added 2026-09-08 for wolf-std#11 item 8: the ad-hoc one-line
+re-probe appears in this file as `s.get(0..^1)` at some pins and
+`s.get(0..^2)` at others, with different byte spans because the probe
+programs differ. Both are end-relative `get`s and both draw the identical
+refusal sentence; nothing distinguishes them but which line somebody
+typed. The pinned witness is `tests/str/end_relative_get.lu`, whose first
+probe is `s.get(0..^1)` and which also carries `1..^1`, `^2..^0` and
+`^4..^0`.) `s.get(0..^1)` still
 answers `unsupported — open-ended or end-relative ranges (slicing)` at
 resolve on both rungs, now measured on the macOS rungs' own machinery
 instead of carried from linux, while `s[..^1]` runs three-lane in
