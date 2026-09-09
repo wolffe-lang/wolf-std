@@ -5190,7 +5190,12 @@ are separable work:
   interim since sc05, and `std.bytes`' header already states the
   landing shape, that every signature keeps its form and `List[int]`
   becomes `Bytes` with nothing else moving. That is a checked property
-  of the existing surface: all nine functions in `std.bytes`, plus
+  of the existing surface: all ten functions in `std.bytes` (`len`,
+  `is_empty`, `at`, `slice`, `find`, `starts_with`, `ends_with`,
+  `from_str`, `to_str`, `is_utf8` — this said "nine" until 2026-09-08,
+  wolf-std#11 item 10; `grep -c '^pub fn' std/bytes/bytes.lu` answers 10
+  at the sc32, sc33 and sc34 merges and answers 10 today, and the sc33
+  register's own correction below caught it first), plus
   `fs.read_bytes`/`read_chunk`/`write_bytes`/`write_chunk` and
   `net.read_bytes`/`write_bytes`, are monomorphic over `List[int]`
   today so that they run on all three lanes (F-0026), and a byte-width
