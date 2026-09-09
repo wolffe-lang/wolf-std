@@ -103,6 +103,22 @@ const EDDSA_SMOKE_INVALID: usize = 1;
 /// native program's runtime moderate.
 const ECDSA_CHUNK: usize = 64;
 
+/// What `place` does with each generated file (sc41).
+///
+/// `CheckPresence` is the dark-formatter check: `wolf fmt` is what makes
+/// the emitter's output comparable to the committed text (D34), so with
+/// no `wolf` on any resolution rung the byte comparison has nothing to
+/// compare and only the inventory is checkable. It is a weaker check
+/// that says so, which is the point — the alternative this replaced was
+/// a hard error that kept the step off every runner in the repository's
+/// history (F-0114).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Write,
+    CheckBytes,
+    CheckPresence,
+}
+
 pub fn gen_vectors(check_only: bool) -> Result<(), String> {
     let repo = crate::repo_root();
     let vec_dir = repo.join("vendor/vectors");
@@ -111,15 +127,47 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
     // included: the emitter's output is passed through the pinned
     // formatter before it is written or compared, so the committed files
     // are canonical and the drift check compares canonical to canonical.
-    let wolf = crate::bins::resolve(crate::bins::Impl::Wolf, &repo)
-        .ok_or(
+    //
+    // sc41: absence of the binary is LEGAL AND LOUD in `--check`, and a
+    // hard error only when WRITING. This step was the first red the new
+    // CI lane produced, identically on ubuntu, macOS and windows: it was
+    // the one binary-dependent step in the rig that treated a dark lane
+    // as an error rather than a SKIP, against the doctrine `bins.rs`
+    // states in its own header. Writing still requires the formatter —
+    // an unformatted generated file must never reach a commit — but a
+    // CHECK can still parse the whole vendored corpus, run every
+    // emitter, and assert that each generated file it would place is
+    // present. Only the BYTE comparison needs canonical text, and only
+    // that goes dark.
+    let wolf = crate::bins::resolve(crate::bins::Impl::Wolf, &repo).map(|r| r.path);
+    if wolf.is_none() && !check_only {
+        return Err(
             "gen-vectors needs the pinned `wolf` (it runs `wolf fmt` on its \
-             output) — set $WOLF_BIN or place .wolf-bin/wolf",
-        )?
-        .path;
+             output) — set $WOLF_BIN or place .wolf-bin/wolf"
+                .into(),
+        );
+    }
+    let mode = match (check_only, &wolf) {
+        (false, _) => Mode::Write,
+        (true, Some(_)) => Mode::CheckBytes,
+        (true, None) => {
+            println!(
+                "SKIP: no wolf — gen-vectors --check cannot canonicalize its output, \
+                 so the BYTE comparison is dark; the corpus is still parsed, every \
+                 emitter still runs, and every generated file must still be present"
+            );
+            Mode::CheckPresence
+        }
+    };
     let mut drift: Vec<String> = Vec::new();
     let mut written = 0usize;
-    let fmt = |name: &str, text: &str| -> Result<String, String> { fmt_lu(&wolf, name, text) };
+    let fmt = |name: &str, text: &str| -> Result<String, String> {
+        match &wolf {
+            Some(w) => fmt_lu(w, name, text),
+            // Uncanonicalized: `place` will not compare it to anything.
+            None => Ok(text.to_string()),
+        }
+    };
 
     for (stem, suffix) in FAMILIES {
         // The short sets are chunked into parts of at most SHORT_CHUNK
@@ -150,7 +198,7 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                     ),
                 ),
             )?;
-            place(&out, &text, check_only, &mut drift, &mut written)?;
+            place(&out, &text, mode, &mut drift, &mut written)?;
         }
         {
             let src = vec_dir.join(format!("cavp/{stem}LongMsg.rsp"));
@@ -160,7 +208,7 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                 &show(&out),
                 &emit_cavp_msgs(stem, suffix, "Long", true, &vectors, "the whole set"),
             )?;
-            place(&out, &text, check_only, &mut drift, &mut written)?;
+            place(&out, &text, mode, &mut drift, &mut written)?;
         }
         let src = vec_dir.join(format!("cavp/{stem}Monte.rsp"));
         let (seed, checkpoints) = parse_rsp_monte(&read(&src)?, &show(&src))?;
@@ -169,7 +217,7 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
             &show(&out),
             &emit_cavp_monte(stem, suffix, &seed, &checkpoints),
         )?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
 
         let wp = vec_dir.join(format!(
             "wycheproof/hkdf_sha{}_test.json",
@@ -186,14 +234,14 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
             &show(&out),
             &emit_wycheproof(suffix, &smoke, true, cases.len()),
         )?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
         let all: Vec<&WpCase> = cases.iter().collect();
         let out = out_dir.join(format!("wycheproof_hkdf{suffix}_full.lu"));
         let text = fmt(
             &show(&out),
             &emit_wycheproof(suffix, &all, false, cases.len()),
         )?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
     }
 
     // ---- sc17: Wycheproof ChaCha20-Poly1305 (the AEAD rung). ----
@@ -215,7 +263,7 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                     corpus.nonce_omitted,
                 ),
             )?;
-            place(&out, &text, check_only, &mut drift, &mut written)?;
+            place(&out, &text, mode, &mut drift, &mut written)?;
         }
         let iparts: Vec<&[AeadCase]> = corpus.invalid.chunks(AEAD_INVALID_CHUNK).collect();
         for (i, part) in iparts.iter().enumerate() {
@@ -231,7 +279,7 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                     corpus.nonce_omitted,
                 ),
             )?;
-            place(&out, &text, check_only, &mut drift, &mut written)?;
+            place(&out, &text, mode, &mut drift, &mut written)?;
         }
         // The differential smoke subsets (see the constants above).
         let vsmoke: Vec<AeadCase> = corpus
@@ -255,7 +303,7 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                 corpus.nonce_omitted,
             ),
         )?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
         let ismoke: Vec<AeadCase> = corpus
             .invalid
             .iter()
@@ -274,7 +322,7 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                 corpus.nonce_omitted,
             ),
         )?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
     }
 
     // ---- sc18: Wycheproof X25519 (the curve rung). ----
@@ -289,14 +337,14 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                 &show(&out),
                 &emit_wycheproof_xdh(part, true, i + 1, sparts.len(), corpus.shared.len()),
             )?;
-            place(&out, &text, check_only, &mut drift, &mut written)?;
+            place(&out, &text, mode, &mut drift, &mut written)?;
         }
         let out = out_dir.join("wycheproof_x25519_zero.lu");
         let text = fmt(
             &show(&out),
             &emit_wycheproof_xdh(&corpus.zero, false, 1, 1, corpus.zero.len()),
         )?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
         // Differential smoke subsets (deterministic: the first N of each).
         let ssmoke: Vec<XdhCase> = corpus
             .shared
@@ -309,14 +357,14 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
             &show(&out),
             &emit_wycheproof_xdh(&ssmoke, true, 0, 0, corpus.shared.len()),
         )?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
         let zsmoke: Vec<XdhCase> = corpus.zero.iter().take(XDH_SMOKE_COUNT).cloned().collect();
         let out = out_dir.join("wycheproof_x25519_zero_smoke.lu");
         let text = fmt(
             &show(&out),
             &emit_wycheproof_xdh(&zsmoke, false, 0, 0, corpus.zero.len()),
         )?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
     }
 
     // ---- sc18: Wycheproof Ed25519 (the signature rung). ----
@@ -331,7 +379,7 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                 &show(&out),
                 &emit_wycheproof_eddsa(part, i + 1, parts.len(), cases.len()),
             )?;
-            place(&out, &text, check_only, &mut drift, &mut written)?;
+            place(&out, &text, mode, &mut drift, &mut written)?;
         }
         let mut smoke: Vec<EddsaCase> = cases
             .iter()
@@ -351,7 +399,7 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
             &show(&out),
             &emit_wycheproof_eddsa(&smoke, 0, 0, cases.len()),
         )?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
     }
 
     // ---- sc23: ECDSA-P256 — CAVP SigVer/SigGen + Wycheproof. ----
@@ -361,13 +409,13 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
         let ver = parse_cavp_sigver(&read(&sv)?, &show(&sv))?;
         let out = out_dir.join("cavp_sigver_p256.lu");
         let text = fmt(&show(&out), &emit_cavp_sigver(&ver))?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
 
         let sg = vec_dir.join("cavp/SigGen.txt");
         let gen = parse_cavp_siggen(&read(&sg)?, &show(&sg))?;
         let out = out_dir.join("cavp_siggen_p256.lu");
         let text = fmt(&show(&out), &emit_cavp_siggen(&gen))?;
-        place(&out, &text, check_only, &mut drift, &mut written)?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
 
         let wp = vec_dir.join("wycheproof/ecdsa_secp256r1_sha256_test.json");
         let cases = parse_wycheproof_ecdsa(&read(&wp)?, &show(&wp))?;
@@ -378,22 +426,33 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                 &show(&out),
                 &emit_wycheproof_ecdsa(part, i + 1, parts.len(), cases.len()),
             )?;
-            place(&out, &text, check_only, &mut drift, &mut written)?;
+            place(&out, &text, mode, &mut drift, &mut written)?;
         }
     }
 
     if !drift.is_empty() {
         return Err(format!(
-            "gen-vectors --check: {} file(s) drift from their vendored source \
-             (regenerate with `cargo xtask gen-vectors` and commit both):\n  {}",
+            "gen-vectors --check: {} file(s) {} (regenerate with \
+             `cargo xtask gen-vectors` and commit both):\n  {}",
             drift.len(),
+            match mode {
+                Mode::CheckPresence =>
+                    "are missing, though the vendored source \
+                     still derives them",
+                _ => "drift from their vendored source",
+            },
             drift.join("\n  ")
         ));
     }
-    if check_only {
-        println!("gen-vectors --check: all generated files match their vendored sources");
-    } else {
-        println!("gen-vectors: {written} file(s) written");
+    match mode {
+        Mode::CheckBytes => {
+            println!("gen-vectors --check: all generated files match their vendored sources")
+        }
+        Mode::CheckPresence => println!(
+            "gen-vectors --check: {written} generated file(s) present and derivable \
+             from their vendored sources (byte comparison dark — wolf lane absent)"
+        ),
+        Mode::Write => println!("gen-vectors: {written} file(s) written"),
     }
     Ok(())
 }
@@ -1567,14 +1626,27 @@ fn show(p: &Path) -> String {
 fn place(
     out: &Path,
     text: &str,
-    check_only: bool,
+    mode: Mode,
     drift: &mut Vec<String>,
     written: &mut usize,
 ) -> Result<(), String> {
-    if check_only {
+    if mode == Mode::CheckBytes {
         let existing = std::fs::read_to_string(out).unwrap_or_default();
         if existing != text {
             drift.push(show(out));
+        }
+        return Ok(());
+    }
+    // Dark formatter: `text` is the emitter's own output, never
+    // canonicalized, so comparing it to a `wolf fmt`-canonical committed
+    // file would report drift on every file and mean nothing. What IS
+    // checkable without the binary is that the vendored corpus parsed,
+    // the emitter produced something for this file, and the file the
+    // generator would place is actually committed and non-empty.
+    if mode == Mode::CheckPresence {
+        match std::fs::metadata(out) {
+            Ok(m) if m.len() > 0 => *written += 1,
+            _ => drift.push(show(out)),
         }
         return Ok(());
     }
@@ -1590,6 +1662,58 @@ fn place(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// sc41 / F-0114: with the formatter dark, `place` checks the
+    /// INVENTORY and never the bytes — a present non-empty file is fine,
+    /// an absent one is drift, and the emitter's uncanonicalized text is
+    /// never compared to anything (it would differ from every committed
+    /// file and mean nothing).
+    #[test]
+    fn a_dark_formatter_checks_presence_and_not_bytes() {
+        let dir = crate::repo_root().join("target/genvec/place-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let present = dir.join("present.lu");
+        std::fs::write(&present, "committed and canonical\n").unwrap();
+        let empty = dir.join("empty.lu");
+        std::fs::write(&empty, "").unwrap();
+        let absent = dir.join("absent.lu");
+
+        let mut drift = Vec::new();
+        let mut written = 0usize;
+        // Text that deliberately does NOT match the committed file: under
+        // CheckPresence it must not matter.
+        place(
+            &present,
+            "emitter output, unformatted",
+            Mode::CheckPresence,
+            &mut drift,
+            &mut written,
+        )
+        .unwrap();
+        assert!(drift.is_empty(), "{drift:?}");
+        assert_eq!(written, 1);
+
+        for missing in [&empty, &absent] {
+            place(missing, "x", Mode::CheckPresence, &mut drift, &mut written).unwrap();
+        }
+        assert_eq!(drift.len(), 2, "{drift:?}");
+        assert_eq!(written, 1);
+
+        // The same mismatch under CheckBytes IS drift — the strong check
+        // is unchanged wherever the binary is on a rung.
+        let mut drift2 = Vec::new();
+        place(
+            &present,
+            "emitter output, unformatted",
+            Mode::CheckBytes,
+            &mut drift2,
+            &mut written,
+        )
+        .unwrap();
+        assert_eq!(drift2.len(), 1, "{drift2:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn rsp_len_is_authoritative_over_msg() {
