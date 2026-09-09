@@ -325,7 +325,7 @@ them.
 
 | measure | sc09 | sc10 |
 |---|---|---|
-| modules in `std/` with code | 28 | **31** (`std.time`, `std.env`, `std.x.json`) |
+| modules in `std/` with code | 28 | **31** (`std.time`, `std.env`, `std.x.json`) [see the count-method note in §9] |
 | free `pub fn` in `std/` | 314 | **359** (+45) |
 | entry tests | 160 | **175** (+15) |
 | fenced doc examples, extracted and RUN | 272 | **317** (+45) |
@@ -438,7 +438,7 @@ first gate, F-0063), lupin 0.1.8 at conformance pin `26fa98e`.
 
 | measure | sc10 | sc11 |
 |---|---|---|
-| modules under `std/` | 33 | **34** (`std.process`) |
+| modules under `std/` | 33 | **34** (`std.process`) [see the count-method note below] |
 | `pub fn` in `std/`, nursery excluded | 328 | **342** (+10 process, +3 net, +1 io) |
 | `pub fn` including `std/x/` | 359 | **373** |
 | public types in the os tier | 3 (`File`, `Listener`, `Socket`) | **5** (`Command`, `Child`) |
@@ -450,6 +450,23 @@ first gate, F-0063), lupin 0.1.8 at conformance pin `26fa98e`.
 because earlier census rows in this file used a different one and a total that
 cannot be reproduced is not a measure. The delta is what matters and it is
 +14.)
+
+**Count-method note, 2026-09-08 (wolf-std#11 item 25).** The module rows
+in §8 and §9 disagree across one sprint boundary — §8 closes sc10 at 31
+and §9 opens sc10 at 33 — and neither row states its rule, so the caveat
+above applies to them too. Re-counted at the sprint merges: directories
+under `std/` holding a `.lu`, EXCLUDING `std/x/`, give 29 / 31 / 32 at
+sc09 / sc10 / sc11, and including `std/x/` give 34 / 37 / 38. §8's `31`
+is the non-`std/x/` count at sc10 exactly; §9's `33` and `34` reproduce
+under neither rule, nor under a D32-facade rule (a `<name>.lu` inside a
+`<name>/` directory), which gives the same 37 / 38. **This is the one
+item in wolf-std#11 that measurement could not settle**: the original
+counting rule is not written down anywhere and cannot be recovered from
+the tree. What both rows do agree on is the delta, which is what §9 says
+above and what the sprint claims — +3 at sc10 (`std.time`, `std.env`,
+`std.x.json`) and +1 at sc11 (`std.process`) — and those deltas are the
+non-`std/x/` measurement's too, once `std.x.json` is counted where it
+lives. A future census row should state its rule in the row.
 
 ### What `std.process` delivers
 
