@@ -389,6 +389,22 @@ pub fn read(mut s: Socket, max: int) -> str ! {closed, timeout, utf8, io} {
 /// Writes are unbuffered: every call reaches the host, so a program
 /// writing a message in small pieces pays for each one.
 ///
+/// **Two writes are TWO SEGMENTS, and since v0.2.8 they stay that way.**
+/// `[os.net.nodelay]` sets `TCP_NODELAY` on every stream, so the kernel
+/// no longer coalesces a small second write into the first — which is
+/// the point (the 40ms delayed-ACK stall is gone) and which also removes
+/// a coalescing a reader may once have leaned on without noticing. A
+/// peer calling `read(mut s, 7)` after these two writes may be handed
+/// `"one "` and nothing else: **`read` is one read of UP TO `max` bytes,
+/// never a promise of `max`**, and the module header's "a stream is
+/// bytes, not messages" is the whole of it. A reader that needs the
+/// whole thing calls `read_all`; a reader that needs a fixed count loops
+/// until it has one. F-0112 is where this cost a doc example that had
+/// been correct-by-Nagle since sc08.
+///
+/// A writer that wants one segment has `writev`, which is the better
+/// answer whenever the pieces are known together.
+///
 /// `mut s` because writing advances the stream, the same rule `read`
 /// follows (§14).
 ///
@@ -402,7 +418,7 @@ pub fn read(mut s: Socket, max: int) -> str ! {closed, timeout, utf8, io} {
 /// net.write(mut cli, "two")?
 /// net.close(take cli)?
 /// var conn = net.accept(mut srv)?
-/// (net.read(mut conn, 7) else "?") == "one two"
+/// (net.read_all(mut conn) else "?") == "one two"
 /// net.close(take conn)?
 /// net.close_listener(take srv)?
 /// ```

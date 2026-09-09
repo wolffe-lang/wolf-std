@@ -68,3 +68,42 @@
   has no filesystem by design. Version alignment removes DATE-shaped
   refusals. It does not remove POSTURE-shaped ones, and the two wear the
   same word in a ledger.
+- **CORRECT-BY-ACCIDENT IS NOT CORRECT, AND A RUNTIME'S GENEROSITY
+  EXPIRES.** A doc example wrote two small strings and read 7 bytes in
+  one call, and was green for thirty sprints. It was never right:
+  `read(s, n)` reads UP TO n and never promised n. Nagle had been
+  coalescing the writes, so the API's actual contract and the observed
+  behaviour agreed by luck. The day `TCP_NODELAY` became the default the
+  luck ran out. When an assertion passes, ask which promise it rests on
+  — the documented one, or a behaviour nothing promised.
+- **A LOAD-SENSITIVE FAILURE IS THE ONE YOUR NARROW RE-RUN WILL BLESS.**
+  The example red the full gauntlet on a loaded box and passed 40/40 on
+  an idle one and 30/30 under synthetic CPU load at 11. Every cheap
+  reproduction said green. If the only thing that reproduces a failure is
+  the whole suite under its real conditions, run the whole suite; a
+  targeted re-run of the changed file is evidence about the file, not
+  about the failure.
+- **MEASURE CAUSATION, DO NOT INFER IT.** "TCP_NODELAY must be why" was a
+  hypothesis with an obvious mechanism, which is exactly when it is
+  tempting to skip the check. Putting Nagle back with the sprint's own
+  new `nodelay(s, false)` and watching the shape become deterministic
+  again is the proof; the mechanism was only the reason to look.
+- **SWEEP FOR THE SHAPE, NOT THE INSTANCE.** Fixing the example that
+  failed would have left a second site standing: a test header asserting
+  in prose that "a read of n returns exactly n while bytes remain", which
+  was never true and is now visibly not, whose assertions happen to
+  survive on alignment. A third candidate was checked and needed nothing
+  because it already loops to a known count. One grep for the shape is
+  the difference between a fix and a coincidence.
+- **ASSERT THE DISJUNCTION WHEN THE HOST OWNS THE CHOICE.** The bounded
+  read answers 4 (this segment) or 7 (both, coalesced) and which one is
+  the kernel's business. Pinning either alone re-creates the bug. This is
+  the same shape as a host difference in a neighbouring call: assert what
+  a portable program may rely on, and write the branch into the header.
+- **A PREDICTION CAN BE HALF RIGHT IN A WAY THAT HIDES THE OTHER HALF.**
+  "The wire changes, the rows do not" was true — 396 ledger rows moved
+  not at all. It was also read as "nothing observable changes", which is
+  a much larger claim, and the gap between the two is where the defect
+  lived. When a clause scopes its promise to one kind of observation,
+  write down what it is NOT promising, or you will quote the promise back
+  at yourself as though it covered everything.

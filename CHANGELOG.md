@@ -111,11 +111,41 @@ whole tier rather than mock it. A matched pin buys reach only where the
 capability exists to begin with.
 
 Census: 33 modules (+0), 596 `pub fn` in `std/` (+3), one new public type
-(`fs.Stat`), 396 entry tests (+4), 396 ledger rows (+4). Every existing
+(`fs.Stat`), 397 entry tests (+5), 397 ledger rows (+5). Every existing
 ledger row unmoved, as predicted: the span's only behavioural commits are
 `[os.net.io]`'s syscall-first and TCP_NODELAY-by-default, and both
 clauses say in their own letter that nothing observable in the rows
 moves. Nineteen `tests/net/*.lu` got faster and none changed verdict.
+
+**And a doc example moved, which the same prediction said would not
+happen.** F-0112: `std.net.write`'s example wrote `"one "` then `"two"`
+and read 7 bytes in ONE call. Nagle used to coalesce two small writes
+into one segment; `TCP_NODELAY` does not, and a read spanning the
+boundary comes back short. The example had been green since sc08 and was
+never correct — it was correct-by-Nagle, because `net.read(mut s, n)` is
+one read of UP TO `n` bytes and never promised `n`. It is fixed to
+`read_all`, `net.write`'s doc now says two writes are two segments and
+points at `writev` and `read_all`, and `tests/net/segment_boundaries.lu`
+pins the three segmentation-independent spellings while asserting the
+bounded read as a disjunction, because asserting either half alone is
+the defect itself.
+
+The failure is load-sensitive: RED under the full gauntlet on a box
+carrying sibling lanes, 40/40 green on an idle one and 30/30 under
+synthetic CPU load at 11. Causation was measured rather than inferred —
+the same shape is deterministic again once `net.nodelay(mut cli, false)`
+puts Nagle back, using this sprint's own new wrapper as the probe. A
+sweep for the shape rather than a fix of the one that failed found a
+second site: `tests/net/stream_pieces.lu`'s header claimed "a read of
+`n` returns exactly `n` while bytes remain", which was never true of
+`read`; its assertions survive on alignment (each read asks for exactly
+one write's length) and the header now says so. The TLS loopback witness
+already loops to a known count and needed nothing.
+
+The lesson recorded in `tools.toml` for the next bump: a clause
+promising that no ROW moves is not promising that no timing-dependent
+assertion moves, and this repository's executable documentation is full
+of the second kind.
 
 ## sc39 — 2026-09-08 — the spawn takes the set, and the first child this rig ever ran told on the docs
 

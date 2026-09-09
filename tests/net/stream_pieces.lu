@@ -21,11 +21,28 @@
 //! may honestly conclude, and it is why `read_all` is a reviewed contract in
 //! the module header instead of a function.
 //!
-//! Determinism: the client writes and CLOSES before the server accepts, so
-//! all thirteen bytes are already buffered by the host when the reads run
-//! and a read of `n` returns exactly `n` while bytes remain. Byte counts are
-//! ASCII on purpose — a byte-count read of non-ASCII text can split a code
-//! point and raise `utf8` (documented on `net.read`, filed as F-0035/F-0044).
+//! Determinism, restated at sc40 because v0.2.8 falsified the reason this
+//! header used to give. It said: the client writes and CLOSES before the
+//! server accepts, so all thirteen bytes are already buffered by the host
+//! when the reads run and "a read of `n` returns exactly `n` while bytes
+//! remain". **That last clause was never a property of `read` and it is
+//! not one now** — `read` is one read of UP TO `n` bytes, and until
+//! `[os.net.nodelay]` shipped, Nagle coalesced these three small writes so
+//! reliably that the difference never showed. It shows now: with
+//! `TCP_NODELAY` on by default the three writes are three segments, and a
+//! read that spans a segment boundary can come back short (F-0112, which
+//! is exactly how `net.write`'s doc example failed).
+//!
+//! **What makes THIS file deterministic is alignment, and that is worth
+//! saying out loud**: each read asks for exactly one write's length — 4,
+//! 4, 5 against `"one "`, `"two "`, `"three"` — so no read ever spans a
+//! boundary, whether the host delivers the segments separately or
+//! coalesces them. A read of 13, or of 7, would be the flaky shape. A
+//! reader that needs a count it did not write asks `read_all` or loops.
+//!
+//! Byte counts are ASCII on purpose — a byte-count read of non-ASCII text
+//! can split a code point and raise `utf8` (documented on `net.read`,
+//! filed as F-0035/F-0044).
 
 use std.net
 

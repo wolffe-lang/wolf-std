@@ -709,6 +709,23 @@ version = "0.2.8"
 #     9a684d4 calls either, because they did not exist to call.
 #     Predicted: zero ledger motion, +3 anchors (os.net.io,
 #     os.net.writev, os.net.nodelay).
+#     **THE LEDGER HALF HELD AND THE OTHER HALF DID NOT, AND THE
+#     GAUNTLET IS WHAT SAID SO.** All 396 ledger rows passed on three
+#     lanes with zero motion, exactly as predicted. What moved was a DOC
+#     EXAMPLE. "The wire changes, the rows do not" is a much narrower
+#     claim than "nothing a program can observe changes", which is how
+#     the clause's own sentence was read when this note was written.
+#     `std.net.write`'s example wrote two small strings and read 7 bytes
+#     in ONE call: Nagle used to coalesce them into one segment,
+#     TCP_NODELAY does not, and a read spanning the boundary comes back
+#     short. Filed as F-0112 and fixed here. The failure is
+#     LOAD-SENSITIVE — RED under the full gauntlet on a box carrying
+#     sibling lanes, 40/40 green on an idle one and 30/30 under
+#     synthetic CPU load at 11 — so any check narrower than the whole
+#     gauntlet would have confirmed the wrong answer. For the next bump:
+#     a clause promising no ROW moves is not promising that no
+#     TIMING-dependent assertion moves, and this repository's executable
+#     documentation is full of the second kind.
 #   s142 / 5376138 + e7297cb + 0d7dda3  NEW SURFACE + DIAGNOSTIC.
 #     `fs_fstat(fd)` is new (predicted +2 anchors: os.fs, os.fs.fstat).
 #     `str.to_int()` is new and std does not wrap it this sprint.
@@ -723,9 +740,12 @@ version = "0.2.8"
 # MEASURED, both key sets diffed both ways (F-0100/#177): 431 -> 436;
 # added {os.fs, os.fs.fstat, os.net.io, os.net.nodelay, os.net.writev};
 # dropped {}; owners moved {}. Clause diffed as bytes: IDENTICAL. The
-# prediction held whole, including the namespace claim, which is the one
-# sc38's prediction missed by reading a commit message instead of the
-# registry.
+# ANCHOR prediction held whole, including the namespace claim, which is
+# the one sc38's prediction missed by reading a commit message instead of
+# the registry. The BEHAVIOURAL prediction did not — see F-0112 in the
+# s141 bullet above. Two predictions, one right and one wrong, and the
+# registry one was easy because it is a diff of two files while the other
+# is a claim about every assertion in the tree.
 #
 # ALL FOUR PINS LAND ON ONE SHA, and for the first time that includes
 # lupin's: this key, `[lupin]`'s, `vendor/upstream/PIN`, and both

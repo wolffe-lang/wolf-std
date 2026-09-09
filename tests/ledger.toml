@@ -3532,3 +3532,16 @@ native = "run"
 lupin = "unsupported"  # sc40: the fs tier's by-design decline, as above
 wolfc = "run"
 native = "run"
+
+# F-0112's regression pin, added after the gauntlet went RED on a doc
+# example this sprint's own pin bump broke. `net.read(mut s, n)` reads UP
+# TO n bytes; `[os.net.nodelay]` stopped Nagle coalescing two small
+# writes, so a read spanning a segment boundary can come back short. The
+# witness asserts the three segmentation-INDEPENDENT spellings (read_all,
+# a read-exactly loop, writev) and asserts the bounded read as a
+# DISJUNCTION (4 or 7, whichever the host chose), because asserting
+# either alone is the bug it is named after.
+[tests."net/segment_boundaries.lu"]
+lupin = "run"   # sc40: three lanes, stdout sha 2737b541 identical on all three
+wolfc = "run"
+native = "run"

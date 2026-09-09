@@ -1,0 +1,108 @@
+//! check: run(exit=0, stdout="read_all: [one two]\nloop: [one two]\nwritev: [one two]\nbounded: 4 or 7")
+//! phase: run
+//! conforms: std.net, os.net.nodelay, os.net.writev, err.row, err.propagate, err.else
+//!
+//! The regression pin for F-0112 (sc40): **`net.read(mut s, n)` is one
+//! read of UP TO `n` bytes and never a promise of `n`**, and since
+//! `[os.net.nodelay]` put `TCP_NODELAY` on every stream by default, two
+//! small writes stay two segments where Nagle used to coalesce them.
+//!
+//! This file exists because that difference cost a doc example that had
+//! been green since sc08: `net.write`'s example wrote `"one "` and
+//! `"two"`, read 7, and compared against `"one two"`. It was never
+//! correct — it was correct-by-Nagle — and at v0.2.8 it started losing a
+//! race that a loaded box wins often enough to red a gauntlet and rarely
+//! enough to pass forty runs in a row on an idle one. **A test that is
+//! right for a reason the runtime has stopped providing is worse than a
+//! failing one, because it looks like evidence.**
+//!
+//! Three spellings that are correct regardless of how the host segments,
+//! asserted here so the module keeps at least one witness of each:
+//!
+//!   1. `read_all` — reads until the peer's close, which is the answer
+//!      when the sender frames by closing;
+//!   2. a read-EXACTLY loop — accumulate until the count is reached,
+//!      which is the answer when the count is known ahead of time (the
+//!      shape `tests/x/tls/client/loopback_handshake.lu` already uses,
+//!      and the reason that witness never depended on Nagle);
+//!   3. `net.writev` — send the pieces as ONE segment, which removes the
+//!      question at the writer rather than the reader.
+//!
+//! The fourth line asserts the honest thing about the bounded read: it
+//! answers 4 (this segment) or 7 (both, coalesced), and **which one is
+//! the host's business**. Asserting either alone is the bug this file is
+//! named after; asserting the disjunction is what a portable program may
+//! rely on. That is the same shape `fs/fstat_rows.lu` uses for the
+//! windows directory case, one tier over.
+//!
+//! Lanes: all three, lupin 0.1.28 included.
+
+use std.net
+
+fn read_exactly(mut s: net.Socket, n: int) -> str ! {closed, timeout, utf8, io} {
+    var out = ""
+    while out.len < n {
+        let piece = net.read(mut s, n - out.len)?
+        out = "{out}{piece}"
+    }
+    out
+}
+
+fn dial(mut srv: net.Listener, p: int) -> net.Socket ! {refused, timeout, closed, io} {
+    var cli = net.connect(net.loopback(p))?
+    net.write(mut cli, "one ")?
+    net.write(mut cli, "two")?
+    net.close(take cli)?
+    net.accept(mut srv)?
+}
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+
+    // 1. Framed by the close.
+    var a = dial(mut srv, p)?
+    let whole = net.read_all(mut a) else "?"
+    net.close(take a)?
+    print("read_all: [{whole}]")
+
+    // 2. Framed by a count the reader knows.
+    var b = dial(mut srv, p)?
+    let exact = read_exactly(mut b, 7) else "?"
+    net.close(take b)?
+    print("loop: [{exact}]")
+
+    // 3. Framed by the writer: one gathered write, one segment.
+    var cli = net.connect(net.loopback(p))?
+    var head = List[byte]()
+    (mut head).push(111 as byte)
+    (mut head).push(110 as byte)
+    (mut head).push(101 as byte)
+    (mut head).push(32 as byte)
+    var body = List[byte]()
+    (mut body).push(116 as byte)
+    (mut body).push(119 as byte)
+    (mut body).push(111 as byte)
+    var parts = List[List[byte]]()
+    (mut parts).push(head)
+    (mut parts).push(body)
+    net.writev(mut cli, parts)?
+    net.close(take cli)?
+    var c = net.accept(mut srv)?
+    let gathered = net.read_all(mut c) else "?"
+    net.close(take c)?
+    print("writev: [{gathered}]")
+
+    // 4. The bounded read: 4 or 7, and which is the host's business.
+    var d = dial(mut srv, p)?
+    let bounded = net.read(mut d, 7) else "?"
+    net.close(take d)?
+    var verdict = "neither"
+    if bounded.len == 4 || bounded.len == 7 {
+        verdict = "4 or 7"
+    }
+    print("bounded: {verdict}")
+
+    net.close_listener(take srv)?
+    0
+}

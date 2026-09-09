@@ -1294,23 +1294,35 @@ the rule is stated first.
 | modules under `std/` (directories, `std/x/` as one) | 33 | **33** (+0) |
 | `pub fn` in `std/`, nursery included | 593 | **596** (+3) |
 | public types | — | **+1** (`fs.Stat`) |
-| entry tests | 392 | **396** (+4) |
-| ledger rows | 392 | **396** (+4) |
+| entry tests | 392 | **397** (+5) |
+| ledger rows | 392 | **397** (+5) |
 | fenced doc examples, extracted and RUN | 418 | **421** (+3) |
 | existing ledger rows moved by the pin bump | — | **0** |
 
-**Predicted before measuring, and the prediction is on the record with
-its one miss.** The counts above were all predicted exactly, including
-the zero row motion — `398e5f5..5c729e8` carries two behavioural commits
-(`[os.net.io]`'s syscall-first, TCP_NODELAY-by-default) and both clauses
-state in their own letter that nothing a program can observe in the rows
-moves. What was predicted wrong was the LANE spread: all three wrappers
-were called three-lane on the strength of a zero pairing gap, and only
-the two `std.net` ones are. `std.fs`'s two rows are `lupin =
-"unsupported"` for the reference machine's oldest posture — no
-filesystem by design, the whole tier declined rather than mocked. A
-matched pin buys reach only where the machine has the capability at all,
-and eleven fs rows in the ledger already said so.
+**Predicted before measuring, and TWO of the predictions missed.** The
+counts were predicted exactly and the zero ledger motion held: all 396
+pre-existing rows passed on three lanes, unmoved, because
+`398e5f5..5c729e8`'s two behavioural commits (`[os.net.io]`'s
+syscall-first, TCP_NODELAY-by-default) both state in their own letter
+that nothing observable in the ROWS moves.
+
+The first miss was the LANE spread: all three wrappers were called
+three-lane on the strength of a zero pairing gap, and only the two
+`std.net` ones are. `std.fs`'s rows are `lupin = "unsupported"` for the
+reference machine's oldest posture — no filesystem by design, the whole
+tier declined rather than mocked. A matched pin buys reach only where
+the machine has the capability at all, and eleven fs rows already said
+so.
+
+The second miss is the one that cost a gauntlet, and it is why the entry
+test count is +5 rather than +4. "The rows do not move" was read as
+"nothing a program can observe moves", and a DOC EXAMPLE moved:
+`std.net.write`'s wrote two small strings and read 7 bytes in one call,
+which Nagle used to coalesce and `TCP_NODELAY` does not. F-0112. The
+failure is load-sensitive — RED under the full gauntlet on a loaded box,
+40/40 green on an idle one — so nothing short of the whole gauntlet
+would have caught it, and the fifth new test
+(`net/segment_boundaries.lu`) is its regression pin.
 
 The three new functions are `net.writev`, `net.nodelay` and `fs.fstat`;
 what each is for is in `CHANGELOG.md`'s sc40 entry and in the
