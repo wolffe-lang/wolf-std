@@ -3036,8 +3036,11 @@ them would be churn with no reader-visible gain.
 
 The filing as it stood:
 
-Measured with four one-line programs after `tests/bytes/to_str_border.lu`
-lost its native lane to `is_utf8(b) == accepts(b)`:
+Measured with eight one-line programs after `tests/bytes/to_str_border.lu`
+lost its native lane to `is_utf8(b) == accepts(b)` — five `bool`
+comparisons, every one refused, and three controls that run (counted
+against the block 2026-09-08, wolf-std#11 item 5; "four" was the count of
+neither half):
 
 ```text
 a == b          unsupported — comparison outside integers/floats  @mem
