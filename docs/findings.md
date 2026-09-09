@@ -8230,3 +8230,99 @@ from a confirmation:
    since F-0113's neighbours all began as report-only counts.
 
 Nothing is predicted to be red on ubuntu.
+
+## The sc41 CI lane — what three hosts answered, and the budget it made a fool of
+
+The budget above was written before the first run. Both are recorded so
+the comparison is checkable.
+
+**Run 1** (`d2322cd`, the first landing, `continue-on-error: true`): RED
+on all three hosts, in under a second each, with the same message.
+
+| host | job wall time | red at | cause |
+| --- | --- | --- | --- |
+| ubuntu-latest | 20 s | `gen-vectors --check` | `gen-vectors needs the pinned wolf (it runs wolf fmt on its output)` |
+| macos-latest | 29 s | `gen-vectors --check` | identical |
+| windows-latest | 39 s | `gen-vectors --check` | identical |
+
+Nothing platform-shaped: `gen-vectors --check` canonicalizes the
+emitter's output through `wolf fmt` before comparing it (D34 applies to
+generated `.lu` too), and no runner has a `wolf` — `ci.yml`'s acquire
+step SKIPs, because no release artifact exists at the pins. It was the
+one binary-dependent step in the rig that treated a dark lane as an
+ERROR rather than a loud SKIP, against the doctrine `bins.rs` states in
+its own header. **Filed and fixed as F-0114 in `4d6f130`**, the rig's
+fault and not the runner's: `--check` with no `wolf` now SKIPs loudly and
+drops from a byte comparison to inventory-and-derivability (corpus
+parsed, all 65 emitters run, every generated file present and non-empty);
+writing still hard-errors. `doc-examples` and `ulp` never got to run in
+run 1 — a step failing ends the job — so the first run bought exactly one
+finding, and it was about the rig, on the platform the rig was written
+on, before it said anything about windows.
+
+**Run 2** (`cc30524`): GREEN on all three hosts, and green a second time
+in the parallel `pull_request` run of the same commit — two runs, three
+hosts, six green jobs, which is item 2's precondition.
+
+| host | budget | measured | doc-examples | error |
+| --- | --- | --- | --- | --- |
+| ubuntu-latest | 6 min | **20 s** | 2 s | 18x over |
+| macos-latest | 7 min | **37 s** | 7 s | 11x over |
+| windows-latest | 20 min | **50 s** | 11 s | 24x over |
+
+The budget's *reasoning* held and its *scale* was nonsense. Staging is
+the dominant cost of the step, as predicted, and windows is the slowest
+host at it, as predicted — but the penalty over ubuntu is 5.5x, not the
+10x guessed, and the absolute cost is 11 seconds, not ten minutes. 21,500
+small file creations is simply not a lot of work for a 2026 runner's
+page cache. What actually dominates the job is the fixed setup: checkout
+plus toolchain is 12 s of ubuntu's 20 and 23 s of windows' 50. The lesson
+for the next budget in this repository is that the runner's constant term
+is the term to estimate, and per-file costs on tier-1 hardware are
+smaller than an author extrapolating from a laptop's `du` expects.
+`timeout-minutes` comes down from 45 to 20 accordingly — matching `rig`,
+with the headroom kept on purpose for the day the binaries publish.
+
+**Of the three reds predicted, one happened and it was not on the list.**
+(1) windows `doc-examples` path handling: did not happen; `stage`'s
+`join()`-built scratch paths and slashed messages are portable, and 421
+staged packages on NTFS produced no complaint. (2) `gen-vectors --check`
+line endings on windows: did not happen — `.gitattributes` carries no
+`* text=auto eol=lf` line, unlike every other repository in this org
+(wolf-lang, wolf-interp, wolf-book, tree-sitter-wolf all have one), so
+the protection is absent and the red simply did not fire; the byte
+comparison is dark on runners for F-0114's reason, so this prediction is
+not yet TESTED and stays live for the day the binaries publish. (3) `ulp`
+host drift: happened, report-only as designed, and it is the lane's other
+new measurement.
+
+**The ULP host-libm drift, per host, measured for the first time** (of
+200 committed reference rows):
+
+| host | rows differing from the host's libm |
+| --- | --- |
+| ubuntu-latest (x86_64) | 4 |
+| windows-latest (x86_64) | 10 |
+| macos-latest (arm64) | 16 |
+
+Report-only by construction and correct to leave that way: the committed
+values come from the vendored reference, not from any host, and the
+counts say so — the author's own architecture is the one that agrees with
+them LEAST. The number to watch is growth, and there is now a baseline on
+three platforms to watch it against.
+
+**What "required" now means here, precisely.** `continue-on-error` is
+gone, so a red `gates` job fails the run exactly as a red `rig` job does.
+That is the whole of it: trunk carries no branch protection, so no job in
+this repository is a "required check" in GitHub's sense, and `rig` never
+was either. What changed is that the four steps now sit at the same
+standing as the other seven, and "CI green" finally means what
+`cargo xtask ci` means — with one caveat that must not be lost in the
+green: **every observation lane on every runner is still dark.** The lane
+gates the static half — 397 test conventions, 65 generated files derived
+from a 7.3 MB corpus, 421 doc examples staged and validated, 200 ULP rows
+— and it does not gate doc TRUTH, which is the thing F-0112 was about.
+That relights for free the day release artifacts exist at the pins, and
+it is the day this job's timings and its greenness should both be
+re-read. No step is advisory: the only red the lane produced was the
+rig's own.

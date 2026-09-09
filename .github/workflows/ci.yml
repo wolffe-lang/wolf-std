@@ -52,39 +52,49 @@ jobs:
       - name: std-test (lanes conditional on binaries; SKIPs are loud)
         run: cargo xtask std-test
 
-  # sc41 / F-0113 / wolf-std#13 — the lane nothing lit.
+  # sc41 / F-0113 / wolf-std#13 — the lane nothing lit, now lit and REQUIRED.
   #
   # `cargo xtask ci` runs eleven steps; the `rig` job above runs seven of
   # them. The four below — lint-conventions, gen-vectors --check,
   # doc-examples and ulp — had never executed on a runner in this
   # repository's history, which is why a broken `net.write` doc example
   # (F-0112) was green on all three platforms for four sprints: no runner
-  # has ever executed a `wolf-doc-example`. They run here, in the gauntlet's
-  # own order, one job per host.
+  # had ever executed a `wolf-doc-example`. They run here, in the
+  # gauntlet's own order, one job per host.
   #
   # Deliberately NOT `needs: rig`. `ci()` is fail-fast, so locally these
   # four really do come after the seven; but a job that is skipped when the
   # seven are red teaches nothing on the run where it is most needed, and
-  # the whole point of this lane is to be read. Ordering is preserved
+  # the whole point of this lane was to be read. Ordering is preserved
   # WITHIN the job; the two jobs are independent across it.
   #
-  # WALL-TIME BUDGET, written before the first run (docs/findings.md, "The
-  # sc41 CI lane"): ubuntu 6 min, macOS 7 min, windows 20 min, whole job,
-  # checkout and cargo build included. `timeout-minutes: 45` on the first
-  # landing so a blown budget is reported as a measurement and not
-  # truncated into a timeout.
+  # BUDGET vs MEASURED (docs/findings.md, "The sc41 CI lane"). The budget
+  # was written before the first run; the measurement is the second run,
+  # green on all three hosts, and it was wrong by more than an order of
+  # magnitude in the cheap direction:
+  #
+  #   ubuntu   budget  6 min   measured 20 s
+  #   macOS    budget  7 min   measured 37 s
+  #   windows  budget 20 min   measured 50 s
+  #
+  # `timeout-minutes: 20`, down from the first landing's 45 and matching
+  # `rig`, with the headroom deliberate rather than slack: every
+  # observation lane is DARK here (no release artifacts at the pins), so
+  # doc-examples currently stages 421 examples and executes none of them.
+  # The day the binaries publish, this job starts running 421 programs on
+  # three lanes and these numbers stop applying.
+  #
+  # `continue-on-error` is GONE (sprint item 2), after two green runs on
+  # all three hosts at cc30524. All four steps are required. Nothing here
+  # is advisory: the one red the lane produced was F-0114, and it was the
+  # rig's own, not any runner's.
   gates:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    # FIRST LANDING ONLY (sprint item 1): report without gating. Dropped in
-    # item 2 once the lane is green on all three hosts twice; whatever step
-    # cannot be made green stays advisory BY NAME, with its finding beside
-    # it, and never as a blanket job-level flag.
-    continue-on-error: true
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
