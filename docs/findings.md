@@ -3572,8 +3572,9 @@ bug:
   a dotted call. F-0016 is unmoved, six-plus sprints running.
 
 A methodology note, kept here although it is not a finding. Half a
-debugging hour was lost to a degenerate lupin parse error, `E0201: expected }`,
-found identifier `z` at 15..16`, which appears identically for a bare
+debugging hour was lost to a degenerate lupin parse error,
+``E0201: expected }, found identifier `z` at 15..16``, which appears
+identically for a bare
 `fn main() -> int { 0 }` and for `continue`/`loop`/`break`. It is no
 language gap: all three keywords run correctly under lupin in a clean
 package root, measured. The cause was the package root. `lupin conform-run`
