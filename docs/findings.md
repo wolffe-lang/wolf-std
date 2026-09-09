@@ -8054,7 +8054,17 @@ design.
 | `net/wait_readiness.lu` | unsupported | run | run | F-0110 — `net_wait` does not resolve |
 | `net/adopt_rows.lu` | unsupported | **unsupported** | run | F-0110 for lupin; the CHECKED machine refuses adoption BY NAME, its own clause |
 | `os/cpus.lu` | unsupported | run | run | F-0110 — `os_cpus` does not resolve |
-| `os/comptime_refuses.lu` | unsupported | run | run | lupin has no comptime tier; both wolf rungs give `E0701` |
+| `os/comptime_refuses.lu` | unsupported | run | run | **NOT F-0110** — lupin has no comptime tier; both wolf rungs give `E0701` |
+
+**Note 2026-09-08 (wolf-std#11 item 16).** F-0110's register row says
+"six ledger rows read `lupin = \"unsupported\"` for a calendar reason".
+Five do. The sixth row in this table, `os/comptime_refuses.lu`, carries
+its lane word for lupin's missing comptime tier — a stated posture, not a
+release date — and it does not retire when a conforming lupin arrives.
+The sc38 closure counts the same five without saying so: "Four of the
+five rows flip `unsupported` -> `run` at FIRST SIGHT ... The fifth row
+did not move" (`net/adopt_rows.lu`). Six is the count of sc37 WITNESSES;
+five is the count of calendar-reason rows.
 
 ## F-0103 re-probed at `6ade878` — unmoved, and this time the span had a compiler in it
 
