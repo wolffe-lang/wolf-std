@@ -2900,9 +2900,18 @@ toolchain refused to ship an unchecked cast; both refusals were right and
 the function they produced is the one both descriptions asked for.
 
 What it does not close: `str_from_utf8` is the compiler's prelude only
-(F-0075 below), so the function has two lanes. And its own family stays open:
-`fs_read_bytes` (F-0044) is still unwritten, so a byte read still has no
-producer to hand `to_str`.
+(F-0075 below), so the function has two lanes.
+
+**Amendment 2026-09-08 (wolf-std#11 item 6).** This paragraph ended "And
+its own family stays open: `fs_read_bytes` (F-0044) is still unwritten,
+so a byte read still has no producer to hand `to_str`." That was already
+false when it was written. F-0044 is **CLOSED at the sc12 (02-os) pin**
+(s90, wolf-lang#51/#52, fifteen new `fs_*` builtins natively lowered in
+the same wave), and F-0080 — filed in that same sc12 register, one
+section over — says so in its own words: "the s90 wave gave the fs tier
+`fs_read_bytes`/`fs_write_bytes` (whole file) and
+`fs_read_chunk`/`fs_write_chunk` (handle), all in `List[int]`". The
+producer existed one sprint before this sentence claimed it did not.
 
 ### F-0037's closure is SPENT: the json DOM has its navigation
 
