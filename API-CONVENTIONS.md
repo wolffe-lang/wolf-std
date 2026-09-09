@@ -881,7 +881,7 @@ worked home, as `std.option` is §2's and `std.errors` is §12's.
   `std.json` are both `json`. Until that is ruled, a resident that shadows a
   facade name divides the work with it strictly and says so in both headers.
 
-**§14 amendment (sc11): the process tier, and the three rules writing it
+**§14 amendment (sc11): the process tier, and the four rules writing it
 settled.** `std.process` is the sixth module of this section and the first
 whose capability can end another program. Everything above applies unchanged.
 Four additions.
