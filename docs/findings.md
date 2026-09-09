@@ -1404,6 +1404,15 @@ report (over all 136 staged programs at this pin the array is empty
 every time, so the std tree is warning-clean going into s69), but a gate
 needs the flag.
 
+**Amendment 2026-09-08 (wolf-std#11 item 1).** The inference in that
+parenthesis is withdrawn. F-0053, one sprint later, measured what the
+array covers: the ENTRY file only. An empty array over 136 staged entry
+files therefore says "no staged entry file warns" and cannot say the std
+tree is warning-clean — `std/math/float/float.lu` carries forty-plus
+`0.0 - x` sites that W0402 diagnoses and not one importing test surfaces
+one. The count and the emptiness stand as measured; the conclusion drawn
+from them does not.
+
 ## F-0047 — a module item that shares an ambient prelude name
 
 Silent wrong answer, and the implementations disagree about which way.
