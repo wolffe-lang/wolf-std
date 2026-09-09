@@ -1300,6 +1300,62 @@ rather than a new tier. Five additions.
   unmeasured rather than stating it flat, and treat lighting that lane
   as the occasion to re-read every such sentence in the file.
 
+### §14 amendments (sc40): the option with a default, the triple with names, and the clause as data
+
+- **A stream option enters the surface with its default stated and its
+  other direction justified.** `net.nodelay(mut s, on)` sets one option,
+  after acquisition, idempotently, and its doc says what happens when
+  nobody calls it (`TCP_NODELAY` is on) and what calling it with `false`
+  is FOR (many small pieces that need not be delivered individually).
+  A setter whose other direction has no stated use is a setter nobody
+  should call, and one whose default is undocumented is a posture rather
+  than a contract. This is deliberately not a generic `setsockopt`, and
+  the rule it establishes is the admission test: an option belongs here
+  when it is one named thing with a stated default and rows, the way
+  `reuse_port` was. It does not belong here when its meaning differs per
+  host and no measurement states the difference (linger, buffer sizes).
+- **Do not declare a row a typed caller cannot reach.** `net.write_bytes`
+  carries `invalid` for an element outside `0..255`, unreachable since
+  `List[byte]` existed, and the tag stays because upstream keeps it true
+  of the FFI caller. `net.writev` is new and takes `List[List[byte]]`, so
+  it declares `{closed, io}` and stops. A row set is a promise about what
+  a caller may have to handle; padding it with tags the type system has
+  already eliminated makes every handler wider than the truth.
+- **A positional row from a builtin is named in a type at the std
+  boundary.** `fs_fstat` answers `[kind, size, modified_ms]` as a
+  `List[int]`; `fs.fstat` answers `fs.Stat`. This is §14's unit rule one
+  step out: where the rule says a bare `int` whose UNIT is the contract
+  gets a named type, this says a bare LIST whose ORDER is the contract
+  gets one too. The test is confusability — `got[1]` and `got[2]` are the
+  same type and swap silently, `st.size` and `st.modified_ms` cannot.
+  Keep the FIELD units identical to the path-shaped call they mirror
+  (`fs.size`, `fs.modified_ms`) so the two answers compare without a
+  conversion; a parallel call that needs a conversion is a second
+  vocabulary wearing the first one's name.
+- **A host difference that lives in a NEIGHBOURING call is stated where
+  the caller meets it, and its witness asserts the disjunction.**
+  `fs.fstat`'s `kind` 1 is unreachable on windows, and the reason is
+  `fs.open` refusing to open a directory as a file — not anything
+  `fstat` does. A witness asserting `kind == 1` is red on windows for
+  something that is not a defect; one asserting `denied` is red on the
+  two hosts this project serves most. Assert what a portable program may
+  rely on (one of the two happens, neither is a trap) and write the
+  branch into the header, rather than picking a host to be correct on.
+- **A list this repository hand-copies from an upstream document is a
+  defect waiting for someone to notice, and the fix is to vendor the
+  document.** `REGISTERED_NS` mirrored `[conf.anchor.ns]` by whoever
+  bumped the pin remembering. Four gates checked it against the anchor
+  REGISTRY, which answers a different question — what the pin publishes,
+  not what it registers — and cannot see a clause that moves without
+  publishing. `test` sat reserved-upstream and uncarried-here for seven
+  weeks inside that blind spot. The clause now ships as snapshot data,
+  byte-verified at the pin, and is set-diffed both ways. Generalise it:
+  when a constant in this repository is a copy of a sentence somewhere
+  else, vendor the sentence and diff it, and give the parse its own
+  negative control — a parser that matches nothing makes every
+  set-difference vacuously empty, which is the defect wearing a test's
+  clothes.
+
 ## Review record
 
 - 2026-09-03, sc36 (§1's no-overloading rule and §14's os posture, applied
