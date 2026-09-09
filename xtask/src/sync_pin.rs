@@ -10,6 +10,10 @@ use crate::anchors::Registry;
 use crate::bins::is_full_sha;
 use crate::exec;
 use crate::repo_root;
+
+/// The vendored clause, named once so the re-vendor instruction and the
+/// error that prints it cannot drift apart.
+const CLAUSE_REL: &str = "vendor/upstream/spec/05-conformance.md";
 use std::process::Command;
 use std::time::Duration;
 
@@ -32,6 +36,19 @@ pub fn sync_pin() -> Result<(), String> {
     Registry::from_json(&String::from_utf8_lossy(&snapshot))
         .map_err(|e| format!("vendor/upstream/anchors.json: corrupt snapshot: {e}"))?;
     println!("sync-pin: anchors.json snapshot parses (registry v1)");
+
+    // The CLAUSE ships as snapshot data too, since sc40: `anchors.json`
+    // answers what the pin PUBLISHES and `05-conformance.md` answers what
+    // it REGISTERS, and the admission gates need both to read
+    // `[conf.anchor.ns.admit]` in the direction the registry cannot see.
+    let clause_snapshot = crate::anchors::clause::text(&repo)?;
+    let (registered, reserved) = crate::anchors::clause::lists(&clause_snapshot)
+        .map_err(|e| format!("{CLAUSE_REL}: {e}"))?;
+    println!(
+        "sync-pin: clause snapshot parses — {} registered, {} reserved namespaces",
+        registered.len(),
+        reserved.len()
+    );
 
     // The submodule may be absent (CI cannot clone the private repo);
     // that is legal and announced. When present, the snapshot must be
@@ -67,6 +84,15 @@ pub fn sync_pin() -> Result<(), String> {
                 .to_string(),
         );
     }
-    println!("sync-pin: snapshot == submodule at pin — OK");
+    let sub_clause = std::fs::read(upstream.join("spec/05-conformance.md"))
+        .map_err(|e| format!("upstream/spec/05-conformance.md: {e}"))?;
+    if sub_clause != clause_snapshot.as_bytes() {
+        return Err(format!(
+            "{CLAUSE_REL} differs from upstream/spec/05-conformance.md at the pin — \
+             NEVER edit the snapshot by hand; re-vendor: \
+             cp upstream/spec/05-conformance.md {CLAUSE_REL}"
+        ));
+    }
+    println!("sync-pin: snapshot == submodule at pin (registry AND clause) — OK");
     Ok(())
 }

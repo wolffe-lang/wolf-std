@@ -55,6 +55,35 @@ use std::path::Path;
 // bump later it fired on its first real event. The append and the
 // re-vendor are one commit, per the clause.
 //
+// AT sc40 (v0.2.8, `5c729e8`) THIS LIST IS ZERO BEHIND, and wolf-std#10's
+// filing said five. It was right when written and stale twice over by the
+// time it was read: sc38 took r09's `diag`/`ct`/`type`/`os`, sc39 took
+// s139's `sched`, and the clause is byte-identical between `ed8f526` and
+// `5c729e8` — twelve registered, fifteen reserved, on both sides. What
+// sc40 owes the issue is therefore not an entry but the GATE it asked for
+// in the same breath, and the gate is below: every check that existed
+// before this sprint asked the anchor REGISTRY, and the registry cannot
+// see a clause that moves without publishing.
+//
+// WHAT THE FIVE HID, measured rather than recalled. At `6ade878` (v0.2.5,
+// the pin this repository held into sc38) the four r09 namespaces
+// published SEVENTY anchors between them — `type` 24, `os` 22, `ct` 14,
+// `diag` 10 — every one of which `classify` rejected here while
+// `[conf.tag.valid]` made citing it a CI failure. That is not an
+// abstraction: sixteen `os.*` citations and sixteen `type.*` citations
+// stand in `std/` and `tests/` today across six and four distinct anchors
+// (`os.cpus`, `os.net.accept`, `os.net.listen.opts`, `os.net.unix`,
+// `os.net.wait`, `os.proc.inherit`; `type.byte`, `type.char.cast`,
+// `type.char.interp`, `type.char.order`), and not one of them could be
+// written before the admission. F-0099 is what it cost while it lasted:
+// sc36's six `[os.net.unix]` witnesses carried the forward tag
+// `std.net.unix` with the true clause in a COMMENT, which is a citation no
+// gauntlet reads, and ten `ty.byte` tags named a namespace the registry
+// has never published. `sched` hid the mirror image and hid it better —
+// seven anchors DECLARED by 07-schedule-points.md and published by
+// nothing, cited here zero times, invisible to every gate on both tracks
+// for a year, because a document nothing reads raises no alarm.
+//
 // Upstream fixed the ROOT CAUSE in the same change: four hand-copied
 // namespace lists there (link_check's owner map, anchor_index's ownership
 // match, its own REGISTERED_NS, spec_extract's document list) collapsed
@@ -86,6 +115,97 @@ pub const FORWARD_NS: &[&str] = &[
     "str", "err", "task", "proc", "sync", "generics", "arith", "ffi", "unsafe", "comptime", "perf",
     "mod", "std", "ty", "test",
 ];
+
+/// `[conf.anchor.ns]` as DATA rather than as a hand-copy.
+///
+/// Every gate above this point asks the anchor REGISTRY
+/// (`vendor/upstream/anchors.json`) what namespaces the pin publishes.
+/// That is not the same question as what the CLAUSE registers, and the two
+/// can differ in a direction the registry cannot see: a namespace admitted
+/// by `[conf.anchor.ns]` whose document publishes nothing yet reads as
+/// silence in `anchors.json` and as a rejected-but-legal tag here. That is
+/// the restrictive half of `[conf.anchor.ns.admit]`, and it is the half
+/// that cost `test` seven weeks — appended to the reserved list on
+/// 2026-08-11 by s39 and not carried here until sc36, with nothing in
+/// between able to notice, because a reserved namespace publishes no
+/// anchors at all and the registry therefore has no opinion about it.
+///
+/// So the clause ships as vendored data beside the registry
+/// (`vendor/upstream/spec/05-conformance.md`, byte-verified against the
+/// submodule at the pin by `sync-pin`), and the tests below set-diff both
+/// of this file's lists against it BOTH WAYS. wolf-interp did this first
+/// at is39 (`2de528d`, wolf-interp#64); this is the mirror, and the
+/// parser is deliberately the same shape so a clause change breaks both
+/// tracks the same way.
+pub mod clause {
+    use std::collections::BTreeSet;
+    use std::path::Path;
+
+    /// The vendored clause document. Snapshot, not submodule: CI cannot
+    /// clone the private upstream repo, which is the whole reason
+    /// `vendor/upstream/` exists.
+    pub fn text(repo: &Path) -> Result<String, String> {
+        let path = repo.join("vendor/upstream/spec/05-conformance.md");
+        std::fs::read_to_string(&path)
+            .map_err(|e| format!("vendor/upstream/spec/05-conformance.md: {e}"))
+    }
+
+    /// The backticked token at each `` `ns` → owner `` pair. Splitting on a
+    /// backtick alternates outside/inside, so odd indices are the spans
+    /// BETWEEN backticks; the chunk following one decides whether it is a
+    /// registration or prose, and an arrow is the registration.
+    fn owners(text: &str) -> BTreeSet<String> {
+        let parts: Vec<&str> = text.split('`').collect();
+        parts
+            .iter()
+            .enumerate()
+            .filter(|(at, _)| at % 2 == 1)
+            .filter(|(at, token)| {
+                !token.is_empty()
+                    && token.chars().all(|c| c.is_ascii_lowercase())
+                    && parts
+                        .get(at + 1)
+                        .is_some_and(|after| after.trim_start().starts_with('\u{2192}'))
+            })
+            .map(|(_, token)| (*token).to_owned())
+            .collect()
+    }
+
+    /// Every backticked all-lowercase token in `text`.
+    fn tokens(text: &str) -> BTreeSet<String> {
+        text.split('`')
+            .skip(1)
+            .step_by(2)
+            .filter(|t| !t.is_empty() && t.chars().all(|c| c.is_ascii_lowercase()))
+            .map(ToOwned::to_owned)
+            .collect()
+    }
+
+    /// The `[conf.anchor.ns]` bullet's two lists: registered, reserved.
+    ///
+    /// Every `expect`-shaped failure here is a CLAUSE SHAPE change, which
+    /// is a thing this repository must be told about rather than parse
+    /// around — the parenthetical between the two lists is prose and grows
+    /// every time a namespace is admitted, so the split points are the
+    /// stable headings and not offsets.
+    pub fn lists(text: &str) -> Result<(BTreeSet<String>, BTreeSet<String>), String> {
+        let bullet = text
+            .split_once("- `[conf.anchor.ns]`")
+            .ok_or("the vendored spec carries no `[conf.anchor.ns]` bullet")?
+            .1;
+        let (registered_half, reserved_half) = bullet
+            .split_once("**Reserved forward namespaces**")
+            .ok_or("the `[conf.anchor.ns]` bullet has no reserved-namespace heading")?;
+        let reserved_half = reserved_half
+            .split_once("*forward*):")
+            .ok_or("the reserved list does not follow the `*forward*):` parenthetical")?
+            .1
+            .split_once("A tag outside")
+            .ok_or("the reserved list does not end at the `A tag outside` sentence")?
+            .0;
+        Ok((owners(registered_half), tokens(reserved_half)))
+    }
+}
 
 pub struct Registry {
     anchors: BTreeSet<String>,
@@ -245,6 +365,96 @@ mod tests {
              a pin bump withdrew the last anchor and stranded the entry. A namespace \
              with nothing in it registers nothing; move it to FORWARD_NS if it is a \
              reservation, or drop it."
+        );
+    }
+
+    fn clause_lists() -> (BTreeSet<String>, BTreeSet<String>) {
+        let text = clause::text(&crate::repo_root()).unwrap();
+        clause::lists(&text).unwrap()
+    }
+
+    /// The negative control the three tests below rest on. A parser that
+    /// silently matched nothing would make every set-difference vacuously
+    /// empty, which is #246's own defect wearing a test's clothes — and it
+    /// is the failure mode sc38 found in sc36's mock-backed pin, one
+    /// mechanism over. Asserted against the clause's SHAPE, not its
+    /// contents, so an admission does not have to edit this test.
+    #[test]
+    fn the_clause_parse_finds_the_lists_rather_than_finding_nothing() {
+        let (registered, reserved) = clause_lists();
+        assert!(
+            registered.len() >= 12,
+            "the registered list parsed to {registered:?} — `[conf.anchor.ns]`'s \
+             shape moved and the parser followed it into silence"
+        );
+        assert!(registered.contains("gram") && registered.contains("conf"));
+        assert!(
+            reserved.len() >= 15,
+            "the reserved list parsed to {reserved:?} — the clause's shape moved"
+        );
+        assert!(reserved.contains("str") && reserved.contains("test"));
+    }
+
+    /// `[conf.anchor.ns.admit]` read against the CLAUSE, both ways — the
+    /// gate wolf-std#10 asked for and the one thing the registry-backed
+    /// gates above cannot supply.
+    ///
+    /// They ask `anchors.json` what the pin PUBLISHES. This asks
+    /// `05-conformance.md` what the pin REGISTERS, and the difference is
+    /// not academic: a namespace admitted by the clause whose document has
+    /// published nothing yet is invisible to every registry gate, while
+    /// `classify` here rejects its tags as unregistered. That is exactly
+    /// how `sched` sat at ed8f526 for the pin before it, and exactly how
+    /// `test` sat reserved-and-uncarried from 2026-08-11 to sc36 — seven
+    /// weeks in which no gate anywhere could hold an opinion, because a
+    /// reserved namespace publishes no anchors to have one about.
+    ///
+    /// This test reds the next time `[conf.anchor.ns]` moves and this file
+    /// does not, in whichever direction it moves.
+    #[test]
+    fn the_pinned_clause_registers_exactly_what_this_file_registers() {
+        let (clause, _) = clause_lists();
+        let ours: BTreeSet<String> = REGISTERED_NS.iter().map(|s| (*s).to_owned()).collect();
+        let missing_here: Vec<&String> = clause.difference(&ours).collect();
+        let extra_here: Vec<&String> = ours.difference(&clause).collect();
+        assert!(
+            missing_here.is_empty(),
+            "[conf.anchor.ns.admit], RESTRICTIVE half: the pinned clause registers \
+             {missing_here:?} and REGISTERED_NS does not, so this rig REJECTS a tag \
+             that is legal upstream. Append them in the SAME change as the pin bump."
+        );
+        assert!(
+            extra_here.is_empty(),
+            "[conf.anchor.ns.admit], PERMISSIVE half: REGISTERED_NS admits \
+             {extra_here:?} and the pinned clause does not. Either the admission ran \
+             ahead of `[conf.anchor.ns]` (file it upstream, do not keep it here) or \
+             the entry is a typo."
+        );
+    }
+
+    /// The same read for the reserved list, which is the one that went
+    /// unchecked longest. `test` was appended upstream on 2026-08-11 and
+    /// carried here at sc36; nothing could have told anyone in between,
+    /// because a reserved namespace publishes no anchors and the registry
+    /// gates are all the rig had.
+    #[test]
+    fn the_pinned_clause_reserves_exactly_what_this_file_reserves() {
+        let (_, clause) = clause_lists();
+        let ours: BTreeSet<String> = FORWARD_NS.iter().map(|s| (*s).to_owned()).collect();
+        let missing_here: Vec<&String> = clause.difference(&ours).collect();
+        let extra_here: Vec<&String> = ours.difference(&clause).collect();
+        assert!(
+            missing_here.is_empty(),
+            "the pinned clause reserves {missing_here:?} and FORWARD_NS does not — a \
+             forward tag that is legal upstream is a CI failure here (`test`'s own \
+             seven weeks, 2026-08-11 to sc36)"
+        );
+        assert!(
+            extra_here.is_empty(),
+            "FORWARD_NS reserves {extra_here:?} and the pinned clause does not — this \
+             rig would classify an unregistered tag as forward and let it through. \
+             Unlike wolf-interp's `repl`, this repository claims no reservation of \
+             its own: `std` is upstream's."
         );
     }
 
