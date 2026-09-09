@@ -1,5 +1,122 @@
 # Changelog
 
+## sc40 — 2026-09-09 — the surface the runtime grew, and the clause stops being a hand-copy
+
+The pairing gap is zero, and this is the first time it has been.
+`wolf 0.2.6` -> `0.2.8` (`5c729e8`), `lupin 0.1.27` -> `0.1.28`
+(`e465979`, conformance pin `5c729e8`). All four wolf-side pins now name
+one commit: both binaries' own `--version` line 1, both `pin` keys in
+`vendor/tools.toml`, and `vendor/upstream/PIN`. Every earlier entry in
+that file records a gap and argues about its direction — sc35's
+inversion, sc37's forty-two commits behind, sc39's data pin three ahead
+of the compiler. There is no direction to argue at `5c729e8`.
+
+Seven deltas across the fifty-five-commit span were classified in
+`tools.toml` before anything was measured, with the two places to look
+first named: s140's new "no std root is configured" diagnostic
+(unreachable here, because this repository IS the std root) and s142's
+`str` refusal now naming the method (a rendering change, the sc37
+`6f57ee0` precedent). Neither moved anything. Registry `ed8f526` ->
+`5c729e8` predicted 431 -> 436, +5, every one in `os`, nothing dropped
+or moved, clause unmoved; measured exactly that, key sets diffed both
+ways — added `os.fs`, `os.fs.fstat`, `os.net.io`, `os.net.nodelay`,
+`os.net.writev`.
+
+**`REGISTERED_NS` is zero namespaces behind, and wolf-std#10 said five.**
+The filing was right when written and stale twice by the time it was
+read: sc38 took r09's `diag`/`ct`/`type`/`os`, sc39 took s139's `sched`,
+and `[conf.anchor.ns]` is byte-identical between `ed8f526` and
+`5c729e8`. So the entry was never the work. The gate the issue asked for
+in the same breath is.
+
+Every admission check this rig had asked `vendor/upstream/anchors.json`
+what the pin PUBLISHES. That is a different question from what the
+clause REGISTERS, and the gap between them is invisible from the
+registry side: a namespace the clause admits whose document has
+published nothing reads as silence in `anchors.json` and as a
+rejected-but-legal tag in `classify`. It is the half that cost `test`
+seven weeks, appended upstream on 2026-08-11 and carried here at sc36,
+with nothing in between able to notice — a reserved namespace publishes
+no anchors for a registry gate to have an opinion about.
+
+`vendor/upstream/spec/05-conformance.md` now ships beside the registry,
+byte-verified against the submodule at the pin by `sync-pin`, and three
+tests set-diff `REGISTERED_NS` and `FORWARD_NS` against the clause both
+ways, over a parse guarded by its own negative control. wolf-interp did
+this first at is39 (`2de528d`, wolf-interp#64); the parser here is the
+same shape on purpose, so a clause change breaks both tracks the same
+way. All four directions were captured RED before they were trusted.
+
+**What the five hid, measured rather than recalled.** At `6ade878` the
+four r09 namespaces published seventy anchors between them — `type` 24,
+`os` 22, `ct` 14, `diag` 10 — every one a CI failure to cite here.
+Sixteen `os.*` and sixteen `type.*` citations stand in this tree today
+across ten distinct anchors, and not one could have been written before
+the admission. F-0099 is the receipt: sc36's six `[os.net.unix]`
+witnesses carried the forward tag `std.net.unix` with the real clause in
+a comment, which is a citation no gauntlet reads, and ten `ty.byte` tags
+named a namespace the registry has never published. `sched` hid the
+mirror image and hid it better — seven anchors declared by a document
+nothing extracted, published by neither side, cited here zero times, and
+invisible to every gate on both tracks for a year.
+
+Three wrappers for the calls the runtime grew:
+
+```wolf
+pub fn writev(mut s: Socket, parts: List[List[byte]]) -> () ! {closed, io}
+pub fn nodelay(mut s: Socket, on: bool) -> () ! {io}
+pub fn fstat(mut f: File) -> Stat ! {not_found, denied, io}
+```
+
+`net.writev` is the response shape lobo asked for: a head and a body sent
+as one write, gathered by the kernel, copied by nobody. `write_bytes` of
+the concatenation puts the same bytes there and allocates the sum;
+two `write_bytes` calls allocate nothing and cost two syscalls and — before
+the nodelay default — a 40ms delayed-ACK stall on linux for the second.
+Its rows are `write_bytes`'s minus `invalid`, because a
+`List[List[byte]]` cannot hold an element outside `0..255` and a
+signature should not declare a row no typed caller can reach.
+
+`net.nodelay` exists so the default is stated rather than posture:
+`TCP_NODELAY` is ON for every accepted or dialed stream, on every tier-1
+host and every tier including the checked machine, because wolf-lang#254
+measured what the other way costs — 40ms per request, 108x against nginx
+on the same runner, for a program that did nothing wrong. What `off` is
+for is written down too, since a setter whose other direction has no
+stated use is a setter nobody should call: many small pieces that need
+not be delivered individually, a throughput choice against a latency
+default. `writev` is the better answer whenever the pieces are known
+together.
+
+`fs.fstat` answers the `[kind, size, modified_ms]` triple as a named
+type. The builtin hands back a `List[int]`; a caller reading `got[1]` and
+`got[2]` is a caller who can confuse them silently, where `st.size` and
+`st.modified_ms` cannot be confused at all. The units are `fs.size`'s and
+`fs.modified_ms`'s deliberately, so the handle's answer and the path's
+compare with no conversion — which is what makes the call a substitution
+rather than a second vocabulary, and what wolf-lang#261 was actually
+about. Windows refuses to open a directory as a file, so `kind` 1 is
+unreachable there; the difference is `fs.open`'s and it is stated where a
+caller meets it, and the row witness asserts the disjunction rather than
+picking a host to be right on.
+
+**The prediction that missed, recorded with the miss.** All three
+wrappers were predicted three-lane off the zero pairing gap: no witness
+could carry `unsupported` for a release DATE, F-0110's whole class. Both
+`std.net` rows are three-lane with byte-identical stdout across all
+three, the first new os-tier calls to manage that on the sprint they
+landed. The two `std.fs` rows are not, and the reason was never a date —
+the reference machine has no filesystem at all by design and declines the
+whole tier rather than mock it. A matched pin buys reach only where the
+capability exists to begin with.
+
+Census: 33 modules (+0), 596 `pub fn` in `std/` (+3), one new public type
+(`fs.Stat`), 396 entry tests (+4), 396 ledger rows (+4). Every existing
+ledger row unmoved, as predicted: the span's only behavioural commits are
+`[os.net.io]`'s syscall-first and TCP_NODELAY-by-default, and both
+clauses say in their own letter that nothing observable in the rows
+moves. Nineteen `tests/net/*.lu` got faster and none changed verdict.
+
 ## sc39 — 2026-09-08 — the spawn takes the set, and the first child this rig ever ran told on the docs
 
 `sched` is admitted, and the gate announced it before a human did.
