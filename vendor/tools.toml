@@ -483,7 +483,40 @@
 # Verified from `--version`, not from the brief: wolf 0.2.6's PAIRING
 # line still names lupin 0.1.26 at 982f857, because is38 shipped after
 # r09 cut the tag. The pairing line is not the machine (F-0064).
-version = "0.1.27"
+#
+# sc40 BUMP: 0.1.27 -> 0.1.28, pin 6ade878 (v0.2.5) -> 5c729e8 (v0.2.8).
+# is40 "the mirror writes vectored" takes the v0.2.8 TAG. Tag `v0.1.28` =
+# wolf-interp `e465979`; the machine was ALREADY running it when the lane
+# opened (installed by the orchestrator), and this entry records the
+# acquisition rather than claiming to have made it. Verified from
+# `--version`: `lupin 0.1.28 (wolf-interp, reference interpreter at pin
+# 5c729e8)`.
+#
+# **THE PAIRING GAP IS ZERO, AND THIS IS THE FIRST BUMP WHERE IT IS.**
+# lupin 0.1.28 conforms to `5c729e8`; wolf 0.2.8 conforms to `5c729e8`;
+# `vendor/upstream/PIN` records `5c729e8`. All FOUR wolf-side pins — the
+# two binaries' own `--version` line 1, this file's two `pin` keys, and
+# the data pin — name one commit. Every earlier entry in this file
+# records a gap and argues about its direction: sc35's inversion (lupin
+# AHEAD of the data pin), sc37's reversal (42 commits behind), sc39's
+# data pin leading the compiler by three. There is no direction to argue
+# here. F-0110's whole class — a witness carrying `lupin = "unsupported"`
+# for a reason that is a release DATE and not a semantics — cannot be
+# created by this pin, because the reference machine has been shown
+# everything the compiler has.
+#
+# What the bump buys this repo: `net_writev`, `net_nodelay` and
+# `fs_fstat` on BOTH lupin rungs as well as both wolf lanes, so sc40's
+# three wrappers ship three-lane instead of wolf-lanes-only. The
+# `[os.net.io]` posture (the syscall goes first) arrives on the mirror in
+# the same release.
+#
+# One thing the pairing LINE still gets wrong, and it is not the machine
+# (F-0064): `wolf 0.2.8`'s second line reads "paired with lupin 0.1.27
+# ..., pin 6ade878", because `c95349c` recorded the pairing before is40
+# cut 0.1.28. Doctor prints it and does not gate it. The pairing line is
+# a record of what upstream tested against, never a claim about this box.
+version = "0.1.28"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -492,7 +525,11 @@ version = "0.1.27"
 # pin = "2bfbe5e6e877d3b6b43a9d8a68b56b1ef74c21c4"  (superseded, sc32 era — is33's s132-merge pin)
 # pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc33/sc34/sc35-bump era — is34's v0.2.2-tag pin, held while wolf ran 71 commits ahead)
 # pin = "982f857885b991e686c6b045de213d10cab013c1"  (superseded, sc35-second/sc36/sc37 era — is36's v0.2.4-tag pin, held across sc37)
-pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"
+# pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"  (superseded, sc38/sc39 era — is38's v0.2.5-tag pin, the pin that paid F-0110)
+pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"
+# (sc40: 0.1.28 crosses to v0.2.8 and lands on the SAME sha as `[wolf]`'s
+#  pin below and as vendor/upstream/PIN. The gap is zero — see the entry
+#  above. The sc37/sc38 note kept for its history:)
 # (sc37: UNCHANGED — 0.1.26 conformed to the same wolf-lang commit 0.1.25
 #  did, is37 was an interpreter release, not a pin chase. sc38: it IS a
 #  pin chase — 0.1.27 crosses to v0.2.5 and this is the pin that pays
@@ -634,7 +671,66 @@ pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.6"
+version = "0.2.8"
+# sc40 BUMP: 398e5f5 (v0.2.6) -> 5c729e8 (v0.2.8), 55 commits under two
+# release tags and three merges (s139, s140, fa01) plus s141 and s142
+# direct. The data pin was ALREADY at ed8f526 (sc39 took the s139 merge
+# for `sched` without moving this key), so the DATA delta this bump
+# carries is ed8f526..5c729e8 and the BINARY delta is the whole span.
+#
+# Seven deltas, classified BEFORE anything was measured:
+#   s139 / ed8f526  SPEC + TOOLING, already banked. `sched` admitted,
+#     424 -> 431. sc39 took it. Zero motion left to find here.
+#   s140 / 1d628ff  DIAGNOSTIC + DRIVER. `wolf --help` answers on stdout
+#     with exit 0 where it used to print one line to stderr and exit 2;
+#     the compile-failure footer names the code actually reported
+#     (#249); a `use std.…` miss says no std root is configured and
+#     names wolf-std (#251). **THIS IS THE ONE TO WATCH.** Predicted
+#     zero motion on all three columns: the rig always sets `WOLF_STD`
+#     (it IS the std root), so #251's new note is unreachable from here
+#     by construction, and the ledger's wolfc column records an error
+#     CODE, never rendered text. If a row moves, look here first.
+#   fa01 / 79e4818  DOCUMENTARY. A facts pass over upstream's own docs.
+#     Predicted zero.
+#   the unslop sweep (28 commits)  DOCUMENTARY. Prose in upstream's
+#     README, CHANGELOG and docs/. Predicted zero.
+#   c95349c  PAIRING RECORD ONLY. wolf 0.2.7+ names lupin 0.1.27 at
+#     6ade878 on `--version` line 2. Reported, never gated (F-0064), and
+#     already stale against the 0.1.28 on this box.
+#   s141 / d821517 + b3208b6  BEHAVIOURAL + NEW SURFACE.
+#     `[os.net.io]`: every parking call tries the syscall before it
+#     waits and parks against the budget computed at entry. The clause
+#     says in its own letter that nothing a program can observe in the
+#     rows moves, so this is a LATENCY change to nineteen existing
+#     `tests/net/*.lu` and not a semantic one. `[os.net.nodelay]` sets
+#     TCP_NODELAY on every accepted or dialed stream by DEFAULT, which
+#     is the same shape: the wire changes, the rows do not.
+#     `net_writev` and `net_nodelay` are NEW builtins — no std file at
+#     9a684d4 calls either, because they did not exist to call.
+#     Predicted: zero ledger motion, +3 anchors (os.net.io,
+#     os.net.writev, os.net.nodelay).
+#   s142 / 5376138 + e7297cb + 0d7dda3  NEW SURFACE + DIAGNOSTIC.
+#     `fs_fstat(fd)` is new (predicted +2 anchors: os.fs, os.fs.fstat).
+#     `str.to_int()` is new and std does not wrap it this sprint.
+#     `0d7dda3` names the method in the `str` builtin-set refusal
+#     instead of leaving a bare span — a RENDERING change, the sc37
+#     precedent (`6f57ee0`) exactly: predicted zero, for the same
+#     reason, and named here as the second place to look.
+#
+# PREDICTED anchors ed8f526 -> 5c729e8: 431 -> 436, +5, dropped 0,
+# owners moved 0, and every one of them in `os` — so REGISTERED_NS is
+# unmoved and `[conf.anchor.ns]` is byte-identical between the two pins.
+# MEASURED, both key sets diffed both ways (F-0100/#177): 431 -> 436;
+# added {os.fs, os.fs.fstat, os.net.io, os.net.nodelay, os.net.writev};
+# dropped {}; owners moved {}. Clause diffed as bytes: IDENTICAL. The
+# prediction held whole, including the namespace claim, which is the one
+# sc38's prediction missed by reading a commit message instead of the
+# registry.
+#
+# ALL FOUR PINS LAND ON ONE SHA, and for the first time that includes
+# lupin's: this key, `[lupin]`'s, `vendor/upstream/PIN`, and both
+# binaries' own `--version` line 1. See the `[lupin]` entry for what a
+# zero pairing gap costs and buys.
 # sc38 BUMP: 6ade878 (v0.2.5) -> 398e5f5 (v0.2.6), 5 commits under two
 # merges. Three deltas, classified BEFORE they were measured:
 #   #239 / a369b22  MECHANICAL upstream, BEHAVIOURAL for this rig's CI
@@ -1625,4 +1721,5 @@ version = "0.2.6"
 # pin = "31170d119379086f6242cd88d4f4e5386f6aef23"  (superseded, sc34 era — the s135-merge dev-stamped acquisition, the byte TYPE)
 # pin = "4230b008e39d6541f31ac9858057e4345a337271"  (superseded, sc35 first bump — the s136-merge dev-stamped acquisition, the byte PRODUCERS)
 # pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"  (superseded, sc37 era — the v0.2.5 tag acquisition, s137's five builtins)
-pin = "398e5f547a65308c6a3e88fee632563e87afd217"
+# pin = "398e5f547a65308c6a3e88fee632563e87afd217"  (superseded, sc38/sc39 era — r09's v0.2.6-tag pin)
+pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"
