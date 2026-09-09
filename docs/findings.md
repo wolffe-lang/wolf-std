@@ -6707,12 +6707,18 @@ The table says four things.
    them to constants. It is the cleanest module in the set and the best
    evidence that the ceremony is a property of what a module computes,
    and not of the rename.
-4. Five `require_byte` guards are deleted, and each was promised.
+4. EIGHT `require_byte` guards are deleted, and each was promised.
    `sha2`, `chacha20`, `curve25519`, `p256`, `x.tls.record`,
    `x.tls.handshake`, `x.tls.cert` and `x.tls.client` each carried a
-   private 0..255 ingestion guard, and four of them carried it as the
-   module's one recorded constant-time exception, with the words "it
-   leaves with F-0035's real byte type" in the header. It left. The
+   private 0..255 ingestion guard — one apiece, eight in all — and FIVE
+   of them (`sha2`, `chacha20`, `x.tls.record`, `x.tls.handshake`,
+   `x.tls.cert`) carried it as the module's one recorded constant-time
+   exception, with the words "it leaves with F-0035's real byte type" in
+   the header. It left. (This bullet read "Five ... deleted" and "four of
+   them" until 2026-09-08, wolf-std#11 item 13; both counts re-taken with
+   `git grep -c 'fn require_byte'` and `git grep -l "leaves with F-0035"`
+   at the sc34 merge, and `git grep` finds no `require_byte` anywhere in
+   `std/` at the sc35 merge.) The
    digest, cipher and ladder paths now have no value-dependent branch at
    all, a constant-time improvement the type paid for and no amount of
    library work could have.
