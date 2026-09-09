@@ -564,7 +564,12 @@ dropped as no longer true.
 Evidence 2: the whitespace set is Unicode too. `trim` and `words` use
 `White_Space`, not ASCII. U+0085, U+00A0, U+1680, U+2000..U+200A,
 U+2028, U+2029, U+202F, U+205F and U+3000 all behave as whitespace
-(observed, all 25). std's `trim_start`/`trim_end` therefore carry a
+(observed). That enumeration is the nineteen NON-ASCII members; the set
+is 25 with the six ASCII ones (`\t`, `\n`, `\v`, `\f`, `\r`, space),
+and 25 is the number the table and the test carry —
+`tests/str/trim_whitespace_set.lu` checks exactly 25 code points, one
+`agrees(...)` call each, returning 1 through 25 (counted 2026-09-08,
+wolf-std#11 item 2). std's `trim_start`/`trim_end` therefore carry a
 25-entry table of their own purely to agree with the builtin, and
 `tests/str/trim_whitespace_set.lu` pins the agreement code point by code
 point so a builtin that changes its set fails CI here instead of silently
