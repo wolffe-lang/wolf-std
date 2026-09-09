@@ -91,6 +91,11 @@ for the same reason as before, against the other implementation. The
 register records the lesson: lupin resolves tags lazily on the taken
 path, so a raise site on an untaken branch proves nothing.
 
+*(As of sc06 this paragraph is history, not practice: the interim is
+RETIRED and the rename was applied tree-wide — §12, whose heading names
+it, and the Review record's sc06 entry. Marked 2026-09-08, wolf-std#11
+item 19; the sc03 record is left as written.)*
+
 ## 3. Parameter modes (X1)
 
 - The `read` default is sacred: the absence of a keyword *is* the mode,
