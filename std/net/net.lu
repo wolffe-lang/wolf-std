@@ -1047,3 +1047,138 @@ pub fn adopt_listener(fd: int) -> Listener ! {unsupported, io} {
 pub fn wait(fds: List[int], deadline_ms: int) -> List[int] ! {io} {
     net_wait(fds, deadline_ms)?
 }
+
+/// Write every part of `parts` to `s`, in order, as ONE write.
+///
+/// The gathered write, `[os.net.writev]`. `writev(2)` on unix and
+/// `WSASend` on windows take the vector as it stands: the kernel gathers
+/// the parts and the runtime never copies them, so a head and a body
+/// leave in one syscall and where two writes would have been two
+/// segments, this is one.
+///
+/// **The shape it exists for is the response**, which is why lobo asked
+/// for it: a header built in a `strbuf` and a body already in hand, sent
+/// without concatenating the two into a third list that is the size of
+/// both. Write
+///
+/// ```text
+/// var parts = List[List[byte]]()
+/// (mut parts).push(head)
+/// (mut parts).push(body)
+/// net.writev(mut conn, parts)?
+/// ```
+///
+/// and the bytes on the wire are `head` then `body`, once. `write_bytes`
+/// of `head ++ body` puts the same bytes there and allocates the sum to
+/// do it; two `write_bytes` calls allocate nothing and cost two syscalls,
+/// and — before `[os.net.nodelay]` — a 40ms delayed-ACK stall on linux
+/// for the second one. This call is the only one of the three that pays
+/// neither price.
+///
+/// Rows are `write_bytes`'s minus one: `closed` when the peer has gone,
+/// `io` for a host failure, a bad handle or a fired budget. There is no
+/// `invalid` — that tag is `net_write_bytes`'s refusal of a list holding
+/// an element outside `0..255`, and a `List[List[byte]]` cannot present
+/// one, so this signature does not declare a row no typed caller can
+/// reach. Never traps.
+///
+/// **Completeness is `write`'s**: the whole gather drains or the call
+/// raises, resumed after a park from the byte the kernel stopped at in
+/// whichever part it stopped in. Empty parts are permitted and send
+/// nothing; a call whose parts are ALL empty is a completed write that
+/// makes no syscall at all, which is the answer to "is an empty vector an
+/// error" — it is not.
+///
+/// `mut s` because writing advances the stream (§14).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_writev` (s141) — all three lanes, lupin 0.1.28 included (is40
+/// mirrors it at the same pin this repository holds).
+///
+/// ```wolf-doc-example
+/// var srv = net.listen(net.loopback(0))?
+/// let p = net.port(srv)?
+/// var cli = net.connect(net.loopback(p))?
+/// var head = List[byte]()
+/// (mut head).push(72 as byte)
+/// var body = List[byte]()
+/// (mut body).push(105 as byte)
+/// var parts = List[List[byte]]()
+/// (mut parts).push(head)
+/// (mut parts).push(body)
+/// net.writev(mut cli, parts)?
+/// net.close(take cli)?
+/// var conn = net.accept(mut srv)?
+/// let got = net.read_bytes(mut conn, 8) else List[byte]()
+/// net.close(take conn)?
+/// net.close_listener(take srv)?
+/// got.len == 2
+/// ```
+pub fn writev(mut s: Socket, parts: List[List[byte]]) -> () ! {closed, io} {
+    net_writev(s.fd, parts)?
+}
+
+/// Set Nagle's algorithm off (`on = true`) or on (`on = false`) for `s`.
+///
+/// **`TCP_NODELAY` is already ON for every stream this module hands
+/// out** — accepted by `accept`, dialed by `connect`, on every tier-1
+/// host and every tier, including the checked machine, whose streams
+/// enter its table under the same default (`[os.net.nodelay]`). A
+/// program that wants the default does not call this function. It is
+/// here so that the default is a STATED one rather than an
+/// undocumented posture, and so the other half is reachable.
+///
+/// **Why that is the default.** wolf-lang#254 measured it: a server that
+/// answers with a head and then a body — two writes, the second small —
+/// stalls on linux behind the peer's delayed ACK at 40ms per request,
+/// a 108x gap against nginx on the same runner, for a program that did
+/// nothing wrong. Nagle coalesces the small second write and the peer
+/// will not ACK until it has something to say. The posture Go, nginx and
+/// node take is the one that makes that naive two-write server correct
+/// without its author having to know this clause exists, and it is the
+/// one taken here.
+///
+/// **What `off` is for.** `nodelay(mut s, false)` puts Nagle back, and
+/// there is one shape that wants it: a program that writes many small
+/// pieces it does not need delivered individually — a log shipper, a
+/// metrics drain, a bulk feed — and would rather the kernel coalesce
+/// them into full segments than pay a packet per piece. That is a
+/// THROUGHPUT choice made against a LATENCY default, and a program
+/// making it should be able to say why. `net.writev` above is the other
+/// answer to the same problem and the better one when the pieces are
+/// known together: gather them and Nagle has nothing to coalesce.
+///
+/// Idempotent, and it takes effect after acquisition — a stream is a
+/// stream first and an option-carrying stream second, which is why this
+/// is a setter and `reuse_port` (which must precede the bind) is not.
+///
+/// Rows: `io`, and it is the whole row set. A LISTENER, a unix-domain
+/// stream (the option is TCP's), a closed handle and a forged one are
+/// each `io`; std adds no check of its own, so the tag is the host's
+/// answer. Never traps.
+///
+/// **This is not a generic `setsockopt` and none is planned.** An option
+/// reaches this module by clause, with its rows and its default stated,
+/// the way `reuse_port` did in `listen_opts`. That admits more options of
+/// the same kind — a keepalive switch is the obvious next — and admits
+/// nothing whose meaning differs per host without a measurement to state
+/// it (linger, buffer sizes).
+///
+/// `mut s` because the socket's host state changes even though the
+/// value's field does not (§14's stream rule).
+///
+/// Capability `net`; refused at comptime (D33). Delegates to
+/// `net_nodelay` (s141) — all three lanes, lupin 0.1.28 included.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen(net.loopback(0))?
+/// let p = net.port(srv)?
+/// var cli = net.connect(net.loopback(p))?
+/// net.nodelay(mut cli, false)?
+/// net.nodelay(mut cli, true)?
+/// net.close(take cli)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn nodelay(mut s: Socket, on: bool) -> () ! {io} {
+    net_nodelay(s.fd, on)?
+}

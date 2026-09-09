@@ -3487,3 +3487,29 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# =====================================================================
+# sc40 — THE SURFACE THE RUNTIME GREW.
+#
+# Every EXISTING row is unmoved across the 398e5f5 -> 5c729e8 bump, which
+# was the prediction written into `vendor/tools.toml` before it was
+# measured: the span carries exactly two behavioural commits
+# (`[os.net.io]`'s syscall-first and TCP_NODELAY-by-default) and both
+# clauses say in their own letter that nothing a program can observe in
+# the ROWS moves. Nineteen `tests/net/*.lu` got faster; none changed
+# verdict.
+#
+# The two rows below are the first brand-new os-tier calls to arrive
+# THREE-LANE on the sprint they landed, and the zero pairing gap is why:
+# lupin 0.1.28 conforms to 5c729e8, the same commit wolf 0.2.8 does, so
+# there is no release-date reason for an `unsupported` to exist. Both
+# stdout hashes are byte-identical across all three lanes.
+[tests."net/writev_gather.lu"]
+lupin = "run"   # sc40: is40 mirrors `net_writev` at pin 5c729e8 — measured, stdout sha df5f721a identical on all three lanes
+wolfc = "run"
+native = "run"
+
+[tests."net/nodelay_rows.lu"]
+lupin = "run"   # sc40: is40 mirrors `net_nodelay`; the option's rows are the host's on every lane, and the listener/closed misses answer `io` identically on all three (sha 8b537bcf)
+wolfc = "run"
+native = "run"

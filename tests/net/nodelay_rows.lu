@@ -1,0 +1,55 @@
+//! check: run(exit=0, stdout="off: ok\non: ok\nlistener: io\nclosed: io")
+//! phase: run
+//! conforms: std.net, os.net.nodelay, err.row, err.propagate, err.else
+//!
+//! `[os.net.nodelay]`'s SURFACE, which is the half a program can assert
+//! (sc40). What cannot be asserted from inside a wolf program is the
+//! DEFAULT: `TCP_NODELAY` is on for every accepted or dialed stream, and
+//! the only difference it makes that a program can observe is 40ms of
+//! delayed-ACK stall on a two-write server — a latency measurement, on a
+//! clock, and this rig's gauntlet is not the place for one. wolf-lang#254
+//! measured it (108x against nginx on the same runner) and upstream's
+//! `corpus/net/nodelay.lu` is the witness that holds it. What is held
+//! here is what std's wrapper owes its callers:
+//!
+//!   - both directions are accepted and idempotent on a TCP stream, so
+//!     the throughput choice is reachable and re-settable;
+//!   - a LISTENER is `io`. The option is TCP's, on a stream, and handing
+//!     it the wrong kind of handle is a miss and not a trap — std adds
+//!     no check, so the tag is the host's own answer;
+//!   - a CLOSED descriptor is `io`, this family's rule, reached the way
+//!     `forged_handle_io_row.lu` reaches it: the number is saved before
+//!     the close and a twin value is built around it, because the mode
+//!     system makes the direct spelling a compile error.
+//!
+//! Lanes: all three, lupin 0.1.28 included (is40 mirrors `net_nodelay`
+//! at the same pin this repository holds).
+
+use std.net
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    let fd_of_srv = srv.fd
+    var cli = net.connect(net.loopback(p))?
+    var conn = net.accept(mut srv)?
+
+    // Nagle back on, then off again: both directions, on a live stream.
+    net.nodelay(mut cli, false)?
+    print("off: ok")
+    net.nodelay(mut cli, true)?
+    print("on: ok")
+
+    // A listener is not a stream.
+    var as_stream = net.Socket { fd: fd_of_srv }
+    net.nodelay(mut as_stream, true) else |_| print("listener: io")
+
+    net.close(take cli)?
+    net.close(take conn)?
+    net.close_listener(take srv)?
+
+    // The listener's descriptor after its close.
+    var stale = net.Socket { fd: fd_of_srv }
+    net.nodelay(mut stale, true) else |_| print("closed: io")
+    0
+}

@@ -1,0 +1,82 @@
+//! check: run(exit=0, stdout="one syscall: 72 105 33\nhole sends nothing: 3\nall empty: completed")
+//! phase: run
+//! conforms: std.net, os.net.writev, err.row, err.propagate
+//!
+//! The gathered write, `[os.net.writev]` (sc40, s141's builtin at
+//! wolf-lang v0.2.8). Three properties in one program, and every one of
+//! them is a thing a caller may build on:
+//!
+//!   1. ORDER AND CONTENT. A head and a body pushed as two parts arrive
+//!      as head-then-body, and the reader cannot tell it was a vector —
+//!      which is the point: this is `write_bytes` of the concatenation
+//!      without the concatenation.
+//!   2. EMPTY PARTS ARE PERMITTED and send nothing. A vector with a
+//!      hole in it is not a refusal.
+//!   3. AN ALL-EMPTY VECTOR IS A COMPLETED WRITE. The clause says it
+//!      makes no syscall at all; what a program can OBSERVE is that it
+//!      does not RAISE, and reaching the print past a `?` is that
+//!      observation. The syscall count is the runtime's business and
+//!      upstream's `corpus/net/writev_gather.lu` is where it is counted.
+//!
+//! Dial-first, as every net test in this directory: the connection waits
+//! in the backlog and nothing blocks.
+//!
+//! Lanes: all three. The wrapper delegates to `net_writev`, which lands
+//! on every tier-1 host and every tier at v0.2.8, and lupin 0.1.28
+//! mirrors it (is40) at the same pin this repository holds — so this
+//! witness carries no `unsupported` for a release date, which is the
+//! first sprint that has been true of a brand-new os-tier call.
+
+use std.net
+
+fn byte_list(a: int, b: int, c: int) -> List[byte] {
+    var xs = List[byte]()
+    (mut xs).push(a as byte)
+    (mut xs).push(b as byte)
+    (mut xs).push(c as byte)
+    xs
+}
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let p = net.port(srv)?
+    var cli = net.connect(net.loopback(p))?
+
+    var head = List[byte]()
+    (mut head).push(72 as byte)
+    var body = List[byte]()
+    (mut body).push(105 as byte)
+    (mut body).push(33 as byte)
+    var parts = List[List[byte]]()
+    (mut parts).push(head)
+    (mut parts).push(body)
+    net.writev(mut cli, parts)?
+
+    var conn = net.accept(mut srv)?
+    let got = net.read_bytes(mut conn, 16)?
+    var line = ""
+    for b in got {
+        line = "{line} {b}"
+    }
+    print("one syscall:{line}")
+
+    // A hole in the middle sends nothing and refuses nothing.
+    var holed = List[List[byte]]()
+    (mut holed).push(byte_list(1, 2, 3))
+    (mut holed).push(List[byte]())
+    net.writev(mut conn, holed)?
+    let back = net.read_bytes(mut cli, 16)?
+    print("hole sends nothing: {back.len}")
+
+    // Every part empty: a completed write with nothing on the wire.
+    var nothing = List[List[byte]]()
+    (mut nothing).push(List[byte]())
+    (mut nothing).push(List[byte]())
+    net.writev(mut conn, nothing)?
+    print("all empty: completed")
+
+    net.close(take cli)?
+    net.close(take conn)?
+    net.close_listener(take srv)?
+    0
+}
