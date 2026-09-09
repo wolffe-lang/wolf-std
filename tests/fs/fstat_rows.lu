@@ -1,0 +1,67 @@
+//! check: run(exit=1, stdout="closed: io\ndirectory handle: denied-or-kind-1\nerror: io")
+//! phase: run
+//! conforms: std.fs, os.fs.fstat, err.row, err.propagate, err.else
+//!
+//! `fs.fstat`'s rows, and the one host difference the clause states
+//! (sc40).
+//!
+//! **`io` on a closed or forged handle** is this family's rule and the
+//! row a program will actually meet: on a HANDLE the misses the path
+//! stat has are already behind it — the entry is resolved — so `io` is
+//! nearly the whole row set in practice, even though `not_found` and
+//! `denied` are declared because the row set is the path stat's and one
+//! handler serves both spellings.
+//!
+//! **The directory case is deliberately asserted as a DISJUNCTION**, and
+//! that is the honest shape rather than a hedge. `[os.fs.fstat]` says the
+//! difference is `fs.open`'s and not this call's: linux, macOS and
+//! freebsd open a directory read-only, so the handle exists and `kind` is
+//! **1**; windows refuses to open a directory as a file, so `fs.open`
+//! answers `denied` and `fstat` is never reached. Both are correct
+//! behaviour on their host. A witness that asserted `kind == 1` would be
+//! red on windows for a reason that is not a defect, and one that
+//! asserted `denied` would be red on the two hosts this project serves
+//! most — so what is asserted is that ONE of the two happens and neither
+//! is a trap, which is exactly what a portable program may rely on.
+//!
+//! The final unhandled `fstat` propagates its `io` out of `main`, which
+//! is the only witness of a tag's identity at this pin.
+//!
+//! Lanes: both compiler rungs; lupin declines the fs tier by design.
+
+use std.fs
+
+fn main() -> !int {
+    fs.write_text("sc40-fstat-rows.tmp", "x")?
+    var f = fs.open("sc40-fstat-rows.tmp")?
+    let fd_of_f = f.fd
+    fs.close(take f)?
+
+    // A descriptor the host knows and has finished with.
+    var stale = fs.File { fd: fd_of_f }
+    fs.fstat(mut stale) else |_| {
+        print("closed: io")
+        fs.Stat { kind: 0 - 1, size: 0 - 1, modified_ms: 0 - 1 }
+    }
+
+    // A directory: `denied` from `fs.open` on windows, `kind` 1 on the
+    // unix hosts. Both are the clause's; neither is a trap.
+    fs.create_dir("sc40-fstat-dir.tmp")?
+    var kind = 0 - 1
+    var opened = fs.open("sc40-fstat-dir.tmp") else |_| fs.File { fd: 0 - 1 }
+    if opened.fd >= 0 {
+        let st = fs.fstat(mut opened) else fs.Stat { kind: 0 - 1, size: 0, modified_ms: 0 }
+        kind = st.kind
+    }
+    fs.close(take opened) else |_| print("")
+    if kind == 1 || kind == 0 - 1 {
+        print("directory handle: denied-or-kind-1")
+    }
+    fs.remove_dir("sc40-fstat-dir.tmp")?
+    fs.remove("sc40-fstat-rows.tmp")?
+
+    var forged = fs.File { fd: 4242 }
+    let never = fs.fstat(mut forged)?
+    print("unreachable: {never.kind}")
+    0
+}

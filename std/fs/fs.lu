@@ -999,6 +999,95 @@ pub fn close(take f: File) -> () ! {io} {
     fs_close(f.fd)?
 }
 
+/// What one metadata read on an open handle answers: a kind, a size and
+/// a modification time.
+///
+/// **A typed value rather than the `[kind, size, modified_ms]` triple
+/// the builtin hands over.** `fs_fstat` answers a `List[int]`, and a
+/// caller reading `got[0]`, `got[1]`, `got[2]` is a caller who has to
+/// remember an ORDER — §14's rule is that when a builtin hands std a
+/// positional row whose meaning is the contract, std names the positions
+/// in a type. `stat.size` cannot be confused with `stat.modified_ms`;
+/// `got[1]` and `got[2]` can be, and silently.
+///
+/// `kind` is **0** for a regular file, **1** for a directory, **2** for
+/// anything else — a fifo, a socket, a device. It is an `int` and not an
+/// enum because `std` has no closed-enum vocabulary at this pin and a
+/// three-constant enum invented here would be a shape no other module
+/// shares; the numbers are the clause's own (`[os.fs.fstat]`) and the
+/// predicates below are what a program actually calls.
+///
+/// `size` is bytes, `fs.size`'s word in `fs.size`'s units.
+/// `modified_ms` is milliseconds from the Unix epoch, negative before
+/// it — `fs.modified_ms`'s word in its units, deliberately, so the
+/// handle's answer and the path's compare with no conversion. The unit
+/// rides in the field name for exactly the reason it rides in
+/// `modified_ms`'s function name, and that doc carries the argument.
+pub struct Stat {
+    kind: int,
+    size: int,
+    modified_ms: int,
+}
+
+/// One metadata read on the open handle `f`.
+///
+/// `[os.fs.fstat]`. This is `fs.size` and `fs.modified_ms` and
+/// `fs.is_dir` and `fs.is_file`, answered together, off the handle a
+/// program is about to read anyway — one host call instead of four path
+/// resolutions.
+///
+/// **The reason is a measurement, not a tidiness.** wolf-lang#261: a
+/// static-file server was paying four path stats per request
+/// (`is_dir`, `is_file`, `size`, `modified_ms`) where nginx pays one
+/// `open` and one `fstat`, and the last two could not move into the
+/// program because nothing in this module answered off a handle. Now
+/// something does, and the four path calls stay exactly where they are
+/// for the callers that have a path and no handle.
+///
+/// Rows are the path stat's, so one handler serves both spellings:
+/// `not_found`, `denied`, `io`. On a HANDLE the hosts answer `io` for
+/// nearly everything — the entry is already resolved, so the misses the
+/// path calls have are behind it — and a closed or forged handle is
+/// `io`, this family's rule. A size or a time outside `int` is `io`,
+/// `fs.size`'s rule. Never traps.
+///
+/// **The one host difference is `fs.open`'s, and it is stated.** linux,
+/// macOS and freebsd open a directory read-only, so a `File` over a
+/// directory exists there and `kind` **1** is reachable. **Windows
+/// refuses to open a directory as a file — `fs.open` answers `denied`,
+/// not this call** — so on windows every handle this function ever sees
+/// is a file or a device, `kind` 1 never appears, and a server that
+/// classifies directories does it BY PATH with `fs.is_dir`, as it did
+/// before this call existed. That is a difference in what can be
+/// OPENED, not in what `fstat` reports, and no row here moves with the
+/// host.
+///
+/// `mut f` because a metadata read is a host call on the handle, and
+/// §14's stream rule has the call site spell it. The handle's read
+/// position is not disturbed.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_fstat`
+/// (s142) — both compiler lanes. The clause says every tier-1 host on
+/// every tier serves it, "the checked machine reads the same handle
+/// metadata the runtime does", and lupin still answers `unsupported`:
+/// the REFERENCE machine has no filesystem at all by design, so the
+/// whole fs tier is declined there rather than mocked, and that is a
+/// posture and not a release date. It is the one place a zero pairing
+/// gap buys this module nothing.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-fstat.tmp", "wolves")?
+/// var f = fs.open("doc-fstat.tmp")?
+/// let st = fs.fstat(mut f)?
+/// fs.close(take f)?
+/// fs.remove("doc-fstat.tmp")?
+/// st.kind == 0 && st.size == 6 && st.modified_ms > 0
+/// ```
+pub fn fstat(mut f: File) -> Stat ! {not_found, denied, io} {
+    let got = fs_fstat(f.fd)?
+    Stat { kind: got[0], size: got[1], modified_ms: got[2] }
+}
+
 /// `base` and `name` joined with a single `/`.
 ///
 /// Total: no rows, no traps — and pure, so unlike everything above it is

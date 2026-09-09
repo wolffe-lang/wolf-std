@@ -1,0 +1,67 @@
+//! check: run(exit=0, stdout="kind: 0\nsize: 6\nagrees: yes\nafter write: 12")
+//! phase: run
+//! conforms: std.fs, os.fs.fstat, err.row, err.propagate
+//!
+//! `[os.fs.fstat]` on a handle (sc40, s142's builtin at wolf-lang
+//! v0.2.8): one metadata read answering the `[kind, size, modified_ms]`
+//! triple, wrapped as `fs.Stat` so the positions have names.
+//!
+//! The property that matters is the LAST one asserted here: the handle's
+//! answer and the path's are the same numbers in the same units, so
+//! `fs.fstat(mut f)?.size` and `fs.size(path)?` agree, and
+//! `st.modified_ms` compares against `fs.modified_ms(path)?` with no
+//! conversion. That agreement is what makes the call a substitution
+//! rather than a second vocabulary — the whole point of wolf-lang#261,
+//! where a static-file server was paying four path stats per request for
+//! what one `fstat` on the handle it was about to read already knew.
+//!
+//! `kind` 0 is a regular file. `kind` 1 (a directory) is NOT reached
+//! here, and that is a host difference rather than an omission: linux,
+//! macOS and freebsd open a directory read-only so a `File` over one
+//! exists there, and **windows refuses to open a directory as a file at
+//! all — `fs.open` answers `denied`, before this call is ever made**. A
+//! witness that opened a directory would pass on two of this project's
+//! three tier-1 hosts, so the directory case stays where the clause puts
+//! it: upstream's crate tests. `fstat_rows.lu` next door holds the
+//! windows refusal as the `fs.open` row it actually is.
+//!
+//! Lanes: both compiler rungs. lupin is `unsupported`, and the reason is
+//! this module's oldest one rather than anything about `fstat`: the
+//! reference machine has no filesystem by design, so the fs tier is
+//! declined there rather than mocked. sc40 PREDICTED all three lanes for
+//! all three of its wrappers, on the strength of a zero pairing gap. The
+//! two `std.net` ones are three-lane; this one is not, and the prediction
+//! is recorded with the miss — a matched pin buys reach only where the
+//! machine has the capability at all.
+
+use std.fs
+
+fn main() -> !int {
+    fs.write_text("sc40-fstat.tmp", "wolves")?
+
+    var f = fs.open("sc40-fstat.tmp")?
+    let st = fs.fstat(mut f)?
+    fs.close(take f)?
+    print("kind: {st.kind}")
+    print("size: {st.size}")
+
+    // The handle's answer is the path's answer, in the path's units.
+    let by_path = fs.size("sc40-fstat.tmp")?
+    let stamp_by_path = fs.modified_ms("sc40-fstat.tmp")?
+    var verdict = "no"
+    if st.size == by_path && st.modified_ms == stamp_by_path {
+        verdict = "yes"
+    }
+    print("agrees: {verdict}")
+
+    // A second read after the file grows: the size is the file's now,
+    // not the one the first handle happened to see.
+    fs.write_text("sc40-fstat.tmp", "wolveswolves")?
+    var g = fs.open("sc40-fstat.tmp")?
+    let after = fs.fstat(mut g)?
+    fs.close(take g)?
+    print("after write: {after.size}")
+
+    fs.remove("sc40-fstat.tmp")?
+    0
+}
