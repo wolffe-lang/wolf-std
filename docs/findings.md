@@ -6854,7 +6854,11 @@ byte tier, goes dark with it.
 
 This is what makes it a finding rather than a chore. The rename is
 blocked by three independent mechanisms in this repository, each written
-years apart, each saying the same sentence:
+in a different sprint and none of them for this, each saying the same
+sentence (the phrase here was "years apart" until 2026-09-08, wolf-std#11
+item 15 — this repository is one month old and every date in this section
+is 2026-08 or 2026-09; the mechanisms are sc00's, sc13's and sc03/sc06's,
+which is the true distance and the one that matters):
 
 1. `tests/ledger.toml` has no lupin word for a static rejection.
    `parse_expect` accepts `run | unsupported | slow | divergent(…)` for
