@@ -602,8 +602,14 @@ a sprint here can say that. The subject was what the s77 wave made cheap.
 `str` and to every zero-copy subslice `trim`/`split`/`get` already returned,
 read in place wherever the call is consumed. `s[a..b]` and `s.get(a..b)`
 stopped calling the runtime in the same wave. The compiler's consuming set is
-seven positions: iteration, indexing, and `len`/`count`/`is_empty`/`get`/
-`first`/`last`.
+seven positions: iteration, indexing, and `len`/`count`/`get`/`first`/`last`.
+(This enumeration also listed `is_empty`, which made eight names under the
+word "seven"; struck 2026-09-08, wolf-std#11 item 22. Seven is the number
+F-0071 and §9's sc12 amendment both carry, and it decomposes exactly:
+`for b in s.bytes()` and `s.bytes().len` are the two the checked tier
+models, and F-0071's own row names the five it refuses —
+`s.bytes()[i]`, `.get(i)`, `.first()`, `.last()`, `.count()`. 2 + 5 = 7,
+and `is_empty` is in neither half.)
 
 std may use two of them (F-0071, filed as wolf-lang#85). Measured, one
 program per position:
