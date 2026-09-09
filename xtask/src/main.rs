@@ -4,6 +4,9 @@
 //!
 //! Subcommands: `std-test`, `doc-examples`, `ulp`, `doctor`, `sync-pin`,
 //! `ledger-check`, `ci`.
+//!
+//! `ci` is the eleven-step local gate, and since sc41 it ends by naming
+//! which of those eleven `.github/workflows/ci.yml` also runs (F-0113).
 
 mod anchors;
 mod bins;
@@ -21,6 +24,7 @@ mod stage;
 mod sync_pin;
 mod tomlite;
 mod ulp;
+mod workflow;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -74,13 +78,37 @@ fn main() {
 /// The full local gate, mirroring the CI lanes: fmt, clippy -D warnings,
 /// tests, then the rig's own checks. Fail-fast, loud banners, a timeout
 /// ceiling on every spawned step.
+///
+/// The step list lives in [`workflow::CI_STEPS`] and is iterated, not
+/// re-spelled here (sc41): the same list is diffed against
+/// `.github/workflows/ci.yml` at the end of the run and by
+/// `selftest::every_ci_step_runs_in_the_ci_workflow`, so a step cannot
+/// drift out of CI's reach without saying so on the author's box. F-0113
+/// is what that drift costs when nothing says so.
 fn ci() -> Result<(), String> {
     let repo = repo_root();
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-    let steps: &[(&str, &[&str])] = &[
-        ("fmt", &["fmt", "--all", "--check"]),
-        (
-            "clippy",
+    for step in workflow::CI_STEPS {
+        banner(step.name);
+        run_step(step.name, &repo, &cargo)?;
+    }
+    banner(&format!("workflow coverage ({})", workflow::CI_WORKFLOW));
+    workflow::report(&repo)?;
+    println!("\nci: GREEN");
+    Ok(())
+}
+
+/// Run one named step of [`workflow::CI_STEPS`]. An unknown name is a
+/// hard error rather than a skip: a step in the list with nothing behind
+/// it would be a banner that gates nothing, which is the failure mode
+/// this pairing exists to make impossible.
+fn run_step(name: &str, repo: &Path, cargo: &str) -> Result<(), String> {
+    match name {
+        "fmt" => cargo_step(cargo, repo, name, &["fmt", "--all", "--check"]),
+        "clippy" => cargo_step(
+            cargo,
+            repo,
+            name,
             &[
                 "clippy",
                 "--workspace",
@@ -90,41 +118,39 @@ fn ci() -> Result<(), String> {
                 "warnings",
             ],
         ),
-        ("test", &["test", "--workspace", "--quiet"]),
-    ];
-    for (name, cargo_args) in steps {
-        banner(name);
-        let mut cmd = Command::new(&cargo);
-        cmd.args(*cargo_args).current_dir(&repo);
-        let got = exec::run(cmd, Duration::from_secs(600))?;
-        if got.timed_out {
-            return Err(format!("ci: `cargo {name}` blew the 600s ceiling"));
-        }
-        if got.status != Some(0) {
-            return Err(format!(
-                "ci: `cargo {name}` failed\n{}\n{}",
-                got.stdout.trim_end(),
-                got.stderr.trim_end()
-            ));
-        }
+        // `--quiet` locally only: the gauntlet's banners are the reading
+        // surface here, while a runner wants the full output when a test
+        // fails. `workflow::CI_STEPS` carries the runner's spelling.
+        "test" => cargo_step(cargo, repo, name, &["test", "--workspace", "--quiet"]),
+        "sync-pin" => sync_pin::sync_pin(),
+        "doctor" => doctor::doctor(),
+        "ledger-check" => runner::ledger_check(),
+        "lint-conventions" => runner::lint_conventions(),
+        "gen-vectors --check" => genvec::gen_vectors(true),
+        "std-test" => runner::std_test(),
+        "doc-examples" => doc_examples::doc_examples(),
+        "ulp" => ulp::ulp(),
+        other => Err(format!(
+            "ci: `{other}` is in workflow::CI_STEPS with no runner behind it — \
+             add a match arm to run_step or take it out of the list"
+        )),
     }
-    banner("sync-pin");
-    sync_pin::sync_pin()?;
-    banner("doctor");
-    doctor::doctor()?;
-    banner("ledger-check");
-    runner::ledger_check()?;
-    banner("lint-conventions");
-    runner::lint_conventions()?;
-    banner("gen-vectors --check");
-    genvec::gen_vectors(true)?;
-    banner("std-test");
-    runner::std_test()?;
-    banner("doc-examples");
-    doc_examples::doc_examples()?;
-    banner("ulp");
-    ulp::ulp()?;
-    println!("\nci: GREEN");
+}
+
+fn cargo_step(cargo: &str, repo: &Path, name: &str, args: &[&str]) -> Result<(), String> {
+    let mut cmd = Command::new(cargo);
+    cmd.args(args).current_dir(repo);
+    let got = exec::run(cmd, Duration::from_secs(600))?;
+    if got.timed_out {
+        return Err(format!("ci: `cargo {name}` blew the 600s ceiling"));
+    }
+    if got.status != Some(0) {
+        return Err(format!(
+            "ci: `cargo {name}` failed\n{}\n{}",
+            got.stdout.trim_end(),
+            got.stderr.trim_end()
+        ));
+    }
     Ok(())
 }
 
