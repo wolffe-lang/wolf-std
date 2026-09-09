@@ -2963,6 +2963,15 @@ so with the clause. `escape`'s totality rides with them, because it changes
   F-0061, F-0065, F-0066, F-0067, F-0068, F-0069, F-0070, F-0071, F-0072:
   all retested or unaffected, all open.
 
+  **Amendment 2026-09-08 (wolf-std#11 item 4).** F-0071 and F-0072 do not
+  belong on that list. Both are recorded in the register as **CLOSED at
+  the sc12 (02-os) pin** — s88/wolf-lang#85 ("a temporary can be read
+  from") and s89/wolf-lang#86 (the argument position is a LEND) — a
+  closure written into their rows AFTER this roll-up was (`653c716`,
+  "the census, the taxonomy and five closed findings", which post-dates
+  `a04b62e`). The roll-up was carried forward rather than re-measured;
+  the rows are the record.
+
 ### The ledger movement
 
 Four rows added, zero rows moved. 185 → 189. The two json rows are
