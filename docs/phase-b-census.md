@@ -296,10 +296,14 @@ that reports one. `conform-run` still rejects `--deny-warnings` (F-0046,
 re-verified at this sha), so the rig denies them itself, and there are two
 reporting lanes now, because lupin 0.1.6's lint wave populates the array
 per `[proto.record.warn]` where sc08 had wolfc alone. It found three real
-doc bugs on its first run (four `0.0 - 1.0` sites in `std.fmt.decimal`'s
-`parse_float` example and two `0.0 - x` sites in `std.math.float`'s
-`neg_inf`/`f_min` examples; they are W0402, the lint sc08's guide entry
-was written about), all now spelled with unary minus. F-0053's open half
+doc bugs on its first run, AT SIX SITES (four `0.0 - 1.0` sites in
+`std.fmt.decimal`'s `parse_float` example and two `0.0 - x` sites in
+`std.math.float`'s `neg_inf`/`f_min` examples — three example blocks, six
+occurrences; they are W0402, the lint sc08's guide entry was written
+about), all now spelled with unary minus. (The site count is added
+2026-09-08, wolf-std#11 item 23: the sentence counted BUGS and the
+parenthesis counted SITES, so 4 + 2 read as a contradiction of "three"
+when it is a decomposition of it.) F-0053's open half
 stands: the array covers the entry file only, so a warning inside a std
 module body is still invisible from here.
 
