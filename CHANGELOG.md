@@ -491,7 +491,7 @@ a designed zero, because §4's one-module note leaves this module prose
 examples and the reason is on both functions; ulp 200 rows GREEN on all
 three lanes.
 
-## sc35 — 2026-09-03 — the rename, the second gate, and the release that opened it
+## sc35 (second bump) — 2026-09-03 — the rename, the second gate, and the release that opened it
 
 Second bump, same day. lupin 0.1.23 -> 0.1.25 (is36 ships `[type.byte]`
 in the mirror) and wolf `0.2.3+dev.4230b00` -> the v0.2.4 tag
@@ -534,7 +534,7 @@ of in an unchecked claim.
 conservatism entries, 0 unstable, 0 slow, 8 divergent; doc-examples
 414 blocks GREEN; ulp 200 rows GREEN on all three lanes.
 
-## sc35 — 2026-09-03 — the rename, and the second gate
+## sc35 (first bump) — 2026-09-03 — the rename, and the second gate
 
 Binary and data pin move together, 31170d1 -> 4230b00 (20 commits),
 `wolf 0.2.3+dev.4230b00 (wolfgang, pin 4230b00)`, the one-sha invariant
