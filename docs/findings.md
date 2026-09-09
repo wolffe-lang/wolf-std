@@ -1579,8 +1579,16 @@ green, each on its second attempt, which is F-0054.
 This is the largest ledger movement this repo has recorded and it is almost
 all in one column: 44 rows moved, 41 of them native.
 
-- The native column: 23 → 64 of 136 rows (`unsupported` → `run`, every
-  one of them). By module: `str` 8/8 of the previously dark rows, `strbuf`
+- The native column: 23 → 64 of the 136 rows the ledger held BEFORE this
+  sprint's additions (`unsupported` → `run`, every one of them). The
+  denominators in this block and in the warnings block below are four
+  bullets and one sprint-half apart on purpose: `tests/ledger.toml` holds
+  136 rows at the flip commit's parent and 144 at the flip commit, which
+  added the eight `net/*` rows, two of them already `native = "run"`
+  (64 + 2 = 66, the count in the file). Re-counted 2026-09-08 (wolf-std#11
+  item 3); both numbers stand, and each now names what it is over.
+
+  By module: `str` 8/8 of the previously dark rows, `strbuf`
   4/4, `fs` 6/7 (the seventh is the E1001 rejection witness, already `run`),
   `io` 2/2, `base64` 3, `fmt` 6, `hex` 3, `iter` 2, `x/deque_int` 4,
   `errors` 1, `list` 1, `unicode` 1. #40 landed native `str`, `List` and the
