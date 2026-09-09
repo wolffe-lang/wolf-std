@@ -3783,10 +3783,16 @@ answer is mixed. All 40 rows were measured one at a time, idle:
   skip, so depth goes down on paper while the record gets more
   accurate. The next lupin release that raises or retires the
   evaluation-step budget inherits these 25 as its expected flip set.
-- 3 rows stay `slow` (`x25519_shared_p3/p4/p5`): neither an answer
-  nor the refusal arrives inside 70s idle, and that verdict is the one
-  word that keeps the lane un-invoked, with the caveat in the row
-  comment.
+- 4 rows stay `slow`: `x25519_shared_p3/p4/p5`, where neither an answer
+  nor the refusal arrives inside 70s idle, and `p256/cavp_siggen_p256`,
+  where the 50M-step refusal itself straddles the 60s ceiling. `slow` is
+  the one word that keeps the lane un-invoked in both cases, with the
+  caveat in each row comment. (This bullet read "3 rows" and named only
+  the curve25519 three until 2026-09-08, wolf-std#11 item 7. Counted from
+  `tests/ledger.toml` at the sc24 merge: four rows carry
+  `lupin = "slow"`, none at the sc25 merge — which is why the sc25 block
+  below says "the 4 `slow` rows" and "All four flip", and it is the same
+  four.)
 
 ## Retirements and movements at the sc25 pin — the waivers die
 
