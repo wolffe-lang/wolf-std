@@ -542,11 +542,14 @@ Eight new rows, and the split is the sprint's lane story: two are two-lane
 on the interpreter side (`process/builder.lu` and `process/exit_code.lu`,
 the pure builder and `os_exit`, which lupin has), one is two-lane on the
 compiler side (`io/input_all_empty.lu`: both rungs, lupin has no stdin),
-two are one-lane (`process/not_found_row.lu`,
+three are one-lane (`process/not_found_row.lu`,
 `process/forged_handle_io_rows.lu` and `net/read_all_and_lines.lu`, checked
 only), and two are rejection witnesses that run on both compiler rungs
 (`process/use_after_wait.lu`, `process/comptime_refuses.lu`), because a
-rejection never reaches lowering.
+rejection never reaches lowering. (2 + 1 + 3 + 2 = 8. The one-lane group
+read "two" over three named files until 2026-09-08, wolf-std#11 item 21;
+"three" is the count that makes the split add up to the eight rows the
+sentence opens with.)
 
 ### The blocked inventory
 
