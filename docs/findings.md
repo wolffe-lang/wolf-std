@@ -3486,6 +3486,18 @@ observation:
   until a binary bump. The next wolf binary bump should re-measure that
   row first and close F-0095's ledger half.
 
+  **Note 2026-09-08 (wolf-std#11 item 9).** "`wolf 0.1.0` @ `<sha>`"
+  throughout this file names the TRUNK COMMIT a binary was built from,
+  never the `v0.1.0` tag. The tag is `94aa69d0` (2026-08-12) and neither
+  `c9da6d9` (2026-08-21, this entry) nor `21b129e` (2026-08-26, the sc24
+  block) is an ancestor of it — both are later trunk commits, verified
+  with `git merge-base --is-ancestor`. Every trunk build of the same
+  crate version printed the same `wolf 0.1.0` string in that era, which
+  is precisely the stale-binary hole D57 later closed by requiring both
+  `WOLF_COMMIT` and `WOLF_RELEASE` for a release stamp. So sc22's
+  c9da6d9 and sc24's 21b129e are two different binaries wearing one
+  version string, not a contradiction.
+
 - F-0079 is closed, and the closure was eight sprints old. A nine-arm
   `else |e| match e` over `std.x.tls.cert.validate_chain`'s row
   discriminated every tag correctly under this lupin, which sent the sc22
