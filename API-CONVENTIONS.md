@@ -949,6 +949,71 @@ new and it is a debt, not a courtesy. sc10's census had to name both
 functions as "no longer blocked, still unwritten" to keep them from sitting
 quietly, which is one sprint of grace and no more.
 
+**§14 amendment (sc12, 02-os): what happens when the tier a module was
+writing around finally lands.** *(Moved here 2026-09-08, wolf-std#11 item
+18: this block sat after the sc13 amendment and both sc14 amendments.
+Text unchanged; §14's amendments now run sc08, sc10, sc10, sc11, sc11,
+sc12, sc13, sc14, sc14, sc36.)* `std.fs` is the first module of this section
+to have its own contracts filled rather than a new module's written, and the
+five rules that came out of doing it are all about the second half of a
+capability's life.
+
+- A row is deleted the day its delegate stops raising it. `append_text`,
+  `copy_file` and `move_file` all carried `utf8` because all three decoded:
+  the append read the file back, the copy and the move were `read_text` +
+  `write_text`. None of them decodes now, so `utf8` came off all three
+  signatures in the same commit as the bodies. This is §14's union rule read
+  in the shrinking direction, and it needs saying because the growing
+  direction is the one that feels like work: a tag that outlives the
+  delegate that raised it is a lie a caller writes a handler for, and it
+  costs a caller more than an added tag ever does.
+- A row is not added for a tag the function's own arguments cannot reach,
+  and the coarsening goes in a private helper. `fs_open_mode` declares
+  five tags across its five modes; with the mode fixed at 2 by std rather
+  than by a caller, `invalid` (a mode outside the set) and `exists` (mode 4
+  losing its exclusive create) cannot happen, so a private `append_fd`
+  handles both (answering `io`, which is truthful if a future pin ever does
+  reach them) and `append_text`/`open_append` carry three tags instead of
+  five. The same judgement leaves `invalid` off `copy_file` (its bytes came
+  out of `fs_read_bytes`) and on `write_bytes` (the list is the caller's).
+  Whose data it is decides whether a tag is reachable, and two functions
+  that differ only in that should sit near each other so the difference is
+  readable.
+- A contract can be answered by a decision, and then it is withdrawn
+  rather than left open. `std.fs.rename` was a reviewed contract for an
+  atomic move. The language does not promise atomicity: POSIX
+  replaces a destination atomically, windows `MoveFileEx` is documented to
+  replace but not to replace atomically, and upstream's platform rule says a
+  promise that cannot be kept on a tier-1 target does not get a `#[cfg]`
+  keeping it on two out of three. So there is no `fs_rename_atomic` and
+  there will not be. std adopts that reading instead of re-promising it one
+  level up: `move_file` is the wrapper, there is no second name for the same
+  call, and the module header records the withdrawal with the reason. A
+  contract left open forever because its exact words were never met is worse
+  than a withdrawal that says what happened.
+- When the toolchain hands std a tag whose trigger has no portable litmus,
+  the tag is still documented and the gap is stated in three places.
+  `cross_device` appears in no `std.fs` signature because `move_file`
+  handles it, and its fallback therefore cannot be reached by any test in
+  this repository (it needs two filesystems). §14's sc11 posture applies
+  unchanged: say so on the function, in the module header and in the report,
+  and never let a green rig imply coverage. What did become witnessable gets
+  the same treatment in reverse: `utf8` had been declared on
+  `fs.read_text` since sc07 and observed nowhere, and the moment
+  `write_bytes` existed it got the same standard of evidence as
+  `not_found`: a tag ridden out of `main` where the record names it.
+- An optimization that lands does not license undoing the algorithm it
+  forced. §9's sc12 amendment ruled that a shape costing a lane is not a
+  shape std writes, and the lane cost is gone (F-0071 closed at this pin:
+  the checked tier models all seven byte-view positions). std's walks did
+  not go back to indexing, because the one-pass forms are shorter than what
+  they replaced. The rule the pair leaves is that a constraint that produced
+  a better body has paid for itself, and the closure buys the next body an
+  option instead of obliging this one to change. Where the code stays, the
+  doc must still move: a comment claiming a live refusal that has closed is
+  the sc13 failure mode, so each of the six sites now reads "was refused
+  when this was written, closed at the sc12 pin, kept because".
+
 **§14 amendment (sc13): the debt clause, paid once and re-armed once.**
 The sc11 sprint added the third clause of the refusal rule: *a capability or
 tier module writes its contract into the module header with the finding that
@@ -1049,10 +1114,14 @@ between tags. F-0079 adds the harder half **[F-0079 closed at lupin 0.1.13
 under wolf-interp#29's arm-selection pass; the register's sc22 closure note
 has the timeline, and the amendment's two shapes remain good doctrine on
 their own merits]**: under lupin (0.1.12, the pin this was measured at) a
-multi-arm `else |e| match e` over a row raised across a module boundary takes
-its first arm, silently, in both arm orders. The compiler rungs are correct,
-the interpreter is not, and it is F-0052 on the other machine, two sprints
-after that one closed. So a std body that must discriminate an imported
+multi-arm `else |e| match e` over a row raised across a module boundary TOOK
+its first arm, silently, in both arm orders. The compiler rungs were correct
+and the interpreter was not, and it was F-0052 on the other machine, two
+sprints after that one closed. *(Tense fixed 2026-09-08, wolf-std#11 item
+20: the paragraph narrated a closed finding in the present tense on both
+sides of the bracketed closure note. The measurement is sc14's and stays
+sc14's; the doctrine below it is still present tense because it is still
+the rule.)* So a std body that must discriminate an imported
 module's tags cannot, on that lane, and two shapes stay truthful: a wildcard
 where only one tag is reachable (with the reachability argued in the doc),
 and one test file per tag riding it out of `main`, where `error: <tag>` is
@@ -1060,69 +1129,6 @@ the toolchain's word and not this repository's. That second habit is what
 caught the finding (a handler said `syntax` and the record said `deep` about
 the same document), so the rule it earns is general: when two ways of
 observing one value disagree, bisect the observers before the code.
-
-
-**§14 amendment (sc12, 02-os): what happens when the tier a module was
-writing around finally lands.** `std.fs` is the first module of this section
-to have its own contracts filled rather than a new module's written, and the
-five rules that came out of doing it are all about the second half of a
-capability's life.
-
-- A row is deleted the day its delegate stops raising it. `append_text`,
-  `copy_file` and `move_file` all carried `utf8` because all three decoded:
-  the append read the file back, the copy and the move were `read_text` +
-  `write_text`. None of them decodes now, so `utf8` came off all three
-  signatures in the same commit as the bodies. This is §14's union rule read
-  in the shrinking direction, and it needs saying because the growing
-  direction is the one that feels like work: a tag that outlives the
-  delegate that raised it is a lie a caller writes a handler for, and it
-  costs a caller more than an added tag ever does.
-- A row is not added for a tag the function's own arguments cannot reach,
-  and the coarsening goes in a private helper. `fs_open_mode` declares
-  five tags across its five modes; with the mode fixed at 2 by std rather
-  than by a caller, `invalid` (a mode outside the set) and `exists` (mode 4
-  losing its exclusive create) cannot happen, so a private `append_fd`
-  handles both (answering `io`, which is truthful if a future pin ever does
-  reach them) and `append_text`/`open_append` carry three tags instead of
-  five. The same judgement leaves `invalid` off `copy_file` (its bytes came
-  out of `fs_read_bytes`) and on `write_bytes` (the list is the caller's).
-  Whose data it is decides whether a tag is reachable, and two functions
-  that differ only in that should sit near each other so the difference is
-  readable.
-- A contract can be answered by a decision, and then it is withdrawn
-  rather than left open. `std.fs.rename` was a reviewed contract for an
-  atomic move. The language does not promise atomicity: POSIX
-  replaces a destination atomically, windows `MoveFileEx` is documented to
-  replace but not to replace atomically, and upstream's platform rule says a
-  promise that cannot be kept on a tier-1 target does not get a `#[cfg]`
-  keeping it on two out of three. So there is no `fs_rename_atomic` and
-  there will not be. std adopts that reading instead of re-promising it one
-  level up: `move_file` is the wrapper, there is no second name for the same
-  call, and the module header records the withdrawal with the reason. A
-  contract left open forever because its exact words were never met is worse
-  than a withdrawal that says what happened.
-- When the toolchain hands std a tag whose trigger has no portable litmus,
-  the tag is still documented and the gap is stated in three places.
-  `cross_device` appears in no `std.fs` signature because `move_file`
-  handles it, and its fallback therefore cannot be reached by any test in
-  this repository (it needs two filesystems). §14's sc11 posture applies
-  unchanged: say so on the function, in the module header and in the report,
-  and never let a green rig imply coverage. What did become witnessable gets
-  the same treatment in reverse: `utf8` had been declared on
-  `fs.read_text` since sc07 and observed nowhere, and the moment
-  `write_bytes` existed it got the same standard of evidence as
-  `not_found`: a tag ridden out of `main` where the record names it.
-- An optimization that lands does not license undoing the algorithm it
-  forced. §9's sc12 amendment ruled that a shape costing a lane is not a
-  shape std writes, and the lane cost is gone (F-0071 closed at this pin:
-  the checked tier models all seven byte-view positions). std's walks did
-  not go back to indexing, because the one-pass forms are shorter than what
-  they replaced. The rule the pair leaves is that a constraint that produced
-  a better body has paid for itself, and the closure buys the next body an
-  option instead of obliging this one to change. Where the code stays, the
-  doc must still move: a comment claiming a live refusal that has closed is
-  the sc13 failure mode, so each of the six sites now reads "was refused
-  when this was written, closed at the sc12 pin, kept because".
 
 **§14 amendment (sc36): a second address family, and the first std surface
 that leaves a filesystem object behind.** `std.net.unix` is the ninth
