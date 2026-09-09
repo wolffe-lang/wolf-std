@@ -1264,3 +1264,56 @@ constraint on the caller, and monomorphized dispatch where a vtable
 would indirect. The facade grows on demand (D31); the first std consumer
 with a real erasure need (a heterogeneous collection, a plugin registry)
 reopens this, and the probe (`p3_dyn`) is the shape it starts from.
+
+## sc40 — the surface the runtime grew, counted with its rule in the row
+
+The count-method note in §9 (wolf-std#11 item 25) ends by asking a
+future census row to state its rule in the row. This is that row, and
+the rule is stated first.
+
+**Counting rules used here, all three reproducible from the tree at
+`sc40`:**
+
+- **modules** — directories directly under `std/` (`find std -mindepth 1
+  -maxdepth 1 -type d | wc -l`). `std/x/` counts as ONE, because it is
+  one directory; the nursery's own members are counted nowhere in this
+  row. That is the rule §8's `31` used at sc10 and the one §9's `33`
+  reproduces under nothing, so it is written down rather than inferred.
+- **`pub fn` in `std/`** — lines matching `^pub fn` across every `.lu`
+  under `std/`, nursery INCLUDED (`grep -rh '^pub fn' std --include='*.lu'
+  | wc -l`). One line per function, because §14 forbids a `pub fn`
+  signature wrapped across the `pub fn` token itself.
+- **entry tests** and **ledger rows** — `find tests -name '*.lu' | wc -l`
+  and `grep -c '^\[tests\.' tests/ledger.toml`. `ledger-check` gates
+  that these two are the same number, so either is the measure.
+- **doc examples** — `wolf-doc-example` fence OPENERS under `std/`;
+  `cargo xtask doc-examples` extracts and runs exactly these.
+
+| measure | sc39 | sc40 |
+|---|---|---|
+| modules under `std/` (directories, `std/x/` as one) | 33 | **33** (+0) |
+| `pub fn` in `std/`, nursery included | 593 | **596** (+3) |
+| public types | — | **+1** (`fs.Stat`) |
+| entry tests | 392 | **396** (+4) |
+| ledger rows | 392 | **396** (+4) |
+| fenced doc examples, extracted and RUN | 418 | **421** (+3) |
+| existing ledger rows moved by the pin bump | — | **0** |
+
+**Predicted before measuring, and the prediction is on the record with
+its one miss.** The counts above were all predicted exactly, including
+the zero row motion — `398e5f5..5c729e8` carries two behavioural commits
+(`[os.net.io]`'s syscall-first, TCP_NODELAY-by-default) and both clauses
+state in their own letter that nothing a program can observe in the rows
+moves. What was predicted wrong was the LANE spread: all three wrappers
+were called three-lane on the strength of a zero pairing gap, and only
+the two `std.net` ones are. `std.fs`'s two rows are `lupin =
+"unsupported"` for the reference machine's oldest posture — no
+filesystem by design, the whole tier declined rather than mocked. A
+matched pin buys reach only where the machine has the capability at all,
+and eleven fs rows in the ledger already said so.
+
+The three new functions are `net.writev`, `net.nodelay` and `fs.fstat`;
+what each is for is in `CHANGELOG.md`'s sc40 entry and in the
+per-function docs. The +3 doc examples are one per function: `fs.Stat`
+carries none, because a struct literal in a fenced block proves nothing
+a field access does not.
