@@ -391,6 +391,39 @@ against it settled three things.
   sentence; the other half is "and because indexing the view costs the checked
   lane". A reader who has only the first half will helpfully rewrite the loop.
 
+**§9 amendment (sc28): `+` joins, interpolation converts, strbuf
+builds.** D62 (`[type.str.concat]`) made `a + b` and `a += b` legal on
+two strs at the sc27 pin, and `[type.str.concat.cost]` prices them as
+the same interpolation-append lowering as `"{a}{b}"`, so the choice is
+a reading and not a cost, and std spells it by role:
+
+- A pure two-str join is `+` (`pad + s`, `sign + out`, `base + name`); a
+  self-append accumulation is `+=` (`out += piece`). The operator matches
+  the operation; a two-hole interpolation at such a site was the pre-D62
+  spelling and reads as formatting where none happens.
+- A hole that converts keeps interpolation: `"{b.s}{c}"` on a `char`
+  (`[type.char.interp]`, where the appended bytes are the scalar's UTF-8
+  encoding, which is the contract at `strbuf.push`), `"{digits}{d}"` on an
+  int. The mixes are refused (`str + char` / `str + int` are E0409 by
+  ruling, `[type.str.concat.mix]`), so interpolation at these sites is
+  doing work and is not legacy.
+- Three or more pieces keep interpolation (`"{sign}{head}.{tail}"`,
+  `"{out}{sep}{c}"`): one hole-string reads better than an operator chain,
+  and the lowering is identical anyway.
+- `+=` in a loop is still quadratic by the anchor's own words, so
+  `std.strbuf` remains the builder. The adopted `out += piece` loops
+  make the pre-existing interpolation-append loops visible without
+  endorsing them: each was already carrying that cost, and the operator
+  now says so.
+
+The sc28 measure over std/: 27 two-hole interpolation sites; 23
+adopted (pure two-str joins and self-appends), 4 kept as conversion
+holes (`strbuf.push`'s char, `std.fmt.decimal`'s int digits), every
+3+-piece site kept. Zero verdict motion. The rig proved the whole
+family is style (`[type.str.concat.cost]`, measured).
+
+## 10. Numerics (sc04)
+
 - Checked is the default, recoverable is the complement, and the docs
   say when each is right. `a + b` traps on overflow in every profile
   (X3) and that is what ordinary code writes. `math.checked_add ->
@@ -473,37 +506,6 @@ instead of growing a table of its own. §9's rule that a std function
 matching a builtin's set carries a test pinning the agreement member by
 member stands, and `tests/str/trim_whitespace_set.lu` remains the
 worked example until the tables land.
-
-**§9 amendment (sc28): `+` joins, interpolation converts, strbuf
-builds.** D62 (`[type.str.concat]`) made `a + b` and `a += b` legal on
-two strs at the sc27 pin, and `[type.str.concat.cost]` prices them as
-the same interpolation-append lowering as `"{a}{b}"`, so the choice is
-a reading and not a cost, and std spells it by role:
-
-- A pure two-str join is `+` (`pad + s`, `sign + out`, `base + name`); a
-  self-append accumulation is `+=` (`out += piece`). The operator matches
-  the operation; a two-hole interpolation at such a site was the pre-D62
-  spelling and reads as formatting where none happens.
-- A hole that converts keeps interpolation: `"{b.s}{c}"` on a `char`
-  (`[type.char.interp]`, where the appended bytes are the scalar's UTF-8
-  encoding, which is the contract at `strbuf.push`), `"{digits}{d}"` on an
-  int. The mixes are refused (`str + char` / `str + int` are E0409 by
-  ruling, `[type.str.concat.mix]`), so interpolation at these sites is
-  doing work and is not legacy.
-- Three or more pieces keep interpolation (`"{sign}{head}.{tail}"`,
-  `"{out}{sep}{c}"`): one hole-string reads better than an operator chain,
-  and the lowering is identical anyway.
-- `+=` in a loop is still quadratic by the anchor's own words, so
-  `std.strbuf` remains the builder. The adopted `out += piece` loops
-  make the pre-existing interpolation-append loops visible without
-  endorsing them: each was already carrying that cost, and the operator
-  now says so.
-
-The sc28 measure over std/: 27 two-hole interpolation sites; 23
-adopted (pure two-str joins and self-appends), 4 kept as conversion
-holes (`strbuf.push`'s char, `std.fmt.decimal`'s int digits), every
-3+-piece site kept. Zero verdict motion. The rig proved the whole
-family is style (`[type.str.concat.cost]`, measured).
 
 ## 11. Formatting, text↔number, and encodings (sc05)
 
