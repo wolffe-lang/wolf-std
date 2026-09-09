@@ -8308,8 +8308,13 @@ new measurement.
 Report-only by construction and correct to leave that way: the committed
 values come from the vendored reference, not from any host, and the
 counts say so — the author's own architecture is the one that agrees with
-them LEAST. The number to watch is growth, and there is now a baseline on
-three platforms to watch it against.
+them LEAST. The sc41 closing gauntlet on the author's box (macOS arm64,
+all three lanes lit, `GAUNTLET_EXIT=0`) reports **16**, the same count as
+`macos-latest`, which is the corroboration worth having: the runner is
+not drifting from the author's host, the two agree, and both differ from
+the recorded table by the same sixteen rows. The number to watch is
+growth, and there is now a baseline on three platforms to watch it
+against.
 
 **What "required" now means here, precisely.** `continue-on-error` is
 gone, so a red `gates` job fails the run exactly as a red `rig` job does.
