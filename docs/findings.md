@@ -5684,7 +5684,16 @@ fn main() -> int {
 | wolf 0.2.2 `--checked` | `fail(E0201)` | parse | **`[88, 88]`** |
 | wolf 0.2.2 `--native` | `fail(E0201)` | parse | **`[88, 88]`** |
 
-Byte 88 is the `{`; both machines report 7:27 and E0201. The class
+**Correction 2026-09-08 (wolf-std#11 item 11): these offsets are not the
+printed program's.** In the reproducer exactly as fenced above, byte 83
+is the `{` and byte 88 is the `1` (counted over the block's bytes). The
+sc34 closure below re-runs "the same reproducer, verbatim" and reports
+`[83, 84]` on all three lanes, which is what the printed program yields;
+this table's 88s belong to a source eight bytes longer before that token
+than the one written down here. The FINDING is unaffected and is the only
+thing the table is evidence for: lupin spans the offending token (width
+1) and both wolf rungs emit width 0 at the same start, whatever the
+absolute offset. The class
 reaches past the eight corpus files: this is an ordinary
 struct-and-region program written for an unrelated purpose and it
 carries the divergence anyway, so any std-side E0201 will.
