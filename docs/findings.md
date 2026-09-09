@@ -6948,15 +6948,19 @@ it, typed code can no longer reach it"). Dropping a tag a caller may have
 written a handler for would be a breaking change, and this rename is not
 one.
 
-Two more cases retired inside otherwise-unchanged tests, recorded here
+FIVE more cases retired inside otherwise-unchanged tests, recorded here
 because a deleted assertion is the easiest thing in a diff to miss:
 `tests/bytes/utf8_validation.lu` loses its two "an element outside
-0..255 answers `false`" cases (300 and -1),
-`tests/bytes/to_str_border.lu` loses the same pair, and
-`tests/fs/chunk_stream.lu` loses its `write_chunk` `invalid` probe. All
-four are unreachable through a `List[byte]`, all four would now be E0401
-if spelled, and each site carries a comment saying so and naming the
-static witness that took the job.
+0..255 answers `false`" cases (256 and -1),
+`tests/bytes/to_str_border.lu` loses the same shape at 300 and -1, and
+`tests/fs/chunk_stream.lu` loses its `write_chunk` `invalid` probe (-1).
+All five are unreachable through a `List[byte]`, all five would now be
+E0401 if spelled, and each site carries a comment saying so and naming
+the static witness that took the job. (This paragraph read "Two more
+cases", "(300 and -1)" for `utf8_validation.lu` and "All four" until
+2026-09-08, wolf-std#11 item 14; the three files' diffs across the sc34
+-> sc35 merges were re-read, and `utf8_validation.lu`'s retired pair is
+`push(256)` / `push(0 - 1)`, not 300.)
 
 ## F-0103 RE-CHARACTERISED — the trigger is not a shape at all, it is a PATH, and four sprints of "minimal shape" were probe artifacts
 
