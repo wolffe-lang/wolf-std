@@ -5517,6 +5517,14 @@ and read back from a real file.
 12 of the tree's 14 `fs` rows are `unsupported` on that lane), so its
 column stays the synthetic one.)
 
+(Re-counted 2026-09-08, wolf-std#11 item 12: 12 of 14 was correct at the
+sc33 and sc34 merges — `fs/path_helpers.lu` since sc08 and
+`fs/use_after_close.lu` since sc28 were the two exceptions. It is 11 of
+14 today: `fs/invalid_row.lu` flipped at the sc37 pin bump, where is37's
+resolve-time byte-domain refusal arrives before the fs decline can be
+reached. The claim the number served — that lupin cannot run this probe —
+is unchanged.)
+
 Two findings, one of them new and sharp.
 
 1. The readers cost what the synthetic list costs, to the byte, at
