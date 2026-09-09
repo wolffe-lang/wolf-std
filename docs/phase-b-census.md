@@ -519,9 +519,11 @@ writable advice instead of a one-machine trick. Zero rows, three
 paragraphs, and the claims were updated rather than left standing.
 
 Two rows did not move and both are worth naming. `env/args_and_vars.lu` stays
-lupin-dark because one builtin of the five is missing: `env_vars` "does not
-resolve" at 0.1.8 while `env_args`, `env_get`, `env_set`, `os_cwd` and
-`os_exit` all run (F-0070, measured one call at a time; inferring from the
+lupin-dark because one builtin of the SIX this row touches is missing:
+`env_vars` "does not resolve" at 0.1.8 while `env_args`, `env_get`,
+`env_set`, `os_cwd` and `os_exit` — five — all run (the sentence read
+"one of the five" over five running plus the missing one until
+2026-09-08, wolf-std#11 item 24) (F-0070, measured one call at a time; inferring from the
 family is how a wrong sentence nearly reached this file).
 The three `x/json/*` rows stay dark for a new reason: lupin 0.1.8 declines
 the json surface by design ("rather than risk a second, guessed RFC 8259
