@@ -807,8 +807,12 @@ probe to know), and `with_cap(n, f)` collapses D68's containment join,
 spawn, monitor, `select` and `is_alloc_contract()`, into one call whose
 failure is the ordinary row `exhausted`. That is the shape lobo's
 per-request 503 consumes. Fifteen probes ran before a line of the module
-was written and five of them changed it: a region may be taken and never
-returned (native refuses `-> region`); the work's value cannot come back
+was written and five of them changed it (this list carried four of the
+five until 2026-09-08, wolf-std#11 item 26; `docs/findings.md`'s sc32
+register numbers all five). The first is the parenthesis
+above — a `read` parameter retains an affine value, so `charged(r)` can be
+a std function at all (p1/p14). The other four: a region may be taken and
+never returned (native refuses `-> region`); the work's value cannot come back
 at all (a channel in a std signature is refused on both wolf rungs); the
 checked tier's C1 refusal is reached at execution and not statically (so
 one function yields two different checked columns across three
