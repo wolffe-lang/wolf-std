@@ -5,7 +5,7 @@
 use crate::bins::{self, Impl};
 use crate::record::Verdict;
 use crate::repo_root;
-use crate::{anchors, directive, exec, ledger, record, stage};
+use crate::{anchors, directive, exec, ledger, record, stage, workflow};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
@@ -284,6 +284,72 @@ fn conform(bin: &PathBuf, entry: &PathBuf, std_root: Option<&std::path::Path>) -
     let got = exec::run(cmd, Duration::from_secs(exec::timeout_secs())).unwrap();
     assert_eq!(got.status, Some(0), "tool error: {}", got.stderr);
     record::parse(&got.stdout, "lupin").unwrap()
+}
+
+/// sc41 (F-0113, wolf-std#13): the two lists, diffed, on every host.
+///
+/// `cargo xtask ci` ran eleven steps and `.github/workflows/ci.yml` ran
+/// seven, for four sprints, and the only reason anyone found out was a
+/// doc example that broke and stayed green on three platforms. This is
+/// the gate that makes the next divergence a red `cargo test` instead of
+/// a finding. It lives in `selftest` on purpose: the `rig` job was
+/// ALREADY required on all three hosts, so the drift check is required
+/// from the moment it lands, without waiting on the lane it describes.
+#[test]
+fn every_ci_step_runs_in_the_ci_workflow() {
+    let repo = repo_root();
+    let path = repo.join(workflow::CI_WORKFLOW);
+    let yaml =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", workflow::CI_WORKFLOW));
+    let invocations = workflow::cargo_invocations(&yaml);
+    assert!(
+        !invocations.is_empty(),
+        "{} parsed to no cargo invocations at all — the reader is broken, \
+         not the workflow",
+        workflow::CI_WORKFLOW
+    );
+    let missing = workflow::local_only(&yaml);
+    assert!(
+        missing.is_empty(),
+        "these `cargo xtask ci` steps run in NO workflow: {missing:?}\n  \
+         a step no runner executes is a gate the merge does not have \
+         (F-0113: that is how a broken `net.write` doc example was green on \
+         ubuntu, macOS and windows for four sprints).\n  \
+         Add it to {} or take it out of workflow::CI_STEPS.",
+        workflow::CI_WORKFLOW
+    );
+    let extra = workflow::workflow_only(&yaml);
+    assert!(
+        extra.is_empty(),
+        "{} runs cargo commands the local gauntlet does not: {extra:?}\n  \
+         the worse direction of the same drift — a check the author cannot \
+         reproduce before pushing. Add it to workflow::CI_STEPS.",
+        workflow::CI_WORKFLOW
+    );
+}
+
+/// Every name in `workflow::CI_STEPS` has a match arm in `run_step`.
+///
+/// `ci()` iterates the list, so an entry with no arm would fail the
+/// gauntlet at that banner — correct, but 20 minutes in and only on the
+/// box that runs the gauntlet. This says it at `cargo test` time, on
+/// every host, by reading the source the arms live in. Cheap, and the
+/// only cross-check between the list and the code that serves it.
+#[test]
+fn every_ci_step_has_a_runner() {
+    let src = std::fs::read_to_string(repo_root().join("xtask/src/main.rs")).unwrap();
+    let body = src
+        .split_once("fn run_step(")
+        .expect("run_step moved — this test reads it by name")
+        .1;
+    for step in workflow::CI_STEPS {
+        let arm = format!("\"{}\" =>", step.name);
+        assert!(
+            body.contains(&arm),
+            "workflow::CI_STEPS names `{}` but run_step has no `{arm}` arm",
+            step.name
+        );
+    }
 }
 
 fn walk_lu(dir: PathBuf) -> Vec<PathBuf> {
