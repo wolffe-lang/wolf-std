@@ -122,7 +122,7 @@ the building.
 | F-0112 | 2026-09-09 | **A doc example that had been green since sc08 was correct-by-Nagle, and wolf v0.2.8 stopped providing the reason.** `[os.net.nodelay]` (s141, wolf-lang#254) sets `TCP_NODELAY` on every accepted or dialed stream, which is the right default and removes a 40ms delayed-ACK stall. It also removes a coalescing that `std.net`'s `write` example had leaned on without saying so: it wrote `"one "` then `"two"`, called `net.read(mut conn, 7)`, and compared against `"one two"`. Two small writes used to arrive as one segment; they are two segments now, and a read spanning the boundary comes back short. **The failure is load-sensitive and that is the worst part** — it reds a full gauntlet on a box carrying sibling lanes (measured, `exit(8)`, the 8th block line) and passes 40/40 on an idle one and 30/30 under synthetic CPU load at 11, so the reproducer is the gauntlet itself rather than the example. Causation is not inferred: the same shape is deterministic on all three lanes once `net.nodelay(mut cli, false)` puts Nagle back, using this sprint's own new wrapper as the probe. **The general lesson is about the assertion, not the pin**: `net.read(mut s, n)` is one read of UP TO `n` bytes and never promised `n`, so the example was always relying on something the API does not offer; the runtime had simply been generous. **A second site was found by sweeping for the shape rather than fixing the one that failed**: `tests/net/stream_pieces.lu`'s header asserted in prose that "a read of `n` returns exactly `n` while bytes remain", which was never true of `read` and is now visibly not; its ASSERTIONS survive because each read asks for exactly one write's length and so never spans a boundary, which is alignment rather than the reason the header gave. `tests/x/tls/client/loopback_handshake.lu` was checked and needs nothing — it already loops to a known count | wolf-std (this repo) | Found at sc40 by the gauntlet, not by review. Doc example moved to `read_all`; `net.write`'s doc now states that two writes are two segments and points at `writev` and `read_all`; `stream_pieces.lu`'s determinism paragraph restated to say alignment; pinned by `tests/net/segment_boundaries.lu`, which holds the three segmentation-independent spellings and asserts the bounded read as a DISJUNCTION (4 or 7, the host's choice) because asserting either alone is the defect itself. Not filed upstream: the clause is right, the default is right, and the wrong thing was this repository's assertion |
 | F-0113 | 2026-09-09 | **Four of `cargo xtask ci`'s eleven steps run in no GitHub workflow, and one of them is the step that caught F-0112.** `ci()` runs fmt, clippy, `cargo test`, sync-pin, doctor, ledger-check, **lint-conventions**, **gen-vectors --check**, std-test, **doc-examples** and **ulp**. `.github/workflows/ci.yml` runs the first six plus std-test and stops; `nightly.yml` runs doctor and std-test against the latest binaries. So the bolded four are LOCAL-ONLY gates: a branch can be green on three platforms in CI and red on `cargo xtask ci` on the author's box, which is exactly what happened at sc40 — GitHub was green on ubuntu, macOS and windows for the commit whose doc example was broken, because **no runner has ever executed a `wolf-doc-example`**. That inverts the usual assumption: the local gauntlet is the STRICTER gate here, not the convenience check, and "CI is green" is not a statement about the doc-truth gate, the conventions linter, the generated-vector check or the ULP budget. Cheapest fix is four lines in `ci.yml`, and it is not free: `doc-examples` runs every fenced block on every available lane (421 blocks at sc40) and would lengthen the job substantially, and its net examples have never been run on the windows runner at all, so the first CI run carrying it should be expected to teach something rather than to pass | wolf-std (this repo) | Found at sc40 while explaining why F-0112 escaped GitHub. NOT fixed there: adding a step that has never executed on two of three tier-1 runners, on a branch that cannot verify them, is the "prose over a lane nothing lit" mistake F-0111 records, one file over. Filed with the measurement and the expected cost so the decision is the merger's. **FIXED at sc41** (wolf-std#13): `27c508b` adds the `gates` job, one per host, advisory on its first landing; the first run was red on all three hosts for a reason that was the rig's own (**F-0114**, fixed in `4d6f130`); `c8a2541` drops `continue-on-error` after two green runs on three hosts, and no step is left advisory. `8a84040`/`d2322cd` make the drift itself visible: `ci()` iterates one list, prints at the end which of its steps `ci.yml` also runs, and a test in the already-required `rig` job fails on drift in either direction. "CI green" now means what the local gauntlet means, with the caveat recorded beside the measurements: every observation lane on every runner is still DARK, so the lane gates the static half and not doc truth until release artifacts exist at the pins |
 | F-0114 | 2026-09-09 | **`gen-vectors --check` was the one binary-dependent step in this rig that treated a dark lane as an ERROR instead of a loud SKIP, and that is why it had never run on a runner.** The first sc41 CI run put F-0113's four steps on ubuntu, macOS and windows; `gen-vectors --check` failed on all three in under a second, with the same message and for a reason that has nothing to do with any platform: `gen-vectors needs the pinned wolf (it runs wolf fmt on its output)`. `wolf fmt` is law for every committed `.lu` (D34), so the emitter's output is canonicalized before it is written OR compared — and with no release artifact at the pins, `ci.yml`'s acquire step SKIPs and no runner has a `wolf`. `bins.rs`'s own header states the doctrine the step broke: "Absence is legal and LOUD." `std-test`, `doc-examples` and `ulp` all honour it; this one alone did not, and because it did not, the step could not be added to CI at all — the prerequisite for F-0113's fix was a fix to a step F-0113 does not mention. Note what the shape of the red says: the first run of a lane nothing lit taught something about the RIG on the host the rig was written on, before it taught anything about windows | wolf-std (this repo) | **Fixed at sc41**, `4d6f130`: `--check` with no `wolf` on any rung prints a loud SKIP and drops from a byte comparison to an inventory-and-derivability check — the 7.3 MB vendored corpus is still parsed, all 65 emitters still run, and every generated file must still be present and non-empty; only the byte comparison goes dark, and it says so. WRITING still hard-errors without the formatter, because an unformatted generated file must never reach a commit. The lane relights for free the day release artifacts exist at the pins |
-| F-0115 | 2026-09-10 | **`cargo xtask std-test`'s native lane terminates the `ubuntu-latest` runner, and it did it twice at the same test.** The first CI run that had binaries to run (sc42, `354cdf0`) put the 397-row differential on three hosts. `macos-latest` was GREEN in 29 min (three lanes lit, 0 divergent, 0 unstable, 0 slow) and `windows-latest` GREEN in 44 min (two lanes; the native lane dark, F-0114's neighbour and now wolf-std#18) — **the differential's first green anywhere but the author's box.** `ubuntu-latest` died at test 303 of 397 in BOTH runs of the commit, printing `cavp_sha256_short_p2.lu` and then `The runner has received a shutdown signal` with exit 143. The next test in order is `tests/x/crypto/sha2/cavp_sha384_long.lu`: 1.69 MB of generated wolf source and a native-lane-ONLY row, so what runs when the runner dies is one native compile-and-link of the largest generated file in the tree. **It is the workload, not the clock** — the two deaths came at 28 m 59 s and 23 m 11 s and at the identical position — and the obvious hypothesis is the one the evidence argues against: `macos-latest` has LESS memory than the ubuntu image and spends about 60 s on that same test. A hosted runner reports an OOM-killed agent and a reclaimed host with the same sentence and the same exit code, so the mechanism is not determinable from a workflow log | wolf-std (this repo) + GitHub's ubuntu image | [filed: wolf-std#19](https://github.com/wolffe-lang/wolf-std/issues/19). **`continue-on-error` cannot be the disposition**: a runner shutdown kills the JOB, so run 1's `rig (ubuntu-latest)` reports every step `success` and the job `failure`, and an advisory marker never gets the chance to swallow anything — leaving it would leave one host permanently red. `std-test` is NOT RUN on `ubuntu-latest` as of sc42, out loud, in a step whose entire content is the skip and this issue number; the differential still runs on two hosts and on the author's box |
+| F-0115 | 2026-09-10 | **`cargo xtask std-test`'s native lane terminates the `ubuntu-latest` runner, and it did it twice at the same test.** The first CI run that had binaries to run (sc42, `354cdf0`) put the 397-row differential on three hosts. `macos-latest` was GREEN in 29 min (three lanes lit, 0 divergent, 0 unstable, 0 slow) and `windows-latest` — **corrected below, and the correction is the finding's twin**: that job's `std-test` printed its 397-row summary and then seven mismatches and `xtask: RED`, and this entry first recorded it as GREEN because the summary line was read as the verdict. The `continue-on-error` marker had made the JOB green, exactly the trap this sprint had already written a paragraph warning about two sections earlier. windows is RED and filed as wolf-std#20; macOS is the differential's first green anywhere but the author's box. `ubuntu-latest` died at test 303 of 397 in BOTH runs of the commit, printing `cavp_sha256_short_p2.lu` and then `The runner has received a shutdown signal` with exit 143. The next test in order is `tests/x/crypto/sha2/cavp_sha384_long.lu`: 1.69 MB of generated wolf source and a native-lane-ONLY row, so what runs when the runner dies is one native compile-and-link of the largest generated file in the tree. **It is the workload, not the clock** — the two deaths came at 28 m 59 s and 23 m 11 s and at the identical position — and the obvious hypothesis is the one the evidence argues against: `macos-latest` has LESS memory than the ubuntu image and spends about 60 s on that same test. A hosted runner reports an OOM-killed agent and a reclaimed host with the same sentence and the same exit code, so the mechanism is not determinable from a workflow log | wolf-std (this repo) + GitHub's ubuntu image | [filed: wolf-std#19](https://github.com/wolffe-lang/wolf-std/issues/19). **`continue-on-error` cannot be the disposition**: a runner shutdown kills the JOB, so run 1's `rig (ubuntu-latest)` reports every step `success` and the job `failure`, and an advisory marker never gets the chance to swallow anything — leaving it would leave one host permanently red. `std-test` is NOT RUN on `ubuntu-latest` as of sc42, out loud, in a step whose entire content is the skip and this issue number; the differential still runs on two hosts and on the author's box |
 
 
 ## F-0001 — the std search path
@@ -8522,13 +8522,28 @@ made anywhere but the author's box.
 | --- | --- | --- | --- | --- | --- |
 | ubuntu-latest | 30 min | 29 min 02 s | died at test 303 of 397 | 3 lit | **RUNNER SHUTDOWN, exit 143** |
 | macos-latest | 30 min | **29 min 51 s** | 29 min 05 s | 3 lit | GREEN — 397 tests, 0 divergent, 0 unstable, 0 slow |
-| windows-latest | 75 min | **45 min 32 s** | 44 min 28 s | 2 lit (native dark) | GREEN — 397 tests, 0 divergent, 0 unstable, 0 slow |
+| windows-latest | 75 min | **45 min 32 s** | 44 min 28 s | 2 lit (native dark) | **RED** — seven mismatches; see the correction below |
 
-**The differential is green on two tier-1 hosts for the first time**, and
-what it says there is what it says on the author's box: zero divergent
-rows, zero unstable rows, zero slow skips, at pins that moved 448
-anchors under it. windows carries 156 conservatism-ledger entries to
-macOS's 210, which is the native lane being dark there and nothing else.
+**The differential is green on ONE tier-1 host for the first time**, and
+what it says on `macos-latest` is what it says on the author's box: zero
+divergent rows, zero unstable rows, zero slow skips, at pins that moved
+448 anchors under it.
+
+**windows was recorded green here and was not, and how that happened is
+worth more than the row it corrected.** The windows `std-test` log
+prints `std-test: 397 test(s); forward tags: 759; conservatism ledger:
+156 entries; unstable rows: 0; slow skips: 0; divergent rows: 0` — and
+then seven `directive mismatch` lines and `xtask: RED`. The summary line
+counts the LEDGER's words; it is not the verdict. This entry read it as
+one, and the `continue-on-error` marker had already turned the job's own
+conclusion green, so nothing in the API contradicted the misreading.
+That is the trap this same sprint had written a paragraph about two
+sections above ("read the LOGS, not the conclusions") — and writing the
+paragraph did not stop it, because the wrong line was in the log too.
+The rule that would have caught it is narrower and is worth keeping:
+**the verdict is the process's exit, and in a log the only spellings of
+it are `GREEN`, `RED` and `##[error]Process completed with exit code`.**
+Corrected here rather than quietly amended, and filed as **wolf-std#20**.
 
 **And on ubuntu the runner dies.** Both runs of the commit — the `push`
 run `34513451718` and the `pull_request` run `34513539219` — printed
@@ -8585,3 +8600,55 @@ twice. It is left alone at sc42 — sc41 used the doubling deliberately,
 as its two greens on one commit, and this sprint does the same — but it
 is written down here because the next lane to touch this file should
 decide it on purpose rather than inherit it.
+
+## The sc42 relit lane — what `std-test` says on windows, and what wolf-std#15 fixed there that nobody asked it to
+
+`rig (windows-latest)` runs the differential on two lanes (the native
+lane is dark there, wolf-std#18) and is RED on all three lit runs. The
+reds sort cleanly, which is why they are worth a section rather than a
+line.
+
+**Deterministic — the same observed hash every run, both on the checked
+tier, both OS-surface rows:**
+
+| row | lane | what the directive expects |
+| --- | --- | --- |
+| `tests/fs/fstat_rows.lu` | `wolfc` | `closed: io` / `directory handle: denied-or-kind-1` / `error: io` |
+| `tests/net/reuse_port.lu` | `wolfc` | five facts about a shared listener, one line |
+
+Identical observed sha256 on run 1, run 2 and run 2' — `5c7a8026…` and
+`c11ba3ce…`. That is windows semantics, not a flake, and it is the first
+time either expectation has been measured on that platform at all: every
+observation lane on every runner was dark until this sprint. The rig
+prints the observed HASH and not the observed TEXT, which is right for a
+byte-exact directive and useless for diagnosing one; reproducing needs a
+windows box or a debug step that echoes the stdout.
+
+**Timing — the 60 s ceiling on the largest generated rows:**
+`cavp_sha384_long.lu [wolfc]` and `cavp_sha512_long.lu [wolfc]` time out
+in all three runs, and the lupin column joins them in one run each
+(`cavp_sha384_long`, `cavp_sha256_long`). Those rows are ledgered
+`unsupported` on both columns for the tier's resource budgets — and **a
+timeout is a different word from `unsupported`**: the runner never
+reaches the honest refusal, so the row is not observed at all rather
+than observed as declined. Whether the answer is a larger ceiling on
+that host or a `slow` word for those rows is wolf-std#20's question.
+
+**And one thing left, which wolf-std#15 fixed without being asked.** Run
+1's windows differential also failed
+`tests/str/interpolation_interplay.lu` with `expected exit(0), observed
+exit(1)` on BOTH lanes. It is gone from run 2 and run 2', and the only
+change between them is `* text=auto eol=lf`. So the line-endings fix
+reached past `gen-vectors --check`: **a CRLF checkout was changing what
+a std TEST printed**, which is a bigger claim than the issue made and
+the strongest single argument for the line that sc41 found missing.
+
+**What is required at the end of sc42.** `gates` — lint-conventions,
+gen-vectors --check, doc-examples, ulp — required on all three hosts,
+green twice on each. `rig`'s acquire and doctor: required on all three.
+`rig`'s `std-test`: **required on `macos-latest`** (four consecutive
+greens, three lanes), **advisory on `windows-latest`** behind
+wolf-std#20, and **not run on `ubuntu-latest`** behind wolf-std#19. As
+sc41 recorded, "required" here means no `continue-on-error` and nothing
+more: trunk carries no branch protection, so no job in this repository
+is a required check in GitHub's sense and `rig` never was either.
