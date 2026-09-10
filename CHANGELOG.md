@@ -77,9 +77,15 @@ too.
 
 **F-0115: the differential kills the ubuntu runner, and it did it twice
 at the same test.** `std-test` went GREEN on `macos-latest` (29 min,
-three lanes) and `windows-latest` (44 min, two lanes) — 397 tests, zero
-divergent rows, zero unstable rows, zero slow skips, the differential's
-first green anywhere but the author's box. On `ubuntu-latest` the runner
+three lanes) — 397 tests, zero divergent rows, zero unstable rows, zero
+slow skips, the differential's first green anywhere but the author's
+box. On `windows-latest` it runs (two lanes; the native lane is dark
+there for a FILENAME, wolf-std#18) and is RED on every lit run, for
+reasons that are real and are wolf-std#20: `fs/fstat_rows` and
+`net/reuse_port` diverge on the checked tier with the same observed hash
+every time, and the two largest generated CAVP rows blow the 60 s
+ceiling so their honest `unsupported` is never reached. On
+`ubuntu-latest` the runner
 received a shutdown signal at test 303 of 397, in BOTH runs of the
 commit, at the identical test and at different elapsed times: one native
 compile of `cavp_sha384_long.lu`, 1.69 MB of generated source and a
@@ -88,6 +94,26 @@ kills the job, so the advisory marker never gets to swallow anything and
 the host would simply be red forever. So the differential is **not run
 on ubuntu**, out loud, in a step whose whole content is the skip and
 wolf-std#19, until the mechanism is known.
+
+**What is required at the end of the sprint.** `gates` — lint-conventions,
+gen-vectors --check, doc-examples, ulp — required on all three hosts,
+after two green runs on three hosts at `4a98793`. `rig`'s acquire and
+doctor: required on all three. `rig`'s `std-test`: required on macOS,
+advisory on windows behind wolf-std#20, not run on ubuntu behind
+wolf-std#19. `timeout-minutes` settles at 20 for `gates` and 75 for
+`rig`, from the measurements rather than from the guess.
+
+**And a correction kept rather than amended away.** This sprint recorded
+the windows differential as GREEN before recording it as RED. The log
+prints `std-test: 397 test(s); … divergent rows: 0` — a count of the
+LEDGER's words, not a verdict — and then seven mismatches and
+`xtask: RED`; the `continue-on-error` marker had already turned the job's
+conclusion green, so nothing in the API contradicted the misreading. The
+sprint had written a paragraph warning about exactly this two sections
+earlier and it did not help, because the wrong line was in the log too.
+The rule that would have caught it is narrower: **the verdict is the
+process's exit, and its only spellings in a log are `GREEN`, `RED` and
+`##[error]Process completed with exit code`.**
 
 ### Line endings (wolf-std#15)
 

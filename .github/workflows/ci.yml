@@ -25,7 +25,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
         # No `submodules:` — upstream/ is private and CI cannot clone it
@@ -65,11 +65,6 @@ jobs:
       #     asset is now a bug in the bump, not a lane that is dark, and
       #     the loud SKIP that used to stand here would hide it.
       - name: acquire the pinned wolf and lupin, by digest, from their releases
-        # ADVISORY ON THIS LANDING ONLY. Not to soften a download failure
-        # — a failed acquisition leaves `.wolf-bin/` empty and every step
-        # below reverts to the loud SKIP it printed yesterday, which is a
-        # readable outcome rather than a hidden one.
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -137,12 +132,6 @@ jobs:
           ".wolf-bin/wolf$exe" --version
           ".wolf-bin/lupin$exe" --version
       - name: doctor
-        # ADVISORY ON THIS LANDING ONLY (see the `gates` note below).
-        # `doctor` has been a required step for forty sprints, but until
-        # this commit it had never had a binary to gate: on a runner it
-        # printed two absences and passed. It gates version AND pin now,
-        # on three hosts, which is a different step wearing the same name.
-        continue-on-error: true
         run: cargo xtask doctor
       - name: ledger-check
         run: cargo xtask ledger-check
@@ -164,11 +153,21 @@ jobs:
       # two sprints arguing is worse than a dark lane that says so.
       - name: std-test (the differential; three lanes lit as of sc42)
         if: runner.os != 'Linux'
-        # ADVISORY ON THIS LANDING ONLY, on the two hosts that run it.
-        # This is the differential — 397 tests against the ledger's three
-        # columns — and no runner had ever executed one of its programs
-        # before this sprint. Required after two greens.
-        continue-on-error: true
+        # REQUIRED on macOS, ADVISORY on windows — one line, because the
+        # two hosts have different evidence behind them and an
+        # unqualified marker would pretend otherwise.
+        #
+        # macOS: four consecutive green runs, three lanes lit, 397 tests
+        # with 0 divergent / 0 unstable / 0 slow. Required.
+        #
+        # windows: RED on all three lit runs, and the reds are REAL
+        # (wolf-std#20) — `fs/fstat_rows` and `net/reuse_port` diverge on
+        # the checked tier with the SAME observed hash every run, so they
+        # are that platform's semantics and not flakes, and the two
+        # largest generated CAVP rows blow the 60 s ceiling so their
+        # honest `unsupported` is never reached. The lane runs and
+        # reports; it does not gate, until those five rows have answers.
+        continue-on-error: ${{ runner.os == 'Windows' }}
         run: cargo xtask std-test
       - name: std-test — NOT RUN on this host (wolf-std#19)
         if: runner.os == 'Linux'
@@ -216,6 +215,14 @@ jobs:
   # `continue-on-error` was GONE at sc41 (cc30524), after two green runs
   # on all three hosts, and the one red the lane produced was F-0114 —
   # the rig's own, not any runner's.
+  #
+  # It is GONE AGAIN at sc42, on every step of THIS job, after two green
+  # runs on three hosts at `4a98793` — the `push` run 34518522469 and the
+  # `pull_request` run 34518526783 of the same commit, six green jobs
+  # each, with the logs read line by line rather than the conclusions
+  # trusted. That last clause is not decoration: a `continue-on-error`
+  # step that exits 1 still reports `conclusion: success`, which is how
+  # sc42 briefly recorded a RED windows differential as green.
   #
   # ---------------------------------------------------------------
   # sc42 — AND THEN THE LANES CAME ON, WHICH IS A DIFFERENT JOB.
@@ -274,18 +281,30 @@ jobs:
   # See docs/findings.md, "The sc42 relit lane", for this budget's
   # reasoning and for what the first lit run actually cost.
   #
-  # `timeout-minutes` goes UP, to 90 from 20, and the honesty is the
-  # same as sc41's headroom note in reverse: 20 was right for a job that
-  # staged 421 examples and executed none of them, and it is not right
-  # for one that runs them on three lanes. It comes back down when the
-  # measurement says what to come down to.
+  # `timeout-minutes` went UP to 90 for the first landing, from the 20
+  # that was right for a job staging 421 examples and executing none of
+  # them. MEASURED over three lit runs, it comes back to **20 for
+  # `gates`** and **75 for `rig`**:
+  #
+  #   job     host     budget    measured (run 1 / run 2)
+  #   gates   ubuntu   10 min    2:35 / 2:44
+  #   gates   macOS    10 min    3:30 / 3:31
+  #   gates   windows  25 min    2:48 / 2:46
+  #   rig     ubuntu   30 min    29:02 (runner killed) / 0:33 (skip, #19)
+  #   rig     macOS    30 min    29:51 / 29:37
+  #   rig     windows  75 min    45:32 / 46:46
+  #
+  # `gates` came in at a QUARTER of its budget on every host and `rig`
+  # came in at the budget exactly on macOS and at 62% on windows, which
+  # is the split the variable-term note predicted: doc examples are
+  # cheap and the differential is not.
   gates:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -315,11 +334,6 @@ jobs:
       #     asset is now a bug in the bump, not a lane that is dark, and
       #     the loud SKIP that used to stand here would hide it.
       - name: acquire the pinned wolf and lupin, by digest, from their releases
-        # ADVISORY ON THIS LANDING ONLY. Not to soften a download failure
-        # — a failed acquisition leaves `.wolf-bin/` empty and every step
-        # below reverts to the loud SKIP it printed yesterday, which is a
-        # readable outcome rather than a hidden one.
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -389,21 +403,8 @@ jobs:
       - name: lint-conventions
         run: cargo xtask std-test --lint-conventions
       - name: gen-vectors --check
-        # ADVISORY ON THIS LANDING ONLY, and this is the step F-0114 was
-        # about: with a `wolf` on the box it stops being an
-        # inventory-and-derivability check and goes back to the BYTE
-        # comparison, on windows for the first time ever.
-        continue-on-error: true
         run: cargo xtask gen-vectors --check
       - name: doc-examples
-        # ADVISORY ON THIS LANDING ONLY. Doc truth, executed on a runner
-        # for the first time in this repository's history — and the net
-        # examples have never run on windows at all (F-0113 said to
-        # expect this run to teach something rather than to pass).
-        continue-on-error: true
         run: cargo xtask doc-examples
       - name: ulp
-        # ADVISORY ON THIS LANDING ONLY. The float budget compares the
-        # last bit across every lit lane; three of them are lit now.
-        continue-on-error: true
         run: cargo xtask ulp
