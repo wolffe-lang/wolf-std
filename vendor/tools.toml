@@ -516,7 +516,54 @@
 # ..., pin 6ade878", because `c95349c` recorded the pairing before is40
 # cut 0.1.28. Doctor prints it and does not gate it. The pairing line is
 # a record of what upstream tested against, never a claim about this box.
-version = "0.1.28"
+#
+# sc42 BUMP: 0.1.28 -> 0.1.30, pin 5c729e8 (v0.2.8) -> 2c03ed9 (wolf-lang
+# s144, dev-stamped). TWO releases in one bump — is41 cut 0.1.29 at
+# e9a17cb (s143) and is42 cut 0.1.30 at 2c03ed9 — and this repo skips
+# the intermediate the way sc35 did. Tag `v0.1.30` = wolf-interp
+# `08d787a`; installed by the orchestrator through fresh inodes (the
+# sc26 SIGKILL rule), and this entry records the acquisition. Verified
+# from `--version`, not from the brief: `lupin 0.1.30 (wolf-interp,
+# reference interpreter at pin 2c03ed9)`.
+#
+# **THE PAIRING GAP REOPENS, AND IT INVERTS BACK TO THE COMPILER.**
+# sc40 was the first bump where all four wolf-side pins named one sha.
+# It lasted exactly one sprint. wolf 0.2.9 conforms to `4c60946`; lupin
+# 0.1.30 conforms to `2c03ed9`, which is an ANCESTOR of `4c60946` by
+# **14 commits**. So the compiler LEADS the mirror by 14 — the direction
+# sc37 had (42 behind) rather than sc35's inversion — and the 14 are not
+# arbitrary: they are exactly wolf-lang s145 (#278 `str + char`, #268
+# `return` inside a closure), the diagnostics-catalog regen, the
+# v0.2.8..v0.2.9 CHANGELOG and the release commit. The data pin follows
+# the COMPILER (see `[wolf]`), so this key is the only one of the four
+# that names `2c03ed9`.
+#
+# **F-0110's CLASS RETURNS, AND IT IS NAMED HERE BEFORE ANY ROW MOVES.**
+# A witness of `str + char` is native-and-checked-only under lupin
+# 0.1.30 for a reason that is a RELEASE DATE and not a semantics:
+# wolf-lang#278's mirror is filed as wolf-interp#78 and is not in
+# 0.1.30, whose release line says what it DID mirror ("the mirror lets
+# `else` start a line (is42)"). The same holds for `[type.closure.return]`.
+# That is the whole reason `std.strbuf`'s `push` keeps its interpolation
+# body this sprint — see the note at the `[wolf]` entry's delta 6.
+#
+# What the bump DOES buy this repo, across both releases:
+#   is41 / 0.1.29  `[mem.str.parse]` — `to_int`'s row is the lowercase
+#     mark `parse` on the mirror too (wolf-interp#71); the six
+#     `[type.interp.*]` clauses cost that machine nothing, which is the
+#     mirror's own way of saying the renderings already agreed.
+#   is42 / 0.1.30  `[conc.chan.close]` spells `closed`/`cancelled`
+#     (wolf-interp#76); `[mem.list.pop]`'s recoverable List reads answer
+#     the `none` row instead of trapping `bounds` (wolf-interp#77); a
+#     leading `else` stops being E0005 (wolf-interp#75). The middle one
+#     is the only candidate in the whole span for a ledger row to move
+#     on the lupin column, and it is predicted at the `[wolf]` entry.
+#
+# The pairing LINE is stale again, and again it is not the machine
+# (F-0064): `wolf 0.2.9`'s second line reads "paired with lupin 0.1.29
+# ..., pin e9a17cb", because `9af606c` recorded the pairing before is42
+# cut 0.1.30. Doctor prints it and does not gate it.
+version = "0.1.30"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -526,7 +573,12 @@ version = "0.1.28"
 # pin = "8cda3aa41004775bb4a4c0a600d7fb673143b7d0"  (superseded, sc33/sc34/sc35-bump era — is34's v0.2.2-tag pin, held while wolf ran 71 commits ahead)
 # pin = "982f857885b991e686c6b045de213d10cab013c1"  (superseded, sc35-second/sc36/sc37 era — is36's v0.2.4-tag pin, held across sc37)
 # pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"  (superseded, sc38/sc39 era — is38's v0.2.5-tag pin, the pin that paid F-0110)
-pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"
+# pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"  (superseded, sc40/sc41 era — is40's v0.2.8-tag pin, the one sprint the gap was zero)
+pin = "2c03ed9360e90e260528411075daded674ceab18"
+# (sc42: 0.1.30 crosses to s144 dev-stamped, and this key is now the ONLY
+#  one of the four that does not name `4c60946` — the gap reopens at 14
+#  commits with the compiler ahead. See the entry above. The sc40 and
+#  sc37/sc38 notes kept for their history:)
 # (sc40: 0.1.28 crosses to v0.2.8 and lands on the SAME sha as `[wolf]`'s
 #  pin below and as vendor/upstream/PIN. The gap is zero — see the entry
 #  above. The sc37/sc38 note kept for its history:)
@@ -671,7 +723,130 @@ pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.8"
+version = "0.2.9"
+# sc42 BUMP: 5c729e8 (v0.2.8) -> 4c60946 (v0.2.9), 52 commits, ZERO
+# merges — three sprints (s143, s144, s145) landed direct on trunk, plus
+# the release commit and a README/mark fixup. The data pin was AT
+# 5c729e8 (sc40 put all four on one sha), so for the second bump running
+# the DATA delta and the BINARY delta are the same span: 5c729e8..4c60946.
+#
+# Eight deltas, classified BEFORE anything was measured:
+#   1. s143 / #265  SPEC + NEW SURFACE. `[mem.str.parse]` and
+#      `[mem.str.to_int]` rule the parse family — one method, `NotAnInt`
+#      blessed, the `[mem.str.ws]` trim, the value, the row including a
+#      magnitude outside int. std does not wrap `to_int` this sprint
+#      either (sc40 said so and it is still true). Predicted +2 anchors,
+#      zero ledger motion.
+#   2. s143 / #268  SPEC + NEW SURFACE, **THE ONE TO WATCH.** Every
+#      interpolation hole's rendering is ruled byte for byte across
+#      unit, tuple, struct, enum, List, `!T`, row and exit reason
+#      (`[type.interp.value/agg/row/union/reason/none]`), and a proc's
+#      int result rides its exit reason. This repo interpolates
+#      constantly; if a doc example or a ledger row moves anywhere in
+#      the span it moves here. Predicted +6 anchors. Predicted ZERO
+#      motion anyway, and the reason is narrow: every hole std writes
+#      holds a scalar, a `str` or a `char`, and those four renderings
+#      were already fixed before the clause named the composites.
+#   3. s143 / #270  TOOLING/BENCH ONLY — upstream's per-file IR-volume
+#      ratchet. Predicted zero on all three columns and zero anchors.
+#   4. s144 / #276  GRAMMAR + FORMATTER + A RETIRED DIAGNOSTIC. A
+#      leading `else` binds as it would on one line; E0005 retires from
+#      the registry; `[gram.fmt.canon]` gains its one declared
+#      exception, `fmt: relaid`. **PREDICTED TO CHANGE NO std SOURCE
+#      BYTE.** `wolf fmt` is law for every committed `.lu` here (D34)
+#      and the formatter still lays the canonical `} else {` chain — the
+#      new spelling is admitted, not preferred — so every file in this
+#      tree is already at the fixed point and fmt-lu is idempotent on
+#      it. Nothing here expects E0005 (grepped: zero hits outside
+#      `upstream/`), so its retirement moves no row either.
+#   5. s144 / #273 + #274  SPEC + BEHAVIOUR. `[conc.chan.close]` spells
+#      its tags `closed` and `cancelled`; `[mem.list.pop]` rules the
+#      recoverable List reads (`pop`, `get`, `first`, `last`) to answer
+#      the `none` row and never fault. Both are mirrored in lupin 0.1.30
+#      (wolf-interp#76/#77), so BOTH sides of the pair move together —
+#      which is precisely why nothing here should go `divergent`.
+#      Predicted zero anchors (both clauses already registered) and the
+#      only real ledger candidate in the span, on `std.list`'s
+#      pop-on-empty witnesses if any staked a trap.
+#      **MEASURED: the clause was right and the ADDRESS was wrong.**
+#      `[mem.list.pop]` was a NEW anchor, not an existing one (see the
+#      registry note below), and the one row it moved is in `std.str`,
+#      not `std.list`: `tests/str/byte_view_first_last.lu` went lupin
+#      `unsupported` -> `run`, because the clause gives the reference
+#      machine `first`/`last` on a `List` for the first time and a byte
+#      view is a `List`. That row is F-0071's surviving half and its own
+#      header had written the closing condition in advance. One mover in
+#      fifty-two commits, RED before the ledger was touched.
+#   6. s145 / #278  TYPE SYSTEM, NEW ADMISSION. `[type.str.concat]`
+#      admits a `char` on either side of `+` and as the value of `+=`;
+#      `[type.str.concat.mix]` keeps the int rows and says why. Predicted
+#      zero anchors (both clauses already registered — this is an
+#      amendment to an existing pair, not a new one).
+#      **THIS IS THE ONE THAT SIMPLIFIES A STD HELPER AND IS NOT TAKEN.**
+#      `std.strbuf`'s `push(mut b: StrBuf, c: char)` has a body of
+#      `b.s = "{b.s}{c}"` — a string built through an interpolation HOLE
+#      for exactly one reason, that `+` refused a `char` — sitting one
+#      function below `push_str`, whose body is the `b.s += s` this
+#      would become. The module's doc improves twice over: the
+#      `[type.char.interp]` paragraph that justifies the hole collapses
+#      into `[type.str.concat]`'s own rule, and the two appenders stop
+#      being written in two different idioms. It is still not taken at
+#      this pin, and the reason is the `[lupin]` entry's: wolf-interp#78
+#      is unmirrored at 0.1.30, `+=` on a char is a REFUSAL there, and a
+#      refusal in a std SOURCE file is not one unsupported ledger row —
+#      it takes the whole of `std.strbuf` dark on the lupin lane for a
+#      reason that is a release date. F-0110's lesson, applied one
+#      sprint before it could bill. The sentence naming the day it lands
+#      is in `std/strbuf/strbuf.lu`, at the function.
+#   7. s145 / #268  TYPE SYSTEM, NEW SURFACE. `return` inside a closure
+#      returns from the closure and types against its own result.
+#      Predicted +1 anchor (`type.closure.return`). std writes no
+#      closure that returns; predicted zero rows.
+#   8. 4c60946 (the v0.2.9 release), 7dcd8df/41b007f/8ac139b/d9554bd
+#      (CHANGELOG), 1b6b2ea/3103577 (catalog regen), ccb80b8/4c02127
+#      (the README mark by absolute URL), 2cab269 (a note in upstream's
+#      own ci.yml)  DOCUMENTARY / PACKAGING. Predicted zero.
+#
+# PREDICTED anchors 5c729e8 -> 4c60946: 436 -> ~445, +9, dropped 0,
+# owners moved 0; every added key inside a namespace the clause already
+# registers, so REGISTERED_NS unmoved and `[conf.anchor.ns]`
+# byte-identical across the span.
+#
+# MEASURED, both key sets diffed both ways (F-0100 / wolf-lang#177):
+# 436 -> **448**, +12, dropped {}, owners moved {}. Added:
+#   {mem.list.pop, mem.str.parse, mem.str.to_int,
+#    type.closure, type.closure.return,
+#    type.interp, type.interp.agg, type.interp.none, type.interp.reason,
+#    type.interp.row, type.interp.union, type.interp.value}
+# The clause diffed as BYTES: IDENTICAL, so the sync-pin snapshot of
+# `[conf.anchor.ns]` does not move and this bump re-vendors PIN and
+# anchors.json only.
+#
+# **THE PREDICTION MISSED BY THREE, IN TWO DIFFERENT WAYS, AND BOTH ARE
+# WORTH THE RECORD.**
+#  * `type.closure` and `type.interp` are PARENT anchors that arrived
+#    with their first children. The prediction counted the leaves and
+#    forgot that a new §-heading registers its own key: `[type.interp]`
+#    did not exist at 5c729e8 because no clause had needed to name the
+#    family, and `[type.closure]` opens §6 in spec/10 in the same commit
+#    that rules `return` inside one. The counting rule to carry forward:
+#    **a new leaf under a namespace whose PARENT is also new costs two
+#    anchors, not one** — this bump paid it twice and sc40's did not pay
+#    it at all (`os.fs` was the parent of `os.fs.fstat` and the
+#    prediction happened to list both).
+#  * `mem.list.pop` was predicted as ALREADY REGISTERED, on the reading
+#    that #274 "rules" an existing clause. It did not exist. The recovery
+#    reads (`pop`, `get`, `first`, `last`) had never had a clause of
+#    their own — `[mem.list]` covered the faulting ones — so #274 is a
+#    first registration wearing an amendment's commit message. Same
+#    lesson as sc38's, at a smaller scale: read the REGISTRY, not the
+#    commit message (F-0100), and the two keys the prediction got right
+#    for the wrong reason (`type.str.concat.mix`, `conc.proc.exit`,
+#    which really were already there) do not make up for it.
+# The namespace claim held: twelve keys, four namespaces, all four
+# already registered, and the clause is byte-identical.
+#
+# Corpus at the two pins: 514 -> 521 `.lu` files, +7.
 # sc40 BUMP: 398e5f5 (v0.2.6) -> 5c729e8 (v0.2.8), 55 commits under two
 # release tags and three merges (s139, s140, fa01) plus s141 and s142
 # direct. The data pin was ALREADY at ed8f526 (sc39 took the s139 merge
@@ -1742,4 +1917,5 @@ version = "0.2.8"
 # pin = "4230b008e39d6541f31ac9858057e4345a337271"  (superseded, sc35 first bump — the s136-merge dev-stamped acquisition, the byte PRODUCERS)
 # pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"  (superseded, sc37 era — the v0.2.5 tag acquisition, s137's five builtins)
 # pin = "398e5f547a65308c6a3e88fee632563e87afd217"  (superseded, sc38/sc39 era — r09's v0.2.6-tag pin)
-pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"
+# pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"  (superseded, sc40/sc41 era — r10's v0.2.8-tag pin, the one sprint all four pins named one sha)
+pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"
