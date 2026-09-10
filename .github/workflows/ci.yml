@@ -146,12 +146,40 @@ jobs:
         run: cargo xtask doctor
       - name: ledger-check
         run: cargo xtask ledger-check
-      - name: std-test (the differential; every lane lit as of sc42)
-        # ADVISORY ON THIS LANDING ONLY. This is the differential — 397
-        # tests against the ledger's three columns — and no runner has
-        # ever executed one of its programs. Required after two greens.
+      # F-0115 / wolf-std#19 — the differential is NOT RUN on ubuntu, and
+      # the step below says so instead of the workflow saying nothing.
+      #
+      # Run 1 of the relit lane put `std-test` on three hosts. macOS and
+      # windows went green (397 tests, 0 divergent, 0 unstable, 0 slow).
+      # ubuntu died at test 303 of 397 in BOTH runs of the commit, at the
+      # same test, with `The runner has received a shutdown signal` and
+      # exit 143 — one native compile of `cavp_sha384_long.lu`, 1.69 MB
+      # of generated source and a native-lane-only row.
+      #
+      # `continue-on-error` is not available as a disposition here: a
+      # runner shutdown kills the JOB, so run 1's ubuntu job reported
+      # every step `success` and the job `failure`, and the advisory
+      # marker never got the chance to swallow anything. Leaving it would
+      # leave one host permanently red, which this repository has spent
+      # two sprints arguing is worse than a dark lane that says so.
+      - name: std-test (the differential; three lanes lit as of sc42)
+        if: runner.os != 'Linux'
+        # ADVISORY ON THIS LANDING ONLY, on the two hosts that run it.
+        # This is the differential — 397 tests against the ledger's three
+        # columns — and no runner had ever executed one of its programs
+        # before this sprint. Required after two greens.
         continue-on-error: true
         run: cargo xtask std-test
+      - name: std-test — NOT RUN on this host (wolf-std#19)
+        if: runner.os == 'Linux'
+        run: |
+          echo "SKIP: std-test is not run on ubuntu-latest — the native lane's"
+          echo "      compile of tests/x/crypto/sha2/cavp_sha384_long.lu (1.69 MB,"
+          echo "      native-only) terminates the runner with exit 143, measured"
+          echo "      twice at the same test (F-0115, wolf-std#19). The 397-row"
+          echo "      differential still runs on macos-latest and windows-latest"
+          echo "      and on the author's box; what is dark here is one host, and"
+          echo "      it is dark out loud."
 
   # sc41 / F-0113 / wolf-std#13 — the lane nothing lit, now lit and REQUIRED.
   #
