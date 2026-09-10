@@ -1,3 +1,13 @@
-# vendored vector corpora are byte-verbatim (hashes in vendor/vectors/README.md);
-# git must never normalize their line endings
+# Line endings are LF, in the index and in every working tree (wolf-std#15).
+# This repository was the only one in the org without the line, and it is
+# the one whose gauntlet compares generated `.lu` bytes: `gen-vectors
+# --check` canonicalizes the emitter's output through `wolf fmt` (D34) and
+# then compares it against the committed file, so a windows checkout with
+# `core.autocrlf=true` would hand CRLF files to an LF comparison.
+* text=auto eol=lf
+
+# ...except the vendored vector corpora, which are byte-verbatim (hashes
+# in vendor/vectors/README.md); git must never normalize their line
+# endings, and the CAVP `.rsp` files really are CRLF upstream. Last
+# matching line wins, so this must stay BELOW the rule above.
 vendor/vectors/** -text
