@@ -1,5 +1,109 @@
 # Changelog
 
+## sc42 — 2026-09-10 — the std takes the release, and the runners stop staging
+
+`wolf 0.2.8` -> `0.2.9` (`4c60946`), `lupin 0.1.28` -> `0.1.30`
+(`08d787a`, conformance pin `2c03ed9`). The zero pairing gap sc40
+recorded as a first lasted one sprint: lupin 0.1.30's pin is an ANCESTOR
+of the compiler's by fourteen commits, so the compiler leads the mirror
+and `[lupin]`'s key is the only one of the four that does not name
+`4c60946`. The fourteen are s145 — a `char` joining a `str`, and
+`return` inside a closure — plus the catalog regeneration, the
+`v0.2.8..v0.2.9` CHANGELOG and the release commit.
+
+Eight deltas across the fifty-two-commit span were classified in
+`tools.toml` before anything was measured, with the one to watch named
+(s143's `[type.interp.*]`, every hole's rendering ruled byte for byte,
+because this repository interpolates constantly) and the one predicted
+to change no std source byte argued rather than asserted (s144's leading
+`else`: the formatter still lays the canonical chain, D34 makes every
+committed `.lu` a fixed point of it, and nothing here expects the
+retired E0005). Registry `5c729e8` -> `4c60946` predicted 436 -> ~445,
++9; measured **436 -> 448, +12**, dropped 0, owners moved 0, key sets
+diffed both ways, `[conf.anchor.ns]` byte-identical.
+
+**The prediction missed by three, in two ways worth keeping.**
+`type.closure` and `type.interp` are PARENT anchors that arrived with
+their first children — a new leaf under a new parent costs two anchors,
+not one — and `mem.list.pop` was read as an existing clause being ruled
+when it is a first registration wearing an amendment's commit message.
+Read the registry, not the commit message (F-0100), one more time.
+
+**One ledger row moved in fifty-two commits, and the file it belongs to
+had written the condition for it sprints ago.**
+`tests/str/byte_view_first_last.lu` went lupin `unsupported` -> `run`.
+wolf-lang#274 rules `[mem.list.pop]` so the recoverable `List` reads
+(`pop`, `get`, `first`, `last`) answer the `none` row and never fault;
+wolf-interp#77 is that clause in the mirror, in lupin 0.1.30. The header
+said: "when lupin grows the two methods this row goes to `run` on every
+lane and the finding closes completely." It was measured RED before
+`tests/ledger.toml` was touched. **F-0071 is closed on both machines.**
+
+**`str + char` would simplify a std helper, and it is not taken.**
+`std.strbuf`'s `push(mut b: StrBuf, c: char)` has a body of
+`b.s = "{b.s}{c}"` — a string built through an interpolation hole for
+exactly one reason, that `+` refused a `char` — sitting one function
+below `push_str`, whose body is the `b.s += s` it would become. The
+module's doc improves twice over. wolf-interp#78 is unmirrored at lupin
+0.1.30, and a refusal in a std SOURCE file is not one `unsupported`
+ledger row: it takes the whole of `std.strbuf` dark on that lane for a
+reason that is a release date. F-0110's lesson, applied one sprint
+before it could bill.
+
+### The observation lanes, relit (wolf-std#16)
+
+sc41 lit `gates` and had to write a caveat beside its green: every
+observation lane on every runner was DARK, so the lane gated the static
+half and not doc truth. Both upstreams publish release archives keyed to
+the pins now, so both jobs acquire the two binaries by digest — versions
+read out of `vendor/tools.toml` so the next bump costs zero edits, digest
+read off the asset GitHub reports and checked against the bytes that
+arrived, a missing asset red by name — and **"CI green" in this repository
+finally means what the local gauntlet means, including doc truth.**
+
+421 doc-example blocks on three lanes, on three hosts: 1,263 wolf
+programs per host on ubuntu and macOS, every one `exit(0)`. The 397-row
+differential runs on every host. The ULP step's central claim — that the
+drift is the HOST's libm against the committed reference and never one
+implementation against another — is made somewhere other than the
+author's box for the first time.
+
+The budget was written before the run and committed with it, constant
+term first. Both windows predictions fired and both are in
+`docs/findings.md` with their dispositions; the numbers, and the one the
+budget got badly wrong (the differential is 5.5x the doc examples, so
+`rig` is the expensive job now and `gates` is the cheap one), are there
+too.
+
+**F-0115: the differential kills the ubuntu runner, and it did it twice
+at the same test.** `std-test` went GREEN on `macos-latest` (29 min,
+three lanes) and `windows-latest` (44 min, two lanes) — 397 tests, zero
+divergent rows, zero unstable rows, zero slow skips, the differential's
+first green anywhere but the author's box. On `ubuntu-latest` the runner
+received a shutdown signal at test 303 of 397, in BOTH runs of the
+commit, at the identical test and at different elapsed times: one native
+compile of `cavp_sha384_long.lu`, 1.69 MB of generated source and a
+native-lane-only row. `continue-on-error` is no help — a runner shutdown
+kills the job, so the advisory marker never gets to swallow anything and
+the host would simply be red forever. So the differential is **not run
+on ubuntu**, out loud, in a step whose whole content is the skip and
+wolf-std#19, until the mechanism is known.
+
+### Line endings (wolf-std#15)
+
+`.gitattributes` gains `* text=auto eol=lf`, which every other
+repository in this org has had and this one — the one whose gauntlet
+compares generated `.lu` bytes — did not. **The normalization commit
+changes no file content**: `git add --renormalize .` staged nothing but
+`.gitattributes` itself, because this tree has only ever been authored
+on LF hosts. What it changes is the windows CHECKOUT, and that is the
+whole point: the first lit CI run had `gen-vectors --check` report all
+65 generated files drifting on `windows-latest`, which is the signature
+of a line ending and not of a content change. The vendored corpora keep
+their `-text` exemption, below the new rule so the more specific line
+wins; the CAVP `.rsp` files really are CRLF upstream and their hashes
+are recorded.
+
 ## sc40 — 2026-09-09 — the surface the runtime grew, and the clause stops being a hand-copy
 
 The pairing gap is zero, and this is the first time it has been.
