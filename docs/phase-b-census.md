@@ -1329,3 +1329,49 @@ what each is for is in `CHANGELOG.md`'s sc40 entry and in the
 per-function docs. The +3 doc examples are one per function: `fs.Stat`
 carries none, because a struct literal in a fenced block proves nothing
 a field access does not.
+
+## sc42 — a bump that added no surface, and the one row it moved anyway
+
+The counting rules are sc40's, unchanged and reproducible from the tree
+at `sc42`; they are not restated here because restating them is how two
+copies drift.
+
+**Predicted before measuring.** `5c729e8..4c60946` is fifty-two commits
+of grammar, type system and spec, and not one of them adds a builtin
+this repository wraps: s143's `to_int` is still unwrapped (sc40 said so
+and it stayed true), s144 admits a `} else` spelling the formatter does
+not prefer, s145 admits a `char` on either side of `+`. So every count
+below was predicted at **+0**, including the last row, and the last row
+was the one that was wrong.
+
+| measure | sc40 | sc42 |
+|---|---|---|
+| modules under `std/` (directories, `std/x/` as one) | 33 | **33** (+0) |
+| `pub fn` in `std/`, nursery included | 596 | **596** (+0) |
+| public types | — | **+0** |
+| entry tests | 397 | **397** (+0) |
+| ledger rows | 397 | **397** (+0) |
+| fenced doc examples, extracted and RUN | 421 | **421** (+0) |
+| existing ledger rows moved by the pin bump | — | **1** |
+
+**The mover, and why the prediction that missed it was written down
+first.** `tests/str/byte_view_first_last.lu` went lupin `unsupported` ->
+`run`. The `tools.toml` bump note had named delta 5 (wolf-lang#274,
+`[mem.list.pop]`) "the only real ledger candidate in the span" and then
+guessed its address — `std.list`'s pop-on-empty witnesses, which stake no
+trap and did not move. The clause was right and the module was wrong: the
+recoverable reads it rules are `pop`, `get`, `first` and `last`, lupin
+had never had the last two on a `List` at all, and a byte view is a
+`List`. The row is F-0071's surviving half, and the FILE had written its
+own closing condition sprints ago — "when lupin grows the two methods
+this row goes to `run` on every lane and the finding closes completely."
+It was measured RED before `tests/ledger.toml` was touched, and flipped
+in its own commit.
+
+**The census row that is not in the table.** This sprint's other measure
+is not a count of this tree at all: it is how much of `cargo xtask ci` a
+green GitHub run now covers. At sc41 that answer was "eleven steps of
+eleven, all of them static, none of them doc truth". At sc42 it is
+"eleven of eleven, on three hosts, against the pinned binaries" — the
+same sentence with the word that mattered added. What that cost in wall
+time, and what the first lit run taught, is in `docs/findings.md`.
