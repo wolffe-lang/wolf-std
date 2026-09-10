@@ -2130,8 +2130,25 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# sc42 — F-0071's SURVIVING HALF CLOSES, and the file's own header
+# called the day: "when lupin grows the two methods this row goes to
+# `run` on every lane and the finding closes completely." lupin 0.1.30
+# grew them. wolf-lang#274 rules `[mem.list.pop]` — the recoverable
+# `List` reads (`pop`, `get`, `first`, `last`) answer the `none` row and
+# never fault — and wolf-interp#77 is that clause in the mirror, so
+# `first`/`last` exist on the reference machine for the first time, on an
+# owned list and on a byte view alike.
+#
+# **THE RED CAME FIRST** (sc37's rule, kept): the pin bump was measured
+# before this file was touched, and `xtask std-test` said
+# `ledger says `unsupported`, observed `run` (deeper than the ledger
+# claims)` on exactly this row and on no other — one mover in a
+# fifty-two-commit span. The sc42 bump note in `vendor/tools.toml`
+# predicted "the only real ledger candidate in the span" at delta 5 and
+# named the wrong module for it (`std.list`'s pop-on-empty witnesses,
+# which stake no trap); the clause was right, the address was not.
 [tests."str/byte_view_first_last.lu"]
-lupin = "unsupported"
+lupin = "run"
 wolfc = "run"
 native = "run"
 
