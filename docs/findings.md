@@ -123,6 +123,8 @@ the building.
 | F-0113 | 2026-09-09 | **Four of `cargo xtask ci`'s eleven steps run in no GitHub workflow, and one of them is the step that caught F-0112.** `ci()` runs fmt, clippy, `cargo test`, sync-pin, doctor, ledger-check, **lint-conventions**, **gen-vectors --check**, std-test, **doc-examples** and **ulp**. `.github/workflows/ci.yml` runs the first six plus std-test and stops; `nightly.yml` runs doctor and std-test against the latest binaries. So the bolded four are LOCAL-ONLY gates: a branch can be green on three platforms in CI and red on `cargo xtask ci` on the author's box, which is exactly what happened at sc40 — GitHub was green on ubuntu, macOS and windows for the commit whose doc example was broken, because **no runner has ever executed a `wolf-doc-example`**. That inverts the usual assumption: the local gauntlet is the STRICTER gate here, not the convenience check, and "CI is green" is not a statement about the doc-truth gate, the conventions linter, the generated-vector check or the ULP budget. Cheapest fix is four lines in `ci.yml`, and it is not free: `doc-examples` runs every fenced block on every available lane (421 blocks at sc40) and would lengthen the job substantially, and its net examples have never been run on the windows runner at all, so the first CI run carrying it should be expected to teach something rather than to pass | wolf-std (this repo) | Found at sc40 while explaining why F-0112 escaped GitHub. NOT fixed there: adding a step that has never executed on two of three tier-1 runners, on a branch that cannot verify them, is the "prose over a lane nothing lit" mistake F-0111 records, one file over. Filed with the measurement and the expected cost so the decision is the merger's. **FIXED at sc41** (wolf-std#13): `27c508b` adds the `gates` job, one per host, advisory on its first landing; the first run was red on all three hosts for a reason that was the rig's own (**F-0114**, fixed in `4d6f130`); `c8a2541` drops `continue-on-error` after two green runs on three hosts, and no step is left advisory. `8a84040`/`d2322cd` make the drift itself visible: `ci()` iterates one list, prints at the end which of its steps `ci.yml` also runs, and a test in the already-required `rig` job fails on drift in either direction. "CI green" now means what the local gauntlet means, with the caveat recorded beside the measurements: every observation lane on every runner is still DARK, so the lane gates the static half and not doc truth until release artifacts exist at the pins |
 | F-0114 | 2026-09-09 | **`gen-vectors --check` was the one binary-dependent step in this rig that treated a dark lane as an ERROR instead of a loud SKIP, and that is why it had never run on a runner.** The first sc41 CI run put F-0113's four steps on ubuntu, macOS and windows; `gen-vectors --check` failed on all three in under a second, with the same message and for a reason that has nothing to do with any platform: `gen-vectors needs the pinned wolf (it runs wolf fmt on its output)`. `wolf fmt` is law for every committed `.lu` (D34), so the emitter's output is canonicalized before it is written OR compared — and with no release artifact at the pins, `ci.yml`'s acquire step SKIPs and no runner has a `wolf`. `bins.rs`'s own header states the doctrine the step broke: "Absence is legal and LOUD." `std-test`, `doc-examples` and `ulp` all honour it; this one alone did not, and because it did not, the step could not be added to CI at all — the prerequisite for F-0113's fix was a fix to a step F-0113 does not mention. Note what the shape of the red says: the first run of a lane nothing lit taught something about the RIG on the host the rig was written on, before it taught anything about windows | wolf-std (this repo) | **Fixed at sc41**, `4d6f130`: `--check` with no `wolf` on any rung prints a loud SKIP and drops from a byte comparison to an inventory-and-derivability check — the 7.3 MB vendored corpus is still parsed, all 65 emitters still run, and every generated file must still be present and non-empty; only the byte comparison goes dark, and it says so. WRITING still hard-errors without the formatter, because an unformatted generated file must never reach a commit. The lane relights for free the day release artifacts exist at the pins |
 | F-0115 | 2026-09-10 | **`cargo xtask std-test`'s native lane terminates the `ubuntu-latest` runner, and it did it twice at the same test.** The first CI run that had binaries to run (sc42, `354cdf0`) put the 397-row differential on three hosts. `macos-latest` was GREEN in 29 min (three lanes lit, 0 divergent, 0 unstable, 0 slow) and `windows-latest` — **corrected below, and the correction is the finding's twin**: that job's `std-test` printed its 397-row summary and then seven mismatches and `xtask: RED`, and this entry first recorded it as GREEN because the summary line was read as the verdict. The `continue-on-error` marker had made the JOB green, exactly the trap this sprint had already written a paragraph warning about two sections earlier. windows is RED and filed as wolf-std#20; macOS is the differential's first green anywhere but the author's box. `ubuntu-latest` died at test 303 of 397 in BOTH runs of the commit, printing `cavp_sha256_short_p2.lu` and then `The runner has received a shutdown signal` with exit 143. The next test in order is `tests/x/crypto/sha2/cavp_sha384_long.lu`: 1.69 MB of generated wolf source and a native-lane-ONLY row, so what runs when the runner dies is one native compile-and-link of the largest generated file in the tree. **It is the workload, not the clock** — the two deaths came at 28 m 59 s and 23 m 11 s and at the identical position — and the obvious hypothesis is the one the evidence argues against: `macos-latest` has LESS memory than the ubuntu image and spends about 60 s on that same test. A hosted runner reports an OOM-killed agent and a reclaimed host with the same sentence and the same exit code, so the mechanism is not determinable from a workflow log | wolf-std (this repo) + GitHub's ubuntu image | [filed: wolf-std#19](https://github.com/wolffe-lang/wolf-std/issues/19). **`continue-on-error` cannot be the disposition**: a runner shutdown kills the JOB, so run 1's `rig (ubuntu-latest)` reports every step `success` and the job `failure`, and an advisory marker never gets the chance to swallow anything — leaving it would leave one host permanently red. `std-test` is NOT RUN on `ubuntu-latest` as of sc42, out loud, in a step whose entire content is the skip and this issue number; the differential still runs on two hosts and on the author's box |
+| F-0116 | 2026-09-11 | **The checked tier's budget counts STEPS and not BYTES: one `cavp_*_long.lu` row reaches 16-18 GiB of resident set before `unsupported: step budget exhausted` arrives, on hosts with 16 GB.** This is the mechanism behind wolf-std#19 (the `ubuntu-latest` runner killed twice at the same test, exit 143) and behind half of wolf-std#20 (the same rows timing out at 60 s on `windows-latest`) — one bug seen through two ceilings, and neither issue had named it. wolf-std#19 read the kill as "one native compile-and-link of the largest generated file"; measured, the NATIVE lane is the cheapest of the three by two orders of magnitude (0.42 s / 57 MiB) and the CHECKED tier is the expensive one (6.7 s / 16.6 GiB). Reduced to twelve lines with no std: `s.bytes()` on the checked tier materializes a view per call against a shrinking `str` and never reclaims it, so a walk is quadratic in memory — 15.4 MiB at n=512 to 1868 MiB at n=8192, x3.8 per doubling, against 54 MiB flat on the native lane and 12 MiB on lupin. Swap the `.bytes()` for a `.len` and the curve flattens, so it is the materialized view and not the slicing. `std.hex.decode` walks a `str` exactly this way and the CAVP rows hand it a 25,600-character literal. v0.2.10 does not change it (the same row under v0.2.9 peaks at 17.8 GiB). Closes when the tier bounds bytes as well as steps, so the refusal arrives before the allocation | wolf-lang (checked-tier execution) | [filed: wolf-lang#308](https://github.com/wolffe-lang/wolf-lang/issues/308); wolf-std#19 and wolf-std#20 carry the measurement |
+| F-0117 | 2026-09-11 | **D34 is asserted in commit messages and gated nowhere: 32 committed `.lu` files are not fixed points of `wolf fmt`.** sc42 argued that the leading-`else` grammar would move no std source byte, and one of its reasons was that "`wolf fmt` is law for every committed `.lu` here (D34) ... so every file in this tree is already at the fixed point". The conclusion held; the premise does not. `wolf fmt --check std tests` names 32 files — six under `std/`, twenty-six under `tests/` — all of them width cases where a long `assert(...)` was committed on one line. Measured at BOTH pins, and the two file sets compare equal, so this is a standing gap and not this bump's motion. Nothing caught it because nothing looks: `workflow::CI_STEPS` has eleven entries and none of them is `wolf fmt --check`, and `cargo fmt --all --check` gates the Rust only. F-0113 one layer up, wolf-std#18 one layer down. Not taken at sc43 (F-0111's reason: a 32-file relay wants its own commit, its own gauntlet and its own reading) | wolf-std (the rig's own gauntlet) | [filed: wolf-std#21](https://github.com/wolffe-lang/wolf-std/issues/21) |
 
 
 ## F-0001 — the std search path
@@ -8652,3 +8654,276 @@ wolf-std#20, and **not run on `ubuntu-latest`** behind wolf-std#19. As
 sc41 recorded, "required" here means no `continue-on-error` and nothing
 more: trunk carries no branch protection, so no job in this repository
 is a required check in GitHub's sense and `rig` never was either.
+
+## The sc43 bump — predicted in writing, and the whole miss is one clause
+
+`4c60946..662b14c` is fifty-one commits, zero merges, three sprints
+landed direct on trunk. Eight deltas were classified in
+`vendor/tools.toml` before anything was measured; the classification and
+the prediction-versus-measurement record live there and are not repeated
+here. What belongs in this file is the two counting lessons.
+
+**The anchors.** Predicted 448 -> ~455, +7; measured **448 -> 458, +10**,
+dropped 0, owners moved 0, key sets diffed both ways. sc42's counting
+rule — a new leaf under a NEW parent costs two anchors, not one — was
+carried forward, applied to s148's `[type.fn.ret]` and
+`[type.row.operand]`, and was exactly right: four predicted, four
+measured, with `type.fn` and `type.row` read out of the OLD registry as
+absent rather than inferred from a commit message. `mem.str.imm` and
+`gram.pat.range` were right for their stated reasons.
+
+The entire miss is s146. `[type.unit]` was counted at ONE key and
+registers **four** — `type.unit`, `type.unit.consume`,
+`type.unit.context`, `type.unit.discard`. Three of those four are
+sub-anchors that the spec commit's subject line does not mention. So the
+rule to carry forward is one indirection past sc42's: **a spec commit's
+SUBJECT names the clause, not the anchors.** A section registers what it
+needs in order to say what it says, and the only honest way to count
+that in advance is to read the section.
+
+**And the same class of sentence, wrong in the other direction, in the
+same span.** s147's spec commit (`9a39305`) states in its own subject
+"anchors 453 -> 454 (+gram.pat.range, nothing dropped)". Measured at the
+commits it sits between, `spec/anchors.json` holds **452 before and 453
+after**. The `+1` is right; both absolute numbers are off by one. A
+prediction anchored on that sentence would have been wrong by one in a
+place no key-set diff can show, because the diff is of KEYS and this is
+a COUNT. Filed upstream. F-0100's rule — read the registry, not the
+commit message — now has an instance in each direction.
+
+**W0601, predicted at zero and measured at zero.** s146 makes a `!()`
+tail in a unit context a warned discard. The prediction was written from
+a scan, not from optimism: all 29 of std's `-> () ! {...}` functions end
+their body in `?`; the sixteen statement-position calls in `tests/` are
+`io.write`, `io.write_line`, `map.set`, `list.set` and `strbuf.remove`,
+every one infallible; and neither corpus writes a closure literal at
+all. The gauntlet agrees — 397 rows, 421 doc examples, zero warnings.
+Worth keeping beside that zero: the rig's warning gate reads the ENTRY
+file only (`xtask/src/record.rs`), so a W0601 inside a std MODULE would
+not have been seen by `std-test` even if one existed. The scan was not
+redundant with the run; it covered ground the run does not.
+
+**Zero ledger motion, and this time that was the prediction.** 397 rows,
+three lanes, 0 divergent, 0 unstable, 0 slow skips, no row flipped. The
+two clauses that could have moved something (`[type.fn.ret]`,
+`[type.row.operand]`) had already landed in the mirror one release
+early: lupin 0.1.31's own #73 and #81 are what wolf-lang#284 cites as
+its witnesses, so both machines tightened in that order and neither
+could diverge from the other by doing it.
+
+## F-0116 — the checked tier's budget counts STEPS and not BYTES, and that is wolf-std#19 and half of wolf-std#20
+
+wolf-std#19 recorded that `std-test` kills the `ubuntu-latest` runner at
+`tests/x/crypto/sha2/cavp_sha384_long.lu`, twice, at the same test, with
+exit 143. Its reading of the mechanism was: the row is `native = "run"`
+and `unsupported` on the other two columns, so "what is running when the
+runner dies is one native compile-and-link of the largest generated file
+in the tree." **That reading is wrong, and the measurement is the
+opposite of it.**
+
+A ledger word is what the rig EXPECTS, never permission to skip a lane.
+`wolfc = "unsupported"` means the checked tier is run and observed to
+decline — and what it costs to reach that decline is the finding.
+Measured on the author's box (macOS aarch64, wolf 0.2.10, one row, one
+lane at a time):
+
+| lane | verdict | wall | peak RSS |
+|---|---|---|---|
+| `wolf conform-run --checked` | `unsupported` (`step budget exhausted`, phase `mem`) | 6.7 s | **16.6 GiB** |
+| `wolf conform-run --native` | `exit(0)` | 0.42 s | 57 MiB |
+| `lupin conform-run` | `unsupported` | 16.7 s | 606 MiB |
+
+The native lane — the one the issue named — is the cheapest of the
+three by two orders of magnitude. The checked tier reaches **16.6 GiB**
+of resident set on one 1.69 MB generated file and only then answers
+`unsupported`, and its own reason says why: the budget it blows is a
+**step** budget. Nothing bounds the allocation. The sibling rows measure
+the same way: `cavp_sha256_long.lu` (432 KB) peaks at 15.7 GiB and
+`cavp_sha512_long.lu` at 17.8 GiB. A GitHub-hosted runner has 16 GB.
+
+That is the whole of wolf-std#19. It also explains the log: the tests
+run in name order, so `cavp_sha256_long.lu` at 15.7 GiB ran EARLIER and
+survived, and `cavp_sha384_long.lu` did not — which is what a marginal
+OOM looks like and what a compile of "the largest file" does not,
+because the largest file is `cavp_sha512_long.lu` and it is never
+reached.
+
+**The reduction, and it is the compiler's.** The quadratic term is
+`s.bytes()` on the checked tier, materialized per call against a
+shrinking `str` and never reclaimed. Twelve lines, no std:
+
+```wolf
+fn main() -> int {
+    var rest = "aaaa…"            // n characters
+    var n = 0
+    while rest.len > 0 {
+        let c = rest.bytes()[0] as int
+        if c < 0 { return 1 }
+        rest = rest[1..]
+        n = n + 1
+    }
+    …
+}
+```
+
+| n | checked | native | lupin |
+|---|---|---|---|
+| 512 | 15.4 MiB | | |
+| 1024 | 40.6 MiB | | |
+| 2048 | 132.9 MiB | | |
+| 4096 | 486.7 MiB | | |
+| 8192 | **1868.4 MiB** | 54.3 MiB | 12.2 MiB |
+
+x3.8 per doubling of the input on the checked tier; flat on the other
+two. Replace the `.bytes()` call with a `.len` read and the checked
+tier goes flat as well (7.5 MiB at n=4096), so it is the materialized
+view that is retained and not the slicing. `std.hex.decode` walks a
+`str` exactly this way — `digit_of(rest)` then `rest = rest[1..]` — and
+the CAVP long rows hand it a 25,600-character literal. Extrapolating the
+table to that length predicts ~18 GiB, which is what the row measures.
+
+**v0.2.10 does not change it**, which was the prediction: the same row
+under the v0.2.9 binary peaks at 17.8 GiB and answers the same way. The
+span is three front-end sprints and none of them touches the tier's
+allocation.
+
+**Half of wolf-std#20 is this finding wearing a different ceiling.**
+`cavp_sha384_long.lu [wolfc]` and `cavp_sha512_long.lu [wolfc]` time out
+at 60 s on `windows-latest`. They are the same rows reaching for the
+same 16-18 GiB on a host with 16 GB: the process does not finish in 60 s
+because it is swapping toward an allocation it will not be allowed to
+make. So wolf-std#20's open question — bigger ceiling, or a `slow` word
+— resolves to **neither**, and both halves of that resolution are
+measurements rather than opinions:
+
+* `slow` is not available. It is a lupin-only expectation by the
+  ledger's own grammar; `xtask/src/ledger.rs` reds on `wolfc = "slow"`
+  by name, and these are the `wolfc` column.
+* A bigger ceiling is the wrong direction. The 60 s timeout is the only
+  thing standing between the windows job and wolf-std#19's exit 143.
+  Raising it would buy the row's honest `unsupported` at the price of
+  the runner.
+
+**What closes it.** The checked tier bounding BYTES as well as steps, so
+that the refusal arrives before the allocation instead of after it — an
+`unsupported: memory budget exhausted` where there is now an OOM. Filed
+to wolf-lang with the reduction above. On this side, the honest posture
+is the one already written into `.github/workflows/ci.yml`: the ceiling
+stays, `std-test` stays off `ubuntu-latest`, and the comment at the step
+says which bug it is waiting on.
+
+## F-0117 — D34 is law in the commit messages and gated nowhere: 32 committed `.lu` files are not fixed points of `wolf fmt`
+
+sc42's `tools.toml` entry argued that s144's leading-`else` grammar
+would change no std source byte, and one of its two reasons was: "`wolf
+fmt` is law for every committed `.lu` here (D34) and the formatter still
+lays the canonical chain — so every file in this tree is already at the
+fixed point and fmt-lu is idempotent on it."
+
+The conclusion held. The premise does not. Measured at sc43 over the
+whole tree:
+
+```
+wolf fmt --check std tests   ->  32 files are not canonically formatted
+```
+
+Six under `std/` (`list`, `math/float`, `os`, `process`,
+`x/crypto/chacha20`, `x/tls/handshake`) and twenty-six under `tests/`.
+What they have in common is width: long `assert(...)` calls and long
+literal arguments that the formatter would break across lines and that
+were committed on one line.
+
+**It is not this bump's motion, and that was measured rather than
+assumed.** The v0.2.9 binary reports the identical 32-file set — the
+lists compare equal, line for line — so this is a standing gap and not
+something s147's formatter work introduced.
+
+**The reason nothing caught it is that nothing looks.**
+`workflow::CI_STEPS` has eleven entries and no `wolf fmt --check` among
+them; `cargo fmt --all --check` gates the RUST and there is no clause
+anywhere in the gauntlet that gates the wolf. So D34 has been asserted
+in commit messages for a dozen sprints and enforced by nobody, which is
+exactly the shape F-0113 records one layer up (four steps in no
+workflow) and the shape wolf-std#18 records one layer down (a SKIP that
+could not tell absent from present).
+
+**Not taken at sc43, and the reason is F-0111's.** Relaying 32 files is
+a mechanical diff across two directories, every one of which is a test
+entry or a std module whose staging the gauntlet must re-verify; it
+wants its own commit, its own gauntlet and its own reading, and adding
+it to a sprint whose job was a pin bump and a windows lane is the
+mistake that finding is about. Filed as wolf-std#21 with the file list
+and the two-pin measurement, to be taken as one commit plus the
+`fmt-lu` step that stops it recurring.
+
+## The sc43 windows native lane — the budget and the four predictions, written before the first lit run
+
+wolf-std#18 is one line of behaviour and a lane's worth of consequence.
+`bins::native_rt()` resolves the runtime by platform name now, so
+`windows-latest` runs three lanes in `rig` where it ran two and three in
+`gates` where it ran two. Nothing changes on ubuntu or macOS. The
+numbers sc42 measured were measured with that lane dark, so none of them
+carries over, and this section is the budget written before the run
+rather than the story told after it.
+
+**The linker question sc42 left untested, answered from the source
+before the run.** The issue's own reason for not taking the one-line fix
+was that lighting the lane asks the next question immediately: the
+native rung compiles and LINKS, and MSVC's `link.exe` is not on `PATH`
+in a runner's shell without a developer-environment shim. Read at the
+pin, `wolf_driver`'s `windows_linker()` does not need one. It runs the
+`cc` crate's own MSVC discovery (`find-msvc-tools`, vswhere plus the
+registry) to obtain `LIB`, refuses BY NAME if the import libraries are
+absent, and then takes the first of: `WOLF_LINKER`, `lld-link` on
+`PATH`, the `lld-link` Visual Studio bundles, rustup's `rust-lld`
+(`-flavor link`), MSVC `link.exe`. The `windows-latest` image carries
+Visual Studio with the Desktop C++ workload and a rustup toolchain, so
+rungs 2-4 each have an answer and the import libraries are present.
+**PREDICTED: the lane links.** If it does not, the failure will name
+which rung it got to, which is the other half of why this is readable
+rather than a guess.
+
+**Four predictions, so that reading the run is a check and not a
+story.**
+
+1. `wolf_rt.lib` resolves and the two SKIP lines in each windows job are
+   gone — `doctor` says "native rung — wolf_rt.lib at … (lane lit)".
+2. `gates (windows-latest)` goes from 2:46 to something in the tens of
+   minutes: 421 doc examples gain a lane that links a binary each.
+   Budget 60 minutes; ubuntu and macOS unchanged at ~3 minutes.
+3. `rig (windows-latest)` goes from 46:46 to something over an hour on
+   the same arithmetic, 397 rows gaining a linking lane. Budget 120
+   minutes.
+4. The windows differential's reds do not shrink. wolf-std#20's two
+   deterministic divergences are OS semantics on the checked tier and
+   nothing here touches them; its two timeouts are F-0116 and the new
+   lane cannot help. What the lane may ADD is native-column rows on a
+   host that has never run one, and those are the findings this lane is
+   for.
+
+**What is NOT predicted, and why the job is advisory.** The three
+`cavp_*_long.lu` rows are `native = "run"`, so windows compiles and
+links 1.7 MB of generated source for the first time. F-0116 says the
+native lane is the cheap one there — 0.42 s and 57 MiB against the
+checked tier's 6.7 s and 16.6 GiB — so this is predicted to cost wall
+time and not memory. It is still the first time that host has been asked,
+which is exactly the case sc41 and sc42 both wrote the advisory rule for.
+`doc-examples` and `ulp` in `gates` are `continue-on-error` on windows
+for this landing and on no other host; `rig`'s `std-test` was already.
+Read line by line, because a `continue-on-error` step that exits 1 still
+reports `conclusion: success` — the lesson sc42 paid for and recorded
+beside its own wrong entry.
+
+**What is required at the end of sc43.** Unchanged from sc42 except
+where this commit changes it, and stated so the next sprint does not
+have to infer it: `gates` — lint-conventions, gen-vectors --check,
+doc-examples, ulp — required on ubuntu and macOS, and on windows
+**required for lint-conventions and gen-vectors --check, advisory for
+doc-examples and ulp** until the newly lit lane is green twice there.
+`rig`'s acquire, doctor and ledger-check: required on all three. `rig`'s
+`std-test`: required on `macos-latest`, advisory on `windows-latest`
+behind wolf-std#20, not run on `ubuntu-latest` behind wolf-std#19 —
+which is now behind F-0116 and wolf-lang#308, and comes back the day the
+checked tier bounds its allocation. "Required" here still means no
+`continue-on-error` and nothing more: trunk carries no branch
+protection.
