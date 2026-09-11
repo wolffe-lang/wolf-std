@@ -35,7 +35,9 @@ fn bytes_of(h: str) -> List[byte] {
 
 /// A well-formed ServerHello with a caller-chosen random, suite,
 /// group, version, compression — every negotiation lever in one place.
-fn make_sh(random: List[byte], suite: int, group: int, selected: int, compression: int) -> List[byte] {
+fn make_sh(random: List[byte], suite: int, group: int, selected: int, compression: int) -> List[
+    byte,
+] {
     var share = List[byte]()
     var i = 0
     while i < 32 {

@@ -45,6 +45,9 @@ fn main() -> int {
     // (ACME POST-as-GET) has an empty middle segment.
     var empty = List[byte]()
     assert(base64.url_encode(empty) == "", "empty")
-    assert(jose.signing_input("{{\"alg\":\"EdDSA\"}}", empty) == "eyJhbGciOiJFZERTQSJ9.", "si_empty")
+    assert(
+        jose.signing_input("{{\"alg\":\"EdDSA\"}}", empty) == "eyJhbGciOiJFZERTQSJ9.",
+        "si_empty",
+    )
     0
 }

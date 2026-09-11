@@ -32,15 +32,28 @@ fn main() -> int {
     let pk = bs("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
 
     // The newAccount protected header: the account key inlined as a JWK.
-    assert(jose.acme_protected_jwk(pk, "aXk6", "https://acme.test/new-account") == "{{\"alg\":\"EdDSA\",\"jwk\":{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"}},\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-account\"}}", "jwk_header")
+    assert(
+        jose.acme_protected_jwk(pk, "aXk6", "https://acme.test/new-account") ==
+            "{{\"alg\":\"EdDSA\",\"jwk\":{{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"}},\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-account\"}}",
+        "jwk_header",
+    )
 
     // Every request after newAccount: the account URL as `kid`.
-    assert(jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order") == "{{\"alg\":\"EdDSA\",\"kid\":\"https://acme.test/acct/1\",\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-order\"}}", "kid_header")
+    assert(
+        jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order") ==
+            "{{\"alg\":\"EdDSA\",\"kid\":\"https://acme.test/acct/1\",\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-order\"}}",
+        "kid_header",
+    )
 
     // The signed request body for a POST-as-GET (empty payload). Frozen:
     // deterministic for the fixed key and header.
-    let header = jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order")
+    let header = jose.
+        acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order")
     let body = jose.acme_body(sk, header, List[byte]())
-    assert(body == "{{\"protected\":\"eyJhbGciOiJFZERTQSIsImtpZCI6Imh0dHBzOi8vYWNtZS50ZXN0L2FjY3QvMSIsIm5vbmNlIjoiYVhrNiIsInVybCI6Imh0dHBzOi8vYWNtZS50ZXN0L25ldy1vcmRlciJ9\",\"payload\":\"\",\"signature\":\"tgYAMT9F9jrpjliBpCdmd7S7fvVGXiiHMy698J6KBBIODoxsVlK5rSQmeyzruPzsFjaExkrCTkDZEywFiiR8BA\"}}", "body")
+    assert(
+        body ==
+            "{{\"protected\":\"eyJhbGciOiJFZERTQSIsImtpZCI6Imh0dHBzOi8vYWNtZS50ZXN0L2FjY3QvMSIsIm5vbmNlIjoiYVhrNiIsInVybCI6Imh0dHBzOi8vYWNtZS50ZXN0L25ldy1vcmRlciJ9\",\"payload\":\"\",\"signature\":\"tgYAMT9F9jrpjliBpCdmd7S7fvVGXiiHMy698J6KBBIODoxsVlK5rSQmeyzruPzsFjaExkrCTkDZEywFiiR8BA\"}}",
+        "body",
+    )
     0
 }

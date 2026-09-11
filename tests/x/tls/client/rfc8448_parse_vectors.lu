@@ -103,7 +103,13 @@ fn main() -> !int {
         z = z + 1
     }
     let _rsa = client.
-        verify_certificate_verify("1.2.840.113549.1.1.1", List[byte](), scheme, copy sig, dummy_hash) else |e| match e {
+        verify_certificate_verify(
+        "1.2.840.113549.1.1.1",
+        List[byte](),
+        scheme,
+        copy sig,
+        dummy_hash,
+    ) else |e| match e {
         unsupported_alg => {
             rsa_msg = "unsupported_alg"
             0
