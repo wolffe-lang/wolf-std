@@ -155,76 +155,55 @@ jobs:
         run: cargo xtask doctor
       - name: ledger-check
         run: cargo xtask ledger-check
-      # F-0115 / wolf-std#19 — the differential is NOT RUN on ubuntu, and
-      # the step below says so instead of the workflow saying nothing.
+      # sc44 — **std-test RUNS ON ALL THREE HOSTS AGAIN, and the thing
+      # that was killing ubuntu is fixed upstream rather than worked
+      # around here.** wolf-std#19 and the timing half of wolf-std#20
+      # were ONE BUG seen through two ceilings, which is what sc43 said
+      # in writing; wolf-lang#308 is the fix and v0.2.11 carries it.
       #
-      # Run 1 of the relit lane put `std-test` on three hosts. macOS and
-      # windows went green (397 tests, 0 divergent, 0 unstable, 0 slow).
-      # ubuntu died at test 303 of 397 in BOTH runs of the commit, at the
-      # same test, with `The runner has received a shutdown signal` and
-      # exit 143 — one native compile of `cavp_sha384_long.lu`, 1.69 MB
-      # of generated source and a native-lane-only row.
+      # `[exec.checked.budget]` (s153, spec/05 §5) gives the checked tier
+      # a BYTE budget beside its step budget — 256 MiB, charged at every
+      # allocation, never refunded — so the tier answers `unsupported`
+      # instead of growing. The clause's own prose names this
+      # repository's row: "one wolf-std row reached 16.6 GiB of resident
+      # set on a 16 GB runner before `step budget exhausted` arrived — an
+      # OOM where an honest refusal was owed."
       #
-      # `continue-on-error` is not available as a disposition here: a
-      # runner shutdown kills the JOB, so run 1's ubuntu job reported
-      # every step `success` and the job `failure`, and the advisory
-      # marker never got the chance to swallow anything. Leaving it would
-      # leave one host permanently red, which this repository has spent
-      # two sprints arguing is worse than a dark lane that says so.
-      - name: std-test (the differential; three lanes lit as of sc42)
-        if: runner.os != 'Linux'
-        # REQUIRED on macOS, ADVISORY on windows — one line, because the
-        # two hosts have different evidence behind them and an
-        # unqualified marker would pretend otherwise.
-        #
-        # macOS: four consecutive green runs, three lanes lit, 397 tests
-        # with 0 divergent / 0 unstable / 0 slow. Required.
-        #
-        # windows: RED on all three lit runs, and the reds are REAL
-        # (wolf-std#20) — `fs/fstat_rows` and `net/reuse_port` diverge on
-        # the checked tier with the SAME observed hash every run, so they
-        # are that platform's semantics and not flakes, and the two
-        # largest generated CAVP rows blow the 60 s ceiling so their
-        # honest `unsupported` is never reached. The lane runs and
-        # reports; it does not gate, until those five rows have answers.
-        #
-        # sc43 answers wolf-std#20's either/or — "a bigger ceiling on that
-        # host or a `slow` word for those rows" — and the answer is
-        # NEITHER, which is why `STD_TEST_TIMEOUT_SECS` is not set here.
-        #   * `slow` is not available: it is a LUPIN-ONLY expectation by
-        #     the ledger's own grammar (`xtask/src/ledger.rs` reds on
-        #     `wolfc = "slow"` by name), and the rows that time out are
-        #     the `wolfc` column.
-        #   * A bigger ceiling would be ACTIVELY DANGEROUS on this host.
-        #     sc43 measured what those rows cost the checked tier and it
-        #     is not time, it is MEMORY: one `cavp_*_long.lu` reaches
-        #     16-18 GiB of RSS before the tier's STEP budget fires and it
-        #     answers `unsupported` (F-0116, filed upstream). A GitHub
-        #     runner has 16 GB. The 60 s ceiling is the only thing
-        #     standing between this job and wolf-std#19's exit 143, and
-        #     the ubuntu kill and these windows timeouts are ONE BUG seen
-        #     through two ceilings. The ceiling stays until the tier
-        #     bounds its allocation.
-        #
-        # sc43 also lights the NATIVE lane on this host (wolf-std#18), so
-        # this step runs 397 rows on three lanes where it ran two. The
-        # native rung is NOT the expensive one on the CAVP rows — 0.42 s
-        # and 57 MiB against the checked tier's 6.7 s and 16 GiB, all
-        # measured — so what the third lane costs here is 397 compiles
-        # and links and not a memory risk. Predicted in writing at
-        # docs/findings.md and read, not guessed.
-        continue-on-error: ${{ runner.os == 'Windows' }}
+      # Re-measured at sc44 on the author's box, the three rows that did
+      # it, cold, `/usr/bin/time -l`, checked tier:
+      #
+      #   cavp_sha256_long   30.2 MiB   1.57 s   unsupported
+      #   cavp_sha384_long   40.4 MiB   1.82 s   unsupported
+      #   cavp_sha512_long   40.0 MiB   1.79 s   unsupported
+      #
+      # Against F-0116's 16-18 GiB and 6.7 s, that is a factor of four
+      # hundred in bytes and four in time. Predicted 45-55 MiB before
+      # measuring and it came in UNDER the band. The most expensive
+      # single process left in the whole differential is lupin's own
+      # refusal of the same rows at 0.63 GiB.
+      #
+      # So both ceilings come off together:
+      #   * ubuntu runs the differential again — the shutdown signal was
+      #     the tier's allocation and the tier is bounded now;
+      #   * the 60 s per-row ceiling stands UNCHANGED and no longer
+      #     binds, because the rows that blew it finish in under two
+      #     seconds. `STD_TEST_TIMEOUT_SECS` is still not set: sc43's
+      #     answer to wolf-std#20's either/or was NEITHER, and it is
+      #     still neither. Nothing here was relaxed.
+      #
+      # The step stays ADVISORY on ubuntu and on windows for THIS
+      # landing, required on macOS, which is sc41's and sc42's procedure
+      # for a lane whose behaviour changes: the first run at a new
+      # posture is to be READ, not to be passed. ubuntu has not completed
+      # this step once in its life; windows still carries
+      # `net/reuse_port`, the one row of wolf-std#20 that survives its
+      # timing half — a directive that cannot say "either" on a platform
+      # with no SO_REUSEPORT, left for a std.net sprint.
+      - name: std-test (the differential; three lanes, three hosts)
+        # REQUIRED on macOS. ADVISORY on ubuntu (first completion at the
+        # new budget) and on windows (wolf-std#20's net/reuse_port).
+        continue-on-error: ${{ runner.os != 'macOS' }}
         run: cargo xtask std-test
-      - name: std-test — NOT RUN on this host (wolf-std#19)
-        if: runner.os == 'Linux'
-        run: |
-          echo "SKIP: std-test is not run on ubuntu-latest — the native lane's"
-          echo "      compile of tests/x/crypto/sha2/cavp_sha384_long.lu (1.69 MB,"
-          echo "      native-only) terminates the runner with exit 143, measured"
-          echo "      twice at the same test (F-0115, wolf-std#19). The 397-row"
-          echo "      differential still runs on macos-latest and windows-latest"
-          echo "      and on the author's box; what is dark here is one host, and"
-          echo "      it is dark out loud."
 
   # sc41 / F-0113 / wolf-std#13 — the lane nothing lit, now lit and REQUIRED.
   #
