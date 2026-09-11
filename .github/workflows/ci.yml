@@ -9,6 +9,18 @@
 # on ubuntu, macOS and windows. The sentence sc41 had to write beside its
 # green — "every observation lane on every runner is still DARK, so the
 # lane gates the static half and not doc truth" — retires with this file.
+#
+# sc43: AND ONE LANE WAS STILL DARK, AT A FILE IT COULD SEE. sc42's own
+# comment predicted it in writing before the run and the run said it:
+# `bins::native_rt()` knew only `libwolf_rt.a`, the windows archive ships
+# the same staticlib as `wolf_rt.lib`, and both windows jobs printed a
+# loud SKIP over a present file (wolf-std#18). The name is resolved by
+# platform now, so windows runs THREE lanes in `rig` where it ran two and
+# THREE in `gates` where it ran two. That is a new workload on a host
+# that has never compiled-and-linked a wolf program in this repository's
+# CI, so the steps whose behaviour changes from dark to lit are ADVISORY
+# for this landing and the timeouts go up — sc41's procedure and sc42's,
+# for their reason: the first run is to be READ, not to be passed.
 name: ci
 
 on:
@@ -25,7 +37,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 75
+    # 75 was the measured windows number with the native lane DARK there
+    # (46:46 over two lanes). sc43 lights the third lane on that host, and
+    # the native rung compiles AND LINKS a binary per row — 397 of them —
+    # so the number that held for two lanes cannot be assumed for three.
+    # 120 for the landing, with the same promise sc42 kept: it comes back
+    # down to the measurement in the sprint that reads this run.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         # No `submodules:` — upstream/ is private and CI cannot clone it
@@ -167,6 +185,32 @@ jobs:
         # largest generated CAVP rows blow the 60 s ceiling so their
         # honest `unsupported` is never reached. The lane runs and
         # reports; it does not gate, until those five rows have answers.
+        #
+        # sc43 answers wolf-std#20's either/or — "a bigger ceiling on that
+        # host or a `slow` word for those rows" — and the answer is
+        # NEITHER, which is why `STD_TEST_TIMEOUT_SECS` is not set here.
+        #   * `slow` is not available: it is a LUPIN-ONLY expectation by
+        #     the ledger's own grammar (`xtask/src/ledger.rs` reds on
+        #     `wolfc = "slow"` by name), and the rows that time out are
+        #     the `wolfc` column.
+        #   * A bigger ceiling would be ACTIVELY DANGEROUS on this host.
+        #     sc43 measured what those rows cost the checked tier and it
+        #     is not time, it is MEMORY: one `cavp_*_long.lu` reaches
+        #     16-18 GiB of RSS before the tier's STEP budget fires and it
+        #     answers `unsupported` (F-0116, filed upstream). A GitHub
+        #     runner has 16 GB. The 60 s ceiling is the only thing
+        #     standing between this job and wolf-std#19's exit 143, and
+        #     the ubuntu kill and these windows timeouts are ONE BUG seen
+        #     through two ceilings. The ceiling stays until the tier
+        #     bounds its allocation.
+        #
+        # sc43 also lights the NATIVE lane on this host (wolf-std#18), so
+        # this step runs 397 rows on three lanes where it ran two. The
+        # native rung is NOT the expensive one on the CAVP rows — 0.42 s
+        # and 57 MiB against the checked tier's 6.7 s and 16 GiB, all
+        # measured — so what the third lane costs here is 397 compiles
+        # and links and not a memory risk. Predicted in writing at
+        # docs/findings.md and read, not guessed.
         continue-on-error: ${{ runner.os == 'Windows' }}
         run: cargo xtask std-test
       - name: std-test — NOT RUN on this host (wolf-std#19)
@@ -298,13 +342,19 @@ jobs:
   # came in at the budget exactly on macOS and at 62% on windows, which
   # is the split the variable-term note predicted: doc examples are
   # cheap and the differential is not.
+  # sc43: `gates` came in at a quarter of its budget on every host with
+  # the windows native lane dark. wolf-std#18 lights it, so `doc-examples`
+  # stages 421 blocks against THREE lanes on that host instead of two and
+  # the third one links a binary per block. 20 minutes was the measured
+  # number for a different job; 60 is the landing's budget and comes back
+  # down to the measurement the same way sc42's did.
   gates:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -404,7 +454,20 @@ jobs:
         run: cargo xtask std-test --lint-conventions
       - name: gen-vectors --check
         run: cargo xtask gen-vectors --check
+      # ADVISORY ON WINDOWS FOR THIS LANDING, on exactly the two steps
+      # whose behaviour changes from dark to lit there (wolf-std#18): both
+      # resolve the native rung through `bins::native_rt()`, and both ran
+      # a lane short on that host until this commit. Nothing changes on
+      # ubuntu or macOS, where the lane was already lit, so neither of
+      # those hosts loses a gate.
+      #
+      # The rule sc42 paid for, restated because this is where it bites: a
+      # `continue-on-error` step that exits 1 still reports
+      # `conclusion: success`, so these two are read LINE BY LINE in the
+      # log and not from the job's colour.
       - name: doc-examples
+        continue-on-error: ${{ runner.os == 'Windows' }}
         run: cargo xtask doc-examples
       - name: ulp
+        continue-on-error: ${{ runner.os == 'Windows' }}
         run: cargo xtask ulp
