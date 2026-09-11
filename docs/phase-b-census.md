@@ -1448,7 +1448,7 @@ is not a count.
 | `impl` blocks in `std/` | 9 | **25** (+16) |
 | entry tests | 397 | **401** (+4) |
 | ledger rows | 397 | **401** (+4) |
-| fenced doc examples, extracted and RUN | 421 | **424** (+3) |
+| fenced doc examples, extracted and RUN | 421 | **423** (+2) |
 | existing ledger rows moved by the pin bump | 0 | **15** |
 | std function bodies rewritten by the bump | 1 | **1** |
 | TEST bodies rewritten by the bump | 0 | **5** |
@@ -1481,6 +1481,16 @@ be felt in `std.ops`, a module that did not exist yet, and said nothing
 about the module s155 would move most. **A clause that rules operators
 reaches every file that writes one**, and this repository writes `==` on
 a `std.cmp.Ordering` in two tests that have been green since sc01.
+
+**The doc-example count is +2 and not +4, and the missing two are a row
+of their own.** `std.sort`'s three returning twins add three fences; two
+EXISTING fences had to come out, because the pin bump turned them red —
+`std.cmp.total_cmp`'s four `==` lines between two `Ordering`s
+(wolf-lang#336, green on every lane since sc01) and `std.json.as_float`'s
+`from_int` line (wolf-lang#337, green since sc05). Both keep their claims
+in prose and return when their issues close. A repository whose doc
+examples are 423 gates should expect a clause that rules operators to
+reach some of them.
 
 **Five TEST bodies were rewritten by the bump**, which is a row this
 census has never carried and is the sprint's honest surprise. Three are

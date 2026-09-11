@@ -113,6 +113,15 @@ second time the dark lane was hiding a wrong ANSWER rather than an unread
 body. wolf-lang#337; both assertions go through `stringify` until it
 closes.
 
+**Two fenced doc examples went to prose, and neither was wrong.**
+`std.cmp.total_cmp`'s four lines have run on every lane since sc01 and
+are `fail(E0301)` now (#336); `std.json.as_float`'s `from_int` line has
+run since sc05 and is `exit(2)` on the checked tier (#337). §4 says a
+fenced block must RUN and that a static rejection is as much a doc bug as
+a wrong answer, so both are prose with their issue named and both come
+back when it closes — 424 blocks would have been the count, 423 is the
+measurement. 
+
 **Half of F-0002 is now false, and the surviving half is about the
 import.** `cmp.Eq.eq(a, b)` through a `use` is `unsupported` on lupin
 while the byte-identical trait declared in the ENTRY FILE runs on all

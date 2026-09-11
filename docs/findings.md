@@ -9371,6 +9371,18 @@ direction, at `3`. So the second module in one sprint where an
 not an unread body but a WRONG ANSWER, which is the worse of the two
 things a dark lane can conceal.
 
+**And it reached the documentation as well as the ledger**, which is how
+the second half of it was found: `std.json.as_float`'s fenced doc example
+carried `(as_float(from_int(3)) else 0.0) == 3.0` from sc05 and is
+`exit(2)` on the checked tier at these pins. That line is prose now, with
+the issue named; the claim is unchanged and the fence returns when the
+bug closes. F-0118's compiler half did the same thing to
+`std.cmp.total_cmp`'s four-line fence, which had run on every lane since
+sc01 and is `fail(E0301)` now. §4's rule is that a fenced block must RUN
+and a static rejection is as much a doc bug as a wrong answer, so both
+are prose-with-a-reason rather than waivers — **two green fences turned
+red by a pin bump, in a repository where 423 of them are gates.**
+
 Both assertions are spelled through `json.stringify` as of sc44 — the
 only spelling that makes the tier refuse honestly instead of answering
 wrongly — with the issue named in both files. Neither ledger row moves,
