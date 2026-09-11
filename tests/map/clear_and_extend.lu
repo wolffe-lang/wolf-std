@@ -12,6 +12,14 @@
 //! `m[k] = v`, and the values are read back through the language's
 //! `m[k]`, not through `map.values`. `keys_values_pairs.lu` covers those
 //! three views on a map no `mut` call has touched.
+//!
+//! **The values are read back through `else` as of sc44, and the `else`
+//! is the s152 ruling arriving in a test.** `[mem.map.absent]` makes
+//! `m[k]` a `V ! {none}` — never a bare `V`, never a `()` — so the
+//! `a["k"] == 2` these three lines used to carry is a comparison on a
+//! ROW, and both compiler rungs answer `unsupported — `==` on a
+//! container, tuple or handle (no `Eq` for these this edition)`. This
+//! was the only file in `tests/` that read a `Map` index bare.
 
 use std.map
 
@@ -23,12 +31,12 @@ fn main() -> !int {
     map.extend(mut a, b)
     if map.len(a) == 2 {} else { return 1 }
     // right wins on the shared key; the untouched entry survives.
-    if a["k"] == 2 {} else { return 2 }
-    if a["only_a"] == 3 {} else { return 3 }
+    if (a["k"] else 0) == 2 {} else { return 2 }
+    if (a["only_a"] else 0) == 3 {} else { return 3 }
     map.clear(mut a)
     if map.is_empty(a) {} else { return 4 }
     a["again"] = 1
     if map.len(a) == 1 {} else { return 5 }
-    if a["again"] == 1 {} else { return 6 }
+    if (a["again"] else 0) == 1 {} else { return 6 }
     0
 }

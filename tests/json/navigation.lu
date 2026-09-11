@@ -97,7 +97,7 @@ fn main() -> !int {
     // The navigation that shipped while these two were withdrawn still
     // works, and gives the same answer.
     let fields = json.as_obj(doc) else Map[str, json.Value]()
-    let same = json.as_arr(fields["users"]) else List[json.Value]()
+    let same = json.as_arr(fields["users"] else json.null()) else List[json.Value]()
     if (json.as_str(json.get(same[0], "name") else json.from_str("?")) else "?") == "wolf" {} else {
         return 17
     }
