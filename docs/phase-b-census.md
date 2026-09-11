@@ -1426,3 +1426,92 @@ tier-1 hosts, `ubuntu-latest` runs ten of the eleven, because `std-test`
 cannot reach the end of the differential there. That is F-0116 and
 wolf-lang#308, and it is the one number in this document that a sprint
 in this repository cannot move on its own.
+
+## sc44 — a bump that added a module, and the first reading of a module nobody could type
+
+The counting rules are sc40's, unchanged and reproducible from the tree
+at `sc44`; they are not restated here because restating them is how two
+copies drift.
+
+**Predicted before measuring.** `662b14c..c9237c1` is ninety-one commits
+and six sprints, and two of them reach this tree hard: s152 gives `Map` a
+TYPE and s155 gives operators a trait bridge. So the prediction was the
+first non-zero census in three sprints — one new module, six new traits,
+sixteen new impls, four new `pub fn`, four new tests — and one row that
+is not a count.
+
+| measure | sc43 | sc44 |
+|---|---|---|
+| modules under `std/` (directories, `std/x/` as one) | 33 | **34** (+1, `std.ops`) |
+| `pub fn` in `std/`, nursery included | 596 | **600** (+4) |
+| `pub trait` in `std/` | 2 | **8** (+6) |
+| `impl` blocks in `std/` | 9 | **25** (+16) |
+| entry tests | 397 | **401** (+4) |
+| ledger rows | 397 | **401** (+4) |
+| fenced doc examples, extracted and RUN | 421 | **424** (+3) |
+| existing ledger rows moved by the pin bump | 0 | **15** |
+| std function bodies rewritten by the bump | 1 | **1** |
+| TEST bodies rewritten by the bump | 0 | **5** |
+
+The `pub fn` column moves by four and all four are `std.sort`'s returning
+twins (`sorted_by`, `sorted_ints`, `sorted_floats`, `sorted_strs`).
+`std.ops` adds none: it is six traits and twelve impls, which is a
+surface the `pub fn` count cannot see — hence the two new rows, added
+this sprint because the count that used to be the whole story stopped
+being it.
+
+**Fifteen rows moved, the largest single-sprint ledger motion this
+repository has recorded, and only six of them were predicted.** The six
+predicted ones are `map/*`, all to a `run` wolfc column because
+`[type.map]` made `Map` a type — written into `tools.toml` before the
+run. The other nine were not:
+
+- **three ADVANCEMENTS in std.cmp** (`clamp_bad_range_trap`,
+  `ordering_exhaustive`, `static_floor` -> `run` on wolfc) because s155's
+  bridge makes `Ord.cmp` and `Eq.eq` dispatch on the checked tier. That
+  is F-0002's compiler half retiring, with rows behind it.
+- **two REGRESSIONS in the same module**, `ordering_methods_static` and
+  `total_cmp_relational`, `unsupported` -> `fail(E0301)` on BOTH compiler
+  rungs, which is F-0118's compiler half (wolf-lang#336) and the only
+  place in this sprint where the pin bump made something worse.
+- **four json rows** to `run` on wolfc with the DOM types typing.
+
+The prediction that missed is worth naming: `tools.toml` said s155 would
+be felt in `std.ops`, a module that did not exist yet, and said nothing
+about the module s155 would move most. **A clause that rules operators
+reaches every file that writes one**, and this repository writes `==` on
+a `std.cmp.Ordering` in two tests that have been green since sc01.
+
+**Five TEST bodies were rewritten by the bump**, which is a row this
+census has never carried and is the sprint's honest surprise. Three are
+`[mem.map.absent]` arriving — `m[k]` is a `V ! {none}` now, so the only
+three bare `Map` index reads in `tests/` needed an `else`. Two are
+wolf-lang#337: assertions that had never executed on the checked tier,
+executed for the first time, and were answered wrongly.
+
+**The body rewritten by the bump is `std.map.set`, and it is F-0119.**
+`m[k] = v` became `m[k] = copy v`. The body was written at sc02 and no
+compiler had ever read it, because the module could not be typed; the pin
+that types it refused the function with E1004 and took the whole module
+down with it. Nothing in the census moves because of the fix — the same
+twelve functions, the same six rows — which is the proof that what
+changed was a spelling and not a surface.
+
+**The surface that is NOT in the table, which is this sprint's honest
+row.** `trait Num` is `[type.trait.op.alias]`'s worked example,
+wolf-std#26 asks for it by name, and it is not in this release. Not
+because it does not work — it runs on the checked tier — but because the
+alias form does not PARSE under lupin 0.1.33 and a lupin `fail(E…)` has
+no legal ledger row, so there is no way to ship it with a test. Zero
+rows, zero counts, one paragraph in `std/ops/ops.lu` naming the trigger,
+and wolf-std#27 filed for the word the ledger is missing. A census that
+counted only what shipped would call this sprint's operator work
+complete; it is one item short and the item is named.
+
+**The census row that is not a count.** sc43's was that `ubuntu-latest`
+ran ten of the eleven gauntlet steps, "the one number in this document
+that a sprint in this repository cannot move on its own". It moved, and
+not by this repository: wolf-lang#308 bounded the checked tier's
+allocation, the three `cavp_*_long.lu` rows fell from 16–18 GiB to
+30–40 MiB, and `std-test` runs on all three tier-1 hosts again. Eleven of
+eleven, on three hosts, for the first time in the repository's life.
