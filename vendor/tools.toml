@@ -563,7 +563,67 @@
 # (F-0064): `wolf 0.2.9`'s second line reads "paired with lupin 0.1.29
 # ..., pin e9a17cb", because `9af606c` recorded the pairing before is42
 # cut 0.1.30. Doctor prints it and does not gate it.
-version = "0.1.30"
+# sc43 BUMP: 0.1.30 -> 0.1.31, pin 2c03ed9 (wolf-lang s144, dev-stamped)
+# -> 4c60946 (v0.2.9). ONE release, not two: is43 cut 0.1.31 at
+# wolf-interp `e9c55b4`, installed by the orchestrator through fresh
+# inodes (the sc26 SIGKILL rule), and this entry records the acquisition.
+# The pin lands ON a wolf-lang TAG again rather than on a dev-stamped
+# trunk commit — the first time since sc40. Verified from `--version`,
+# not from the brief: `lupin 0.1.31 (wolf-interp, reference interpreter
+# at pin 4c60946)`.
+#
+# **THE GAP WIDENS TO 51, AND THE COMPILER IS STILL THE ONE AHEAD.**
+# wolf 0.2.10 conforms to `662b14c`; lupin 0.1.31 conforms to `4c60946`,
+# which is exactly the PREVIOUS wolf release — so the mirror sits one
+# whole release behind and the 51 commits between them are s146, s147
+# and s148 entire. Ordinary posture (sc38's), not sc35's inversion, and
+# the widest this gap has been since sc37's 42. The data pin follows the
+# COMPILER (see `[wolf]`), so this key is again the only one of the four
+# not naming `662b14c`.
+#
+# **F-0110'S CLASS RETIRES HERE, ON THE SPRINT ITS OWN NOTE NAMED.** sc42
+# wrote the condition at the `[wolf]` entry's delta 6 in so many words:
+# `std.strbuf.push` keeps its interpolation body "for a reason that is a
+# release date", wolf-interp#78 being unmirrored at 0.1.30. is43 mirrors
+# it — `387b20b pin+concat: take wolf-lang v0.2.9 (4c60946) and mirror
+# [type.str.concat] — a char joins a str by + in either order (#78)` —
+# and the release's own line is "concat_mix_char closes". The date has
+# passed, the reason is gone, and the body is `b.s += c` in this
+# sprint's own commit. NO LEDGER ROW MOVES WITH IT, which is the point:
+# the function ran on all three lanes before the change and runs on all
+# three after, because what was blocked was never the meaning.
+#
+# What else the bump buys this repo:
+#   is43 / #73 + #81  **THE DECLARED TYPE GETS READ, AND THE MIRROR GOT
+#     THERE FIRST.** A body's tail is checked against the declared result
+#     and a bare `!T` operand is refused — which is s148's
+#     `[type.fn.ret]` and `[type.row.operand]`, arriving in the
+#     interpreter one release BEFORE the clause that rules them.
+#     wolf-lang's own witness commit says so (`c6acbf6`: "is43's four
+#     witnesses for #284"). This is the rare shape where lupin at an
+#     OLDER wolf-lang pin already carries a NEWER clause's behaviour, and
+#     it is the reason nothing here is predicted `divergent` on those
+#     two: both machines tightened, in that order.
+#   is43 / #79  a type annotation's name is resolved at last.
+#   is43 / #72  a REPL note for a bare directive name. Nothing this
+#     repository can observe: the rig never opens a prompt.
+#
+# What the bump does NOT buy, named here so no row is misread as a
+# divergence: `[gram.pat.range]` (s147) is NOT in 0.1.31 — the pair's
+# own named divergence is wolf-interp#83 — and neither is
+# `[type.unit]`/W0601 (s146) nor `[mem.str.imm]`/E0416 (s148). All three
+# are unreachable from this tree by construction (no range pattern in any
+# match arm, no `!()` tail in any unit context, no assignment through a
+# `str` index), so all three cost it exactly nothing and none of them is
+# an F-0110. The next bump is where they arrive.
+#
+# The pairing LINE is not stale for once, and that is worth a sentence
+# because five bumps running it was (F-0064): `wolf 0.2.10`'s second line
+# reads "paired with lupin 0.1.31 (reference interpreter), pin 4c60946",
+# and that IS this box's binary at this box's pin — `7511f7e` recorded
+# the pairing inside the release that carries it. Doctor prints it and
+# still does not gate it; a line that happens to be true is not a gate.
+version = "0.1.31"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -574,7 +634,13 @@ version = "0.1.30"
 # pin = "982f857885b991e686c6b045de213d10cab013c1"  (superseded, sc35-second/sc36/sc37 era — is36's v0.2.4-tag pin, held across sc37)
 # pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"  (superseded, sc38/sc39 era — is38's v0.2.5-tag pin, the pin that paid F-0110)
 # pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"  (superseded, sc40/sc41 era — is40's v0.2.8-tag pin, the one sprint the gap was zero)
-pin = "2c03ed9360e90e260528411075daded674ceab18"
+# pin = "2c03ed9360e90e260528411075daded674ceab18"  (superseded, sc42 era — is42's 0.1.30 at wolf-lang s144 dev-stamped, the pin that held `str + char` back one sprint)
+pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"
+# (sc43: 0.1.31 crosses to v0.2.9 and lands ON a tag. The gap to the
+#  data pin below reopens at 51 commits with the compiler ahead — one
+#  whole release, s146+s147+s148 — and this key is again the only one
+#  of the four that does not name `662b14c`. The sc42 and sc40 notes
+#  kept for their history:)
 # (sc42: 0.1.30 crosses to s144 dev-stamped, and this key is now the ONLY
 #  one of the four that does not name `4c60946` — the gap reopens at 14
 #  commits with the compiler ahead. See the entry above. The sc40 and
@@ -723,7 +789,124 @@ pin = "2c03ed9360e90e260528411075daded674ceab18"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.9"
+version = "0.2.10"
+# sc43 BUMP: 4c60946 (v0.2.9) -> 662b14c (v0.2.10), 51 commits, ZERO
+# merges — three sprints (s146, s147, s148) landed direct on trunk, plus
+# the pairing, the CHANGELOG and the release commit. The data pin was AT
+# 4c60946, so for the third bump running the DATA delta and the BINARY
+# delta are the same span: 4c60946..662b14c.
+#
+# Eight deltas, classified BEFORE anything was measured:
+#   1. s146 / #275  SPEC + TYPE SYSTEM + A NEW WARNING. `[type.unit]`: a
+#      unit context is a position expecting `()`, and a `!()` tail there
+#      is a WARNED DISCARD (W0601) rather than a mismatch — loop bodies,
+#      else-less `if` chains, unit functions, closures against
+#      `fn() -> ()`. `chan.send` is `() ! {closed, cancelled}` and joins
+#      its status through `chan_status_join`. Predicted +1 anchor.
+#      **W0601 COUNT IN THIS TREE PREDICTED AT ZERO**, and predicted from
+#      a scan rather than from optimism: all 29 of std's `-> () ! {...}`
+#      functions end their body in `?`; the 16 statement-position calls
+#      in `tests/` are `io.write`, `io.write_line`, `map.set`,
+#      `list.set` and `strbuf.remove`, every one of them INFALLIBLE; and
+#      neither corpus writes a closure literal at all. Worth knowing
+#      either way: the rig's warning gate reads the ENTRY file only
+#      (`xtask/src/record.rs`), so a W0601 inside a std MODULE would not
+#      be seen by `std-test` — only by a doc example or a test entry.
+#   2. s147 / #287  GRAMMAR + SEMA + WIR + A NEW DIAGNOSTIC.
+#      `[gram.pat.range]`: `lo..hi` / `lo..=hi` over integer and char
+#      literals in a match arm, literal endpoints only, open ends refused
+#      BY NAME (E0201), the empty range E0815, exhaustiveness keeping
+#      every integer column infinite. Predicted +1 anchor. Predicted zero
+#      motion: this tree writes no range pattern in any arm (grepped,
+#      zero hits). NOT in lupin 0.1.31 — the pair's named divergence is
+#      wolf-interp#83 — which costs nothing precisely because nothing
+#      here uses it.
+#   3. s147 / #286  WIR ONLY. A guarded binder arm before `_` lowers,
+#      and the old refusal named the wrong arm. Predicted zero anchors,
+#      zero rows: the refusal it retires was never reachable from here.
+#   4. s148 / #284  TYPE SYSTEM, TWO CLAUSES, **THE ONE TO WATCH.**
+#      `[type.fn.ret]`: a body's tail AND every `return` is checked
+#      against the declared result — the ok half of a fallible one — so
+#      a `()` where `T` is declared is E0401. `[type.row.operand]`: a
+#      `!T` is two values and no operator reads one, E0409 on either
+#      side. This repository is 596 `pub fn` whose results are declared
+#      and whose bodies end in a tail; if anything in the span reds a std
+#      SOURCE file it reds here. Predicted +4 anchors — two new leaves
+#      under two new parents, sc42's own counting rule, with `type.fn`
+#      and `type.row` read out of the 4c60946 registry as ABSENT rather
+#      than inferred from the commit message (F-0100). Predicted zero
+#      motion anyway, and the reason is the mirror: lupin 0.1.31 already
+#      enforces both (is43 #73/#81, landed BEFORE the clause), and this
+#      tree has been green against that machine for a sprint.
+#   5. s148 / #293  TYPE SYSTEM + A NEW DIAGNOSTIC. `[mem.str.imm]`: a
+#      `str` never changes after it is built, an index or slice of one is
+#      not a place, and `s[i] = v` / `s[a..b] = v` are E0416 with the fix
+#      in the note. Predicted +1 anchor (`mem.str.imm`; parent `mem.str`
+#      already registered). Predicted zero motion: every indexed
+#      assignment in this tree is a `Map` or a `List` — 20 sites,
+#      grepped, zero of them a `str`.
+#   6. s148 / #292  INTERFACE HASH. The `.wolfi` interface hash is taken
+#      over the interface's CONTENT (edition, package, module path, dep
+#      hashes) and drops the magic, the format version and the toolchain
+#      stamp, so a version bump moves no hash and `wolf publish` takes
+#      the `interface=` address. Predicted zero anchors (no spec commit
+#      in the set) and zero motion: this repository publishes no
+#      interface and compiles std from source on every lane.
+#   7. #301 / bf4014a  TOOLING. The D57 stamp's commit clause is seven
+#      hex characters by decision rather than by clone size. Predicted
+#      zero — the rig reads `--version` line 1 for the pin and never
+#      parses the stamp's width.
+#   8. 662b14c (the v0.2.10 release), 4d134c5 (CHANGELOG), 7511f7e (the
+#      lupin 0.1.31 pairing), 23d9cbe/8748a74/489883a (upstream's own
+#      xtask), e4b4031/e0ce018 (the per-file IR-volume record folded off
+#      the linux lane), a6007fb/7106336 (diagnostics catalog regen),
+#      9fa39d6/c6acbf6/52a36fa/8d946d2/dcba47e/c227a67/34c44a7 (upstream
+#      corpus and snapshots), 35569c6/ba0c10c/b2a8cc7/fmt  DOCUMENTARY /
+#      PACKAGING / UPSTREAM-INTERNAL. Predicted zero.
+#
+# PREDICTED anchors 4c60946 -> 662b14c: 448 -> ~455, +7, dropped 0,
+# owners moved 0; every added key inside a namespace the clause already
+# registers, so REGISTERED_NS unmoved and `[conf.anchor.ns]`
+# byte-identical across the span.
+#
+# MEASURED, both key sets diffed both ways (F-0100 / wolf-lang#177):
+# 448 -> **458**, +10, dropped {}, owners moved {}. Added:
+#   {gram.pat.range, mem.str.imm,
+#    type.fn, type.fn.ret, type.row, type.row.operand,
+#    type.unit, type.unit.consume, type.unit.context, type.unit.discard}
+# The clause diffed as BYTES: IDENTICAL, so the sync-pin snapshot of
+# `[conf.anchor.ns]` does not move and this bump re-vendors PIN and
+# anchors.json only.
+#
+# **THE PREDICTION MISSED BY THREE, ALL OF IT IN ONE CLAUSE, AND THE
+# RULE THAT FAILED IS NOT THE ONE sc42 WROTE DOWN.** sc42's counting rule
+# — a new leaf under a new parent costs two — was applied to delta 4 and
+# was exactly right: `type.fn`, `type.fn.ret`, `type.row`,
+# `type.row.operand`, predicted four and measured four, with both parents
+# read out of the OLD registry instead of assumed. `mem.str.imm` and
+# `gram.pat.range` were right for their stated reasons. The whole miss is
+# delta 1: `[type.unit]` was counted at ONE key and registers FOUR —
+# `type.unit` plus `type.unit.consume`, `type.unit.context` and
+# `type.unit.discard`, three sub-anchors the spec commit's subject line
+# never mentions. **The rule to carry forward: a spec commit's SUBJECT
+# names the clause, not the anchors.** A section registers what it needs
+# to name, and the only honest way to count it in advance is to read the
+# section — counting from the subject is the same class of error as
+# counting from a commit message, one indirection further out.
+#
+# **AND THE COMMIT MESSAGE THAT WOULD HAVE MISLED IN THE OTHER
+# DIRECTION.** s147's spec commit (`9a39305`) states in its own subject
+# "anchors 453 -> 454 (+gram.pat.range, nothing dropped)". Measured at
+# the two commits it sits between: **452 -> 453**. The DELTA is right and
+# both ABSOLUTE numbers are off by one, so a prediction anchored on that
+# sentence would have been wrong by one in a place no key-set diff would
+# ever show. Filed upstream. The registry answered in both directions;
+# the prose answered in neither.
+#
+# The namespace claim held: ten keys, three namespaces (`type`, `gram`,
+# `mem`), all three already registered, and the clause is byte-identical.
+#
+# Corpus at the two pins: 521 -> 534 `.lu` files, +13.
 # sc42 BUMP: 5c729e8 (v0.2.8) -> 4c60946 (v0.2.9), 52 commits, ZERO
 # merges — three sprints (s143, s144, s145) landed direct on trunk, plus
 # the release commit and a README/mark fixup. The data pin was AT
@@ -1918,4 +2101,5 @@ version = "0.2.9"
 # pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"  (superseded, sc37 era — the v0.2.5 tag acquisition, s137's five builtins)
 # pin = "398e5f547a65308c6a3e88fee632563e87afd217"  (superseded, sc38/sc39 era — r09's v0.2.6-tag pin)
 # pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"  (superseded, sc40/sc41 era — r10's v0.2.8-tag pin, the one sprint all four pins named one sha)
-pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"
+# pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"  (superseded, sc42 era — r14's v0.2.9-tag pin)
+pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"
