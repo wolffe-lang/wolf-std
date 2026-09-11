@@ -123,8 +123,13 @@ the building.
 | F-0113 | 2026-09-09 | **Four of `cargo xtask ci`'s eleven steps run in no GitHub workflow, and one of them is the step that caught F-0112.** `ci()` runs fmt, clippy, `cargo test`, sync-pin, doctor, ledger-check, **lint-conventions**, **gen-vectors --check**, std-test, **doc-examples** and **ulp**. `.github/workflows/ci.yml` runs the first six plus std-test and stops; `nightly.yml` runs doctor and std-test against the latest binaries. So the bolded four are LOCAL-ONLY gates: a branch can be green on three platforms in CI and red on `cargo xtask ci` on the author's box, which is exactly what happened at sc40 — GitHub was green on ubuntu, macOS and windows for the commit whose doc example was broken, because **no runner has ever executed a `wolf-doc-example`**. That inverts the usual assumption: the local gauntlet is the STRICTER gate here, not the convenience check, and "CI is green" is not a statement about the doc-truth gate, the conventions linter, the generated-vector check or the ULP budget. Cheapest fix is four lines in `ci.yml`, and it is not free: `doc-examples` runs every fenced block on every available lane (421 blocks at sc40) and would lengthen the job substantially, and its net examples have never been run on the windows runner at all, so the first CI run carrying it should be expected to teach something rather than to pass | wolf-std (this repo) | Found at sc40 while explaining why F-0112 escaped GitHub. NOT fixed there: adding a step that has never executed on two of three tier-1 runners, on a branch that cannot verify them, is the "prose over a lane nothing lit" mistake F-0111 records, one file over. Filed with the measurement and the expected cost so the decision is the merger's. **FIXED at sc41** (wolf-std#13): `27c508b` adds the `gates` job, one per host, advisory on its first landing; the first run was red on all three hosts for a reason that was the rig's own (**F-0114**, fixed in `4d6f130`); `c8a2541` drops `continue-on-error` after two green runs on three hosts, and no step is left advisory. `8a84040`/`d2322cd` make the drift itself visible: `ci()` iterates one list, prints at the end which of its steps `ci.yml` also runs, and a test in the already-required `rig` job fails on drift in either direction. "CI green" now means what the local gauntlet means, with the caveat recorded beside the measurements: every observation lane on every runner is still DARK, so the lane gates the static half and not doc truth until release artifacts exist at the pins |
 | F-0114 | 2026-09-09 | **`gen-vectors --check` was the one binary-dependent step in this rig that treated a dark lane as an ERROR instead of a loud SKIP, and that is why it had never run on a runner.** The first sc41 CI run put F-0113's four steps on ubuntu, macOS and windows; `gen-vectors --check` failed on all three in under a second, with the same message and for a reason that has nothing to do with any platform: `gen-vectors needs the pinned wolf (it runs wolf fmt on its output)`. `wolf fmt` is law for every committed `.lu` (D34), so the emitter's output is canonicalized before it is written OR compared — and with no release artifact at the pins, `ci.yml`'s acquire step SKIPs and no runner has a `wolf`. `bins.rs`'s own header states the doctrine the step broke: "Absence is legal and LOUD." `std-test`, `doc-examples` and `ulp` all honour it; this one alone did not, and because it did not, the step could not be added to CI at all — the prerequisite for F-0113's fix was a fix to a step F-0113 does not mention. Note what the shape of the red says: the first run of a lane nothing lit taught something about the RIG on the host the rig was written on, before it taught anything about windows | wolf-std (this repo) | **Fixed at sc41**, `4d6f130`: `--check` with no `wolf` on any rung prints a loud SKIP and drops from a byte comparison to an inventory-and-derivability check — the 7.3 MB vendored corpus is still parsed, all 65 emitters still run, and every generated file must still be present and non-empty; only the byte comparison goes dark, and it says so. WRITING still hard-errors without the formatter, because an unformatted generated file must never reach a commit. The lane relights for free the day release artifacts exist at the pins |
 | F-0115 | 2026-09-10 | **`cargo xtask std-test`'s native lane terminates the `ubuntu-latest` runner, and it did it twice at the same test.** The first CI run that had binaries to run (sc42, `354cdf0`) put the 397-row differential on three hosts. `macos-latest` was GREEN in 29 min (three lanes lit, 0 divergent, 0 unstable, 0 slow) and `windows-latest` — **corrected below, and the correction is the finding's twin**: that job's `std-test` printed its 397-row summary and then seven mismatches and `xtask: RED`, and this entry first recorded it as GREEN because the summary line was read as the verdict. The `continue-on-error` marker had made the JOB green, exactly the trap this sprint had already written a paragraph warning about two sections earlier. windows is RED and filed as wolf-std#20; macOS is the differential's first green anywhere but the author's box. `ubuntu-latest` died at test 303 of 397 in BOTH runs of the commit, printing `cavp_sha256_short_p2.lu` and then `The runner has received a shutdown signal` with exit 143. The next test in order is `tests/x/crypto/sha2/cavp_sha384_long.lu`: 1.69 MB of generated wolf source and a native-lane-ONLY row, so what runs when the runner dies is one native compile-and-link of the largest generated file in the tree. **It is the workload, not the clock** — the two deaths came at 28 m 59 s and 23 m 11 s and at the identical position — and the obvious hypothesis is the one the evidence argues against: `macos-latest` has LESS memory than the ubuntu image and spends about 60 s on that same test. A hosted runner reports an OOM-killed agent and a reclaimed host with the same sentence and the same exit code, so the mechanism is not determinable from a workflow log | wolf-std (this repo) + GitHub's ubuntu image | [filed: wolf-std#19](https://github.com/wolffe-lang/wolf-std/issues/19). **`continue-on-error` cannot be the disposition**: a runner shutdown kills the JOB, so run 1's `rig (ubuntu-latest)` reports every step `success` and the job `failure`, and an advisory marker never gets the chance to swallow anything — leaving it would leave one host permanently red. `std-test` is NOT RUN on `ubuntu-latest` as of sc42, out loud, in a step whose entire content is the skip and this issue number; the differential still runs on two hosts and on the author's box |
-| F-0116 | 2026-09-11 | **The checked tier's budget counts STEPS and not BYTES: one `cavp_*_long.lu` row reaches 16-18 GiB of resident set before `unsupported: step budget exhausted` arrives, on hosts with 16 GB.** This is the mechanism behind wolf-std#19 (the `ubuntu-latest` runner killed twice at the same test, exit 143) and behind half of wolf-std#20 (the same rows timing out at 60 s on `windows-latest`) — one bug seen through two ceilings, and neither issue had named it. wolf-std#19 read the kill as "one native compile-and-link of the largest generated file"; measured, the NATIVE lane is the cheapest of the three by two orders of magnitude (0.42 s / 57 MiB) and the CHECKED tier is the expensive one (6.7 s / 16.6 GiB). Reduced to twelve lines with no std: `s.bytes()` on the checked tier materializes a view per call against a shrinking `str` and never reclaims it, so a walk is quadratic in memory — 15.4 MiB at n=512 to 1868 MiB at n=8192, x3.8 per doubling, against 54 MiB flat on the native lane and 12 MiB on lupin. Swap the `.bytes()` for a `.len` and the curve flattens, so it is the materialized view and not the slicing. `std.hex.decode` walks a `str` exactly this way and the CAVP rows hand it a 25,600-character literal. v0.2.10 does not change it (the same row under v0.2.9 peaks at 17.8 GiB). Closes when the tier bounds bytes as well as steps, so the refusal arrives before the allocation | wolf-lang (checked-tier execution) | [filed: wolf-lang#308](https://github.com/wolffe-lang/wolf-lang/issues/308); wolf-std#19 and wolf-std#20 carry the measurement |
+| F-0116 | 2026-09-11 | **The checked tier's budget counts STEPS and not BYTES: one `cavp_*_long.lu` row reaches 16-18 GiB of resident set before `unsupported: step budget exhausted` arrives, on hosts with 16 GB.** This is the mechanism behind wolf-std#19 (the `ubuntu-latest` runner killed twice at the same test, exit 143) and behind half of wolf-std#20 (the same rows timing out at 60 s on `windows-latest`) — one bug seen through two ceilings, and neither issue had named it. wolf-std#19 read the kill as "one native compile-and-link of the largest generated file"; measured, the NATIVE lane is the cheapest of the three by two orders of magnitude (0.42 s / 57 MiB) and the CHECKED tier is the expensive one (6.7 s / 16.6 GiB). Reduced to twelve lines with no std: `s.bytes()` on the checked tier materializes a view per call against a shrinking `str` and never reclaims it, so a walk is quadratic in memory — 15.4 MiB at n=512 to 1868 MiB at n=8192, x3.8 per doubling, against 54 MiB flat on the native lane and 12 MiB on lupin. Swap the `.bytes()` for a `.len` and the curve flattens, so it is the materialized view and not the slicing. `std.hex.decode` walks a `str` exactly this way and the CAVP rows hand it a 25,600-character literal. v0.2.10 does not change it (the same row under v0.2.9 peaks at 17.8 GiB). Closes when the tier bounds bytes as well as steps, so the refusal arrives before the allocation | wolf-lang (checked-tier execution) | [filed: wolf-lang#308](https://github.com/wolffe-lang/wolf-lang/issues/308); wolf-std#19 and wolf-std#20 carry the measurement — **RETIRED at sc44, and the fix is upstream's not this repository's.** wolf-lang#308 landed as s153's `[exec.checked.budget]`: the checked tier keeps a BYTE budget beside its step budget (256 MiB at s153, charged at every allocation, never refunded) and exhausting either is `unsupported`, never a verdict. The clause's own prose names this row — "one wolf-std row reached 16.6 GiB of resident set on a 16 GB runner before `step budget exhausted` arrived, an OOM where an honest refusal was owed" — which is this finding's number reaching the spec. Re-measured cold at the sc44 pins (wolf 0.2.11, `/usr/bin/time -l`, one row one lane at a time): `cavp_sha256_long` **30.2 MiB / 1.57 s**, `cavp_sha384_long` **40.4 MiB / 1.82 s**, `cavp_sha512_long` **40.0 MiB / 1.79 s**, each `unsupported — step budget exhausted`. Four hundred times in bytes, four in time. sc44 predicted 45–55 MiB in writing before measuring and it came in UNDER the band. The most expensive single process left in the whole differential is lupin's own refusal of the same rows at 0.63 GiB. `std-test` runs on all three tier-1 hosts again (wolf-std#19 closed, and the timing family of wolf-std#20 with it), the 60 s per-row ceiling stands UNCHANGED and no longer binds, and `STD_TEST_TIMEOUT_SECS` is still not set — sc43's answer to #20's either/or was NEITHER and nothing was relaxed to get the green |
 | F-0117 | 2026-09-11 | **D34 is asserted in commit messages and gated nowhere: 32 committed `.lu` files are not fixed points of `wolf fmt`.** sc42 argued that the leading-`else` grammar would move no std source byte, and one of its reasons was that "`wolf fmt` is law for every committed `.lu` here (D34) ... so every file in this tree is already at the fixed point". The conclusion held; the premise does not. `wolf fmt --check std tests` names 32 files — six under `std/`, twenty-six under `tests/` — all of them width cases where a long `assert(...)` was committed on one line. Measured at BOTH pins, and the two file sets compare equal, so this is a standing gap and not this bump's motion. Nothing caught it because nothing looks: `workflow::CI_STEPS` has eleven entries and none of them is `wolf fmt --check`, and `cargo fmt --all --check` gates the Rust only. F-0113 one layer up, wolf-std#18 one layer down. Not taken at sc43 (F-0111's reason: a 32-file relay wants its own commit, its own gauntlet and its own reading) | wolf-std (the rig's own gauntlet) | [filed: wolf-std#21](https://github.com/wolffe-lang/wolf-std/issues/21) |
+| F-0118 | 2026-09-11 | **A trait is not the same trait through an import, and half of F-0002 is now false.** F-0002 ("neither implementation EXECUTES trait dispatch") has been quoted in six module headers since sc01. At the sc44 pins BOTH compiler rungs dispatch, and lupin 0.1.33 dispatches a trait declared in the ENTRY FILE while refusing the byte-identical trait reached through a `use` — `unsupported: `Eq` is a trait; traits, enums and type-level items have no dynamic semantics here`, at `resolve`, before dispatch is attempted. Twelve lines, two files, move the trait and it runs. **AND ON THE COMPILER, THE LOUDEST OF THE FOUR:** `[type.trait.op]` resolves the operator trait by BARE name, `use std.cmp` binds only `cmp`, and wolf has no item imports — so `==` on `std.cmp.Ordering` is `E0301` from every file that imports it, with a fix-it neither half of which can be followed (nothing brings `Eq` into scope; the `impl Eq for Ordering` it asks for already exists). Every user type any library publishes has the same hole, in the release whose headline is operators on user types; two entry tests are its ledgered regression witnesses. Two more use-counting neighbours on opposite sides: a qualified trait in a BOUND does not count as a use of its import under lupin (E0305 on a name that IS used), and one in a trait-ALIAS right-hand side does not count under wolfc, on both imports, one at a time. The cost is itemized: std.map's `[K: Eq]` five and std.cmp's four new impls stay prose examples, std.ops has no fenced example at all, four ledger rows carry `unsupported` on the lupin column for this alone. wolf-std#24 predicted the opposite, reading wolf-lang's own corpus witness — which declares its `Eq` in the entry file. **A witness that declares its trait locally cannot say anything about a trait reached through `use`**, and this repository's std is the only corpus in the org where every trait is imported by construction | wolf-interp (resolve); wolf-lang (resolve, alias half) | [filed: wolf-interp#96](https://github.com/wolffe-lang/wolf-interp/issues/96), [wolf-interp#97](https://github.com/wolffe-lang/wolf-interp/issues/97), [wolf-lang#334](https://github.com/wolffe-lang/wolf-lang/issues/334), [wolf-lang#336](https://github.com/wolffe-lang/wolf-lang/issues/336); retires the compiler half of F-0002 |
+| F-0119 | 2026-09-11 | **A module nobody could type is a module nobody read: `std.map.set` had been wrong since sc02 and no compiler had ever looked at it.** `std/map/map.lu` was `unsupported` on both compiler rungs for forty-two sprints because `Map` was prelude-ambient and wolfc did not type it. s152 made it `TyKind::Map`; the mem tier read the module for the first time and answered `E1004` at `m[k] = v` — one function, taking the WHOLE module down on both rungs, twelve functions' worth of rows. The body is `m[k] = copy v` now, the fix-it the diagnostic prints. **The general shape is the finding**: an `unsupported` row for a STRUCTURAL reason is not a lane that passed, it is a lane that never looked, and every such row suspends every claim this repository makes about the source behind it — so the sprint that removes the structural reason should budget for a BODY being read for the first time and not for a row flipping. F-0113's shape ("a claim with no mechanism behind it") in the ledger rather than in the workflow. The asymmetry itself is real and filed: `(mut xs).push(v)` generic over `[T]` needs no `copy`, the same `set` body monomorphic at `Map[str, int]` runs on all three lanes, and `let w = v; m[k] = w` is still E1004 | wolf-std (sc02 body); wolf-lang (mem) | [filed: wolf-lang#333](https://github.com/wolffe-lang/wolf-lang/issues/333); predicted in `vendor/tools.toml`'s delta 1 before the run |
+| F-0120 | 2026-09-11 | **`take` is a reserved word, and the combinator the book's chain wanted is a slice.** wolf-std#23 asked whether std intends a returning `sorted_by` and a prefix `take`, naming wolf-lang#154's ownership verb as "the naming collision the second combinator has to survive". It does not survive it: `fn take[T](xs: List[T], n: int)` is `E0008: `take` is a reserved keyword and cannot be a name; wolf has no raw identifiers` on BOTH machines, at parse. There is no spelling of that function and the question was never which module it belongs in. And it is not needed — `xs[..n]` and `xs[1..]` (`[mem.list.slice]`) reach `exit(0)` on all three lanes at these pins, where the issue's own text said the compiler "declines at wir", true at the pins it was written against. §8 forbids a std name that shadows a working builtin. **Before designing around a name, check that the name can exist**: one `conform-run` would have answered half of wolf-std#23 the day it was filed | wolf-std (sc04 API question) | not filed upstream — the grammar is correct and the answer is a std decision; `std/sort/sort.lu`'s header and `tests/sort/returning_twins.lu` carry it |
+| F-0121 | 2026-09-11 | **The ledger has no word for "the reference machine refuses STATICALLY where the compiler lanes run", and it cost `trait Num` a release.** `tests/ledger.toml`'s lupin column is `run \| unsupported \| slow \| divergent(…)` and `ledger.rs` refuses `fail(…)` there by name; `divergent(…)` was built at sc24 for the OPPOSITE direction and its vocabulary describes what lupin DOES, not what it refuses. So a test whose lupin verdict is `fail(E…)` has no legal row at all and is a RED no ledger edit can make green. Not hypothetical: `[type.trait.op.alias]`'s form does not parse under lupin 0.1.33 (s155 unmirrored), so a module carrying `trait Num = …` is `fail(E0201)` there — the FILE, not a row — and the nursery cannot hold it either, because a resident is a complete TESTED body and a body with no ledgerable test is a claim rather than code (F-0061's rule). `Num` was withdrawn and its trigger written into `std/ops/ops.lu`. **The sc35 block at the top of `ledger.toml` already named the gap** — "`divergent(…)`'s vocabulary is one-directional … blind to the mirror" — and left it alone because the bump that caused it retired it the same day; it recurred one release later on a different clause. Not fixed here on purpose: a new word changes what all 401 rows may say (F-0111) | wolf-std (the rig) | [filed: wolf-std#27](https://github.com/wolffe-lang/wolf-std/issues/27) |
+| F-0122 | 2026-09-11 | **The checked tier answers a float comparison WRONGLY, and a structural `unsupported` had been hiding it since sc10.** `let n: int = 4; let a = n as f64; a == 4.0` is `false` on `--checked` and `true` on `--native` and under lupin; the value prints as `4` on all three and compares equal to ITSELF. Any `f64` that has passed through `as f64` is unequal to every `f64` that has not — not a magnitude story (`4`, `1000000` and both sides of 2^53 all fail) and not a regression (v0.2.10 gives the identical `false`). This is not an honest `unsupported`, it is a VERDICT and it is the wrong one, on a tier whose clause says it "never guesses"; and it is very nearly the tier's whole float comparison surface, because `<` on floats is already refused. **Found the way F-0119 was found, on the same day, in a second module**: `tests/json/number_posture_and_depth.lu`'s wolfc row was `unsupported` for `methods on generic std data`, s152 removed that refusal, the program ran on that tier for the first time in its life and returned 4 — its `as_float` widening assertion. A dark lane concealing an unread BODY is F-0119; a dark lane concealing a wrong ANSWER is this, and it is the worse of the two. Both affected assertions are spelled through `json.stringify` as of sc44 — the only spelling that makes the tier refuse honestly instead of answering wrongly — and neither ledger row moves | wolf-lang (checked-tier execution) | [filed: wolf-lang#337](https://github.com/wolffe-lang/wolf-lang/issues/337); `tests/json/number_posture_and_depth.lu` and `tests/json/values_and_accessors.lu` name it in their headers |
 
 
 ## F-0001 — the std search path
@@ -8813,6 +8818,49 @@ is the one already written into `.github/workflows/ci.yml`: the ceiling
 stays, `std-test` stays off `ubuntu-latest`, and the comment at the step
 says which bug it is waiting on.
 
+**RETIRED at sc44, and this repository's number reached the spec.**
+wolf-lang#308 landed as s153's `[exec.checked.budget]`: the checked tier
+keeps a BYTE budget beside its step budget — 256 MiB at s153, charged at
+every allocation, never refunded, the ledger monotone — and exhausting
+either is `unsupported`, never a verdict. The clause's own normative
+prose is this finding, in upstream's words:
+
+> one wolf-std row reached 16.6 GiB of resident set on a 16 GB runner
+> before `step budget exhausted` arrived — an OOM where an honest
+> refusal was owed.
+
+Re-measured cold at the sc44 pins (macOS aarch64, `wolf 0.2.11`,
+`/usr/bin/time -l`, one row one lane at a time, `--checked`):
+
+| row | peak RSS | wall | verdict |
+|---|---|---|---|
+| `cavp_sha256_long.lu` | **30.2 MiB** | 1.57 s | `unsupported — step budget exhausted` |
+| `cavp_sha384_long.lu` | **40.4 MiB** | 1.82 s | `unsupported — step budget exhausted` |
+| `cavp_sha512_long.lu` | **40.0 MiB** | 1.79 s | `unsupported — step budget exhausted` |
+
+Four hundred times in bytes, four in time. sc44 wrote **45–55 MiB** as
+its prediction before measuring and it came in UNDER the band. The other
+two lanes on the same rows, for scale: native `exit(0)` at 0.36 s and
+56 MiB, lupin `unsupported` at 16.6 s and 0.63 GiB — so the most
+expensive single process left in the whole 401-row differential is the
+reference machine's own honest refusal, at a twenty-fifth of what the
+checked tier used to cost.
+
+`std-test` runs on all three tier-1 hosts again. **The 60 s per-row
+ceiling stands UNCHANGED and no longer binds**, and
+`STD_TEST_TIMEOUT_SECS` is still not set anywhere: sc43's answer to
+wolf-std#20's either/or was NEITHER and nothing was relaxed to get the
+green. wolf-std#19 closes; wolf-std#20's timing family closes with it and
+that issue stays open on `net/reuse_port` alone.
+
+**The two sentences worth keeping from the whole episode.** The first is
+sc43's: a ledger word is what the rig EXPECTS, never permission to skip a
+lane, and what it costs to reach an `unsupported` is a measurement
+nobody had taken. The second is sc44's, and it is the same sentence one
+turn further — the fix for a cost nobody had measured was a BUDGET and
+not a ceiling, because a ceiling buys the refusal at the price of the
+allocation finishing, and on a 16 GB runner that is the kill.
+
 ## F-0117 — D34 is law in the commit messages and gated nowhere: 32 committed `.lu` files are not fixed points of `wolf fmt`
 
 sc42's `tools.toml` entry argued that s144's leading-`else` grammar
@@ -9077,3 +9125,255 @@ from GitHub's release storage, six seconds in, after wolf's archive had
 already verified. The `pull_request` run of the same commit downloaded
 both. A network reset is a network reset; it is named here only so the
 run's two reds are not remembered as one kind of thing.
+
+## F-0118 — a trait is not the same trait through an import, and half of F-0002 is now false
+
+F-0002 has been quoted in six module headers since sc01: "neither
+implementation EXECUTES trait dispatch". Measured at the sc44 pins
+(wolf 0.2.11, lupin 0.1.33) the sentence is wrong in two directions at
+once, and the correction is what decides which of this sprint's doc
+examples could be fenced.
+
+**Both compiler rungs dispatch.** `cmp.Eq.eq('a', 'a')`,
+`cmp.Ord.cmp("a", "b").is_lt()`, `ops.Add.add(a, b)` and a bound-driven
+`acc + x` under `[T: ops.Add]` all reach `exit(0)` on the checked tier,
+and everything that does not touch `std.cmp` reaches it natively too.
+
+**lupin dispatches a trait declared in the ENTRY FILE and refuses the
+same trait through a `use`.** Twelve lines, two files, nothing else
+different:
+
+```wolf
+// std/tiny/tiny.lu          | // m.lu
+//! member: true             | use std.tiny
+pub trait Eq {               |
+    fn eq(self, other: Self) |  fn same[K: tiny.Eq](a: K, b: K) -> bool {
+        -> bool              |      tiny.Eq.eq(a, b)
+}                            |  }
+impl Eq for str {            |
+    fn eq(self, other: Self) |  fn main() -> !int {
+        -> bool {            |      print("{same("x", "x")}")
+        self == other        |      0
+    }                        |  }
+}                            |
+```
+
+```
+lupin:  unsupported — `Eq` is a trait; traits, enums and type-level items
+                      have no dynamic semantics here
+wolfc:  exit(0)
+native: exit(0)
+```
+
+Move the trait and impl into `m.lu`, change nothing else, and lupin
+prints. So dispatch is not what is missing; the resolver refuses a trait
+reached through an import, at `resolve`, before dispatch is attempted.
+Filed as wolf-interp#96.
+
+**THE SAME SHAPE ON THE COMPILER, AND IT IS THE LOUDEST OF THE FOUR:
+`==` on a std type cannot dispatch from any file that imports it.**
+`[type.trait.op]` resolves the operator trait by BARE NAME. `use
+std.cmp` binds `cmp`; the trait is `cmp.Eq` and never `Eq`; wolf has no
+item imports of any kind. So
+
+```wolf
+use std.cmp
+let less = cmp.total_cmp(1.0, 2.0)
+let greater = cmp.total_cmp(2.0, 1.0)
+if less == greater { … }
+```
+
+is `E0301: `==` on `Ordering` needs the trait `Eq`, and nothing named
+`Eq` is in scope` on BOTH compiler rungs, and **neither half of its
+fix-it can be followed**: there is no spelling that brings `Eq` into
+scope, and the `impl Eq for Ordering` it asks for already exists in
+std.cmp — it is the NAME that does not resolve, not the impl that is
+missing. Inside `std/cmp/*.lu` the name is bare and `==` on `Ordering`
+works; one `use` away it does not. Every user type any library publishes
+has the same hole, in the release whose headline is operators on user
+types. Two entry tests went `unsupported` -> `fail(E0301)` on two lanes
+each and are ledgered as its regression witnesses; filed as
+wolf-lang#336.
+
+**Two more neighbours, both about USE-COUNTING rather than execution,
+and they are on opposite sides.**
+
+- lupin: a qualified trait in a generic BOUND does not count as a use of
+  its import — `fn f[T: ops.Add]` whose only mention of `ops` is that
+  bound is `E0305 … never used [mod.use.unused]`, a hard error on a name
+  that IS used. The compiler accepts the same file (wolf-interp#97).
+- wolfc: a qualified trait in a trait-ALIAS right-hand side does not
+  count either — `trait Num = ops.Add + … + cmp.Eq` is E0305 on BOTH
+  imports, one at a time, while a bound in the same file does count
+  (wolf-lang#334).
+
+**What it cost this sprint, itemized, because the cost is the finding.**
+The `[K: Eq]` five in `std.map` and the four new primitive impls in
+`std.cmp` stay prose examples; `std.ops` has no fenced example at all;
+four ledger rows carry `unsupported` on the lupin column for this and
+nothing else; two more carry `fail(E0301)` on both compiler columns. wolf-std#24 predicted the opposite — "they execute now on
+all three machines" — reading wolf-lang's own corpus witness, which
+declares its `Eq` in the entry file. **A witness that declares its trait
+locally cannot tell you anything about a trait reached through `use`,
+and that is the lesson worth keeping**: this repository's std is the
+only corpus in the org where every trait is imported by construction,
+so it is the only one that could have found this.
+
+## F-0119 — a module nobody could type is a module nobody read, and std.map.set had been wrong since sc02
+
+`std/map/map.lu` has been `unsupported` on both compiler rungs for
+forty-two sprints, because `Map` was prelude-ambient and wolfc did not
+type it. s152 made it `TyKind::Map`. The mem tier read the module for
+the first time at this pin and refused it:
+
+```
+error[E1004]: this stores a value from `v`'s region into `m`'s region —
+              parameter regions are independent by default
+  --> std://map/map.lu:136:5
+    |
+135 | pub fn set[K, V](mut m: Map[K, V], k: K, v: V) {
+136 |     m[k] = v
+```
+
+One function, and it took the WHOLE module down on both rungs — twelve
+functions' worth of rows, every one of which would otherwise have moved
+from `unsupported` to `run` in this sprint. The body is `m[k] = copy v`
+now, which is the fix-it the diagnostic prints.
+
+**The prediction was written before the measurement and it was right for
+the wrong reason.** `tools.toml`'s delta 1 says: "Every `map/*` row was
+`unsupported` on both compiler rungs because `Map` was not typed; now it
+types, so every body in the module is read by the mem tier for the first
+time. Predict at least one refusal falls out of that first reading." One
+did. What was not predicted is that it would be the module's most
+ordinary function, untouched since sc02, and that the refusal would be
+module-wide rather than row-local.
+
+**The general shape, which is worth more than the fix.** A lane that is
+`unsupported` for a STRUCTURAL reason — a type the compiler does not
+have, a capability an implementation declines — is not a lane that
+passed; it is a lane that never looked. Every `unsupported` row in
+`tests/ledger.toml` is a claim about a machine and simultaneously a
+suspension of every claim this repository makes about the source behind
+it. The day the structural reason goes away, a sprint should expect to
+find not a row moving but a BODY being read for the first time, and
+should budget for the finding rather than for the flip. This is F-0113's
+shape ("a claim with no mechanism behind it") in the ledger rather than
+in the workflow.
+
+The asymmetry itself is filed as wolf-lang#333 and it is a real one:
+`(mut xs).push(v)` generic over `[T]` needs no `copy`, the same `set`
+body monomorphic at `Map[str, int]` runs on all three lanes, and
+`let w = v; m[k] = w` is still E1004 — so the obvious hoist does not
+help and only the generic index store is refused.
+
+## F-0120 — `take` is a reserved word, and the combinator the book's chain wanted is a slice
+
+wolf-std#23 asked whether std intends a returning `sorted_by` and a
+prefix `take`, and named wolf-lang#154's ownership verb as "the naming
+collision the second combinator has to survive". It does not survive it.
+
+```
+E0008: `take` is a reserved keyword and cannot be a name; wolf has no raw
+       identifiers, so pick another name [gram.item.fn]
+```
+
+on BOTH machines, at parse, for `fn take[T](xs: List[T], n: int)`. There
+is no spelling of that function; the question was never which module it
+belongs in.
+
+**And it is not needed.** `xs[..n]` and `xs[1..]` (`[mem.list.slice]`)
+reach `exit(0)` on all three lanes at these pins — measured, and the
+issue's own text said the compiler "declines at wir", which was true at
+the pins it was written against and is not true at these. §8's container
+rule forbids a std name that shadows a working builtin, so the answer to
+half the issue is that the language already shipped it.
+
+The chain in std's vocabulary is `sort.sorted_ints(xs)[..2]`, it runs on
+lupin and the checked tier today, and `tests/sort/returning_twins.lu` is
+the row. Recorded here rather than only in the module header because the
+shape recurs: **before designing around a name, check that the name can
+exist.** One `conform-run` would have answered wolf-std#23's second half
+the day it was filed.
+
+## F-0121 — the ledger has no word for "the reference machine refuses STATICALLY where the compilers run", and it cost `trait Num`
+
+`tests/ledger.toml`'s lupin column is `run | unsupported | slow |
+divergent(…)` and `ledger.rs` refuses `fail(…)` for that column BY NAME:
+"`fail(…)` is a wolfc expectation". `divergent(…)` exists for the
+opposite direction — sc24 built it for "the compilers reject statically
+and the interpreter runs" — and its vocabulary (`stdout | exit(N) |
+trap(kind)`) is about what lupin DOES, not about what it refuses.
+
+So a test whose lupin verdict is `fail(E0201)` or `fail(E0305)` has no
+legal row at all. It is not a `divergent(…)`, it is not `unsupported`,
+and the word that describes it is rejected by the loader.
+
+**This is not hypothetical and it is why `trait Num` is not in this
+release.** `[type.trait.op.alias]`'s form does not parse under lupin
+0.1.33 (s155 is unmirrored; wolf-interp#92), so any module carrying the
+alias is `fail(E0201)` there — the FILE, not a row — and any test
+importing it is unledgerable. Parking it in `std/x/` does not help,
+because the nursery's own rule is that a resident is a complete TESTED
+body and a body with no ledgerable test is a claim rather than code
+(the rule `std.x.json.float_at` was withdrawn under, F-0061). So the
+alias was withdrawn and its trigger written into `std/ops/ops.lu`.
+
+The sc35 block at the top of `ledger.toml` already noticed the gap —
+"`divergent(…)`'s vocabulary is one-directional … blind to the mirror" —
+and left it alone because the pin bump that caused it retired it the
+same day. It did not retire; it recurred, one release later, on a
+different clause. **Not fixed here on purpose**: adding a word to the
+ledger's vocabulary changes what every one of 401 rows is allowed to
+say, it wants its own commit and its own reading, and folding it into a
+sprint whose job was a pin bump and a new module is the mistake F-0111
+records. Filed as its own issue with this paragraph as the argument.
+
+## F-0122 — the checked tier answers a float comparison wrongly, and an `unsupported` had been hiding it
+
+The checked tier is what `[exec.checked]` calls the machine that runs the
+abstract machine as an interpreter, detects every UB row rather than
+exploiting it, and "never guesses". Seven lines:
+
+```wolf
+fn main() -> !int {
+    let n: int = 4
+    let a = n as f64
+    print("{a}")        // 4 everywhere
+    print("{a == 4.0}") // checked FALSE; native true; lupin true
+    print("{a == a}")   // true everywhere
+    0
+}
+```
+
+Two of three machines say `true`. The value prints as `4` on all three
+and compares equal to ITSELF; it compares unequal to the literal with the
+same digits, and to any other `f64` it is numerically equal to. **Any
+`f64` that has passed through `as f64` is unequal to every `f64` that has
+not.** Not a magnitude story — `4`, `1000000` and both sides of 2^53 all
+fail — and not a regression: `wolf 0.2.10` gives the identical `false`.
+
+**It is not an honest `unsupported`; it is a verdict, and it is the wrong
+one.** The tier's whole float comparison surface is this operator: `<` on
+floats is already `unsupported — ordering outside integers, char, byte
+and str`, so `==` is very nearly all there is and it is wrong.
+
+**How it was found is F-0119 happening twice in one day, which is why it
+gets its own number rather than a paragraph in that one.**
+`tests/json/number_posture_and_depth.lu` asserts that `json.as_float`
+widens an `Int` and reports the rounded value; its `wolfc` row was
+`unsupported` at v0.2.10 with the reason `methods on generic std data`.
+s152 removed that structural refusal, **the program ran on that tier for
+the first time in its life, and returned 4** — that assertion.
+`tests/json/values_and_accessors.lu` reached the same line from the other
+direction, at `3`. So the second module in one sprint where an
+`unsupported` was not a lane that passed, and here what it was hiding was
+not an unread body but a WRONG ANSWER, which is the worse of the two
+things a dark lane can conceal.
+
+Both assertions are spelled through `json.stringify` as of sc44 — the
+only spelling that makes the tier refuse honestly instead of answering
+wrongly — with the issue named in both files. Neither ledger row moves,
+and that is the shape of the trade: the honest word is back, and it is
+honest for a stated reason now instead of a structural accident. They go
+back to `==` when this closes. Filed as wolf-lang#337.
