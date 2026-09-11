@@ -109,10 +109,15 @@ pub fn len(b: StrBuf) -> int {
 /// interim backing, amortized O(len(s)) once the SSO builder lands. Total:
 /// no error row, no traps beyond allocation.
 ///
-/// The `+=` spelling the sprint contract mentions is not available: `+` on
-/// `str` runs in lupin and is E0409 in wolfc, and the operator-to-method
-/// bridge is F-0004's open question. `push_str` is the one spelling std
-/// writes.
+/// The `+=` spelling the sprint contract mentions — `b += s` on the
+/// BUFFER — is not available: the operator-to-method bridge is F-0004's
+/// open question, and wolf has no operator overloading, so a `StrBuf`
+/// cannot be the left side of one. `push_str` is the one spelling std
+/// writes. (The sentence that stood here until sc43 went on to say `+`
+/// on `str` "runs in lupin and is E0409 in wolfc". That was true when it
+/// was written and stopped being true at D62, which this very body
+/// adopted: `b.s += s` is a `str` `+=` on all three lanes, and sc43's
+/// `push` is now its `char` twin one function down.)
 ///
 /// ```wolf-doc-example
 /// var b = strbuf.new()
@@ -126,14 +131,24 @@ pub fn push_str(mut b: StrBuf, s: str) {
 
 /// Appends one code point — the sc03 contract's `push(c)`, code at last
 /// (sc24), over D58's `char` (`[type.char]`: a Unicode scalar value,
-/// ordered, NOT an integer). The body is `{c}` interpolation, which
-/// `[type.char.interp]` rules to print THE CHARACTER — so the appended
+/// ordered, NOT an integer). The body is `b.s += c`, which
+/// `[type.str.concat]` rules to append THE CHARACTER — so the appended
 /// bytes are exactly `c`'s UTF-8 encoding, 1 to 4 of them, and the
 /// buffer's UTF-8 validity is preserved by construction: no `int` ever
 /// touches this path, and a non-scalar cannot exist as a `char` at all
 /// (the D56 cast already trapped it). O(len(b)) with the interim
 /// backing, amortized O(1) once the SSO builder lands. Total: no error
 /// row, no traps beyond allocation.
+///
+/// **It was an interpolation hole until sc43** — `b.s = "{b.s}{c}"` —
+/// and the hole existed for exactly one reason: `+` refused a `char`,
+/// so the only way to put one on the end of a `str` was to render it
+/// into a new string. wolf-lang#278 admitted a `char` on either side of
+/// `+` and as the value of `+=` at v0.2.9, and lupin 0.1.31 mirrored it
+/// (is43, wolf-interp#78). The two appenders are written in one idiom
+/// now — this line and `push_str`'s are the same line with a different
+/// operand type — and `[type.char.interp]` is no longer what carries
+/// the character across; `[type.str.concat]` is.
 ///
 /// LANES: every executing lane runs this as of the sc25 pins — both
 /// wolf rungs since s121, lupin since 0.1.15 (is26, the scalar
@@ -148,7 +163,7 @@ pub fn push_str(mut b: StrBuf, s: str) {
 /// strbuf.len(b) == 6
 /// ```
 pub fn push(mut b: StrBuf, c: char) {
-    b.s = "{b.s}{c}"
+    b.s += c
 }
 
 /// Inserts `s` at byte offset `off`, shifting everything at or after `off`
