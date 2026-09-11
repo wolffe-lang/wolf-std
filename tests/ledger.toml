@@ -521,13 +521,13 @@ native = "run"
 
 [tests."cmp/static_floor.lu"]
 lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1): [type.trait.op] — operators dispatch
 native = "unsupported"
 
 [tests."cmp/total_cmp_relational.lu"]
 lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
+wolfc = "fail(E0301)"  # sc44: `==` on `Ordering` needs a BARE `Eq` in scope (wolf-lang#336)
+native = "fail(E0301)"  # sc44: `==` on `Ordering` needs a BARE `Eq` in scope (wolf-lang#336)
 
 # sc44: the four impls this sprint added — `Eq for char`, `Ord for char`,
 # `Ord for str` (F-0006 retires) and `Eq for f64` (sc01's decision
@@ -548,17 +548,17 @@ native = "unsupported"
 # honestly rather than answered wrongly, which is the better verdict.
 [tests."cmp/ordering_exhaustive.lu"]
 lupin = "unsupported"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1): [type.trait.op] — operators dispatch
 native = "unsupported"
 
 [tests."cmp/ordering_methods_static.lu"]
 lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
-wolfc = "unsupported"
-native = "unsupported"
+wolfc = "fail(E0301)"  # sc44: `==` on `Ordering` needs a BARE `Eq` in scope (wolf-lang#336)
+native = "fail(E0301)"  # sc44: `==` on `Ordering` needs a BARE `Eq` in scope (wolf-lang#336)
 
 [tests."cmp/clamp_bad_range_trap.lu"]
 lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1): [type.trait.op] — operators dispatch
 native = "unsupported"
 
 # ---- std.testing ----
@@ -1326,7 +1326,7 @@ native = "unsupported"
 
 [tests."json/stringify_shapes.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1): [type.map] — the DOM types
 native = "unsupported"
 
 [tests."json/pretty_and_escape.lu"]
@@ -1980,12 +1980,12 @@ native = "run"  # 1b149ba: s106 crossed net natively
 # each, exactly as its header predicted in sc05.
 [tests."json/navigation.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1): [type.map] — the DOM types
 native = "unsupported"
 
 [tests."json/navigation_rows.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1): [type.map] — the DOM types
 native = "unsupported"
 
 # `std.bytes` gains `to_str` — a reviewed contract since sc05 and the last
@@ -2055,7 +2055,7 @@ native = "unsupported"
 
 [tests."json/unescape_shapes.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1): [type.map] — the DOM types
 native = "unsupported"
 
 
