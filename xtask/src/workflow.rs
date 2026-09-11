@@ -37,7 +37,7 @@ pub struct Step {
     pub command: &'static str,
 }
 
-/// The eleven steps, in the order `ci()` runs them. This list is the
+/// The twelve steps, in the order `ci()` runs them. This list is the
 /// gauntlet: `ci()` iterates it, so a step cannot exist here without
 /// running, or run without being here.
 pub const CI_STEPS: &[Step] = &[
@@ -68,6 +68,17 @@ pub const CI_STEPS: &[Step] = &[
     Step {
         name: "lint-conventions",
         command: "cargo xtask std-test --lint-conventions",
+    },
+    // sc45, F-0117, wolf-std#21 — THE STEP THAT WAS NEVER HERE. D34
+    // ("`wolf fmt` is law for every committed `.lu`") had no mechanism:
+    // `fmt` above gates the RUST, and until this entry nothing in either
+    // list gated the WOLF. Thirty-two files had been off the fixed point
+    // at three consecutive pins. It sits beside `lint-conventions`
+    // because it is the other static reading of the same `.lu` files,
+    // and it costs 0.2 s over the whole tree.
+    Step {
+        name: "fmt-lu",
+        command: "cargo xtask fmt-lu",
     },
     Step {
         name: "gen-vectors --check",
@@ -231,10 +242,19 @@ jobs:\n\
 \x20     - run: cargo xtask ledger-check\n\
 \x20     - run: cargo xtask std-test\n\
 ";
+        // The four of F-0113 are exactly the four this fixture cannot
+        // cover, and they still are. sc45's `fmt-lu` joins them because
+        // that workflow did not run it either — it did not exist — so
+        // the list is five now and the F-0113 four are the first four
+        // in order. Asserted as containment rather than equality: the
+        // fixture is frozen history, and the thing it proves is that
+        // the reader FINDS a step no runner executes, not how many
+        // steps the gauntlet has grown to since.
         assert_eq!(
             local_only(seven),
             vec![
                 "lint-conventions",
+                "fmt-lu",
                 "gen-vectors --check",
                 "doc-examples",
                 "ulp"

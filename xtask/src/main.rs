@@ -3,10 +3,14 @@
 //! wolf-interp (binaries and pinned data are the only couplings).
 //!
 //! Subcommands: `std-test`, `doc-examples`, `ulp`, `doctor`, `sync-pin`,
-//! `ledger-check`, `ci`.
+//! `ledger-check`, `fmt-lu`, `ci`.
 //!
-//! `ci` is the eleven-step local gate, and since sc41 it ends by naming
-//! which of those eleven `.github/workflows/ci.yml` also runs (F-0113).
+//! `ci` is the twelve-step local gate, and since sc41 it ends by naming
+//! which of those twelve `.github/workflows/ci.yml` also runs (F-0113).
+//! The twelfth is sc45's `fmt-lu` (F-0117, wolf-std#21): `cargo fmt
+//! --all --check` gated the Rust and nothing gated the wolf, so D34 was
+//! asserted in commit messages for a dozen sprints and enforced by
+//! nobody.
 
 mod anchors;
 mod bins;
@@ -14,6 +18,7 @@ mod directive;
 mod doc_examples;
 mod doctor;
 mod exec;
+mod fmt_lu;
 mod genvec;
 mod ledger;
 mod record;
@@ -52,6 +57,8 @@ fn main() {
         Some("doc-examples") => doc_examples::doc_examples(),
         Some("ulp") => ulp::ulp(),
         Some("ledger-check") => runner::ledger_check(),
+        // sc45: `wolf fmt --check` over every committed `.lu` (D34).
+        Some("fmt-lu") => fmt_lu::fmt_lu(),
         // sc16: regenerate the crypto vector tests from `vendor/vectors/`
         // (`--check` verifies the committed files instead of writing).
         Some("gen-vectors") => genvec::gen_vectors(args.iter().any(|a| a == "--check")),
@@ -62,7 +69,7 @@ fn main() {
             eprintln!(
                 "usage: cargo xtask \
                  <std-test [--lint-conventions]|doc-examples|ulp|ledger-check\
-                 |gen-vectors [--check]|doctor|sync-pin|ci>{}",
+                 |gen-vectors [--check]|fmt-lu|doctor|sync-pin|ci>{}",
                 other.map(|o| format!(" (got `{o}`)")).unwrap_or_default()
             );
             std::process::exit(2);
@@ -126,6 +133,7 @@ fn run_step(name: &str, repo: &Path, cargo: &str) -> Result<(), String> {
         "doctor" => doctor::doctor(),
         "ledger-check" => runner::ledger_check(),
         "lint-conventions" => runner::lint_conventions(),
+        "fmt-lu" => fmt_lu::fmt_lu(),
         "gen-vectors --check" => genvec::gen_vectors(true),
         "std-test" => runner::std_test(),
         "doc-examples" => doc_examples::doc_examples(),

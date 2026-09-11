@@ -434,6 +434,35 @@ jobs:
           ".wolf-bin/lupin$exe" --version
       - name: lint-conventions
         run: cargo xtask std-test --lint-conventions
+      # sc45 / F-0117 / wolf-std#21 — THE GATE D34 NEVER HAD.
+      #
+      # `fmt` in the `rig` job gates the RUST (`cargo fmt --all --check`)
+      # and has since sc00. Nothing in either job gated the WOLF, so
+      # "`wolf fmt` is law for every committed `.lu` here" was a sentence
+      # in commit messages and in `vendor/tools.toml` with no mechanism
+      # behind it — and thirty-two committed files were off the fixed
+      # point at wolf 0.2.9, 0.2.10 AND 0.2.11, the three sorted lists
+      # equal line for line. Standing drift, never a bump artefact,
+      # invisible because nothing looked (F-0113's shape one gate over).
+      #
+      # It runs in `gates` rather than `rig` because it needs the wolf
+      # binary this job has already acquired, and beside
+      # `lint-conventions` because it is the other static reading of the
+      # same `.lu` files. MEASURED on the author's box over 452 files at
+      # 0.2.11: **0.23 s** for the whole tree in one process; the step
+      # batches at 64 paths per invocation (windows caps a command line
+      # at 32,767 characters and this list only grows), so budget seven
+      # invocations and call it two seconds on any host.
+      #
+      # REQUIRED from the first run, and that is deliberate against this
+      # repository's own custom of one advisory landing: the advisory
+      # rule is for a step whose BEHAVIOUR on a host is unknown. This
+      # step's behaviour is known on every host — it is one process
+      # comparing bytes, it was run to completion here before the push,
+      # and the tree it reads is committed. A `continue-on-error` on it
+      # would reproduce exactly the thing being fixed.
+      - name: fmt-lu
+        run: cargo xtask fmt-lu
       - name: gen-vectors --check
         run: cargo xtask gen-vectors --check
       # These two were ADVISORY ON WINDOWS for one commit — the landing
