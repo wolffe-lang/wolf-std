@@ -34,7 +34,8 @@
 //!
 //! 1. The alias FORM is `E0201: expected `{`, found `=`
 //!    [gram.item.trait]` under lupin 0.1.33, whose conformance pin is
-//!    v0.2.10 — one release short of s155. A parse failure is not a
+//!    v0.2.10 — one release short of s155 (wolf-interp#92 tracks the
+//!    mirror). A parse failure is not a
 //!    row's verdict, it is the FILE, so an alias committed anywhere in
 //!    this module's directory would take the reference machine's lane
 //!    off every importer of the six traits above.
@@ -46,7 +47,8 @@
 //!    A body with no ledgerable test is a claim rather than code
 //!    (D31's register, rule 1 — `std.x.json.float_at` was written and
 //!    withdrawn inside one sprint for exactly that), so `Num` is
-//!    withdrawn here rather than shipped anywhere.
+//!    withdrawn here rather than shipped anywhere. Filed as
+//!    wolf-std#27, which is the word the ledger is missing.
 //!
 //! **The trigger, named:** the wolf-interp release whose conformance
 //! pin is at or past wolf-lang `c9237c1` (v0.2.11). On that release the
@@ -65,13 +67,16 @@
 //!   IT, a program that imports this module and adds two ints goes from
 //!   `exit(0)` to `unsupported` on the native lane. One refused body
 //!   costs every importer a lane (house doctrine, sc01), so it waits for
-//!   wolf-lang#327. The consequence is stated where it lands:
-//!   `std.x.ops_num`'s `Num` is satisfied at `int` and not at `f64`.
+//!   wolf-lang#327. The consequence rides with `Num` above: the alias
+//!   lists `Rem`, so `Num` is satisfiable at `int` and not at `f64`
+//!   whichever release lands it, until #327 goes one way or the other.
 //! - `impl Div for int` is integer division, truncating toward zero, and
-//!   it traps `divide_by_zero` on a zero divisor exactly as the operator
-//!   does — the impl IS the operator, traps included.
+//!   it traps `div-zero` on a zero divisor exactly as the operator does —
+//!   the impl IS the operator, traps included, which is what
+//!   `tests/ops/div_zero_trap.lu` is for.
 //! - Every example in this module is PROSE and not a fenced block, for a
-//!   reason measured at sc44 and filed at wolf-interp: a qualified trait
+//!   reason measured at sc44 and filed as wolf-interp#97: a qualified
+//!   trait
 //!   in a BOUND (`fn f[T: ops.Add]`) does not count as a use of `use
 //!   std.ops` under lupin 0.1.33, so the import the extractor writes is
 //!   `E0305 … never used [mod.use.unused]` — a hard error on a name that
@@ -112,7 +117,8 @@ pub trait Div {
 
 /// Remainder, `a % b`. At `int` the sign follows the dividend
 /// (truncated remainder) and a zero divisor traps `divide_by_zero`.
-/// There is no `f64` impl at these pins — see the module header.
+/// There is no `f64` impl at these pins — see the module header and
+/// wolf-lang#327.
 pub trait Rem {
     fn rem(self, other: Self) -> Self
 }

@@ -63,7 +63,7 @@
 //!   dispatch through an IMPORTED module's trait is `unsupported: `Eq`
 //!   is a trait; traits, enums and type-level items have no dynamic
 //!   semantics here`. Measured at sc44 with a twelve-line reduction and
-//!   filed at wolf-interp. F-0002 has said "dispatch executes nowhere"
+//!   filed as wolf-interp#96. F-0002 has said "dispatch executes nowhere"
 //!   since sc01; half of that is now false, and the half that is left is
 //!   about the import and not about dispatch.
 //! - So the five stay PROSE and not fenced blocks (§4 wants the
@@ -123,8 +123,8 @@ pub fn is_empty[K, V](m: Map[K, V]) -> bool {
 /// The asymmetry behind it is filed upstream: `(mut xs).push(v)` under
 /// `[T]` needs no `copy` and `m[k] = v` under `[K, V]` does, and the
 /// same body monomorphic at `Map[str, int]` runs on all three lanes.
-/// If that is ruled a bug the `copy` comes back out and no caller
-/// notices.
+/// Filed as wolf-lang#333; if it is ruled a bug the `copy` comes back
+/// out and no caller notices.
 ///
 /// ```wolf-doc-example
 /// var m = Map[str, int]()
