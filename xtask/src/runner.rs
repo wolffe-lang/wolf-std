@@ -612,8 +612,9 @@ fn classify(rec: &Record, check: &Check) -> Result<Achieved, String> {
             match stdout {
                 Some(expected) if !record::stdout_matches(rec, expected) => Err(format!(
                     "stdout hash mismatch (expected sha256 of {expected:?} \
-                     modulo one trailing newline, observed {:?})",
-                    rec.stdout_sha256
+                     modulo one trailing newline, observed {:?}){}",
+                    rec.stdout_sha256,
+                    observed_text(rec)
                 )),
                 _ => Ok(Achieved::Satisfies),
             }
@@ -630,6 +631,36 @@ fn classify(rec: &Record, check: &Check) -> Result<Achieved, String> {
         },
         (got, want) => Err(format!("expected {want:?}, observed verdict {got}")),
     }
+}
+
+/// What the program actually PRINTED, when the record carries it.
+///
+/// A byte-exact directive is checked against `stdout_sha256` and that is
+/// right: the hash is the contract. But a hash is unreadable, and
+/// wolf-std#20 is two windows rows whose divergence has a stable hash
+/// and no text — "reproducing needs a windows box (or a runner with a
+/// debug step) to print the actual stdout", says the issue, because the
+/// rig printed the hash and stopped. `[proto.record]` has carried
+/// `stdout_inline` the whole time; a mismatch is exactly the moment to
+/// spend it. Capped, so a generated row that prints a megabyte cannot
+/// turn one red line into a log nobody reads, and escaped, so a
+/// trailing-newline difference is visible rather than invisible.
+fn observed_text(rec: &Record) -> String {
+    const CAP: usize = 400;
+    let Some(text) = &rec.stdout_inline else {
+        return String::new();
+    };
+    let shown: String = text
+        .chars()
+        .take(CAP)
+        .flat_map(char::escape_default)
+        .collect();
+    let tail = if text.chars().count() > CAP {
+        " …(truncated)"
+    } else {
+        ""
+    };
+    format!("\n    observed stdout: \"{shown}\"{tail}")
 }
 
 fn diff_class(a: &Record, b: &Record) -> Option<&'static str> {
