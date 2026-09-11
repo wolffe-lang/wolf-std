@@ -8928,3 +8928,152 @@ which is now behind F-0116 and wolf-lang#308, and comes back the day the
 checked tier bounds its allocation. "Required" here still means no
 `continue-on-error` and nothing more: trunk carries no branch
 protection.
+
+## The sc43 windows native lane — what the first lit run answered, and the two windows "divergences" were never divergences
+
+Two runs of `ec5087e`, the `push` run `34547816236` and the
+`pull_request` run `34547819459`, read line by line.
+
+**Prediction 1 — the runtime resolves. HELD.** Both windows jobs print
+
+```
+doctor: native rung — wolf_rt.lib at D:/a/wolf-std/wolf-std/.wolf-bin/wolf_rt.lib (lane lit)
+lane native: D:/a/wolf-std/wolf-std/.wolf-bin/wolf.exe (source: .wolf-bin)
+```
+
+and the two loud SKIPs wolf-std#18 was filed for are gone.
+
+**Prediction 2 — the lane LINKS. HELD, and the proof is 370 programs.**
+`doc-examples: 421 block(s), GREEN` on windows, with 370 of the blocks
+carrying a `[native]` lane and every one of them `exit(0)`. A doc example
+cannot print `exit(0)` on the native rung without being compiled, linked
+and executed, so the linker question sc42 declined to guess at is
+answered by the ordinary output of an ordinary step. `ulp: native
+reproduces all 200 recorded values exactly` on that host for the first
+time in this repository's history.
+
+**Predictions 3 and 4 — the budget. WRONG, by an order of magnitude, in
+the cheap direction.** Budgeted: `gates (windows-latest)` into the tens
+of minutes, `rig (windows-latest)` over an hour. Measured:
+
+| job | before (2 lanes) | budget | measured (3 lanes) |
+|---|---|---|---|
+| `gates (windows-latest)` | 2:46 | 60 min | **3 min** |
+| `rig (windows-latest)` | 46:46 | 120 min | **48 min** |
+
+The arithmetic behind the budget — "397 rows gaining a lane that links a
+binary each" — assumed the native rung would compile most of what it is
+handed. It does not. The conservatism ledger on that host is 206-207
+entries and most of them are `unsupported(native)`: `json/*`, `map/*`,
+`pool/*`, `cmp/*` and the rest are refused BY NAME before any linking
+happens, so the third lane costs about ninety seconds on `rig` and about
+fifteen seconds on `gates`. **The rule to carry: a lane's cost is the
+rows it ACCEPTS, not the rows it is offered**, and this repository has a
+ledger that says which is which before the run. The budget could have
+read it and did not. Timeouts come back to 90 (`rig`) and 20 (`gates`).
+
+**`gates`' two advisory steps are required again**, on sc42's own
+evidence rule — two greens on the same commit, read line by line. `rig`'s
+`std-test` stays advisory on windows.
+
+### wolf-std#20's two deterministic rows, read as TEXT for the first time
+
+The `stdout_inline` change landed one commit earlier paid on the first
+run it was part of. Both rows print what the program actually printed,
+and **neither of them is the windows semantics disagreement the issue
+recorded.**
+
+**`tests/fs/fstat_rows.lu`** — expected
+`"closed: io\ndirectory handle: denied-or-kind-1\nerror: io"`, observed
+`"closed: io\n\ndirectory handle: denied-or-kind-1\nerror: io\n"`. The
+difference is **one blank line**, and its source is the test's own
+recovery arm:
+
+```wolf
+fs.close(take opened) else |_| print("")
+```
+
+`fs.open` on a directory answers `denied` on windows — which is the row
+this test is *about*, and which the clause states — so `opened.fd` is
+`-1`, closing `-1` raises `io`, the `else` fires, and `print("")` puts an
+empty line in the middle of the transcript. On the unix hosts the open
+succeeds, the close succeeds and the arm never runs. **The row the test
+asserts was satisfied on windows the whole time**: the observed text
+contains `directory handle: denied-or-kind-1`. The arm is `else |_| {}`
+now, which is what "recover by printing nothing" always meant, and which
+changes no byte on any other host.
+
+**`tests/net/reuse_port.lu`** — expected `served: true | …`, observed
+`served: false | second_bind: true | some_member: true | survivor: true |
+double_bind_exists: true`. Exactly one of the five facts differs, and the
+program sets it itself:
+
+```wolf
+var a = net.listen_with(net.loopback(0), opts) else |e| match e {
+    unsupported => { served = false; … }
+```
+
+`opts.reuse_port = true` is `unsupported` on windows, which is TRUE —
+that platform has no `SO_REUSEPORT` — and the test already models the
+case, which is the only reason `served` is a variable. What it does not
+do is admit the case in its DIRECTIVE, which hard-codes
+`served: true`. So this is a test written on a host where the feature
+exists, not two machines disagreeing about a program: both windows lanes
+agree with each other and with the platform. Not fixed here, because the
+honest fix is a directive that can say "either", or a body that asserts
+the four portable facts and reports the fifth — a `std.net` sprint's
+call and not a pin bump's.
+
+Both rows were filed as "windows semantics, not flakes" and "reproducing
+needs a windows box". Neither needed a windows box. They needed the rig
+to print the string it was hashing.
+
+### What the lit lane ADDED, which is what a first run is for
+
+Three rows fail on the windows NATIVE column that no host had ever
+observed, all in the descriptor-handoff family:
+
+```
+tests/net/adopt_rows.lu [native]: expected exit(0), observed exit(1)
+tests/process/prefork_handoff.lu [native]: expected exit(0), observed exit(1)
+tests/process/start_with_inherit_rows.lu [native]: expected exit(0), observed exit(1)
+```
+
+These are first observations on a platform whose descriptor model is not
+the unix one, not regressions: the lane that would have reported them has
+been dark since the repository had a windows runner. They belong to
+wolf-std#20's windows ledger and are named there.
+
+### F-0116 REACHED `macos-latest`, on the required lane, on this branch's own first run
+
+`rig (macos-latest)` went RED in the `push` run of `ec5087e` on
+
+```
+tests/x/crypto/sha2/cavp_sha512_long.lu [wolfc]: timed out after 60s
+```
+
+and was GREEN on the `pull_request` run of the same commit, thirty
+minutes apart. Four consecutive greens at sc42 and one green here say it
+is not deterministic; F-0116 says what it is. That row asks the checked
+tier for 17.8 GiB before the step budget fires, and whether the ask
+completes inside 60 seconds is a question about how much the host can
+give without swapping — which is a property of the runner that hour, not
+of the program. **So the timing family is not a windows problem.** It is
+a property of the three `cavp_*_long.lu` rows on every host, and
+`macos-latest` — the one host where `std-test` is REQUIRED — is one
+unlucky scheduling away from it.
+
+Recorded rather than papered over, and deliberately not "fixed" by
+raising the ceiling: a bigger ceiling buys the refusal at the price of
+the allocation finishing, which on a 16 GB runner is wolf-std#19. The
+required lane stays required and this is the flake it carries until
+wolf-lang#308 lands. If it recurs at a rate that costs the wave, the next
+step is a rig-side memory bound on the checked lane, not a bigger clock.
+
+**And a second red in the same run that is not ours.**
+`gates (ubuntu-latest)` failed in the acquire step with
+`read tcp …: read: connection reset by peer` fetching lupin's tarball
+from GitHub's release storage, six seconds in, after wolf's archive had
+already verified. The `pull_request` run of the same commit downloaded
+both. A network reset is a network reset; it is named here only so the
+run's two reds are not remembered as one kind of thing.

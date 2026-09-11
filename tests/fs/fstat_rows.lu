@@ -53,7 +53,15 @@ fn main() -> !int {
         let st = fs.fstat(mut opened) else fs.Stat { kind: 0 - 1, size: 0, modified_ms: 0 }
         kind = st.kind
     }
-    fs.close(take opened) else |_| print("")
+    // sc43: this arm FIRES on windows — `fs.open` on a directory answers
+    // `denied` there, so `opened.fd` is -1 and closing it raises `io` —
+    // and the `print("")` that used to stand here put a BLANK LINE in
+    // this test's stdout on exactly one host. That blank line is the
+    // whole of wolf-std#20's `fs/fstat_rows` "divergence": the row it
+    // asserts (`denied-or-kind-1`) was satisfied on windows all along.
+    // Recovering from a close failure by printing nothing is what the
+    // arm meant; printing an empty line is not the same thing.
+    fs.close(take opened) else |_| {}
     if kind == 1 || kind == 0 - 1 {
         print("directory handle: denied-or-kind-1")
     }

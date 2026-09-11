@@ -38,12 +38,14 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     # 75 was the measured windows number with the native lane DARK there
-    # (46:46 over two lanes). sc43 lights the third lane on that host, and
-    # the native rung compiles AND LINKS a binary per row — 397 of them —
-    # so the number that held for two lanes cannot be assumed for three.
-    # 120 for the landing, with the same promise sc42 kept: it comes back
-    # down to the measurement in the sprint that reads this run.
-    timeout-minutes: 120
+    # (46:46 over two lanes). sc43 lights the third lane on that host and
+    # the budget said the number could not be assumed for three.
+    # MEASURED over the two runs of `ec5087e`: windows **48 min** (from
+    # 46:46 — the third lane costs about ninety seconds, because most of
+    # what it meets here it declines by name), macOS 31 min. 90 leaves
+    # headroom over the windows number without pretending 75 was
+    # re-earned on a host that now runs half again as many invocations.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         # No `submodules:` — upstream/ is private and CI cannot clone it
@@ -345,16 +347,17 @@ jobs:
   # sc43: `gates` came in at a quarter of its budget on every host with
   # the windows native lane dark. wolf-std#18 lights it, so `doc-examples`
   # stages 421 blocks against THREE lanes on that host instead of two and
-  # the third one links a binary per block. 20 minutes was the measured
-  # number for a different job; 60 is the landing's budget and comes back
-  # down to the measurement the same way sc42's did.
+  # the third one links a binary per block. The landing budgeted 60
+  # minutes for that; MEASURED over the two runs of `ec5087e`, windows
+  # came in at **3 minutes** and so did ubuntu and macOS. Back to 20,
+  # which is where the measurement puts it.
   gates:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -454,20 +457,27 @@ jobs:
         run: cargo xtask std-test --lint-conventions
       - name: gen-vectors --check
         run: cargo xtask gen-vectors --check
-      # ADVISORY ON WINDOWS FOR THIS LANDING, on exactly the two steps
-      # whose behaviour changes from dark to lit there (wolf-std#18): both
-      # resolve the native rung through `bins::native_rt()`, and both ran
-      # a lane short on that host until this commit. Nothing changes on
-      # ubuntu or macOS, where the lane was already lit, so neither of
-      # those hosts loses a gate.
+      # These two were ADVISORY ON WINDOWS for one commit — the landing
+      # that lit the native lane there (wolf-std#18) — and the advisory
+      # marker is GONE AGAIN, on the same evidence sc42 required: two
+      # greens, read LINE BY LINE rather than off the job's colour,
+      # because a `continue-on-error` step that exits 1 still reports
+      # `conclusion: success`.
       #
-      # The rule sc42 paid for, restated because this is where it bites: a
-      # `continue-on-error` step that exits 1 still reports
-      # `conclusion: success`, so these two are read LINE BY LINE in the
-      # log and not from the job's colour.
+      # The two runs of `ec5087e`, `gates (windows-latest)` in each:
+      #   doc-examples: 421 block(s), GREEN   (370 of them on the NEW
+      #     native lane, every one `exit(0)` — which is also the proof
+      #     that the rung LINKS on that host, the question sc42 left
+      #     untested)
+      #   ulp: native reproduces all 200 recorded values exactly; GREEN
+      #
+      # And the budget written before the run was wrong by an order of
+      # magnitude in the cheap direction, which is worth the two lines
+      # it costs to say: `gates (windows-latest)` was budgeted at 60
+      # minutes for 421 examples gaining a linking lane and came in at
+      # **3 minutes**, because most of what the native rung meets in
+      # this tree it declines by name rather than compiles.
       - name: doc-examples
-        continue-on-error: ${{ runner.os == 'Windows' }}
         run: cargo xtask doc-examples
       - name: ulp
-        continue-on-error: ${{ runner.os == 'Windows' }}
         run: cargo xtask ulp
