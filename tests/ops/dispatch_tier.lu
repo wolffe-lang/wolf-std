@@ -1,0 +1,78 @@
+//! check: run(exit=0, stdout="3 7.5 abcd\n5 12 4 1 -5\n5.5 3 4.5 -2.5\n")
+//! phase: run
+//! conforms: type.trait.op, std.ops
+//!
+//! The operator bridge, executing: six generic functions whose only
+//! arithmetic is an operator on a type parameter, instantiated at `int`,
+//! `f64` and (for `Add`) `str`. Every one of them is a dispatch through
+//! `std.ops` by NAME ([type.trait.op]) and every one of them answers
+//! what the builtin operator answers, which is the clause's own claim
+//! about primitives — `[T: Add]` at `int` IS the machine add.
+//!
+//! `total` is the book's chapter-5 shape and the reason the module
+//! exists. It is written here with the bound spelled `ops.Add` rather
+//! than through an alias: `trait Num = …` does not parse under lupin
+//! 0.1.33 and lives in `std.x.ops_num` until it does.
+//!
+//! `ops.Add.add(…)` is called once on purpose. Without it lupin answers
+//! `E0305: the import `ops` is never used` — a qualified trait in a
+//! BOUND is not counted as a use there (measured at sc44, filed at
+//! wolf-interp) — and `fail(E0305)` is not a word the lupin column of
+//! the ledger has. With it the row is the honest `unsupported`: lupin
+//! executes no imported module's trait items.
+//!
+//! Literals stay in typed bindings: a bare literal argument defaults to
+//! `i32`, which does not meet an `impl … for int` (E0502) — the same
+//! paper cut `tests/cmp/static_floor.lu` carries.
+
+use std.ops
+
+fn total[T: ops.Add](xs: List[T], zero: T) -> T {
+    var acc = zero
+    for x in xs {
+        acc = acc + x
+    }
+    acc
+}
+
+fn diff[T: ops.Sub](a: T, b: T) -> T {
+    a - b
+}
+
+fn prod[T: ops.Mul](a: T, b: T) -> T {
+    a * b
+}
+
+fn quot[T: ops.Div](a: T, b: T) -> T {
+    a / b
+}
+
+fn rest[T: ops.Rem](a: T, b: T) -> T {
+    a % b
+}
+
+fn flip[T: ops.Neg](a: T) -> T {
+    -a
+}
+
+fn main() -> !int {
+    var ints = List[int]()
+    (mut ints).push(1)
+    (mut ints).push(2)
+    var floats = List[f64]()
+    (mut floats).push(2.5)
+    (mut floats).push(5.0)
+    var strs = List[str]()
+    (mut strs).push("ab")
+    (mut strs).push("cd")
+    let two: int = 2
+    let three: int = 3
+    let four: int = 4
+    let five: int = 5
+    let seven: int = 7
+    let nine: int = 9
+    print("{total(ints, 0)} {total(floats, 0.0)} {total(strs, "")}")
+    print("{diff(seven, two)} {prod(three, four)} {quot(nine, two)} {rest(nine, two)} {flip(five)}")
+    print("{diff(7.5, 2.0)} {prod(1.5, 2.0)} {quot(9.0, 2.0)} {flip(2.5)}")
+    if ops.Add.add(two, three) == five { 0 } else { 1 }
+}

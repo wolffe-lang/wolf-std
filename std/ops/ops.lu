@@ -1,0 +1,218 @@
+//! member: true
+//!
+//! std.ops — the operator traits: the protocols `+ - * / %` and unary
+//! `-` dispatch through when their operand is a type parameter or a user
+//! type. Stability tier: core.
+//!
+//! **This module is what `[type.trait.op]` asks std for, and the shapes
+//! are the clause's, not this module's opinion.** Since s155 (wolf-lang
+//! #5, spec/10 §11) an operator whose left operand is a type parameter
+//! or a user type is a call to a trait method chosen BY NAME: `a + b` is
+//! `Add.add(a, b)`, `-a` is `Neg.neg(a)`. The compiler refuses any other
+//! method shape with E0514, a missing impl with E0502 and no trait in
+//! scope with E0301, so the six declarations below are transcriptions
+//! and a rename here is a break for every caller.
+//!
+//! **On primitives the impls ARE the builtin operations** — the clause
+//! says so in as many words, so `[T: Add]` instantiated at `int` is the
+//! machine add and nothing is interposed. Every body below is one
+//! operator expression for that reason; a body that did arithmetic of
+//! its own would be a different function wearing the operator's name.
+//!
+//! **`Eq` and `Ord` are NOT here.** They are `std.cmp`'s and they stay
+//! there: `Ordering` is one enum in std (API-CONVENTIONS §6) and the
+//! compiler reads `Ord.cmp`'s answer by VARIANT NAME, so a second
+//! `Ordering` would be a second answer to a settled question. A bound
+//! that wants both writes `[T: ops.Add + cmp.Ord]`; the composed alias
+//! `Num` is the next paragraph's subject.
+//!
+//! **`trait Num` IS NOT SHIPPED AT THESE PINS, and it is the one item
+//! of s155's surface this module withholds.** `[type.trait.op.alias]`
+//! spells it `trait Num = Add + Sub + Mul + Div + Rem + Eq + Ord`, and
+//! wolf-std#26 asks for it by name. Two measurements at sc44 say not
+//! yet, and the second is the one that decides:
+//!
+//! 1. The alias FORM is `E0201: expected `{`, found `=`
+//!    [gram.item.trait]` under lupin 0.1.33, whose conformance pin is
+//!    v0.2.10 — one release short of s155. A parse failure is not a
+//!    row's verdict, it is the FILE, so an alias committed anywhere in
+//!    this module's directory would take the reference machine's lane
+//!    off every importer of the six traits above.
+//! 2. Parking it in the nursery does not pay that bill either, and
+//!    this is the part that is not obvious: `tests/ledger.toml`'s
+//!    lupin column is `run | unsupported | slow | divergent(…)` and
+//!    REFUSES `fail(…)` by name, so a resident whose module file
+//!    fails to PARSE on lupin has no legal row to be ledgered with.
+//!    A body with no ledgerable test is a claim rather than code
+//!    (D31's register, rule 1 — `std.x.json.float_at` was written and
+//!    withdrawn inside one sprint for exactly that), so `Num` is
+//!    withdrawn here rather than shipped anywhere.
+//!
+//! **The trigger, named:** the wolf-interp release whose conformance
+//! pin is at or past wolf-lang `c9237c1` (v0.2.11). On that release the
+//! alias goes in above, verbatim from the clause, and this paragraph
+//! becomes a CHANGELOG line. `Num` at `f64` needs a second thing as
+//! well — see `Rem` below — so the two triggers are independent and
+//! `Num` at `int` is the one that lands first.
+//!
+//! INTERIM SPELLINGS (each filed, flipped by the pin bump that fixes it):
+//! - **`impl Rem for f64` is NOT shipped.** Its body is `self % other`
+//!   by the clause, and `%` on `f64` has no native lowering
+//!   (`unsupported — this float operator (no frem op)`) and no checked
+//!   one either (`unsupported — `%` on floats (unruled: fmod vs
+//!   remainder)`). Measured at sc44, and the measurement is the reason
+//!   rather than the story: with the impl present and NOTHING CALLING
+//!   IT, a program that imports this module and adds two ints goes from
+//!   `exit(0)` to `unsupported` on the native lane. One refused body
+//!   costs every importer a lane (house doctrine, sc01), so it waits for
+//!   wolf-lang#327. The consequence is stated where it lands:
+//!   `std.x.ops_num`'s `Num` is satisfied at `int` and not at `f64`.
+//! - `impl Div for int` is integer division, truncating toward zero, and
+//!   it traps `divide_by_zero` on a zero divisor exactly as the operator
+//!   does — the impl IS the operator, traps included.
+//! - Every example in this module is PROSE and not a fenced block, for a
+//!   reason measured at sc44 and filed at wolf-interp: a qualified trait
+//!   in a BOUND (`fn f[T: ops.Add]`) does not count as a use of `use
+//!   std.ops` under lupin 0.1.33, so the import the extractor writes is
+//!   `E0305 … never used [mod.use.unused]` — a hard error on a name that
+//!   IS used, and the compiler accepts the same file. §4's doc-truth
+//!   rule wants the reference machine at `exit(0)`; until that is fixed
+//!   no block here can reach it, and an example that cannot run belongs
+//!   in prose.
+
+/// Addition, `a + b`. The compiler dispatches `+` here when the left
+/// operand is a type parameter bounded by `Add` or a user type with an
+/// `Add` impl in scope ([type.trait.op]); both operands are the same
+/// type, which the clause calls homogeneity and E0514 enforces.
+///
+/// Prose, not a fenced example (see the module header, wolf-interp's
+/// bound-is-not-a-use): under `fn total[T: ops.Add](xs: List[T], zero:
+/// T)`, `acc = acc + x` is `Add.add(acc, x)`, and at `int` that is the
+/// machine add.
+pub trait Add {
+    fn add(self, other: Self) -> Self
+}
+
+/// Subtraction, `a - b`. Binary only: unary minus is `Neg`.
+pub trait Sub {
+    fn sub(self, other: Self) -> Self
+}
+
+/// Multiplication, `a * b`.
+pub trait Mul {
+    fn mul(self, other: Self) -> Self
+}
+
+/// Division, `a / b`. The impl inherits the operator's traps: at `int`
+/// a zero divisor traps `divide_by_zero`, at `f64` it is IEEE and traps
+/// nothing.
+pub trait Div {
+    fn div(self, other: Self) -> Self
+}
+
+/// Remainder, `a % b`. At `int` the sign follows the dividend
+/// (truncated remainder) and a zero divisor traps `divide_by_zero`.
+/// There is no `f64` impl at these pins — see the module header.
+pub trait Rem {
+    fn rem(self, other: Self) -> Self
+}
+
+/// Arithmetic negation, unary `-a`. One argument, unlike the five
+/// binary traits, and the clause reads the shape: a `neg` taking two
+/// parameters is E0514.
+pub trait Neg {
+    fn neg(self) -> Self
+}
+
+impl Add for int {
+    fn add(self, other: Self) -> Self {
+        self + other
+    }
+}
+
+impl Sub for int {
+    fn sub(self, other: Self) -> Self {
+        self - other
+    }
+}
+
+impl Mul for int {
+    fn mul(self, other: Self) -> Self {
+        self * other
+    }
+}
+
+impl Div for int {
+    fn div(self, other: Self) -> Self {
+        self / other
+    }
+}
+
+impl Rem for int {
+    fn rem(self, other: Self) -> Self {
+        self % other
+    }
+}
+
+impl Neg for int {
+    fn neg(self) -> Self {
+        -self
+    }
+}
+
+impl Add for f64 {
+    fn add(self, other: Self) -> Self {
+        self + other
+    }
+}
+
+impl Sub for f64 {
+    fn sub(self, other: Self) -> Self {
+        self - other
+    }
+}
+
+impl Mul for f64 {
+    fn mul(self, other: Self) -> Self {
+        self * other
+    }
+}
+
+impl Div for f64 {
+    fn div(self, other: Self) -> Self {
+        self / other
+    }
+}
+
+impl Neg for f64 {
+    fn neg(self) -> Self {
+        -self
+    }
+}
+
+// NOT SHIPPED at these pins — `impl Rem for f64`, whose body is
+// `self % other` by [type.trait.op]. Both compiler tiers refuse that
+// expression (`no frem op` natively, `unruled: fmod vs remainder`
+// checked) and the refusal is not local: with the impl present and
+// nothing calling it, an importer that adds two ints drops from
+// `exit(0)` to `unsupported` on the native lane. wolf-lang#327 is the
+// trigger; the maintainer's call there is between lowering `%` on
+// floats and ruling it out, and either answer lands this impl or
+// retires the line.
+
+/// Concatenation, `a + b` ([type.str.concat]). `str`'s one operator
+/// impl: there is no `Sub`, `Mul`, `Div` or `Rem` for `str`, because a
+/// string has no such operation and an impl that invented one would be
+/// a lie the operator table tells for it.
+impl Add for str {
+    fn add(self, other: Self) -> Self {
+        self + other
+    }
+}
+
+// BLOCKED — the bitwise family (`BitAnd`, `BitOr`, `BitXor`, `Shl`,
+// `Shr`, `Not`) and `Index`. [type.trait.op]'s table this edition is the
+// six arithmetic operators plus `Eq`/`Ord`'s comparisons; nothing
+// upstream dispatches `&`, `|`, `^`, `<<`, `>>` or `xs[i]` through a
+// trait, so a trait named for one would be a declaration no compiler
+// reads. They land with the clause that adds them to the table.

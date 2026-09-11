@@ -1,0 +1,27 @@
+//! check: run(exit=trap(div-zero))
+//! phase: run
+//! conforms: type.trait.op, std.ops
+//!
+//! The impl IS the operator, traps included. `[type.trait.op]` says the
+//! primitive impls are the same operations, so `a / b` under `[T: Div]`
+//! at `int` with a zero divisor traps `div-zero` in every profile
+//! (X3) — not a row, not a sentinel, and not a different kind because a
+//! trait method is standing between the caller and the machine.
+
+use std.ops
+
+fn quot[T: ops.Div](a: T, b: T) -> T {
+    a / b
+}
+
+fn main() -> !int {
+    let nine: int = 9
+    let zero: int = 0
+    let two: int = 2
+    if ops.Div.div(nine, two) == 4 {
+        let boom = quot(nine, zero)
+        if boom == 0 { 1 } else { 1 }
+    } else {
+        1
+    }
+}
