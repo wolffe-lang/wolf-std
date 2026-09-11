@@ -529,6 +529,17 @@ lupin = "run"
 wolfc = "unsupported"
 native = "unsupported"
 
+# sc44: the four impls this sprint added — `Eq for char`, `Ord for char`,
+# `Ord for str` (F-0006 retires) and `Eq for f64` (sc01's decision
+# reversed). wolfc RUNS trait dispatch now; lupin has no dynamic
+# semantics for an IMPORTED module's trait items, which is a narrower
+# claim than F-0002's and a filed one; the native rung refuses
+# `impl Eq for Ordering`'s tuple match.
+[tests."cmp/primitive_impls_tier.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "unsupported"
+
 # sc04 pin bump, lupin 0.1.2: `run` -> `unsupported`, and the CAUSE is a
 # fix. wolf-interp#5 landed, so a bare-ident pattern is a variant pattern
 # now instead of a binding that always matched the first arm — and a
@@ -739,37 +750,46 @@ lupin = "run"
 wolfc = "run"
 native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
-# ---- sc02: std.map (lupin executes the builtin; wolfc does not type
-# `Map` at all — F-0011) ----
+# ---- sc02: std.map. AT sc44 THIS BLOCK STOPPED SAYING "wolfc does not
+# type `Map` at all" — s152 made `Map` a TYPE (`[type.map]`), so the
+# checked tier reads every body in the module and runs six rows that were
+# freight. The native rung stays `unsupported` for a reason that belongs
+# to std.cmp and not to std.map: `impl Eq for Ordering`'s
+# `match (self, other)` is `an enum or row test inside a product pattern
+# (deep trees, c06)`, which every importer of std.cmp pays. The `[K: Eq]`
+# three are `unsupported` on lupin because dispatch through an IMPORTED
+# module's trait has no dynamic semantics there — the same trait declared
+# in the entry file runs on all three machines, which is what makes this
+# an import bug and not F-0002's old blanket claim. ----
 
 [tests."map/set_len_empty.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1): [type.map] — `Map` is TyKind::Map
 native = "unsupported"
 
 [tests."map/keys_values_pairs.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1)
 native = "unsupported"
 
 [tests."map/clear_and_extend.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1)
 native = "unsupported"
 
 [tests."map/get_hit_miss.lu"]
 lupin = "unsupported"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1): the `[K: Eq]` five dispatch
 native = "unsupported"
 
 [tests."map/has_and_get_or.lu"]
 lupin = "unsupported"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1)
 native = "unsupported"
 
 [tests."map/remove_and_tally.lu"]
 lupin = "unsupported"
-wolfc = "unsupported"
+wolfc = "run"  # sc44 pin bump (c9237c1)
 native = "unsupported"
 
 # ---- sc02: std.pool (X5 — the two-phase protocol and the stale-handle
@@ -1096,10 +1116,34 @@ lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
 native = "unsupported"
 
+# sc44, wolf-std#23: the returning twins. Same lanes as their in-place
+# twins, for the same reason — `sorted_ints` IS `sort_ints` over a copy.
+[tests."sort/returning_twins.lu"]
+lupin = "run"
+wolfc = "run"
+native = "unsupported"
+
 # Freight: the generic contracts typecheck (`check: pass`, phase mem) and
 # execute nowhere — `Ord.cmp` dispatch (F-0002) and cross-module
 # `Ordering` examination (F-0029) are two independent blockers.
 [tests."sort/generic_contract.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# ---- sc44: std.ops — the operator traits ([type.trait.op], s155).
+# The bound-driven operator dispatches on both compiler rungs, native
+# included, because this module imports nothing: `std.cmp`'s tuple-match
+# refusal is what darkens the native lane for every other trait module
+# here, and `std.ops` does not pay it. lupin executes no imported
+# module's trait items. ----
+
+[tests."ops/dispatch_tier.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."ops/div_zero_trap.lu"]
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
