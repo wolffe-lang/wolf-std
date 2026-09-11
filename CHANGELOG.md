@@ -1,5 +1,135 @@
 # Changelog
 
+## sc43 — 2026-09-11 — the std takes the tenth, and the runner that dies is not dying of what we said
+
+`wolf 0.2.9` -> `0.2.10` (`662b14c`), `lupin 0.1.30` -> `0.1.31`
+(`e9c55b4`, conformance pin `4c60946`). The pairing gap reopens at
+**51 commits** with the compiler ahead — one whole release, s146 plus
+s147 plus s148 — which is the widest it has been since sc37 and the
+ordinary posture rather than sc35's inversion. lupin 0.1.31 lands ON a
+wolf-lang tag for the first time since sc40, and `wolf 0.2.10`'s pairing
+line names exactly the interpreter this box carries, which after five
+stale bumps is worth a sentence.
+
+Eight deltas across the fifty-one-commit span were classified in
+`tools.toml` before anything was measured, with the one to watch named
+(s148's `[type.fn.ret]` and `[type.row.operand]` — this repository is 596
+`pub fn` whose bodies end in a tail) and the two that cannot reach this
+tree argued rather than assumed (s147's range patterns, which no arm here
+writes; s148's E0416, because all twenty indexed assignments in the tree
+are a `Map` or a `List`). Registry `4c60946` -> `662b14c` predicted
+448 -> ~455, +7; measured **448 -> 458, +10**, dropped 0, owners moved 0,
+key sets diffed both ways, `[conf.anchor.ns]` byte-identical.
+
+**The prediction missed by three and all of it is one clause.** sc42's
+counting rule — a new leaf under a new parent costs two — was carried
+forward to `type.fn` and `type.row` and was exactly right, four predicted
+and four measured, both parents read out of the OLD registry. `[type.unit]`
+was counted at one key and registers **four**: the family head plus
+`consume`, `context` and `discard`, three sub-anchors its spec commit's
+subject never mentions. The rule one indirection further out: **a spec
+commit's SUBJECT names the clause, not the anchors.** And the same class
+of sentence, wrong the other way, in the same span — s147's spec commit
+says "anchors 453 -> 454" where the file reads 452 -> 453. Filed upstream.
+
+**Zero ledger motion, and this time zero was the prediction.** 397 rows,
+three lanes, 0 divergent, 0 unstable, 0 slow skips. s148's two clauses
+could not move anything because the mirror had already landed them: lupin
+0.1.31's #73 and #81 are what wolf-lang#284 cites as its own witnesses,
+so both machines tightened, in that order.
+
+**W0601, predicted at zero and measured at zero.** s146 makes a `!()`
+tail in a unit context a warned discard. All 29 of std's `-> () ! {...}`
+functions end in `?`, every statement-position call in `tests/` is
+infallible, neither corpus writes a closure literal — scanned before the
+run, and the run agrees over 397 rows and 421 examples on a rig that
+denies warnings.
+
+**`str + char` is taken, one sprint after it was measured and declined.**
+`std.strbuf.push` had a body of `b.s = "{b.s}{c}"`: a string built
+through an interpolation hole for one reason, that `+` refused a `char`,
+sitting one function below `push_str`, whose body is the `b.s += s` it
+becomes. sc42 declined it in writing for a reason that was a release date
+— wolf-interp#78 unmirrored at lupin 0.1.30, and a refusal in a std SOURCE
+file takes a module dark on that lane rather than costing one row. is43
+mirrored it; 0.1.31's own release line is "concat_mix_char closes". Zero
+ledger motion came with the change, which is what "a release date and not
+a semantics" meant. `push_str`'s doc loses a sentence that had been false
+since D62 along the way.
+
+### The windows native lane, lit (wolf-std#18)
+
+`bins::native_rt()` resolved `$WOLF_RT_LIB`, else `libwolf_rt.a` beside
+the driver. The windows archive ships the native rung's runtime beside
+`wolf.exe` as `wolf_rt.lib` — rustc's own spelling for an MSVC target,
+and the same name `wolf_driver`'s own `RT_LIB_NAME` stages and links — so
+that host printed `SKIP: no libwolf_rt.a` at a file sitting in the
+directory it had just looked in. **A lit lane reported as dark, which is
+F-0114 wearing the other hat.** The name is `cfg!(windows)`-selected now,
+and `native_rt_absence()` tells ABSENT from PRESENT-UNDER-ANOTHER-NAME so
+the four SKIP sites cannot say the wrong one again.
+
+windows runs three lanes in `rig` and three in `gates` as of this commit.
+`doc-examples` and `ulp` are advisory THERE for this landing, on exactly
+the steps whose behaviour changes from dark to lit and on no other host;
+timeouts 75 -> 120 and 20 -> 60. The linker question sc42 left untested
+is answered off the driver's own discovery order before the run —
+`find-msvc-tools` for `LIB`, then `lld-link`, the VS-bundled `lld-link`,
+rustup's `rust-lld`, MSVC `link.exe` — and the prediction, with the other
+three, is in `docs/findings.md` where the run can be read against it.
+
+### The ubuntu runner is not dying of what wolf-std#19 said (F-0116)
+
+wolf-std#19 read the exit 143 as the cost of "one native compile-and-link
+of the largest generated file in the tree". Measured, one row and one
+lane at a time:
+
+| lane | verdict | wall | peak RSS |
+|---|---|---|---|
+| `wolf conform-run --checked` | `unsupported` (`step budget exhausted`) | 6.7 s | **16.6 GiB** |
+| `wolf conform-run --native` | `exit(0)` | 0.42 s | 57 MiB |
+| `lupin conform-run` | `unsupported` | 16.7 s | 606 MiB |
+
+The native lane is the cheapest of the three by two orders of magnitude.
+A ledger word is what the rig EXPECTS and never permission to skip a
+lane, so `wolfc = "unsupported"` means the checked tier runs and is
+observed declining — and it reaches **16.6 GiB** on a host with 16 GB
+before its **step** budget fires. Nothing bounds the allocation.
+
+Reduced to twelve lines with no std and filed as **wolf-lang#308**:
+`s.bytes()` on the checked tier materializes a view per call against a
+shrinking `str` and never reclaims it, so a walk is quadratic in memory —
+15.4 MiB at n=512 to 1868 MiB at n=8192, ×3.8 per doubling, against 54
+MiB flat on the native lane and 12 MiB on lupin. Swap the `.bytes()` for
+a `.len` read and keep the slicing and the curve flattens.
+`std.hex.decode` walks exactly that shape and the CAVP rows hand it
+25,600 characters. v0.2.10 does not change it; v0.2.9 measures the same.
+
+**wolf-std#20's open question resolves to neither of its two answers, and
+both halves are measurements.** `slow` is not available — it is
+lupin-only by the ledger's own grammar and these are the `wolfc` column.
+A bigger ceiling is the wrong direction — the 60 s timeout is the only
+thing standing between the windows job and wolf-std#19's exit 143, since
+the ubuntu kill and the windows timeouts are one bug through two
+ceilings. The ceiling stays and the workflow says why. What DID move on
+#20: a stdout mismatch now prints the observed TEXT beside the hash, from
+the `stdout_inline` the record protocol has carried all along, so the two
+deterministic windows divergences are readable off the next run's log
+instead of needing a windows box.
+
+### F-0117 — D34 is law in the commit messages and gated nowhere
+
+`wolf fmt --check std tests` names **32 files** that are not canonically
+formatted — six under `std/`, twenty-six under `tests/`, all of them
+width cases. The identical set at the v0.2.9 binary, so it is standing
+and not this bump's motion. Nothing caught it because `workflow::CI_STEPS`
+has eleven entries and no `wolf fmt --check` among them: `cargo fmt
+--all --check` gates the Rust and nothing gates the wolf. sc42 leaned on
+the premise in writing while predicting that s144's leading `else` would
+move no std source byte; the conclusion held and the premise was already
+false. Filed as wolf-std#21 with the list, not taken here — a 32-file
+relay wants its own commit and its own gauntlet.
+
 ## sc42 — 2026-09-10 — the std takes the release, and the runners stop staging
 
 `wolf 0.2.8` -> `0.2.9` (`4c60946`), `lupin 0.1.28` -> `0.1.30`
