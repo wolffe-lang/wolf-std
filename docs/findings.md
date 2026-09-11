@@ -124,7 +124,7 @@ the building.
 | F-0114 | 2026-09-09 | **`gen-vectors --check` was the one binary-dependent step in this rig that treated a dark lane as an ERROR instead of a loud SKIP, and that is why it had never run on a runner.** The first sc41 CI run put F-0113's four steps on ubuntu, macOS and windows; `gen-vectors --check` failed on all three in under a second, with the same message and for a reason that has nothing to do with any platform: `gen-vectors needs the pinned wolf (it runs wolf fmt on its output)`. `wolf fmt` is law for every committed `.lu` (D34), so the emitter's output is canonicalized before it is written OR compared — and with no release artifact at the pins, `ci.yml`'s acquire step SKIPs and no runner has a `wolf`. `bins.rs`'s own header states the doctrine the step broke: "Absence is legal and LOUD." `std-test`, `doc-examples` and `ulp` all honour it; this one alone did not, and because it did not, the step could not be added to CI at all — the prerequisite for F-0113's fix was a fix to a step F-0113 does not mention. Note what the shape of the red says: the first run of a lane nothing lit taught something about the RIG on the host the rig was written on, before it taught anything about windows | wolf-std (this repo) | **Fixed at sc41**, `4d6f130`: `--check` with no `wolf` on any rung prints a loud SKIP and drops from a byte comparison to an inventory-and-derivability check — the 7.3 MB vendored corpus is still parsed, all 65 emitters still run, and every generated file must still be present and non-empty; only the byte comparison goes dark, and it says so. WRITING still hard-errors without the formatter, because an unformatted generated file must never reach a commit. The lane relights for free the day release artifacts exist at the pins |
 | F-0115 | 2026-09-10 | **`cargo xtask std-test`'s native lane terminates the `ubuntu-latest` runner, and it did it twice at the same test.** The first CI run that had binaries to run (sc42, `354cdf0`) put the 397-row differential on three hosts. `macos-latest` was GREEN in 29 min (three lanes lit, 0 divergent, 0 unstable, 0 slow) and `windows-latest` — **corrected below, and the correction is the finding's twin**: that job's `std-test` printed its 397-row summary and then seven mismatches and `xtask: RED`, and this entry first recorded it as GREEN because the summary line was read as the verdict. The `continue-on-error` marker had made the JOB green, exactly the trap this sprint had already written a paragraph warning about two sections earlier. windows is RED and filed as wolf-std#20; macOS is the differential's first green anywhere but the author's box. `ubuntu-latest` died at test 303 of 397 in BOTH runs of the commit, printing `cavp_sha256_short_p2.lu` and then `The runner has received a shutdown signal` with exit 143. The next test in order is `tests/x/crypto/sha2/cavp_sha384_long.lu`: 1.69 MB of generated wolf source and a native-lane-ONLY row, so what runs when the runner dies is one native compile-and-link of the largest generated file in the tree. **It is the workload, not the clock** — the two deaths came at 28 m 59 s and 23 m 11 s and at the identical position — and the obvious hypothesis is the one the evidence argues against: `macos-latest` has LESS memory than the ubuntu image and spends about 60 s on that same test. A hosted runner reports an OOM-killed agent and a reclaimed host with the same sentence and the same exit code, so the mechanism is not determinable from a workflow log | wolf-std (this repo) + GitHub's ubuntu image | [filed: wolf-std#19](https://github.com/wolffe-lang/wolf-std/issues/19). **`continue-on-error` cannot be the disposition**: a runner shutdown kills the JOB, so run 1's `rig (ubuntu-latest)` reports every step `success` and the job `failure`, and an advisory marker never gets the chance to swallow anything — leaving it would leave one host permanently red. `std-test` is NOT RUN on `ubuntu-latest` as of sc42, out loud, in a step whose entire content is the skip and this issue number; the differential still runs on two hosts and on the author's box |
 | F-0116 | 2026-09-11 | **The checked tier's budget counts STEPS and not BYTES: one `cavp_*_long.lu` row reaches 16-18 GiB of resident set before `unsupported: step budget exhausted` arrives, on hosts with 16 GB.** This is the mechanism behind wolf-std#19 (the `ubuntu-latest` runner killed twice at the same test, exit 143) and behind half of wolf-std#20 (the same rows timing out at 60 s on `windows-latest`) — one bug seen through two ceilings, and neither issue had named it. wolf-std#19 read the kill as "one native compile-and-link of the largest generated file"; measured, the NATIVE lane is the cheapest of the three by two orders of magnitude (0.42 s / 57 MiB) and the CHECKED tier is the expensive one (6.7 s / 16.6 GiB). Reduced to twelve lines with no std: `s.bytes()` on the checked tier materializes a view per call against a shrinking `str` and never reclaims it, so a walk is quadratic in memory — 15.4 MiB at n=512 to 1868 MiB at n=8192, x3.8 per doubling, against 54 MiB flat on the native lane and 12 MiB on lupin. Swap the `.bytes()` for a `.len` and the curve flattens, so it is the materialized view and not the slicing. `std.hex.decode` walks a `str` exactly this way and the CAVP rows hand it a 25,600-character literal. v0.2.10 does not change it (the same row under v0.2.9 peaks at 17.8 GiB). Closes when the tier bounds bytes as well as steps, so the refusal arrives before the allocation | wolf-lang (checked-tier execution) | [filed: wolf-lang#308](https://github.com/wolffe-lang/wolf-lang/issues/308); wolf-std#19 and wolf-std#20 carry the measurement — **RETIRED at sc44, and the fix is upstream's not this repository's.** wolf-lang#308 landed as s153's `[exec.checked.budget]`: the checked tier keeps a BYTE budget beside its step budget (256 MiB at s153, charged at every allocation, never refunded) and exhausting either is `unsupported`, never a verdict. The clause's own prose names this row — "one wolf-std row reached 16.6 GiB of resident set on a 16 GB runner before `step budget exhausted` arrived, an OOM where an honest refusal was owed" — which is this finding's number reaching the spec. Re-measured cold at the sc44 pins (wolf 0.2.11, `/usr/bin/time -l`, one row one lane at a time): `cavp_sha256_long` **30.2 MiB / 1.57 s**, `cavp_sha384_long` **40.4 MiB / 1.82 s**, `cavp_sha512_long` **40.0 MiB / 1.79 s**, each `unsupported — step budget exhausted`. Four hundred times in bytes, four in time. sc44 predicted 45–55 MiB in writing before measuring and it came in UNDER the band. The most expensive single process left in the whole differential is lupin's own refusal of the same rows at 0.63 GiB. `std-test` runs on all three tier-1 hosts again (wolf-std#19 closed, and the timing family of wolf-std#20 with it), the 60 s per-row ceiling stands UNCHANGED and no longer binds, and `STD_TEST_TIMEOUT_SECS` is still not set — sc43's answer to #20's either/or was NEITHER and nothing was relaxed to get the green |
-| F-0117 | 2026-09-11 | **D34 is asserted in commit messages and gated nowhere: 32 committed `.lu` files are not fixed points of `wolf fmt`.** sc42 argued that the leading-`else` grammar would move no std source byte, and one of its reasons was that "`wolf fmt` is law for every committed `.lu` here (D34) ... so every file in this tree is already at the fixed point". The conclusion held; the premise does not. `wolf fmt --check std tests` names 32 files — six under `std/`, twenty-six under `tests/` — all of them width cases where a long `assert(...)` was committed on one line. Measured at BOTH pins, and the two file sets compare equal, so this is a standing gap and not this bump's motion. Nothing caught it because nothing looks: `workflow::CI_STEPS` has eleven entries and none of them is `wolf fmt --check`, and `cargo fmt --all --check` gates the Rust only. F-0113 one layer up, wolf-std#18 one layer down. Not taken at sc43 (F-0111's reason: a 32-file relay wants its own commit, its own gauntlet and its own reading) | wolf-std (the rig's own gauntlet) | [filed: wolf-std#21](https://github.com/wolffe-lang/wolf-std/issues/21) |
+| F-0117 | 2026-09-11 | **D34 is asserted in commit messages and gated nowhere: 32 committed `.lu` files are not fixed points of `wolf fmt`.** sc42 argued that the leading-`else` grammar would move no std source byte, and one of its reasons was that "`wolf fmt` is law for every committed `.lu` here (D34) ... so every file in this tree is already at the fixed point". The conclusion held; the premise does not. `wolf fmt --check std tests` names 32 files — six under `std/`, twenty-six under `tests/` — all of them width cases where a long `assert(...)` was committed on one line. Measured at BOTH pins, and the two file sets compare equal, so this is a standing gap and not this bump's motion. Nothing caught it because nothing looks: `workflow::CI_STEPS` has eleven entries and none of them is `wolf fmt --check`, and `cargo fmt --all --check` gates the Rust only. F-0113 one layer up, wolf-std#18 one layer down. Not taken at sc43 (F-0111's reason: a 32-file relay wants its own commit, its own gauntlet and its own reading) | wolf-std (the rig's own gauntlet) | [filed: wolf-std#21](https://github.com/wolffe-lang/wolf-std/issues/21) — **CLOSED at sc45.** `cargo xtask fmt-lu` is the gauntlet's twelfth step and a step of the workflow's `gates` job (`wolf fmt --check` over the 452 committed `.lu` files, batched at 64 paths for the windows command-line cap), landed BEFORE the re-lay so one commit in this history has the gate present and naming the 32 files it refuses. The 32 were re-measured at a THIRD pin (`wolf 0.2.11`) before anything was touched and came back identical to sc43's list line for line. All 32 re-laid in three commits, one per directory; `std-test` and `doc-examples` run over the tree before and after and diffed — 401 rows, 0 divergent, 0 unstable, 0 slow, 423 doc-example blocks, every verdict unchanged. Six of the 32 are blank-line and brace canon, fourteen are width, and **twelve carry a layout that is the FORMATTER's defect** (17 dot-broken calls indenting their arguments to the method's own column, 8 generic type applications split, 3 error sets split, 4 lines left past 100 columns that `--check` accepts) — committed as the tool lays them rather than hand-fixed, and filed as [wolf-lang#339](https://github.com/wolffe-lang/wolf-lang/issues/339) with the over-width half added to wolf-lang#303. Neither wolf-lang#303 nor #314 has a carrier anywhere in this tree, so the answer to "which of the 32 retire when s154 lands" is measured as NONE. The exception class (`//! fmt: relaid`) is empty: every one of the 32 becomes a fixed point and `wolf fmt` over the tree is idempotent in one pass |
 | F-0118 | 2026-09-11 | **A trait is not the same trait through an import, and half of F-0002 is now false.** F-0002 ("neither implementation EXECUTES trait dispatch") has been quoted in six module headers since sc01. At the sc44 pins BOTH compiler rungs dispatch, and lupin 0.1.33 dispatches a trait declared in the ENTRY FILE while refusing the byte-identical trait reached through a `use` — `unsupported: `Eq` is a trait; traits, enums and type-level items have no dynamic semantics here`, at `resolve`, before dispatch is attempted. Twelve lines, two files, move the trait and it runs. **AND ON THE COMPILER, THE LOUDEST OF THE FOUR:** `[type.trait.op]` resolves the operator trait by BARE name, `use std.cmp` binds only `cmp`, and wolf has no item imports — so `==` on `std.cmp.Ordering` is `E0301` from every file that imports it, with a fix-it neither half of which can be followed (nothing brings `Eq` into scope; the `impl Eq for Ordering` it asks for already exists). Every user type any library publishes has the same hole, in the release whose headline is operators on user types; two entry tests are its ledgered regression witnesses. Two more use-counting neighbours on opposite sides: a qualified trait in a BOUND does not count as a use of its import under lupin (E0305 on a name that IS used), and one in a trait-ALIAS right-hand side does not count under wolfc, on both imports, one at a time. The cost is itemized: std.map's `[K: Eq]` five and std.cmp's four new impls stay prose examples, std.ops has no fenced example at all, four ledger rows carry `unsupported` on the lupin column for this alone. wolf-std#24 predicted the opposite, reading wolf-lang's own corpus witness — which declares its `Eq` in the entry file. **A witness that declares its trait locally cannot say anything about a trait reached through `use`**, and this repository's std is the only corpus in the org where every trait is imported by construction | wolf-interp (resolve); wolf-lang (resolve, alias half) | [filed: wolf-interp#96](https://github.com/wolffe-lang/wolf-interp/issues/96), [wolf-interp#97](https://github.com/wolffe-lang/wolf-interp/issues/97), [wolf-lang#334](https://github.com/wolffe-lang/wolf-lang/issues/334), [wolf-lang#336](https://github.com/wolffe-lang/wolf-lang/issues/336); retires the compiler half of F-0002 |
 | F-0119 | 2026-09-11 | **A module nobody could type is a module nobody read: `std.map.set` had been wrong since sc02 and no compiler had ever looked at it.** `std/map/map.lu` was `unsupported` on both compiler rungs for forty-two sprints because `Map` was prelude-ambient and wolfc did not type it. s152 made it `TyKind::Map`; the mem tier read the module for the first time and answered `E1004` at `m[k] = v` — one function, taking the WHOLE module down on both rungs, twelve functions' worth of rows. The body is `m[k] = copy v` now, the fix-it the diagnostic prints. **The general shape is the finding**: an `unsupported` row for a STRUCTURAL reason is not a lane that passed, it is a lane that never looked, and every such row suspends every claim this repository makes about the source behind it — so the sprint that removes the structural reason should budget for a BODY being read for the first time and not for a row flipping. F-0113's shape ("a claim with no mechanism behind it") in the ledger rather than in the workflow. The asymmetry itself is real and filed: `(mut xs).push(v)` generic over `[T]` needs no `copy`, the same `set` body monomorphic at `Map[str, int]` runs on all three lanes, and `let w = v; m[k] = w` is still E1004 | wolf-std (sc02 body); wolf-lang (mem) | [filed: wolf-lang#333](https://github.com/wolffe-lang/wolf-lang/issues/333); predicted in `vendor/tools.toml`'s delta 1 before the run |
 | F-0120 | 2026-09-11 | **`take` is a reserved word, and the combinator the book's chain wanted is a slice.** wolf-std#23 asked whether std intends a returning `sorted_by` and a prefix `take`, naming wolf-lang#154's ownership verb as "the naming collision the second combinator has to survive". It does not survive it: `fn take[T](xs: List[T], n: int)` is `E0008: `take` is a reserved keyword and cannot be a name; wolf has no raw identifiers` on BOTH machines, at parse. There is no spelling of that function and the question was never which module it belongs in. And it is not needed — `xs[..n]` and `xs[1..]` (`[mem.list.slice]`) reach `exit(0)` on all three lanes at these pins, where the issue's own text said the compiler "declines at wir", true at the pins it was written against. §8 forbids a std name that shadows a working builtin. **Before designing around a name, check that the name can exist**: one `conform-run` would have answered half of wolf-std#23 the day it was filed | wolf-std (sc04 API question) | not filed upstream — the grammar is correct and the answer is a std decision; `std/sort/sort.lu`'s header and `tests/sort/returning_twins.lu` carry it |
@@ -8904,6 +8904,131 @@ it to a sprint whose job was a pin bump and a windows lane is the
 mistake that finding is about. Filed as wolf-std#21 with the file list
 and the two-pin measurement, to be taken as one commit plus the
 `fmt-lu` step that stops it recurring.
+
+### CLOSED at sc45 — the step, the re-lay, and the third pin that says the same thing
+
+`cargo xtask fmt-lu` is the twelfth entry of `workflow::CI_STEPS` and a
+step of the `gates` job: `wolf fmt --check` over the 452 committed `.lu`
+files under `std/` and `tests/`, batched at 64 paths per invocation for
+the windows command-line cap, red on drift. Landed BEFORE the re-lay, so
+there is one commit in this repository's history where the gate exists
+and names the 32 files it will not accept.
+
+**Three pins, one list.** sc43 measured the 32 at `wolf 0.2.10` and
+verified the set was identical at `0.2.9`. sc45 re-measured at `0.2.11`
+before touching anything: the same 32 files, in the same order, the
+sorted lists equal line for line a third time. Standing drift at every
+pin this repository has ever carried a formatter through.
+
+**Zero behaviour motion — predicted in writing before the re-lay and
+then measured by diffing the two logs, not by reading two GREENs.**
+
+The prediction: `std-test`'s 401 rows byte-identical, 0 divergent, 0
+unstable, 0 slow; `doc-examples` at 423 blocks with every verdict
+unchanged. Measured on this box over the pre-re-lay tree (`ad01472`,
+17:25) and again over the re-laid one (`c753ee2`, `cargo xtask ci`
+entire, 17:33), both exit 0:
+
+```
+std-test rows      401 / 401   BYTE-IDENTICAL (cmp, no normalization)
+std-test summary   401 test(s); forward tags 763; conservatism 202;
+                   unstable 0; slow 0; divergent 0   — identical
+doc-examples       423 block(s) GREEN, 1269 lane observations
+                   BYTE-IDENTICAL modulo line numbers
+verdict census     1183 exit(0) (ok) + 86 unsupported (ok), both runs
+ulp                200 reference rows GREEN, 16 libm notes, both runs
+```
+
+The ONLY textual difference in 1,695 observation lines is the line
+number of a doc-example block in the four std files whose length
+changed — `math/float`, `os`, `process`, `x/crypto/chacha20` — which is
+the re-lay reporting itself and not a row moving.
+
+`wolf fmt` is a pretty-printer over the parsed tree, so the one way it
+could have moved a value is by dropping a parenthesis that was
+load-bearing, and it drops two: `((diff … ) | (x … ^ y … ))` in
+`std/x/tls/handshake`'s constant-time compare, and `(expr?).len` in
+`tests/net/unix/stream_surface.lu`. Both were probed directly BEFORE the
+gauntlet rather than argued from precedence tables — `8 | (12 ^ 10)` and
+`8 | 12 ^ 10` both answer 14 at `wolf 0.2.11`, checked tier — and both
+sites carry ledgered witnesses the differential re-ran.
+
+**The three causes, counted, and they partition the 32.**
+
+* **Six files are blank-line and brace canon alone** — a blank line
+  inserted between adjacent one-line `fn`s (`std/list`,
+  `tests/list/predicate_tier`, `tests/list/relation_tier`,
+  `tests/str/each_word_walk`), a doubled blank after the `//!` header
+  collapsed (`std/os`), and `fn nothing() {\n}` closing up to `{}`
+  (`tests/mem/budget/negative_cap_trap`). No width motion at all in any
+  of them.
+* **Fourteen are width alone** — a long `assert`, `check`, `print` or
+  `bytes_of` argument the formatter breaks onto its own lines, or the
+  reverse: a continuation the formatter JOINS back because it fits
+  (`std/math/float`'s three `ln`/`log2`/`rem_pio2` chains,
+  `tests/net/reuse_port`'s `&&`, and two redundant-paren drops).
+* **Twelve carry a layout that is the formatter's defect and not the
+  file's**: seventeen calls broken after the receiver's dot with the
+  arguments landing at the method name's own column, eight generic type
+  applications split (`-> List[\n    byte,\n] {`), three error sets
+  split (`-> int ! {\n    decrypt_error,\n} {`), and four lines left
+  past 100 columns. Eleven of the twelve carry a NEW such line;
+  `tests/x/tls/client/rfc8448_parse_vectors.lu` is the twelfth and was
+  already dot-broken before the re-lay, which only exploded its argument
+  list under the break.
+
+Six plus fourteen plus twelve is the thirty-two.
+
+**What is NOT here: wolf-lang#303 and #314.** The contract for this
+sprint asked which of the 32 are not fixed points BECAUSE of the two
+formatter defects s154 is fixing, on the reasoning that such a file is
+the formatter's and should be re-laid and marked rather than hand-fixed.
+Measured: **none of them, and neither defect has a carrier anywhere in
+this tree.** #314's shape — a closure whose expression body starts with
+`(`, printed as `fn(c)(…)` — occurs zero times in 452 files (`fn(` is
+followed by a `(` in no file). #303's shape — an `if`/`else if`/`else`
+chain laid past the width — has 53 `else if` lines in the tree and not
+one of them exceeds 100 columns, before the re-lay or after. So s154
+landing retires nothing here, and the honest answer to "which of the 32"
+is zero rather than a list.
+
+**What IS here is #303's other half, in three positions that are not
+chains.** The re-lay PRODUCES four lines past the width — 101 columns
+twice in `std/x/crypto/chacha20/chacha20.lu` (a call argument and a `pub
+fn open(…) -> List[byte] ! {` signature), 109 in
+`std/x/tls/handshake/handshake.lu` (`pub fn accept_finished(…) -> int !
+{`, where the formatter broke a one-name error set and left the parameter
+list it knows how to break on the over-width line) and 101 in
+`tests/x/tls/handshake/message_bytes.lu` — and `wolf fmt --check` accepts
+every one, so each is a fixed point the toolchain cannot object to. None
+contains a token near 100 characters, so none is covered by
+`[gram.fmt.indent]`'s stated licence. Filed as a comment on wolf-lang#303
+with the table, and the two layout defects beside it as wolf-lang#339
+with twelve-line reproducers. The decisive line of that filing is that a
+hand-laid `(mut kw).push(\n    …\n)` whose longest line is **97 columns**
+is REJECTED by `wolf fmt --check`, so the dot-break is not a last resort
+the width forced — it is the canon, taken ahead of the argument break
+that would have sufficed.
+
+**The exception class is empty, and that is a measurement.** wolf-lang's
+corpus gate carries `//! fmt: relaid` (`[gram.fmt.canon]`'s one declared
+exception, wolf-lang#276) for files that deliberately pin a spelling the
+formatter re-lays. No file here needs it: every one of the 32 becomes a
+fixed point, `wolf fmt` over the whole tree is idempotent in ONE pass
+(the second `--check` after the first `fmt` exits 0, measured), and
+`fmt_lu.rs` therefore ships with no path list at all. The ugly layouts
+above are committed as the tool lays them and will stay committed until
+wolf-lang#339 closes; that is the contract's rule — a file the formatter
+cannot make a good fixed point of is a wolf-lang filing, not a local
+hand-fix.
+
+**Cost:** 0.23 s over 452 files in one process on this box; seven batched
+invocations in the step. The gate is REQUIRED in `gates` from its first
+run, against this repository's custom of one advisory landing, because
+that custom is for a step whose behaviour on a host is unknown and this
+one is a byte comparison over committed files whose behaviour is the same
+everywhere. A `continue-on-error` on this particular step would reproduce
+exactly the thing it was written to end.
 
 ## The sc43 windows native lane — the budget and the four predictions, written before the first lit run
 
