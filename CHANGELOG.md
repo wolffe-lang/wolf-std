@@ -30,7 +30,8 @@ was counted at one key and registers **four**: the family head plus
 subject never mentions. The rule one indirection further out: **a spec
 commit's SUBJECT names the clause, not the anchors.** And the same class
 of sentence, wrong the other way, in the same span — s147's spec commit
-says "anchors 453 -> 454" where the file reads 452 -> 453. Filed upstream.
+says "anchors 453 -> 454" where the file reads 452 -> 453. Filed as
+wolf-lang#309.
 
 **Zero ledger motion, and this time zero was the prediction.** 397 rows,
 three lanes, 0 divergent, 0 unstable, 0 slow skips. s148's two clauses

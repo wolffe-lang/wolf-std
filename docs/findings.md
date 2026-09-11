@@ -8688,8 +8688,9 @@ commits it sits between, `spec/anchors.json` holds **452 before and 453
 after**. The `+1` is right; both absolute numbers are off by one. A
 prediction anchored on that sentence would have been wrong by one in a
 place no key-set diff can show, because the diff is of KEYS and this is
-a COUNT. Filed upstream. F-0100's rule — read the registry, not the
-commit message — now has an instance in each direction.
+a COUNT. Filed as wolf-lang#309. F-0100's rule — read the registry, not
+the commit message — now has an instance in each direction, and both of
+them are in this one span.
 
 **W0601, predicted at zero and measured at zero.** s146 makes a `!()`
 tail in a unit context a warned discard. The prediction was written from
