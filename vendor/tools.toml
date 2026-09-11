@@ -563,6 +563,78 @@
 # (F-0064): `wolf 0.2.9`'s second line reads "paired with lupin 0.1.29
 # ..., pin e9a17cb", because `9af606c` recorded the pairing before is42
 # cut 0.1.30. Doctor prints it and does not gate it.
+# sc44 BUMP: 0.1.31 -> 0.1.33, pin 4c60946 (v0.2.9) -> 662b14c (v0.2.10).
+# TWO releases in one chase for the second time in this ledger's life
+# (sc35's was the first): is44 cut 0.1.32 at wolf-interp `c3dd607`, pin
+# `e0ce018` (wolf-lang s147, dev-stamped), and is45 cut 0.1.33 at
+# `9be44e8`, pin `662b14c` — a TAG again, and the tag this repository's
+# own data pin carried all through sc43. Acquired by DIGEST from the
+# release, the whole archive pair into `.wolf-bin/`, and verified from
+# `--version` rather than from the brief: `lupin 0.1.33 (wolf-interp,
+# reference interpreter at pin 662b14c)`.
+#
+# **THE GAP IS 91 COMMITS, THE WIDEST IT HAS EVER BEEN, AND THE COMPILER
+# IS AHEAD.** wolf 0.2.11 conforms to `c9237c1`; lupin 0.1.33 conforms to
+# `662b14c`, which is exactly the PREVIOUS wolf release (v0.2.10). The
+# mirror sits one whole release behind for the second bump running and
+# the span between them is s149, s150, s151, s152, s153 and s155 entire
+# — six sprints where sc43's was three. Ordinary posture (sc38's), not
+# sc35's inversion. The data pin follows the COMPILER (see `[wolf]`), so
+# this key is again the only one of the four not naming `c9237c1`.
+#
+# What the two releases buy this repository, and it is less than the
+# version numbers suggest:
+#   is44 / #83   `[gram.pat.range]` — the range arm, with E0815 for an
+#     empty one and E0802 for a subsumed one. sc43 argued this cost the
+#     tree nothing because no match arm here writes a range; still true,
+#     and now the mirror has it, so the pair's own named divergence
+#     retires without a byte moving.
+#   is44 / #79   a method's impl-block generics reach the method.
+#   is45 / #90   `[gram.expr.if]` — the bare `if` with the contextual
+#     `then`. s151's clause, mirrored in the SAME release span the
+#     compiler shipped it. No std source writes one; the formatter's
+#     `[gram.fmt.if]` never converts between forms, so no committed
+#     `.lu` moves either (predicted, and F-0117's `fmt --check` sweep is
+#     the measurement that would catch it if it did).
+#   is45 / #85   `[type.row.operand]` (a comparison on a bare row is
+#     E0409 on either side) and `[mem.str.imm]` (assigning through a
+#     `str` slice is E0416 at the place). Both are s148 clauses arriving
+#     one release after the compiler ruled them, and sc43 already argued
+#     both unreachable from this tree — no bare-row comparison, and all
+#     twenty indexed assignments are `Map` or `List`.
+#   is45 / #89   a keyword in type position is E0206; a container's type
+#     argument resolves. #84: a type parameter binds once per call.
+#
+# **WHAT THE BUMP DOES NOT BUY, AND IT IS THE SPRINT'S CENTRAL FACT.**
+# s155's `[type.trait.op]` is NOT in 0.1.33 — the mirror's pin is
+# v0.2.10 and s155 landed after it — so the TRAIT ALIAS FORM
+# (`trait Num = Add + Sub`) does not parse there: `E0201: expected `{`,
+# found `=` [gram.item.trait]`. A parse failure is not a row's verdict,
+# it is the FILE, so an alias committed into `std/ops/ops.lu` would make
+# that module unparseable on the reference machine and take the lupin
+# lane off every importer of it. Measured before a line was written, and
+# it is why `Num` ships in the nursery (`std.x.ops_num`) and the six
+# operator traits ship in the facade. The trigger is written at the
+# resident: the release that mirrors s155.
+#
+# Two more lupin gaps measured at this pin, both filed, neither one a
+# divergence this repository can ledger around:
+#   * a qualified trait in a BOUND (`fn f[T: ops.Add]`) does not count
+#     as a use of `use std.ops`, so the import is `E0305 … never used
+#     [mod.use.unused]` — a hard error on a name that IS used. The
+#     compiler accepts the same file. (wolf-interp, filed at sc44.)
+#   * trait dispatch through an IMPORTED module's trait
+#     (`cmp.Eq.eq(a, b)`) is `unsupported: `Eq` is a trait; traits,
+#     enums and type-level items have no dynamic semantics here`, while
+#     the byte-identical trait declared in the entry file RUNS. That
+#     second half is new information: F-0002 has said "dispatch executes
+#     nowhere" since sc01 and half of it is now false on lupin and false
+#     on both compiler rungs. (wolf-interp, filed at sc44.)
+#
+# The pairing LINE is stale again, and again it is not the machine
+# (F-0064): `wolf 0.2.11`'s second line reads "paired with lupin 0.1.32
+# (reference interpreter), pin e0ce018", because `d818458` recorded the
+# pairing before is45 cut 0.1.33. Doctor prints it and does not gate it.
 # sc43 BUMP: 0.1.30 -> 0.1.31, pin 2c03ed9 (wolf-lang s144, dev-stamped)
 # -> 4c60946 (v0.2.9). ONE release, not two: is43 cut 0.1.31 at
 # wolf-interp `e9c55b4`, installed by the orchestrator through fresh
@@ -623,7 +695,7 @@
 # and that IS this box's binary at this box's pin — `7511f7e` recorded
 # the pairing inside the release that carries it. Doctor prints it and
 # still does not gate it; a line that happens to be true is not a gate.
-version = "0.1.31"
+version = "0.1.33"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -635,7 +707,13 @@ version = "0.1.31"
 # pin = "6ade878c1f5f48bcb5c9ee804c749fbbc8634a02"  (superseded, sc38/sc39 era — is38's v0.2.5-tag pin, the pin that paid F-0110)
 # pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"  (superseded, sc40/sc41 era — is40's v0.2.8-tag pin, the one sprint the gap was zero)
 # pin = "2c03ed9360e90e260528411075daded674ceab18"  (superseded, sc42 era — is42's 0.1.30 at wolf-lang s144 dev-stamped, the pin that held `str + char` back one sprint)
-pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"
+# pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"  (superseded, sc43 era — is43's 0.1.31 at wolf-lang v0.2.9)
+pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"
+# (sc44: two releases in one chase, 0.1.31 -> 0.1.33, and the pin lands
+#  on the tag this repository's DATA pin carried through sc43. The gap to
+#  the data pin below opens to 91 commits with the compiler ahead — six
+#  sprints, the widest it has ever been. The sc43 note kept for its
+#  history:)
 # (sc43: 0.1.31 crosses to v0.2.9 and lands ON a tag. The gap to the
 #  data pin below reopens at 51 commits with the compiler ahead — one
 #  whole release, s146+s147+s148 — and this key is again the only one
@@ -789,7 +867,115 @@ pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.10"
+version = "0.2.11"
+# sc44 BUMP: 662b14c (v0.2.10) -> c9237c1 (v0.2.11), 91 commits, SIX
+# sprints (s149, s150, s151, s152, s153, s155) plus the pairing, the
+# CHANGELOG and the release commit. The data pin was AT 662b14c, so for
+# the fourth bump running the DATA delta and the BINARY delta are the
+# same span: 662b14c..c9237c1. Acquired by digest from the release, the
+# whole archive pair into `.wolf-bin/` (never a source build on this
+# box), verified from `--version`: `wolf 0.2.11 (wolfgang, pin c9237c1)`.
+#
+# Six deltas, classified BEFORE anything was measured, with the two that
+# reach this tree named first because they are the sprint:
+#
+#   1. s152 / #11, #154  **THE KEY PROTOCOL, AND `Map` IS A TYPE AT
+#      LAST.** `[type.map]` / `[type.map.key]` / `[mem.map.absent]`:
+#      `Map[K, V]` is `TyKind::Map` in sema, the native runtime has a
+#      `wolf_rt::map` seam, and the checked machine serves it. Keys are
+#      `str`, `int`, `char`, `bool` — the four whose equality the
+#      language defines — and `[K: Eq]` is satisfied by them through
+#      ordinary impls. `m[k]` reads `V ! {none}`; `m[k] = v` inserts;
+#      `m[k] op= v` is E0417 whose note names `map.tally` BY NAME; a
+#      struct key is E0418. This is std.map's whole header answered:
+#      F-0011's three filed questions collapse to two rulings and one
+#      unchanged sentence, and `tally` is std's by the clause.
+#      **PREDICTED COST: the module stops being freight and starts being
+#      checked.** Every `map/*` row was `unsupported` on both compiler
+#      rungs because `Map` was not typed; now it types, so every body in
+#      the module is read by the mem tier for the first time. Predict at
+#      least one refusal falls out of that first reading.
+#
+#   2. s155 / #5  **THE OPERATOR BRIDGE.** `[type.trait.op]`: `+ - * / %`
+#      and unary `-`, `==`/`!=` and the relationals dispatch through
+#      `Add`…`Neg`, `Eq`, `Ord` BY NAME when the left operand is a type
+#      parameter or a user type; homogeneous only, E0514 for a method of
+#      the wrong shape, E0502 for a missing impl, E0301 for no trait in
+#      scope. `[type.trait.op.alias]`: `trait Num = Add + Sub + …`, an
+#      alias bound that expands at elaboration. F-0004's bridge filing —
+#      open since sc01, cited by API-CONVENTIONS §6 and by std.cmp's
+#      header — is what this rules. std.ops is the module it asks for and
+#      sc44 is the sprint that writes it.
+#
+#   3. s153 / #308, #310  `[exec.checked.budget]` rules STEPS AND BYTES
+#      (20,000,000 and 256 MiB at s153) and a blown budget is
+#      `unsupported`, never a verdict; `[mem.region.escape]` names a
+#      `str` built by `+`, `+=`, `repeat` or a holed interpolation as an
+#      allocation site in the ambient region. **This is wolf-std#19's
+#      ruling arriving from upstream.** The clause's own prose names the
+#      number this repository measured: "one wolf-std row reached
+#      16.6 GiB of resident set on a 16 GB runner before `step budget
+#      exhausted` arrived — an OOM where an honest refusal was owed."
+#      F-0116 said the ubuntu kill was the CHECKED tier's memory and not
+#      the native compile; the spec now says the same thing in its own
+#      words. Predict the CAVP rows fall to tens of MiB.
+#
+#   4. s151 / #307  `[gram.expr.if]` — the bare `if` closed by a
+#      contextual `then` — plus `[gram.amb.else]` and `[gram.fmt.if]`
+#      ("never convert between the braced and bare form"). Costs this
+#      tree nothing by construction: no committed `.lu` writes a bare
+#      `if`, and a formatter that never converts cannot move one that
+#      does not exist. `then` is CONTEXTUAL, so a std identifier named
+#      `then` keeps working — `std.cmp`'s `Ordering.then` is a method
+#      name and s151's own witness list includes "a bool named then" and
+#      "`.then(` in a condition" for exactly this reason.
+#
+#   5. s150 / #300  `[type.fn.value]` (every fn value is a pointer to a
+#      callable record), `[abi.native.closure]` rewritten,
+#      `[conc.chan.payload]` (a struct, enum or tuple of payloads is
+#      sendable). The closure blocker c05 has been named in six std
+#      module headers since sc02; this is the clause that ends it, and
+#      wolf-std#23's `sorted_by`/`take` are the first two std functions
+#      written against it.
+#
+#   6. s149 / #289, #290  `[os.fs.open]` ruled; the accept posture
+#      (`accept4(SOCK_NONBLOCK)` where the host has it) and the
+#      `TCP_NODELAY` deferral stated. Two anchors' worth of OS surface
+#      this repository already tests through `std.fs`/`std.net`;
+#      predicted to move no row, because a posture the runtime already
+#      had does not change what a program prints.
+#
+# **THE REGISTRY, PREDICTED AND MEASURED.** Predicted 458 -> 470, +12,
+# from the clause subjects: type +5, gram +2, mem +2, conc +1, abi +1,
+# exec +1. Measured, key sets diffed both ways: 458 -> **471**, +13,
+# dropped {}, owners moved {}, added {conc.chan.payload, exec.checked,
+# exec.checked.budget, gram.expr.if, gram.fmt.if, mem.map.absent,
+# mem.region.escape, os.fs.open, type.fn.value, type.map, type.map.key,
+# type.trait.op, type.trait.op.alias}. Three corrections, and sc43's rule
+# is what makes all three visible — a spec commit's subject names the
+# CLAUSE, not the anchors, so the keys are counted and not read off the
+# log:
+#   * `abi.native.closure` was predicted new and was ALREADY REGISTERED
+#     at 662b14c. s150's subject says "`[abi.native.closure]` rewritten",
+#     and a rewritten clause publishes no key.
+#   * `exec.checked` came with `exec.checked.budget`: the namespace
+#     arrives with a PARENT anchor and the budget under it, two keys for
+#     one clause name.
+#   * `os.fs.open` was in no brief's list at all — s149 is a sprint this
+#     bump's summary did not mention and the registry did.
+#
+# **AND `exec` IS A THIRTEENTH NAMESPACE, WHICH IS THE LOUD ONE.** It is
+# the sc38 shape for the third time: the re-vendored snapshot lands and
+# `every_published_anchor_sits_in_a_registered_namespace` goes RED naming
+# `exec` and 2 before a human reads an issue. The clause admits it in the
+# same commit upstream (`20b081e`, "the exec namespace admitted") with
+# `[conf.anchor.ns.admit]`'s one-change rule honoured, so the snapshot,
+# the clause and `REGISTERED_NS` move together here as well. The CLAUSE
+# is not byte-identical this time — sc43's was — and the diff is exactly
+# two hunks: `exec` in the owners list, and a new normative `§5
+# Execution tiers` appended.
+#
+# Corpus 542 -> 578 files.
 # sc43 BUMP: 4c60946 (v0.2.9) -> 662b14c (v0.2.10), 51 commits, ZERO
 # merges — three sprints (s146, s147, s148) landed direct on trunk, plus
 # the pairing, the CHANGELOG and the release commit. The data pin was AT
@@ -2102,4 +2288,5 @@ version = "0.2.10"
 # pin = "398e5f547a65308c6a3e88fee632563e87afd217"  (superseded, sc38/sc39 era — r09's v0.2.6-tag pin)
 # pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"  (superseded, sc40/sc41 era — r10's v0.2.8-tag pin, the one sprint all four pins named one sha)
 # pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"  (superseded, sc42 era — r14's v0.2.9-tag pin)
-pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"
+# pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"  (superseded, sc43 era — r15's v0.2.10-tag pin, the one lupin 0.1.33 now conforms to)
+pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"

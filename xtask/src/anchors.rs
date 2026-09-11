@@ -91,8 +91,23 @@ use std::path::Path;
 // from it, so it has no copies to drift — what it lacked was the second
 // direction of the check, added below as
 // `every_registered_namespace_publishes_at_least_one_anchor`.
+//
+// AND `exec` IS THE THIRTEENTH, at sc44's re-vendor (v0.2.11, `c9237c1`;
+// upstream `20b081e`, s153/#308 — "the exec namespace admitted"). Third
+// time for this shape and the third time the gate found it first: the
+// snapshot landed and
+// `every_published_anchor_sits_in_a_registered_namespace` went RED naming
+// `exec` and 2 — TWO, not one, because the namespace arrives with a parent
+// anchor (`[exec.checked]`) under the clause it was admitted for
+// (`[exec.checked.budget]`). 05-conformance.md owns it: no execution
+// document exists and a tier's budget decides what `unsupported` means on
+// that lane, which is a conformance fact. Appended here in the same commit
+// as the snapshot and the clause, per `[conf.anchor.ns.admit]`'s
+// one-change rule; additive, nothing renumbered, `[conf.anchor.stable]`
+// untouched.
 pub const REGISTERED_NS: &[&str] = &[
     "gram", "diag", "mem", "conc", "abi", "conf", "proto", "pkg", "ct", "type", "os", "sched",
+    "exec",
 ];
 
 /// Reserved forward namespaces, same clause.
