@@ -19,6 +19,32 @@
 //! as their first parameter with an honest X1 mode: `mut` where mutation
 //! IS the operation, the bare `read` default everywhere else.
 //!
+//! Two operations joined the language's list at the sc44 pins and they
+//! are worth naming because a learner reaches for them first: SLICING
+//! (`xs[..n]`, `xs[1..]`, `[mem.list.slice]`) runs on all three lanes
+//! now, and it is the language's, not std's. There is no
+//! `list.prefix`/`list.suffix` and there will not be one — §8 forbids a
+//! std name that shadows a working builtin — and there cannot be a
+//! `list.take` either, because `take` is a reserved word (`E0008` on
+//! both machines: the ownership verb owns it).
+//!
+//! **THE METHOD SPELLINGS ARE NOT STD'S TO GIVE (wolf-std#25).** A
+//! learner coming from chapter 5 writes `(mut l).truncate(2)` or
+//! `l.remove(i)` and gets "wolf cannot compile this yet — methods on
+//! generic std data" from the compiler and "`List` has no method
+//! `truncate` in this machine's std subset" from lupin. Both refusals
+//! are about the LANGUAGE's method surface on the builtin `List`, and
+//! std cannot extend it: this module is free functions over a container,
+//! by §8's rule, and `list.truncate(mut l, 2)` is the spelling it
+//! offers. All three of `insert`, `remove` and `truncate` are here, with
+//! bodies, with fenced doc examples that execute, and with three-lane
+//! ledger rows (`list/insert_remove.lu`, `list/clear_truncate_fill.lu`)
+//! — so the gap the issue found is a gap in what a learner is TOLD, not
+//! in what std ships. None of the three is written over the slice: the
+//! bodies rebuild through the private `at`, which predates slicing by
+//! nine sprints and stays because it is correct, and a rewrite would be
+//! churn against three green rows.
+//!
 //! Regions (D10): every function allocates in the ambient region and no
 //! signature asks for one. The `.in(r)` targets are s37's plumbing, not
 //! this module's. **s76 made that sentence true of the machine and not
