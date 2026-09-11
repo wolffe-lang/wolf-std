@@ -1,0 +1,36 @@
+//! check: run(exit=0, stdout="true false true true\ntrue true false\ntrue false false true\n")
+//! phase: run
+//! conforms: std.cmp, type.trait.op, mem.str.order
+//!
+//! The four impls sc44 added, executing: `Eq for char`, `Ord for char`,
+//! `Ord for str` and `Eq for f64`. Two of them retire sentences this
+//! module's header carried since sc01 — F-0006 said `impl Ord for str`
+//! would poison every importer, and the f64 paragraph said `f64` has no
+//! `Eq` — and a retired sentence wants a running witness, not a claim.
+//!
+//! Line 2 is `[mem.str.order]`: byte-lexicographic, shorter first on a
+//! shared prefix, every multi-byte code point above every ASCII one.
+//! Line 3 is the `Eq for f64` law caveat in full — reflexive at a real
+//! number, NOT reflexive at NaN, and total only through `Ord`.
+//!
+//! lupin executes no imported module's trait items (measured at sc44,
+//! filed at wolf-interp), so its row is the honest `unsupported`; the
+//! native rung refuses `impl Eq for Ordering`'s tuple match (`an enum or
+//! row test inside a product pattern`, c06) and refuses this file for
+//! that older reason rather than for anything new here.
+
+use std.cmp
+
+fn main() -> !int {
+    let nan = 0.0 / 0.0
+    print(
+        "{cmp.Eq.eq('a', 'a')} {cmp.Eq.eq('a', 'b')} {cmp.Ord.cmp('a', 'b').is_lt()} {cmp.Ord.cmp('z', 'a').is_gt()}",
+    )
+    print(
+        "{cmp.Ord.cmp("a", "b").is_lt()} {cmp.Ord.cmp("ab", "abc").is_lt()} {cmp.Ord.cmp("a", "a").is_ne()}",
+    )
+    print(
+        "{cmp.Eq.eq(1.5, 1.5)} {cmp.Eq.eq(1.5, 2.5)} {cmp.Eq.eq(nan, nan)} {cmp.Ord.cmp(nan, nan).is_eq()}",
+    )
+    if cmp.max("a", "b") == "b" { 0 } else { 1 }
+}

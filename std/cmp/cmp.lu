@@ -3,11 +3,25 @@
 //! std.cmp — comparison and ordering: the `Ordering` enum, the `Eq` and
 //! `Ord` protocols, and the min/max/clamp family. Stability tier: core.
 //!
-//! Decided here and recorded (sc01): f64 ordering. `f64` has no
-//! `Eq` — IEEE partial comparison stays on the builtin operators — and
-//! its `Ord` is `total_cmp` (IEEE totalOrder), so sorting floats is
-//! legal and NaN has one home (above `+inf`). See `total_cmp` for the
-//! two documented approximations at the current pins.
+//! Decided here and recorded (sc01): f64 ordering. Its `Ord` is
+//! `total_cmp` (IEEE totalOrder), so sorting floats is legal and NaN
+//! has one home (above `+inf`). See `total_cmp` for the two documented
+//! approximations at the current pins.
+//!
+//! **`f64` HAS AN `Eq` NOW, AND sc44 REVERSED sc01 TO GIVE IT ONE.**
+//! This header said for forty-three sprints that `f64` has no `Eq`
+//! because "IEEE partial comparison stays on the builtin operators".
+//! `[type.trait.op]` (s155, wolf-lang#5) is what retires that sentence:
+//! since the operator bridge landed, `==` on a type parameter IS
+//! `Eq.eq`, so "stays on the builtin operator" and "goes through `Eq`"
+//! stopped being two different places. Withholding the impl would not
+//! have kept a partial order out of a total protocol; it would only
+//! have made `f64` the one primitive whose `==` does not work under a
+//! bound, while `<` under the same bound did. The impl's body is
+//! `self == other` — the clause's rule that a primitive impl IS the
+//! builtin operation — and the law caveat is stated on the impl
+//! itself: reflexivity fails at NaN, which is exactly what the builtin
+//! does and is why `Ord for f64` is `total_cmp` and not this.
 //!
 //! INTERIM SPELLINGS (each filed, flipped on the pin bump that fixes it):
 //! - The absence-spelling interim is RETIRED (F-0003, dead at the sc05
@@ -15,15 +29,26 @@
 //!   every implementation. Until sc12 this line still described the
 //!   interim, in a half-renamed sentence that said the source said the
 //!   opposite of what it says.
-//! - `Ord` requires `Eq` by doctrine, but the pinned grammar has no
-//!   supertrait clause (`trait_item` carries no bound list), so the
-//!   requirement is documentary until the F-0004 bridge filing settles
-//!   trait composition.
-//! - `impl Ord for str` is NOT shipped: wolfc rejects `<` on `str`
-//!   (E0409) and one rejected body poisons every test that imports this
-//!   module, while lupin runs str relational operators. Divergence
-//!   filed (F-0006); the impl lands with the pin that defines str
-//!   ordering in both implementations.
+//! - `Ord` requires `Eq` by doctrine, and the requirement is still
+//!   DOCUMENTARY, but for a smaller reason than it was. s155 gave the
+//!   grammar a `trait_item` with an `=` form (the alias bound,
+//!   `[type.trait.op.alias]`) and no supertrait clause, so composition
+//!   this edition is an alias listing both and not `trait Ord: Eq`.
+//!   F-0004's operator half is RULED — `==`, `!=` and the relationals
+//!   dispatch through `Eq`/`Ord` by name on a type parameter or a user
+//!   type, which is what `std.ops` is written against — and its
+//!   supertrait half is what remains open.
+//! - **F-0006 IS RETIRED AND `impl Ord for str` SHIPS.** The finding
+//!   said "wolfc rejects `<` on `str` (E0409) and one rejected body
+//!   poisons every test that imports this module". Re-measured at the
+//!   sc44 pins on all three lanes: `cmp.Ord.cmp("a", "b").is_lt()` is
+//!   `true` on the checked tier, the body passes the static ladder on
+//!   every lane, and nothing is poisoned. The impl is written here in
+//!   the same shape as `Ord for int` — two relational tests and a
+//!   fallthrough — and the order it reports is the language's
+//!   byte-lexicographic one (`[mem.str.order]`), which `std.sort`'s
+//!   `sort_strs` already documents is not alphabetical in any human
+//!   language (F-0019 owns collation).
 
 pub enum Ordering {
     Less,
@@ -184,6 +209,64 @@ impl Ord for Ordering {
             (Greater, Greater) => Ordering.Equal,
             (Greater, _) => Ordering.Greater,
         }
+    }
+}
+
+impl Eq for char {
+    fn eq(self, other: Self) -> bool {
+        self == other
+    }
+}
+
+/// Scalar order (D58): `char` is a Unicode scalar value and this is the
+/// order of its code points, which is also the order the language's `<`
+/// reports. Same shape as `Ord for int` for the same reason — two
+/// relational tests and a fallthrough.
+impl Ord for char {
+    fn cmp(self, other: Self) -> Ordering {
+        if self < other { return Ordering.Less }
+        if other < self { return Ordering.Greater }
+        Ordering.Equal
+    }
+}
+
+/// Byte-lexicographic order (`[mem.str.order]`): unsigned byte compare,
+/// shorter first on a shared prefix, so every multi-byte code point
+/// sorts above every ASCII one. That is NOT alphabetical order in any
+/// human language and this module does not pretend it is — collation is
+/// a table question (F-0019) and belongs where the tables land.
+/// `std.sort.sort_strs` sorts by the same relation and says the same
+/// thing; the two agree because both are the language's `<`.
+impl Ord for str {
+    fn cmp(self, other: Self) -> Ordering {
+        if self < other { return Ordering.Less }
+        if other < self { return Ordering.Greater }
+        Ordering.Equal
+    }
+}
+
+/// IEEE equality, and the law caveat is the point of the doc comment
+/// rather than a footnote to it. `Eq`'s law says `eq` is reflexive;
+/// `eq(nan, nan)` is `false`, so at NaN it is not. That is exactly what
+/// the builtin `==` does, and `[type.trait.op]` rules that a primitive
+/// impl IS the builtin operation — an impl that repaired the law would
+/// be a different operation wearing `==`'s name, and the one place a
+/// total answer is owed is `Ord`, which is `total_cmp` and gives NaN a
+/// home. A caller that needs reflexivity over floats compares through
+/// `Ord.cmp(a, b).is_eq()`, which is total by construction.
+///
+/// Prose, not a fenced example (§4): trait dispatch through an IMPORTED
+/// module's trait is `unsupported` under lupin 0.1.33 — measured at
+/// sc44 and filed at wolf-interp — and §4's doc-truth rule wants the
+/// reference machine at `exit(0)`. On the two lanes that do execute it:
+/// `Eq.eq(1.5, 1.5)` is `true`, `Eq.eq(1.5, 2.5)` is `false`,
+/// `Eq.eq(0.0 / 0.0, 0.0 / 0.0)` is `false`, and
+/// `Ord.cmp(0.0 / 0.0, 0.0 / 0.0).is_eq()` is `true` — the whole caveat
+/// in four lines. `tests/cmp/primitive_impls_tier.lu` is the running
+/// witness.
+impl Eq for f64 {
+    fn eq(self, other: Self) -> bool {
+        self == other
     }
 }
 
