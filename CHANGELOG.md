@@ -1,5 +1,157 @@
 # Changelog
 
+## sc44 — 2026-09-11 — the std takes the eleventh, and a module nobody could type turns out never to have been read
+
+`wolf 0.2.10` -> `0.2.11` (`c9237c1`), `lupin 0.1.31` -> `0.1.33`
+(`18de030`, conformance pin `662b14c`). lupin takes TWO releases in one
+chase for the second time in this ledger's life, and the pairing gap
+opens to **91 commits** with the compiler ahead — six sprints, s149
+through s155, the widest it has ever been. The mirror's pin is exactly
+the tag this repository's own data pin carried through sc43.
+
+Six deltas across the span classified in `tools.toml` before anything was
+measured, with the two that ARE the sprint named first: s152's key
+protocol and s155's operator bridge. Registry `662b14c` -> `c9237c1`
+predicted 458 -> 470, +12; measured **458 -> 471, +13**, dropped 0,
+owners moved 0, key sets diffed both ways.
+
+**The prediction missed by one and it missed three ways, which is more
+useful than missing by none.** sc43's rule — a spec commit's subject
+names the CLAUSE, not the anchors — caught all three.
+`[abi.native.closure]` was predicted new and was already registered (its
+commit says "rewritten", and a rewritten clause publishes no key);
+`exec.checked` arrived beside `exec.checked.budget`, two keys for one
+clause name; and `os.fs.open` belongs to an s149 that no summary of this
+bump mentioned. **And `exec` is a thirteenth namespace** —
+`every_published_anchor_sits_in_a_registered_namespace` went RED naming
+`exec` and 2 before a human read an issue, for the third time, and the
+snapshot, the clause and `REGISTERED_NS` moved in one commit per
+`[conf.anchor.ns.admit]`.
+
+**`std.ops` is new, and it is what F-0004 has been filed against since
+sc01.** Six operator traits (`Add`, `Sub`, `Mul`, `Div`, `Rem`, `Neg`)
+with their primitive impls, transcribed from `[type.trait.op]` because
+E0514 refuses any other shape. Every body is one operator expression: the
+clause says the primitive impls ARE the builtin operations, so
+`[T: Add]` at `int` is the machine add and nothing is interposed. It is
+the one trait module in this tree whose native lane is lit, because it
+imports nothing.
+
+**Two items of that surface are withheld, both on measurements taken
+before anything was written.** `impl Rem for f64` is not shipped: its
+body is `self % other` by the clause and both compiler tiers refuse it,
+and with the impl present and NOTHING CALLING IT a program that imports
+the module and adds two ints drops from `exit(0)` to `unsupported` on the
+native lane (wolf-lang#327, with a correction to that issue's own text —
+at v0.2.11 the checked tier refuses `%` on floats too, so the
+disagreement is compiler-versus-interpreter). And `trait Num` is not
+shipped anywhere: the alias form is `E0201` at PARSE under lupin 0.1.33,
+which is the FILE and not a row, and the nursery cannot hold it either
+because a lupin `fail(…)` has no legal ledger word (F-0121,
+wolf-std#27).
+
+**`std.cmp` retires two sentences it has carried since sc01.**
+`impl Ord for str` ships and F-0006 retires — the finding said one
+rejected body would poison every importer and it does not, re-measured on
+three lanes. And `impl Eq for f64` REVERSES the sc01 decision: since the
+operator bridge landed, `==` on a type parameter IS `Eq.eq`, so "IEEE
+comparison stays on the builtin operators" and "goes through `Eq`"
+stopped being two different places, and withholding the impl would only
+have made `f64` the one primitive whose `==` does not work under a bound
+while `<` under the same bound did. The law caveat is on the impl:
+reflexivity fails at NaN, exactly as the builtin does, and the one place
+a total answer is owed is `Ord`. `impl Eq for char` and `impl Ord for
+char` land with them, the first because `[type.map.key]` names four keys
+and this module shipped three impls.
+
+**`std.map` stops being a filing and becomes a module — and the first
+reading found a bug in it.** F-0011's three questions become two rulings
+and one unchanged sentence: the key protocol is `str`/`int`/`char`/`bool`
+with no `Hash` half, `tally` is std's the way the filing recommended, and
+iteration order is still unspecified. Six ledger rows move to a `run`
+wolfc column. But `set`'s body — `m[k] = v`, written at sc02 and never
+read by a compiler, because `Map` was not a type — is `E1004` at the pin
+that types it, and the refusal took the WHOLE module down on both rungs.
+It is `m[k] = copy v` now. **F-0119** is the general shape: an
+`unsupported` row for a STRUCTURAL reason is not a lane that passed, it
+is a lane that never looked, and the day the reason goes away a sprint
+should budget for a body being read rather than for a row flipping.
+
+**THE GAUNTLET WENT RED ON ITS FIRST RUN AT THE NEW PINS, ON SIXTEEN
+ROWS, AND THE RED IS THE PROOF.** A ledger edited before a measurement
+would have gone green and proved nothing (sc37's lesson, followed). Six
+of the sixteen were predicted in `tools.toml`; ten were not, and they are
+where the sprint's two new findings came from. Every one was re-run alone
+before its word changed. Fifteen ledger rows move — the largest
+single-sprint motion this repository has recorded — and **five TEST
+bodies are rewritten by the bump**, a census row that has never existed
+before.
+
+**`==` on a std type cannot dispatch from any file that imports it, and
+that is the one thing this bump made worse.** `[type.trait.op]` resolves
+the operator trait by BARE name; `use std.cmp` binds `cmp`; wolf has no
+item imports. So `less == greater` on two `Ordering`s is `E0301` on both
+compiler rungs, with a fix-it neither half of which can be followed —
+nothing brings `Eq` into scope, and the `impl Eq for Ordering` it asks
+for already exists in std.cmp. Inside `std/cmp/*.lu` the name is bare and
+`==` works; one `use` away it does not, for every user type any library
+will ever publish, in the release whose headline is operators on user
+types. Two entry tests green since sc01 are `fail(E0301)` on two lanes
+each and are ledgered as its regression witnesses, NOT rewritten around
+it. wolf-lang#336.
+
+**And the checked tier answers a float comparison wrongly, which an
+`unsupported` had been hiding.** `let n: int = 4; let a = n as f64;
+a == 4.0` is `false` on `--checked` and `true` on `--native` and lupin;
+the value prints as `4` on all three and compares equal to itself. Not a
+magnitude story, not a regression — v0.2.10 gives the identical `false`.
+It surfaced because `json/number_posture_and_depth`'s wolfc row was
+`unsupported` for `methods on generic std data`, s152 removed that
+refusal, and the program ran on that tier for the first time in its life
+and returned 4. **F-0119 twice in one day, in two modules**, and the
+second time the dark lane was hiding a wrong ANSWER rather than an unread
+body. wolf-lang#337; both assertions go through `stringify` until it
+closes.
+
+**Half of F-0002 is now false, and the surviving half is about the
+import.** `cmp.Eq.eq(a, b)` through a `use` is `unsupported` on lupin
+while the byte-identical trait declared in the ENTRY FILE runs on all
+three machines — twelve lines, two files, filed as wolf-interp#96. So
+wolf-std#24's prediction that std.map's `[K: Eq]` five could become
+fenced examples is wrong: they run on the checked tier and not on the
+reference machine, and doc-truth wants the reference machine. A witness
+that declares its trait locally cannot say anything about a trait reached
+through `use`, and this repository's std is the only corpus in the org
+where every trait is imported by construction.
+
+**wolf-std#23 answered, and half of it turned out to be unspellable.**
+Four returning twins ship (`sorted_by`, `sorted_ints`, `sorted_floats`,
+`sorted_strs`), each its in-place twin over a copy. The prefix does not,
+and not as a decision: `fn take` is `E0008: `take` is a reserved
+keyword` on BOTH machines, so there is no spelling of that function —
+and `xs[..n]` runs on all three lanes at these pins, so §8 forbids a std
+name shadowing it anyway. The chain is `sort.sorted_ints(xs)[..2]`, it
+runs, and the book can stop fencing it as text. **F-0120**: before
+designing around a name, check that the name can exist.
+
+**wolf-std#19 and the timing half of #20 close, and nothing was relaxed
+to close them.** sc43 said the ubuntu kill and the windows timeouts were
+one bug seen through two ceilings and filed F-0116 saying the cost was
+the CHECKED tier's memory. wolf-lang#308 is the fix and v0.2.11 carries
+it; the clause's own prose names this repository's row at 16.6 GiB.
+Re-measured cold: `cavp_sha256_long` 30.2 MiB, `cavp_sha384_long`
+40.4 MiB, `cavp_sha512_long` 40.0 MiB, under two seconds each, each an
+honest `unsupported — step budget exhausted`. Predicted 45–55 MiB and it
+came in under the band. `std-test` runs on all three hosts again, the
+60 s per-row ceiling stands unchanged and no longer binds, and
+`STD_TEST_TIMEOUT_SECS` is still not set — sc43's answer to #20's
+either/or was NEITHER and it is still neither.
+
+**wolf-std#25 answered in `std.list`'s header.** `insert`, `remove` and
+`truncate` are all here with bodies, fenced examples and three-lane rows;
+what does not work is the METHOD spelling on the builtin `List`, which
+std cannot extend. The gap was in what a learner is told.
+
 ## sc43 — 2026-09-11 — the std takes the tenth, and the runner that dies is not dying of what we said
 
 `wolf 0.2.9` -> `0.2.10` (`662b14c`), `lupin 0.1.30` -> `0.1.31`
