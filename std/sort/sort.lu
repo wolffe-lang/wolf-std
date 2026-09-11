@@ -31,6 +31,28 @@
 //! call `std.list.reverse`, or pass a comparator that swaps its
 //! arguments (`sort_by(mut xs, reverse_cmp)`); there is no `sort_desc`.
 //!
+//! **RETURNING TWINS (sc44, wolf-std#23), and the one name that could
+//! not be written.** The Wolf Book's §5.2 has promised a chain since
+//! bs00 — `totals.pairs().sorted_by(…).take(2)` — and every function
+//! here was in place and unit-returning, so the page printed a `text`
+//! fence. Four functions answer the first half: `sorted_by` beside
+//! `sort_by`, and `sorted_ints`/`sorted_floats`/`sorted_strs` beside the
+//! three that run. Each is its in-place twin over a copy, leaves its
+//! argument alone, and takes the container in the bare read mode (§8:
+//! `mut` where mutation IS the operation, and here it is not).
+//!
+//! **`take` CANNOT BE WRITTEN AND DOES NOT NEED TO BE**, and both halves
+//! are measurements rather than opinions. `fn take` is `E0008: `take` is
+//! a reserved keyword and cannot be a name; wolf has no raw identifiers`
+//! on BOTH machines — the ownership verb wolf-lang#154 names owns the
+//! word outright, so the collision is not a style question. And the
+//! prefix it would have provided is the language's: `xs[..n]` and
+//! `xs[1..]` (`[mem.list.slice]`) both run on all three lanes at the
+//! sc44 pins, measured. A std function shadowing a working builtin with
+//! a worse name is the one thing §8's container rule forbids outright.
+//! So the chain in std's vocabulary is `sort.sorted_ints(xs)[..2]`, it
+//! runs today, and the book can stop fencing it as text.
+//!
 //! **Bench kernels (D5/D36, report-only).** The three registered
 //! candidates for s44's T1 perf suite are `sort_ints` over 1e5 random
 //! ints, `sort_ints` over a sorted run of the same length (the
@@ -154,6 +176,29 @@ pub fn sort_by[T](mut xs: List[T], by: fn(T, T) -> cmp.Ordering) {
         width = width + width
     }
     xs = src
+}
+
+/// `sort_by`'s returning twin: a fresh list holding `xs`'s elements in
+/// `by`'s order, with `xs` untouched. The chain's sort (wolf-std#23).
+/// `by` must be a total order or the result is merely a permutation.
+/// Total: no error row, no traps beyond allocation.
+///
+/// Does not execute at these pins, for the two reasons its twin carries
+/// and neither of them new: `Ordering` produced by `std.cmp` cannot be
+/// examined by this module (F-0029), and the checked tier answers
+/// `unsupported — trait dispatch on a non-nominal receiver` at
+/// `Ord.cmp(src[b], src[a])`. It ships anyway and it ships NOW because
+/// the name is what the book promises, and a promised name that does
+/// not exist is worse than one that is honestly freight —
+/// `tests/sort/generic_contract.lu` proves the shape typechecks.
+/// Prose, not a fenced example, for that reason.
+pub fn sorted_by[T](xs: List[T], by: fn(T, T) -> cmp.Ordering) -> List[T] {
+    var out = List[T]()
+    for x in xs {
+        (mut out).push(x)
+    }
+    sort_by(mut out, by)
+    out
 }
 
 /// Sorts a list of `int` ascending, in place, stably. O(n log n)
@@ -373,6 +418,71 @@ pub fn sort_strs(mut xs: List[str]) {
         width = width + width
     }
     xs = src
+}
+
+/// `sort_ints`'s returning twin: a fresh ascending list, `xs`
+/// untouched. Total: no error row, no traps beyond allocation.
+///
+/// This is the chain the book's §5.2 wants, with the prefix spelled as
+/// the language's slice: `sort.sorted_ints(xs)[..2]`.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// (mut xs).push(3)
+/// (mut xs).push(1)
+/// (mut xs).push(2)
+/// sort.sorted_ints(xs)[0] == 1
+/// sort.sorted_ints(xs)[..2].len == 2
+/// xs[0] == 3
+/// ```
+pub fn sorted_ints(xs: List[int]) -> List[int] {
+    var out = List[int]()
+    for x in xs {
+        (mut out).push(x)
+    }
+    sort_ints(mut out)
+    out
+}
+
+/// `sort_floats`'s returning twin, under the same IEEE totalOrder.
+/// Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var xs = List[f64]()
+/// (mut xs).push(2.5)
+/// (mut xs).push(-1.0)
+/// sort.sorted_floats(xs)[0] == -1.0
+/// xs[0] == 2.5
+/// ```
+pub fn sorted_floats(xs: List[f64]) -> List[f64] {
+    var out = List[f64]()
+    for x in xs {
+        (mut out).push(x)
+    }
+    sort_floats(mut out)
+    out
+}
+
+/// `sort_strs`'s returning twin, in the language's byte-lexicographic
+/// order (`[mem.str.order]`). Total: no error row, no traps beyond
+/// allocation. Runs on the interpreter only at these pins, for its
+/// twin's reason: `<` on `str` is `unsupported` in the native rung's
+/// string lowering.
+///
+/// ```wolf-doc-example
+/// var xs = List[str]()
+/// (mut xs).push("pear")
+/// (mut xs).push("apple")
+/// sort.sorted_strs(xs)[0] == "apple"
+/// xs[0] == "pear"
+/// ```
+pub fn sorted_strs(xs: List[str]) -> List[str] {
+    var out = List[str]()
+    for x in xs {
+        (mut out).push(x)
+    }
+    sort_strs(mut out)
+    out
 }
 
 /// True when `xs` is in ascending order (ties allowed). The empty list
