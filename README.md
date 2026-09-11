@@ -72,8 +72,12 @@ cargo xtask ci            # all of it, behind fmt/clippy/test
 Toolchain binaries are looked up at run time from `$LUPIN_BIN` /
 `$WOLF_BIN`, then `.wolf-bin/`, then `PATH`. A rung whose binary is
 missing reports `SKIP: no lupin at pin …` and is counted as skipped.
-The native rung also needs `libwolf_rt.a` beside the `wolf` binary (or
-`$WOLF_RT_LIB`) and skips the same way without it.
+The native rung also needs the runtime staticlib beside the `wolf`
+binary (or `$WOLF_RT_LIB`) and skips the same way without it. Its name
+is rustc's own spelling per target — `wolf_rt.lib` on windows,
+`libwolf_rt.a` everywhere else — which is what every release archive
+ships; a rig that knew only one of the two reported a lane dark at a
+file it could see (wolf-std#18).
 
 `upstream/` is the wolf-lang submodule (sparse `spec/` and `corpus/`),
 `vendor/upstream/` the snapshot CI reads, and `vendor/tools.toml` the

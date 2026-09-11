@@ -53,7 +53,31 @@ impl Impl {
     }
 }
 
-/// The native rung links against `libwolf_rt.a`, which the driver looks
+/// The runtime staticlib's file name, rustc's own spelling per target:
+/// `wolf_rt.lib` on MSVC, `libwolf_rt.a` everywhere else. The driver
+/// (`wolf_driver::RT_LIB_NAME`) stages and links exactly this name, and
+/// every release archive ships it under it, so the rig resolves exactly
+/// this and nothing else.
+///
+/// wolf-std#18: the windows lane was dark for a reason that was a
+/// FILENAME. `wolf-<v>-x86_64-pc-windows-msvc.tar.gz` ships the runtime
+/// beside `wolf.exe` as `wolf_rt.lib`, this function looked only for
+/// `libwolf_rt.a`, and the loud SKIP that followed said ABSENT about a
+/// file that was right there — the one direction a SKIP must never lie
+/// in (`bins.rs`'s own header: absence is legal and LOUD).
+pub const RT_LIB_NAME: &str = if cfg!(windows) {
+    "wolf_rt.lib"
+} else {
+    "libwolf_rt.a"
+};
+
+/// Every spelling of the runtime this rig knows. Used only to tell
+/// ABSENT from PRESENT-UNDER-ANOTHER-PLATFORM'S-NAME, which is the
+/// distinction wolf-std#18 was filed for; the lane still only links
+/// `RT_LIB_NAME`, because that is the only name the driver links.
+const RT_LIB_NAMES: [&str; 2] = ["libwolf_rt.a", "wolf_rt.lib"];
+
+/// The native rung links against `RT_LIB_NAME`, which the driver looks
 /// for next to the `wolf` binary or at `$WOLF_RT_LIB`. Absent, the lane
 /// is dark — and says so, like every other absence here.
 pub fn native_rt(repo: &Path) -> Option<PathBuf> {
@@ -62,8 +86,32 @@ pub fn native_rt(repo: &Path) -> Option<PathBuf> {
         return p.is_file().then_some(p);
     }
     let wolf = resolve(Impl::Wolf, repo)?;
-    let beside = wolf.path.parent()?.join("libwolf_rt.a");
+    let beside = wolf.path.parent()?.join(RT_LIB_NAME);
     beside.is_file().then_some(beside)
+}
+
+/// Why the native lane is dark, in one sentence a reader can act on:
+/// the name that was looked for, and — when one of the OTHER known
+/// spellings is sitting beside the driver — that fact, said out loud.
+/// A rig that prints `absent` at a runtime it can see is worse than a
+/// dark lane; it is a dark lane with an alibi (wolf-std#18).
+pub fn native_rt_absence(repo: &Path) -> String {
+    let base = format!("no {RT_LIB_NAME} beside the wolf binary (nor $WOLF_RT_LIB)");
+    let Some(wolf) = resolve(Impl::Wolf, repo) else {
+        return format!("{base} — and no `wolf` to sit beside");
+    };
+    let Some(dir) = wolf.path.parent() else {
+        return base;
+    };
+    for other in RT_LIB_NAMES {
+        if other != RT_LIB_NAME && dir.join(other).is_file() {
+            return format!(
+                "{base} — but `{other}` IS there, which is another platform's \
+                 spelling of the same staticlib and not one this host links"
+            );
+        }
+    }
+    base
 }
 
 #[derive(Debug)]

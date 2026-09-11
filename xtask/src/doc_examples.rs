@@ -176,7 +176,10 @@ pub fn doc_examples() -> Result<(), String> {
     let mut lanes = Vec::new();
     for imp in bins::LANES {
         if imp == Impl::Native && native_rt.is_none() {
-            println!("SKIP: no libwolf_rt.a — doc-example native lane dark");
+            println!(
+                "SKIP: {} — doc-example native lane dark",
+                bins::native_rt_absence(&repo)
+            );
             continue;
         }
         match bins::resolve(imp, &repo) {

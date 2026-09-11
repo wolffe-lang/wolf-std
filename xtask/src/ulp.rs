@@ -222,7 +222,10 @@ pub fn ulp() -> Result<(), String> {
     let mut lanes_run = 0usize;
     for imp in bins::LANES {
         if imp == Impl::Native && native_rt.is_none() {
-            println!("SKIP: no libwolf_rt.a — ulp determinism lane `native` dark");
+            println!(
+                "SKIP: {} — ulp determinism lane `native` dark",
+                bins::native_rt_absence(&repo)
+            );
             continue;
         }
         let Some(bin) = bins::resolve(imp, &repo) else {

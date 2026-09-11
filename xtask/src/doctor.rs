@@ -19,14 +19,15 @@ pub fn doctor() -> Result<(), String> {
     }
     match bins::native_rt(&repo) {
         Some(lib) => println!(
-            "doctor: native rung — libwolf_rt.a at {} (lane lit)",
+            "doctor: native rung — {} at {} (lane lit)",
+            bins::RT_LIB_NAME,
             stage::show(&lib)
         ),
         None => println!(
-            "doctor: native rung — ABSENT (no libwolf_rt.a beside the wolf \
-             binary, no $WOLF_RT_LIB)\n        SKIP: the `native` ledger column \
-             will not be observed; build it with `cargo build -p wolf_rt` at \
-             the recorded pin"
+            "doctor: native rung — ABSENT ({})\n        SKIP: the `native` ledger \
+             column will not be observed; build it with `cargo build -p wolf_rt` \
+             at the recorded pin",
+            bins::native_rt_absence(&repo)
         ),
     }
     if reds.is_empty() {

@@ -220,9 +220,9 @@ pub fn std_test() -> Result<(), String> {
     ] {
         if imp == Impl::Native && native_rt.is_none() {
             println!(
-                "SKIP: no libwolf_rt.a beside the wolf binary (nor $WOLF_RT_LIB) \
-                 — the native lane is dark; build it with \
+                "SKIP: {} — the native lane is dark; build it with \
                  `cargo build -p wolf_rt` in a checkout at pin {}",
+                bins::native_rt_absence(&repo),
                 &wolf_pin.pin[..7.min(wolf_pin.pin.len())]
             );
             lanes.push((imp, None));
