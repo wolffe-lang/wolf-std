@@ -202,14 +202,19 @@ pub fn concat(a: List[byte], b: List[byte]) -> List[byte] {
 /// HandshakeType `client_hello` (1). Zero-argument functions stand in
 /// for `const`s (F-0025).
 pub fn hs_client_hello() -> int { 1 }
+
 /// HandshakeType `server_hello` (2).
 pub fn hs_server_hello() -> int { 2 }
+
 /// HandshakeType `encrypted_extensions` (8).
 pub fn hs_encrypted_extensions() -> int { 8 }
+
 /// HandshakeType `certificate` (11).
 pub fn hs_certificate() -> int { 11 }
+
 /// HandshakeType `certificate_verify` (15).
 pub fn hs_certificate_verify() -> int { 15 }
+
 /// HandshakeType `finished` (20).
 pub fn hs_finished() -> int { 20 }
 
@@ -644,7 +649,7 @@ pub fn ct_eq(a: List[byte], b: List[byte]) -> bool {
     while i < a.len {
         let x = a[i] as int
         let y = b[i] as int
-        diff = ((diff as wrapping[u64]) | (x as wrapping[u64] ^ y as wrapping[u64])) as int
+        diff = (diff as wrapping[u64] | x as wrapping[u64] ^ y as wrapping[u64]) as int
         i = i + 1
     }
     diff == 0
@@ -669,7 +674,9 @@ pub fn verify_finished(base_secret: List[byte], transcript_hash: List[byte], rec
 /// the miss). The state machine and the record layer continue their
 /// smuggling/confusion discipline through this named reject.
 /// ct: as `verify_finished`.
-pub fn accept_finished(base_secret: List[byte], transcript_hash: List[byte], received: List[byte]) -> int ! {decrypt_error} {
+pub fn accept_finished(base_secret: List[byte], transcript_hash: List[byte], received: List[byte]) -> int ! {
+    decrypt_error,
+} {
     if verify_finished(base_secret, transcript_hash, received) {
         return 1
     }

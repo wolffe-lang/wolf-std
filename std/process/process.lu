@@ -480,10 +480,12 @@ pub fn start(c: Command) -> Child ! {not_found, denied, io} {
 /// `let w = process.start_with(cmd, workers)?` — the worker reads
 /// `net.adopt_listener(3)?` and accepts. `tests/process/start_with_empty_rows.lu`
 /// and `tests/process/start_with_inherit_rows.lu` are the witnesses.
-pub fn start_with(
-    c: Command,
-    inherit: List[net.Listener],
-) -> Child ! {unsupported, not_found, denied, io} {
+pub fn start_with(c: Command, inherit: List[net.Listener]) -> Child ! {
+    unsupported,
+    not_found,
+    denied,
+    io,
+} {
     var exe = ""
     var args = List[str]()
     var named = false

@@ -697,9 +697,7 @@ pub fn ln(x: f64) -> f64 {
     let k = ln_exponent(x)
     let m = x * two_pow(0.0 - k)
     // ln2 in two pieces keeps k*ln2 honest for |k| up to 1100.
-    ln_mantissa(m) +
-        k * 0.6931471805599453 +
-        k * 2.3190468138462996e-17
+    ln_mantissa(m) + k * 0.6931471805599453 + k * 2.3190468138462996e-17
 }
 
 /// The scaling exponent `k` with `x * 2^-k` in `[sqrt(2)/2, sqrt(2))`.
@@ -767,8 +765,7 @@ pub fn log2(x: f64) -> f64 {
     let m = x * two_pow(0.0 - k)
     // Splitting this way — the exponent as an exact term, the mantissa
     // through the series — is what makes log2 of a power of two exact.
-    k +
-        ln_mantissa(m) * 1.4426950408889634
+    k + ln_mantissa(m) * 1.4426950408889634
 }
 
 /// The base-10 logarithm. `log10(0.0)` is `-inf` and `log10` of a
@@ -812,10 +809,7 @@ fn reduce_quadrant(x: f64) -> f64 {
     // bits each: `n * PIO2_1` and `n * PIO2_2` are then exact for every
     // |n| below 2^20, and the first subtraction cancels exactly. The
     // single-piece split costs 300 ulp at x = 1000.
-    x -
-        n * 1.5707963267341256 -
-        n * 6.077100506303966e-11 -
-        n * 2.0222662487959506e-21
+    x - n * 1.5707963267341256 - n * 6.077100506303966e-11 - n * 2.0222662487959506e-21
 }
 
 /// The quadrant index 0..3 of `x` as an `f64`.
