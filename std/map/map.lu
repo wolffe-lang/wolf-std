@@ -4,34 +4,79 @@
 //! the keyed store the wordcount exemplar is written against. Stability
 //! tier: core.
 //!
-//! **What is the language's and what is std's** (F-0011, this sprint's
-//! structural finding): `Map` is prelude-ambient today — the spec lists
-//! it, lupin executes it, wolfc does not type it — and that is
-//! SCAFFOLDING, not a decision. The recommendation filed upstream: `Map`
-//! becomes a std-defined generic type once s16 delivers generic data
-//! types, with the builtin as a documented interim that must not outlive
-//! s16. Until then this module is the API surface over whatever the
-//! implementation provides, and three questions ride the filing:
+//! **WHAT IS THE LANGUAGE'S AND WHAT IS STD'S — RULED, and this header
+//! stops being a filing.** F-0011 asked three questions when this module
+//! was written (sc02) and s152 (`[type.map]`, `[type.map.key]`,
+//! `[mem.map.absent]`; wolf-lang#11 item 4, #154) answers two of them
+//! and leaves the third exactly as it was:
 //!
-//! - the **key protocol**: hashing lives inside the implementations and
-//!   is unspecified. The functions here that must compare keys take a
-//!   `[K: Eq]` bound, which is the honest half of the protocol; the
-//!   `Hash` half is the filing's open question.
-//! - **`tally`**: the corpus writes `tally[w] += 1` with absent keys
-//!   defaulting to the zero value. Neither half of that idiom works at
-//!   the pins — lupin refuses the compound assignment through an index
-//!   (`does not denote a place`) and reads an absent key as `()`, not a
-//!   zero — so is absent-key-defaulting a language rule or a std
-//!   function? Filed with the recommendation that std own it (`tally`),
-//!   because a defaulting read hides a lookup miss the row makes visible.
-//! - **iteration order**: unspecified, deliberately. `keys`, `values` and
-//!   `pairs` promise the SAME order as each other for an unmodified map,
-//!   and nothing more.
+//! - **The key protocol: RULED, and there is no `Hash` half.** This
+//!   header used to say "hashing lives inside the implementations and is
+//!   unspecified … the `Hash` half is the filing's open question".
+//!   `[type.map.key]` retires that sentence: `Map[K, V]` admits `str`,
+//!   `int`, `char` and `bool` keys this edition — the four whose
+//!   equality the LANGUAGE defines — and `[K: Eq]` is satisfied by the
+//!   four through `std.cmp`'s ordinary impls. So the bound the five
+//!   functions below already carried is not "the honest half" of a
+//!   protocol; it is the whole of it. A struct key is E0418 and waits on
+//!   derived equality, which is named upstream and unruled. `impl Eq for
+//!   char` landed in `std.cmp` at sc44 for this clause: the ruling names
+//!   four keys and that module shipped three impls.
+//! - **`tally`: RULED, and it is std's.** The filed question was "is
+//!   absent-key-defaulting a language rule or a std function?" and it
+//!   closes the way the filing recommended. The LANGUAGE rules the
+//!   absence — `m[k]` is `V ! {none}`, never `()`; `m[k] = v` inserts;
+//!   `m[k] op= v` is E0417, whose note names `map.tally(mut m, k)` BY
+//!   NAME — and STD owns the defaulting. `tally`'s body below is the
+//!   clause's own spelling, unchanged since sc02 and now ruled rather
+//!   than proposed.
+//! - **Iteration order: unchanged, and deliberately.** `keys`, `values`
+//!   and `pairs` promise the SAME order as each other for an unmodified
+//!   map, and nothing more. Both machines answer insertion order at
+//!   these pins and neither promise is made here.
 //!
-//! Ledger reality at the current pins: every function here is
-//! `unsupported` under wolfc (`Map` is not typed there — the whole
-//! module is, honestly, freight), and the `[K: Eq]` five are
-//! `unsupported` under lupin too (no trait dispatch — F-0002/F-0004).
+//! `Map` itself stays the language's. The sc02 recommendation — that it
+//! become a std-defined generic type — is answered in the other
+//! direction and the answer is better than the recommendation: `Map` is
+//! `TyKind::Map` in the compiler, a `wolf_rt::map` seam in the native
+//! runtime and a served type in the checked machine, so it is a language
+//! type with a spec clause instead of scaffolding with a deadline. This
+//! module is the API surface over it, which is what §8's container rule
+//! has said all along.
+//!
+//! **LEDGER REALITY at the sc44 pins, measured rather than carried
+//! forward.** The old paragraph said every function here is
+//! `unsupported` under wolfc because `Map` is not typed there — "the
+//! whole module is, honestly, freight". That is over. What replaced it
+//! is not uniform and the differences are the point:
+//!
+//! - The compiler's two rungs TYPE this module now, which means every
+//!   body in it was read by the mem tier for the first time at this pin.
+//!   One refusal fell out of that first reading and it is recorded at
+//!   `set` below.
+//! - The `[K: Eq]` five (`get`, `get_or`, `has`, `remove`, `tally`)
+//!   EXECUTE on the checked tier. They are `unsupported` under lupin,
+//!   and the reason is new information rather than F-0002's old one:
+//!   dispatch through a trait declared in the ENTRY FILE runs on all
+//!   three machines (wolf-lang's own `corpus/memory/map_std_keys.lu` is
+//!   these three bodies word for word and prints on every lane), while
+//!   dispatch through an IMPORTED module's trait is `unsupported: `Eq`
+//!   is a trait; traits, enums and type-level items have no dynamic
+//!   semantics here`. Measured at sc44 with a twelve-line reduction and
+//!   filed at wolf-interp. F-0002 has said "dispatch executes nowhere"
+//!   since sc01; half of that is now false, and the half that is left is
+//!   about the import and not about dispatch.
+//! - So the five stay PROSE and not fenced blocks (§4 wants the
+//!   reference machine at `exit(0)`), and the sentence that says so
+//!   names the measured reason instead of the retired one. They fence on
+//!   the wolf-interp release that closes it, and nothing else has to
+//!   change for that to happen.
+//! - The native rung refuses this module for a reason that is
+//!   `std.cmp`'s and not `std.map`'s: `impl Eq for Ordering`'s
+//!   `match (self, other)` is `unsupported — an enum or row test inside
+//!   a product pattern (deep trees, c06)`. Every importer of `std.cmp`
+//!   pays it; it is honest and it is older than this sprint.
+//!
 //! Absence is spelled `none`, the convention's own spelling — F-0003 is
 //! dead (sc05 pins, renamed at sc06) and nothing here waits on it.
 
@@ -63,6 +108,24 @@ pub fn is_empty[K, V](m: Map[K, V]) -> bool {
 /// Binds `k` to `v`, replacing any previous binding. Total: no error
 /// row, no traps beyond allocation.
 ///
+/// **The body is `m[k] = copy v` and the `copy` is not decoration.**
+/// This function's body was `m[k] = v` from sc02 until sc44 and nothing
+/// read it, because `Map` was untyped on both compiler rungs. At the
+/// pin that types it the mem tier read it for the first time and
+/// answered E1004 — "this stores a value from `v`'s region into `m`'s
+/// region — parameter regions are independent by default" — which took
+/// the WHOLE module down on both rungs, not just this function.
+/// `copy` is the fix-it the diagnostic itself suggests and it is in the
+/// grammar now; the value is copied into the container's region, which
+/// for the four key types and every `V` this edition admits is what a
+/// caller means by `set`.
+///
+/// The asymmetry behind it is filed upstream: `(mut xs).push(v)` under
+/// `[T]` needs no `copy` and `m[k] = v` under `[K, V]` does, and the
+/// same body monomorphic at `Map[str, int]` runs on all three lanes.
+/// If that is ruled a bug the `copy` comes back out and no caller
+/// notices.
+///
 /// ```wolf-doc-example
 /// var m = Map[str, int]()
 /// map.set(mut m, "a", 1)
@@ -70,7 +133,7 @@ pub fn is_empty[K, V](m: Map[K, V]) -> bool {
 /// map.len(m) == 1
 /// ```
 pub fn set[K, V](mut m: Map[K, V], k: K, v: V) {
-    m[k] = v
+    m[k] = copy v
 }
 
 /// Every key, in the map's unspecified-but-consistent iteration order.
@@ -164,10 +227,13 @@ pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
 /// The value bound to `k`; `none` when the key is absent — the absence
 /// row, never a zero-value sentinel (§2). No traps.
 ///
-/// Prose, not a fenced example (§4): `Eq` dispatch executes in neither
-/// implementation at the pins (F-0002/F-0004), so a runnable example
-/// would be a doc bug. For a map binding `"a"` to `1`, `get(m, "a")` is
-/// `1` and `get(m, "z")` raises `none`.
+/// Prose, not a fenced example (§4), and the reason changed at sc44:
+/// this runs on the checked tier now — `[K: Eq]` is satisfied by
+/// `str`/`int`/`char`/`bool` and the dispatch happens — but lupin
+/// answers `unsupported` for a trait reached through an IMPORT, and
+/// doc-truth wants the reference machine at `exit(0)`. For a map
+/// binding `"a"` to `1`, `get(m, "a")` is `1` and `get(m, "z")` raises
+/// `none`. `tests/map/get_hit_miss.lu` is the running witness.
 pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
     for pair in m.pairs() {
         if cmp.Eq.eq(pair.0, k) {
@@ -181,16 +247,17 @@ pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
 /// default (a lazy variant waits on closures, c05). Total: no error row,
 /// no traps.
 ///
-/// Prose, not a fenced example (§4, `Eq` dispatch — F-0002):
-/// `get_or(m, "z", 0)` is `0` for a map without `"z"`.
+/// Prose, not a fenced example (§4, the imported-trait refusal — see
+/// `get`): `get_or(m, "z", 0)` is `0` for a map without `"z"`.
 pub fn get_or[K: cmp.Eq, V](m: Map[K, V], k: K, d: V) -> V {
     get(m, k) else d
 }
 
 /// Whether `k` is bound. Total: no error row, no traps.
 ///
-/// Prose, not a fenced example (§4, `Eq` dispatch — F-0002):
-/// `has(m, "a")` is `true` exactly when `get(m, "a")` yields a value.
+/// Prose, not a fenced example (§4, the imported-trait refusal — see
+/// `get`): `has(m, "a")` is `true` exactly when `get(m, "a")` yields a
+/// value.
 pub fn has[K: cmp.Eq, V](m: Map[K, V], k: K) -> bool {
     for pair in m.pairs() {
         if cmp.Eq.eq(pair.0, k) {
@@ -203,10 +270,12 @@ pub fn has[K: cmp.Eq, V](m: Map[K, V], k: K) -> bool {
 /// Removes `k`'s entry and returns the value it was bound to; `none`
 /// when the key was absent. No traps.
 ///
-/// Prose, not a fenced example (§4, `Eq` dispatch — F-0002). Note the
-/// implementation cost this signature hides at the pins: no builtin
-/// erases a key, so the body rebuilds the map without it — filed with
-/// F-0011 (a `Map` that cannot erase is not a `Map`).
+/// Prose, not a fenced example (§4, the imported-trait refusal — see
+/// `get`). The implementation cost this signature hides is UNCHANGED by
+/// s152 and worth restating because the rest of the header moved: no
+/// builtin erases a key, so the body rebuilds the map without it.
+/// wolf-lang#11's D50 approved a key-erase builtin and s152 did not add
+/// one, so the cost stands and so does the filing.
 pub fn remove[K: cmp.Eq, V](mut m: Map[K, V], k: K) -> V ! {none} {
     let v = get(m, k)?
     var out = Map[K, V]()
@@ -225,8 +294,10 @@ pub fn remove[K: cmp.Eq, V](mut m: Map[K, V], k: K) -> V ! {none} {
 /// module header's filed question). Traps `overflow` when the count is
 /// at `int`'s maximum: arithmetic is checked in every profile (X3).
 ///
-/// Prose, not a fenced example (§4, `Eq` dispatch — F-0002): tallying
-/// `"a"` twice leaves it bound to `2`.
+/// Prose, not a fenced example (§4, the imported-trait refusal — see
+/// `get`): tallying `"a"` twice leaves it bound to `2`. The body below
+/// is the one `[mem.map.absent]`'s E0417 note names by name — a reader
+/// who writes `m[k] += 1` is sent here by the compiler.
 pub fn tally[K: cmp.Eq](mut m: Map[K, int], k: K) -> int {
     let n = get(m, k) else 0
     m[k] = n + 1
