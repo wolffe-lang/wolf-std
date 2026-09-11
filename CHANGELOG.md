@@ -1,5 +1,77 @@
 # Changelog
 
+## sc45 — 2026-09-11 — the fixed points: D34 gets a mechanism, and the 32 files it had never been enforced on
+
+No pin change. `wolf 0.2.11` (`c9237c1`) and `lupin 0.1.33`
+(conformance pin `662b14c`), both taken from the release archives by
+digest, both `--version`-verified at every use.
+
+**`cargo xtask fmt-lu` is the twelfth step of the gauntlet and a step of
+the workflow's `gates` job.** `wolf fmt --check` over the 452 committed
+`.lu` files under `std/` and `tests/`, batched at 64 paths per
+invocation for the windows command-line cap, red on drift, with
+`selftest::every_ci_step_runs_in_the_ci_workflow` holding both ends of
+the pair. `cargo fmt --all --check` has gated the RUST since sc00;
+nothing anywhere gated the WOLF, so D34 — "`wolf fmt` is law for every
+committed `.lu` here" — had been asserted in commit messages for a dozen
+sprints and enforced by nobody (F-0117, wolf-std#21). It landed BEFORE
+the re-lay, so one commit in this history has the gate present and
+naming the 32 files it refuses.
+
+**Thirty-two files re-laid, at a third pin that says the same thing.**
+sc43 measured the 32 at `wolf 0.2.10` and checked the set was identical
+at `0.2.9`; sc45 re-measured at `0.2.11` before touching anything and
+got the same 32 in the same order, the sorted lists equal line for line
+a third time. Standing drift at every pin this repository has carried a
+formatter through, not a bump artefact.
+
+**Zero behaviour motion, predicted in writing and measured both ways.**
+`std-test` and `doc-examples` were run over the pre-re-lay tree and
+again over the re-laid one and the two logs diffed rather than read as
+two GREENs: the **401 std-test rows are byte-identical** under `cmp` with
+no normalization, the summary line is identical (401 tests, 763 forward
+tags, 202 conservatism entries, 0 unstable, 0 slow, 0 divergent), the
+1,269 doc-example lane observations are byte-identical modulo line
+numbers, and the verdict census is 1183 `exit(0)` + 86 `unsupported` on
+both sides. The only textual difference in 1,695 observation lines is
+the doc-example line numbers in the four std files whose length changed.
+The formatter drops two parentheses that could have been load-bearing —
+the constant-time compare in `std/x/tls/handshake` and `(expr?).len` in
+`tests/net/unix/stream_surface.lu` — so both were probed directly rather
+than argued before the gauntlet ran.
+
+**The classes partition the 32:** six are blank-line and brace canon
+alone, fourteen are width alone (a long argument broken out, or a
+continuation joined back because it fits), and twelve carry a layout
+that is the FORMATTER's defect — seventeen calls broken after the
+receiver's dot with their arguments at the method name's own column,
+eight generic type applications split, three error sets split, and four
+lines left past 100 columns that `wolf fmt --check` then accepts. Those
+twelve are committed as the tool lays them and are not hand-fixed: a
+file the formatter cannot make a good fixed point of is a wolf-lang
+filing. Filed as wolf-lang#339, with the over-width half added to
+wolf-lang#303 as four witnesses in three positions that are not `if`
+chains.
+
+**Neither of the two formatter defects s154 is fixing has a carrier
+here, and that was measured rather than assumed.** wolf-lang#314's shape
+(a closure body starting with `(`, printed `fn(c)(…)`) occurs zero times
+in 452 files; wolf-lang#303's shape (an `if`/`else if`/`else` chain past
+the width) has 53 candidate lines and not one over 100 columns. So the
+answer to "which of the 32 retire when s154 lands" is **none**.
+
+**The exception class is empty.** wolf-lang's corpus gate carries
+`//! fmt: relaid` (`[gram.fmt.canon]`'s one declared exception); no file
+here needs it. Every one of the 32 becomes a fixed point, `wolf fmt`
+over the tree is idempotent in one pass, and `fmt_lu.rs` ships with no
+path list at all.
+
+**wolf-std#11 closed**, all twenty-nine items verified landed against
+the tree rather than off the log — including item 25, whose honest
+resolution is a count-method note saying the original rule cannot be
+recovered, and whose follow-through (every census row since states its
+rule in the row) has happened.
+
 ## sc44 — 2026-09-11 — the std takes the eleventh, and a module nobody could type turns out never to have been read
 
 `wolf 0.2.10` -> `0.2.11` (`c9237c1`), `lupin 0.1.31` -> `0.1.33`
