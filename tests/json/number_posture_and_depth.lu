@@ -13,6 +13,19 @@
 //! The DEPTH LIMIT, at the limit and one past it: a serializer that dies
 //! on a deep value is a denial-of-service surface, so nesting past
 //! `depth_limit()` is the `deep` row and never a stack trap.
+//!
+//! **One assertion in this file is spelled through `stringify` and not
+//! through `==`, and the spelling is a filed compiler bug**
+//! (wolf-lang#337, sc44): on the CHECKED tier a value produced by `int as f64`
+//! compares unequal to every f64 it is numerically equal to, including
+//! the literal with the same digits — `(4 as f64) == 4.0` is `false`
+//! there and `true` on the native rung and under lupin, at v0.2.10 and
+//! v0.2.11 alike. `json.as_float`'s `Int(n) => n as f64` arm is exactly
+//! that value. The tier also has no `<` on floats at all, so there is no
+//! comparison spelling it answers correctly; `stringify` is the one that
+//! makes it refuse HONESTLY (`unsupported — ordering outside integers`)
+//! instead of answering wrongly, which is the trade this file takes
+//! until the bug closes.
 
 use std.json
 
@@ -39,7 +52,10 @@ fn main() -> !int {
     }
     // And the widening accessor reports the rounded value, which is why
     // `as_int` refuses to do it.
-    if (json.as_float(json.from_int(big)) else 0.0) == 9007199254740992.0 {} else { return 4 }
+    let widened = json.as_float(json.from_int(big)) else 0.0
+    if (json.stringify(json.from_num(widened)) else "?") == "9007199254740992" {} else {
+        return 4
+    }
     // One below the boundary is exact in both.
     if (json.stringify(json.from_num(9007199254740992.0)) else "?") == "9007199254740992" {} else {
         return 5

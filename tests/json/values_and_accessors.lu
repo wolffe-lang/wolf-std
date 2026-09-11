@@ -29,7 +29,11 @@ fn main() -> !int {
     if (json.as_int(json.from_int(42)) else 0) == 42 {} else { return 10 }
     if (json.as_int(json.from_num(42.0)) else 0) == 0 {} else { return 11 }
     if (json.as_float(json.from_num(1.5)) else 0.0) == 1.5 {} else { return 12 }
-    if (json.as_float(json.from_int(3)) else 0.0) == 3.0 {} else { return 13 }
+    // Spelled through `stringify` and not `==`: on the checked tier a
+    // value from `int as f64` compares unequal to every f64 it equals
+    // (wolf-lang#337), and `as_float`'s `Int(n)` arm is that value.
+    let widened = json.as_float(json.from_int(3)) else 0.0
+    if (json.stringify(json.from_num(widened)) else "?") == "3" {} else { return 13 }
     if (json.as_float(json.from_str("3")) else 0.0) == 0.0 {} else { return 14 }
     if (json.as_str(json.from_str("wolf")) else "?") == "wolf" {} else { return 15 }
     if (json.as_str(json.null()) else "?") == "?" {} else { return 16 }
@@ -58,7 +62,7 @@ fn main() -> !int {
     if ks[0] == "a" {} else { return 28 }
     if (json.keys(json.from_int(1)) else List[str]()).len == 0 {} else { return 29 }
     let fields = json.as_obj(obj) else Map[str, json.Value]()
-    if (json.as_str(fields["a"]) else "?") == "x" {} else { return 30 }
+    if (json.as_str(fields["a"] else json.null()) else "?") == "x" {} else { return 30 }
     // `len` is for containers only.
     if (json.len(json.from_int(1)) else 0 - 1) == 0 - 1 {} else { return 31 }
     if (json.len(json.from_str("abc")) else 0 - 1) == 0 - 1 {} else { return 32 }
