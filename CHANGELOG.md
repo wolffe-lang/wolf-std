@@ -118,6 +118,46 @@ the `stdout_inline` the record protocol has carried all along, so the two
 deterministic windows divergences are readable off the next run's log
 instead of needing a windows box.
 
+### What the first lit windows run said
+
+Both windows jobs print `doctor: native rung — wolf_rt.lib at … (lane
+lit)`, and the lane **links**: 370 doc-example blocks ran on the native
+rung there, every one `exit(0)`, and `ulp: native reproduces all 200
+recorded values exactly` on that host for the first time. The linker
+question sc42 declined to guess at is answered by the ordinary output of
+an ordinary step. `gates`' two steps are required again after two greens
+read line by line; `rig`'s `std-test` stays advisory there.
+
+**The budget was wrong by an order of magnitude, in the cheap
+direction**: `gates (windows)` budgeted 60 min, measured **3**; `rig
+(windows)` budgeted 120, measured **48**, up from 46:46 on two lanes. The
+arithmetic assumed the native rung compiles most of what it is handed. It
+declines most of it by name — 206 conservatism-ledger entries on that
+host — so the third lane costs about ninety seconds. **A lane's cost is
+the rows it ACCEPTS, not the rows it is offered**, and the ledger says
+which is which before any run. Timeouts to the measurement: 90 and 20.
+
+**Neither of wolf-std#20's two deterministic rows is a divergence**, and
+the `stdout_inline` change is what showed it, on the first run it
+shipped in. `fs/fstat_rows` differs by **one blank line**, printed by the
+test's own `fs.close(…) else |_| print("")` arm — which fires only on
+windows, because that is the host where opening a directory answers
+`denied`, which is the row the test is about. The arm is `else |_| {}`
+now and moves no byte on any other host. `net/reuse_port` differs in one
+of five facts, `served: false`, which the program sets itself when
+`reuse_port` answers `unsupported` — true on a platform with no
+`SO_REUSEPORT`. Its directive cannot say "either"; that one is left to a
+`std.net` sprint. Three native-column rows fail on windows that no host
+had ever observed, all descriptor-handoff — first observations, not
+regressions.
+
+**F-0116 reached `macos-latest`.** The `push` run of `ec5087e` went RED
+on `cavp_sha512_long.lu [wolfc]: timed out after 60s` where the
+`pull_request` run of the same commit was green half an hour later. The
+timing family is not a windows problem: it is those three rows on every
+host, and the one lane this repository requires is one unlucky
+scheduling away from it until wolf-lang#308 lands.
+
 ### F-0117 — D34 is law in the commit messages and gated nowhere
 
 `wolf fmt --check std tests` names **32 files** that are not canonically
