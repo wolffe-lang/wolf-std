@@ -1375,3 +1375,54 @@ eleven, all of them static, none of them doc truth". At sc42 it is
 "eleven of eleven, on three hosts, against the pinned binaries" — the
 same sentence with the word that mattered added. What that cost in wall
 time, and what the first lit run taught, is in `docs/findings.md`.
+
+## sc43 — a bump that added no surface, moved no row, and rewrote one body
+
+The counting rules are sc40's, unchanged and reproducible from the tree
+at `sc43`; they are not restated here because restating them is how two
+copies drift.
+
+**Predicted before measuring.** `4c60946..662b14c` is fifty-one commits
+of type system, grammar and spec, and not one of them adds a builtin
+this repository wraps: s146 rules what a `!()` tail means in a unit
+context, s147 admits range patterns in a match arm, s148 checks a body's
+tail against its declared result, refuses an operator on a `!T`, and
+rules a `str` not a place. So every count below was predicted at **+0**,
+including the last row — and this time the last row was right too.
+
+| measure | sc42 | sc43 |
+|---|---|---|
+| modules under `std/` (directories, `std/x/` as one) | 33 | **33** (+0) |
+| `pub fn` in `std/`, nursery included | 596 | **596** (+0) |
+| public types | — | **+0** |
+| entry tests | 397 | **397** (+0) |
+| ledger rows | 397 | **397** (+0) |
+| fenced doc examples, extracted and RUN | 421 | **421** (+0) |
+| existing ledger rows moved by the pin bump | 1 | **0** |
+| std function bodies rewritten by the bump | 0 | **1** |
+
+**The last row is new and it is the sprint.** `std.strbuf.push` had a
+body of `b.s = "{b.s}{c}"` — a string built through an interpolation hole
+because `+` refused a `char` — and it is `b.s += c` now. sc42 measured
+the same simplification and declined it in writing, for a reason that was
+a release date rather than a semantics: wolf-interp#78 was unmirrored at
+lupin 0.1.30, and a refusal in a std SOURCE file takes a whole module
+dark on that lane instead of costing one `unsupported` row. is43 mirrored
+it. Nothing in the census moves because of it, which is the proof that
+sc42's argument was about a spelling: the function ran on three lanes
+before and runs on three after.
+
+**The W0601 count, which is a census measure this sprint and may never be
+one again.** s146's `[type.unit]` makes a `!()` tail in a unit context a
+warned discard. Predicted **0** in std source, in `tests/` and in the doc
+examples, from a scan of all three corpora rather than from optimism;
+measured **0**, with the gauntlet's warning gate — which denies warnings
+outright — green over 397 rows and 421 examples.
+
+**The census row that is not in the table.** sc42's was how much of
+`cargo xtask ci` a green GitHub run covers, and the answer was "eleven of
+eleven, on three hosts". sc43's is narrower and worse: of the three
+tier-1 hosts, `ubuntu-latest` runs ten of the eleven, because `std-test`
+cannot reach the end of the differential there. That is F-0116 and
+wolf-lang#308, and it is the one number in this document that a sprint
+in this repository cannot move on its own.
