@@ -70,7 +70,9 @@ fn main() -> !int {
     net.write(mut cli, "hi")?
     let got = net.read(mut conn, 8) else "?"
 
-    print("pollable: {pollable} | bounded: {bounded} | ready_after_dial: {ready_after_dial} | takes_after_a_timeout: {got}")
+    print(
+        "pollable: {pollable} | bounded: {bounded} | ready_after_dial: {ready_after_dial} | takes_after_a_timeout: {got}",
+    )
 
     net.close(take conn)?
     net.close(take cli)?

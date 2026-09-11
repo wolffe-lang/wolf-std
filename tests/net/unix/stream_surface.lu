@@ -68,7 +68,7 @@ fn main() -> !int {
         (mut reply).push(0 as byte)
         (mut reply).push(253 as byte)
         net.write_bytes(mut conn, reply)?
-        back = (net.read_bytes(mut cli, 16)?).len
+        back = net.read_bytes(mut cli, 16)?.len
 
         // The peer is alive and says nothing: without a budget this read
         // never returns.
@@ -95,6 +95,8 @@ fn main() -> !int {
         }
         net.close_listener(take srv)?
     }
-    print("bytes:{line} | back: {back} | read_deadline: {read_deadline} | accept_deadline: {accept_deadline}")
+    print(
+        "bytes:{line} | back: {back} | read_deadline: {read_deadline} | accept_deadline: {accept_deadline}",
+    )
     0
 }

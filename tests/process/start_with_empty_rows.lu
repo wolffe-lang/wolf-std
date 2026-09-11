@@ -36,10 +36,14 @@ use std.process
 
 fn main() -> !int {
     let empty = process.from_argv(List[str]())
-    let a = process.start_with(empty, List[net.Listener]()) else |_| { process.Child { slot: 0 - 1 } }
+    let a = process.start_with(empty, List[net.Listener]()) else |_| {
+        process.Child { slot: 0 - 1 }
+    }
     print("empty argv: {a.slot}")
     let missing = process.command("wolf-sc11-no-such-program-here")
-    let b = process.start_with(missing, List[net.Listener]()) else |_| { process.Child { slot: 0 - 1 } }
+    let b = process.start_with(missing, List[net.Listener]()) else |_| {
+        process.Child { slot: 0 - 1 }
+    }
     print("no such program: {b.slot}")
     let c = process.command("wolf-sc11-no-such-program-here")
     let ch = process.start_with(c, List[net.Listener]())?

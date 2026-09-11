@@ -84,7 +84,9 @@ fn main() -> !int {
 
     net.close(take conn)?
     net.close_listener(take srv)?
-    print("empty_is_answer: {empty_is_answer} | listener_ready: {listener_ready} | level_triggered: {level_triggered} | closed_peer_ready: {closed_peer_ready} | order_kept: {order_kept} | unbounded_empty_io: {unbounded_empty_io}")
+    print(
+        "empty_is_answer: {empty_is_answer} | listener_ready: {listener_ready} | level_triggered: {level_triggered} | closed_peer_ready: {closed_peer_ready} | order_kept: {order_kept} | unbounded_empty_io: {unbounded_empty_io}",
+    )
     if !empty_is_answer { return 1 }
     if !listener_ready { return 2 }
     if !level_triggered { return 3 }

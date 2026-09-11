@@ -67,8 +67,7 @@ fn main() -> !int {
             (mut set).push(a.fd)
             (mut set).push(b.fd)
             let ready = net.wait(set, 2000)?
-            some_member = ready.len == 1 &&
-                (ready[0] == a.fd || ready[0] == b.fd)
+            some_member = ready.len == 1 && (ready[0] == a.fd || ready[0] == b.fd)
             net.close(take cli)?
             // Drain whichever member took it, so the survivor probe
             // below measures a fresh dial and not this one.
@@ -104,21 +103,23 @@ fn main() -> !int {
         double_bind_exists = false
         let dup_addr = net.endpoint("127.0.0.1", q)
         var dup = net.listen_with(dup_addr, net.listen_opts()) else |e| match e {
-                exists => {
-                    double_bind_exists = true
-                    net.Listener { fd: 0 - 1 }
-                },
-                unsupported => { net.Listener { fd: 0 - 2 } },
-                denied => { net.Listener { fd: 0 - 2 } },
-                io => { net.Listener { fd: 0 - 2 } },
-            }
+            exists => {
+                double_bind_exists = true
+                net.Listener { fd: 0 - 1 }
+            },
+            unsupported => { net.Listener { fd: 0 - 2 } },
+            denied => { net.Listener { fd: 0 - 2 } },
+            io => { net.Listener { fd: 0 - 2 } },
+        }
         // `dup` is read rather than discarded: the `exists` arm is the
         // only one that hands back the sentinel, so this is the same
         // assertion said twice and no binding goes unused.
         double_bind_exists = double_bind_exists && dup.fd == 0 - 1
         net.close_listener(take d)?
     }
-    print("served: {served} | second_bind: {second_bind} | some_member: {some_member} | survivor: {survivor} | double_bind_exists: {double_bind_exists}")
+    print(
+        "served: {served} | second_bind: {second_bind} | some_member: {some_member} | survivor: {survivor} | double_bind_exists: {double_bind_exists}",
+    )
     if !second_bind { return 1 }
     if !some_member { return 2 }
     if !survivor { return 4 }

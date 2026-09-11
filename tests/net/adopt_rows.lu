@@ -71,7 +71,9 @@ fn main() -> !int {
         },
     }
     net.close_listener(take srv)?
-    print("not_a_socket: {not_a_socket} | negative: {negative} | absurd: {absurd} | own_handle: {own_handle}")
+    print(
+        "not_a_socket: {not_a_socket} | negative: {negative} | absurd: {absurd} | own_handle: {own_handle}",
+    )
     if !not_a_socket { return 1 }
     if !negative { return 2 }
     if !absurd { return 3 }
