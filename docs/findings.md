@@ -9570,8 +9570,34 @@ carry the fact.
    divergence is one line in every future run.
 2. The step's log text — `xtask: RED`, and the runner's own
    `##[error]Process completed with exit code 1`.
-3. The `continue-on-error:` key itself, in the workflow file, which is
-   the only one of the three that exists *before* the run.
+3. The **annotations** API, which is the one a REST reader can actually
+   use. The step object carries no `outcome` field — `outcome` exists
+   only in the workflow expression context — but the job's check-run
+   annotations do carry the failure:
+
+   ```
+   $ jid=$(gh api repos/wolffe-lang/wolf-std/actions/runs/34672768728/jobs \
+             --jq '.jobs[]|select(.name=="rig (windows-latest)")|.id')
+   $ gh api repos/wolffe-lang/wolf-std/check-runs/$jid/annotations \
+       --jq '.[]|"\(.annotation_level): \(.message|split("\n")[0])"'
+   warning: Node.js 20 is deprecated. ...
+   failure: Process completed with exit code 1.
+   ```
+
+   `annotation_level: failure` on a job whose every step and whose own
+   conclusion both say `success`.
+4. The `continue-on-error:` key itself, in the workflow file, which is
+   the only one of the four that exists *before* the run.
+
+**This has a consumer outside this repository.** `tools/lane-audit.sh`
+in the planning repo gates every fast-forward, and sc46 added a step
+check to it on the strength of F-0126, commented in the script as
+"every STEP success too (a continue-on-error lane's job conclusion is
+not its verdict)". It selects on `.steps[].conclusion`, so it inherits
+the rewrite exactly. Run against run 34672768728 — whose windows
+`std-test` step is RED — its own jq prints nothing, and the audit
+reports every step green. Reported rather than fixed here: that file is
+not this repository's. The cheap fix is the annotations query above.
 
 **The structural half.** `xtask/src/workflow.rs` has known this shape
 since sc41. Its own doc comment excludes `nightly.yml` from coverage
