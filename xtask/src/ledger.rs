@@ -2,7 +2,7 @@
 //! is00 corpus-overlay pattern). The two implementations diverge by
 //! design (lupin runs what wolfc refuses, and vice versa), so each test
 //! records what each implementation is expected to do *today*:
-//! `lupin = "run" | "unsupported" | "slow" | "divergent(…)"`,
+//! `lupin = "run" | "unsupported" | "slow" | "divergent(…)" | "mirror-lag(E…)"`,
 //! `wolfc = "run" | "unsupported" | "fail(E…)"`,
 //! `native = "run" | "unsupported" | "fail(E…)"` — the compiler's second
 //! rung (sc04: `conform-run --native`, s28's compile-link-execute), which
@@ -63,6 +63,43 @@ pub enum Expect {
     /// is louder than a `run`, not quieter. Each row's comment cites its
     /// finding.
     Divergent(DivObs),
+    /// **The reference machine refuses STATICALLY where the compiler
+    /// lanes RUN** — spelled `mirror-lag(E…)`, lupin-only (sc46,
+    /// F-0121, wolf-std#27). The mirror-lag row.
+    ///
+    /// `divergent(…)` above was built at sc24 for the OPPOSITE
+    /// direction — the compilers reject statically and the interpreter
+    /// executes — and its vocabulary (`stdout | exit(N) | trap(kind)`)
+    /// describes what lupin DOES. There was no word at all for what it
+    /// REFUSES: `fail(…)` is rejected for this column by name a few
+    /// lines below, `unsupported` would lie about the machine's
+    /// semantics (it is not outside the modelled surface, it is
+    /// short of a grammar), and `divergent(…)` cannot spell a phase
+    /// that never reached run. So a row whose lupin verdict was
+    /// `fail(E…)` had NO legal spelling and was a red no ledger edit
+    /// could green — measured at sc44, where it cost `trait Num` a
+    /// whole release, and recorded as F-0121.
+    ///
+    /// The word carries the CODE on purpose. A mirror-lag row is not
+    /// "lupin cannot do this"; it is "lupin is short of THIS grammar,
+    /// and here is the diagnostic it answers instead", so the row
+    /// names which clause the mirror has not caught up to and the
+    /// runner can demand that exact code. The runner invokes the lane,
+    /// demands EXACTLY `fail(<code>)` — anything else is red, a heal
+    /// included — and prints a mirror-lag ledger naming every such row,
+    /// so the entry is louder than a `run`, not quieter. **It therefore
+    /// retires itself**: the release that mirrors the grammar makes the
+    /// row RED on the day it lands, and the flip to `run` is a
+    /// deliberate commit, exactly as `divergent(…)`'s flip is.
+    ///
+    /// Its first carrier is `tests/ops/num_alias_tier.lu`
+    /// (wolf-interp#102): `trait Num = Add + … + cmp.Ord` is the
+    /// surface `[type.trait.op.alias]` asks std for, both compiler
+    /// rungs run the bound at `int` and at `f64`, and lupin 0.1.34
+    /// answers `E0501` at resolve because an alias reached through an
+    /// IMPORT expands no bound there — while the byte-identical alias
+    /// declared in the entry file runs.
+    MirrorLag(String),
     /// This is not a relaxation, it is a truthful record: at the sc07 pin
     /// two `str`-heavy tests get `run` or
     /// `unsupported — place projection outside the modelled surface` from
@@ -119,6 +156,7 @@ impl std::fmt::Display for Expect {
                     .join("|")
             ),
             Expect::Divergent(obs) => write!(f, "divergent({obs})"),
+            Expect::MirrorLag(c) => write!(f, "mirror-lag({c})"),
         }
     }
 }
@@ -142,6 +180,14 @@ pub fn depth(e: &Expect) -> u8 {
         // answers is wrong or differently-shaped, which the runner checks
         // exactly. Documentation rather than a gate, like `slow`.
         Expect::Divergent(_) => 2,
+        // A mirror-lag lane REFUSES the program statically: it reaches
+        // exactly the depth `fail(…)` does on a compiler column, and no
+        // further. The runner demands the code exactly, so this is the
+        // direction word in a red message rather than a gate — but it
+        // must be 1 and not 2, because a mirror-lag row that starts
+        // RUNNING has gone DEEPER, which is the sentence the reader
+        // needs on the day the mirror catches up.
+        Expect::MirrorLag(_) => 1,
     }
 }
 
@@ -209,6 +255,14 @@ pub fn parse(text: &str, what: &str) -> Result<Ledger, String> {
                      speed, sc16); a compiled lane is measured or it is `unsupported`"
                 ));
             }
+            if k != "lupin" && matches!(expect, Expect::MirrorLag(_)) {
+                return Err(format!(
+                    "{what}:{line}: `mirror-lag(…)` is a lupin expectation \
+                     (sc46, F-0121); it means the REFERENCE machine refuses \
+                     statically where the compiler lanes run, and a compiler \
+                     lane's own static refusal is `fail(E…)`"
+                ));
+            }
             if k != "lupin" && matches!(expect, Expect::Divergent(_)) {
                 return Err(format!(
                     "{what}:{line}: `divergent(…)` is a lupin expectation (sc24); \
@@ -250,14 +304,27 @@ fn parse_expect(v: &str) -> Option<Expect> {
             let mut set = Vec::new();
             for part in inner.split('|') {
                 let e = parse_expect(part.trim())?;
-                if matches!(e, Expect::Unstable(_) | Expect::Slow | Expect::Divergent(_))
-                    || set.contains(&e)
+                if matches!(
+                    e,
+                    Expect::Unstable(_)
+                        | Expect::Slow
+                        | Expect::Divergent(_)
+                        | Expect::MirrorLag(_)
+                ) || set.contains(&e)
                 {
-                    return None; // no nesting, no skips, no filed divergences, no duplicates
+                    // no nesting, no skips, no filed divergences, no
+                    // mirror-lag rows, no duplicates: each of those is a
+                    // claim about one measured shape, and `unstable(…)`
+                    // says the pin answers two ways for the same program.
+                    return None;
                 }
                 set.push(e);
             }
             (set.len() >= 2).then_some(Expect::Unstable(set))
+        }
+        _ if v.starts_with("mirror-lag(") => {
+            let code = v.strip_prefix("mirror-lag(")?.strip_suffix(')')?;
+            valid_code(code).then(|| Expect::MirrorLag(code.to_string()))
         }
         _ if v.starts_with("divergent(") => {
             let inner = v.strip_prefix("divergent(")?.strip_suffix(')')?;
@@ -265,12 +332,16 @@ fn parse_expect(v: &str) -> Option<Expect> {
         }
         _ => {
             let code = v.strip_prefix("fail(")?.strip_suffix(')')?;
-            let ok = code.starts_with('E')
-                && code.len() > 1
-                && code[1..].chars().all(|c| c.is_ascii_digit());
-            ok.then(|| Expect::Fail(code.to_string()))
+            valid_code(code).then(|| Expect::Fail(code.to_string()))
         }
     }
+}
+
+/// A diagnostic code as both `fail(…)` and `mirror-lag(…)` spell it:
+/// `E` and at least one digit, nothing else. Named once so the two
+/// words cannot drift apart about what a code is.
+fn valid_code(code: &str) -> bool {
+    code.starts_with('E') && code.len() > 1 && code[1..].chars().all(|c| c.is_ascii_digit())
 }
 
 /// The inner of `divergent(…)`: `stdout`, `exit(N)`, or `trap(kind)` —
@@ -361,6 +432,96 @@ mod tests {
         )
         .is_err());
         assert!(parse_expect("unstable(slow|run)").is_none());
+    }
+
+    #[test]
+    fn mirror_lag_is_lupin_only_and_carries_a_code() {
+        // The sc46 word (F-0121, wolf-std#27): the REFERENCE machine
+        // refuses statically where the compiler lanes run. Accepted on
+        // the lupin column, and only there.
+        let l = parse(
+            "[tests.\"a.lu\"]\nlupin = \"mirror-lag(E0501)\"\nwolfc = \"run\"\n\
+             native = \"run\"\n",
+            "l",
+        )
+        .unwrap();
+        assert_eq!(l["a.lu"].lupin, Expect::MirrorLag("E0501".into()));
+        assert_eq!(l["a.lu"].lupin.to_string(), "mirror-lag(E0501)");
+
+        // THE CODE IS THE POINT. The row says which grammar the mirror
+        // is short of, so it goes red when the CODE changes rather than
+        // only when the lag ends; a word with no code could not.
+        assert_eq!(
+            parse_expect("mirror-lag(E0201)"),
+            Some(Expect::MirrorLag("E0201".into()))
+        );
+        assert!(parse_expect("mirror-lag()").is_none());
+        assert!(parse_expect("mirror-lag(E)").is_none());
+        assert!(parse_expect("mirror-lag(0501)").is_none());
+        assert!(parse_expect("mirror-lag(W0601)").is_none());
+        assert!(parse_expect("mirror-lag(E05a1)").is_none());
+        assert!(parse_expect("mirror-lag(E0501").is_none());
+
+        // FAIL-DEPTH, not run-depth — unlike `slow` and `divergent(…)`,
+        // whose lanes execute. A mirror-lag lane never reaches run, so
+        // the day it starts running the red must read "deeper than the
+        // ledger claims", which is the sentence that tells the reader
+        // the mirror caught up.
+        assert_eq!(
+            depth(&Expect::MirrorLag("E0501".into())),
+            depth(&Expect::Fail("E0501".into()))
+        );
+        assert!(depth(&Expect::MirrorLag("E0501".into())) < depth(&Expect::Run));
+        assert!(depth(&Expect::MirrorLag("E0501".into())) > depth(&Expect::Unsupported));
+
+        // The runner's special path is the only acceptance (the
+        // `divergent(…)` pattern): no ordinary observation satisfies the
+        // row, so a heal is a red and the flip to `run` is deliberate.
+        assert!(!satisfies(&Expect::MirrorLag("E0501".into()), &Expect::Run));
+        assert!(!satisfies(
+            &Expect::MirrorLag("E0501".into()),
+            &Expect::Fail("E0501".into())
+        ));
+
+        // LUPIN-ONLY, both compiler columns, one at a time. A compiler
+        // lane's own static refusal is `fail(E…)` and always has been;
+        // the whole reason this word exists is that the lupin column
+        // could not say that.
+        assert!(parse(
+            "[tests.\"a.lu\"]\nlupin = \"run\"\nwolfc = \"mirror-lag(E0501)\"\n\
+             native = \"run\"\n",
+            "l"
+        )
+        .is_err());
+        assert!(parse(
+            "[tests.\"a.lu\"]\nlupin = \"run\"\nwolfc = \"run\"\n\
+             native = \"mirror-lag(E0501)\"\n",
+            "l"
+        )
+        .is_err());
+
+        // And it cannot be smuggled in through `unstable(…)`: that word
+        // says the pin answers two ways for one program, which is a
+        // different claim from "the mirror is short of a grammar".
+        assert!(parse_expect("unstable(run|mirror-lag(E0501))").is_none());
+        assert!(parse_expect("unstable(mirror-lag(E0501)|unsupported)").is_none());
+    }
+
+    #[test]
+    fn lupin_still_refuses_the_word_that_is_not_its_own() {
+        // The complement of the test above, kept separate because it is
+        // the sentence F-0121 is about: `fail(…)` stays a WOLFC word.
+        // sc46 gave the lupin column a spelling for a static refusal and
+        // deliberately did NOT give it this one — `fail(E…)` on a
+        // compiler column means "the directive is what this lane
+        // refuses"; on the lupin column it would mean nothing at all,
+        // because the directive is not lupin's to define.
+        assert!(parse(
+            "[tests.\"a.lu\"]\nlupin = \"fail(E0501)\"\nwolfc = \"run\"\n\
+             native = \"run\"\n",
+            "l"
+        )
+        .is_err());
     }
 
     #[test]

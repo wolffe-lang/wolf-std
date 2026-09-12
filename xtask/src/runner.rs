@@ -262,6 +262,7 @@ pub fn std_test() -> Result<(), String> {
     let mut unstable: Vec<String> = Vec::new();
     let mut slow_skips: Vec<String> = Vec::new();
     let mut divergent_rows: Vec<String> = Vec::new();
+    let mut mirror_lag_rows: Vec<String> = Vec::new();
     let mut divergences: Vec<serde_json::Value> = Vec::new();
     let mut ran = 0usize;
 
@@ -377,6 +378,37 @@ pub fn std_test() -> Result<(), String> {
                 }
                 continue;
             }
+            // A `mirror-lag(E…)` row (sc46, F-0121, wolf-std#27): the
+            // REFERENCE machine refuses this program STATICALLY where the
+            // compiler lanes run it, because the mirror is short of a
+            // grammar the compiler has. `fail(…)` is not a word this
+            // column has (the loader says so by name), `unsupported`
+            // would lie about the machine's semantics, and
+            // `divergent(…)` describes what lupin DOES rather than what
+            // it refuses — so the row demands exactly the code the
+            // mirror answers, and anything else, a HEAL included, is red.
+            // That is the whole design: the word retires itself at the
+            // mirror release instead of being retired by a reader.
+            if let Expect::MirrorLag(code) = want_pre {
+                match &rec.verdict {
+                    _ if mirror_lag_matches(&rec, code) => mirror_lag_rows.push(format!(
+                        "mirror-lag({}): {test} — refused statically with \
+                         `fail({code})` at `{}`, where the compiler lanes run; \
+                         flips to `run` at the release that mirrors the grammar \
+                         (sc46, F-0121)",
+                        imp.ledger_name(),
+                        rec.phase_reached
+                    )),
+                    other => reds.push(format!(
+                        "tests/{test} [{}]: ledger says `mirror-lag({code})`, \
+                         observed `{other}` — the mirror moved (a heal, or a \
+                         different code); re-measure and flip the row \
+                         deliberately",
+                        imp.ledger_name()
+                    )),
+                }
+                continue;
+            }
             let achieved = match classify(&rec, &check) {
                 Ok(a) => a,
                 Err(mismatch) => {
@@ -447,6 +479,11 @@ pub fn std_test() -> Result<(), String> {
                     Expect::Divergent(_) => {
                         unreachable!("a divergent row is handled before classify")
                     }
+                    // A `mirror-lag(E…)` row is accepted (or reddened) on
+                    // its own path above, for the same reason.
+                    Expect::MirrorLag(_) => {
+                        unreachable!("a mirror-lag row is handled before classify")
+                    }
                 }
             }
         }
@@ -498,12 +535,13 @@ pub fn std_test() -> Result<(), String> {
     println!(
         "std-test: {ran} test(s); forward tags: {forward_tags}; \
          conservatism ledger: {} entr{}; unstable rows: {}; slow skips: {}; \
-         divergent rows: {}",
+         divergent rows: {}; mirror-lag rows: {}",
         conservatism.len(),
         if conservatism.len() == 1 { "y" } else { "ies" },
         unstable.len(),
         slow_skips.len(),
-        divergent_rows.len()
+        divergent_rows.len(),
+        mirror_lag_rows.len()
     );
     for line in &unstable {
         println!("  {line}");
@@ -512,6 +550,9 @@ pub fn std_test() -> Result<(), String> {
         println!("  {line}");
     }
     for line in &divergent_rows {
+        println!("  {line}");
+    }
+    for line in &mirror_lag_rows {
         println!("  {line}");
     }
     for line in &conservatism {
@@ -587,6 +628,19 @@ fn invoke(
 /// Compare a record against the directive's `check:`. `Ok` classifies in
 /// ledger vocabulary; `Err` is a hard directive mismatch (the tool ran
 /// the program and disagrees with what the test says happens).
+/// Does this record show the mirror-lag the row claims — a STATIC
+/// refusal carrying exactly that code?
+///
+/// Pulled out of `std_test`'s loop so it can be tested in BOTH
+/// directions (wolf-std#27 asks for exactly that): the row is satisfied
+/// only by `fail(<code>)`, so a different code is red — the mirror
+/// moved to a different grammar — and so is every non-refusal, which is
+/// what makes the word retire ITSELF on the release that mirrors the
+/// clause instead of waiting for a reader to notice.
+fn mirror_lag_matches(rec: &Record, code: &str) -> bool {
+    matches!(&rec.verdict, Verdict::Fail(got) if got == code)
+}
+
 fn classify(rec: &Record, check: &Check) -> Result<Achieved, String> {
     match (&rec.verdict, check) {
         (Verdict::Unsupported, _) => Ok(Achieved::Unsupported),
@@ -691,6 +745,39 @@ mod tests {
             stdout_inline: None,
             warnings: Vec::new(),
         }
+    }
+
+    #[test]
+    fn mirror_lag_matches_only_that_static_refusal() {
+        // The word's whole contract, both directions (wolf-std#27).
+        // SATISFIED: the reference machine refuses statically with the
+        // code the row names.
+        assert!(mirror_lag_matches(
+            &rec(Verdict::Fail("E0501".into()), None),
+            "E0501"
+        ));
+        // RED — the mirror moved to a DIFFERENT grammar. A row that
+        // silently accepted any code would stop naming which clause the
+        // mirror is short of, which is the one thing the code is for.
+        assert!(!mirror_lag_matches(
+            &rec(Verdict::Fail("E0301".into()), None),
+            "E0501"
+        ));
+        // RED — THE HEAL. This is the direction the word exists for:
+        // the release that mirrors the grammar makes the row red on the
+        // day it lands, so the flip to `run` is a deliberate commit.
+        assert!(!mirror_lag_matches(&rec(Verdict::Exit(0), None), "E0501"));
+        // RED — an honest refusal is `unsupported`, a different word
+        // about a different thing (outside the modelled surface, not
+        // short of a grammar).
+        assert!(!mirror_lag_matches(
+            &rec(Verdict::Unsupported, None),
+            "E0501"
+        ));
+        assert!(!mirror_lag_matches(
+            &rec(Verdict::Trap("div-zero".into()), None),
+            "E0501"
+        ));
     }
 
     #[test]

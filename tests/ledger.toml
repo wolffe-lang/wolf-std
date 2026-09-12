@@ -1,4 +1,45 @@
 # =====================================================================
+# sc46 — THE WORD THE LUPIN COLUMN DID NOT HAVE, AND IT ARRIVED WITH A
+# CARRIER ON THE SAME DAY.
+#
+# The sc35 block below names this gap in its own words — "`divergent(…)`'s
+# vocabulary (`stdout | exit(N) | trap(kind)`) is one-directional — built
+# for 'the compilers reject statically and the interpreter runs', blind to
+# the mirror" — and left it alone because the bump that caused it retired
+# it the same day. It did not retire. It recurred at sc44 on a different
+# clause and cost `trait Num` a whole release: `[type.trait.op.alias]`'s
+# form did not parse under lupin 0.1.33, so any module carrying it was
+# `fail(E0201)` on the reference machine, and a row whose lupin verdict is
+# `fail(E…)` had NO legal spelling in this file. Recorded as F-0121, filed
+# as wolf-std#27.
+#
+# **The word is `mirror-lag(E…)`**, lupin-only, and it carries the CODE
+# on purpose: the row says which grammar the mirror is short of, so it
+# goes red when the code CHANGES and not only when the lag ends. The
+# runner invokes the lane, demands exactly `fail(<code>)`, prints a
+# mirror-lag ledger naming every such row, and reds on anything else — a
+# HEAL included. That is the design: the release that mirrors the clause
+# makes the row red on the day it lands and the flip to `run` is a
+# deliberate commit, exactly as `divergent(…)`'s flip is.
+#
+# **It did not ship without a user.** wolf-std#27's own rule 3 said the
+# word and its first carrier land together, and sc46 set out expecting the
+# carrier to be unnecessary — is46 mirrors s155, so `trait Num = A + B`
+# PARSES under lupin 0.1.34 and was predicted to run. It does, when it is
+# declared in the entry file. Reached through an IMPORT it expands no
+# bound at all: `fn total[T: ops.Num]` is `E0501: the bounds on `T` say
+# nothing about `+`` at resolve, while `fn total[T: ops.Add]` through the
+# same import runs, and both compiler rungs run the alias at `int` and at
+# `f64`. Filed as wolf-interp#102 with a two-file twenty-line witness.
+# `tests/ops/num_alias_tier.lu` is the row, and it is the first
+# `mirror-lag(…)` this ledger has ever carried.
+#
+# `fail(…)` is STILL not a lupin word and that is deliberate: on a
+# compiler column it means "the directive is what this lane refuses",
+# and the directive is not lupin's to define.
+# =====================================================================
+#
+# =====================================================================
 # sc37 — THE WORDS CAME TRUE, AND THERE WERE TEN OF THEM, NOT EIGHT.
 #
 # The block below (sc35's) ends with a promise: "When it closes, all
@@ -87,7 +128,7 @@
 # tests/ledger.toml — per-test, per-implementation expectations (sc00 §3,
 # the is00 corpus-overlay pattern). The two implementations diverge by
 # design; each test records what each one is expected to achieve TODAY:
-#   lupin = "run" | "unsupported" | "slow"
+#   lupin = "run" | "unsupported" | "slow" | "divergent(…)" | "mirror-lag(E…)"
 #   wolfc = "run" | "unsupported" | "fail(E…)"
 # "run" means: satisfies the directive's `check:` in full. A test passing
 # deeper than its ledger claims fails CI — advancement is deliberate, in
