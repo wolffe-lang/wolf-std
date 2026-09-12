@@ -125,6 +125,25 @@ able to type — answered W0402 on `0.0 - inf`, in the one file in this
 repository whose subject is signed-zero ordering. F-0125: a file nobody
 could type is a file nobody linted.
 
+### wolf-std#20 closes, and the reason two lanes thought it already had is F-0126
+
+**The windows rig has been RED on three native rows since sc43 and the
+job says `success`.** `ci.yml` marks `std-test` `continue-on-error` off
+macOS, so an advisory step's RED never reaches the job's conclusion — and
+`std-test`'s summary line ("0 divergent / 0 unstable / 0 slow") counts
+ledger WORDS and prints identically on a red run. sc44 and t02 both read
+the job and both recorded windows GREEN; run 34602166418's step carried
+FIVE reds, two of them `net/reuse_port` at exactly the `c11ba3ce…` hash
+wolf-std#20 opened with, and the sc45 head carries the identical five.
+`7223653` recorded this class once already; its rule was about a pipe,
+and the sentence that was missing is that **a lane which is
+`continue-on-error` has no exit code to read, so it is read from the
+STEP's output and never from the job's conclusion.** At sc46's head the
+windows list is three (`net/adopt_rows`, `process/prefork_handoff`,
+`process/start_with_inherit_rows`, all native, all `exit(1)` for an
+`exit(0)`, all handle-inheritance-across-a-spawn) — filed as wolf-std#34
+with the observation that ubuntu can go REQUIRED today. F-0126.
+
 ### wolf-std#20: the directive can say "either" now
 
 `net/reuse_port`'s header claimed its stdout was "the same on every host
@@ -137,7 +156,10 @@ an assertion: the four relations are measured on a serving host and
 vacuous on a refusing one and the stdout is identical either way. The
 witness asserts the capability's relations, not the host's posture — the
 decision the issue routed here, and it does not depend on two lucky
-runners.
+runners. **Measured on the windows runner**: the row is `staged, 3
+lane(s) observed` with no red at run 34668214219, where it was two reds
+at the two previous heads. That is the first time it has actually come
+off the list, and it came off at a mechanism rather than at a runner.
 
 ## sc45 — 2026-09-11 — the fixed points: D34 gets a mechanism, and the 32 files it had never been enforced on
 
