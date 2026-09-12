@@ -211,9 +211,13 @@ fn key_words(key: List[byte]) -> List[int] {
     var kw = List[int]()
     var i: int = 0
     while i < 32 {
-        (mut kw).
-            push(
-            word32_le(key[i] as int, key[i + 1] as int, key[i + 2] as int, key[i + 3] as int) as int,
+        (mut kw).push(
+            word32_le(
+                key[i] as int,
+                key[i + 1] as int,
+                key[i + 2] as int,
+                key[i + 3] as int,
+            ) as int,
         )
         i = i + 4
     }
@@ -225,8 +229,7 @@ fn nonce_words(nonce: List[byte]) -> List[int] {
     var nw = List[int]()
     var i: int = 0
     while i < 12 {
-        (mut nw).
-            push(
+        (mut nw).push(
             word32_le(
                 nonce[i] as int,
                 nonce[i + 1] as int,
@@ -387,7 +390,12 @@ pub fn block(key: List[byte], counter: int, nonce: List[byte]) -> List[byte] {
 /// chacha20.to_hex(ct) == "2e7d3d92e359096f5c4660bbeed3"
 /// chacha20.to_hex(chacha20.stream_xor(key, 1, nonce, ct)) == "61747461636b206174206461776e"
 /// ```
-pub fn stream_xor(key: List[byte], counter: int, nonce: List[byte], data: List[byte]) -> List[byte] {
+pub fn stream_xor(
+    key: List[byte],
+    counter: int,
+    nonce: List[byte],
+    data: List[byte],
+) -> List[byte] {
     require_chacha_inputs(key, counter, nonce)
     let blocks = (data.len + 63) / 64
     if blocks > 0 {
@@ -729,9 +737,12 @@ fn push_len64_le(mut out: List[byte], n: int) {
 /// boxed.len == 30
 /// chacha20.to_hex(boxed) == "2e7d3d92e359096f5c4660bbeed3c6e125ca300df002b2a92947a5deded4"
 /// ```
-pub fn seal(key: List[byte], nonce: List[byte], aad: List[byte], plaintext: List[byte]) -> List[
-    byte,
-] {
+pub fn seal(
+    key: List[byte],
+    nonce: List[byte],
+    aad: List[byte],
+    plaintext: List[byte],
+) -> List[byte] {
     let otk = poly_key(key, nonce)
     let ct = stream_xor(key, 1, nonce, plaintext)
     let t = poly1305(otk, mac_data(aad, ct))
@@ -772,9 +783,12 @@ pub fn seal(key: List[byte], nonce: List[byte], aad: List[byte], plaintext: List
 /// let short = chacha20.open(key, nonce, "hdr".bytes(), "not16".bytes()) else List[byte]()
 /// short.len == 0
 /// ```
-pub fn open(key: List[byte], nonce: List[byte], aad: List[byte], boxed: List[byte]) -> List[byte] ! {
-    tag,
-} {
+pub fn open(
+    key: List[byte],
+    nonce: List[byte],
+    aad: List[byte],
+    boxed: List[byte],
+) -> List[byte] ! {tag} {
     if boxed.len < 16 {
         return tag
     }

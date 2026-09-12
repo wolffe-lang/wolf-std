@@ -193,7 +193,12 @@ pub fn hkdf_label(length: int, label: str, context: List[byte]) -> List[byte] {
 /// ct: `secret` is the PRK, carried through sha2's HKDF (its `ct:` line
 /// holds the wrapping-not-checked posture); the label/context/length
 /// that select `HkdfLabel` are public.
-pub fn expand_label(secret: List[byte], label: str, context: List[byte], length: int) -> List[byte] {
+pub fn expand_label(
+    secret: List[byte],
+    label: str,
+    context: List[byte],
+    length: int,
+) -> List[byte] {
     let info = hkdf_label(length, label, context)
     sha2.hkdf256_expand(secret, info, length)
 }

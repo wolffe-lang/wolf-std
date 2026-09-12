@@ -720,8 +720,10 @@ pub fn verify_certificate_verify(
     sig: List[byte],
     transcript_hash: List[byte],
 ) -> int ! {unsupported_alg, bad_signature} {
-    let content = handshake.
-        certificate_verify_content("TLS 1.3, server CertificateVerify", transcript_hash)
+    let content = handshake.certificate_verify_content(
+        "TLS 1.3, server CertificateVerify",
+        transcript_hash,
+    )
     if scheme == scheme_ed25519() {
         if spki_alg != cert.oid_ed25519() {
             return bad_signature
@@ -1139,7 +1141,13 @@ pub fn complete(take p: Pending) -> Client ! {
                 // fields feed the one verify call.
                 let CertVerifyView { scheme, sig } = certificate_verify_of(copy msg)?
                 let th_cert = handshake.transcript_hash(copy transcript)
-                let cv_ok = verify_certificate_verify(leaf_alg, copy leaf_key, scheme, sig, th_cert)?
+                let cv_ok = verify_certificate_verify(
+                    leaf_alg,
+                    copy leaf_key,
+                    scheme,
+                    sig,
+                    th_cert,
+                )?
                 if cv_ok != 1 {
                     return bad_signature
                 }
@@ -1213,7 +1221,12 @@ pub fn read(mut c: Client) -> List[byte] ! {
         } else if rtype != 23 {
             return unexpected_message
         } else {
-            let inner = record.open(copy c.read_key, copy c.read_iv, c.read_seq, wire) else |e| match e {
+            let inner = record.open(
+                copy c.read_key,
+                copy c.read_iv,
+                c.read_seq,
+                wire,
+            ) else |e| match e {
                 tag => {
                     return bad_record_mac
                 },
@@ -1254,8 +1267,7 @@ pub fn read(mut c: Client) -> List[byte] ! {
 /// on success.
 /// ct: the seal carries the write key through sc20/sc17.
 pub fn write(mut c: Client, data: List[byte]) -> () ! {closed, invalid, io} {
-    let rec = record.
-        seal(
+    let rec = record.seal(
         copy c.write_key,
         copy c.write_iv,
         c.write_seq,
@@ -1279,8 +1291,14 @@ pub fn close(take c: Client) -> () ! {io} {
     var alert = List[byte]()
     (mut alert).push(1 as byte)
     (mut alert).push(0 as byte)
-    let rec = record.
-        seal(c.write_key, c.write_iv, c.write_seq, record.content_type_alert(), alert, 0)
+    let rec = record.seal(
+        c.write_key,
+        c.write_iv,
+        c.write_seq,
+        record.content_type_alert(),
+        alert,
+        0,
+    )
     write_all(c.fd, rec) else |_| {}
     var s = net.Socket { fd: c.fd }
     net.close(take s)?

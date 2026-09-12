@@ -662,7 +662,11 @@ pub fn ct_eq(a: List[byte], b: List[byte]) -> bool {
 /// no key material is exposed on the miss (the recompute leaks nothing the
 /// peer did not already send).
 /// ct: recompute is `finished_verify_data`; compare is `ct_eq`.
-pub fn verify_finished(base_secret: List[byte], transcript_hash: List[byte], received: List[byte]) -> bool {
+pub fn verify_finished(
+    base_secret: List[byte],
+    transcript_hash: List[byte],
+    received: List[byte],
+) -> bool {
     ct_eq(finished_verify_data(base_secret, transcript_hash), received)
 }
 
@@ -674,9 +678,11 @@ pub fn verify_finished(base_secret: List[byte], transcript_hash: List[byte], rec
 /// the miss). The state machine and the record layer continue their
 /// smuggling/confusion discipline through this named reject.
 /// ct: as `verify_finished`.
-pub fn accept_finished(base_secret: List[byte], transcript_hash: List[byte], received: List[byte]) -> int ! {
-    decrypt_error,
-} {
+pub fn accept_finished(
+    base_secret: List[byte],
+    transcript_hash: List[byte],
+    received: List[byte],
+) -> int ! {decrypt_error} {
     if verify_finished(base_secret, transcript_hash, received) {
         return 1
     }
