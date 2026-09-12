@@ -61,7 +61,10 @@ fn main() -> !int {
     var forged = List[net.Listener]()
     (mut forged).push(net.Listener { fd: 4242 })
     var bad_set_first = false
-    let a = process.start_with(process.command("wolf-sc11-no-such-program-here"), forged) else |e| match e {
+    let a = process.start_with(
+        process.command("wolf-sc11-no-such-program-here"),
+        forged,
+    ) else |e| match e {
         unsupported => { process.Child { slot: 0 - 1 } },
         not_found => { process.Child { slot: 0 - 1 } },
         denied => { process.Child { slot: 0 - 1 } },
@@ -74,7 +77,10 @@ fn main() -> !int {
     var set = List[net.Listener]()
     (mut set).push(srv)
     var good_set_spawns = false
-    let b = process.start_with(process.command("wolf-sc11-no-such-program-here"), set) else |e| match e {
+    let b = process.start_with(
+        process.command("wolf-sc11-no-such-program-here"),
+        set,
+    ) else |e| match e {
         unsupported => { process.Child { slot: 0 - 1 } },
         not_found => {
             good_set_spawns = true

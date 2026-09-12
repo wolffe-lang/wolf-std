@@ -54,7 +54,8 @@ fn main() -> !int {
     if float.to_bits(decimal.parse_float("0.1") else 0.0) == float.to_bits(0.1) {} else {
         return 29
     }
-    if float.to_bits(decimal.parse_float("1e23") else 0.0) == float.to_bits(9.999999999999999e22) {} else {
+    if float.to_bits(decimal.parse_float("1e23") else 0.0) ==
+        float.to_bits(9.999999999999999e22) {} else {
         return 30
     }
     if float.to_bits(decimal.parse_float("5e-324") else 0.0) == 1 {} else { return 31 }
@@ -64,14 +65,19 @@ fn main() -> !int {
     if float.to_bits(decimal.parse_float("2.4703282292062328e-324") else 0.0) == 1 {} else {
         return 33
     }
-    if float.to_bits(decimal.parse_float("1.7976931348623157e308") else 0.0) == 9218868437227405311 {} else {
+    if float.to_bits(decimal.parse_float("1.7976931348623157e308") else 0.0) ==
+        9218868437227405311 {} else {
         return 34
     }
     // A significand longer than any double can hold, and a 9007199254740993
     // that rounds to its even neighbour.
     if float.to_bits(decimal.parse_float("123456789012345678901234567890") else 0.0) ==
-        float.to_bits(1.2345678901234568e29) {} else { return 35 }
+        float.to_bits(1.2345678901234568e29) {} else {
+        return 35
+    }
     if float.to_bits(decimal.parse_float("9007199254740993") else 0.0) ==
-        float.to_bits(9007199254740992.0) {} else { return 36 }
+        float.to_bits(9007199254740992.0) {} else {
+        return 36
+    }
     0
 }

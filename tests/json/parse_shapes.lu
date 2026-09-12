@@ -100,7 +100,8 @@ fn main() -> !int {
     if (json.as_int(kept) else 0) == 2 {} else { return 36 }
 
     // The round trip, on documents whose rendering is order-free.
-    if (json.stringify(json.parse("[1,null,true]") else json.null()) else "?") == "[1,null,true]" {} else {
+    if (json.stringify(json.parse("[1,null,true]") else json.null()) else "?") ==
+        "[1,null,true]" {} else {
         return 37
     }
     if (json.stringify(json.parse("{{\"k\":\"a\\nb\"}}") else json.null()) else "?") ==

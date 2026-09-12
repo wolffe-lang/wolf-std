@@ -29,7 +29,8 @@ fn main() -> !int {
     // Nesting compounds the indent.
     var outer = List[json.Value]()
     (mut outer).push(json.from_list(xs))
-    if (json.stringify_pretty(json.from_list(outer), 2) else "?") == "[\n  [\n    1,\n    2\n  ]\n]" {} else {
+    if (json.stringify_pretty(json.from_list(outer), 2) else "?") ==
+        "[\n  [\n    1,\n    2\n  ]\n]" {} else {
         return 6
     }
     // An indent of zero is newlines without indentation.

@@ -165,7 +165,9 @@ fn main() -> !int {
         let ok = accepts(seq1(i))
         if i < 128 {
             if ok {} else { return 41 }
-        } else if !ok {} else { return 42 }
+        } else if !ok {} else {
+            return 42
+        }
         i = i + 1
     }
     0
