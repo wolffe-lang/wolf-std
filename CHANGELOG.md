@@ -1,5 +1,135 @@
 # Changelog
 
+## sc47 — 2026-09-12 — the residue: a step that ran and gated nothing, and two fences that were never wrong
+
+**No pin moves.** wolf 0.2.12 (`a7f517e`) and lupin 0.1.34 (`c9237c1`)
+are sc46's and are unchanged. Nothing in `std/` gains or loses a public
+function. This sprint is three rows sc46 filed against itself plus the
+CI defect it found, and the defect turned out to be the interesting one.
+
+### `std-test` ran on three hosts and gated one (wolf-std#34, F-0127)
+
+`ci.yml` marked the differential `continue-on-error` off macOS, so the
+**job reported `success` while the step was RED** — and it had been RED
+on `rig (windows-latest)` since wolf-std#18 lit the native rung at sc43.
+wolf-std#20 states a windows green twice on that reading and is wrong
+both times.
+
+F-0126 closed the second occurrence with a rule: read the STEP's own
+output, never the job's conclusion. **Measured here, that rule is still
+not sufficient.** Run 34672768728, asking the API for the step object
+rather than the job:
+
+```
+{"name":"std-test (the differential; three lanes, three hosts)",
+ "conclusion":"success","number":11,"status":"completed"}
+```
+
+while the same step's log ends `xtask: RED` and `##[error]Process
+completed with exit code 1`. GitHub rewrites the conclusion at BOTH
+levels; there is no level of the conclusion tree that carries the fact,
+which is why three careful readings in a row got it wrong. What survives
+is `steps.<id>.outcome`, the log text, and the `continue-on-error:` key
+itself — the only one that exists before the run.
+
+Three things land:
+
+* **ubuntu's `std-test` is REQUIRED.** The marker narrows from
+  `${{ runner.os != 'macOS' }}` to `${{ runner.os == 'Windows' }}`, on
+  four consecutive `std-test: GREEN` readings of `rig (ubuntu-latest)` —
+  runs 34602166418, 34618995826, 34668184512, 34672768728. sc44's reason
+  for the advisory marker was "the first completion at the new budget";
+  it has completed four times.
+* **The advisory host says its red out loud.** A verdict step prints
+  `outcome` beside `conclusion` on every host and raises a `::warning::`
+  when they disagree.
+* **A `continue-on-error` step is no longer counted as coverage.**
+  `workflow.rs` already refused to count `nightly.yml` for exactly this
+  reason and had never applied the rule to a STEP inside `ci.yml`; that
+  is the hole `std-test` sat in for four sprints, satisfying
+  `every_ci_step_runs_in_the_ci_workflow` the whole time. F-0113 asked
+  *does this step RUN?* Nothing asked *does its red reach the merge?*
+  `workflow::ADVISORY_STEPS` is now a blessed list carrying the command,
+  the expression verbatim and the issue that retires it, gated by
+  `selftest` in both directions in the already-required `rig` job.
+
+**Proved RED on three planted failures before landing**, each exit 101:
+the marker widened back to `!= 'macOS'` (unblessed expression), a marker
+added to `fmt-lu` (unblessed step), the marker deleted with the blessing
+left standing (stale blessing). And proved in CI on a throwaway branch
+carrying one planted red row on every lane.
+
+### sc44's last two prose examples go back into their fences (wolf-std#32)
+
+Both were prose for a filed compiler bug, both bugs closed in v0.2.12,
+and neither claim was ever wrong — they were green fences a pin bump
+broke. `cmp.total_cmp`'s four `==` lines return **verbatim** as sc44
+promised (wolf-lang#336), and `json.as_float`'s `from_int` line rejoins
+the fence it was cut from (wolf-lang#337).
+
+**Predicted 436 blocks before the run and measured 436**, against
+wolf-std#32's own guess of 437: the extractor counts BLOCKS, cmp's four
+lines are one new block, and json's line rejoins a block already
+counted. Lane by lane over the tree, before -> after:
+
+```
+lupin  exit(0) 404 -> 405      wolfc  exit(0) 434 -> 435
+native exit(0) 370 -> 370      native unsupported 65 -> 66
+```
+
+Two lanes of three. The new cmp block is `unsupported` on the native
+rung, for wolf-std#31's reason exactly — which is the next entry.
+
+### std.cmp's native-rung cost is std's own, and it is removable (wolf-std#31)
+
+sc46 recorded, as a cost of shipping `trait Num`, that every importer of
+std.cmp loses the native rung to `impl Eq for Ordering`'s product
+pattern, and asked which of three shapes to take. sc47 took the
+measurement the issue said would decide it.
+
+**Option 3 is writable at these pins.** With both `Ordering` impls —
+`Eq` *and* `Ord`, which the issue did not name — rewritten as nested
+matches, arm for arm identical, a probe importing std.cmp goes
+`unsupported` (`phase_reached: mem`) -> `exit(0)` (`phase_reached: run`)
+on the native rung.
+
+So the ruling is split, and it is not the one sc46 defaulted to. The
+compiler's refusal is **by design and not a lowering gap worth filing
+upstream** — `deep trees, c06` is a named, tracked conservatism
+answering honestly. But the **cost is std's own, not the import's**: it
+buys nothing, and every importer is paying for a `match (self, other)`
+that had no reason to be a product pattern.
+
+**And it is 40 rows, not the ~13 the issue estimated.** The full
+402-row three-lane differential with the rewrite applied moves exactly
+40 rows from `unsupported` to `run` on the NATIVE column and **nothing
+else moves** — no row shallower, no directive mismatch, no regression:
+
+```
+testing 10   map 6   cmp 6   sort 5   search 5   x/* 4   ops 3   rand 1
+conservatism ledger  190 -> 150 entries
+```
+
+`impl Ord for bool` keeps its product pattern deliberately: its arms are
+bool LITERALS, and the refusal is specifically an enum or row TEST
+inside a product pattern.
+
+**Not landed here.** Forty ledger rows are a lane's work, verified by a
+second full differential, and they should not arrive in the same PR as
+the CI gate. The measurement, the rewrite and the row list are on
+wolf-std#31; the clause note is at `impl Eq for Ordering` so the next
+reader meets it at the code rather than in an issue.
+
+### wolf-std#30 — not taken, and the reason changed under the lane
+
+`range[int]` as a nameable type needs **wolf v0.2.13**, which was
+untagged when this lane opened (`404` on the ref) and was **published at
+07:49 the same morning**, inside the window. Left open deliberately: the
+contract's instruction was conditional on the tag existing beforehand,
+and taking it means a pin bump plus F-0030's three functions plus a
+differential against a compiler this repository has never observed. The
+tag's arrival is reported rather than acted on.
+
 ## sc46 — 2026-09-12 — the alias lands: `trait Num`, the word the ledger did not have, and a mirror that parses the form without expanding the bound
 
 Pins move to **`wolf 0.2.12`** (`a7f517e`) and **`lupin 0.1.34`**
