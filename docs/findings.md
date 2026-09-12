@@ -134,6 +134,7 @@ the building.
 | F-0124 | 2026-09-12 | **A formatter re-lay count measured on a branch build is not the count the release produces: predicted 33, measured 35.** wolf-lang#339's own closing comment and the v0.2.12 CHANGELOG both say "wolf-std `7582e7a` 33 files" and "33 std files … re-lay at their next pins", measured against trunk `be348b9` plus the #339 branch. Re-measured here with the RELEASE binary (`wolf 0.2.12`, pin `a7f517e`) over the same tree `7582e7a`: **35**, by the directory walk and by the explicit 452-path file list, the two sets equal. Four under `std/` and thirty-one under `tests/`. Classified: twenty files carry #339's orphaned receiver-dot removal, four carry s154's `[gram.fmt.if]` braced-chain expansion (#303), the rest are argument-list, type-application and error-set re-lays. The two formatter commits between `be348b9` and `a7f517e` are #339 itself and #340 (`[gram.fmt.paren]`, a binary `else` fallback keeps the author's parens), and **#340 moves no file in this tree** — verified directly: all five `else (` sites under `std/` and `tests/` are unmoved, and none of the 35 diffs touches a paren. So the +2 is not attributable to a commit in that span. The lesson is the measurement's, not the compiler's: a re-lay prediction is only as good as the BINARY it was taken with, and a consumer must re-measure at its own pin before it trusts a number from upstream's branch. Cost here: none — the re-lay is mechanical and the extra two files were re-laid with the other thirty-three | wolf-lang (the formatter's own measurement, not a defect) | reported on [wolf-lang#339](https://github.com/wolffe-lang/wolf-lang/issues/339); wolf-std re-laid 35 at sc46 |
 | F-0125 | 2026-09-12 | **A static refusal hides its file's own lints, and one had been hiding a W0402 in this tree since sc01.** `tests/cmp/total_cmp_relational.lu` was `fail(E0301)` on BOTH compiler columns from sc44 (`==` on an imported `Ordering` needed a bare `Eq` in scope, which no importer can have — wolf-lang#336) and `unsupported` on the compiler rungs before that, so no compiler had ever type-checked it. s156's #336 made it compile, and the FIRST reading answered `W0402: `0.0 - x` is not negation` on `cmp.total_cmp(0.0 - inf, 1.0)` — in the one file in this repository whose entire subject is signed-zero ordering, where `0.0 - (-0.0)` being `+0.0` is precisely the caveat the file exists to pin. The rig denies warnings on every lane (F-0046/F-0053), so the lint is what turned a green row red rather than a reader. This is F-0119's shape one layer down: that finding was "a module nobody could type is a module nobody read", and this is "a file nobody could type is a file nobody LINTED" — the same blindness, at the warning rung, where it is cheaper to miss because a warning never fails a build on its own. The general form is a rule for pin bumps: when a row flips off `fail(…)`, expect the first clean reading to surface defects that predate the refusal, and read them as the file's own rather than as the bump's. Written `-inf` | wolf-std (the witness's own defect; the compiler was right both times) | no filing owed — the lint is correct and fired the moment it could |
 | F-0126 | 2026-09-12 | **The windows differential has been RED on three native rows since the native lane was lit, and two lanes recorded it GREEN — the second occurrence of the class this repository already has a correction commit for.** wolf-std#20 says twice, from sc44 and from t02's triage, that "windows went GREEN at sc44's head (run 34602166418), 401 rows, 0 divergent / 0 unstable / 0 slow" and that "`net/reuse_port` did not fire either". Re-read line by line at sc46: run 34602166418's `rig (windows-latest)` **std-test step was RED with five reds**, and `net/reuse_port` was two of them at exactly the `c11ba3ce…` hash the issue opened with; the sc45 head (run 34618995826) carries the identical five. The JOB says `success` in both because `ci.yml` marks the step `continue-on-error: ${{ runner.os != 'macOS' }}`, so an advisory step's RED never reaches the job's conclusion — and the "0 divergent / 0 unstable / 0 slow" quoted as evidence is the SUMMARY line, which counts ledger words and prints identically on a red run. `7223653` recorded this class once already ("the windows differential was recorded GREEN and is RED — the correction, and the rule that would have caught it"); the rule is that a gauntlet's verdict is its exit code, and **a lane that is `continue-on-error` has no exit code to read, so it must be read from the STEP's own output and never from the job's conclusion** — which is the sentence that was missing, because the first occurrence was about a pipe and this one is about a workflow key. At sc46's head (run 34668214219) the windows list is **three, not five**: `net/adopt_rows [native]`, `process/prefork_handoff [native]` and `process/start_with_inherit_rows [native]`, all `expected exit(0), observed exit(1)`, all handle-inheritance-across-a-spawn, all invisible since wolf-std#18 lit that rung at sc43 — and `net/reuse_port` is GONE, because sc46 stopped its directive asserting the host's posture. macOS and ubuntu are clean on all three at the same head | wolf-std (the rig's own reading discipline) | [filed: wolf-std#34](https://github.com/wolffe-lang/wolf-std/issues/34); wolf-std#20's last named row closes with the directive fix, and the three are its successor |
+| F-0127 | 2026-09-12 | **`continue-on-error` rewrites a step's conclusion at the STEP level too, so F-0126's own correction is not sufficient — the only durable fact is the marker in the workflow file, and now a gate reads it.** F-0126 closed the second occurrence of the recorded-GREEN-is-RED class with a rule: "a lane that is `continue-on-error` has no exit code to read, so it must be read from the STEP's own output and never from the job's conclusion." Measured at sc47 against run 34672768728 (trunk `8b5a18e`), that rule is still not enough if "the step's output" is taken to mean the step's reported conclusion. The REST API answers `{"name":"std-test (the differential; three lanes, three hosts)","conclusion":"success"}` for `rig (windows-latest)` — the STEP object, not the job — while the same step's log ends `xtask: RED` and `##[error]Process completed with exit code 1`. GitHub rewrites the conclusion at BOTH levels, so a reader who follows F-0126's rule to the letter with `gh api …/jobs` gets the same wrong answer the two earlier lanes got. Three things survive: the step's own LOG text, the `::error::` annotation, and `steps.<id>.outcome`, which is the pre-rewrite result. **The structural half is what closed it.** `xtask/src/workflow.rs` already refused to count `nightly.yml` as coverage and said why — "counting its steps as coverage would let a step be 'in CI' while no merge ever waited on it — the exact confusion F-0113 records" — and that rule was applied to a whole workflow at the JOB level and never to a STEP inside `ci.yml`, which is the hole `std-test` sat in from sc43 to sc46. The reader is now per-step, `ADVISORY_STEPS` is a blessed list carrying the issue that retires each entry, and `selftest.rs` asserts it against `ci.yml` in both directions in the `rig` job that was already required on three hosts. Proved RED on three planted failures before landing: widening the marker back to `!= 'macOS'`, adding one to `fmt-lu`, and deleting the marker while keeping the blessing. ubuntu's `std-test` goes REQUIRED at the same commit on four consecutive greens (34602166418, 34618995826, 34668184512, 34672768728) | wolf-std (the rig's own reading discipline, one level below F-0126) | no upstream filing owed — GitHub's behaviour is documented and the defect was this repository's use of it; wolf-std#34 carries the three windows rows that keep the last marker alive |
 
 
 ## F-0001 — the std search path
@@ -9518,3 +9519,104 @@ wrongly — with the issue named in both files. Neither ledger row moves,
 and that is the shape of the trade: the honest word is back, and it is
 honest for a stated reason now instead of a structural accident. They go
 back to `==` when this closes. Filed as wolf-lang#337.
+
+
+## F-0127 — the step conclusion lies too, and the marker is the only thing that does not
+
+F-0126 is the second time this repository recorded a RED windows
+differential as green, and it closed with a rule sharp enough to sound
+final:
+
+> a lane that is `continue-on-error` has no exit code to read, so it
+> must be read from the STEP's own output and never from the job's
+> conclusion
+
+sc47's contract repeats it as the lane's whole lesson: *read the STEP
+conclusions of any CI run you cite, not the job's.* Followed literally,
+it produces the same wrong answer a third time.
+
+**The measurement.** Run 34672768728, trunk `8b5a18e`, the push run of
+sc46's head. Asked for the step object rather than the job:
+
+```
+$ gh api repos/wolffe-lang/wolf-std/actions/runs/34672768728/jobs \
+    --jq '.jobs[]|select(.name=="rig (windows-latest)")
+          |.steps[]|select(.name|startswith("std-test"))'
+{"completed_at":"...","conclusion":"success",
+ "name":"std-test (the differential; three lanes, three hosts)",
+ "number":11,"status":"completed"}
+```
+
+`conclusion: success`. The same step's log, same run:
+
+```
+tests/net/adopt_rows.lu [native]: directive mismatch — expected exit(0), observed exit(1)
+tests/process/prefork_handoff.lu [native]: directive mismatch — expected exit(0), observed exit(1)
+tests/process/start_with_inherit_rows.lu [native]: directive mismatch — expected exit(0), observed exit(1)
+xtask: RED
+##[error]Process completed with exit code 1.
+```
+
+`continue-on-error` rewrites the conclusion of the STEP and of the JOB.
+There is no level of the conclusion tree at which the truth is reported,
+which is why three careful readings in a row got it wrong: the defect
+was never insufficient care, it was that the thing being read does not
+carry the fact.
+
+**What does carry it**, in descending order of how easy it is to grep:
+
+1. `steps.<id>.outcome` — the pre-rewrite result, `failure` here.
+   `ci.yml` now prints it beside `conclusion` on every host, so the
+   divergence is one line in every future run.
+2. The step's log text — `xtask: RED`, and the runner's own
+   `##[error]Process completed with exit code 1`.
+3. The `continue-on-error:` key itself, in the workflow file, which is
+   the only one of the three that exists *before* the run.
+
+**The structural half.** `xtask/src/workflow.rs` has known this shape
+since sc41. Its own doc comment excludes `nightly.yml` from coverage
+and gives the reason:
+
+> a scheduled drift watch that gates nothing (`continue-on-error` at
+> the job level), so counting its steps as coverage would let a step be
+> "in CI" while no merge ever waited on it — the exact confusion F-0113
+> records.
+
+The rule was right and was applied one level too high. `ci.yml`'s
+`std-test` step was in `CI_STEPS`, ran on three runners, and satisfied
+`every_ci_step_runs_in_the_ci_workflow` for four sprints while gating
+nothing on two hosts. F-0113 asked *does this step RUN on a runner?*
+Nothing asked *does its red reach the merge?*
+
+So the reader is per-step now, the marker is parsed rather than
+ignored, and `workflow::ADVISORY_STEPS` is a blessed list in which each
+entry carries the command, the expression verbatim, and the open issue
+that retires it. `selftest::every_advisory_step_is_blessed_with_an_issue`
+asserts the list against `ci.yml` in both directions, in the `rig` job
+that was already required on all three hosts — so it is a red
+`cargo test` on the author's box before the push, which is where this
+should have been caught at sc43.
+
+Pinning the EXPRESSION and not merely the step is deliberate: the way
+this defect grows is a host at a time, and `!= 'macOS'` silently covers
+two hosts where `== 'Windows'` covers one.
+
+**Proved red before it was believed.** A green gate that has never been
+seen red is not a gate, so three failures were planted against it, each
+exiting 101:
+
+| planted | what it models | the assertion that fired |
+|---|---|---|
+| marker widened back to `${{ runner.os != 'macOS' }}` | sc44's posture returning by a one-word edit | unblessed expression |
+| `continue-on-error: true` added to `fmt-lu` | a new advisory step arriving quietly | unblessed step |
+| marker deleted, blessing left standing | an issue closing without its licence being returned | stale blessing |
+
+**And the posture moved with it.** ubuntu's `std-test` is REQUIRED from
+this commit. It was made advisory at sc44 "for the first completion at
+the new budget"; that completion has happened four times —
+`std-test: GREEN` on `rig (ubuntu-latest)` at runs 34602166418,
+34618995826, 34668184512 and 34672768728 — and a reason that has
+expired is a licence nobody is using. windows is the only advisory host
+left, behind wolf-std#34's three native net/process rows, and it now
+says its red out loud through a `::warning::` annotation and a job
+summary line rather than passing in silence.
