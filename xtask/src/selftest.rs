@@ -328,6 +328,80 @@ fn every_ci_step_runs_in_the_ci_workflow() {
     );
 }
 
+/// Every `continue-on-error:` in `ci.yml` is a BLESSED advisory step.
+///
+/// sc47 / wolf-std#34. `every_ci_step_runs_in_the_ci_workflow` above
+/// asks whether a step RUNS on a runner. It cannot ask whether the step
+/// GATES anything, and for four sprints `std-test` answered yes to the
+/// first question and no to the second on two of three hosts: it was RED
+/// on `rig (windows-latest)` from sc43 onward and the job reported
+/// success. Two lanes read that green and wrote it into wolf-std#20 as a
+/// windows pass, twice.
+///
+/// Reading harder does not fix it. At run 34672768728 the REST API
+/// reports `conclusion: success` for the `std-test` STEP on
+/// `rig (windows-latest)` as well as for the job, while the same step's
+/// log ends `xtask: RED` — `continue-on-error` rewrites the conclusion at
+/// both levels. The durable fact is the marker itself, in the workflow
+/// file, so that is what this gates.
+///
+/// The rule: an advisory step must be named in
+/// `workflow::ADVISORY_STEPS` with the expression it carries and the
+/// open issue that retires it. Adding a marker, widening one to another
+/// host, or leaving one behind after its issue closes all red the `rig`
+/// job on all three hosts — and red `cargo test` on the author's box
+/// before the push, which is where wolf-std#34 should have been caught.
+#[test]
+fn every_advisory_step_is_blessed_with_an_issue() {
+    let repo = repo_root();
+    let path = repo.join(workflow::CI_WORKFLOW);
+    let yaml =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", workflow::CI_WORKFLOW));
+
+    let found: Vec<(String, String)> = workflow::advisory_invocations(&yaml);
+    let blessed: Vec<(String, String)> = workflow::ADVISORY_STEPS
+        .iter()
+        .map(|a| (a.command.to_string(), a.expr.to_string()))
+        .collect();
+
+    for (command, expr) in &found {
+        assert!(
+            blessed.contains(&(command.clone(), expr.clone())),
+            "{}: `{command}` carries `continue-on-error: {expr}` and is not in \
+             workflow::ADVISORY_STEPS.\n  \
+             An advisory step RUNS and GATES NOTHING on every host where that \
+             expression is true, and GitHub rewrites its conclusion to \
+             `success` at the step level as well as the job level — so nothing \
+             downstream can tell. Bless it with the issue that retires it, or \
+             take the marker off.",
+            workflow::CI_WORKFLOW
+        );
+    }
+    for a in workflow::ADVISORY_STEPS {
+        assert!(
+            found.contains(&(a.command.to_string(), a.expr.to_string())),
+            "workflow::ADVISORY_STEPS says `{}` is advisory with \
+             `continue-on-error: {}` ({}), and {} does not carry that.\n  \
+             If the step went REQUIRED, drop the entry here and close the \
+             issue; a stale blessing is a licence nobody is using.",
+            a.command,
+            a.expr,
+            a.issue,
+            workflow::CI_WORKFLOW
+        );
+    }
+    for a in workflow::ADVISORY_STEPS {
+        assert!(
+            a.issue.starts_with("wolf-std#") || a.issue.starts_with("wolf-lang#"),
+            "advisory step `{}` is blessed with `{}`, which is not an issue \
+             reference — an advisory step nobody has filed against is a red \
+             nobody is going to fix",
+            a.command,
+            a.issue
+        );
+    }
+}
+
 /// Every name in `workflow::CI_STEPS` has a match arm in `run_step`.
 ///
 /// `ci()` iterates the list, so an entry with no arm would fail the

@@ -98,36 +98,177 @@ pub const CI_STEPS: &[Step] = &[
     },
 ];
 
+/// A step of `ci.yml` that RUNS and GATES NOTHING on some host, because
+/// `continue-on-error` rewrites what its red becomes.
+///
+/// sc47 / wolf-std#34. This module already refused to count
+/// `nightly.yml` as coverage, and said why: "counting its steps as
+/// coverage would let a step be 'in CI' while no merge ever waited on
+/// it — the exact confusion F-0113 records." That rule was applied to a
+/// whole workflow at the JOB level and never to a STEP inside `ci.yml`,
+/// which is the hole `std-test` sat in for four sprints: it ran on three
+/// hosts, it was RED on one of them from sc43 onward, and two lanes read
+/// the green and reported it.
+///
+/// What makes it worse than "the job says success" is that the STEP says
+/// success too. At run 34672768728 the REST API reports
+/// `conclusion: success` for `std-test` on `rig (windows-latest)` while
+/// its log ends `xtask: RED` — GitHub rewrites the conclusion at both
+/// levels, so no amount of care reading conclusions recovers the truth.
+/// The fact that DOES survive is this key, in this file, which is why
+/// the marker is gated here rather than moved into a shell variable.
+pub struct Advisory {
+    /// The cargo invocation the advisory step runs.
+    pub command: &'static str,
+    /// The `continue-on-error:` value, verbatim after whitespace
+    /// normalization. Pinning the EXPRESSION and not just the step is
+    /// what stops the advisory set from being widened a host at a time.
+    pub expr: &'static str,
+    /// The open issue that says why this is advisory and what closes it.
+    /// An advisory step without one is a step nobody is going to fix.
+    pub issue: &'static str,
+}
+
+/// Every advisory step this repository has BLESSED, with its reason.
+///
+/// `selftest.rs` asserts that what `ci.yml` carries is exactly this
+/// list, in both directions, so an advisory marker cannot be added,
+/// widened, or outlive its issue without the `rig` job going red on
+/// every host — the gate that would have caught wolf-std#34 at sc43,
+/// on the author's box, before the push.
+pub const ADVISORY_STEPS: &[Advisory] = &[
+    // sc47: narrowed from `${{ runner.os != 'macOS' }}`. ubuntu is
+    // REQUIRED from this commit — `std-test: GREEN` on
+    // `rig (ubuntu-latest)` at four consecutive heads (34602166418,
+    // 34618995826, 34668184512, 34672768728) — and windows is the only
+    // host left, behind three native net/process rows that arrived when
+    // wolf-std#18 lit the native rung there.
+    Advisory {
+        command: "cargo xtask std-test",
+        expr: "${{ runner.os == 'Windows' }}",
+        issue: "wolf-std#34",
+    },
+];
+
+/// One `cargo …` invocation of the workflow, with the advisory marker of
+/// the step that runs it.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Invocation {
+    /// The command, whitespace normalized.
+    pub command: String,
+    /// `Some(expr)` when the step carries `continue-on-error:`. A red
+    /// here reaches the job only on the hosts where `expr` is false.
+    pub advisory: Option<String>,
+}
+
 /// Every `cargo …` invocation the workflow actually runs, whitespace
-/// normalized, in file order.
+/// normalized, in file order, each with its step's advisory marker.
 ///
 /// The parse is deliberately dumb — no YAML crate, by the same
 /// dependency charter that keeps `tomlite.rs` in this repository — and
-/// it is dumb in the safe direction: it recognizes a command only when
-/// the line, after an optional `- ` and an optional `run:`, BEGINS with
-/// `cargo `. A comment cannot be mistaken for a command (comment lines
-/// are dropped), and a `cargo` mentioned inside an `echo` or a prose
-/// comment tail cannot either, because such a line does not begin with
-/// it. The failure mode is under-counting, which shows up as a step
-/// reported local-only that is not — loud, and never the reverse.
-pub fn cargo_invocations(yaml: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for raw in yaml.lines() {
-        let mut line = raw.trim();
+/// it is dumb in the safe direction, which is a DIFFERENT direction for
+/// each of the two things it reads:
+///
+///   * For commands, under-counting is safe: it recognizes a command
+///     only when the line, after an optional `- ` and an optional
+///     `run:`, BEGINS with `cargo `. A comment cannot be mistaken for a
+///     command (comment lines are dropped), and a `cargo` mentioned
+///     inside an `echo` or a prose comment tail cannot either, because
+///     such a line does not begin with it. A miss shows up as a step
+///     reported local-only that is not — loud, and never the reverse.
+///
+///   * For advisory markers, OVER-counting is safe and under-counting is
+///     the bug being fixed: a missed marker leaves a step gating nothing
+///     with the gate still green, which is wolf-std#34 exactly. So a
+///     `continue-on-error:` indented SHALLOWER than the steps — a
+///     job-level marker, which would make every step in that job
+///     advisory — marks every invocation in the file rather than being
+///     skipped. That over-reports across jobs and reds the selftest,
+///     which is the loud direction.
+///
+/// Steps are split on a line whose trimmed form starts with `- name:` or
+/// `- uses:`, so a marker and its command are found together however
+/// they are ordered within the step.
+pub fn invocations(yaml: &str) -> Vec<Invocation> {
+    let lines: Vec<&str> = yaml.lines().collect();
+    let is_step_start =
+        |l: &str| l.trim_start().starts_with("- name:") || l.trim_start().starts_with("- uses:");
+    let indent = |l: &str| l.len() - l.trim_start().len();
+
+    // A `continue-on-error:` above/outside the steps is job-level.
+    let step_indent = lines.iter().find(|l| is_step_start(l)).map(|l| indent(l));
+    let mut job_level: Option<String> = None;
+    for raw in &lines {
+        let line = raw.trim();
         if line.starts_with('#') {
             continue;
         }
-        if let Some(rest) = line.strip_prefix("- ") {
-            line = rest.trim();
+        if let Some(rest) = line.strip_prefix("continue-on-error:") {
+            if step_indent.is_none_or(|si| indent(raw) < si) {
+                job_level = Some(normalize(rest));
+            }
         }
-        if let Some(rest) = line.strip_prefix("run:") {
-            line = rest.trim();
+    }
+
+    // Split into step blocks; everything before the first step start is
+    // the job's own keys and runs no `cargo` of its own here.
+    let mut blocks: Vec<Vec<&str>> = Vec::new();
+    let mut cur: Vec<&str> = Vec::new();
+    for raw in &lines {
+        if is_step_start(raw) && !cur.is_empty() {
+            blocks.push(std::mem::take(&mut cur));
         }
-        if let Some(rest) = line.strip_prefix("cargo ") {
-            out.push(format!("cargo {}", normalize(rest)));
+        cur.push(raw);
+    }
+    blocks.push(cur);
+
+    let mut out = Vec::new();
+    for block in blocks {
+        let mut advisory = job_level.clone();
+        let mut commands = Vec::new();
+        for raw in block {
+            let mut line = raw.trim();
+            if line.starts_with('#') {
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("continue-on-error:") {
+                advisory = Some(normalize(rest));
+                continue;
+            }
+            if let Some(rest) = line.strip_prefix("- ") {
+                line = rest.trim();
+            }
+            if let Some(rest) = line.strip_prefix("run:") {
+                line = rest.trim();
+            }
+            if let Some(rest) = line.strip_prefix("cargo ") {
+                commands.push(format!("cargo {}", normalize(rest)));
+            }
+        }
+        for command in commands {
+            out.push(Invocation {
+                command,
+                advisory: advisory.clone(),
+            });
         }
     }
     out
+}
+
+/// Every `cargo …` invocation the workflow actually runs, whitespace
+/// normalized, in file order — advisory or not.
+pub fn cargo_invocations(yaml: &str) -> Vec<String> {
+    invocations(yaml).into_iter().map(|i| i.command).collect()
+}
+
+/// The invocations that carry a `continue-on-error:` marker, as
+/// `(command, expr)` pairs in file order. These are the steps whose red
+/// does not reach the job on at least one host.
+pub fn advisory_invocations(yaml: &str) -> Vec<(String, String)> {
+    invocations(yaml)
+        .into_iter()
+        .filter_map(|i| i.advisory.map(|a| (i.command, a)))
+        .collect()
 }
 
 fn normalize(s: &str) -> String {
@@ -188,6 +329,21 @@ pub fn report(repo: &Path) -> Result<(), String> {
     }
     for c in &extra {
         println!("ci: WORKFLOW-ONLY — `{c}` runs on the runner and not here");
+    }
+    // sc47 / wolf-std#34 — a step that RUNS is not a step that GATES.
+    // Printed on the author's box beside LOCAL-ONLY because it is the
+    // same fact one level down: `std-test` was in this list, and green,
+    // and red on windows, for four sprints.
+    for (command, expr) in advisory_invocations(&yaml) {
+        let issue = ADVISORY_STEPS
+            .iter()
+            .find(|a| a.command == command && a.expr == expr)
+            .map(|a| a.issue)
+            .unwrap_or("UNBLESSED — selftest will red");
+        println!(
+            "ci: ADVISORY — `{command}` runs with `continue-on-error: {expr}`, \
+             so its RED does not reach the job where that is true ({issue})"
+        );
     }
     Ok(())
 }
@@ -267,6 +423,120 @@ jobs:\n\
     fn a_step_only_the_runner_has_is_drift_too() {
         let extra = "run: cargo xtask doctor\nrun: cargo xtask sync-pin --write\n";
         assert_eq!(workflow_only(extra), vec!["cargo xtask sync-pin --write"]);
+    }
+
+    /// sc47 / wolf-std#34 — the marker is read per STEP, and a step
+    /// that carries it is not coverage.
+    #[test]
+    fn an_advisory_step_is_read_off_its_own_marker() {
+        let yaml = "\
+jobs:\n\
+\x20 rig:\n\
+\x20   steps:\n\
+\x20     - name: required\n\
+\x20       run: cargo xtask doctor\n\
+\x20     - name: advisory\n\
+\x20       continue-on-error: ${{ runner.os == 'Windows' }}\n\
+\x20       run: cargo xtask std-test\n\
+\x20     - name: required again\n\
+\x20       run: cargo xtask ulp\n\
+";
+        assert_eq!(
+            advisory_invocations(yaml),
+            vec![(
+                "cargo xtask std-test".to_string(),
+                "${{ runner.os == 'Windows' }}".to_string()
+            )]
+        );
+        // The advisory step still RUNS, so it is still covered — the two
+        // questions are separate and this reader answers both.
+        assert!(cargo_invocations(yaml).contains(&"cargo xtask std-test".to_string()));
+    }
+
+    /// The marker binds to its own step and does not leak to the next
+    /// one. This is the assertion that would have failed loudest if the
+    /// parse had stayed line-at-a-time.
+    #[test]
+    fn the_marker_does_not_leak_past_its_step() {
+        let yaml = "\
+\x20     - name: advisory\n\
+\x20       continue-on-error: true\n\
+\x20       run: cargo xtask std-test\n\
+\x20     - name: next\n\
+\x20       run: cargo xtask ulp\n\
+";
+        let adv = advisory_invocations(yaml);
+        assert_eq!(adv.len(), 1, "{adv:?}");
+        assert_eq!(adv[0].0, "cargo xtask std-test");
+    }
+
+    /// Order within a step does not matter: YAML keys are a mapping, and
+    /// `run:` above `continue-on-error:` is the same step.
+    #[test]
+    fn the_marker_is_found_below_its_own_run() {
+        let yaml = "\
+\x20     - name: advisory\n\
+\x20       run: cargo xtask std-test\n\
+\x20       continue-on-error: true\n\
+";
+        assert_eq!(
+            advisory_invocations(yaml),
+            vec![("cargo xtask std-test".to_string(), "true".to_string())]
+        );
+    }
+
+    /// A JOB-level marker makes every step of that job advisory. The
+    /// dumb reader cannot scope it to one job, so it marks the whole
+    /// file — over-reporting, which reds the selftest. Under-reporting
+    /// would leave a step gating nothing with the gate green, which is
+    /// wolf-std#34 itself.
+    #[test]
+    fn a_job_level_marker_over_reports_rather_than_missing() {
+        let yaml = "\
+jobs:\n\
+\x20 nightly:\n\
+\x20   continue-on-error: true\n\
+\x20   steps:\n\
+\x20     - name: one\n\
+\x20       run: cargo xtask doctor\n\
+\x20     - name: two\n\
+\x20       run: cargo xtask ulp\n\
+";
+        let adv = advisory_invocations(yaml);
+        assert_eq!(
+            adv.len(),
+            2,
+            "a job-level marker covers every step: {adv:?}"
+        );
+        assert!(adv.iter().all(|(_, e)| e == "true"));
+    }
+
+    /// Prose about `continue-on-error` is not a marker. `ci.yml` carries
+    /// four such comment lines from sc41, sc42 and sc45, and every one of
+    /// them would be a false advisory reading if comments were not
+    /// dropped first.
+    #[test]
+    fn prose_about_the_marker_is_not_the_marker() {
+        let yaml = "\
+\x20     - name: fmt-lu\n\
+\x20       # A `continue-on-error` on it would reproduce exactly the\n\
+\x20       # thing being fixed. continue-on-error: true\n\
+\x20       run: cargo xtask fmt-lu\n\
+";
+        assert!(advisory_invocations(yaml).is_empty());
+        assert_eq!(cargo_invocations(yaml), vec!["cargo xtask fmt-lu"]);
+    }
+
+    /// The file this repository actually ships: exactly one advisory
+    /// step, and it is the blessed one. `selftest.rs` gates the real
+    /// file; this pins the shape the reader expects to find in it.
+    #[test]
+    fn the_blessed_list_is_well_formed() {
+        assert!(ADVISORY_STEPS
+            .iter()
+            .all(|a| a.command.starts_with("cargo ")
+                && !a.expr.is_empty()
+                && a.issue.contains('#')));
     }
 
     #[test]
