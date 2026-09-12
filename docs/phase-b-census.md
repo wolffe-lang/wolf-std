@@ -1525,3 +1525,102 @@ not by this repository: wolf-lang#308 bounded the checked tier's
 allocation, the three `cavp_*_long.lu` rows fell from 16–18 GiB to
 30–40 MiB, and `std-test` runs on all three tier-1 hosts again. Eleven of
 eleven, on three hosts, for the first time in the repository's life.
+
+## sc46 — the smallest bump in five sprints, and the only surface item this repository still owed
+
+The counting rules are sc40's, unchanged and reproducible from the tree
+at `sc46`.
+
+**Predicted before measuring.** `c9237c1..a7f517e` is seventeen commits
+and two sprints — the shortest span this repository has crossed since
+sc41 — and the release's own name for it is THE PAPERCUTS. So the
+prediction was a near-zero census with exactly one real surface entry:
+`trait Num`, the last item of s155's surface std owed, plus the
+`impl Rem for f64` that makes it satisfiable at `f64`. One new trait, one
+new impl, one new test, and the doc-example count moving for a reason
+that is not new code.
+
+| measure | sc44 | sc46 |
+|---|---|---|
+| modules under `std/` (directories, `std/x/` as one) | 34 | **34** (+0) |
+| `pub fn` in `std/`, nursery included | 600 | **600** (+0) |
+| `pub trait` in `std/` | 8 | **9** (+1, `Num`) |
+| `impl` blocks in `std/` | 25 | **26** (+1, `Rem for f64`) |
+| entry tests | 401 | **402** (+1) |
+| ledger rows | 401 | **402** (+1) |
+| fenced doc examples, extracted and RUN | 423 | **435** (+12) |
+| existing ledger rows moved by the pin bump | 15 | **15** |
+| std function bodies rewritten by the bump | 1 | **0** |
+| TEST bodies rewritten by the bump | 5 | **1** |
+| committed `.lu` files re-laid by the formatter | 32 | **35** |
+
+**`trait Num` is one row in the `pub trait` column and it is the whole
+first item of the sprint**, which is the census saying what sc44's
+version of this section already said from the other side: "a census that
+counted only what shipped would call this sprint's operator work
+complete; it is one item short and the item is named". The item is no
+longer short. Both triggers sc44 wrote down were met and both were
+MEASURED rather than read off a release note — lupin 0.1.34 pins
+`c9237c1` and parses the alias (wolf-interp#92), and wolf-lang#327 went
+the LOWERING way so `self % other` at `f64` is served on all three lanes.
+
+**The +12 doc examples are the census's own correction of a claim it made
+two sprints ago.** sc44's section said four blocks went to prose and
+"return when their issues close". Six of them come back here (`std.map`'s
+five `[K: Eq]` functions and `std.cmp`'s `Eq for f64` caveat, on
+wolf-interp#96), and six are NEW — `std.ops`, which had never carried a
+fenced example at all because a qualified trait in a BOUND did not count
+as a use of its import on the reference machine (wolf-interp#97). Both
+closed in is46, and 423 -> 435 is what F-0118's itemized cost looks like
+being paid back. The remaining two of sc44's four (`total_cmp`'s `==`
+lines, `as_float`'s `from_int`) are still prose: wolf-lang#336 and #337
+both landed, and re-fencing them is the next lane's measurement rather
+than a claim made here.
+
+**Fifteen rows moved again, the same number as sc44 over a span one
+fifth the size**, and they sort into four causes, all of which were
+classified in `vendor/tools.toml` before the gauntlet ran:
+
+- **wolf-lang#336** (the operator trait is the one REACHABLE) — two
+  `cmp/*` rows leave `fail(E0301)` on the wolfc column. They land on
+  `unsupported` on native, which is not a regression: the file
+  type-checks for the first time and the native rung then declines
+  std.cmp's product pattern, exactly as every other importer does.
+- **wolf-lang#327** (`%` on a float lowers) — two `fmt/decimal/*` rows to
+  `run` on wolfc.
+- **wolf-lang#337** (the checked tier's casts convert) — two `json/*`
+  rows to `run` on wolfc, which is the other half of the pair sc44 had
+  to route through `stringify`.
+- **wolf-interp#96** (dispatch through an IMPORTED module's trait) —
+  nine rows to `run` on lupin, across `map/`, `ops/`, `testing/` and
+  `x/list_eq/`.
+
+**And two rows moved because of this sprint rather than the bump**, which
+is the row this census owes the reader as a cost and not as an
+achievement: `ops/dispatch_tier` and `ops/div_zero_trap` drop `run` ->
+`unsupported` on NATIVE, because the `Num` alias needs `use std.cmp` and
+every importer of std.cmp pays `unsupported — an enum or row test inside
+a product pattern (deep trees, c06)` for `impl Eq for Ordering`'s
+`match (self, other)`. Shipping the clause's surface cost the operator
+bridge's two oldest witnesses one rung each. It is an honest refusal on a
+capability chapter 6 has not reached, not a defect, and it is the price
+of shipping `[type.trait.op.alias]`'s surface rather than a subset of it.
+
+**The one TEST body rewritten by the bump is F-0125**, and it is the
+census's favourite kind of row: `tests/cmp/total_cmp_relational.lu`
+carried `0.0 - inf` since sc01 and answers W0402 — `0.0 - x` is not
+negation — in the one file in this repository whose entire subject is
+signed-zero ordering. No compiler had ever been able to type the file, so
+no compiler had ever linted it. A module nobody could type is a module
+nobody read (F-0119); a file nobody could type is a file nobody linted.
+
+**The row that is not a count.** Thirty-five committed `.lu` files were
+re-laid by the formatter, against the **33** that wolf-lang#339's closing
+comment and the v0.2.12 CHANGELOG both predict for this exact tree.
+Upstream measured on a branch build (trunk `be348b9` plus the fix); this
+repository measured with the released binary at its own pin, twice, by
+two different walks, and got 35 both times. Neither of the two formatter
+commits in the span accounts for the difference — #340 moves no file
+here, verified at all five `else (` sites. F-0124. Zero behaviour motion
+either way: 402 rows, 435 doc blocks and 200 ULP references all
+reproduce.
