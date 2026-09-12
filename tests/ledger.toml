@@ -567,8 +567,8 @@ native = "unsupported"
 
 [tests."cmp/total_cmp_relational.lu"]
 lupin = "run"
-wolfc = "fail(E0301)"  # sc44: `==` on `Ordering` needs a BARE `Eq` in scope (wolf-lang#336)
-native = "fail(E0301)"  # sc44: `==` on `Ordering` needs a BARE `Eq` in scope (wolf-lang#336)
+wolfc = "run"  # sc46 pin bump (a7f517e): wolf-lang#336 — the operator trait is the one REACHABLE, so `==` on an imported `Ordering` dispatches
+native = "unsupported"  # sc46: #336 lets it type-check, and the native rung then declines std.cmp's product pattern (deep trees, c06)
 
 # sc44: the four impls this sprint added — `Eq for char`, `Ord for char`,
 # `Ord for str` (F-0006 retires) and `Eq for f64` (sc01's decision
@@ -594,8 +594,8 @@ native = "unsupported"
 
 [tests."cmp/ordering_methods_static.lu"]
 lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
-wolfc = "fail(E0301)"  # sc44: `==` on `Ordering` needs a BARE `Eq` in scope (wolf-lang#336)
-native = "fail(E0301)"  # sc44: `==` on `Ordering` needs a BARE `Eq` in scope (wolf-lang#336)
+wolfc = "run"  # sc46 pin bump (a7f517e): wolf-lang#336 — the operator trait is the one REACHABLE, so `==` on an imported `Ordering` dispatches
+native = "unsupported"  # sc46: #336 lets it type-check, and the native rung then declines std.cmp's product pattern (deep trees, c06)
 
 [tests."cmp/clamp_bad_range_trap.lu"]
 lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
@@ -625,12 +625,12 @@ wolfc = "run"
 native = "unsupported"
 
 [tests."testing/assert_eq_trap.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # 1b149ba: primitive-receiver Eq dispatch executes on the checked tier (F-0082 half-moves; native unmoved)
 native = "unsupported"
 
 [tests."testing/assert_ne_trap.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # 1b149ba: primitive-receiver Eq dispatch executes on the checked tier (F-0082 half-moves; native unmoved)
 native = "unsupported"
 
@@ -819,17 +819,17 @@ wolfc = "run"  # sc44 pin bump (c9237c1)
 native = "unsupported"
 
 [tests."map/get_hit_miss.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # sc44 pin bump (c9237c1): the `[K: Eq]` five dispatch
 native = "unsupported"
 
 [tests."map/has_and_get_or.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # sc44 pin bump (c9237c1)
 native = "unsupported"
 
 [tests."map/remove_and_tally.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # sc44 pin bump (c9237c1)
 native = "unsupported"
 
@@ -875,12 +875,12 @@ wolfc = "run"
 native = "run"  # sc08 pin bump (13b811f)
 
 [tests."x/list_eq/contains_and_index_of.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # 1b149ba: primitive-receiver Eq dispatch executes on the checked tier (F-0082 half-moves; native unmoved)
 native = "unsupported"
 
 [tests."x/list_eq/dedup_and_affixes.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "unsupported"
 native = "unsupported"
 
@@ -1185,14 +1185,14 @@ wolfc = "run"
 native = "unsupported"  # the std.cmp product-pattern decline every importer pays
 
 [tests."ops/dispatch_tier.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"
-native = "run"
+native = "unsupported"  # sc46: std.ops imports std.cmp for the `Num` alias, and every importer of std.cmp pays the product-pattern decline (deep trees, c06)
 
 [tests."ops/div_zero_trap.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"
-native = "run"
+native = "unsupported"  # sc46: std.ops imports std.cmp for the `Num` alias, and every importer of std.cmp pays the product-pattern decline (deep trees, c06)
 
 # ---- sc04: std.search ----
 
@@ -1323,12 +1323,12 @@ native = "run"  # sc24 binary bump (wolf @ a900b8c): the f64 decimal tier lowers
 
 [tests."fmt/decimal/shortest_round_trip.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc46 pin bump (a7f517e): wolf-lang#327 — `%` on a float is `fmod` and it LOWERS ([type.float.rem])
 native = "run"  # sc24 binary bump (wolf @ a900b8c): the f64 decimal tier lowers natively — the sc22 drift list's native side, now release-backed
 
 [tests."fmt/decimal/parse_float_shapes.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc46 pin bump (a7f517e): wolf-lang#327 — `%` on a float is `fmod` and it LOWERS ([type.float.rem])
 native = "run"  # sc24 binary bump (wolf @ a900b8c): the f64 decimal tier lowers natively — the sc22 drift list's native side, now release-backed
 
 [tests."hex/round_trip.lu"]
@@ -1367,7 +1367,7 @@ native = "run"  # sc08 pin bump (13b811f)
 
 [tests."json/values_and_accessors.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc46 pin bump (a7f517e): wolf-lang#337 — the checked tier's casts CONVERT
 native = "unsupported"
 
 [tests."json/stringify_shapes.lu"]
@@ -2091,7 +2091,7 @@ native = "run"
 # lane each.
 [tests."json/parse_shapes.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc46 pin bump (a7f517e): wolf-lang#337 — the checked tier's casts CONVERT
 native = "unsupported"
 
 [tests."json/parse_misses.lu"]

@@ -11,15 +11,22 @@
 //!
 //! `total` is the book's chapter-5 shape and the reason the module
 //! exists. It is written here with the bound spelled `ops.Add` rather
-//! than through an alias: `trait Num = …` does not parse under lupin
-//! 0.1.33 and lives in `std.x.ops_num` until it does.
+//! than through the alias ON PURPOSE, and at sc46 that stopped being a
+//! workaround and became the CONTROL: `std.ops` ships `trait Num` now,
+//! `tests/ops/num_alias_tier.lu` is the same shape through it, and the
+//! only difference between the two files on the reference machine is
+//! the alias — this one runs, that one is `E0501` at resolve
+//! (wolf-interp#102). A witness that shows one machine refusing is
+//! worth more beside the byte-identical program it accepts.
 //!
-//! `ops.Add.add(…)` is called once on purpose. Without it lupin answers
-//! `E0305: the import `ops` is never used` — a qualified trait in a
-//! BOUND is not counted as a use there (measured at sc44, filed at
-//! wolf-interp) — and `fail(E0305)` is not a word the lupin column of
-//! the ledger has. With it the row is the honest `unsupported`: lupin
-//! executes no imported module's trait items.
+//! `ops.Add.add(…)` is called once, and the reason it was added has
+//! gone: at sc44 a qualified trait in a BOUND did not count as a use of
+//! its import on lupin (`E0305`, wolf-interp#97) and the call was what
+//! kept the import used. #97 closed in is46; the call stays because it
+//! asserts the trait method directly, which is the other half of what
+//! this file is for. The lupin column moved `unsupported` -> `run` at
+//! the same release for the neighbouring reason, wolf-interp#96: an
+//! imported module's trait items execute there now.
 //!
 //! Literals stay in typed bindings: a bare literal argument defaults to
 //! `i32`, which does not meet an `impl … for int` (E0502) — the same
