@@ -1,5 +1,144 @@
 # Changelog
 
+## sc46 — 2026-09-12 — the alias lands: `trait Num`, the word the ledger did not have, and a mirror that parses the form without expanding the bound
+
+Pins move to **`wolf 0.2.12`** (`a7f517e`) and **`lupin 0.1.34`**
+(conformance pin `c9237c1` — the v0.2.11 tag), both from the release
+archives BY DIGEST, never a source build, the whole archive pair, and
+`--version`-verified at every use. The gap narrows for the first time in
+four bumps and both halves sit on TAGS: seventeen commits, two sprints
+(s154, s156), the compiler ahead. sc44's was 91 commits and six sprints.
+
+Registry `c9237c1 -> a7f517e` predicted **471 -> 475, +4, dropped 0,
+moved 0**, with the four keys named in advance — `gram.fmt.break`,
+`gram.fmt.paren`, `mem.region.edge.elem`, `type.float.rem`. Measured,
+key sets diffed both ways: exactly that. The prediction held because
+sc43's rule was followed and the KEYS were counted rather than the
+subjects: the three clause names the bump's own summary leads with
+(`gram.inv.ctx`, `gram.item.let`, `type.interp.union`) are all already
+registered and publish nothing. The conformance clause is
+byte-identical, so `REGISTERED_NS` does not move. Corpus 578 -> 580.
+
+### `trait Num` ships, and so does `impl Rem for f64` (wolf-std#26)
+
+The two items sc44 withheld, on the triggers sc44 itself wrote down, and
+both triggers were MEASURED before a line was written rather than read
+off a release note.
+
+`[type.trait.op.alias]`'s form needed "the wolf-interp release whose
+conformance pin is at or past wolf-lang `c9237c1`". lupin 0.1.34 pins
+exactly `c9237c1` and parses the alias (wolf-interp#92), so
+`pub trait Num = Add + Sub + Mul + Div + Rem + cmp.Eq + cmp.Ord` goes in
+verbatim from the clause. `Eq` and `Ord` stay std.cmp's and are
+qualified, because wolf binds whole modules and has no item imports: the
+bound a caller writes is `[T: ops.Num]` and there is no other spelling.
+
+`impl Rem for f64` needed wolf-lang#327, and #327 went the LOWERING way
+— s156's `[type.float.rem]`: `fmod`, truncated remainder, sign of the
+dividend, `x % 0.0` NaN, nothing traps, `Opcode::Frem` on both backends.
+`7.5 % 2.0` is `1.5` on lupin, on the checked tier and on the native
+rung, measured one lane at a time. So `Num` is satisfiable at `f64` on
+the day it lands rather than a release later.
+
+**The cost, stated as a cost.** The alias needs `use std.cmp`, and every
+importer of std.cmp pays the native rung `unsupported — an enum or row
+test inside a product pattern (deep trees, c06)`. So
+`tests/ops/dispatch_tier.lu` and `tests/ops/div_zero_trap.lu` drop `run`
+-> `unsupported` on native. An honest refusal on one rung, the same one
+every `cmp/*` and `map/*` row already carries, and the price of shipping
+the clause's surface rather than a subset of it.
+
+### `mirror-lag(E…)` — the word the ledger did not have (wolf-std#27, F-0121 CLOSED)
+
+`tests/ledger.toml`'s lupin column was
+`run | unsupported | slow | divergent(…)` and `ledger.rs` refused
+`fail(…)` there BY NAME, so a test whose lupin verdict is `fail(E…)` had
+no legal spelling at all and was a red no ledger edit could green.
+`divergent(…)` was built at sc24 for the OPPOSITE direction and its
+vocabulary describes what lupin DOES, never what it refuses.
+
+The word is lupin-only and carries the CODE on purpose: the row says
+which grammar the mirror is short of, so it reds when the code CHANGES
+and not only when the lag ends. The runner invokes the lane, demands
+exactly `fail(<code>)`, prints a mirror-lag ledger naming every such row,
+and reds on anything else — a HEAL included — so it retires ITSELF at the
+mirror release. Depth is FAIL-depth, not run-depth, so the day a
+mirror-lag row starts running the red reads "deeper than the ledger
+claims". Selftests both directions, which is rule 2 of the issue.
+`fail(…)` is still not a lupin word, deliberately.
+
+### And the word found a carrier the sprint set out expecting not to need (F-0123, wolf-interp#102)
+
+is46 mirrors s155, so the alias form parses under lupin 0.1.34. It
+parses, and a bound written against it RUNS — when the alias is declared
+in the ENTRY FILE. Reached through an import it expands no bound at all:
+
+    fn twice[T: tiny.Num](a: T) -> T { a + a }   lupin  fail(E0501)
+    fn twice[T: tiny.Add](a: T) -> T { a + a }   lupin  exit(0), "42"
+
+Same import, same file, same program, one token apart; both compiler
+rungs run both, at `int` and at `f64`. Two files, twenty lines, filed as
+wolf-interp#102. wolf has no item imports, so `ops.Num` is the only
+spelling any caller has — an alias that works only when the caller
+re-declares it locally is an alias no library can publish, and
+`[type.trait.op.alias]`'s own worked example is std.ops + std.cmp.
+
+`tests/ops/num_alias_tier.lu` is the ledger's first `mirror-lag(E0501)`
+row, with `tests/ops/dispatch_tier.lu` beside it as the control.
+
+### The fmt pass: thirty-five files, not the thirty-three predicted (F-0124)
+
+wolf-lang#339's closing comment and the v0.2.12 CHANGELOG both say
+"wolf-std `7582e7a` 33 files", measured against trunk `be348b9` plus the
+fix branch. Measured here with the RELEASE binary over the same tree:
+**35**, by the directory walk and by the explicit 452-path file list,
+the two sets equal. Twenty carry #339's orphaned receiver-dot removal,
+four carry #303's braced-if chain, the rest are argument-list,
+type-application and error-set re-lays. Neither formatter commit in the
+span accounts for the extra two — #340 moves no file here, verified at
+all five `else (` sites. Re-laid in three commits, one per directory,
+committed as the tool lays them.
+
+**Zero behaviour motion.** Thirty-two of the thirty-five have ledger
+rows this sprint never touched and every one reproduces its recorded
+word; the other three were measured at their new words BEFORE the re-lay.
+402 rows, 435 doc blocks, 200 ULP references, all three lanes exact.
+`fmt-lu` is green over all 453 committed `.lu` files and `wolf fmt` is
+idempotent over the tree in one pass; the exception class
+(`//! fmt: relaid`) stays empty for the second sprint running.
+
+### Twelve doc examples come back, and six of them had never existed
+
+F-0118 itemized the cost of the imported-trait refusals in std's own
+headers. is46 closed both (wolf-interp#96 and #97), so std.map's five
+`[K: Eq]` examples and std.cmp's `Eq for f64` caveat return to fences,
+and std.ops gets six — the first fenced examples that module has ever
+carried. 423 -> 435 blocks, GREEN.
+
+### Fifteen rows moved, measured before the ledger was touched
+
+The gauntlet ran at the new pins over the UNTOUCHED ledger (sc37's order
+rule) and was red on exactly fifteen rows: two on wolf-lang#336, two on
+#327, two on #337, nine on wolf-interp#96. The first clean reading of
+`tests/cmp/total_cmp_relational.lu` — a file no compiler had ever been
+able to type — answered W0402 on `0.0 - inf`, in the one file in this
+repository whose subject is signed-zero ordering. F-0125: a file nobody
+could type is a file nobody linted.
+
+### wolf-std#20: the directive can say "either" now
+
+`net/reuse_port`'s header claimed its stdout was "the same on every host
+BY CONSTRUCTION" and printed `served: {served}` as its first field, so a
+host that refused `SO_REUSEPORT` BY NAME — the lawful answer
+`[os.net.listen.opts]` describes — printed `served: false` and failed a
+byte-exact directive that says `true`. That is the `c11ba3ce…` hash the
+windows runner reported three times at sc42. `served` is a GATE now, not
+an assertion: the four relations are measured on a serving host and
+vacuous on a refusing one and the stdout is identical either way. The
+witness asserts the capability's relations, not the host's posture — the
+decision the issue routed here, and it does not depend on two lucky
+runners.
+
 ## sc45 — 2026-09-11 — the fixed points: D34 gets a mechanism, and the 32 files it had never been enforced on
 
 No pin change. `wolf 0.2.11` (`c9237c1`) and `lupin 0.1.33`
