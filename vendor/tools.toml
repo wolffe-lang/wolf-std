@@ -563,6 +563,53 @@
 # (F-0064): `wolf 0.2.9`'s second line reads "paired with lupin 0.1.29
 # ..., pin e9a17cb", because `9af606c` recorded the pairing before is42
 # cut 0.1.30. Doctor prints it and does not gate it.
+# sc46 BUMP: 0.1.33 -> 0.1.34, pin 662b14c (v0.2.10) -> c9237c1 (v0.2.11).
+# ONE release, chased on schedule: is46 cut 0.1.34 at wolf-interp
+# `b83049a`, pin `c9237c1` — a TAG again, and the tag the compiler
+# released FROM last sprint. Acquired by DIGEST from the release, the
+# whole archive pair, and verified from `--version` rather than from the
+# brief: `lupin 0.1.34 (wolf-interp, reference interpreter at pin
+# c9237c1)`. Archive `lupin-0.1.34-aarch64-apple-darwin.tar.gz`,
+# sha256 `51d05b703fce5e13cbfd10a292b48f0e34208c5712a871c42ca017546eb48e19`.
+#
+# **THE SPRINT IS WHAT THIS BUMP BUYS, AND FOR ONCE IT IS ONE THING.**
+# is46 mirrors s155 (wolf-interp#92): `[type.trait.op]` and — the half
+# this repository has been waiting two sprints for — `[type.trait.op.alias]`,
+# the form `trait Num = Add + Sub + …`, which "parses as a memberless
+# TraitDef carrying its bound". At 0.1.33 that form was `E0201: expected
+# `{`, found `=` [gram.item.trait]`, a FILE failing to parse rather than a
+# row's verdict, and it is the entire reason sc44 withheld `Num` and wrote
+# its trigger into `std/ops/ops.lu`. **The trigger that header names — "the
+# wolf-interp release whose conformance pin is at or past wolf-lang
+# `c9237c1` (v0.2.11)" — is THIS release, met exactly: the pin IS
+# `c9237c1`.** Measured before a line was written, not assumed.
+#
+# The gap NARROWS for the first time in four bumps and both halves are at
+# TAGS: wolf 0.2.12 conforms to `a7f517e`, lupin 0.1.34 to `c9237c1` =
+# v0.2.11. One release wide (s154 + s156), the compiler ahead, where sc44's
+# was 91 commits and six sprints. The data pin follows the COMPILER (see
+# `[wolf]`), so this key is again the only one of the four not naming
+# `a7f517e`.
+#
+# What else the release buys this repository, each classified before it was
+# measured:
+#   is46 / #91   the map mirror — `Map` keys and `m[k]`'s absent row on the
+#     reference machine. std.map's five `[K: Eq]` functions were prose
+#     examples at sc44 for the compiler's half of F-0118; this is the
+#     mirror's half arriving.
+#   is46 / #88   `[mem.region.edge.elem]`'s `region-fault` trap, E1010's
+#     paired kind. No std body allocates across a region edge; predicted to
+#     cost this tree nothing.
+#   is46 / #98   a dyn temporary is refused (E0810); #94's E0408 and #95's
+#     E0301 at an unresolved bound name. Three refusals this tree writes
+#     nowhere.
+#
+# **AND THE PAIRING LINE IS TRUE, WHICH IS WORTH THE SENTENCE** (F-0064,
+# and the second time in eight bumps): `wolf 0.2.12`'s second line reads
+# "paired with lupin 0.1.34 (reference interpreter), pin c9237c1", and that
+# IS this box's binary at this box's pin — r17 stamped the pairing at
+# `9847426` INSIDE the release that carries it. Doctor prints it and still
+# does not gate it; a line that happens to be true is not a gate.
 # sc44 BUMP: 0.1.31 -> 0.1.33, pin 4c60946 (v0.2.9) -> 662b14c (v0.2.10).
 # TWO releases in one chase for the second time in this ledger's life
 # (sc35's was the first): is44 cut 0.1.32 at wolf-interp `c3dd607`, pin
@@ -695,7 +742,7 @@
 # and that IS this box's binary at this box's pin — `7511f7e` recorded
 # the pairing inside the release that carries it. Doctor prints it and
 # still does not gate it; a line that happens to be true is not a gate.
-version = "0.1.33"
+version = "0.1.34"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -708,7 +755,12 @@ version = "0.1.33"
 # pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"  (superseded, sc40/sc41 era — is40's v0.2.8-tag pin, the one sprint the gap was zero)
 # pin = "2c03ed9360e90e260528411075daded674ceab18"  (superseded, sc42 era — is42's 0.1.30 at wolf-lang s144 dev-stamped, the pin that held `str + char` back one sprint)
 # pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"  (superseded, sc43 era — is43's 0.1.31 at wolf-lang v0.2.9)
-pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"
+# pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"  (superseded, sc44/sc45 era — is45's 0.1.33 at wolf-lang v0.2.10)
+pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"
+# (sc46: 0.1.34 crosses to v0.2.11 and lands ON a tag for the second
+#  bump running. The gap to the data pin below NARROWS to one release
+#  — s154 and s156 — from sc44's 91 commits, and both halves are at
+#  tags for the first time. The sc44 note kept for its history:)
 # (sc44: two releases in one chase, 0.1.31 -> 0.1.33, and the pin lands
 #  on the tag this repository's DATA pin carried through sc43. The gap to
 #  the data pin below opens to 91 commits with the compiler ahead — six
@@ -867,7 +919,87 @@ pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.11"
+version = "0.2.12"
+# sc46 BUMP: c9237c1 (v0.2.11) -> a7f517e (v0.2.12), 17 commits, TWO
+# sprints (s154, s156) plus the pairing, the CHANGELOG and the release
+# commit. The data pin was AT c9237c1, so for the fifth bump running the
+# DATA delta and the BINARY delta are the same span: c9237c1..a7f517e.
+# Acquired by digest from the release, the whole archive pair into
+# `.wolf-bin/` (never a source build on this box), verified from
+# `--version`: `wolf 0.2.12 (wolfgang, pin a7f517e)`. Archive
+# `wolf-0.2.12-aarch64-apple-darwin.tar.gz`, sha256
+# `6be493a91347b031b0d920786c43e3d263eadda22049aa46210af9e23e40ecc5`.
+#
+# THE PAPERCUTS, and the shortest span this repository has crossed since
+# sc41. Twenty filed defects, nineteen moved, and the release's own
+# sentence for all of them is "the compiler was right about the program
+# and wrong about the reader". Nine deltas reach this tree; they are
+# classified here BEFORE anything was measured, with the four that ARE
+# the sprint named first.
+#
+#   1. s156 / #334  **A TRAIT ALIAS'S RIGHT-HAND SIDE MARKS ITS IMPORTS
+#      USED.** `resolve_item` walked a trait's members and never an
+#      alias's bound, so `trait Num = ops.Add + … + cmp.Ord` was E0305
+#      on BOTH imports with a fix-it that deleted the names three lines
+#      below. This is one of the two halves F-0118 itemized as the cost
+#      of the alias, and it is the compiler's half.
+#   2. s156 / #327  **`%` ON A FLOAT IS `fmod`, AND IT LOWERS** —
+#      `[type.float.rem]`, a NEW anchor. Ruled before it could be
+#      lowered: truncated-division remainder, sign of the dividend,
+#      `x % 0.0` is NaN, nothing traps; `Opcode::Frem` through the whole
+#      set, LLVM emits `frem` and cranelift calls the routine. This is
+#      the trigger `std/ops/ops.lu` names for `impl Rem for f64` — the
+#      body the clause demands (`self % other`) was refused by BOTH
+#      compiler tiers at 0.2.11 ("no frem op" natively, "unruled: fmod
+#      vs remainder" checked), so the impl was withheld and with it
+#      `Num` at `f64`. PREDICTED COST: the withheld impl lands and the
+#      alias is satisfiable at `f64` for the first time.
+#   3. s156 / #336  **AN OPERATOR'S TRAIT IS THE ONE REACHABLE, NOT THE
+#      ONE BARE.** `[type.trait.op]` resolved the operator trait by BARE
+#      name and wolf binds whole modules, so `==` on `std.cmp.Ordering`
+#      was E0301 from every importer — F-0118's loudest quarter, filed
+#      as wolf-lang#334/#336, and this is the one that says every user
+#      type any library publishes had the same hole. Three places are
+#      consulted now: the name in scope, the operand type's own module
+#      (no import needed), then this file's imports.
+#   4. s154 / #331  **A `let` BINDING'S FIELDS ARE AS IMMUTABLE AS THE
+#      BINDING** — `[gram.item.let]`, E0410 at the field write. `let r =
+#      Row{…}; r.cents = 5` RAN to exit 0 on both machines at 0.2.11.
+#      The two machines agreed, so the differential could not see it,
+#      which means this tree's own ledger could not either. **PREDICTED
+#      COST: the only delta in the span that can turn a green row red
+#      here.** Grepped before measuring: a field write on a `let`-bound
+#      struct anywhere under `std/` or `tests/`.
+#
+# The five that are predicted to cost nothing, each with its reason:
+#   s154 / #297   a row is E0409 on EITHER side of an operator. sc43
+#     argued the tree writes no bare-row operand; #326's twin below is
+#     the one that could reach it.
+#   s154 / #326   a `!T` tail in a unit context is W0601, not E0401 —
+#     `[type.unit.discard]` widened from `!()` to the row. sc43 fixed
+#     every `!()`-in-unit-context tail in this tree with `?` or `else`
+#     when W0601 first arrived; a WIDENING can only reach a tail this
+#     rig already denies, and the rig denies warnings on every lane.
+#   s156 / #337   the checked tier's casts CONVERT. sc44 routed two
+#     `tests/json` assertions through `stringify` at `0db528c` because
+#     `(n as f64) == 4.0` was false there; the reason is gone, and the
+#     workaround is left standing on purpose — it asserts through a
+#     public surface and is not wrong, only no longer forced.
+#   s156 / #333   a store through a container index LENDS
+#     (`[mem.region.edge.elem]`, a NEW anchor). `fn set_g[K, V](mut m:
+#     Map[K, V], …) { m[k] = v }` was E1004; std.map's `set` takes a
+#     concrete `Map[K, V]` through the same shape and sc44 already
+#     added the `copy` that made it compile.
+#   s156 / #323   `{m[k]:>5}` is E0413 (`[type.interp.union]`), a typing
+#     refusal where 0.2.11 answered `unsupported` at run. No format
+#     spec in this tree sits on a `!T` hole; grepped.
+#   s154+s156 / #303, #314, #339, #340  the FORMATTER, four clauses
+#     (`[gram.fmt.if]`, `[gram.fmt.break]` and `[gram.fmt.paren]`, the
+#     last two NEW anchors). This is the one delta that is certain to
+#     move committed bytes and it moves no behaviour: BACKLOG B3, item 3
+#     of this sprint, with the ledger's rows, the doc-example count and
+#     the ULP table measured on both sides of the re-lay.
+#
 # sc44 BUMP: 662b14c (v0.2.10) -> c9237c1 (v0.2.11), 91 commits, SIX
 # sprints (s149, s150, s151, s152, s153, s155) plus the pairing, the
 # CHANGELOG and the release commit. The data pin was AT 662b14c, so for
@@ -2289,4 +2421,5 @@ version = "0.2.11"
 # pin = "5c729e8779a83611a66f47a63a5276b158ecdec1"  (superseded, sc40/sc41 era — r10's v0.2.8-tag pin, the one sprint all four pins named one sha)
 # pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"  (superseded, sc42 era — r14's v0.2.9-tag pin)
 # pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"  (superseded, sc43 era — r15's v0.2.10-tag pin, the one lupin 0.1.33 now conforms to)
-pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"
+# pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"  (superseded, sc44/sc45 era — r16's v0.2.11-tag pin, the one lupin 0.1.34 now conforms to)
+pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"
