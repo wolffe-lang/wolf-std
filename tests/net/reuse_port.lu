@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="served: true | second_bind: true | some_member: true | survivor: true | double_bind_exists: true")
+//! check: run(exit=0, stdout="second_bind: true | some_member: true | survivor: true | double_bind_exists: true")
 //! phase: run
 //! conforms: std.net, err.row, err.propagate, os.net.listen.opts
 //!
@@ -24,6 +24,21 @@
 //! must refuse BY NAME — windows, per the clause — and the four
 //! relations then hold vacuously. A serving host that fails a relation
 //! is the failure this witness exists to catch.
+//!
+//! **AND UNTIL sc46 THAT SENTENCE WAS FALSE, which is the whole of
+//! wolf-std#20's surviving red.** The line printed `served: {served}`
+//! as its first field, so a host that refused the option BY NAME —
+//! exactly the lawful answer the paragraph above describes — printed
+//! `served: false` and failed a byte-exact `stdout=` that says `true`.
+//! That is the hash `c11ba3ce…` the windows runner reported three times
+//! at sc42, and it is why the issue's own disposition says a byte-exact
+//! directive "cannot say either". It can, once it stops asserting the
+//! HOST'S POSTURE alongside the capability's relations. `served` is a
+//! GATE now and not an assertion: the four relations are measured on a
+//! serving host and vacuous on a refusing one, the stdout is identical
+//! either way, and `[os.net.listen.opts]` keeps the posture where the
+//! clause puts it — the host's. A row that asserted the posture would
+//! red on a kernel without `SO_REUSEPORT` and call it a std defect.
 //!
 //! **`double_bind_exists` is the row half.** Two binds on one address
 //! WITHOUT the option on both sides is `exists` — the "already in use"
@@ -118,7 +133,7 @@ fn main() -> !int {
         net.close_listener(take d)?
     }
     print(
-        "served: {served} | second_bind: {second_bind} | some_member: {some_member} | survivor: {survivor} | double_bind_exists: {double_bind_exists}",
+        "second_bind: {second_bind} | some_member: {some_member} | survivor: {survivor} | double_bind_exists: {double_bind_exists}",
     )
     if !second_bind { return 1 }
     if !some_member { return 2 }
