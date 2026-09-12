@@ -186,6 +186,38 @@ impl Eq for str {
     }
 }
 
+// sc47 / wolf-std#31 — THE NATIVE RUNG'S REFUSAL HERE IS THIS MODULE'S
+// COST, NOT ITS IMPORTERS'.
+//
+// This `match (self, other)` and the one in `impl Ord for Ordering`
+// below are the whole reason every importer of std.cmp loses the native
+// rung: the rung answers `unsupported — an enum or row test inside a
+// product pattern (deep trees, c06)` on the module, so `use std.cmp`
+// costs a lane. sc46 recorded that as a cost of shipping `trait Num`
+// and assumed the coverage returns only when chapter 6 lands.
+//
+// MEASURED at sc47, wolf 0.2.12 / lupin 0.1.34, and that assumption is
+// false. Rewritten as nested matches — `match self { Less => match
+// other { Less => true, _ => false }, … }`, arm for arm identical — a
+// probe importing this module goes `unsupported` (`phase_reached: mem`)
+// to `exit(0)` (`phase_reached: run`) on the native rung, and the full
+// 402-row differential moves **40 rows** from `unsupported` to `run` on
+// the native column with NOTHING else moving: no row got shallower, no
+// directive mismatched. testing 10, map 6, cmp 6, sort 5, search 5,
+// x/* 4, ops 3, rand 1. The conservatism ledger goes 190 -> 150.
+//
+// So the COMPILER is right and owes nothing — `deep trees, c06` is a
+// named conservatism answering honestly, and there is no upstream
+// filing here. The cost is ours, it buys nothing, and it is removable
+// at these pins.
+//
+// `impl Ord for bool` above keeps its product pattern deliberately: its
+// arms are bool LITERALS, and the refusal is specifically an enum or row
+// TEST inside a product pattern. It is not part of this.
+//
+// Not rewritten at sc47 because the 40 ledger rows are a lane's work and
+// should not ride in the same PR as the CI gate that sprint carried.
+// wolf-std#31 holds the measurement, the rewrite and the row list.
 impl Eq for Ordering {
     fn eq(self, other: Self) -> bool {
         match (self, other) {
