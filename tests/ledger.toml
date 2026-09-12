@@ -1179,6 +1179,11 @@ native = "run"
 # here, and `std.ops` does not pay it. lupin executes no imported
 # module's trait items. ----
 
+[tests."ops/num_alias_tier.lu"]
+lupin = "mirror-lag(E0501)"  # sc46: an alias through an IMPORT expands no bound (wolf-interp#102) — the ledger's first mirror-lag row
+wolfc = "run"
+native = "unsupported"  # the std.cmp product-pattern decline every importer pays
+
 [tests."ops/dispatch_tier.lu"]
 lupin = "unsupported"
 wolfc = "run"

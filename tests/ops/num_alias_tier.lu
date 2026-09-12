@@ -1,0 +1,69 @@
+//! check: run(exit=0, stdout="6 3.75\n1.5 true\n")
+//! phase: run
+//! conforms: type.trait.op, type.trait.op.alias, std.ops
+//!
+//! **The composed bound, which is the last item of s155's surface std
+//! owed and the one sc44 had to withhold.** `[type.trait.op.alias]`
+//! spells `trait Num = Add + Sub + Mul + Div + Rem + Eq + Ord`, std.ops
+//! ships it with `Eq` and `Ord` qualified to std.cmp, and this file is
+//! the book's chapter-5 shape written against it: one `fn total[T:
+//! ops.Num]` instantiated at `int` AND at `f64`. The `f64` half is only
+//! satisfiable because `impl Rem for f64` landed in the same sprint —
+//! the alias lists `Rem`, so `Num` at `f64` waited on wolf-lang#327's
+//! `[type.float.rem]` exactly as std.ops' header said it would.
+//!
+//! **This is the ledger's first `mirror-lag(E0501)` row** (sc46,
+//! F-0121, wolf-std#27). lupin 0.1.34 parses the alias form — that is
+//! wolf-interp#92, is46's mirror of s155, and the release this module
+//! waited two sprints for — but an alias reached through an IMPORT
+//! expands no bound there: `fn total[T: ops.Num]` is `E0501: the bounds
+//! on `T` say nothing about `+`` at resolve, while the byte-identical
+//! `fn total[T: ops.Add]` through the same import runs
+//! (`tests/ops/dispatch_tier.lu` is that file). Filed as
+//! wolf-interp#102. The row demands exactly that code and goes RED the
+//! day the mirror catches up, which is what the word is for.
+//!
+//! `bound_sees_ord` calls through the alias's Eq and Ord halves rather
+//! than only its arithmetic: an alias that expanded to Add alone would
+//! satisfy the first line of output and not the second.
+//!
+//! Literals stay in typed bindings: a bare literal argument defaults to
+//! `i32`, which does not meet an `impl … for int` (E0502) — the same
+//! paper cut `tests/cmp/static_floor.lu` carries.
+
+use std.ops
+
+fn total[T: ops.Num](xs: List[T], zero: T) -> T {
+    var acc = zero
+    for x in xs {
+        acc = acc + x
+    }
+    acc
+}
+
+fn rest[T: ops.Num](a: T, b: T) -> T {
+    a % b
+}
+
+fn bound_sees_ord[T: ops.Num](a: T, b: T) -> bool {
+    if a == b {
+        false
+    } else {
+        a < b
+    }
+}
+
+fn main() -> !int {
+    var ints = List[int]()
+    (mut ints).push(1)
+    (mut ints).push(2)
+    (mut ints).push(3)
+    var floats = List[f64]()
+    (mut floats).push(1.5)
+    (mut floats).push(2.25)
+    let two: int = 2
+    let five: int = 5
+    print("{total(ints, 0)} {total(floats, 0.0)}")
+    print("{rest(7.5, 2.0)} {bound_sees_ord(two, five)}")
+    if ops.Add.add(two, 3) == five { 0 } else { 1 }
+}
