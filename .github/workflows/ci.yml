@@ -191,19 +191,78 @@ jobs:
       #     answer to wolf-std#20's either/or was NEITHER, and it is
       #     still neither. Nothing here was relaxed.
       #
-      # The step stays ADVISORY on ubuntu and on windows for THIS
-      # landing, required on macOS, which is sc41's and sc42's procedure
-      # for a lane whose behaviour changes: the first run at a new
-      # posture is to be READ, not to be passed. ubuntu has not completed
-      # this step once in its life; windows still carries
-      # `net/reuse_port`, the one row of wolf-std#20 that survives its
-      # timing half — a directive that cannot say "either" on a platform
-      # with no SO_REUSEPORT, left for a std.net sprint.
+      # sc47 / wolf-std#34 — UBUNTU GOES REQUIRED, AND THE ADVISORY HOST
+      # STOPS BEING SILENT.
+      #
+      # The marker above was `${{ runner.os != 'macOS' }}` for four
+      # sprints, and it hid a RED windows differential through two
+      # lanes' readings of it (wolf-std#20 stated a windows green twice
+      # on that reading and was wrong both times). The mechanism is
+      # worse than "the job says success": at run 34672768728 the REST
+      # API reports `conclusion: success` for this step on
+      # `rig (windows-latest)` as well — a `continue-on-error` step's
+      # conclusion is rewritten at BOTH levels, so "read the step
+      # conclusion, not the job's" is not enough on its own. The only
+      # two things that still carry the truth are the step's own log
+      # (`xtask: RED`, `##[error]Process completed with exit code 1`)
+      # and `steps.<id>.outcome`, which is the PRE-rewrite result.
+      #
+      # Two changes, and neither of them relaxes anything:
+      #
+      # 1. UBUNTU IS REQUIRED. `std-test: GREEN` on `rig (ubuntu-latest)`
+      #    at four consecutive heads — 34602166418 (527fa44),
+      #    34618995826 (7582e7a), 34668184512 (d116bcb) and
+      #    34672768728 (8b5a18e). sc44 made it advisory for "the first
+      #    completion at the new budget"; that completion has now
+      #    happened four times and the reason has expired. The marker
+      #    narrows from `!= 'macOS'` to `== 'Windows'`.
+      #
+      # 2. WINDOWS STAYS ADVISORY AND SAYS SO OUT LOUD. Three native
+      #    net/process rows are red there (wolf-std#34) and they are a
+      #    std.net/std.process question, not this lane's. But the
+      #    verdict step below reads `outcome` beside `conclusion` and
+      #    prints both, so the divergence between them is ONE GREPPABLE
+      #    LINE in every future run instead of a hunt through 400 rows,
+      #    and an advisory RED raises a `::warning::` annotation that
+      #    `gh run view` surfaces.
+      #
+      # The marker stays spelled `continue-on-error` rather than moving
+      # into the script, deliberately: `xtask/src/workflow.rs` now reads
+      # this key and `selftest.rs` gates it against a blessed list that
+      # carries the issue number, so an advisory step cannot be added,
+      # widened, or left behind its issue without the `rig` job going
+      # red on every host. Hiding the advisory-ness inside a shell
+      # variable would have put it back where no checker can see it.
+      #
+      # `run:` stays a bare `cargo xtask std-test` on its own line
+      # because `workflow::cargo_invocations` matches the invocation
+      # verbatim; a `; rc=$?` tail would make this step read LOCAL-ONLY.
       - name: std-test (the differential; three lanes, three hosts)
-        # REQUIRED on macOS. ADVISORY on ubuntu (first completion at the
-        # new budget) and on windows (wolf-std#20's net/reuse_port).
-        continue-on-error: ${{ runner.os != 'macOS' }}
+        id: std_test
+        # REQUIRED on ubuntu and macOS. ADVISORY on windows only, behind
+        # wolf-std#34's three native net/process rows. Blessed in
+        # `workflow::ADVISORY_STEPS`; changing it here without changing
+        # it there reds `rig` on all three hosts.
+        continue-on-error: ${{ runner.os == 'Windows' }}
         run: cargo xtask std-test
+      # The step above is the only advisory step in this file. This one
+      # exists so that being advisory is never the same as being quiet:
+      # `outcome` is what the step DID, `conclusion` is what
+      # `continue-on-error` rewrote it to, and printing the pair is the
+      # cheapest possible version of the rule wolf-std#34 had to learn
+      # by being wrong twice.
+      - name: std-test verdict (outcome vs conclusion, wolf-std#34)
+        if: always()
+        shell: bash
+        run: |
+          outcome='${{ steps.std_test.outcome }}'
+          conclusion='${{ steps.std_test.conclusion }}'
+          echo "std-test verdict on $RUNNER_OS: outcome=$outcome conclusion=$conclusion"
+          echo "- \`std-test\` on **$RUNNER_OS**: outcome \`$outcome\`, conclusion \`$conclusion\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$outcome" = failure ] && [ "$conclusion" = success ]; then
+            echo "::warning title=std-test is RED on $RUNNER_OS and ADVISORY::cargo xtask std-test exited non-zero; continue-on-error rewrote the conclusion of the step AND of the job to success. This host gates nothing for std-test. See wolf-std#34."
+            echo "std-test verdict: ADVISORY RED on $RUNNER_OS — this host gates nothing for std-test (wolf-std#34)"
+          fi
 
   # sc41 / F-0113 / wolf-std#13 — the lane nothing lit, now lit and REQUIRED.
   #
