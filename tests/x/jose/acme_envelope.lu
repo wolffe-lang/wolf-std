@@ -40,15 +40,22 @@ fn main() -> int {
 
     // Every request after newAccount: the account URL as `kid`.
     assert(
-        jose.acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order") ==
+        jose.acme_protected_kid(
+            "https://acme.test/acct/1",
+            "aXk6",
+            "https://acme.test/new-order",
+        ) ==
             "{{\"alg\":\"EdDSA\",\"kid\":\"https://acme.test/acct/1\",\"nonce\":\"aXk6\",\"url\":\"https://acme.test/new-order\"}}",
         "kid_header",
     )
 
     // The signed request body for a POST-as-GET (empty payload). Frozen:
     // deterministic for the fixed key and header.
-    let header = jose.
-        acme_protected_kid("https://acme.test/acct/1", "aXk6", "https://acme.test/new-order")
+    let header = jose.acme_protected_kid(
+        "https://acme.test/acct/1",
+        "aXk6",
+        "https://acme.test/new-order",
+    )
     let body = jose.acme_body(sk, header, List[byte]())
     assert(
         body ==

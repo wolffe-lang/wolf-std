@@ -63,8 +63,7 @@ fn main() -> int {
 
     // constant-time verify accepts the peer's correct Finished.
     assert(
-        hs.
-            verify_finished(
+        hs.verify_finished(
             shs,
             th_cv,
             bytes_of("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718"),
@@ -72,16 +71,14 @@ fn main() -> int {
         "verify server Finished",
     )
     assert(
-        hs.
-            verify_finished(
+        hs.verify_finished(
             chs,
             th_sf,
             bytes_of("a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61"),
         ),
         "verify client Finished",
     )
-    let ok = hs.
-        accept_finished(
+    let ok = hs.accept_finished(
         shs,
         th_cv,
         bytes_of("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718"),

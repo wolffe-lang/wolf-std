@@ -90,8 +90,7 @@ fn main() -> int {
     // same helper: `verify_certificate_verify` answers `int` and
     // raises only {unsupported_alg, bad_signature}.
     let unknown_scheme = 9999
-    let judged = client.
-        verify_certificate_verify(
+    let judged = client.verify_certificate_verify(
         cert.oid_ed25519(),
         zeros(32),
         unknown_scheme,

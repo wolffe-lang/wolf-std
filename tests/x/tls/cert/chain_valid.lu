@@ -30,8 +30,12 @@ fn main() -> int {
     // The validated leaf is destructured where it is born (sc30,
     // [gram.pat.struct]): the four pinned fields bind by name, `..`
     // leaves the rest of the certificate packaged.
-    let cert.Cert { subject_cn, has_san, spki_key, not_after, .. } = cert.
-        validate_chain(leaf_der, "wolf.example", root, now) else |_| {
+    let cert.Cert { subject_cn, has_san, spki_key, not_after, .. } = cert.validate_chain(
+        leaf_der,
+        "wolf.example",
+        root,
+        now,
+    ) else |_| {
         return 1
     }
     assert(subject_cn == "wolf.example", "validated leaf subject")
@@ -41,8 +45,12 @@ fn main() -> int {
         "validated leaf key",
     )
     assert(not_after == cert.timestamp(2027, 1, 1, 0, 0, 0), "validated leaf notAfter")
-    let cert.Cert { subject_cn: upper_cn, .. } = cert.
-        validate_chain(leaf_der, "WWW.WOLF.EXAMPLE", root, now) else |_| {
+    let cert.Cert { subject_cn: upper_cn, .. } = cert.validate_chain(
+        leaf_der,
+        "WWW.WOLF.EXAMPLE",
+        root,
+        now,
+    ) else |_| {
         return 1
     }
     assert(upper_cn == "wolf.example", "second SAN entry, case-insensitive")

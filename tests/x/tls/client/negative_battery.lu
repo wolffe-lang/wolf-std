@@ -35,9 +35,13 @@ fn bytes_of(h: str) -> List[byte] {
 
 /// A well-formed ServerHello with a caller-chosen random, suite,
 /// group, version, compression — every negotiation lever in one place.
-fn make_sh(random: List[byte], suite: int, group: int, selected: int, compression: int) -> List[
-    byte,
-] {
+fn make_sh(
+    random: List[byte],
+    suite: int,
+    group: int,
+    selected: int,
+    compression: int,
+) -> List[byte] {
     var share = List[byte]()
     var i = 0
     while i < 32 {
@@ -270,8 +274,14 @@ fn tampered_record_name() -> str {
     var content = List[byte]()
     (mut content).push(104 as byte)
     (mut content).push(105 as byte)
-    let sealed = record.
-        seal(copy key, copy iv, 0, record.content_type_application_data(), content, 0)
+    let sealed = record.seal(
+        copy key,
+        copy iv,
+        0,
+        record.content_type_application_data(),
+        content,
+        0,
+    )
     // Flip a byte inside the ciphertext (index 7, past the 5-byte
     // header).
     var tampered = List[byte]()
@@ -346,8 +356,7 @@ fn bad_cv_name() -> str {
     let leaf_key = bytes_of("b8b7f9e884fa9d1d530b0f5d1bac5adc27270db72116b7e55c81fa11c67378a3")
     let bad_sig = zeros(64)
     let th = zeros(32)
-    let judged = client.
-        verify_certificate_verify(
+    let judged = client.verify_certificate_verify(
         cert.oid_ed25519(),
         leaf_key,
         client.scheme_ed25519(),

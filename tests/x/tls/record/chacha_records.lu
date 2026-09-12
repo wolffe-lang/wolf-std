@@ -20,14 +20,29 @@ fn bytes_of(h: str) -> List[byte] {
     hex.decode(h) else List[byte]()
 }
 
-fn seal_matches(key_hex: str, iv_hex: str, seq: int, ct: int, content_hex: str, pad: int, want: str) -> bool {
+fn seal_matches(
+    key_hex: str,
+    iv_hex: str,
+    seq: int,
+    ct: int,
+    content_hex: str,
+    pad: int,
+    want: str,
+) -> bool {
     let key = bytes_of(key_hex)
     let iv = bytes_of(iv_hex)
     let content = bytes_of(content_hex)
     record.to_hex(record.seal(key, iv, seq, ct, content, pad)) == want
 }
 
-fn opens_to(key_hex: str, iv_hex: str, seq: int, rec_hex: str, want_ct: int, want_content: str) -> bool {
+fn opens_to(
+    key_hex: str,
+    iv_hex: str,
+    seq: int,
+    rec_hex: str,
+    want_ct: int,
+    want_content: str,
+) -> bool {
     let key = bytes_of(key_hex)
     let iv = bytes_of(iv_hex)
     let rec = bytes_of(rec_hex)

@@ -118,8 +118,14 @@ fn main() -> !int {
     var cli_sock = net.connect(net.loopback(p))?
 
     // ---- PHASE 1: the client sends its ClientHello and yields ----
-    let pend = client.
-        begin(take cli_sock, "wolf.example", copy root, now, client_random, copy key_seed)?
+    let pend = client.begin(
+        take cli_sock,
+        "wolf.example",
+        copy root,
+        now,
+        client_random,
+        copy key_seed,
+    )?
 
     // ---- The server half reads the ClientHello ----
     var conn = net.accept(mut srv)?
@@ -223,8 +229,7 @@ fn main() -> !int {
     }
 
     // ---- The server replies with one application record ----
-    let reply = record.
-        seal(
+    let reply = record.seal(
         s_ap_key,
         s_ap_iv,
         0,
