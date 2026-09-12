@@ -255,15 +255,22 @@ impl Ord for str {
 /// home. A caller that needs reflexivity over floats compares through
 /// `Ord.cmp(a, b).is_eq()`, which is total by construction.
 ///
-/// Prose, not a fenced example (§4): trait dispatch through an IMPORTED
-/// module's trait is `unsupported` under lupin 0.1.33 — measured at
-/// sc44 and filed as wolf-interp#96 — and §4's doc-truth rule wants the
-/// reference machine at `exit(0)`. On the two lanes that do execute it:
-/// `Eq.eq(1.5, 1.5)` is `true`, `Eq.eq(1.5, 2.5)` is `false`,
-/// `Eq.eq(0.0 / 0.0, 0.0 / 0.0)` is `false`, and
-/// `Ord.cmp(0.0 / 0.0, 0.0 / 0.0).is_eq()` is `true` — the whole caveat
-/// in four lines. `tests/cmp/primitive_impls_tier.lu` is the running
-/// witness.
+/// The whole caveat in four lines, and a FENCE at last: sc44 wrote this
+/// example in prose because trait dispatch through an IMPORTED module's
+/// trait was `unsupported` under lupin 0.1.33 (wolf-interp#96), and
+/// is46 closed it — so §4's doc-truth rule is satisfiable here for the
+/// first time. `tests/cmp/primitive_impls_tier.lu` is the running
+/// witness beside it.
+///
+/// ```wolf-doc-example
+/// let a: f64 = 1.5
+/// let b: f64 = 2.5
+/// cmp.Eq.eq(a, a) == true
+/// cmp.Eq.eq(a, b) == false
+/// let nan: f64 = 0.0 / 0.0
+/// cmp.Eq.eq(nan, nan) == false
+/// cmp.Ord.cmp(nan, nan).is_eq() == true
+/// ```
 impl Eq for f64 {
     fn eq(self, other: Self) -> bool {
         self == other

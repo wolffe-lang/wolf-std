@@ -55,22 +55,20 @@
 //!   One refusal fell out of that first reading and it is recorded at
 //!   `set` below.
 //! - The `[K: Eq]` five (`get`, `get_or`, `has`, `remove`, `tally`)
-//!   EXECUTE on the checked tier. They are `unsupported` under lupin,
-//!   and the reason is new information rather than F-0002's old one:
-//!   dispatch through a trait declared in the ENTRY FILE runs on all
-//!   three machines (wolf-lang's own `corpus/memory/map_std_keys.lu` is
-//!   these three bodies word for word and prints on every lane), while
-//!   dispatch through an IMPORTED module's trait is `unsupported: `Eq`
+//!   EXECUTE on the checked tier AND on lupin, as of sc46. They were
+//!   `unsupported` on the reference machine for one release, and the
+//!   reason was never F-0002's old blanket claim: dispatch through a
+//!   trait declared in the ENTRY FILE ran on all three machines while
+//!   dispatch through an IMPORTED module's trait was `unsupported: `Eq`
 //!   is a trait; traits, enums and type-level items have no dynamic
-//!   semantics here`. Measured at sc44 with a twelve-line reduction and
-//!   filed as wolf-interp#96. F-0002 has said "dispatch executes nowhere"
-//!   since sc01; half of that is now false, and the half that is left is
-//!   about the import and not about dispatch.
-//! - So the five stay PROSE and not fenced blocks (§4 wants the
-//!   reference machine at `exit(0)`), and the sentence that says so
-//!   names the measured reason instead of the retired one. They fence on
-//!   the wolf-interp release that closes it, and nothing else has to
-//!   change for that to happen.
+//!   semantics here`. Measured at sc44 with a twelve-line reduction,
+//!   filed as wolf-interp#96, and CLOSED in is46 — so F-0002's last
+//!   quarter goes with it. The three `[K: Eq]` rows flip
+//!   `unsupported` -> `run` on lupin in this sprint's ledger commit.
+//! - So the five are FENCED blocks again, which is what sc44 promised
+//!   would happen "on the wolf-interp release that closes it, and
+//!   nothing else has to change for that to happen" — nothing else did.
+//!   Five examples, all five at `exit(0)` on the reference machine.
 //! - The native rung refuses this module for a reason that is
 //!   `std.cmp`'s and not `std.map`'s: `impl Eq for Ordering`'s
 //!   `match (self, other)` is `unsupported — an enum or row test inside
@@ -227,13 +225,19 @@ pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
 /// The value bound to `k`; `none` when the key is absent — the absence
 /// row, never a zero-value sentinel (§2). No traps.
 ///
-/// Prose, not a fenced example (§4), and the reason changed at sc44:
-/// this runs on the checked tier now — `[K: Eq]` is satisfied by
-/// `str`/`int`/`char`/`bool` and the dispatch happens — but lupin
-/// answers `unsupported` for a trait reached through an IMPORT, and
-/// doc-truth wants the reference machine at `exit(0)`. For a map
-/// binding `"a"` to `1`, `get(m, "a")` is `1` and `get(m, "z")` raises
-/// `none`. `tests/map/get_hit_miss.lu` is the running witness.
+/// **Fenced at sc46, and this is where F-0118's cost comes back.** sc44
+/// wrote this example and the four below in prose for one reason —
+/// lupin answered `unsupported` for a trait reached through an IMPORT,
+/// and `[K: Eq]` puts one in every signature here — and is46 closed it
+/// (wolf-interp#96). Five examples return to fences in one commit, all
+/// five at `exit(0)` on the reference machine.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// m["a"] = 1
+/// (map.get(m, "a") else 0) == 1
+/// (map.get(m, "z") else 0 - 1) == 0 - 1
+/// ```
 pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
     for pair in m.pairs() {
         if cmp.Eq.eq(pair.0, k) {
@@ -247,17 +251,24 @@ pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
 /// default (a lazy variant waits on closures, c05). Total: no error row,
 /// no traps.
 ///
-/// Prose, not a fenced example (§4, the imported-trait refusal — see
-/// `get`): `get_or(m, "z", 0)` is `0` for a map without `"z"`.
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// m["a"] = 1
+/// map.get_or(m, "a", 0) == 1
+/// map.get_or(m, "z", 0) == 0
+/// ```
 pub fn get_or[K: cmp.Eq, V](m: Map[K, V], k: K, d: V) -> V {
     get(m, k) else d
 }
 
 /// Whether `k` is bound. Total: no error row, no traps.
 ///
-/// Prose, not a fenced example (§4, the imported-trait refusal — see
-/// `get`): `has(m, "a")` is `true` exactly when `get(m, "a")` yields a
-/// value.
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// m["a"] = 1
+/// map.has(m, "a") == true
+/// map.has(m, "z") == false
+/// ```
 pub fn has[K: cmp.Eq, V](m: Map[K, V], k: K) -> bool {
     for pair in m.pairs() {
         if cmp.Eq.eq(pair.0, k) {
@@ -270,8 +281,15 @@ pub fn has[K: cmp.Eq, V](m: Map[K, V], k: K) -> bool {
 /// Removes `k`'s entry and returns the value it was bound to; `none`
 /// when the key was absent. No traps.
 ///
-/// Prose, not a fenced example (§4, the imported-trait refusal — see
-/// `get`). The implementation cost this signature hides is UNCHANGED by
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// m["a"] = 1
+/// (map.remove(mut m, "a") else 0) == 1
+/// map.has(m, "a") == false
+/// (map.remove(mut m, "a") else 0 - 1) == 0 - 1
+/// ```
+///
+/// The implementation cost this signature hides is UNCHANGED by
 /// s152 and worth restating because the rest of the header moved: no
 /// builtin erases a key, so the body rebuilds the map without it.
 /// wolf-lang#11's D50 approved a key-erase builtin and s152 did not add
@@ -294,10 +312,15 @@ pub fn remove[K: cmp.Eq, V](mut m: Map[K, V], k: K) -> V ! {none} {
 /// module header's filed question). Traps `overflow` when the count is
 /// at `int`'s maximum: arithmetic is checked in every profile (X3).
 ///
-/// Prose, not a fenced example (§4, the imported-trait refusal — see
-/// `get`): tallying `"a"` twice leaves it bound to `2`. The body below
-/// is the one `[mem.map.absent]`'s E0417 note names by name — a reader
-/// who writes `m[k] += 1` is sent here by the compiler.
+/// The body below is the one `[mem.map.absent]`'s E0417 note names by
+/// name — a reader who writes `m[k] += 1` is sent here by the compiler.
+///
+/// ```wolf-doc-example
+/// var m = Map[str, int]()
+/// map.tally(mut m, "a") == 1
+/// map.tally(mut m, "a") == 2
+/// (map.get(m, "a") else 0) == 2
+/// ```
 pub fn tally[K: cmp.Eq](mut m: Map[K, int], k: K) -> int {
     let n = get(m, k) else 0
     m[k] = n + 1
