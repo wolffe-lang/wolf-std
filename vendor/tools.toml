@@ -742,7 +742,48 @@
 # and that IS this box's binary at this box's pin — `7511f7e` recorded
 # the pairing inside the release that carries it. Doctor prints it and
 # still does not gate it; a line that happens to be true is not a gate.
-version = "0.1.34"
+# sc48 BUMP: 0.1.34 -> 0.1.36, pin c9237c1 (v0.2.11) -> a7f517e (v0.2.12).
+# TWO releases in one chase — is47 cut 0.1.35 at wolf-interp `4f6cb2e`,
+# is48 cut 0.1.36 at `6e94436`, both declaring the SAME pin — and this
+# repo takes the second the way sc35 did. Acquired by digest from the
+# release, `lupin-0.1.36-aarch64-apple-darwin.tar.gz`, sha256
+# `41f21002598dec61cd8600fe3ab28e3a882c41b482a35ca417e2467e20fc8e2a`
+# (the digest lobo's ws35 verified for the same asset), the whole
+# archive pair into `.wolf-bin/`, verified from `--version`:
+# `lupin 0.1.36 (wolf-interp, reference interpreter at pin a7f517e)`.
+#
+# THE FS TIER (is48, BACKLOG B16). "This machine has no filesystem by
+# design" — the posture CONTRIBUTING.md and forty ledger rows have quoted
+# since sc07 — is withdrawn upstream: `eval::fs` implements `[os.fs]`
+# over real files (22 names, six open modes, 1-based never-reused
+# handles, `read_dir` sorted bytewise, a handle-level failure `io` on
+# every host). What it does NOT land: `read_line` (stdin is not a file;
+# the name resolves, the refusal reads "unsupported feature"), any path
+# that is absolute or climbs out of the working directory (refused BY
+# NAME, never a row), and FOUR of the twenty-six `fs_*` names std.fs
+# calls — `fs_create_dir`, `fs_remove_dir`, `fs_write_chunk`,
+# `fs_rename_atomic` "do not resolve" (measured one name at a time).
+# Predicted before the run: 15 lupin rows `unsupported` -> `run`, all
+# 13 fs rows plus the two `net/unix` rows whose relations are fs
+# readings. MEASURED: **11** — nine fs rows and both `net/unix` rows;
+# the four that stayed dark are exactly the rows that reach the four
+# absent names (`fs/chunk_stream`, `fs/directories_and_metadata`,
+# `fs/exists_row`, `fs/fstat_rows`). The two `io` rows stayed on
+# `read_line` as predicted. Nothing else on the reference machine moved
+# (402 rows, 0 divergent, 0 unstable, 0 slow, 1 mirror-lag).
+#
+# THE GAP, at tags, is TWO releases and on the compiler's side, the
+# first time it has been two: 0.1.36 declares a7f517e (v0.2.12) while
+# wolf 0.2.14 declares 30731a6. s158's three surfaces are unmet here,
+# MEASURED: the range accessors are `fail(E0301)` at RESOLVE (lazy, so
+# only a row that calls them pays — `mirror-lag(E0301)`), while an
+# error-set alias and a list literal are `fail(E0201)` at PARSE, which
+# darkens every row of every module carrying the form — 18 lupin rows
+# for one `error` line in std/fs, measured on a scratch copy against
+# `fs/path_helpers.lu`. That is why std/fs carries no alias at this pin
+# (wolf-std#30). wolf-interp#102 (the imported alias expands no bound)
+# is still open, so `ops/num_alias_tier.lu` keeps `mirror-lag(E0501)`.
+version = "0.1.36"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -756,7 +797,8 @@ version = "0.1.34"
 # pin = "2c03ed9360e90e260528411075daded674ceab18"  (superseded, sc42 era — is42's 0.1.30 at wolf-lang s144 dev-stamped, the pin that held `str + char` back one sprint)
 # pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"  (superseded, sc43 era — is43's 0.1.31 at wolf-lang v0.2.9)
 # pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"  (superseded, sc44/sc45 era — is45's 0.1.33 at wolf-lang v0.2.10)
-pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"
+# pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"  (superseded, sc46/sc47 era — is46's 0.1.34 at wolf-lang v0.2.11)
+pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"
 # (sc46: 0.1.34 crosses to v0.2.11 and lands ON a tag for the second
 #  bump running. The gap to the data pin below NARROWS to one release
 #  — s154 and s156 — from sc44's 91 commits, and both halves are at
@@ -919,7 +961,49 @@ pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.12"
+version = "0.2.14"
+# sc48 BUMP: a7f517e (v0.2.12) -> 30731a6 (v0.2.14), TWO releases —
+# s157/s158 (0.2.13, "the literals and the papercuts III") and s159/s160
+# (0.2.14, "the string runtime and the papercuts IV"). The data pin was
+# AT a7f517e, so the DATA delta and the BINARY delta are one span again:
+# a7f517e..30731a6, +23 anchors and 0 removed. Acquired by digest from
+# the release, the whole archive pair into `.wolf-bin/` (never a source
+# build on this box), verified from `--version`: `wolf 0.2.14 (wolfgang,
+# pin 30731a6)`, pairing line `paired with lupin 0.1.36 (reference
+# interpreter), pin a7f517e` — TRUE of this box's binary at this box's
+# pin (F-0064's happy case). Archive
+# `wolf-0.2.14-aarch64-apple-darwin.tar.gz`, sha256
+# `80407e31b89cae684163fd9fd79c3935a5fe63873dcb16376c36c8596af61b54`,
+# the digest lobo's ws35 (`bbfd40c`) verified for the same asset.
+#
+# WHAT THE SPAN CARRIES FOR THIS TREE. s158: `range[int]` is a TYPE with
+# `start`/`end` (`[type.range]` — wolf-lang#24, the issue F-0030 filed),
+# list literals (`[type.list.lit]`) and transparent error-set aliases
+# (`[type.err.alias]` — wolf-lang#36, F-0041's filing). s159/s160: the
+# string runtime — a `str` charges its region, `[mem.region.proc]` and
+# `[mem.region.escape]` (E1010 on both tiers), `net_writev_head` — and
+# nine papercuts, one of which is F-0096's (`s.get(0..^1)` resolves,
+# wolf-lang#164). PREDICTED before the run, on a carrier census of the
+# tree (no `range[` outside std/range, no list literal, no alias, no
+# `region` block beside a str escape site, no `proc` spawn building a
+# str): exactly 2 compiler-lane rows move, `range/is_empty.lu` on both
+# rungs, `fail(E0301)` -> `run`. MEASURED: **4** — those two, and
+# `str/end_relative_get.lu` on both rungs, `unsupported` -> `run`, the
+# flip that row's own comment predicted "at the binary that closes the
+# filing" and this reader failed to tie to the release note he had just
+# read. Nothing else moved on either compiler lane.
+#
+# THE FORMATTER, re-measured at the RELEASE binary (F-0124's lesson):
+# `wolf fmt --check std tests` names 0 files at 0.2.12 and 0 files at
+# 0.2.14 over the 453 committed `.lu` files; `fmt-lu` says the same
+# ("every one a fixed point of `wolf fmt` at wolf 0.2.14"). BACKLOG B3's
+# "54" was measured at `4f796b1`, a tree sc45 and sc46 have since
+# re-laid; there is no standing set and no pass to run.
+#
+# THE OPERATOR BRIDGE (wolf-std#31), re-measured: `ops/dispatch_tier.lu`
+# and `ops/div_zero_trap.lu` are still `unsupported` at `mem` on the
+# native rung, same c06 construct, same span — the string lost its
+# ", c06" suffix to s158's no-sprint-ids papercut and nothing else moved.
 # sc46 BUMP: c9237c1 (v0.2.11) -> a7f517e (v0.2.12), 17 commits, TWO
 # sprints (s154, s156) plus the pairing, the CHANGELOG and the release
 # commit. The data pin was AT c9237c1, so for the fifth bump running the
@@ -2422,4 +2506,5 @@ version = "0.2.12"
 # pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"  (superseded, sc42 era — r14's v0.2.9-tag pin)
 # pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"  (superseded, sc43 era — r15's v0.2.10-tag pin, the one lupin 0.1.33 now conforms to)
 # pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"  (superseded, sc44/sc45 era — r16's v0.2.11-tag pin, the one lupin 0.1.34 now conforms to)
-pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"
+# pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"  (superseded, sc46/sc47 era — r17's v0.2.12-tag pin, the one lupin 0.1.35 and 0.1.36 both conform to)
+pin = "30731a6509443ade03724707345da9ceb86a88bf"
