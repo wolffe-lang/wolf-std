@@ -55,19 +55,16 @@
 //! (wolf-lang#16, API-CONVENTIONS §10).
 
 /// True when `r` yields no values — `5..5` and `7..3` are empty, `2..7`
-/// is not. O(1): the loop body runs at most once. The body is still the
-/// iteration probe in this commit; it moves onto the accessor in its own
-/// commit, and the header above already describes the module there.
-/// Total: no error row, no traps.
+/// is not. One comparison, `r.start >= r.end`; the body before 0.2.14
+/// asked the iterator the same question (`for _ in r { return false }`),
+/// which was O(1) too and is why this function shipped eleven sprints
+/// before the other three. Total: no error row, no traps.
 ///
 /// Example (prose; see the module header for why it is not a fenced
 /// block): `range.is_empty(5..5)` is true and `range.is_empty(2..7)` is
 /// false.
 pub fn is_empty(r: range[int]) -> bool {
-    for _ in r {
-        return false
-    }
-    true
+    r.start >= r.end
 }
 
 /// True when `x` is a value `r` yields: `r.start <= x && x < r.end`,
