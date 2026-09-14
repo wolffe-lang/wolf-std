@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="child said: 0")
+//! check: run(exit=0, stdout="prefork: ok")
 //! phase: run
 //! conforms: std.process, std.net, os.proc.inherit, err.row, err.propagate
 //!
@@ -32,13 +32,34 @@
 //!
 //! **Exit codes are the channel, deliberately.** The child's verdict
 //! comes back as its exit code (`0` agree, `7` port mismatch, `8`
-//! descriptor 4 adopted something) and the parent prints only what it was
-//! handed. Two negative controls were run against this shape before it
-//! landed and both behaved: handing the child a port one digit off makes
-//! it exit `7`, and spawning with an EMPTY inherit set makes its
-//! `adopt_listener(3)` answer `io` and ride out of `main`. The file
+//! descriptor 4 adopted something, `9` a stranger came back from 4,
+//! `17` the child's own adopt was declined BY NAME — a host that spawned
+//! a child with a set it says it cannot pass) and the parent prints only
+//! what it was handed. Two negative controls were run against this shape
+//! before it landed and both behaved: handing the child a port one digit
+//! off makes it exit `7`, and spawning with an EMPTY inherit set makes
+//! its `adopt_listener(3)` answer `io` and ride out of `main`. The file
 //! cannot hold either control — a witness gets one program — so they are
 //! recorded here, which is the only place they can be.
+//!
+//! **sc48: the host that never spawns (wolf-std#34).** `[os.proc.inherit]`
+//! says windows answers `unsupported` to a non-empty inherit set, BY
+//! NAME — a `SOCKET` is not a small stable number a parent can name by
+//! position — so on `rig (windows-latest)` the parent's `start_with`
+//! raised the row, `?` rode it out of `main`, and this row was `exit(1)`
+//! behind a `continue-on-error` marker from sc43 to sc47 (run
+//! 34686645924, `expected exit(0), observed exit(1)`). The handshake is
+//! a POSIX shape and the clause says so; asserting it on a host the
+//! clause exempts was asserting the host's posture. So the parent now
+//! handles the spawn's row by arm: `unsupported` is the clause's windows
+//! word and the line is `prefork: ok` — the disjunction "the child
+//! adopted the listener and matched the port, OR the host declined the
+//! set by name" — while `not_found`, `denied` and `io` from the spawn are
+//! `11`, `12` and `13`, where they used to be a bare `1`. On linux and
+//! macOS the disjunction is exactly as strong as the old line, because
+//! `start_with` never answers `unsupported` there; on windows the row
+//! asserts the clause instead of contradicting it, and any OTHER answer
+//! is a numbered red rather than a silent one.
 //!
 //! **Native only, and the two reasons are different.** A non-empty
 //! inherit set is refused by name on the checked machine and on lupin
@@ -60,7 +81,16 @@ fn main() -> !int {
     let argv = env.args()
     if argv.len > 0 {
         let want = argv[0]
-        var adopted = net.adopt_listener(3)?
+        var by_name = false
+        var adopted = net.adopt_listener(3) else |e| match e {
+            unsupported => {
+                by_name = true
+                net.Listener { fd: 0 - 1 }
+            },
+            io => { net.Listener { fd: 0 - 1 } },
+        }
+        if by_name { return 17 }
+        if adopted.fd == 0 - 1 { return 18 }
         let got = net.port(adopted)?
         net.close_listener(take adopted)?
         if "{got}" != want { return 7 }
@@ -82,10 +112,41 @@ fn main() -> !int {
     (mut set).push(srv)
     var cmd = process.command(os_exe()?)
     process.push_arg(mut cmd, "{port}")
-    var ch = process.start_with(cmd, set)?
+    // 0 = spawned, 2 = unsupported by name, 3 = not_found, 4 = denied, 1 = io
+    var arm = 0
+    var ch = process.start_with(cmd, set) else |e| match e {
+        unsupported => {
+            arm = 2
+            process.Child { slot: 0 - 1 }
+        },
+        not_found => {
+            arm = 3
+            process.Child { slot: 0 - 1 }
+        },
+        denied => {
+            arm = 4
+            process.Child { slot: 0 - 1 }
+        },
+        io => {
+            arm = 1
+            process.Child { slot: 0 - 1 }
+        },
+    }
+    if arm == 2 {
+        net.close_listener(take srv)?
+        print("prefork: ok")
+        return 0
+    }
+    if arm == 3 { return 11 }
+    if arm == 4 { return 12 }
+    if arm == 1 { return 13 }
     let code = process.wait(take ch)?
     net.close_listener(take srv)?
-    print("child said: {code}")
+    var word = "no"
+    if code == 0 {
+        word = "ok"
+    }
+    print("prefork: {word}")
     if code != 0 { return code }
     0
 }
