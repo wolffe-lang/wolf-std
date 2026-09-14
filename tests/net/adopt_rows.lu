@@ -12,71 +12,89 @@
 //! `[os.proc.inherit]` is specific about it: the runtime asks the KERNEL
 //! what the number is rather than trusting the caller.
 //!
-//! **Four numbers, one row.** A descriptor that is not a socket
-//! (`0` — this process's stdin), a negative number, an absurd number,
-//! and — the interesting one — **this process's own `Listener` handle**.
-//! That last is the trap a reader is most likely to fall into: a
-//! `Listener`'s `fd` field is a small non-negative index into the
-//! machine's socket table, NOT an OS descriptor, so handing it to
-//! `adopt_listener` is handing over a number that means something else.
-//! It is `io`, like every other number the kernel does not recognise as
-//! a listening socket with no peer. **Never a trap, and never a wrapped
-//! stranger** — that is the whole promise.
+//! **Four numbers, ONE row — and the row is the host's.** A descriptor
+//! that is not a socket (`0` — this process's stdin), a negative number,
+//! an absurd number, and — the interesting one — **this process's own
+//! `Listener` handle**. That last is the trap a reader is most likely to
+//! fall into: a `Listener`'s `fd` field is a small non-negative index
+//! into the machine's socket table, NOT an OS descriptor, so handing it
+//! to `adopt_listener` is handing over a number that means something
+//! else. On linux and macOS every one of the four is `io`, like every
+//! other number the kernel does not recognise as a listening socket
+//! with no peer. On windows every one of the four is **`unsupported`**,
+//! BY NAME — the clause's own third sentence: handle inheritance exists
+//! there, but a `SOCKET` is not a small stable number a parent can name
+//! by position, so the call is declined before any number is examined.
+//! **Never a trap, never a wrapped stranger, and never a SUCCESS** —
+//! that is the whole promise, and it is the same promise under either
+//! word.
 //!
-//! **The lane words here are the most uneven in the repository and
-//! every one of them is named.** The CHECKED machine refuses adoption
-//! BY NAME — "listener adoption in checked execution" — because it is
-//! the `wolf` binary interpreting a program, so a descriptor handed to
-//! "the program's child" would go to the compiler's child; that is a
+//! **sc48: the witness stopped asserting the POSIX word (wolf-std#34).**
+//! From sc37 to sc47 this file counted only `io` as a refusal, so on
+//! `rig (windows-latest)` — where the native lane was lit at sc43 — all
+//! four calls took the `unsupported` arm, every flag stayed false, and
+//! the row was `exit(1)` behind a `continue-on-error` marker for four
+//! sprints (run 34686645924, `expected exit(0), observed exit(1)`). The
+//! relation the file exists to pin is REFUSAL, and the clause spells
+//! windows's refusal with a different tag; asserting `io` alone was
+//! asserting the host's posture, exactly what sc46 took out of
+//! `net/reuse_port.lu`. So each call now records WHICH arm it took, the
+//! four must agree — one row, whichever it is — and the exit codes name
+//! what went wrong when they do not: `10 + k` means number `k` was
+//! ADOPTED where a refusal was owed (a runtime bug on any host), `20 + k`
+//! means number `k` answered a different tag from number 1 (a mixed
+//! posture no clause describes). The stdout line is identical under
+//! both postures, so the directive is one line on three hosts.
+//!
+//! **The lane words are the most uneven in the repository and every one
+//! of them is named.** The CHECKED machine refuses adoption BY NAME —
+//! "listener adoption in checked execution" — because it is the `wolf`
+//! binary interpreting a program, so a descriptor handed to "the
+//! program's child" would go to the compiler's child; that is a
 //! whole-program `unsupported`, not a catchable row, so the ledger says
-//! `unsupported` for `wolfc`. The reference machine is `unsupported`
-//! for the unrelated reason that lupin 0.1.26 conforms to a pin older
-//! than the call (F-0110). The NATIVE lane is the one that measures the
-//! rows, and it is enough: these are the runtime's own checks.
+//! `unsupported` for `wolfc`. The reference machine declines it by name
+//! for the same reason (is38). The NATIVE lane is the one that measures
+//! the rows, on all three hosts.
 
 use std.net
 
+// 0 = adopted (wrong everywhere), 1 = `io`, 2 = `unsupported` by name
+fn arm_of(fd: int) -> int {
+    var arm = 0
+    let l = net.adopt_listener(fd) else |e| match e {
+        unsupported => {
+            arm = 2
+            net.Listener { fd: 0 - 1 }
+        },
+        io => {
+            arm = 1
+            net.Listener { fd: 0 - 1 }
+        },
+    }
+    if l.fd != 0 - 1 { return 0 }
+    arm
+}
+
 fn main() -> !int {
-    var not_a_socket = false
-    let a = net.adopt_listener(0) else |e| match e {
-        unsupported => { net.Listener { fd: 0 - 1 } },
-        io => {
-            not_a_socket = true
-            net.Listener { fd: 0 - 1 }
-        },
-    }
-    var negative = false
-    let b = net.adopt_listener(0 - 5) else |e| match e {
-        unsupported => { net.Listener { fd: 0 - 1 } },
-        io => {
-            negative = true
-            net.Listener { fd: 0 - 1 }
-        },
-    }
-    var absurd = false
-    let c = net.adopt_listener(999999) else |e| match e {
-        unsupported => { net.Listener { fd: 0 - 1 } },
-        io => {
-            absurd = true
-            net.Listener { fd: 0 - 1 }
-        },
-    }
-    var own_handle = false
+    let a = arm_of(0)
+    let b = arm_of(0 - 5)
+    let c = arm_of(999999)
     var srv = net.listen(net.loopback(0))?
-    let d = net.adopt_listener(srv.fd) else |e| match e {
-        unsupported => { net.Listener { fd: 0 - 1 } },
-        io => {
-            own_handle = true
-            net.Listener { fd: 0 - 1 }
-        },
-    }
+    let d = arm_of(srv.fd)
     net.close_listener(take srv)?
+    let not_a_socket = a != 0
+    let negative = b != 0
+    let absurd = c != 0
+    let own_handle = d != 0
     print(
         "not_a_socket: {not_a_socket} | negative: {negative} | absurd: {absurd} | own_handle: {own_handle}",
     )
-    if !not_a_socket { return 1 }
-    if !negative { return 2 }
-    if !absurd { return 3 }
-    if !own_handle { return 4 }
+    if a == 0 { return 11 }
+    if b == 0 { return 12 }
+    if c == 0 { return 13 }
+    if d == 0 { return 14 }
+    if b != a { return 22 }
+    if c != a { return 23 }
+    if d != a { return 24 }
     0
 }
