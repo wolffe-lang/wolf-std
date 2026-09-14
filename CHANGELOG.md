@@ -1,5 +1,91 @@
 # Changelog
 
+## sc48 — 2026-09-14 — std takes the release: the pin at 0.2.14, the range functions eleven sprints late, and three windows rows that were asserting the wrong host
+
+**The pin moves two releases.** wolf 0.2.12 (`a7f517e`) -> **0.2.14**
+(`30731a6`), lupin 0.1.34 (`c9237c1`) -> **0.1.36** (`a7f517e`), whole
+archive pair by digest (`80407e31…`, `41f21002…` — the digests lobo's
+ws35 verified), never a source build (`773df4f`). The data pin follows
+the compiler (+23 anchors, 0 removed; the clause snapshot re-vendored
+beside the registry). lupin 0.1.36 conforms to v0.2.12, so the gap at
+tags is TWO releases and on the compiler's side for the first time.
+
+**Predicted, then measured** (scratch `sc48-stdtest-2.log`, 402 rows):
+
+| prediction | predicted | measured | miss |
+|---|---|---|---|
+| lupin rows lit by is48's fs tier | 15 | **11** | 4 rows on 4 `fs_*` names outside 0.1.36's 22 (F-0128, wolf-interp#112) |
+| compiler-lane rows moved by 0.2.13+0.2.14 | 2 | **4** | `str/end_relative_get` ×2 — F-0096's own predicted flip, missed by the reader (F-0096 CLOSED) |
+| `wolf fmt --check std tests` at 0.2.12 / 0.2.14 | 0 / 0 | **0 / 0** | none — B3's "54" was `4f796b1`'s tree, since re-laid |
+| `ops/dispatch_tier`, `div_zero_trap` on native | still `unsupported` (c06) | **still `unsupported`** | none; the string lost ", c06" |
+| `mirror-lag(E0501)` row | stays | **stays** | none (wolf-interp#102 open) |
+| s158's surfaces on lupin | alias/list literal refused | **refused at PARSE** (E0201); accessor **declined by name** at resolve | the phase is the whole cost story (F-0130) |
+| std.range tests at 0.2.14 | exit(0) ×4, trap(overflow) ×1 on both rungs; lupin `mirror-lag(E0301)` | compilers **as predicted**; lupin **`unsupported`** by name | the rig's word, not the code |
+| the three windows rows after the fix | `exit(0)` on `rig (windows-latest)` | (CI, see the PR) | |
+
+`doc-examples` 436 blocks GREEN before and after; `ulp` 200 GREEN;
+`lint-conventions` 5 rules; `fmt-lu` 458 fixed points at 0.2.14.
+
+### wolf-std#30 — `std.range` is four functions (F-0030 CLOSED)
+
+`[type.range]` (s158) makes `range[int]` a nameable type with
+`start`/`end`, `end` exclusive always. Measured at the release binary:
+`std/range/range.lu` was `fail(E0301)` on BOTH compiler rungs at 0.2.12
+— the module did not compile — and runs on both at 0.2.14. One commit
+per function: `contains` (`df1635f`), `len` (`109fd9e`), `clamp_to`
+(`fe911ac`), `is_empty` on the accessor (`d2afb9f`, its ledger flip in `2ce7bce` — the first full gauntlet caught the flip missing on exactly that row); F-0030 closed
+(`6df5c8d`), the issue closed by hand.
+
+Two deviations from the issue's spellings, each measured: **`len` is the
+count, not the signed difference** — `7..3` is a legal empty value whose
+raw `end - start` is -4 at 0.2.14 — and it traps `overflow` when the
+count does not fit an `int` (`len_overflow_trap.lu`, with `lo` annotated
+`int` on purpose: a literal no context decides defaults to `i32`, E0415).
+**`clamp_to` raises `none` on an empty range** (§2), a row the reviewed
+signature lacked. The reference lane's cost is written where it is paid:
+lupin 0.1.36 declines the accessor BY NAME, so all five `tests/range/`
+rows are `unsupported` there, `is_empty` included (`run` ->
+`unsupported`, deliberate), and the four examples are prose because
+`doc-examples` has no mirror-lag word (F-0131, wolf-std#37).
+
+**The alias is witnessed, not written into std.fs** (`80880ed`,
+`tests/fs/alias_row.lu`, `run`/`run`/`mirror-lag(E0201)` — the ledger's
+second mirror-lag row). One `error` line in a scratch copy of
+`std/fs/fs.lu` darkened `fs/path_helpers.lu` at parse on lupin;
+eighteen lupin rows import std.fs and fifteen were lit by this same
+bump. F-0130; the trigger is wolf-std#36. The list-literal half has no
+carrier.
+
+### wolf-std#34 — the three windows rows stop asserting the POSIX word
+
+`[os.proc.inherit]` says windows answers `unsupported` to a non-empty
+inherit set and to `net_adopt_listener`, BY NAME. `net/adopt_rows`
+(`9d850b9`), `process/start_with_inherit_rows` (`f41fbe4`) and
+`process/prefork_handoff` (`8e4f5a8`) counted only the POSIX rows, so
+on `rig (windows-latest)` each took its `unsupported` arm and exited 1
+behind the advisory marker from sc43 to sc47 (run 34686645924). Each
+call now records its arm, a file must take ONE posture, the printed
+line is identical under both, and every other outcome has its own exit
+code — an adoption where a refusal was owed, a mixed posture, a child
+spawned on a host that says it cannot. No ledger word moves; native on
+macOS reproduces every directive's hash. Windows's answer is read off
+the PR's CI log, and the marker's retirement is the orchestrator's call.
+
+### wolf-std#31 — a ruling, recommended and not landed
+
+Option 3 (both `Ordering` impls as nested matches), re-measured at
+0.2.14: the two witnesses are still refused by the same c06 construct
+at the same span, so sc47's 40-row recovery is unchanged by the bump
+and nothing upstream is moving it. Priced on the issue as its own lane.
+
+### Filed
+
+F-0128 wolf-interp#112 (four `fs_*` names outside 0.1.36's tier),
+F-0129 wolf-lang#381 (the checked machine's `capacity overflow` panic on
+a wide range value — a crash, not a verdict), F-0130 wolf-std#36 (the
+alias's trigger), F-0131 wolf-std#37 (doc-examples' missing word).
+F-0096 CLOSED (wolf-lang#164) with the `end_relative_get` flip.
+
 ## sc47 — 2026-09-12 — the residue: a step that ran and gated nothing, and two fences that were never wrong
 
 **No pin moves.** wolf 0.2.12 (`a7f517e`) and lupin 0.1.34 (`c9237c1`)
