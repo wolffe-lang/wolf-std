@@ -3687,6 +3687,11 @@ lupin = "unsupported"  # sc40: the fs tier's by-design decline, as above
 wolfc = "run"
 native = "run"
 
+[tests."fs/alias_row.lu"]
+lupin = "mirror-lag(E0201)"  # sc48: `error IoErrors = {…}` does not PARSE on lupin 0.1.36 (pin v0.2.12, before `[type.err.alias]`) — the ledger's second mirror-lag row, and the reason the alias is witnessed here rather than written into std/fs (one row's cost instead of eighteen)
+wolfc = "run"
+native = "run"
+
 # F-0112's regression pin, added after the gauntlet went RED on a doc
 # example this sprint's own pin bump broke. `net.read(mut s, n)` reads UP
 # TO n bytes; `[os.net.nodelay]` stopped Nagle coalescing two small

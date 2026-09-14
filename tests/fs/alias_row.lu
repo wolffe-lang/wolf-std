@@ -1,0 +1,78 @@
+//! check: run(exit=0, stdout="through alias: -1 | tag: not_found | expanded: -1")
+//! phase: run
+//! conforms: std.fs, type.err.alias, type.err.alias.transparent, type.err.alias.diag, err.row, err.propagate, err.else
+//!
+//! **The io tier's alias, witnessed against std.fs's own row and not
+//! yet written into it.** `[type.err.alias]` (s158, wolf-lang#36 — the
+//! filing sc06 measured the case for as F-0041) makes `error IoErrors =
+//! {not_found, denied, io}` a SPELLING of the row fifteen `std.fs`
+//! signatures carry, the same type in both directions with no
+//! conversion. Both directions are what this file pins: a function
+//! declared `-> int ! IoErrors` propagates `fs.size`'s expanded row
+//! through `?` unchanged (`size` carries exactly the three tags —
+//! `read_text` carries `utf8` too, and E0602 said so on the first
+//! draft), and a function declared with the expanded row
+//! propagates the ALIAS row back through `?`; the handler over either
+//! matches TAGS, because the diagnostic and the type both expand the
+//! alias (`[type.err.alias.diag]`). The tag that fires is the host's
+//! honest `not_found` for a path under a directory that does not exist.
+//!
+//! **Why the alias lives in this test and not in `std/fs/fs.lu` at this
+//! pin — measured, not chosen.** wolf 0.2.14 takes the form on both
+//! rungs. lupin 0.1.36 conforms to `a7f517e` = v0.2.12 and refuses it
+//! at PARSE (`fail(E0201)`) — and a parse refusal is not lazy: with one
+//! `error` line appended to a scratch copy of `std/fs/fs.lu`,
+//! `fs/path_helpers.lu`, a row that never names the alias, went from
+//! `exit(0)` to `fail(E0201)` on the reference machine. Eighteen lupin
+//! rows import `std.fs`, fifteen of which the SAME bump lit with the fs
+//! tier; naming the row inside the module would put all eighteen at
+//! `mirror-lag(E0201)` on the day they came on. So the row is named
+//! here, at the cost of exactly one lupin row — this one — which is the
+//! shape sc46 chose for `trait Num`'s alias, and `std.fs` takes the
+//! alias the release that mirrors `[type.err.alias]` (wolf-std#30's
+//! residue).
+//!
+//! Lane words: both compiler rungs run — the checked machine performs
+//! real host operations on the fs tier — and lupin is
+//! `mirror-lag(E0201)` on the `error` item.
+
+use std.fs
+
+error IoErrors = {not_found, denied, io}
+
+fn size_through_alias(path: str) -> int ! IoErrors {
+    fs.size(path)?
+}
+
+fn size_expanded(path: str) -> int ! {not_found, denied, io} {
+    size_through_alias(path)?
+}
+
+fn main() -> !int {
+    let absent = "no-such-dir/absent.txt"
+    let a = size_through_alias(absent) else |e| match e {
+        not_found => 0 - 1,
+        denied => 0 - 2,
+        io => 0 - 3,
+    }
+    var tag = "none-fired"
+    let b = size_expanded(absent) else |e| match e {
+        not_found => {
+            tag = "not_found"
+            0 - 1
+        },
+        denied => {
+            tag = "denied"
+            0 - 2
+        },
+        io => {
+            tag = "io"
+            0 - 3
+        },
+    }
+    print("through alias: {a} | tag: {tag} | expanded: {b}")
+    if a != 0 - 1 { return 1 }
+    if tag != "not_found" { return 2 }
+    if b != 0 - 1 { return 3 }
+    0
+}
