@@ -1,0 +1,33 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.range, type.range, type.range.accessor, type.range.endpoints
+//!
+//! `contains(r, x)` is `r.start <= x && x < r.end` — the spelling
+//! `[type.range.accessor]` gives and F-0030 waited for. The relations:
+//! `start` is in, `end` is out (exclusive, always), `a..=b` includes `b`
+//! because it normalized to `end = b + 1` at construction, an empty
+//! range contains nothing, and — the row that decides the function is
+//! O(1) rather than a loop — `0..9223372036854775807` answers for its
+//! last member without iterating to it.
+//!
+//! Lane words: both compiler rungs run; lupin 0.1.36 (pin v0.2.12)
+//! declines the accessor by name ("a range has no member `start`"), so
+//! the row is `unsupported` there.
+
+use std.range
+
+fn main() -> !int {
+    if range.contains(2..7, 2) {} else { return 1 }
+    if range.contains(2..7, 6) {} else { return 2 }
+    if range.contains(2..7, 7) { return 3 }
+    if range.contains(2..7, 1) { return 4 }
+    if range.contains(2..=7, 7) {} else { return 5 }
+    if range.contains(2..=7, 8) { return 6 }
+    if range.contains(5..5, 5) { return 7 }
+    if range.contains(7..3, 5) { return 8 }
+    if range.contains(0..9223372036854775807, 9223372036854775806) {} else { return 9 }
+    if range.contains(0..9223372036854775807, 9223372036854775807) { return 10 }
+    if range.contains(0 - 5..5, 0 - 5) {} else { return 11 }
+    if range.contains(0 - 5..5, 0 - 6) { return 12 }
+    0
+}

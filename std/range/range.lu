@@ -3,54 +3,62 @@
 //! std.range — operations over the language's `a..b`. Stability tier:
 //! core.
 //!
-//! **Three of the contract's four functions are BLOCKED, and the reason
-//! is one missing thing: a range value has no bounds accessor.** At
-//! these pins a `range[int]` can be constructed (`2..7`), passed to a
-//! function, and iterated by `for` — and nothing else. `r.start`,
-//! `r.end`, `r.len`, `r.lo`, `r.hi`, `r.first`, `r.last` all answer
-//! "a range has no member" in the interpreter, and the type `range` does
-//! not resolve at all in the compiler (E0301). Filed as F-0030.
+//! **Four functions, all O(1), on the two accessors `[type.range]` gave
+//! the type at wolf 0.2.14 (s158, wolf-lang#24; F-0030 CLOSED).** A
+//! `range[int]` is a nameable type with `start` and `end` as properties,
+//! and `end` is EXCLUSIVE, always: `a..=b` normalizes at construction to
+//! `end = b + 1` under `[mem.iter.range]`'s checked arithmetic, so
+//! `(2..=7).end` is 8 and `r.end - r.start` is the count for both
+//! spellings (`[type.range.accessor]`). That one exclusive `end` is what
+//! makes `contains`, `len` and `clamp_to` writable at all. sc04 reviewed
+//! their signatures and F-0030 recorded them as unwritable for eleven
+//! sprints, because the only spelling was iteration: O(len) for an O(1)
+//! question, and a hang rather than an answer on
+//! `0..9223372036854775807`. `is_empty` shipped alone, on the one fact
+//! iteration can decide in O(1), and is now the same comparison as the
+//! other three.
 //!
-//! What that costs, precisely:
+//! **A reversed range is a legal, empty value.** `7..3` iterates zero
+//! times — `[mem.iter.range]` steps ascending while `< end` — so
+//! `is_empty(7..3)` is true, and its raw `end - start` is **-4**,
+//! measured at wolf 0.2.14 on both rungs. `len` therefore answers the
+//! COUNT of values a `for` would yield, which is 0 there, and not the
+//! signed difference wolf-std#30 spelled: a function named `len` that
+//! answers a negative number is the wrong-on-legal-input shape sc03's
+//! refusal-over-approximation rule (§9) does not ship. `clamp_to` on an
+//! empty range has no member to answer with and raises `none` (§2:
+//! absence is a row tag, never a sentinel), a row the reviewed signature
+//! did not carry; returning `start` — a number the range does not
+//! contain — would be the same wrong answer under a different name.
 //!
-//! - `contains(r, x) -> bool` — writable only by iterating, which is
-//!   O(len) where the operation is O(1), and a *hang* rather than an
-//!   answer on `0..9223372036854775807`. std does not ship a function
-//!   that is right on small inputs and fatal on legal ones (sc03's
-//!   refusal-over-approximation rule, §9).
-//! - `len(r) -> int` — same, and worse: counting to 2^63 is not an
-//!   implementation of `len`.
-//! - `clamp_to(r, x) -> int` — needs both bounds as values; there is no
-//!   spelling at all.
+//! **Lane words, named.** Both compiler rungs run every row here at
+//! 0.2.14. The reference machine (lupin 0.1.36) conforms to `a7f517e` =
+//! v0.2.12 and has not mirrored `[type.range.accessor]`: `r.start` and
+//! `r.end` are declined BY NAME at resolve there — "a range has no
+//! member `start`", F-0030's sentence, a whole-program `unsupported`
+//! and never a diagnostic — so every test in `tests/range/` is
+//! `unsupported` on lupin, `is_empty`'s included (it ran there while
+//! its body was a loop). The examples below
+//! are prose rather than fenced blocks for the same reason: a fenced
+//! example must reach `exit(0)` or an honest `unsupported` on every lane
+//! (§4) — and it would, since `unsupported` is honest — but an example
+//! that no reference lane runs documents less than the tests do, so the
+//! four rows carry the truth and the prose carries the reader. The
+//! release that mirrors the clause reds the four lupin rows (deeper
+//! than the ledger) and the fences come back with the flip.
 //!
-//! `is_empty(r)` survives because emptiness is decidable in O(1) from
-//! iteration alone: a range is empty exactly when its iterator yields
-//! nothing, and `for` plus an early `return` asks that question without
-//! consuming the range. It is the only function here, and it is the
-//! demonstration that the other three are blocked by an accessor rather
-//! than by iteration.
-//!
-//! The reviewed signatures, for the sprint that lands them:
-//! `contains(r: range[int], x: int) -> bool`,
-//! `len(r: range[int]) -> int`,
-//! `clamp_to(r: range[int], x: int) -> int`. `rev()` and `step_by()`
-//! remain BLOCKED on the iterator combinator surface (F-0008's
-//! successor); note that the combinator that truncates a sequence is
-//! named `limit(n)`, never `take(n)` — `take` is the ownership mode that
-//! CONSUMES its operand, and a combinator that does not consume would be
-//! a false friend at the centre of the ownership story (wolf-lang#16,
-//! recorded in API-CONVENTIONS §10).
-//!
-//! Runs on the interpreter only: the compiler does not resolve the type
-//! `range` at either rung, so every test here is a lupin lane and the
-//! ledger says so. The single function's example is prose rather than a
-//! fenced block for exactly that reason — a fenced example must reach
-//! `exit(0)` or an honest `unsupported`, and a static rejection is a doc
-//! bug by §4.
+//! `rev()` and `step_by()` remain BLOCKED on the iterator combinator
+//! surface (F-0008's successor); the combinator that truncates a sequence
+//! is named `limit(n)`, never `take(n)` — `take` is the ownership mode
+//! that CONSUMES its operand, and a combinator that does not consume
+//! would be a false friend at the centre of the ownership story
+//! (wolf-lang#16, API-CONVENTIONS §10).
 
 /// True when `r` yields no values — `5..5` and `7..3` are empty, `2..7`
-/// is not. O(1): the loop body runs at most once. Total: no error row,
-/// no traps.
+/// is not. O(1): the loop body runs at most once. The body is still the
+/// iteration probe in this commit; it moves onto the accessor in its own
+/// commit, and the header above already describes the module there.
+/// Total: no error row, no traps.
 ///
 /// Example (prose; see the module header for why it is not a fenced
 /// block): `range.is_empty(5..5)` is true and `range.is_empty(2..7)` is
@@ -60,4 +68,17 @@ pub fn is_empty(r: range[int]) -> bool {
         return false
     }
     true
+}
+
+/// True when `x` is a value `r` yields: `r.start <= x && x < r.end`,
+/// the spelling `[type.range.accessor]` gives. O(1) on every input,
+/// `0..9223372036854775807` included — the range this function refused
+/// to be written over by iteration. An empty range contains nothing.
+/// Total: no error row, no traps.
+///
+/// Example (prose): `range.contains(2..7, 2)` is true,
+/// `range.contains(2..7, 7)` is false because `end` is exclusive, and
+/// `range.contains(2..=7, 7)` is true.
+pub fn contains(r: range[int], x: int) -> bool {
+    r.start <= x && x < r.end
 }

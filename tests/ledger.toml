@@ -1273,6 +1273,11 @@ lupin = "run"
 wolfc = "run"  # sc48 binary bump (wolf 0.2.14): `[type.range]` (s158) — `range[int]` is a nameable type, the E0301 both rungs answered since sc04 is gone
 native = "run"  # sc48 binary bump (wolf 0.2.14): same — the type resolves and the rung lowers the body
 
+[tests."range/contains.lu"]
+lupin = "unsupported"  # sc48: declined BY NAME at resolve — "a range has no member `start`" — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]`; a whole-program refusal, so `unsupported` and not `mirror-lag`
+wolfc = "run"
+native = "run"
+
 # ---- sc05: std.fmt, std.fmt.decimal, std.hex, std.base64, std.json ----
 #
 # One column, and the reason is structural rather than incidental: every
