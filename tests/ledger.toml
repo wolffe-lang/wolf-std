@@ -1257,14 +1257,21 @@ lupin = "run"
 wolfc = "run"
 native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
-# ---- sc04: std.range. The compiler resolves no type named `range`, so
-# both of its rungs REJECT — the only fail(E…) rows in the ledger, and
-# they die with the accessor F-0030 asks for. ----
+# ---- sc04: std.range. Through wolf 0.2.12 the compiler resolved no type
+# named `range`, so both rungs REJECTED every row here — the only
+# fail(E…) rows the ledger carried — and the module did not compile at
+# all. sc48 (wolf 0.2.14, `[type.range]`, s158): the type resolves,
+# `start`/`end` read the endpoints, F-0030 is CLOSED and both compiler
+# columns are `run`. The reference machine has the opposite history:
+# lupin ran `is_empty` while its body was a loop, and lupin 0.1.36
+# conforms to v0.2.12, where `r.start` is `fail(E0301)` at resolve — so
+# every std.range row is `mirror-lag(E0301)` there from the commit that
+# rewrites the bodies on the accessor. ----
 
 [tests."range/is_empty.lu"]
 lupin = "run"
-wolfc = "fail(E0301)"
-native = "fail(E0301)"
+wolfc = "run"  # sc48 binary bump (wolf 0.2.14): `[type.range]` (s158) — `range[int]` is a nameable type, the E0301 both rungs answered since sc04 is gone
+native = "run"  # sc48 binary bump (wolf 0.2.14): same — the type resolves and the rung lowers the body
 
 # ---- sc05: std.fmt, std.fmt.decimal, std.hex, std.base64, std.json ----
 #
@@ -1386,6 +1393,26 @@ wolfc = "unsupported"
 native = "unsupported"
 
 
+# ---- sc48 (lupin 0.1.36, is48): THE REFERENCE MACHINE HAS A FILESYSTEM.
+# "This machine has no filesystem by design, so the fs tier is declined
+# rather than mocked" — the sentence every lupin fs row below quoted from
+# sc07 to sc47 — is withdrawn upstream (BACKLOG B16): `eval::fs`
+# implements `[os.fs]` over real files, 22 names, in the observed
+# program's own directory. Predicted 15 lupin rows `unsupported` -> `run`
+# (all 13 fs rows plus the two `net/unix` rows whose relations are fs
+# readings); MEASURED 11. The four that stay dark name the four std
+# builtins outside the 22, in lupin's own resolve strings:
+#   fs/chunk_stream.lu            `fs_write_chunk` does not resolve
+#   fs/directories_and_metadata.lu `fs_create_dir` does not resolve
+#   fs/exists_row.lu              `fs_remove_dir` does not resolve
+#   fs/fstat_rows.lu              `fs_create_dir` does not resolve
+# (`fs_rename_atomic` is the fourth absent name, with no row of its own;
+# `fs_create_dir_all`, `fs_remove_dir_all` and `fs_read_chunk` DO
+# resolve). Filed on wolf-interp. The two `io` rows stay `unsupported`
+# on `read_line`, which 0.1.36's notes decline by name — stdin is not a
+# file. The old sentence is kept in the row comments below as the
+# history it is. ----
+#
 # ---- std.fs and std.io: PHASE B OPENS (sc07) ----
 # One posture for the whole tier, stated here and in CONTRIBUTING rather
 # than in nine file headers. The checked tier is the executing lane: it
@@ -1406,17 +1433,17 @@ native = "unsupported"
 # an escape (the s38 lesson, now in the rig).
 
 [tests."fs/text_round_trip.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48 BUILT THE FS TIER (BACKLOG B16) — real files over `[os.fs]`, the by-design decline withdrawn upstream; flipped on the designed red, staged re-measure 2026-09-14
 wolfc = "run"
 native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fs/copy_and_move.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48 BUILT THE FS TIER (BACKLOG B16) — real files over `[os.fs]`, the by-design decline withdrawn upstream; flipped on the designed red, staged re-measure 2026-09-14
 wolfc = "run"
 native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fs/fd_stream.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48 BUILT THE FS TIER (BACKLOG B16) — real files over `[os.fs]`, the by-design decline withdrawn upstream; flipped on the designed red, staged re-measure 2026-09-14
 wolfc = "run"
 native = "run"  # sc08 pin bump (13b811f)
 
@@ -1434,12 +1461,12 @@ native = "run"  # sc08 pin bump (13b811f)
 # `else` handler cannot say which tag fired (F-0043), so the propagation
 # record is the only place `not_found` and `io` appear as themselves.
 [tests."fs/not_found_row.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48 BUILT THE FS TIER (BACKLOG B16) — real files over `[os.fs]`, the by-design decline withdrawn upstream; flipped on the designed red, staged re-measure 2026-09-14
 wolfc = "run"
 native = "run"  # sc08 pin bump (13b811f)
 
 [tests."fs/forged_handle_io_row.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48 BUILT THE FS TIER (BACKLOG B16) — real files over `[os.fs]`, the by-design decline withdrawn upstream; flipped on the designed red, staged re-measure 2026-09-14
 wolfc = "run"
 native = "run"  # sc08 pin bump (13b811f)
 
@@ -2152,12 +2179,12 @@ native = "unsupported"
 # is filed as F-0081.
 
 [tests."fs/binary_round_trip.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48 BUILT THE FS TIER (BACKLOG B16) — real files over `[os.fs]`, the by-design decline withdrawn upstream; flipped on the designed red, staged re-measure 2026-09-14
 wolfc = "run"
 native = "run"
 
 [tests."fs/append_is_an_append.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48 BUILT THE FS TIER (BACKLOG B16) — real files over `[os.fs]`, the by-design decline withdrawn upstream; flipped on the designed red, staged re-measure 2026-09-14
 wolfc = "run"
 native = "run"
 
@@ -2191,7 +2218,7 @@ wolfc = "run"
 native = "run"
 
 [tests."fs/utf8_row.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48 BUILT THE FS TIER (BACKLOG B16) — real files over `[os.fs]`, the by-design decline withdrawn upstream; flipped on the designed red, staged re-measure 2026-09-14
 wolfc = "run"
 native = "run"
 
@@ -3312,8 +3339,8 @@ native = "run"
 # s[a..b]; the wolf rungs refuse the shape at resolve, lupin runs it.
 # Both wolf columns flip to `run` at the binary that closes the filing.
 lupin = "run"
-wolfc = "unsupported"
-native = "unsupported"
+wolfc = "run"  # sc48 binary bump (wolf 0.2.14): F-0096 PAID at v0.2.13 (`s.get(0..^1)` resolves, wolf-lang#164) — the flip this row's own comment predicted, at the binary that closes the filing
+native = "run"  # sc48 binary bump (wolf 0.2.14): F-0096 PAID, as above
 
 [tests."str/chars_builtin_agree.lu"]
 # sc25 binary bump (lupin 0.1.15, the is26 scalar release): chars()
@@ -3481,12 +3508,12 @@ native = "run"
 # Harmless (staging wipes before every run) and recorded because it is
 # the sort of thing that looks like a leak when it is a lane word.
 [tests."net/unix/cleanup.lu"]
-lupin = "unsupported"  # sc36: `fs_exists` — "this machine has no filesystem (or injectable stdin) by design, so the fs tier is declined rather than mocked". Every relation in the file is an `fs.exists` reading
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48's fs tier — every relation here is an `fs.exists` reading and the reference machine now has a filesystem to read; flipped on the designed red
 wolfc = "run"
 native = "run"
 
 [tests."net/unix/refused_row.lu"]
-lupin = "unsupported"  # sc36: `fs_rename` does not resolve — the stale-socket recipe is a rename, so the row that needs it is compiler-lanes-only
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48's fs tier — `fs_rename` resolves, so the stale-socket recipe runs on the reference machine; flipped on the designed red
 wolfc = "run"
 native = "run"
 
@@ -3631,7 +3658,7 @@ native = "run"
 # matched pin buys reach only where the machine has the capability to
 # begin with, which is a distinction the prediction collapsed.
 [tests."fs/fstat_handle.lu"]
-lupin = "unsupported"  # sc40: the reference machine's own words at `resolve` — "this machine has no filesystem (or injectable stdin) by design, so the fs tier is declined rather than mocked". A posture, not a release date, and unchanged by the zero pairing gap
+lupin = "run"  # sc48 binary bump (lupin 0.1.36): is48 BUILT THE FS TIER (BACKLOG B16) — real files over `[os.fs]`, the by-design decline withdrawn upstream; flipped on the designed red, staged re-measure 2026-09-14
 wolfc = "run"
 native = "run"
 
