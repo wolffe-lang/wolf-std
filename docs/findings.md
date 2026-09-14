@@ -135,6 +135,10 @@ the building.
 | F-0125 | 2026-09-12 | **A static refusal hides its file's own lints, and one had been hiding a W0402 in this tree since sc01.** `tests/cmp/total_cmp_relational.lu` was `fail(E0301)` on BOTH compiler columns from sc44 (`==` on an imported `Ordering` needed a bare `Eq` in scope, which no importer can have — wolf-lang#336) and `unsupported` on the compiler rungs before that, so no compiler had ever type-checked it. s156's #336 made it compile, and the FIRST reading answered `W0402: `0.0 - x` is not negation` on `cmp.total_cmp(0.0 - inf, 1.0)` — in the one file in this repository whose entire subject is signed-zero ordering, where `0.0 - (-0.0)` being `+0.0` is precisely the caveat the file exists to pin. The rig denies warnings on every lane (F-0046/F-0053), so the lint is what turned a green row red rather than a reader. This is F-0119's shape one layer down: that finding was "a module nobody could type is a module nobody read", and this is "a file nobody could type is a file nobody LINTED" — the same blindness, at the warning rung, where it is cheaper to miss because a warning never fails a build on its own. The general form is a rule for pin bumps: when a row flips off `fail(…)`, expect the first clean reading to surface defects that predate the refusal, and read them as the file's own rather than as the bump's. Written `-inf` | wolf-std (the witness's own defect; the compiler was right both times) | no filing owed — the lint is correct and fired the moment it could |
 | F-0126 | 2026-09-12 | **The windows differential has been RED on three native rows since the native lane was lit, and two lanes recorded it GREEN — the second occurrence of the class this repository already has a correction commit for.** wolf-std#20 says twice, from sc44 and from t02's triage, that "windows went GREEN at sc44's head (run 34602166418), 401 rows, 0 divergent / 0 unstable / 0 slow" and that "`net/reuse_port` did not fire either". Re-read line by line at sc46: run 34602166418's `rig (windows-latest)` **std-test step was RED with five reds**, and `net/reuse_port` was two of them at exactly the `c11ba3ce…` hash the issue opened with; the sc45 head (run 34618995826) carries the identical five. The JOB says `success` in both because `ci.yml` marks the step `continue-on-error: ${{ runner.os != 'macOS' }}`, so an advisory step's RED never reaches the job's conclusion — and the "0 divergent / 0 unstable / 0 slow" quoted as evidence is the SUMMARY line, which counts ledger words and prints identically on a red run. `7223653` recorded this class once already ("the windows differential was recorded GREEN and is RED — the correction, and the rule that would have caught it"); the rule is that a gauntlet's verdict is its exit code, and **a lane that is `continue-on-error` has no exit code to read, so it must be read from the STEP's own output and never from the job's conclusion** — which is the sentence that was missing, because the first occurrence was about a pipe and this one is about a workflow key. At sc46's head (run 34668214219) the windows list is **three, not five**: `net/adopt_rows [native]`, `process/prefork_handoff [native]` and `process/start_with_inherit_rows [native]`, all `expected exit(0), observed exit(1)`, all handle-inheritance-across-a-spawn, all invisible since wolf-std#18 lit that rung at sc43 — and `net/reuse_port` is GONE, because sc46 stopped its directive asserting the host's posture. macOS and ubuntu are clean on all three at the same head | wolf-std (the rig's own reading discipline) | [filed: wolf-std#34](https://github.com/wolffe-lang/wolf-std/issues/34); wolf-std#20's last named row closes with the directive fix, and the three are its successor |
 | F-0127 | 2026-09-12 | **`continue-on-error` rewrites a step's conclusion at the STEP level too, so F-0126's own correction is not sufficient — the only durable fact is the marker in the workflow file, and now a gate reads it.** F-0126 closed the second occurrence of the recorded-GREEN-is-RED class with a rule: "a lane that is `continue-on-error` has no exit code to read, so it must be read from the STEP's own output and never from the job's conclusion." Measured at sc47 against run 34672768728 (trunk `8b5a18e`), that rule is still not enough if "the step's output" is taken to mean the step's reported conclusion. The REST API answers `{"name":"std-test (the differential; three lanes, three hosts)","conclusion":"success"}` for `rig (windows-latest)` — the STEP object, not the job — while the same step's log ends `xtask: RED` and `##[error]Process completed with exit code 1`. GitHub rewrites the conclusion at BOTH levels, so a reader who follows F-0126's rule to the letter with `gh api …/jobs` gets the same wrong answer the two earlier lanes got. Three things survive: the step's own LOG text, the `::error::` annotation, and `steps.<id>.outcome`, which is the pre-rewrite result. **The structural half is what closed it.** `xtask/src/workflow.rs` already refused to count `nightly.yml` as coverage and said why — "counting its steps as coverage would let a step be 'in CI' while no merge ever waited on it — the exact confusion F-0113 records" — and that rule was applied to a whole workflow at the JOB level and never to a STEP inside `ci.yml`, which is the hole `std-test` sat in from sc43 to sc46. The reader is now per-step, `ADVISORY_STEPS` is a blessed list carrying the issue that retires each entry, and `selftest.rs` asserts it against `ci.yml` in both directions in the `rig` job that was already required on three hosts. Proved RED on three planted failures before landing: widening the marker back to `!= 'macOS'`, adding one to `fmt-lu`, and deleting the marker while keeping the blessing. ubuntu's `std-test` goes REQUIRED at the same commit on four consecutive greens (34602166418, 34618995826, 34668184512, 34672768728) | wolf-std (the rig's own reading discipline, one level below F-0126) | no upstream filing owed — GitHub's behaviour is documented and the defect was this repository's use of it; wolf-std#34 carries the three windows rows that keep the last marker alive |
+| F-0128 | 2026-09-14 | **lupin 0.1.36's fs tier is 22 names and std.fs calls 26**: `fs_create_dir`, `fs_remove_dir`, `fs_write_chunk` and `fs_rename_atomic` answer `unsupported — `<name>` does not resolve` at `resolve` while their siblings (`fs_create_dir_all`, `fs_remove_dir_all`, `fs_read_chunk`, `fs_rename`) run — measured one name at a time on the release that built the tier. sc48 predicted 15 lupin fs rows `unsupported` -> `run` at the bump and measured 11; the four that stayed dark (`fs/chunk_stream`, `fs/directories_and_metadata`, `fs/exists_row`, `fs/fstat_rows`) name the four absent builtins in the rig's own records, and flip on the release that carries them | wolf-interp (the fs tier, is48) | [filed: wolf-interp#112](https://github.com/wolffe-lang/wolf-interp/issues/112) |
+| F-0129 | 2026-09-14 | **The checked machine PANICS on a wide range VALUE — `capacity overflow`, no record at all**: `fn first(r: range[int]) -> int { for x in r { return x } … }` over `0..9223372036854775807` is `exit(0)` / `first 0` on the native rung and a Rust panic on `wolf conform-run --checked`; `0..1000000` is fine on both. The checked tier materializes a range value before iterating it, where `[type.range.value]` says a `for` over a range header never materializes one. A panic is not a verdict, so the differential cannot even file it as a divergence. Found writing `std.range.len`'s overflow witness, which measures the wide range and does not iterate it | wolf-lang (checked execution, s158's range values) | [filed: wolf-lang#381](https://github.com/wolffe-lang/wolf-lang/issues/381) |
+| F-0130 | 2026-09-14 | **An error-set alias inside a std module costs the reference lane EVERY importer, at parse**: wolf 0.2.14 takes `error IoErrors = {not_found, denied, io}` on both rungs; lupin 0.1.36 (pin v0.2.12) refuses it at parse (`fail(E0201)`), and one `error` line appended to a scratch copy of `std/fs/fs.lu` turned `fs/path_helpers.lu` — a row that never names it — from `exit(0)` to `fail(E0201)`. Eighteen lupin rows import `std.fs`, fifteen of them lit by the same bump; sc46's `trait Num` alias cost ONE row because its refusal was at resolve. So the io tier's alias is witnessed (`tests/fs/alias_row.lu`, `run`/`run`/`mirror-lag(E0201)`) and not written into std.fs until the mirror parses the form. The list-literal half of wolf-std#30 has no carrier at all (zero non-doc `List[T]()`-plus-literal-push sites) | wolf-std (the alias's home) + wolf-interp (the mirror at v0.2.12) | [filed: wolf-std#36](https://github.com/wolffe-lang/wolf-std/issues/36) |
+| F-0131 | 2026-09-14 | **`doc-examples` has no mirror-lag word**: a lupin `unsupported` is accepted only for `CAPABILITY_MODULES` or a per-function `LUPIN_TIER_WAIVERS` entry, and a lupin `fail(E…)` never — so a module the mirror has not caught up to (`std.range` at 0.2.14: both compiler rungs run it, lupin declines the accessor BY NAME) cannot fence an example two lanes run to `exit(0)`, and its four examples are prose while the ledger has carried `mirror-lag(E…)` for the same shape since sc46 | wolf-std (the rig's extractor) | [filed: wolf-std#37](https://github.com/wolffe-lang/wolf-std/issues/37) |
 
 
 ## F-0001 — the std search path
@@ -9650,3 +9654,70 @@ expired is a licence nobody is using. windows is the only advisory host
 left, behind wolf-std#34's three native net/process rows, and it now
 says its red out loud through a `::warning::` annotation and a job
 summary line rather than passing in silence.
+
+## F-0128 — lupin 0.1.36's fs tier is twenty-two names, and std.fs calls twenty-six
+
+`wolf-interp#112`. is48 built the fs tier "from `spec/11-os.md` §6 and
+the witnesses under `corpus/fs/`", twenty-two names. wolf-std's
+`std/fs/fs.lu` calls twenty-six `fs_*` builtins, and four of them do not
+resolve on the release: `fs_create_dir`, `fs_remove_dir`,
+`fs_write_chunk`, `fs_rename_atomic` — each measured with a one-call
+program, `unsupported — `<name>` does not resolve` at `resolve`, while
+`fs_create_dir_all`, `fs_remove_dir_all`, `fs_read_chunk` and
+`fs_rename` run. The non-recursive halves of two implemented calls and
+the write half of an implemented read.
+
+sc48 predicted before its differential that all thirteen lupin fs rows
+plus the two `net/unix` fs-reading rows would flip `unsupported` ->
+`run`; eleven did. The four that stayed dark name the four builtins in
+the rig's own records (`tests/ledger.toml`'s sc48 note lists them), and
+they flip on the release that carries the names — a row count the
+release notes could have let a consumer predict.
+
+## F-0129 — the checked machine panics on a wide range value
+
+`wolf-lang#381`. `[type.range.value]` says a range "passes as a
+parameter, returns, binds, and iterates". Passed and iterated —
+`fn first(r: range[int]) -> int { for x in r { return x } 0 }` over
+`0..9223372036854775807` — the native rung answers `first 0` and the
+checked machine dies with a Rust `capacity overflow` panic and no
+record; `0..1000000` runs on both. The checked tier materializes a
+range VALUE into a vector sized by `end - start` before iterating it,
+where the same clause says a `for` over a range header never
+materializes one. A panic is never a verdict, so `conform-run` has
+nothing to compare and the differential cannot even call it a
+divergence. Found while writing `std.range.len`'s overflow witness,
+which measures the wide range and deliberately does not iterate it.
+
+## F-0130 — an alias in a std module darkens every importer on the reference lane, at parse
+
+`wolf-std#36`. The measurement wolf-std#30's alias half needed before
+it could land. wolf 0.2.14 takes `error IoErrors = {not_found, denied,
+io}` on both rungs; lupin 0.1.36 conforms to v0.2.12 and refuses the
+item at PARSE (`fail(E0201)`). Unlike a resolve-phase refusal, a parse
+refusal is not lazy: one `error` line appended to a scratch copy of
+`std/fs/fs.lu` turned `fs/path_helpers.lu`, which never names the
+alias, from `exit(0)` to `fail(E0201)`. Eighteen lupin rows import
+`std.fs`; fifteen of them were lit by the same bump. sc46 paid one row
+for `trait Num`'s alias because is46's mirror parsed the form and only
+resolve refused it (wolf-interp#102); this form would cost eighteen.
+So the alias is witnessed in the entry file — `tests/fs/alias_row.lu`,
+both directions of `[type.err.alias.transparent]` through `?` over
+`fs.size`, `run`/`run`/`mirror-lag(E0201)` — and moves into std.fs at
+the release that mirrors the clause. The list-literal half has no
+carrier: zero non-doc `List[T]()`-plus-literal-push sites in std.
+
+## F-0131 — doc-examples has no mirror-lag word
+
+`wolf-std#37`. `doc_examples.rs` accepts a lupin `unsupported` for a
+`CAPABILITY_MODULES` entry or a per-function `LUPIN_TIER_WAIVERS`
+entry, and a lupin `fail(E…)` never. `std.range` at 0.2.14 is neither
+shape: both compiler rungs run all four functions, lupin declines the
+accessor BY NAME ("a range has no member `start`"), and the module is
+not a capability. A fenced example there would red the gate on the
+reference lane while two lanes ran it, so the four examples are prose
+under §4 — while `tests/ledger.toml` has carried `mirror-lag(E…)` for
+exactly this shape since sc46. The ask is the ledger's semantics in the
+extractor: a blessed, self-testing list that accepts the refusal per
+module and reds on the release that runs the example, so the fences
+come back the day the ledger rows flip.
