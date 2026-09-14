@@ -1269,7 +1269,7 @@ native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 # rewrites the bodies on the accessor. ----
 
 [tests."range/is_empty.lu"]
-lupin = "run"
+lupin = "unsupported"  # sc48: `run` -> `unsupported`, DELIBERATE and shallower — the body moved from the iteration probe to `r.start >= r.end` (the contract's spelling), and lupin 0.1.36 declines the accessor by name ("a range has no member `start`"); the row comes back with the mirror
 wolfc = "run"  # sc48 binary bump (wolf 0.2.14): `[type.range]` (s158) — `range[int]` is a nameable type, the E0301 both rungs answered since sc04 is gone
 native = "run"  # sc48 binary bump (wolf 0.2.14): same — the type resolves and the rung lowers the body
 
@@ -1428,7 +1428,7 @@ native = "unsupported"
 #   fs/fstat_rows.lu              `fs_create_dir` does not resolve
 # (`fs_rename_atomic` is the fourth absent name, with no row of its own;
 # `fs_create_dir_all`, `fs_remove_dir_all` and `fs_read_chunk` DO
-# resolve). Filed on wolf-interp. The two `io` rows stay `unsupported`
+# resolve). Filed as wolf-interp#112 (F-0128). The two `io` rows stay `unsupported`
 # on `read_line`, which 0.1.36's notes decline by name — stdin is not a
 # file. The old sentence is kept in the row comments below as the
 # history it is. ----

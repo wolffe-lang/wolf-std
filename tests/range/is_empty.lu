@@ -1,14 +1,20 @@
 //! check: run(exit=0)
 //! phase: run
-//! conforms: std.range
+//! conforms: std.range, type.range, type.range.accessor
 //!
-//! The one function `std.range` can ship. Emptiness is decidable from
-//! iteration alone, which is why it survives where `contains`, `len` and
-//! `clamp_to` do not: those need the bounds as VALUES, and a range
-//! exposes no accessor at these pins (F-0030).
+//! `is_empty` was `std.range`'s one function for eleven sprints, because
+//! emptiness is decidable from iteration alone; at wolf 0.2.14 it is
+//! `r.start >= r.end` like the other three (`[type.range.accessor]`,
+//! F-0030 closed). The relations here did not move with the body: a
+//! reversed range (`7..3`) is empty, `a..a` is empty, and `a..a+1` is
+//! not.
 //!
-//! Interpreter lane only — the compiler does not resolve the type
-//! `range` at all (E0301), on either rung.
+//! Lane words: both compiler rungs run this now (they rejected the TYPE
+//! `range[int]` as E0301 through 0.2.12). The reference machine ran the
+//! iteration body and declines the accessor body BY NAME — lupin 0.1.36
+//! mirrors v0.2.12, and "a range has no member `start`" is its whole
+//! answer at resolve — so this row is `unsupported` there until the
+//! mirror takes `[type.range]`.
 
 use std.range
 
