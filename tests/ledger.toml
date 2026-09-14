@@ -1278,6 +1278,16 @@ lupin = "unsupported"  # sc48: declined BY NAME at resolve — "a range has no m
 wolfc = "run"
 native = "run"
 
+[tests."range/len.lu"]
+lupin = "unsupported"  # sc48: "a range has no member `start`", as contains.lu
+wolfc = "run"
+native = "run"
+
+[tests."range/len_overflow_trap.lu"]
+lupin = "unsupported"  # sc48: "a range has no member `start`" — declined one rung before the arithmetic that traps on the compiler rungs
+wolfc = "run"
+native = "run"
+
 # ---- sc05: std.fmt, std.fmt.decimal, std.hex, std.base64, std.json ----
 #
 # One column, and the reason is structural rather than incidental: every

@@ -1,0 +1,27 @@
+//! check: run(exit=trap(overflow))
+//! phase: run
+//! conforms: std.range, type.range, type.range.accessor, mem.iter.range
+//!
+//! `len` is `r.end - r.start` under checked arithmetic (X3), and a
+//! range spanning more than half the integer line has more values than
+//! an `int` can count: `(0 - 9223372036854775807 - 1)..9223372036854775807`
+//! yields 2^64 - 1 of them. The function's doc names the kind; this file
+//! pins it. The range itself is legal and constructs without a trap —
+//! only the count overflows. `lo` carries its `int` annotation on
+//! purpose: a literal no context decides defaults to `i32` (E0415, both
+//! rungs, measured) and this file is about `len`'s arithmetic, not the
+//! literal's.
+//!
+//! Lane words: both compiler rungs trap; lupin 0.1.36 (pin v0.2.12)
+//! declines the accessor by name one rung before the arithmetic, so the
+//! row is `unsupported` there.
+
+use std.range
+
+fn main() -> !int {
+    let lo: int = 0 - 9223372036854775807 - 1
+    let wide = lo..9223372036854775807
+    let n = range.len(wide)
+    print("unreachable: {n}")
+    0
+}

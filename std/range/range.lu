@@ -82,3 +82,22 @@ pub fn is_empty(r: range[int]) -> bool {
 pub fn contains(r: range[int], x: int) -> bool {
     r.start <= x && x < r.end
 }
+
+/// The number of values `r` yields: `r.end - r.start` when `r` is
+/// non-empty, `0` when it is not — `len(7..3)` is 0 where the raw
+/// difference is -4 (module header), and `len(a..=b)` is `b - a + 1`
+/// because `end` normalized to `b + 1` at construction. No error row.
+/// Traps `overflow` (checked arithmetic, X3) when the count does not fit
+/// an `int`, which is exactly a range spanning more than half the
+/// integer line — `(0 - 9223372036854775807 - 1)..9223372036854775807`
+/// yields 2^64 - 1 values and there is no `int` to say so;
+/// `tests/range/len_overflow_trap.lu` pins the kind.
+///
+/// Example (prose): `range.len(2..7)` is 5, `range.len(2..=7)` is 6,
+/// and `range.len(5..5)` is 0.
+pub fn len(r: range[int]) -> int {
+    if r.start >= r.end {
+        return 0
+    }
+    r.end - r.start
+}

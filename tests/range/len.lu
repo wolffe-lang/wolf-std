@@ -1,0 +1,30 @@
+//! check: run(exit=0, stdout="raw: -4 | len: 0")
+//! phase: run
+//! conforms: std.range, type.range, type.range.accessor, type.range.endpoints, mem.iter.range
+//!
+//! `len(r)` is the COUNT of values `r` yields — `r.end - r.start` on a
+//! non-empty range and 0 on an empty one. The printed line is the fact
+//! the module header records: a reversed range is a legal empty value
+//! whose raw `end - start` is -4, and `len` answers 0 there, not -4,
+//! because a count is never negative. The inclusive spelling counts
+//! `b - a + 1` (`end` normalized to `b + 1`), and the widest range a
+//! program can spell without overflowing the count answers in O(1).
+//!
+//! Lane words: both compiler rungs run; lupin 0.1.36 (pin v0.2.12)
+//! declines the accessor by name ("a range has no member `start`"), so
+//! the row is `unsupported` there.
+
+use std.range
+
+fn main() -> !int {
+    let rev = 7..3
+    print("raw: {rev.end - rev.start} | len: {range.len(rev)}")
+    if range.len(2..7) != 5 { return 1 }
+    if range.len(2..=7) != 6 { return 2 }
+    if range.len(5..5) != 0 { return 3 }
+    if range.len(7..3) != 0 { return 4 }
+    if range.len(0..1) != 1 { return 5 }
+    if range.len(0..9223372036854775807) != 9223372036854775807 { return 6 }
+    if range.len(0 - 5..5) != 10 { return 7 }
+    0
+}
