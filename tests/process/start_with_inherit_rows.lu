@@ -9,18 +9,24 @@
 //!
 //! **1. A bad set spawns NOTHING, and the ORDER of the checks is the
 //! property.** The command names a program no host has and the set holds
-//! a forged listener, so two rows are available — and the answer is `io`,
-//! not `not_found`. The runtime maps handles to descriptors BEFORE it
-//! reaches for the program, so a caller that gets `io` from this call
-//! knows no child exists and has nothing to reap. Asserting `io` here
-//! rather than `not_found` is the only way to measure that ordering from
-//! outside; the two-row setup is deliberate and this comment is why it
-//! must not be "simplified" to a program that exists.
+//! a forged listener, so two rows are available — and the answer is
+//! never `not_found`. On linux and macOS it is `io`: the runtime maps
+//! handles to descriptors BEFORE it reaches for the program. On windows
+//! it is `unsupported`, BY NAME: the clause's third sentence declines a
+//! non-empty set before any handle is examined, which is EARLIER still.
+//! Under either word a caller that gets the answer knows no child exists
+//! and has nothing to reap; the two-row setup is deliberate and this
+//! comment is why it must not be "simplified" to a program that exists.
 //!
-//! **2. A good set maps, and the row then comes from the PROGRAM.** Same
-//! missing program, but a real listener this time: `not_found`. Together
-//! with (1) that is the whole contract — a set the runtime accepts stops
-//! being the story, and a set it rejects is the only story.
+//! **2. A good set maps, and the row then comes from the PROGRAM** —
+//! where the set is served at all. Same missing program, a real listener
+//! this time: `not_found` on linux and macOS. windows answers
+//! `unsupported` here too, the set being declined by name whatever it
+//! holds, and the property this call pins there is CONSISTENCY: a host
+//! that declines the set does so on both calls, never `unsupported` for
+//! one and a POSIX word for the other. Together with (1) that is the
+//! whole contract — a set the runtime accepts stops being the story, and
+//! a set it rejects is the only story.
 //!
 //! **3. The master KEEPS its listeners, which is why the set is on the
 //! spawn and not on the `Command`.** One binding, two spawns, and
@@ -30,29 +36,36 @@
 //! workers hands the same set to each spawn in turn and re-spawns any one
 //! of them after a `kill -9`. That is lobo's ws18 argument — the listener
 //! set is a property of the MASTER and each spawn is an event that
-//! BORROWS it — measured rather than asserted in prose.
+//! BORROWS it — measured rather than asserted in prose, and it holds on
+//! the host that never spawns: declining the set does not touch it.
+//!
+//! **sc48: the witness stopped asserting the POSIX words (wolf-std#34).**
+//! From sc39 to sc47 (1) counted only `io` and (2) only `not_found`, so
+//! on `rig (windows-latest)` both calls took their `unsupported` arm and
+//! the row was `exit(1)` behind a `continue-on-error` marker (run
+//! 34686645924, `expected exit(0), observed exit(1)`). Each call now
+//! records the arm it took; the exit codes name the failure: 1 and 2 as
+//! before (a spawn where a refusal was owed, or a tag no posture
+//! predicts — `denied`, or `not_found` for the forged set), 3 the master
+//! lost its listener, 4/5 a `Child` came back on a refused call, and
+//! **6 is a MIXED posture** — the clause's windows word on one call and
+//! a POSIX word on the other. The stdout line is the same under both
+//! postures, so the directive is one line on three hosts.
 //!
 //! **Lane words, all three named.** The CHECKED machine refuses a
 //! non-empty set BY NAME, with the construct string verbatim — "fd
 //! inheritance across os_spawn_with in checked execution" — because it is
 //! the `wolf` binary interpreting a program, so a descriptor handed to
 //! "the program's child" would go to the compiler's child. The REFERENCE
-//! machine (lupin 0.1.27) declines it with the SAME string, by name and
+//! machine (lupin 0.1.27 on) declines it with the SAME string, by name and
 //! not by calendar: this is not F-0110, which was a release-date lane
-//! word. The NATIVE lane is the one that measures the rows, and it is
-//! enough — these are the runtime's own checks. Windows would answer the
-//! catchable `unsupported` ROW here for the third reason in the clause (a
-//! `SOCKET` is not a small stable number a parent can name by position),
-//! which is why every handler below carries an `unsupported` arm even
-//! though the lane that runs this file never takes it.
+//! word. The NATIVE lane is the one that measures the rows, on all three
+//! hosts.
 //!
 //! **What this file still cannot witness**, honestly and for the same
 //! reason `net/adopt_rows.lu` cannot: the rig runs ONE program per test,
 //! so nothing here is a child that can adopt what was handed down. The
-//! end-to-end prefork handshake needs a parent and a child in one test
-//! and that remains F-0066's shape. What both halves now have is every
-//! REFUSAL and every ordering property, on both ends, which is the half a
-//! program actually has to survive.
+//! end-to-end prefork handshake is `process/prefork_handoff.lu`.
 
 use std.net
 use std.process
@@ -60,34 +73,53 @@ use std.process
 fn main() -> !int {
     var forged = List[net.Listener]()
     (mut forged).push(net.Listener { fd: 4242 })
-    var bad_set_first = false
+    // 0 = spawned, 1 = io, 2 = unsupported by name, 3 = not_found, 4 = denied
+    var arm_bad = 0
     let a = process.start_with(
         process.command("wolf-sc11-no-such-program-here"),
         forged,
     ) else |e| match e {
-        unsupported => { process.Child { slot: 0 - 1 } },
-        not_found => { process.Child { slot: 0 - 1 } },
-        denied => { process.Child { slot: 0 - 1 } },
+        unsupported => {
+            arm_bad = 2
+            process.Child { slot: 0 - 1 }
+        },
+        not_found => {
+            arm_bad = 3
+            process.Child { slot: 0 - 1 }
+        },
+        denied => {
+            arm_bad = 4
+            process.Child { slot: 0 - 1 }
+        },
         io => {
-            bad_set_first = true
+            arm_bad = 1
             process.Child { slot: 0 - 1 }
         },
     }
     var srv = net.listen(net.loopback(0))?
     var set = List[net.Listener]()
     (mut set).push(srv)
-    var good_set_spawns = false
+    var arm_good = 0
     let b = process.start_with(
         process.command("wolf-sc11-no-such-program-here"),
         set,
     ) else |e| match e {
-        unsupported => { process.Child { slot: 0 - 1 } },
-        not_found => {
-            good_set_spawns = true
+        unsupported => {
+            arm_good = 2
             process.Child { slot: 0 - 1 }
         },
-        denied => { process.Child { slot: 0 - 1 } },
-        io => { process.Child { slot: 0 - 1 } },
+        not_found => {
+            arm_good = 3
+            process.Child { slot: 0 - 1 }
+        },
+        denied => {
+            arm_good = 4
+            process.Child { slot: 0 - 1 }
+        },
+        io => {
+            arm_good = 1
+            process.Child { slot: 0 - 1 }
+        },
     }
     let c = process.start_with(process.command("wolf-sc11-no-such-program-here"), set) else |_| {
         process.Child { slot: 0 - 1 }
@@ -100,6 +132,8 @@ fn main() -> !int {
             master_keeps = true
         }
     }
+    let bad_set_first = arm_bad == 1 || arm_bad == 2
+    let good_set_spawns = arm_good == 3 || arm_good == 2
     print(
         "bad set first: {bad_set_first} | good set spawns: {good_set_spawns} | master keeps the set: {master_keeps}",
     )
@@ -108,5 +142,7 @@ fn main() -> !int {
     if !master_keeps { return 3 }
     if a.slot != 0 - 1 { return 4 }
     if b.slot != 0 - 1 { return 5 }
+    if arm_bad == 2 && arm_good != 2 { return 6 }
+    if arm_good == 2 && arm_bad != 2 { return 6 }
     0
 }
