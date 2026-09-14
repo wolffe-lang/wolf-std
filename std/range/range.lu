@@ -101,3 +101,26 @@ pub fn len(r: range[int]) -> int {
     }
     r.end - r.start
 }
+
+/// The value of `r` nearest to `x`: `x` itself when `r` contains it,
+/// `r.start` when `x` lies below, and `r.end - 1` — the last value
+/// yielded — when `x` is at or above `end`. Rows: `none` when `r` is
+/// empty, because an empty range has no member to answer with (§2).
+/// Never traps: `r.end - 1` is computed only under `r.start < r.end`,
+/// so it cannot underflow.
+///
+/// Example (prose): `range.clamp_to(2..7, 4)` is 4,
+/// `range.clamp_to(2..7, 9)` is 6, `range.clamp_to(2..7, 0 - 3)` is 2,
+/// and `range.clamp_to(5..5, 1)` raises `none`.
+pub fn clamp_to(r: range[int], x: int) -> int ! {none} {
+    if r.start >= r.end {
+        return none
+    }
+    if x < r.start {
+        return r.start
+    }
+    if x >= r.end {
+        return r.end - 1
+    }
+    x
+}

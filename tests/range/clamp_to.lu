@@ -1,0 +1,44 @@
+//! check: run(exit=0, stdout="in: 4 | above: 6 | below: 2 | inclusive: 7 | empty: none")
+//! phase: run
+//! conforms: std.range, type.range, type.range.accessor, type.range.endpoints, err.row, err.else
+//!
+//! `clamp_to(r, x)` is the member of `r` nearest to `x`: `x` when `r`
+//! contains it, `start` below, `end - 1` — the last value yielded, never
+//! `end` itself — at or above. The inclusive spelling clamps to `b`,
+//! which is `end - 1` after normalization. An empty range has no member
+//! to answer with and raises `none`, asserted through the row rather
+//! than a sentinel (§2); the reviewed signature had no row, and the
+//! module header says why it has one now.
+//!
+//! Lane words: both compiler rungs run; lupin 0.1.36 (pin v0.2.12)
+//! declines the accessor by name ("a range has no member `start`"), so
+//! the row is `unsupported` there.
+
+use std.range
+
+fn main() -> !int {
+    let inside = range.clamp_to(2..7, 4)?
+    let above = range.clamp_to(2..7, 9)?
+    let below = range.clamp_to(2..7, 0 - 3)?
+    let incl = range.clamp_to(2..=7, 9)?
+    var empty = "answered"
+    let miss = range.clamp_to(5..5, 1) else |e| match e {
+        none => {
+            empty = "none"
+            0 - 1
+        },
+    }
+    print("in: {inside} | above: {above} | below: {below} | inclusive: {incl} | empty: {empty}")
+    if inside != 4 { return 1 }
+    if above != 6 { return 2 }
+    if below != 2 { return 3 }
+    if incl != 7 { return 4 }
+    if miss != 0 - 1 { return 5 }
+    let edge = range.clamp_to(2..7, 7)?
+    if edge != 6 { return 6 }
+    let first = range.clamp_to(2..7, 2)?
+    if first != 2 { return 7 }
+    let reversed = range.clamp_to(7..3, 5) else 0 - 9
+    if reversed != 0 - 9 { return 8 }
+    0
+}
