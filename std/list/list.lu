@@ -941,3 +941,32 @@ pub fn sort_by[T](mut xs: List[T], less: fn(T, T) -> bool) {
     }
     xs = src
 }
+
+/// `sort_by`'s returning twin: a fresh list holding `xs`'s elements in
+/// `less`'s order, stably, with `xs` untouched. `less` must be a strict
+/// weak order or the result is merely a permutation. Total: no error
+/// row, no traps beyond allocation and whatever `less` traps.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method
+/// `xs.sorted_by(less)` is this call, the chain's sort (`corpus/
+/// wordcount.lu`'s `sorted_by`). Cost, as the clause states it:
+/// `sort_by` over a fresh copy. `std.sort.sorted_by` is the `Ordering`
+/// twin that runs on no lane (F-0029) and keeps its qualified spelling.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 3)
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// (list.first(list.sorted_by(xs, fn(a, b) a < b)) else 0) == 1
+/// (list.last(list.sorted_by(xs, fn(a, b) a < b)) else 0) == 3
+/// (list.first(xs) else 0) == 3
+/// ```
+pub fn sorted_by[T](xs: List[T], less: fn(T, T) -> bool) -> List[T] {
+    var out = List[T]()
+    for x in xs {
+        (mut out).push(x)
+    }
+    sort_by(mut out, less)
+    out
+}
