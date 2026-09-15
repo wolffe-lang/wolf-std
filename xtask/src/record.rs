@@ -50,6 +50,14 @@ pub struct Record {
     /// pins (wolfc since s67, lupin since 0.1.6's lint wave), so the gate
     /// now reads two lanes where sc08 could read one.
     pub warnings: Vec<String>,
+    /// The refusal SENTENCE behind an `unsupported` verdict, when the
+    /// implementation names one: lupin spells the key `x-unsupported`,
+    /// wolf `x-unsupported-construct`. Both are `x-` extension fields
+    /// (`[proto.record.ext]`), so absence is legal
+    /// and nothing but `doc-examples`' mirror-lag word reads it — a
+    /// by-name refusal is only tellable from drift by its text
+    /// (wolf-std#37, and F-0081 before it).
+    pub unsupported_reason: Option<String>,
 }
 
 /// Validate against `[proto.record.fields]` and parse the fields the
@@ -121,6 +129,7 @@ pub fn parse(stdout: &str, who: &str) -> Result<Record, String> {
         stdout_sha256: opt_str("stdout_sha256"),
         stdout_inline: opt_str("stdout_inline"),
         warnings,
+        unsupported_reason: opt_str("x-unsupported").or_else(|| opt_str("x-unsupported-construct")),
     };
     if matches!(rec.verdict, Verdict::Exit(_))
         && rec.stdout_sha256.is_none()
@@ -222,6 +231,33 @@ mod tests {
         // Present and malformed: a tool-level failure, not zero warnings.
         let broken = OK.replace("\"diagnostics\":[],", "\"diagnostics\":[],\"warnings\":7,");
         assert!(parse(&broken, "x").is_err());
+    }
+
+    #[test]
+    fn the_refusal_sentence_is_read_under_either_extension_key() {
+        // wolf-std#37: absent on a record that names none.
+        assert_eq!(parse(OK, "x").unwrap().unsupported_reason, None);
+        // lupin's spelling (0.1.36, measured on a std.range example).
+        let lupin = OK.replace("exit(0)", "unsupported").replace(
+            "\"diagnostics\":[],",
+            "\"diagnostics\":[],\"x-unsupported\":\"a range has no member `start`\",",
+        );
+        assert_eq!(
+            parse(&lupin, "lupin")
+                .unwrap()
+                .unsupported_reason
+                .as_deref(),
+            Some("a range has no member `start`")
+        );
+        // wolf's spelling (0.2.14's native rung).
+        let wolf = OK.replace(
+            "\"diagnostics\":[],",
+            "\"diagnostics\":[],\"x-unsupported-construct\":\"Pool/shared constructor lowering\",",
+        );
+        assert_eq!(
+            parse(&wolf, "wolf").unwrap().unsupported_reason.as_deref(),
+            Some("Pool/shared constructor lowering")
+        );
     }
 
     #[test]

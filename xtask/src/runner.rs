@@ -744,6 +744,7 @@ mod tests {
             stdout_sha256: sha.map(str::to_string),
             stdout_inline: None,
             warnings: Vec::new(),
+            unsupported_reason: None,
         }
     }
 
