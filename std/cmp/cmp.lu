@@ -186,45 +186,43 @@ impl Eq for str {
     }
 }
 
-// sc47 / wolf-std#31 — THE NATIVE RUNG'S REFUSAL HERE IS THIS MODULE'S
-// COST, NOT ITS IMPORTERS'.
+// wolf-std#31, option 3 (ruled 2026-09-15, landed sc49) — THESE TWO
+// IMPLS ARE NESTED MATCHES ON PURPOSE. Do not fold them back into
+// `match (self, other)`.
 //
-// This `match (self, other)` and the one in `impl Ord for Ordering`
-// below are the whole reason every importer of std.cmp loses the native
-// rung: the rung answers `unsupported — an enum or row test inside a
-// product pattern (deep trees, c06)` on the module, so `use std.cmp`
-// costs a lane. sc46 recorded that as a cost of shipping `trait Num`
-// and assumed the coverage returns only when chapter 6 lands.
-//
-// MEASURED at sc47, wolf 0.2.12 / lupin 0.1.34, and that assumption is
-// false. Rewritten as nested matches — `match self { Less => match
-// other { Less => true, _ => false }, … }`, arm for arm identical — a
-// probe importing this module goes `unsupported` (`phase_reached: mem`)
-// to `exit(0)` (`phase_reached: run`) on the native rung, and the full
-// 402-row differential moves **40 rows** from `unsupported` to `run` on
-// the native column with NOTHING else moving: no row got shallower, no
-// directive mismatched. testing 10, map 6, cmp 6, sort 5, search 5,
-// x/* 4, ops 3, rand 1. The conservatism ledger goes 190 -> 150.
-//
-// So the COMPILER is right and owes nothing — `deep trees, c06` is a
-// named conservatism answering honestly, and there is no upstream
-// filing here. The cost is ours, it buys nothing, and it is removable
-// at these pins.
+// Written as product patterns (`(Less, Less) => true, …`) they cost
+// every importer of std.cmp the native rung: the rung declines an enum
+// or row TEST inside a product pattern — `unsupported — an enum or row
+// test inside a product pattern (deep trees)`, a named conservatism
+// answering honestly, nothing to file upstream — and it declines it on
+// the whole module, so `use std.cmp` (and `std.ops`, which imports it
+// for `trait Num`) went dark natively. sc47 measured the nested form
+// writable at wolf 0.2.12, sc48 re-measured the refusal at 0.2.14 on
+// the same span, and sc49 landed it: 40 ledger rows `unsupported` ->
+// `run` on the native column (testing 10, map 6, cmp 6, sort 5,
+// search 5, x/* 4, ops 3, rand 1), the operator bridge's two oldest
+// witnesses (`ops/dispatch_tier`, `ops/div_zero_trap`) among them.
+// The arms are unchanged; `tests/cmp/ordering_exhaustive.lu` is the
+// witness that they did not move.
 //
 // `impl Ord for bool` above keeps its product pattern deliberately: its
 // arms are bool LITERALS, and the refusal is specifically an enum or row
-// TEST inside a product pattern. It is not part of this.
-//
-// Not rewritten at sc47 because the 40 ledger rows are a lane's work and
-// should not ride in the same PR as the CI gate that sprint carried.
-// wolf-std#31 holds the measurement, the rewrite and the row list.
+// TEST inside a product pattern.
 impl Eq for Ordering {
     fn eq(self, other: Self) -> bool {
-        match (self, other) {
-            (Less, Less) => true,
-            (Equal, Equal) => true,
-            (Greater, Greater) => true,
-            _ => false,
+        match self {
+            Less => match other {
+                Less => true,
+                _ => false,
+            },
+            Equal => match other {
+                Equal => true,
+                _ => false,
+            },
+            Greater => match other {
+                Greater => true,
+                _ => false,
+            },
         }
     }
 }
@@ -232,14 +230,20 @@ impl Eq for Ordering {
 impl Ord for Ordering {
     fn cmp(self, other: Self) -> Ordering {
         // Less < Equal < Greater.
-        match (self, other) {
-            (Less, Less) => Ordering.Equal,
-            (Less, _) => Ordering.Less,
-            (Equal, Less) => Ordering.Greater,
-            (Equal, Equal) => Ordering.Equal,
-            (Equal, Greater) => Ordering.Less,
-            (Greater, Greater) => Ordering.Equal,
-            (Greater, _) => Ordering.Greater,
+        match self {
+            Less => match other {
+                Less => Ordering.Equal,
+                _ => Ordering.Less,
+            },
+            Equal => match other {
+                Less => Ordering.Greater,
+                Equal => Ordering.Equal,
+                Greater => Ordering.Less,
+            },
+            Greater => match other {
+                Greater => Ordering.Equal,
+                _ => Ordering.Greater,
+            },
         }
     }
 }
