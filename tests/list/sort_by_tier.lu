@@ -1,0 +1,81 @@
+//! check: run(exit=0, stdout="sort_by holds\n")
+//! phase: run
+//! conforms: std.list, type.fn.value, generics.mono
+//!
+//! sc50's `sort_by` over a `bool` relation, on every lane: ascending and
+//! descending by flipping the relation, the empty and one-element lists,
+//! a length that is not a power of two, agreement with `is_sorted_by`,
+//! and the STABILITY witness F-0029 said no comparator-taking std sort
+//! could carry: a relation that ignores part of the value, and ties that
+//! keep their original order.
+
+use std.list
+
+// Not `le`/`ge`: `sort_by` and `is_sorted_by` name their parameter `le`,
+// and the checked machine calls a top-level fn that shares a fn-typed
+// parameter's name instead of the argument, silently (F-0134). Written
+// as `le`/`ge` this file exits 6 there and 0 on the other two lanes.
+fn ascending(a: int, b: int) -> bool { a <= b }
+
+fn descending(a: int, b: int) -> bool { a >= b }
+
+// Ties on the last digit; the tens digit records the original order.
+fn by_last_digit(a: int, b: int) -> bool { a % 10 <= b % 10 }
+
+fn by_len(a: str, b: str) -> bool { a.len <= b.len }
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 5)
+    list.push(mut xs, 3)
+    list.push(mut xs, 9)
+    list.push(mut xs, 1)
+    list.push(mut xs, 3)
+    list.push(mut xs, 7)
+    list.push(mut xs, 2)
+
+    list.sort_by(mut xs, ascending)
+    if list.len(xs) == 7 {} else { return 1 }
+    if list.is_sorted_by(xs, ascending) {} else { return 2 }
+    if (list.first(xs) else 0) == 1 {} else { return 3 }
+    if (list.last(xs) else 0) == 9 {} else { return 4 }
+
+    list.sort_by(mut xs, descending)
+    if list.is_sorted_by(xs, descending) {} else { return 5 }
+    if (list.first(xs) else 0) == 9 {} else { return 6 }
+
+    var empty = List[int]()
+    list.sort_by(mut empty, ascending)
+    if list.is_empty(empty) == true {} else { return 7 }
+    var one = List[int]()
+    list.push(mut one, 4)
+    list.sort_by(mut one, ascending)
+    if (list.first(one) else 0) == 4 {} else { return 8 }
+
+    // Stability: 11, 21, 31 tie on the last digit and must stay in that
+    // order; so must 02 and 12.
+    var ys = List[int]()
+    list.push(mut ys, 21)
+    list.push(mut ys, 12)
+    list.push(mut ys, 11)
+    list.push(mut ys, 2)
+    list.push(mut ys, 31)
+    list.sort_by(mut ys, by_last_digit)
+    if (list.get(ys, 0) else 0) == 21 {} else { return 9 }
+    if (list.get(ys, 1) else 0) == 11 {} else { return 10 }
+    if (list.get(ys, 2) else 0) == 31 {} else { return 11 }
+    if (list.get(ys, 3) else 0) == 12 {} else { return 12 }
+    if (list.get(ys, 4) else 0) == 2 {} else { return 13 }
+
+    var words = List[str]()
+    list.push(mut words, "wolf")
+    list.push(mut words, "a")
+    list.push(mut words, "std")
+    list.push(mut words, "be")
+    list.sort_by(mut words, by_len)
+    if (list.first(words) else "?") == "a" {} else { return 14 }
+    if (list.last(words) else "?") == "wolf" {} else { return 15 }
+
+    print("sort_by holds")
+    0
+}

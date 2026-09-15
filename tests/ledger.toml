@@ -776,6 +776,14 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+[tests."list/sort_by_tier.lu"]
+# sc50: `sort_by` on the `bool` relation, stable, with the stability
+# witness F-0029 kept from `std.sort`. Predicted run/run/run for the body;
+# the first draft was exit(6) on wolfc for F-0134, not for the sort.
+lupin = "run"
+wolfc = "run"
+native = "run"
+
 [tests."list/get_hit_miss.lu"]
 lupin = "run"
 # The row raise lives in an imported module's body: wolfc's checked tier

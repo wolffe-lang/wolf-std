@@ -826,3 +826,72 @@ pub fn zip[A, B](a: List[A], b: List[B]) -> List[(A, B)] {
     }
     out
 }
+
+/// Sorts `xs` in place, stably, under `le`, where `le(a, b)` reads "a
+/// may precede b" (`is_sorted_by`'s relation, and its judge). A tie
+/// keeps its original order: the merge takes from the left run whenever
+/// `le(left, right)` holds. `le` must be a total preorder or the result
+/// is merely a permutation; std cannot check that and does not pretend
+/// to. Total: no error row, no traps beyond allocation and whatever `le`
+/// traps. O(n log n) calls to `le`, O(n) scratch: `std.sort`'s bottom-up
+/// merge, line for line.
+///
+/// **Why a second `sort_by`, and what differs.** `std.sort.sort_by`
+/// takes a `cmp.Ordering` comparator, and at wolf 0.2.14 / lupin 0.1.36
+/// it runs on no lane (re-measured for this function: lupin declines the
+/// enum's dynamics at resolve, the checked machine declines `std.cmp`'s
+/// module items, the native rung finds `.is_lt()` untyped; F-0029). This
+/// one takes the `bool` relation the callable tier has used since sc13
+/// and runs on all three. Same mode, same stability, same algorithm; the
+/// comparator's type is the one difference, and it is stated on both.
+///
+/// Call shape (a prose example, witnessed by `tests/list/sort_by_tier.lu`
+/// on all three lanes): `fn by_len(a: str, b: str) -> bool { a.len <=
+/// b.len }` … then `list.sort_by(mut words, by_len)`. It is not fenced
+/// because §4's extractor reads any line holding a relational operator as
+/// an assertion, and the relation's lambda holds one.
+pub fn sort_by[T](mut xs: List[T], le: fn(T, T) -> bool) {
+    let n = len(xs)
+    if n < 2 {
+        return
+    }
+    var src = xs
+    var width = 1
+    while width < n {
+        var out = List[T]()
+        var i = 0
+        while i < n {
+            var mid = i + width
+            if mid > n {
+                mid = n
+            }
+            var end = mid + width
+            if end > n {
+                end = n
+            }
+            var a = i
+            var b = mid
+            while a < mid {
+                var take_right = false
+                if b < end {
+                    if le(at(src, a), at(src, b)) {} else { take_right = true }
+                }
+                if take_right {
+                    (mut out).push(at(src, b))
+                    b = b + 1
+                } else {
+                    (mut out).push(at(src, a))
+                    a = a + 1
+                }
+            }
+            while b < end {
+                (mut out).push(at(src, b))
+                b = b + 1
+            }
+            i = end
+        }
+        src = out
+        width = width + width
+    }
+    xs = src
+}
