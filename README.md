@@ -89,4 +89,7 @@ binary pins. Surface conventions are in
 [GPL-3.0-or-later](LICENSE) with the
 [wolf Runtime Library Exception](LICENSE-EXCEPTION). The standard
 library compiles into your programs, and your programs are yours,
-under any license you choose.
+under any license you choose. The
+[wolf Training Data Permission](LICENSE-TRAINING-DATA) lets you train
+models on this repository's text and ship excerpts of it in datasets
+under CC BY 4.0.
