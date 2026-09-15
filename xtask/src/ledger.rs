@@ -340,7 +340,7 @@ fn parse_expect(v: &str) -> Option<Expect> {
 /// A diagnostic code as both `fail(…)` and `mirror-lag(…)` spell it:
 /// `E` and at least one digit, nothing else. Named once so the two
 /// words cannot drift apart about what a code is.
-fn valid_code(code: &str) -> bool {
+pub(crate) fn valid_code(code: &str) -> bool {
     code.starts_with('E') && code.len() > 1 && code[1..].chars().all(|c| c.is_ascii_digit())
 }
 

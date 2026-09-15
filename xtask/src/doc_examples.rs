@@ -17,8 +17,10 @@
 //! bug, and an unrunnable example belongs in prose (§4). The compiler's
 //! two rungs (checked and, from sc04, native) must reach `exit(0)` or
 //! refuse honestly (`unsupported`); a static rejection (`fail(E…)`) is a
-//! doc bug too — which is why `std.range`, whose one function names a
-//! type the compiler does not resolve, carries prose instead of a fence.
+//! doc bug too. The one exception to the lupin half is the ledger's own
+//! word, `mirror-lag` (`LUPIN_MIRROR_LAG`, wolf-std#37): a module the
+//! reference machine has not been shown yet, refused with exactly the
+//! named code or sentence, and red the day it runs.
 //!
 //! sc01 left "fold examples into tests/ledger.toml" to sc02; sc02's
 //! answer, for the closeout to confirm: NO. The ledger's value is
@@ -155,10 +157,61 @@ const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "process
 /// that a waiver had gone inert.
 const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[];
 
-struct Block {
+/// **The ledger's `mirror-lag` word, for examples** (sc49, wolf-std#37).
+///
+/// `tests/ledger.toml` has spelled "the reference machine is short of a
+/// clause the compiler lanes run" as `mirror-lag(E…)` since sc46
+/// (F-0121, wolf-std#27). This extractor had no such word, so a module
+/// the mirror refuses could not fence an example at all: the capability
+/// list is per-module-FOREVER, the tier waiver is per-CALL-per-finding,
+/// and a whole module the mirror has not caught up to — with a date on
+/// it — is neither. `std.range` is the case that forced it: its four
+/// examples run on both compiler rungs at wolf 0.2.14 and were prose for
+/// one release because lupin 0.1.36 (mirroring v0.2.12) declines
+/// `[type.range.accessor]` by name.
+///
+/// `(module, the refusal, the issue)`. The refusal is either a CODE
+/// (`E0301`) — the lane must answer exactly `fail(<code>)`, the ledger
+/// word's own contract — or a by-name SENTENCE, which the lane must
+/// answer as `unsupported` carrying that text in its record's
+/// `x-unsupported` field. The second form is the one the ledger spells
+/// `unsupported` (a whole-program decline is not a diagnostic), but an
+/// example has exactly one legitimate depth on the reference machine, so
+/// here the SENTENCE is what makes the refusal a posture rather than
+/// drift (F-0081's lesson).
+///
+/// **Gated the way the ledger's word is gated, in both directions:**
+/// - a block in the module whose lupin lane answers ANYTHING ELSE — a
+///   heal to `exit(0)` included — is RED, so the fences come back
+///   running on three lanes the day the mirror release lands, and the
+///   entry leaves in that commit;
+/// - an entry no block fired against is RED (stale), the `waiver_fired`
+///   gate's rule (wolf-lang#177);
+/// - a mirror-lagged block must still reach `exit(0)` on a compiler
+///   lane — the word is "the compilers RUN this", never "nobody did".
+pub(crate) const LUPIN_MIRROR_LAG: &[(&str, &str, &str)] = &[(
+    "range",
+    "a range has no member `start`",
+    "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
+)];
+
+/// Does the reference lane's answer hold a mirror-lag entry's refusal?
+/// A code demands exactly that `fail(…)`; a sentence demands
+/// `unsupported` naming it. Everything else — the heal, a different
+/// code, a different sentence, a code where a sentence was written — is
+/// the mirror having moved.
+fn mirror_lag_holds(refusal: &str, verdict: &Verdict, reason: Option<&str>) -> bool {
+    if crate::ledger::valid_code(refusal) {
+        matches!(verdict, Verdict::Fail(code) if code == refusal)
+    } else {
+        matches!(verdict, Verdict::Unsupported) && reason.is_some_and(|r| r.contains(refusal))
+    }
+}
+
+pub(crate) struct Block {
     /// Dotted std module path, without the `std.` head (`cmp`,
     /// `x.deque_int`, …). The bound name is its last segment.
-    module: String,
+    pub(crate) module: String,
     /// Source file and 1-based line of the opening fence, for messages.
     origin: String,
     /// The example lines, fence markers stripped.
@@ -201,6 +254,8 @@ pub fn doc_examples() -> Result<(), String> {
     // longer happens. Both times this list emptied (sc14, sc25) a HUMAN
     // noticed at a bump; sc38 is the third and it is a gate instead.
     let mut waiver_fired = vec![false; LUPIN_TIER_WAIVERS.len()];
+    let mut lag_fired = vec![false; LUPIN_MIRROR_LAG.len()];
+    let mut lag_ledger: Vec<String> = Vec::new();
     for (k, b) in blocks.iter().enumerate() {
         for line in &b.lines {
             validate_line(line, &b.origin)?;
@@ -218,10 +273,11 @@ pub fn doc_examples() -> Result<(), String> {
         let tier_waiver = LUPIN_TIER_WAIVERS
             .iter()
             .find(|(m, needle, _)| *m == b.module && b.lines.iter().any(|l| l.contains(needle)));
+        let mirror_lag = LUPIN_MIRROR_LAG.iter().position(|(m, _, _)| *m == b.module);
         let mut any_ran = false;
         let mut tier_waived_here = false;
         for (imp, bin) in &lanes {
-            let (verdict, warnings) = run_lane(*imp, bin, &staged, ceiling)?;
+            let (verdict, warnings, reason) = run_lane(*imp, bin, &staged, ceiling)?;
             if !warnings.is_empty() {
                 reds.push(format!(
                     "{} [{}]: {} warning(s) — this rig denies warnings \
@@ -240,6 +296,35 @@ pub fn doc_examples() -> Result<(), String> {
                         .any(|(m, c, _)| *m == b.module && c == code));
             if matches!(&verdict, Verdict::Exit(0)) {
                 any_ran = true;
+            }
+            if let (Some(i), Impl::Lupin) = (mirror_lag, imp) {
+                let (m, refusal, issue) = LUPIN_MIRROR_LAG[i];
+                if mirror_lag_holds(refusal, &verdict, reason.as_deref()) {
+                    lag_fired[i] = true;
+                    lag_ledger.push(format!(
+                        "mirror-lag(lupin): {} — refused `{refusal}` ({issue}); \
+                         red the day the mirror runs it",
+                        b.origin
+                    ));
+                    println!(
+                        "doc-example {} [lupin]: {verdict} (MIRROR-LAG: {m}, {issue})",
+                        b.origin
+                    );
+                } else {
+                    println!("doc-example {} [lupin]: {verdict} (MIRROR MOVED)", b.origin);
+                    reds.push(format!(
+                        "{} [lupin]: LUPIN_MIRROR_LAG[{i}] says `{refusal}` ({issue}), \
+                         observed `{verdict}`{} — the mirror moved (a heal, or a \
+                         different refusal); re-measure, and retire the entry in the \
+                         commit that lets this block run on three lanes",
+                        b.origin,
+                        reason
+                            .as_deref()
+                            .map(|r| format!(" (\"{r}\")"))
+                            .unwrap_or_default()
+                    ));
+                }
+                continue;
             }
             let tier_waived = tier_waiver.is_some()
                 && matches!(imp, Impl::Lupin)
@@ -307,6 +392,16 @@ pub fn doc_examples() -> Result<(), String> {
                 b.origin
             ));
         }
+        // And for a mirror-lagged block: the word says the COMPILERS run
+        // it, so one of them must have (lupin cannot be the one — its
+        // lane is the refusal).
+        if mirror_lag.is_some() && !any_ran && !lanes.is_empty() {
+            reds.push(format!(
+                "{}: no lane reached exit(0) — a mirror-lagged example is one the compiler \
+                 lanes RUN (§4, wolf-std#37)",
+                b.origin
+            ));
+        }
     }
     // Only meaningful when the lupin lane actually ran: with no binary
     // there is nothing a waiver could have fired against.
@@ -323,6 +418,25 @@ pub fn doc_examples() -> Result<(), String> {
             }
         }
     }
+    // The stale direction for the mirror-lag word, only meaningful when
+    // the reference lane ran at all.
+    if lanes.iter().any(|(imp, _)| matches!(imp, Impl::Lupin)) {
+        for (i, fired) in lag_fired.iter().enumerate() {
+            if !*fired {
+                let (m, refusal, issue) = LUPIN_MIRROR_LAG[i];
+                reds.push(format!(
+                    "LUPIN_MIRROR_LAG[{i}] ({m}: `{refusal}`, {issue}) never fired — no \
+                     `std.{m}` block was refused that way on the reference lane, so the \
+                     entry asserts a lag that does not happen. RETIRE IT with the flip \
+                     (wolf-lang#177's lesson)."
+                ));
+            }
+        }
+    }
+    // Louder than an `ok`, like the ledger's mirror-lag rows.
+    for line in &lag_ledger {
+        println!("{line}");
+    }
     if reds.is_empty() {
         println!("doc-examples: {} block(s), GREEN", blocks.len());
         Ok(())
@@ -336,7 +450,7 @@ fn run_lane(
     bin: &Path,
     staged: &stage::Staged,
     ceiling: Duration,
-) -> Result<(Verdict, Vec<String>), String> {
+) -> Result<(Verdict, Vec<String>, Option<String>), String> {
     let mut cmd = Command::new(bin);
     // The staged package root is the working directory (sc07), so an
     // os-facing example writes its scratch files there and nowhere else.
@@ -370,7 +484,7 @@ fn run_lane(
     // (sc09), and a warning is reported like any other doc bug — collected,
     // named, and never allowed to stop the sweep, so one bad example does
     // not hide the next one. See `runner`'s gate and F-0046/F-0053.
-    Ok((rec.verdict, rec.warnings))
+    Ok((rec.verdict, rec.warnings, rec.unsupported_reason))
 }
 
 /// Relational operators an assertion line must carry (§4 amendment,
@@ -481,7 +595,7 @@ fn validate_line(line: &str, origin: &str) -> Result<(), String> {
 /// Walk the whole std tree — nested modules included (`std/x/deque_int`
 /// is the module `x.deque_int`, imported as `use std.x.deque_int` and
 /// bound to its last segment).
-fn collect_blocks(std_root: &Path) -> Result<Vec<Block>, String> {
+pub(crate) fn collect_blocks(std_root: &Path) -> Result<Vec<Block>, String> {
     let mut blocks = Vec::new();
     walk_modules(std_root, &[], &mut blocks)?;
     Ok(blocks)
@@ -681,6 +795,79 @@ mod tests {
             "bytes",
             "bytes.is_utf8(bytes.from_str(\"x\")) == true"
         ));
+    }
+
+    #[test]
+    fn mirror_lag_holds_only_that_refusal_in_both_directions() {
+        // wolf-std#37: the ledger word's contract, carried over.
+        let by_name = "a range has no member `start`";
+        // HOLDS: the by-name decline, with its sentence.
+        assert!(mirror_lag_holds(
+            by_name,
+            &Verdict::Unsupported,
+            Some("a range has no member `start`")
+        ));
+        // RED — THE HEAL, the direction the word exists for.
+        assert!(!mirror_lag_holds(by_name, &Verdict::Exit(0), None));
+        // RED — a different decline is drift, not this posture (F-0081).
+        assert!(!mirror_lag_holds(
+            by_name,
+            &Verdict::Unsupported,
+            Some("`fs_read_dir` does not resolve")
+        ));
+        // RED — an `unsupported` naming nothing cannot be told from drift.
+        assert!(!mirror_lag_holds(by_name, &Verdict::Unsupported, None));
+        // RED — a static refusal where a by-name one was written.
+        assert!(!mirror_lag_holds(
+            by_name,
+            &Verdict::Fail("E0301".into()),
+            None
+        ));
+        // A CODE demands exactly that code, and nothing else.
+        assert!(mirror_lag_holds(
+            "E0201",
+            &Verdict::Fail("E0201".into()),
+            None
+        ));
+        assert!(!mirror_lag_holds(
+            "E0201",
+            &Verdict::Fail("E0301".into()),
+            None
+        ));
+        assert!(!mirror_lag_holds("E0201", &Verdict::Exit(0), None));
+        assert!(!mirror_lag_holds(
+            "E0201",
+            &Verdict::Unsupported,
+            Some("E0201")
+        ));
+        // A trap is the program RUNNING; never a lag.
+        assert!(!mirror_lag_holds(
+            by_name,
+            &Verdict::Trap("overflow".into()),
+            None
+        ));
+    }
+
+    #[test]
+    fn a_mirror_lag_entry_names_a_module_a_refusal_and_an_issue() {
+        for (m, refusal, issue) in LUPIN_MIRROR_LAG {
+            assert!(
+                !CAPABILITY_MODULES.contains(m),
+                "{m}: a capability module already accepts `unsupported` forever; a mirror \
+                 lag there would be a second, weaker excuse"
+            );
+            assert!(
+                crate::ledger::valid_code(refusal) || refusal.len() >= 12,
+                "{m}: the refusal is a code or a whole sentence, never a fragment \
+                 broad enough to match any decline (`{refusal}`)"
+            );
+            assert!(
+                issue.starts_with("wolf-std#")
+                    || issue.starts_with("wolf-interp#")
+                    || issue.starts_with("wolf-lang#"),
+                "{m}: a mirror lag is a debt with an issue (`{issue}`)"
+            );
+        }
     }
 
     #[test]

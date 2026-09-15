@@ -5,7 +5,7 @@
 use crate::bins::{self, Impl};
 use crate::record::Verdict;
 use crate::repo_root;
-use crate::{anchors, directive, exec, ledger, record, stage, workflow};
+use crate::{anchors, directive, doc_examples, exec, ledger, record, stage, workflow};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
@@ -398,6 +398,27 @@ fn every_advisory_step_is_blessed_with_an_issue() {
              nobody is going to fix",
             a.command,
             a.issue
+        );
+    }
+}
+
+/// wolf-std#37's static half. A `LUPIN_MIRROR_LAG` entry whose module
+/// carries no fenced block can never fire, and `doc-examples` would only
+/// say so twenty minutes into a gauntlet on a box with lupin; this says
+/// it at `cargo test` time, binary or not. The dynamic half (a block that
+/// RUNS on the reference lane is red; an entry nothing fired is red) is
+/// `doc-examples`' own gate.
+#[test]
+fn every_mirror_lag_entry_has_blocks_to_fence() {
+    let repo = repo_root();
+    let blocks = doc_examples::collect_blocks(&repo.join("std")).unwrap();
+    for (m, refusal, issue) in doc_examples::LUPIN_MIRROR_LAG {
+        let n = blocks.iter().filter(|b| b.module == *m).count();
+        assert!(
+            n > 0,
+            "LUPIN_MIRROR_LAG names `std.{m}` (`{refusal}`, {issue}) and std/{m} carries \
+             no wolf-doc-example block — a lag with nothing to fence is a stale entry; \
+             retire it"
         );
     }
 }
