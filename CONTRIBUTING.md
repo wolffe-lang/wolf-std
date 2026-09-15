@@ -171,6 +171,15 @@ extractor (`fs`, `io`, `net`, `time`, `env`, `process`, `x.json`). An
 in exchange at least one lane must reach `exit(0)`. An example nobody
 ran is not documentation.
 
+The ledger's `mirror-lag` word has a twin there too (sc49, wolf-std#37):
+`LUPIN_MIRROR_LAG`, `(module, refusal, issue)`, for a module the
+reference machine has not been shown yet. The refusal is a code
+(`fail(<code>)` exactly) or a by-name sentence (`unsupported` carrying
+it). A block that answers anything else on lupin, a heal included, is
+red, and so is an entry nothing fired against. The entry leaves in the
+commit that flips the module's ledger rows. `std.range` is the first
+carrier.
+
 ## The pin ritual
 
 - Data pin bump: `git -C upstream fetch && git -C upstream checkout
