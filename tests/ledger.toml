@@ -739,6 +739,13 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+[tests."list/fold_tier.lu"]
+# sc50: `fold` over fn VALUES, a left fold with an accumulator type of its own.
+# Predicted run/run/run before the body existed (docs/findings.md, sc50).
+lupin = "run"
+wolfc = "run"
+native = "run"
+
 [tests."list/get_hit_miss.lu"]
 lupin = "run"
 # The row raise lives in an imported module's body: wolfc's checked tier

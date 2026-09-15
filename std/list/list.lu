@@ -706,3 +706,23 @@ pub fn filter[T](xs: List[T], pred: fn(T) -> bool) -> List[T] {
     }
     out
 }
+
+/// Combines every element of `xs` into one value, left to right:
+/// `f(… f(f(init, x0), x1) …, xn)`. `init` is the answer for the empty
+/// list. The accumulator's type `A` need not be the element's. Total:
+/// no error row, no traps beyond whatever `f` traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.push(mut xs, 3)
+/// list.fold(xs, 0, fn(acc, v) acc + v) == 6
+/// ```
+pub fn fold[T, A](xs: List[T], init: A, f: fn(A, T) -> A) -> A {
+    var acc = init
+    for x in xs {
+        acc = f(acc, x)
+    }
+    acc
+}
