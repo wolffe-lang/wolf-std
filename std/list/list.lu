@@ -541,14 +541,17 @@ pub fn repeat[T](xs: List[T], n: int) -> List[T] {
     out
 }
 
-// BLOCKED(c05) — the functional family, every one of them waiting on
-// closures (lambda values as parameters), and named here so nobody
-// re-invents them locally: `map`, `filter`, `fold`, `any`, `all`,
-// `each`, `retain`, `count_if`, `min_by`, `max_by`, `position`. Sorting
-// (`sort`, `sort_by`) is sc04's, and `sorted_by` in the wordcount
-// exemplar is the same closure blocker. No half-shipped variants: a
-// `map` that takes a named function only would be a different API from
-// the one that lands, and callers would have to change twice.
+// The functional family, which this comment listed as BLOCKED(c05) from
+// sc02 until sc50: `any`, `all`, `min_by`, `max_by` and the
+// `count_where`/`index_where`/`find_where` spellings of `count_if` and
+// `position` shipped at sc13 over fn VALUES, and `map`, `filter`, `fold`,
+// `sum`, `enumerate`, `zip` and `sort_by` at sc50 (below). None of them
+// waited for closures in the end: a named fn value was enough, and a
+// lambda passes where one is written. Still unwritten: `each` (a `for`
+// is the language's spelling, and a std name over it would shadow it)
+// and `retain` (`filter` returns the kept list; an in-place twin would
+// be a second name for one walk). `sorted_by` in the wordcount exemplar
+// is `std.sort`'s returning twin, still on the `Ordering` comparator.
 
 // ------------------------------------------------------------------
 // The callable tier (sc13): predicates and relations as fn VALUES —
