@@ -688,6 +688,12 @@ pub fn is_sorted_by[T](xs: List[T], le: fn(T, T) -> bool) -> bool {
 /// read, not consumed. The empty list maps to the empty list. Total: no
 /// error row, no traps beyond allocation and whatever `f` traps.
 ///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.map(f)` is
+/// this call (`[type.method.resolve]` step 2), and eager
+/// (`[type.comb.eager]`). Cost, as the clause states it: one fresh
+/// `List[U]` of `xs.len` in the ambient region, and `xs.len` calls of
+/// `f`. A fallible `f` is `par`'s alone (`[conc.task.par]`).
+///
 /// ```wolf-doc-example
 /// var xs = List[int]()
 /// list.push(mut xs, 1)
@@ -763,6 +769,11 @@ pub fn fold[T, A](xs: List[T], init: A, step: fn(A, T) -> A) -> A {
 /// partial sum leaves `int` (checked arithmetic, X3), deliberately not a
 /// row: `std.search.sum`'s contract, word for word.
 ///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.sum()` is
+/// this call on a `List[int]`, and on any other `List` it is E0403, not
+/// a match. Cost, as the clause states it: none beyond checked addition
+/// left to right (X3).
+///
 /// Monomorphic over `int`, and that is measured, not modest. A generic
 /// `sum[T: ops.Add]` needs `use std.ops`, which imports `std.cmp`, and
 /// every importer of `std.cmp` is `unsupported` on the native rung (the
@@ -791,6 +802,10 @@ pub fn sum(xs: List[int]) -> int {
 /// A new list pairing each element of `xs` with its index, in order:
 /// `(0, x0), (1, x1), …`. The shape `for (i, x) in list.enumerate(xs)`
 /// destructures. Total: no error row, no traps beyond allocation.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.enumerate()`
+/// is this call. Cost, as the clause states it: one fresh `List` of
+/// pairs, indices from 0.
 ///
 /// ```wolf-doc-example
 /// var xs = List[str]()
