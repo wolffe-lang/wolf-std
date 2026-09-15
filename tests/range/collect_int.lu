@@ -1,0 +1,33 @@
+//! check: run(exit=0, stdout="collect int holds\n")
+//! phase: run
+//! conforms: std.range
+//!
+//! sc50's `collect` over `range[int]`: the values a `for` yields, in
+//! order, for `..` and `..=`, and the empty list for an empty and a
+//! reversed range. It names no accessor, so lupin runs it where it
+//! declines the module's other four rows.
+
+use std.range
+
+fn main() -> !int {
+    let xs = range.collect(2..5)
+    if xs.len == 3 {} else { return 1 }
+    if xs[0] == 2 {} else { return 2 }
+    if xs[2] == 4 {} else { return 3 }
+
+    let ys = range.collect(1..=3)
+    if ys.len == 3 {} else { return 4 }
+    if ys[2] == 3 {} else { return 5 }
+
+    if range.collect(5..5).len == 0 {} else { return 6 }
+    if range.collect(7..3).len == 0 {} else { return 7 }
+
+    var total = 0
+    for v in range.collect(0 - 2..3) {
+        total = total + v
+    }
+    if total == 0 {} else { return 8 }
+
+    print("collect int holds")
+    0
+}

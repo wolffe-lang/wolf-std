@@ -1340,6 +1340,22 @@ native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 # before the measurement; the rows below were always the measured word.
 # Corrected at sc49.) ----
 
+[tests."range/collect_int.lu"]
+# sc50 item 2: `[type.comb.set]`'s `collect` over `range[int]`. Predicted
+# run/run/run from the probe; it walks `for` and names no accessor, so
+# lupin 0.1.36 runs it where it declines the module's other four rows.
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."range/collect_char.lu"]
+# sc50 item 2: the same generic `collect` over `range[char]`. lupin 0.1.36
+# declines the char range itself at resolve ("a range needs integer
+# endpoints, got char and char"), a whole-program refusal; both rungs run.
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
 [tests."range/is_empty.lu"]
 lupin = "unsupported"  # sc48: `run` -> `unsupported`, DELIBERATE and shallower — the body moved from the iteration probe to `r.start >= r.end` (the contract's spelling), and lupin 0.1.36 declines the accessor by name ("a range has no member `start`"); the row comes back with the mirror
 wolfc = "run"  # sc48 binary bump (wolf 0.2.14): `[type.range]` (s158) — `range[int]` is a nameable type, the E0301 both rungs answered since sc04 is gone
