@@ -678,6 +678,10 @@ pub fn is_sorted_by[T](xs: List[T], le: fn(T, T) -> bool) -> bool {
 // and the checked machine answers `unsupported — closures in checked
 // execution` for it, which the doc gate accepts from a compiler lane.
 // The three-lane witness for each is its test file, over top-level fns.
+// One more constraint, measured red by the first sc50 gauntlet: §4's
+// extractor classifies a LINE by its text, so a lambda holding `==` or
+// `<` in a `let` or `for` line becomes an `if let …` / `if for …` and
+// fails to parse. A lambda that compares rides inside an assertion line.
 // ------------------------------------------------------------------
 
 /// A new list holding `f(x)` for every `x` in `xs`, in order; `xs` is
@@ -711,9 +715,8 @@ pub fn map[T, U](xs: List[T], f: fn(T) -> U) -> List[U] {
 /// list.push(mut xs, 1)
 /// list.push(mut xs, 2)
 /// list.push(mut xs, 3)
-/// let odds = list.filter(xs, fn(v) v % 2 == 1)
-/// list.len(odds) == 2
-/// (list.last(odds) else 0) == 3
+/// list.len(list.filter(xs, fn(v) v % 2 == 1)) == 2
+/// (list.last(list.filter(xs, fn(v) v % 2 == 1)) else 0) == 3
 /// ```
 pub fn filter[T](xs: List[T], pred: fn(T) -> bool) -> List[T] {
     var out = List[T]()
@@ -783,9 +786,9 @@ pub fn sum(xs: List[int]) -> int {
 /// list.push(mut xs, "a")
 /// list.push(mut xs, "b")
 /// let pairs = list.enumerate(xs)
-/// var at_b = 0 - 1
-/// for (i, s) in pairs { if s == "b" { at_b = i } }
-/// at_b == 1
+/// let second = pairs[1]
+/// second.0 == 1
+/// second.1 == "b"
 /// ```
 pub fn enumerate[T](xs: List[T]) -> List[(int, T)] {
     var out: List[(int, T)] = fresh()
