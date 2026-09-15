@@ -811,12 +811,17 @@ pub fn enumerate[T](xs: List[T]) -> List[(int, T)] {
     out
 }
 
-/// A new list pairing the elements of `a` and `b` position by position:
-/// `(a0, b0), (a1, b1), …`, as long as the SHORTER of the two, so the
-/// longer list's tail is dropped rather than trapped on. Both operands
-/// are read, not consumed. Built through the private `fresh` for the
-/// reason `enumerate` is (F-0133). Total: no error row, no traps beyond
-/// allocation.
+/// A new list pairing the elements of `xs` and `ys` position by
+/// position: `(x0, y0), (x1, y1), …`, as long as the SHORTER of the two,
+/// so the longer list's tail is dropped rather than trapped on. Both
+/// operands are read, not consumed. Built through the private `fresh`
+/// for the reason `enumerate` is (F-0133). Total: no error row, no traps
+/// beyond allocation.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.zip(ys)` is
+/// this call. Cost, as the clause states it: one fresh `List` of
+/// `min(xs.len, ys.len)` pairs. It stops at the shorter list because a
+/// length mismatch is not an access out of range.
 ///
 /// ```wolf-doc-example
 /// var names = List[str]()
@@ -830,15 +835,15 @@ pub fn enumerate[T](xs: List[T]) -> List[(int, T)] {
 /// for (n, s) in rows { total = total + s + n.len }
 /// total == 94
 /// ```
-pub fn zip[A, B](a: List[A], b: List[B]) -> List[(A, B)] {
-    var out: List[(A, B)] = fresh()
-    let n = len(b)
+pub fn zip[T, U](xs: List[T], ys: List[U]) -> List[(T, U)] {
+    var out: List[(T, U)] = fresh()
+    let n = len(ys)
     var i = 0
-    for x in a {
+    for x in xs {
         if i >= n {
             return out
         }
-        (mut out).push((x, at(b, i)))
+        (mut out).push((x, at(ys, i)))
         i = i + 1
     }
     out
