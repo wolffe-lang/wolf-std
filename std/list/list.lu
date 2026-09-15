@@ -694,12 +694,21 @@ pub fn is_sorted_by[T](xs: List[T], le: fn(T, T) -> bool) -> bool {
 /// `List[U]` of `xs.len` in the ambient region, and `xs.len` calls of
 /// `f`. A fallible `f` is `par`'s alone (`[conc.task.par]`).
 ///
-/// No `copy` here, and that is the rule read precisely: what this list
-/// holds is `f`'s own return value, not an element moved out of `xs`, so
-/// nothing lent escapes (`[mem.tier0.mode.read]`, wolf-lang#366). `x` is
-/// only LENT to `f` for the call, which is what a `read` parameter is
-/// for. An `f` that hands its own argument back is the caller's site,
-/// not this one.
+/// **The one element here that this call OWNS, and the spelling it is
+/// owed.** What this list holds is `f`'s own return value, not an
+/// element moved out of `xs`, so nothing lent escapes
+/// (`[mem.tier0.mode.read]`, wolf-lang#366); `x` is only LENT to `f` for
+/// the call, which is what a `read` parameter is for, and an `f` that
+/// hands its own argument back is the caller's site, not this one.
+/// Because `f(x)` is a temporary this activation owns, the right
+/// spelling under wolf-lang#385 (ruled option 3, s167, unreleased) is
+/// `(mut out).push(take f(x))`, which MOVES it where the default copies.
+/// It is not written yet because it does not exist yet: at wolf 0.2.14
+/// both compiler rungs answer `E1007 — `push` takes `value` as plain
+/// `read`, no mode is written for it` (measured, F-0136), and that is a
+/// static refusal of this whole module, so every `std.list` row on both
+/// rungs would pay for it. It lands with the pin that carries s167, and
+/// the cost line above changes with it.
 ///
 /// ```wolf-doc-example
 /// var xs = List[int]()
@@ -726,14 +735,22 @@ pub fn map[T, U](xs: List[T], f: fn(T) -> U) -> List[U] {
 /// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.filter(keep)`
 /// is this call (`[type.method.resolve]` step 2). Cost, as the clause
 /// states it: one fresh `List[T]` of at most `xs.len` in the ambient
-/// region, and `xs.len` calls of `keep`, plus one `copy` per kept
-/// element. The `copy` is `[mem.tier0.mode.read]`'s (wolf-lang#366, in
-/// 0.2.15): `xs` is a `read` parameter, so an element moved out of it is
-/// LENT and may not escape this call — and the kept elements do escape,
-/// in the returned list. `copy` is DEEP on the native tiers from
-/// wolf-lang#384 (`[mem.tier0.move.3]`): a `List` or `Map` element
-/// copies its buffer, a `str` element shares its immutable bytes, and a
-/// scalar element costs nothing.
+/// region, and `xs.len` calls of `keep`, plus one element copy per kept
+/// element — `push`'s own, not one spelled here.
+///
+/// **Why no `copy` is written.** `xs` is a `read` parameter, so an
+/// element moved out of it is LENT and may not escape this call
+/// (`[mem.tier0.mode.read]`, wolf-lang#366, in 0.2.15) — and the kept
+/// elements do escape, in the returned list. That clause says in its own
+/// words that it does not reach the builtin store which keeps a `read`
+/// argument inside its receiver; that is wolf-lang#385, **ruled option
+/// 3** (s167, unreleased): `push` COPIES a non-`Copy` element by
+/// default, and `push(take v)` moves it. The default copy is exactly the
+/// copy this function needs, so writing `copy x` here would buy a second
+/// one. `push`'s copy is deep on the native tiers (`[mem.tier0.move.3]`,
+/// wolf-lang#384): a `List` element copies its buffer, a `str` element
+/// shares its immutable bytes, a scalar costs nothing. Nothing is lent
+/// out of this module either way, at this pin or at the next.
 ///
 /// ```wolf-doc-example
 /// var xs = List[int]()
@@ -747,7 +764,7 @@ pub fn filter[T](xs: List[T], keep: fn(T) -> bool) -> List[T] {
     var out = List[T]()
     for x in xs {
         if keep(x) {
-            (mut out).push(copy x)
+            (mut out).push(x)
         }
     }
     out
@@ -819,11 +836,14 @@ pub fn sum(xs: List[int]) -> int {
 ///
 /// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.enumerate()`
 /// is this call. Cost, as the clause states it: one fresh `List` of
-/// pairs, indices from 0, plus one `copy` per element — the pairs escape
-/// with the element inside them (`[mem.tier0.mode.read]`,
-/// wolf-lang#366), and `copy` is deep on the native tiers
-/// (`[mem.tier0.move.3]`, wolf-lang#384): a scalar costs nothing, a
-/// `str` shares its bytes, a `List` element copies its buffer.
+/// pairs, indices from 0, plus `push`'s own copy of each pair — the
+/// pairs escape with the element inside them
+/// (`[mem.tier0.mode.read]`, wolf-lang#366), and the store that copies
+/// them is wolf-lang#385's, ruled option 3 (s167, unreleased): `push`
+/// copies a non-`Copy` element by default, deeply on the native tiers
+/// (`[mem.tier0.move.3]`, wolf-lang#384) — a scalar costs nothing, a
+/// `str` shares its bytes, a `List` element copies its buffer. No `copy`
+/// is spelled here, because that default is already it.
 ///
 /// ```wolf-doc-example
 /// var xs = List[str]()
@@ -838,7 +858,7 @@ pub fn enumerate[T](xs: List[T]) -> List[(int, T)] {
     var out: List[(int, T)] = fresh()
     var i = 0
     for x in xs {
-        (mut out).push((i, copy x))
+        (mut out).push((i, x))
         i = i + 1
     }
     out
@@ -853,12 +873,13 @@ pub fn enumerate[T](xs: List[T]) -> List[(int, T)] {
 ///
 /// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.zip(ys)` is
 /// this call. Cost, as the clause states it: one fresh `List` of
-/// `min(xs.len, ys.len)` pairs, plus one `copy` per element of each
-/// operand — BOTH lists are `read` parameters and both elements escape
-/// inside the pairs (`[mem.tier0.mode.read]`, wolf-lang#366). `copy` is
-/// deep on the native tiers (`[mem.tier0.move.3]`, wolf-lang#384). It
-/// stops at the shorter list because a length mismatch is not an access
-/// out of range.
+/// `min(xs.len, ys.len)` pairs, plus `push`'s own copy of each pair —
+/// BOTH lists are `read` parameters and both elements escape inside the
+/// pairs (`[mem.tier0.mode.read]`, wolf-lang#366), and the copy that
+/// makes that legal is `push`'s under wolf-lang#385, ruled option 3
+/// (s167, unreleased), deep on the native tiers
+/// (`[mem.tier0.move.3]`, wolf-lang#384). It stops at the shorter list
+/// because a length mismatch is not an access out of range.
 ///
 /// ```wolf-doc-example
 /// var names = List[str]()
@@ -880,7 +901,7 @@ pub fn zip[T, U](xs: List[T], ys: List[U]) -> List[(T, U)] {
         if i >= n {
             return out
         }
-        (mut out).push((copy x, copy at(ys, i)))
+        (mut out).push((x, at(ys, i)))
         i = i + 1
     }
     out
@@ -996,10 +1017,12 @@ pub fn sort_by[T](mut xs: List[T], less: fn(T, T) -> bool) {
 /// `[type.comb.set]` (wolf-lang `4c046f15`): the method
 /// `xs.sorted_by(less)` is this call, the chain's sort (`corpus/
 /// wordcount.lu`'s `sorted_by`). Cost, as the clause states it:
-/// `sort_by` over a fresh copy, plus one `copy` per element building
-/// that copy — the elements escape in the returned list, and `xs` is a
-/// `read` parameter (`[mem.tier0.mode.read]`, wolf-lang#366). `copy` is
-/// deep on the native tiers (`[mem.tier0.move.3]`, wolf-lang#384).
+/// `sort_by` over a fresh copy, plus `push`'s own copy per element
+/// building that copy — the elements escape in the returned list and
+/// `xs` is a `read` parameter (`[mem.tier0.mode.read]`, wolf-lang#366),
+/// and the store that copies them is wolf-lang#385's, ruled option 3
+/// (s167, unreleased), deep on the native tiers
+/// (`[mem.tier0.move.3]`, wolf-lang#384).
 /// `std.sort.sorted_by` is the `Ordering` twin that runs on no lane
 /// (F-0029) and keeps its qualified spelling.
 ///
@@ -1015,7 +1038,7 @@ pub fn sort_by[T](mut xs: List[T], less: fn(T, T) -> bool) {
 pub fn sorted_by[T](xs: List[T], less: fn(T, T) -> bool) -> List[T] {
     var out = List[T]()
     for x in xs {
-        (mut out).push(copy x)
+        (mut out).push(x)
     }
     sort_by(mut out, less)
     out

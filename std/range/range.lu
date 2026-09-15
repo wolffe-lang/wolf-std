@@ -158,17 +158,20 @@ pub fn clamp_to(r: range[int], x: int) -> int ! {none} {
 /// `[type.comb.set]` (wolf-lang `4c046f15`): the method `r.collect()`
 /// is this call (`std.range` is `range`'s home module,
 /// `[type.method.home]`). Cost, as the clause states it: one fresh
-/// `List` of the range's length, plus one `copy` per value.
+/// `List` of the range's length, plus `push`'s own copy per value.
 ///
-/// The `copy` is `[mem.tier0.mode.read]`'s (wolf-lang#366, in 0.2.15):
-/// `r` is a `read` parameter, the values collected escape in the
-/// returned list, and the clause counts a TYPE PARAMETER as able to
-/// reach shared storage always, "because a generic body is checked once
-/// for every instantiation" — so `T` needs it even though the two
-/// element types this range can have are scalars. It costs nothing at
-/// run time for exactly that reason: `copy` is deep on the native tiers
-/// (`[mem.tier0.move.3]`, wolf-lang#384) and a value that reaches no
-/// heap storage is its own copy.
+/// `r` is a `read` parameter and the values escape in the returned list
+/// (`[mem.tier0.mode.read]`, wolf-lang#366, in 0.2.15), and that clause
+/// counts a TYPE PARAMETER as able to reach shared storage always,
+/// "because a generic body is checked once for every instantiation" — so
+/// `T` is in scope for the rule even though the two element types a
+/// range can have are scalars. No `copy` is spelled: the store is
+/// `push`'s, wolf-lang#385 ruled option 3 (s167, unreleased) copies a
+/// non-`Copy` element by default, and a value that reaches no heap
+/// storage is its own copy, so this costs nothing at run time either way
+/// (`[mem.tier0.move.3]`, wolf-lang#384). `take` is not the spelling
+/// here: a value moved out of a `read` parameter is LENT, and a `take`
+/// of a lent binding is E1014 by the same clause.
 ///
 /// ```wolf-doc-example
 /// range.collect(2..5).len == 3
@@ -179,7 +182,7 @@ pub fn clamp_to(r: range[int], x: int) -> int ! {none} {
 pub fn collect[T](r: range[T]) -> List[T] {
     var out = List[T]()
     for x in r {
-        (mut out).push(copy x)
+        (mut out).push(x)
     }
     out
 }
