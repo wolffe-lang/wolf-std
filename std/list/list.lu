@@ -644,3 +644,40 @@ pub fn is_sorted_by[T](xs: List[T], le: fn(T, T) -> bool) -> bool {
     }
     true
 }
+
+// ------------------------------------------------------------------
+// The combinators (sc50, wolf-lang#390): the free-function half of the
+// method surface s166's clauses place on std data. Same tier, same
+// rules as the callable tier above: a fn VALUE parameter, a walk in
+// order, a fresh list where the answer is a list. Nothing here consumes
+// its operand, so nothing here is spelled `take`.
+//
+// The doc examples are FENCED now, and the reason the tier above is
+// prose has half gone: a std fn value crosses the module boundary on
+// all three lanes at wolf 0.2.14 / lupin 0.1.36 (F-0085's refusal,
+// wolf-lang#116 closed). An example still cannot import a predicate
+// from a second module (§4's one-module note), so it passes a lambda,
+// and the checked machine answers `unsupported — closures in checked
+// execution` for it, which the doc gate accepts from a compiler lane.
+// The three-lane witness for each is its test file, over top-level fns.
+// ------------------------------------------------------------------
+
+/// A new list holding `f(x)` for every `x` in `xs`, in order; `xs` is
+/// read, not consumed. The empty list maps to the empty list. Total: no
+/// error row, no traps beyond allocation and whatever `f` traps.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// let ys = list.map(xs, fn(v) v * 10)
+/// list.len(ys) == 2
+/// (list.last(ys) else 0) == 20
+/// ```
+pub fn map[T, U](xs: List[T], f: fn(T) -> U) -> List[U] {
+    var out = List[U]()
+    for x in xs {
+        (mut out).push(f(x))
+    }
+    out
+}

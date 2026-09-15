@@ -1,0 +1,43 @@
+//! check: run(exit=0, stdout="map holds\n")
+//! phase: run
+//! conforms: std.list, type.fn.value, generics.mono
+//!
+//! sc50's `map` over fn VALUES, on every lane: the element type changes
+//! (`int` to `str`, `str` to `int`), the order is kept, the operand is
+//! left alone, and the empty list maps to the empty list. The fns live
+//! at top level so the checked machine runs this file; the module's
+//! fenced example passes a lambda, which that machine declines.
+
+use std.list
+
+fn tenfold(v: int) -> int { v * 10 }
+
+fn label(v: int) -> str { "n{v}" }
+
+fn width(s: str) -> int { s.len }
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    list.push(mut xs, 2)
+    list.push(mut xs, 3)
+
+    let tens = list.map(xs, tenfold)
+    if list.len(tens) == 3 {} else { return 1 }
+    if (list.get(tens, 0) else 0) == 10 {} else { return 2 }
+    if (list.get(tens, 2) else 0) == 30 {} else { return 3 }
+    // The operand is read, not consumed, and not rewritten.
+    if (list.get(xs, 0) else 0) == 1 {} else { return 4 }
+
+    // A different U: the element type changes across the call.
+    let names = list.map(xs, label)
+    if (list.first(names) else "?") == "n1" {} else { return 5 }
+    let widths = list.map(names, width)
+    if (list.last(widths) else 0) == 2 {} else { return 6 }
+
+    var empty = List[int]()
+    if list.is_empty(list.map(empty, tenfold)) == true {} else { return 7 }
+
+    print("map holds")
+    0
+}

@@ -725,6 +725,13 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+[tests."list/map_tier.lu"]
+# sc50: `map` over fn VALUES, the element type changing across the call.
+# Predicted run/run/run before the body existed (docs/findings.md, sc50).
+lupin = "run"
+wolfc = "run"
+native = "run"
+
 [tests."list/get_hit_miss.lu"]
 lupin = "run"
 # The row raise lives in an imported module's body: wolfc's checked tier
