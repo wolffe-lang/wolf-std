@@ -21,7 +21,7 @@ tags is TWO releases and on the compiler's side for the first time.
 | `mirror-lag(E0501)` row | stays | **stays** | none (wolf-interp#102 open) |
 | s158's surfaces on lupin | alias/list literal refused | **refused at PARSE** (E0201); accessor **declined by name** at resolve | the phase is the whole cost story (F-0130) |
 | std.range tests at 0.2.14 | exit(0) ×4, trap(overflow) ×1 on both rungs; lupin `mirror-lag(E0301)` | compilers **as predicted**; lupin **`unsupported`** by name | the rig's word, not the code |
-| the three windows rows after the fix | `exit(0)` on `rig (windows-latest)` | (CI, see the PR) | |
+| the three windows rows after the fix | `exit(0)` on `rig (windows-latest)` | **green** — absent from run 34910870288's red list, only their `unsupported(lupin/wolfc)` conservatism lines | none — and the step is STILL red there, on three json rows that overflow the checked machine's stack (F-0132, wolf-lang#382), red at trunk too and never counted |
 
 `doc-examples` 436 blocks GREEN before and after; `ulp` 200 GREEN;
 `lint-conventions` 5 rules; `fmt-lu` 458 fixed points at 0.2.14.
@@ -68,8 +68,15 @@ call now records its arm, a file must take ONE posture, the printed
 line is identical under both, and every other outcome has its own exit
 code — an adoption where a refusal was owed, a mixed posture, a child
 spawned on a host that says it cannot. No ledger word moves; native on
-macOS reproduces every directive's hash. Windows's answer is read off
-the PR's CI log, and the marker's retirement is the orchestrator's call.
+macOS reproduces every directive's hash, and **`rig (windows-latest)`
+runs all three green at the head** (run 34910870288: absent from the
+red list, `xtask: RED` for another reason). That reason is F-0132: the
+step was red on SIX rows at trunk, not three — `json/number_posture_and_depth`,
+`json/parse_misses` and `json/parse_shapes` overflow the checked
+machine's stack on windows (`STATUS_STACK_OVERFLOW`, no record) at
+0.2.12 and 0.2.14 alike, and #34's count grepped only directive
+mismatches. Filed as wolf-lang#382; the marker stays until the checked
+tier sizes its own stack.
 
 ### wolf-std#31 — a ruling, recommended and not landed
 
@@ -81,6 +88,7 @@ and nothing upstream is moving it. Priced on the issue as its own lane.
 ### Filed
 
 F-0128 wolf-interp#112 (four `fs_*` names outside 0.1.36's tier),
+F-0132 wolf-lang#382 (the windows stack overflows behind the marker),
 F-0129 wolf-lang#381 (the checked machine's `capacity overflow` panic on
 a wide range value — a crash, not a verdict), F-0130 wolf-std#36 (the
 alias's trigger), F-0131 wolf-std#37 (doc-examples' missing word).

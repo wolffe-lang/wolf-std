@@ -139,6 +139,7 @@ the building.
 | F-0129 | 2026-09-14 | **The checked machine PANICS on a wide range VALUE — `capacity overflow`, no record at all**: `fn first(r: range[int]) -> int { for x in r { return x } … }` over `0..9223372036854775807` is `exit(0)` / `first 0` on the native rung and a Rust panic on `wolf conform-run --checked`; `0..1000000` is fine on both. The checked tier materializes a range value before iterating it, where `[type.range.value]` says a `for` over a range header never materializes one. A panic is not a verdict, so the differential cannot even file it as a divergence. Found writing `std.range.len`'s overflow witness, which measures the wide range and does not iterate it | wolf-lang (checked execution, s158's range values) | [filed: wolf-lang#381](https://github.com/wolffe-lang/wolf-lang/issues/381) |
 | F-0130 | 2026-09-14 | **An error-set alias inside a std module costs the reference lane EVERY importer, at parse**: wolf 0.2.14 takes `error IoErrors = {not_found, denied, io}` on both rungs; lupin 0.1.36 (pin v0.2.12) refuses it at parse (`fail(E0201)`), and one `error` line appended to a scratch copy of `std/fs/fs.lu` turned `fs/path_helpers.lu` — a row that never names it — from `exit(0)` to `fail(E0201)`. Eighteen lupin rows import `std.fs`, fifteen of them lit by the same bump; sc46's `trait Num` alias cost ONE row because its refusal was at resolve. So the io tier's alias is witnessed (`tests/fs/alias_row.lu`, `run`/`run`/`mirror-lag(E0201)`) and not written into std.fs until the mirror parses the form. The list-literal half of wolf-std#30 has no carrier at all (zero non-doc `List[T]()`-plus-literal-push sites) | wolf-std (the alias's home) + wolf-interp (the mirror at v0.2.12) | [filed: wolf-std#36](https://github.com/wolffe-lang/wolf-std/issues/36) |
 | F-0131 | 2026-09-14 | **`doc-examples` has no mirror-lag word**: a lupin `unsupported` is accepted only for `CAPABILITY_MODULES` or a per-function `LUPIN_TIER_WAIVERS` entry, and a lupin `fail(E…)` never — so a module the mirror has not caught up to (`std.range` at 0.2.14: both compiler rungs run it, lupin declines the accessor BY NAME) cannot fence an example two lanes run to `exit(0)`, and its four examples are prose while the ledger has carried `mirror-lag(E…)` for the same shape since sc46 | wolf-std (the rig's extractor) | [filed: wolf-std#37](https://github.com/wolffe-lang/wolf-std/issues/37) |
+| F-0132 | 2026-09-15 | **The windows rig was RED on SIX rows, not three, and the three nobody counted are stack overflows**: `json/number_posture_and_depth`, `json/parse_misses`, `json/parse_shapes` on the CHECKED lane die on `rig (windows-latest)` with `tool error (exit Some(-1073741571), no record): thread 'main' has overflowed its stack` — `STATUS_STACK_OVERFLOW`, a crash and not a verdict — at trunk `2d10219` (run 34686645924, wolf 0.2.12) AND at sc48's head (run 34910870288, wolf 0.2.14), where ubuntu and macOS answer `unsupported`/`exit(0)`. wolf-std#34's "three, not five" counted `directive mismatch` lines; the rig prints a tool error in another shape, so the count was wrong the way F-0126 and F-0127 were wrong: the thing read did not carry the fact. sc48's three #34 rows are GREEN on windows at the head; the step stays ADVISORY RED on these three, and the marker stays until the checked tier sizes its own stack | wolf-lang (the checked tier on windows) + wolf-std (the reading) | [filed: wolf-lang#382](https://github.com/wolffe-lang/wolf-lang/issues/382) |
 
 
 ## F-0001 — the std search path
@@ -9721,3 +9722,26 @@ exactly this shape since sc46. The ask is the ledger's semantics in the
 extractor: a blessed, self-testing list that accepts the refusal per
 module and reds on the release that runs the example, so the fences
 come back the day the ledger rows flip.
+
+## F-0132 — the windows rig was red on six rows, and the three nobody counted are stack overflows
+
+`wolf-lang#382`. Read line by line, `rig (windows-latest)`'s std-test
+step at trunk `2d10219` (run 34686645924) ends with SIX red lines: the
+three `directive mismatch` lines wolf-std#34 records, and three
+`tool error (exit Some(-1073741571), no record): thread 'main' has
+overflowed its stack` lines on `json/number_posture_and_depth`,
+`json/parse_misses` and `json/parse_shapes`, checked lane. The same
+three at sc48's head (run 34910870288, wolf 0.2.14), where the #34 rows
+are green. `-1073741571` is `STATUS_STACK_OVERFLOW`: the checked tier's
+depth budget answers `unsupported` on a unix main thread and the
+windows main thread runs out first.
+
+The count was wrong for the reason F-0126 and F-0127 were: the thing
+read did not carry the fact. sc46 grepped the log for directive
+mismatches, and the rig prints a crash as a tool error — a different
+shape on the same step. The rule that stands after three occurrences
+is the narrowest one: **read the step to its `xtask:` line, and count
+every line above it that names a test**. A crash writes no record, so
+the ledger cannot carry a word for it and the rows stay as unix
+measures them; the fix is upstream's, and `std-test` stays ADVISORY on
+windows behind three rows the marker's own issue did not know it had.
