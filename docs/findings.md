@@ -138,7 +138,7 @@ the building.
 | F-0128 | 2026-09-14 | **lupin 0.1.36's fs tier is 22 names and std.fs calls 26**: `fs_create_dir`, `fs_remove_dir`, `fs_write_chunk` and `fs_rename_atomic` answer `unsupported — `<name>` does not resolve` at `resolve` while their siblings (`fs_create_dir_all`, `fs_remove_dir_all`, `fs_read_chunk`, `fs_rename`) run — measured one name at a time on the release that built the tier. sc48 predicted 15 lupin fs rows `unsupported` -> `run` at the bump and measured 11; the four that stayed dark (`fs/chunk_stream`, `fs/directories_and_metadata`, `fs/exists_row`, `fs/fstat_rows`) name the four absent builtins in the rig's own records, and flip on the release that carries them | wolf-interp (the fs tier, is48) | [filed: wolf-interp#112](https://github.com/wolffe-lang/wolf-interp/issues/112) |
 | F-0129 | 2026-09-14 | **The checked machine PANICS on a wide range VALUE — `capacity overflow`, no record at all**: `fn first(r: range[int]) -> int { for x in r { return x } … }` over `0..9223372036854775807` is `exit(0)` / `first 0` on the native rung and a Rust panic on `wolf conform-run --checked`; `0..1000000` is fine on both. The checked tier materializes a range value before iterating it, where `[type.range.value]` says a `for` over a range header never materializes one. A panic is not a verdict, so the differential cannot even file it as a divergence. Found writing `std.range.len`'s overflow witness, which measures the wide range and does not iterate it | wolf-lang (checked execution, s158's range values) | [filed: wolf-lang#381](https://github.com/wolffe-lang/wolf-lang/issues/381) |
 | F-0130 | 2026-09-14 | **An error-set alias inside a std module costs the reference lane EVERY importer, at parse**: wolf 0.2.14 takes `error IoErrors = {not_found, denied, io}` on both rungs; lupin 0.1.36 (pin v0.2.12) refuses it at parse (`fail(E0201)`), and one `error` line appended to a scratch copy of `std/fs/fs.lu` turned `fs/path_helpers.lu` — a row that never names it — from `exit(0)` to `fail(E0201)`. Eighteen lupin rows import `std.fs`, fifteen of them lit by the same bump; sc46's `trait Num` alias cost ONE row because its refusal was at resolve. So the io tier's alias is witnessed (`tests/fs/alias_row.lu`, `run`/`run`/`mirror-lag(E0201)`) and not written into std.fs until the mirror parses the form. The list-literal half of wolf-std#30 has no carrier at all (zero non-doc `List[T]()`-plus-literal-push sites) | wolf-std (the alias's home) + wolf-interp (the mirror at v0.2.12) | [filed: wolf-std#36](https://github.com/wolffe-lang/wolf-std/issues/36) |
-| F-0131 | 2026-09-14 | **`doc-examples` has no mirror-lag word**: a lupin `unsupported` is accepted only for `CAPABILITY_MODULES` or a per-function `LUPIN_TIER_WAIVERS` entry, and a lupin `fail(E…)` never — so a module the mirror has not caught up to (`std.range` at 0.2.14: both compiler rungs run it, lupin declines the accessor BY NAME) cannot fence an example two lanes run to `exit(0)`, and its four examples are prose while the ledger has carried `mirror-lag(E…)` for the same shape since sc46 | wolf-std (the rig's extractor) | [filed: wolf-std#37](https://github.com/wolffe-lang/wolf-std/issues/37) |
+| F-0131 | 2026-09-14 | **`doc-examples` has no mirror-lag word**: a lupin `unsupported` is accepted only for `CAPABILITY_MODULES` or a per-function `LUPIN_TIER_WAIVERS` entry, and a lupin `fail(E…)` never — so a module the mirror has not caught up to (`std.range` at 0.2.14: both compiler rungs run it, lupin declines the accessor BY NAME) cannot fence an example two lanes run to `exit(0)`, and its four examples are prose while the ledger has carried `mirror-lag(E…)` for the same shape since sc46 | wolf-std (the rig's extractor) | [filed: wolf-std#37](https://github.com/wolffe-lang/wolf-std/issues/37) — **CLOSED at sc49 (`f746a24`).** `LUPIN_MIRROR_LAG` is `(module, refusal, issue)`: a CODE demands exactly `fail(<code>)`, a by-name SENTENCE demands `unsupported` carrying it in the record's `x-unsupported` (read since `a79b75a`). A heal or a different refusal on any block of the module is RED, an entry no block fired is RED, a mirror-lagged block must still reach `exit(0)` on a compiler lane, and `selftest` reds an entry whose module has no fence. Both runtime directions seen red on plants before the green. The carrier is `std.range`'s four examples, fenced: 440 blocks GREEN |
 | F-0132 | 2026-09-15 | **The windows rig was RED on SIX rows, not three, and the three nobody counted are stack overflows**: `json/number_posture_and_depth`, `json/parse_misses`, `json/parse_shapes` on the CHECKED lane die on `rig (windows-latest)` with `tool error (exit Some(-1073741571), no record): thread 'main' has overflowed its stack` — `STATUS_STACK_OVERFLOW`, a crash and not a verdict — at trunk `2d10219` (run 34686645924, wolf 0.2.12) AND at sc48's head (run 34910870288, wolf 0.2.14), where ubuntu and macOS answer `unsupported`/`exit(0)`. wolf-std#34's "three, not five" counted `directive mismatch` lines; the rig prints a tool error in another shape, so the count was wrong the way F-0126 and F-0127 were wrong: the thing read did not carry the fact. sc48's three #34 rows are GREEN on windows at the head; the step stays ADVISORY RED on these three, and the marker stays until the checked tier sizes its own stack | wolf-lang (the checked tier on windows) + wolf-std (the reading) | [filed: wolf-lang#382](https://github.com/wolffe-lang/wolf-lang/issues/382) |
 
 
@@ -9722,6 +9722,30 @@ exactly this shape since sc46. The ask is the ledger's semantics in the
 extractor: a blessed, self-testing list that accepts the refusal per
 module and reds on the release that runs the example, so the fences
 come back the day the ledger rows flip.
+
+**CLOSED at sc49 (`f746a24`).** The word is `LUPIN_MIRROR_LAG` in
+`xtask/src/doc_examples.rs`, one entry: ``("range", "a range has no
+member `start`", "wolf-std#37 …")``. It takes either spelling of a
+refusal because the shape needs both: the ledger's `mirror-lag(E…)` is
+a static refusal, and `std.range`'s is a by-name decline the ledger
+spells `unsupported`. For an example, which has one legitimate depth on
+the reference machine, the SENTENCE is what tells the posture from
+drift (F-0081), so `record::Record` reads `x-unsupported` /
+`x-unsupported-construct` (`a79b75a`). Gated as the ledger word is:
+- measured with the four fences and an EMPTY list: exactly four reds,
+  `std/range/range.lu:{64,81,100,122} [lupin]: unsupported (DOC BUG)`,
+  both compiler lanes `exit(0)` on all four;
+- with the sentence planted wrong (`end` for `start`): four
+  `MIRROR MOVED` reds naming the observed sentence, plus
+  `LUPIN_MIRROR_LAG[0] … never fired`;
+- the heal (`exit(0)` on lupin) is red in
+  `mirror_lag_holds_only_that_refusal_in_both_directions`, the one
+  direction no local binary can plant;
+- with the entry: `doc-examples: 440 block(s), GREEN`, the four
+  printed as a mirror-lag ledger.
+
+The entry leaves in the commit that flips `tests/range/`'s five lupin
+rows, which the same mirror release reds.
 
 ## F-0132 — the windows rig was red on six rows, and the three nobody counted are stack overflows
 
