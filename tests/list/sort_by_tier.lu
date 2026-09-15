@@ -2,7 +2,8 @@
 //! phase: run
 //! conforms: std.list, type.fn.value, generics.mono
 //!
-//! sc50's `sort_by` over a `bool` relation, on every lane: ascending and
+//! sc50's `sort_by` over the strict `bool` relation `less` of
+//! `[type.comb.set]`, on every lane: ascending and
 //! descending by flipping the relation, the empty and one-element lists,
 //! a length that is not a power of two, agreement with `is_sorted_by`,
 //! and the STABILITY witness F-0029 said no comparator-taking std sort
@@ -11,18 +12,23 @@
 
 use std.list
 
-// Not `le`/`ge`: `sort_by` and `is_sorted_by` name their parameter `le`,
-// and the checked machine calls a top-level fn that shares a fn-typed
-// parameter's name instead of the argument, silently (F-0134). Written
-// as `le`/`ge` this file exits 6 there and 0 on the other two lanes.
-fn ascending(a: int, b: int) -> bool { a <= b }
+// Not `less`/`le`: `sort_by` names its parameter `less` and
+// `is_sorted_by` names its own `le`, and the checked machine calls a
+// top-level fn that shares a fn-typed parameter's name instead of the
+// argument, silently (F-0134, wolf-lang#400).
+fn ascending(a: int, b: int) -> bool { a < b }
 
-fn descending(a: int, b: int) -> bool { a >= b }
+fn descending(a: int, b: int) -> bool { a > b }
+
+// `is_sorted_by` takes the non-strict "may precede".
+fn at_most(a: int, b: int) -> bool { a <= b }
+
+fn at_least(a: int, b: int) -> bool { a >= b }
 
 // Ties on the last digit; the tens digit records the original order.
-fn by_last_digit(a: int, b: int) -> bool { a % 10 <= b % 10 }
+fn by_last_digit(a: int, b: int) -> bool { a % 10 < b % 10 }
 
-fn by_len(a: str, b: str) -> bool { a.len <= b.len }
+fn by_len(a: str, b: str) -> bool { a.len < b.len }
 
 fn main() -> !int {
     var xs = List[int]()
@@ -36,12 +42,12 @@ fn main() -> !int {
 
     list.sort_by(mut xs, ascending)
     if list.len(xs) == 7 {} else { return 1 }
-    if list.is_sorted_by(xs, ascending) {} else { return 2 }
+    if list.is_sorted_by(xs, at_most) {} else { return 2 }
     if (list.first(xs) else 0) == 1 {} else { return 3 }
     if (list.last(xs) else 0) == 9 {} else { return 4 }
 
     list.sort_by(mut xs, descending)
-    if list.is_sorted_by(xs, descending) {} else { return 5 }
+    if list.is_sorted_by(xs, at_least) {} else { return 5 }
     if (list.first(xs) else 0) == 9 {} else { return 6 }
 
     var empty = List[int]()
