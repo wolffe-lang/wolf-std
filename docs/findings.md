@@ -140,6 +140,7 @@ the building.
 | F-0130 | 2026-09-14 | **An error-set alias inside a std module costs the reference lane EVERY importer, at parse**: wolf 0.2.14 takes `error IoErrors = {not_found, denied, io}` on both rungs; lupin 0.1.36 (pin v0.2.12) refuses it at parse (`fail(E0201)`), and one `error` line appended to a scratch copy of `std/fs/fs.lu` turned `fs/path_helpers.lu` — a row that never names it — from `exit(0)` to `fail(E0201)`. Eighteen lupin rows import `std.fs`, fifteen of them lit by the same bump; sc46's `trait Num` alias cost ONE row because its refusal was at resolve. So the io tier's alias is witnessed (`tests/fs/alias_row.lu`, `run`/`run`/`mirror-lag(E0201)`) and not written into std.fs until the mirror parses the form. The list-literal half of wolf-std#30 has no carrier at all (zero non-doc `List[T]()`-plus-literal-push sites) | wolf-std (the alias's home) + wolf-interp (the mirror at v0.2.12) | [filed: wolf-std#36](https://github.com/wolffe-lang/wolf-std/issues/36) |
 | F-0131 | 2026-09-14 | **`doc-examples` has no mirror-lag word**: a lupin `unsupported` is accepted only for `CAPABILITY_MODULES` or a per-function `LUPIN_TIER_WAIVERS` entry, and a lupin `fail(E…)` never — so a module the mirror has not caught up to (`std.range` at 0.2.14: both compiler rungs run it, lupin declines the accessor BY NAME) cannot fence an example two lanes run to `exit(0)`, and its four examples are prose while the ledger has carried `mirror-lag(E…)` for the same shape since sc46 | wolf-std (the rig's extractor) | [filed: wolf-std#37](https://github.com/wolffe-lang/wolf-std/issues/37) — **CLOSED at sc49 (`f746a24`).** `LUPIN_MIRROR_LAG` is `(module, refusal, issue)`: a CODE demands exactly `fail(<code>)`, a by-name SENTENCE demands `unsupported` carrying it in the record's `x-unsupported` (read since `a79b75a`). A heal or a different refusal on any block of the module is RED, an entry no block fired is RED, a mirror-lagged block must still reach `exit(0)` on a compiler lane, and `selftest` reds an entry whose module has no fence. Both runtime directions seen red on plants before the green. The carrier is `std.range`'s four examples, fenced: 440 blocks GREEN |
 | F-0132 | 2026-09-15 | **The windows rig was RED on SIX rows, not three, and the three nobody counted are stack overflows**: `json/number_posture_and_depth`, `json/parse_misses`, `json/parse_shapes` on the CHECKED lane die on `rig (windows-latest)` with `tool error (exit Some(-1073741571), no record): thread 'main' has overflowed its stack` — `STATUS_STACK_OVERFLOW`, a crash and not a verdict — at trunk `2d10219` (run 34686645924, wolf 0.2.12) AND at sc48's head (run 34910870288, wolf 0.2.14), where ubuntu and macOS answer `unsupported`/`exit(0)`. wolf-std#34's "three, not five" counted `directive mismatch` lines; the rig prints a tool error in another shape, so the count was wrong the way F-0126 and F-0127 were wrong: the thing read did not carry the fact. sc48's three #34 rows are GREEN on windows at the head; the step stays ADVISORY RED on these three, and the marker stays until the checked tier sizes its own stack | wolf-lang (the checked tier on windows) + wolf-std (the reading) | [filed: wolf-lang#382](https://github.com/wolffe-lang/wolf-lang/issues/382) |
+| F-0133 | 2026-09-15 | **A list of tuples has one spelling that runs on all three lanes, and it is not the constructor**: `List[(int, T)]()` (and a concrete `List[(int, int)]()`, and a generic-struct `List[Pair[int]]()`) is `unsupported — this prelude container instantiation (generic data)` at RESOLVE on both compiler rungs, eagerly, so one such body in `std.list` darkened every importer (`list/map_tier` went dark on both rungs without calling it); `var out: List[(int, T)] = []` runs on both rungs and is `fail(E0201)` at parse on lupin 0.1.36; `fresh[(int, str)]()` is `E0812: the argument for U must be a type` on both rungs; and `var out: List[(int, T)] = fresh()` over a private `fn fresh[U]() -> List[U]` runs on all three. `std.list.enumerate`/`zip` ship on that helper | [wolf-lang#349](https://github.com/wolffe-lang/wolf-lang/issues/349) (comment), wolf-interp#106 | sc50 probe |
 
 
 ## F-0001 — the std search path
@@ -9809,3 +9810,35 @@ which `doc-examples` accepts (the compiler lanes may refuse honestly;
 lupin may not). A fenced example with a three-lane verdict needs a fn
 value from `std.list` itself, and no `std.list` function has a
 predicate's shape.
+
+## F-0133 — a list of tuples has one three-lane spelling, and it is not the constructor
+
+`wolf-lang#349` (a comment with these measurements), `wolf-interp#106`.
+sc50 predicted `enumerate` and `zip` at run / run / run on the reasoning
+that `map.pairs` already returns `List[(K, V)]`. The row was right and
+the path was not: `map.pairs` returns the builtin's list and never
+constructs one. Measured at wolf 0.2.14 / lupin 0.1.36, entry files
+staged over `std/`:
+
+| spelling | lupin | wolfc | native |
+|---|---|---|---|
+| `var out = List[(int, T)]()` in a generic fn | exit(0) | unsupported @ resolve | unsupported @ resolve |
+| `var out = List[(int, int)]()` | exit(0) | unsupported @ resolve | unsupported @ resolve |
+| `var out = List[Pair[int]]()` (`struct Pair[T]`) | exit(0) | unsupported @ resolve | unsupported @ resolve |
+| `var out = List[List[T]]()` | exit(0) | exit(0) | exit(0) |
+| `var out: List[(int, T)] = []` | fail(E0201) @ parse | exit(0) | exit(0) |
+| `var out = fresh[(int, str)]()` | exit(0) | fail(E0812) | fail(E0812) |
+| `var out: List[(int, T)] = fresh()`, `fn fresh[U]() -> List[U]` | exit(0) | exit(0) | exit(0) |
+
+Two costs make the choice. The compiler decline is at resolve and it
+reads the whole module, so a constructor in any `std.list` body is a
+dark row for every importer on both rungs (`list/map_tier`, which never
+calls `enumerate`, went `unsupported` on both). The literal's cost is the
+mirror of that, on lupin at parse, which is F-0130's shape. The helper
+costs no lane, has the constructor's semantics, and is private. It
+retires for `[]` when lupin parses the literal, and the constructor
+spelling comes back when wolf-lang#349 closes.
+
+`E0812` on a tuple in type-argument position is a separate sentence
+from #349's (a type is refused where a type is asked for, at typecheck,
+with an error code rather than a decline) and rides the same comment.
