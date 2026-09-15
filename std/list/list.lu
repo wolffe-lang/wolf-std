@@ -704,11 +704,16 @@ pub fn map[T, U](xs: List[T], f: fn(T) -> U) -> List[U] {
     out
 }
 
-/// A new list holding the elements of `xs` for which `pred` holds, in
+/// A new list holding the elements of `xs` for which `keep` holds, in
 /// their original order; `xs` is read, not consumed. The in-place
 /// sibling (`retain`) is not written: a returning `filter` is the
 /// combinator, and a `mut` twin would be a second name for one walk.
 /// Total: no error row, no traps beyond allocation.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.filter(keep)`
+/// is this call (`[type.method.resolve]` step 2). Cost, as the clause
+/// states it: one fresh `List[T]` of at most `xs.len` in the ambient
+/// region, and `xs.len` calls of `keep`.
 ///
 /// ```wolf-doc-example
 /// var xs = List[int]()
@@ -718,10 +723,10 @@ pub fn map[T, U](xs: List[T], f: fn(T) -> U) -> List[U] {
 /// list.len(list.filter(xs, fn(v) v % 2 == 1)) == 2
 /// (list.last(list.filter(xs, fn(v) v % 2 == 1)) else 0) == 3
 /// ```
-pub fn filter[T](xs: List[T], pred: fn(T) -> bool) -> List[T] {
+pub fn filter[T](xs: List[T], keep: fn(T) -> bool) -> List[T] {
     var out = List[T]()
     for x in xs {
-        if pred(x) {
+        if keep(x) {
             (mut out).push(x)
         }
     }
