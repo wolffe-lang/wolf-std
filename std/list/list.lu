@@ -726,3 +726,32 @@ pub fn fold[T, A](xs: List[T], init: A, f: fn(A, T) -> A) -> A {
     }
     acc
 }
+
+/// The sum of `xs`; 0 for the empty list. Traps `overflow` the moment a
+/// partial sum leaves `int` (checked arithmetic, X3), deliberately not a
+/// row: `std.search.sum`'s contract, word for word.
+///
+/// Monomorphic over `int`, and that is measured, not modest. A generic
+/// `sum[T: ops.Add]` needs `use std.ops`, which imports `std.cmp`, and
+/// every importer of `std.cmp` is `unsupported` on the native rung (the
+/// `search/*` rows carry exactly that), so the bound would cost every
+/// `std.list` importer a lane; `std.ops` has no zero for `T` either. The
+/// generic reduction is `fold`. `std.search.sum` stays: two modules may
+/// share a function name (a program importing both links at this pin,
+/// measured natively on `list.len` beside `bytes.len`), and this one
+/// is the three-lane spelling.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.push(mut xs, 3)
+/// list.sum(xs) == 6
+/// ```
+pub fn sum(xs: List[int]) -> int {
+    var total: int = 0
+    for v in xs {
+        total = total + v
+    }
+    total
+}
