@@ -94,6 +94,21 @@ fn at[T](xs: List[T], i: int) -> T {
     xs[i]
 }
 
+/// A fresh empty list of any element type, named through a type
+/// parameter instead of written out. Private, and here for one reason
+/// the tuple-returning combinators share: both compiler rungs decline
+/// `List[(int, T)]()` at resolve, eagerly, so the constructor darkens
+/// every importer of this module and not only its caller ("this
+/// prelude container instantiation (generic data)", wolf-lang#349);
+/// the list-literal spelling `var out: List[(int, T)] = []` compiles
+/// there and is `E0201` at parse on lupin 0.1.36 (wolf-interp#106),
+/// which darkens every importer on the reference lane instead. The same
+/// empty list reached through `U` runs on all three lanes. It retires,
+/// for `[]`, the day lupin parses the literal (F-0133).
+fn fresh[U]() -> List[U] {
+    List[U]()
+}
+
 /// Appends `v` to the end of `xs`, growing it. Amortized constant time
 /// (the buffer doubles; no capacity contract beyond that is promised).
 /// Total: no error row, no traps beyond allocation.
@@ -754,4 +769,27 @@ pub fn sum(xs: List[int]) -> int {
         total = total + v
     }
     total
+}
+
+/// A new list pairing each element of `xs` with its index, in order:
+/// `(0, x0), (1, x1), …`. The shape `for (i, x) in list.enumerate(xs)`
+/// destructures. Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var xs = List[str]()
+/// list.push(mut xs, "a")
+/// list.push(mut xs, "b")
+/// let pairs = list.enumerate(xs)
+/// var at_b = 0 - 1
+/// for (i, s) in pairs { if s == "b" { at_b = i } }
+/// at_b == 1
+/// ```
+pub fn enumerate[T](xs: List[T]) -> List[(int, T)] {
+    var out: List[(int, T)] = fresh()
+    var i = 0
+    for x in xs {
+        (mut out).push((i, x))
+        i = i + 1
+    }
+    out
 }

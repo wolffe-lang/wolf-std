@@ -1,0 +1,43 @@
+//! check: run(exit=0, stdout="enumerate holds\n")
+//! phase: run
+//! conforms: std.list, generics.mono
+//!
+//! sc50's `enumerate`, on every lane: indices from 0 in walk order, the
+//! pair read both by destructuring and by field, the empty list, and a
+//! second element type.
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 7)
+    list.push(mut xs, 8)
+    list.push(mut xs, 9)
+
+    let pairs = list.enumerate(xs)
+    if list.len(pairs) == 3 {} else { return 1 }
+    var want = 0
+    for (i, x) in pairs {
+        if i == want {} else { return 2 }
+        if x == 7 + i {} else { return 3 }
+        want = want + 1
+    }
+    let last = pairs[2]
+    if last.0 == 2 {} else { return 4 }
+    if last.1 == 9 {} else { return 5 }
+
+    var empty = List[int]()
+    if list.is_empty(list.enumerate(empty)) == true {} else { return 6 }
+
+    var ss = List[str]()
+    list.push(mut ss, "wolf")
+    list.push(mut ss, "std")
+    var found = 0 - 1
+    for (i, s) in list.enumerate(ss) {
+        if s == "std" { found = i }
+    }
+    if found == 1 {} else { return 7 }
+
+    print("enumerate holds")
+    0
+}
