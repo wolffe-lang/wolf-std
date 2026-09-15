@@ -563,12 +563,12 @@ native = "run"
 [tests."cmp/static_floor.lu"]
 lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
 wolfc = "run"  # sc44 pin bump (c9237c1): [type.trait.op] — operators dispatch
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."cmp/total_cmp_relational.lu"]
 lupin = "run"
 wolfc = "run"  # sc46 pin bump (a7f517e): wolf-lang#336 — the operator trait is the one REACHABLE, so `==` on an imported `Ordering` dispatches
-native = "unsupported"  # sc46: #336 lets it type-check, and the native rung then declines std.cmp's product pattern (deep trees, c06)
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # sc44: the four impls this sprint added — `Eq for char`, `Ord for char`,
 # `Ord for str` (F-0006 retires) and `Eq for f64` (sc01's decision
@@ -579,7 +579,7 @@ native = "unsupported"  # sc46: #336 lets it type-check, and the native rung the
 [tests."cmp/primitive_impls_tier.lu"]
 lupin = "unsupported"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # sc04 pin bump, lupin 0.1.2: `run` -> `unsupported`, and the CAUSE is a
 # fix. wolf-interp#5 landed, so a bare-ident pattern is a variant pattern
@@ -590,17 +590,17 @@ native = "unsupported"
 [tests."cmp/ordering_exhaustive.lu"]
 lupin = "unsupported"
 wolfc = "run"  # sc44 pin bump (c9237c1): [type.trait.op] — operators dispatch
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."cmp/ordering_methods_static.lu"]
 lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
 wolfc = "run"  # sc46 pin bump (a7f517e): wolf-lang#336 — the operator trait is the one REACHABLE, so `==` on an imported `Ordering` dispatches
-native = "unsupported"  # sc46: #336 lets it type-check, and the native rung then declines std.cmp's product pattern (deep trees, c06)
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."cmp/clamp_bad_range_trap.lu"]
 lupin = "run"  # sc24 binary bump (lupin 0.1.14): the is14-17 dispatch waves — trait defaults #32, prim impls #34
 wolfc = "run"  # sc44 pin bump (c9237c1): [type.trait.op] — operators dispatch
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # ---- std.testing ----
 
@@ -612,27 +612,27 @@ native = "run"
 [tests."testing/fail_trap.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."testing/unreachable_trap.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."testing/todo_trap.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."testing/assert_eq_trap.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # 1b149ba: primitive-receiver Eq dispatch executes on the checked tier (F-0082 half-moves; native unmoved)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."testing/assert_ne_trap.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # 1b149ba: primitive-receiver Eq dispatch executes on the checked tier (F-0082 half-moves; native unmoved)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # sc06: the comparison family as a static contract. Trait dispatch runs
 # in no implementation (F-0002 / F-0004), so the pass/trap pair the sprint
@@ -651,27 +651,27 @@ native = "run"
 [tests."testing/near_and_ulps.lu"]
 lupin = "run"
 wolfc = "run"  # sc26 pin bump (wolf @ c1ca543): the checked tier executes order_key's INT_MIN literal — at a900b8c it refused `unsupported — this literal shape in checked execution` spanning `-9223372036854775808` in std/testing (measured against BOTH binaries at the bump); the s123 numeric-literal wave (E0415/width defaulting) is the span's owner. The ONE row the sc26 bump moves.
-native = "unsupported"  # still refused at c1ca543, sentence evolved: `match over this scrutinee type` in std/testing (was c08's interpolation-in-fail); verdict unchanged, re-measured at the bump
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."testing/near_far_trap.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."testing/near_nan_trap.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."testing/ulps_far_trap.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."testing/ulps_nan_mixed_trap.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # sc06: the two-argument `assert` intrinsic, both halves. F-0020 (it
 # trapped when the condition HELD) is retired and these two files are
@@ -794,10 +794,12 @@ native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 # ---- sc02: std.map. AT sc44 THIS BLOCK STOPPED SAYING "wolfc does not
 # type `Map` at all" — s152 made `Map` a TYPE (`[type.map]`), so the
 # checked tier reads every body in the module and runs six rows that were
-# freight. The native rung stays `unsupported` for a reason that belongs
-# to std.cmp and not to std.map: `impl Eq for Ordering`'s
-# `match (self, other)` is `an enum or row test inside a product pattern
-# (deep trees, c06)`, which every importer of std.cmp pays. The `[K: Eq]`
+# freight. The native rung stayed `unsupported` through sc48 for a reason
+# that belonged to std.cmp and not to std.map: `impl Eq for Ordering`'s
+# `match (self, other)` was `an enum or row test inside a product pattern
+# (deep trees, c06)`, which every importer of std.cmp paid. sc49 wrote
+# both Ordering impls as nested matches (wolf-std#31 option 3) and all six
+# rows run natively. The `[K: Eq]`
 # three are `unsupported` on lupin because dispatch through an IMPORTED
 # module's trait has no dynamic semantics there — the same trait declared
 # in the entry file runs on all three machines, which is what makes this
@@ -806,32 +808,32 @@ native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 [tests."map/set_len_empty.lu"]
 lupin = "run"
 wolfc = "run"  # sc44 pin bump (c9237c1): [type.map] — `Map` is TyKind::Map
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."map/keys_values_pairs.lu"]
 lupin = "run"
 wolfc = "run"  # sc44 pin bump (c9237c1)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."map/clear_and_extend.lu"]
 lupin = "run"
 wolfc = "run"  # sc44 pin bump (c9237c1)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."map/get_hit_miss.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # sc44 pin bump (c9237c1): the `[K: Eq]` five dispatch
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."map/has_and_get_or.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # sc44 pin bump (c9237c1)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."map/remove_and_tally.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # sc44 pin bump (c9237c1)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # ---- sc02: std.pool (X5 — the two-phase protocol and the stale-handle
 # trap execute in both) ----
@@ -877,12 +879,12 @@ native = "run"  # sc08 pin bump (13b811f)
 [tests."x/list_eq/contains_and_index_of.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"  # 1b149ba: primitive-receiver Eq dispatch executes on the checked tier (F-0082 half-moves; native unmoved)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."x/list_eq/dedup_and_affixes.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "unsupported"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # ---- sc06's three nursery residents, each with a diagnostic behind it ----
 # These are the only `fail(...)` rows in the tree besides F-0014's and
@@ -928,12 +930,12 @@ lupin = "run"
 # `std.testing`: there it would have taken `fail`/`unreachable`/`todo`
 # off the compiler lane with it.
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."x/testing_text/starts_with_trap.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # ---- sc03: std.str. The whole module is a LUPIN lane, and the reason is
 # structural rather than incidental: wolfc answers `unsupported` at RESOLVE
@@ -1140,29 +1142,29 @@ native = "run"
 [tests."sort/ints_adversarial.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."sort/is_sorted_edges.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."sort/floats_total_order.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."sort/strs_bytewise.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # sc44, wolf-std#23: the returning twins. Same lanes as their in-place
 # twins, for the same reason — `sorted_ints` IS `sort_ints` over a copy.
 [tests."sort/returning_twins.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # Freight: the generic contracts typecheck (`check: pass`, phase mem) and
 # execute nowhere — `Ord.cmp` dispatch (F-0002) and cross-module
@@ -1182,44 +1184,44 @@ native = "run"
 [tests."ops/num_alias_tier.lu"]
 lupin = "mirror-lag(E0501)"  # sc46: an alias through an IMPORT expands no bound (wolf-interp#102) — the ledger's first mirror-lag row
 wolfc = "run"
-native = "unsupported"  # the std.cmp product-pattern decline every importer pays
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."ops/dispatch_tier.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"
-native = "unsupported"  # sc46: std.ops imports std.cmp for the `Num` alias, and every importer of std.cmp pays the product-pattern decline (deep trees, c06)
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."ops/div_zero_trap.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
 wolfc = "run"
-native = "unsupported"  # sc46: std.ops imports std.cmp for the `Num` alias, and every importer of std.cmp pays the product-pattern decline (deep trees, c06)
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # ---- sc04: std.search ----
 
 [tests."search/binary_search_hits.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."search/binary_search_misses.lu"]
 lupin = "run"
 wolfc = "run"  # sc07 pin bump (f0da6e6)
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."search/bounds_and_equal_range.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."search/reductions.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."search/sum_overflow_trap.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # ---- sc04: std.rand. The output permutation uses `>>`, `^` and `&`
 # on wrapping values, which the checked tier refused from sc04 through
@@ -1245,7 +1247,7 @@ native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 [tests."rand/shuffle_and_choose.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."rand/choose_empty_miss.lu"]
 lupin = "run"
@@ -1264,9 +1266,13 @@ native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 # `start`/`end` read the endpoints, F-0030 is CLOSED and both compiler
 # columns are `run`. The reference machine has the opposite history:
 # lupin ran `is_empty` while its body was a loop, and lupin 0.1.36
-# conforms to v0.2.12, where `r.start` is `fail(E0301)` at resolve — so
-# every std.range row is `mirror-lag(E0301)` there from the commit that
-# rewrites the bodies on the accessor. ----
+# conforms to v0.2.12 and declines `r.start` BY NAME at resolve ("a range
+# has no member `start`", a whole-program `unsupported`, not a
+# diagnostic) — so every std.range row is `unsupported` there from the
+# commit that rewrites the bodies on the accessor, and not `mirror-lag`,
+# which demands a `fail(E…)`. (sc48 wrote this note as `mirror-lag(E0301)`
+# before the measurement; the rows below were always the measured word.
+# Corrected at sc49.) ----
 
 [tests."range/is_empty.lu"]
 lupin = "unsupported"  # sc48: `run` -> `unsupported`, DELIBERATE and shallower — the body moved from the iteration probe to `r.start >= r.end` (the contract's spelling), and lupin 0.1.36 declines the accessor by name ("a range has no member `start`"); the row comes back with the mirror
