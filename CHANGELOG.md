@@ -1,5 +1,45 @@
 # Changelog
 
+## sc50 — 2026-09-15 — the combinators, std's half: nine functions on `[type.comb.set]`, two upstream bugs, and `sorted` named where it is missing
+
+wolf-lang#390 ruled `par` stays (option 1). s166's clauses
+(`[type.method]`, `[type.comb]`, wolf-lang `4c046f15`) make `xs.map(f)`
+the free call `list.map(xs, f)` and assign the combinator set to std.
+`par` is the language's builtin and is not written here. The pin is
+unchanged (wolf 0.2.14 / lupin 0.1.36).
+
+**Written, each predicted before its body** (`28a50e0`, `093796b`), and
+each run / run / run unless stated: `map` (`415c611`), `filter` (`c1f1a63`),
+`fold` (`7df0365`), `sum` over `List[int]` with its overflow trap
+(`9a54f73`), `enumerate` (`55fcd9a`), `zip` (`dea21c7`), `sort_by`
+(`1e5f791`, strict `less` at `b31f765`), `sorted_by` (`152ea98`), and
+`std.range.collect` over `range[int]` and `range[char]` (`9450c31`;
+the char row is lupin `unsupported`, where 0.1.36 declines the char
+range). Parameters and costs follow the clause: `keep` (`7362666`),
+`step` (`cf5e491`), `zip[T, U](xs, ys)` (`f6eb721`), anchors and costs
+cited (`5f0a075`). Fenced examples come back for the tier: a std fn value
+crosses the module boundary on all three lanes now (F-0085's refusal is
+gone), and a lambda example is checked `unsupported` only.
+
+**Not written: `sorted`** (`e8b8b72`, F-0135). `use std.cmp` in
+`std.list` darkens every importer natively until sc49's nested-match
+`Ordering` impls land (measured against origin/sc49: importers three-lane),
+and the checked machine then declines `sorted` alone (wolf-lang#402).
+
+**Findings.** F-0133 (`0dbb5f5`): `List[(int, T)]()` is declined at
+resolve on both compiler rungs, eagerly, for every importer, while the
+list literal is lupin `E0201` at parse; `enumerate`/`zip` build through a
+private `fresh[U]()` (wolf-lang#349, commented). F-0134 (`fbe2ad0`): a
+silent wrong answer on the checked machine, where a fn-typed parameter
+named like a top-level fn calls the top-level fn (wolf-lang#400). F-0135:
+`sorted`'s costs (wolf-lang#402).
+
+**Doc truth.** The first gauntlet redded two sc50 examples on all three
+lanes (`sc50-ci-1.log`): §4 classifies a line by its text, so a lambda
+holding `==` in a `let` or `for` line became `if let …` / `if for …`.
+Every comparison now rides an assertion line (`ac81cca`), and the
+combinators header says so. `std.sort.sort_by` names its running sibling
+(`c536e6e`); the `BLOCKED(c05)` comment retires (`58bd1d5`).
 ## sc49 — 2026-09-15 — the operator bridge gets its native rung back, and doc-examples learns the mirror-lag word
 
 Pins unchanged: wolf 0.2.14 (`30731a6`), lupin 0.1.36 (`a7f517e`),
