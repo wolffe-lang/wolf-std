@@ -141,6 +141,7 @@ the building.
 | F-0131 | 2026-09-14 | **`doc-examples` has no mirror-lag word**: a lupin `unsupported` is accepted only for `CAPABILITY_MODULES` or a per-function `LUPIN_TIER_WAIVERS` entry, and a lupin `fail(E…)` never — so a module the mirror has not caught up to (`std.range` at 0.2.14: both compiler rungs run it, lupin declines the accessor BY NAME) cannot fence an example two lanes run to `exit(0)`, and its four examples are prose while the ledger has carried `mirror-lag(E…)` for the same shape since sc46 | wolf-std (the rig's extractor) | [filed: wolf-std#37](https://github.com/wolffe-lang/wolf-std/issues/37) — **CLOSED at sc49 (`f746a24`).** `LUPIN_MIRROR_LAG` is `(module, refusal, issue)`: a CODE demands exactly `fail(<code>)`, a by-name SENTENCE demands `unsupported` carrying it in the record's `x-unsupported` (read since `a79b75a`). A heal or a different refusal on any block of the module is RED, an entry no block fired is RED, a mirror-lagged block must still reach `exit(0)` on a compiler lane, and `selftest` reds an entry whose module has no fence. Both runtime directions seen red on plants before the green. The carrier is `std.range`'s four examples, fenced: 440 blocks GREEN |
 | F-0132 | 2026-09-15 | **The windows rig was RED on SIX rows, not three, and the three nobody counted are stack overflows**: `json/number_posture_and_depth`, `json/parse_misses`, `json/parse_shapes` on the CHECKED lane die on `rig (windows-latest)` with `tool error (exit Some(-1073741571), no record): thread 'main' has overflowed its stack` — `STATUS_STACK_OVERFLOW`, a crash and not a verdict — at trunk `2d10219` (run 34686645924, wolf 0.2.12) AND at sc48's head (run 34910870288, wolf 0.2.14), where ubuntu and macOS answer `unsupported`/`exit(0)`. wolf-std#34's "three, not five" counted `directive mismatch` lines; the rig prints a tool error in another shape, so the count was wrong the way F-0126 and F-0127 were wrong: the thing read did not carry the fact. sc48's three #34 rows are GREEN on windows at the head; the step stays ADVISORY RED on these three, and the marker stays until the checked tier sizes its own stack | wolf-lang (the checked tier on windows) + wolf-std (the reading) | [filed: wolf-lang#382](https://github.com/wolffe-lang/wolf-lang/issues/382) |
 | F-0133 | 2026-09-15 | **A list of tuples has one spelling that runs on all three lanes, and it is not the constructor**: `List[(int, T)]()` (and a concrete `List[(int, int)]()`, and a generic-struct `List[Pair[int]]()`) is `unsupported — this prelude container instantiation (generic data)` at RESOLVE on both compiler rungs, eagerly, so one such body in `std.list` darkened every importer (`list/map_tier` went dark on both rungs without calling it); `var out: List[(int, T)] = []` runs on both rungs and is `fail(E0201)` at parse on lupin 0.1.36; `fresh[(int, str)]()` is `E0812: the argument for U must be a type` on both rungs; and `var out: List[(int, T)] = fresh()` over a private `fn fresh[U]() -> List[U]` runs on all three. `std.list.enumerate`/`zip` ship on that helper | [wolf-lang#349](https://github.com/wolffe-lang/wolf-lang/issues/349) (comment), wolf-interp#106 | sc50 probe |
+| F-0134 | 2026-09-15 | **Silent wrong answer on the checked machine: a call through a fn-typed parameter goes to a top-level fn of the same name**: `fn apply(le: fn(int, int) -> bool, …) { le(x, y) }` called as `apply(ge, 1, 2)` in a file that also declares `fn le` prints `true` under `wolf conform-run --checked` and `false` on lupin and native; across the module boundary it made `list.sort_by(mut xs, ge)` sort ascending and `list.is_sorted_by(xs, ge)` answer true. Every callable-tier parameter name in std (`pred`, `better`, `le`, `f`) is exposed to it; `tests/list/sort_by_tier.lu` names its relations `ascending`/`descending` and says why | [wolf-lang#400](https://github.com/wolffe-lang/wolf-lang/issues/400) | sc50 probe |
 
 
 ## F-0001 — the std search path
@@ -9842,3 +9843,31 @@ spelling comes back when wolf-lang#349 closes.
 `E0812` on a tuple in type-argument position is a separate sentence
 from #349's (a type is refused where a type is asked for, at typecheck,
 with an error code rather than a decline) and rides the same comment.
+
+## F-0134 — the checked machine calls the top-level fn and not the parameter
+
+`wolf-lang#400`. Found by the first draft of `tests/list/sort_by_tier.lu`,
+which declared `fn le` and `fn ge` and passed `ge` to `list.sort_by`,
+whose relation parameter is named `le`. lupin and native sorted
+descending; the checked machine sorted ascending, answered `true` for
+`is_sorted_by(xs, ge)` on the ascending list, and the file exited 6. The
+one-module reproducer in the issue needs no std: a fn-typed parameter
+named like a top-level fn resolves, at the call, to the top-level fn.
+
+The bisection is the sc14 rule (when two observers disagree, bisect the
+observers): `is_sorted_by` agreeing with the wrong sort looked like the
+sort was right and `first` was wrong, until both were seen to be calling
+the same fn. There is no ledger word for a compiler lane giving a wrong
+answer, and a witness asserting the right one would be a standing red,
+so the test avoids the collision and names the finding. The existing
+`list/relation_tier.lu` declares `fn le` too and passes it only where the
+parameter is `le`, so the confusion is invisible there and masks nothing.
+
+The same re-measure settled `sort_by`'s other question. wolf-lang#23 is
+CLOSED, and `std.sort.sort_by` with a `cmp.Ordering` comparator still
+runs on no lane at 0.2.14 / 0.1.36: lupin declines at resolve (``Ordering`
+is a enum; traits, enums and type-level items have no dynamic semantics
+here``), the checked machine declines `std.cmp`'s module items, and the
+native rung answers `a member access without a recorded type` at
+`.is_lt()`. So F-0029 stays open in this register whatever the upstream
+issue's state, and `std.list.sort_by` ships on the `bool` relation.
