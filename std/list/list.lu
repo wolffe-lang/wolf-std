@@ -736,7 +736,13 @@ pub fn filter[T](xs: List[T], keep: fn(T) -> bool) -> List[T] {
 /// Combines every element of `xs` into one value, left to right:
 /// `f(… f(f(init, x0), x1) …, xn)`. `init` is the answer for the empty
 /// list. The accumulator's type `A` need not be the element's. Total:
-/// no error row, no traps beyond whatever `f` traps.
+/// no error row, no traps beyond whatever `step` traps.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.fold(init,
+/// step)` is this call (`[type.method.resolve]` step 2). Cost, as the
+/// clause states it: no allocation of its own, and `xs.len` calls of
+/// `step`, left to right. The clause's `f64` sum is this function:
+/// `xs.fold(0.0, fn(a, x) a + x)`.
 ///
 /// ```wolf-doc-example
 /// var xs = List[int]()
@@ -745,10 +751,10 @@ pub fn filter[T](xs: List[T], keep: fn(T) -> bool) -> List[T] {
 /// list.push(mut xs, 3)
 /// list.fold(xs, 0, fn(acc, v) acc + v) == 6
 /// ```
-pub fn fold[T, A](xs: List[T], init: A, f: fn(A, T) -> A) -> A {
+pub fn fold[T, A](xs: List[T], init: A, step: fn(A, T) -> A) -> A {
     var acc = init
     for x in xs {
-        acc = f(acc, x)
+        acc = step(acc, x)
     }
     acc
 }
