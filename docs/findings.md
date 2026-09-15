@@ -9871,3 +9871,42 @@ here``), the checked machine declines `std.cmp`'s module items, and the
 native rung answers `a member access without a recorded type` at
 `.is_lt()`. So F-0029 stays open in this register whatever the upstream
 issue's state, and `std.list.sort_by` ships on the `bool` relation.
+
+## sc50 item 2 — aligned to s166's clauses: the prediction, written before the edit
+
+s166's spec commit is wolf-lang `4c046f15` on branch `s166` (two commits
+on trunk `ceda387`): `[type.method]` and `[type.comb]` in
+`spec/10-types.md` (`acad5737`), `[conc.task.par]` completed in
+`spec/03-concurrency.md`. `[type.comb.set]` assigns `std.list` `map`,
+`filter`, `fold`, `sum`, `sort_by`, `sorted_by`, `sorted`, `enumerate`
+and `zip`, and `std.range` `collect`. `par` is `[type.comb.builtin]`,
+the language's, and not written here. `[type.method.take]` closes #154's
+window: nothing in this branch is named `take` or spells a prefix or
+suffix combinator, so nothing is renamed for it.
+
+Probed before this entry (scratch `sc50-probe`, measurements, not
+predictions):
+- `sorted[T: cmp.Ord]` in `std.list` needs `use std.cmp`, and that import
+  alone turns `list/map_tier` native `unsupported` ("an enum or row test
+  inside a product pattern (deep trees)"), which is every `std.list`
+  importer's native row; the body itself is checked `unsupported`
+  ("trait dispatch on a non-nominal receiver") at `x < y` and runs only
+  on lupin. Predicted outcome: not shipped, a finding.
+- `collect[T](r: range[T]) -> List[T]` (one generic fn, because wolf has
+  no overloading and the clause names both `range[int]` and
+  `range[char]`): over `2..5` exit(0) on all three lanes; over
+  `'a'..='c'` exit(0) on both compiler rungs and `unsupported` on lupin
+  0.1.36 ("a range needs integer endpoints, got char and char"). A
+  monomorphic `collect(r: range[int])` refuses the char range `E0401`.
+
+Predicted rows (lupin / wolfc / native):
+
+| row | predicted | why |
+|---|---|---|
+| `list/filter_tier`, `fold_tier`, `zip_tier` after the parameter renames (`keep`, `step`, `xs`/`ys`, `T`/`U`) | run / run / run, unchanged | a parameter's name is not part of a call |
+| `list/sort_by_tier` on `less` (strict, stable: take the right run only when `less(right, left)`) | run / run / run | the same merge with the test flipped; the test's relations become strict |
+| `list/sorted_by_tier` (new) | run / run / run | `sort_by` over a fresh copy |
+| `range/collect_int` (new) | run / run / run | probed |
+| `range/collect_char` (new) | unsupported / run / run | probed; lupin's char range |
+| every other `range/*` row | unchanged (lupin still `unsupported`) | lupin resolves lazily; `collect` names no accessor |
+| `doc-examples` | the two sc50 blocks the first gauntlet redded (`filter`, `enumerate`) green once no statement line holds a relational operator | §4's classification, measured red in `sc50-ci-1.log` |
