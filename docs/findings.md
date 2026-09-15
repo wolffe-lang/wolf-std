@@ -9769,3 +9769,43 @@ every line above it that names a test**. A crash writes no record, so
 the ledger cannot carry a word for it and the rows stay as unix
 measures them; the fix is upstream's, and `std-test` stays ADVISORY on
 windows behind three rows the marker's own issue did not know it had.
+
+## sc50 — the combinators, std's half: the ledger prediction, written before the first body
+
+wolf-lang#390 ruled `par` stays (option 1), and s166 writes the clauses
+that name and place the combinators. Item 1 of sc50 is what `std.list`
+can already express at wolf 0.2.14 / lupin 0.1.36 as free functions,
+the shape `any`/`all` have had since sc13. Written 2026-09-15, before
+any body exists in the tree. Three probes were run first, and they
+decide the doc examples rather than the rows, so they are recorded as
+measurements and not as predictions (scratch `sc50-probe`, the three
+`conform-run` lanes over a staged `std/`):
+
+- a std fn value passed across the module boundary
+  (`list.all(xs, unicode.is_ascii)`) runs on all three lanes, so
+  F-0085's refusal is gone at this pin (wolf-lang#116 CLOSED);
+- a nested `fn` inside `main` runs on lupin and native, and the checked
+  machine answers `unsupported — a nested fn in checked execution`;
+- a lambda (`list.any(xs, fn(v) v % 2 == 1)`) runs on lupin and native,
+  and the checked machine answers `unsupported — closures in checked
+  execution`.
+
+The shapes, and the row each new test is predicted to carry
+(lupin / wolfc / native):
+
+| function | signature | predicted row | reasoning |
+|---|---|---|---|
+| `map` | `map[T, U](xs: List[T], f: fn(T) -> U) -> List[U]` | run / run / run | `find_where`'s shape plus a second type parameter and a built `List[U]`; `std.list` imports nothing, so no importer cost |
+| `filter` | `filter[T](xs: List[T], pred: fn(T) -> bool) -> List[T]` | run / run / run | `count_where` that pushes instead of counting |
+| `fold` | `fold[T, A](xs: List[T], init: A, f: fn(A, T) -> A) -> A` | run / run / run | a second type parameter carried through a `var` |
+| `sum` | `sum(xs: List[int]) -> int` | run / run / run; its overflow trap row run / run / run | monomorphic, `std.search.sum`'s contract. A generic `sum` needs `std.ops` for the bound, which imports `std.cmp`, which darkens every `std.list` importer natively (`search/*` is `native = "unsupported"` for exactly that), and `ops` has no zero anyway |
+| `enumerate` | `enumerate[T](xs: List[T]) -> List[(int, T)]` | run / run / run | the least certain of the seven: `map/keys_values_pairs` is native-dark, but for `std.cmp`, not for the tuple list; `map.pairs` returns the same shape |
+| `zip` | `zip[A, B](a: List[A], b: List[B]) -> List[(A, B)]` | run / run / run | `enumerate`'s risk; the shorter list decides the length |
+| `sort_by` | a `bool` relation (`le: fn(T, T) -> bool`), stable merge | body run / run / run; **the name is the open question** | the callable tier allows the body (`is_sorted_by` is its judge, three-lane). `std.sort.sort_by` already owns the name with a `cmp.Ordering` comparator (freight, F-0029), so a second `sort_by` with a different signature is §1's "one concept, one name" broken. Predicted outcome: a finding, not a ship, unless the `Ordering` form now runs |
+
+Doc examples, from the probes: a lambda example is predicted
+`exit(0)` on lupin and native and `unsupported` on the checked machine,
+which `doc-examples` accepts (the compiler lanes may refuse honestly;
+lupin may not). A fenced example with a three-lane verdict needs a fn
+value from `std.list` itself, and no `std.list` function has a
+predicate's shape.
