@@ -1,5 +1,52 @@
 # Changelog
 
+## sc49 — 2026-09-15 — the operator bridge gets its native rung back, and doc-examples learns the mirror-lag word
+
+Pins unchanged: wolf 0.2.14 (`30731a6`), lupin 0.1.36 (`a7f517e`),
+whole archive pair by digest (`80407e31…`, `41f21002…`).
+
+### wolf-std#31, option 3 — Ordering's `Eq` and `Ord` as nested matches
+
+Both impls in `std/cmp/cmp.lu` are nested matches now, arm for arm the
+same (`8c45895`), so no product pattern refuses the native rung on
+std.cmp's importers. The 40 ledger rows flipped in `08416ff`.
+
+**Predicted before the edit** (from each row's baseline refusal
+sentence and span), **then measured**:
+
+| prediction | predicted | measured |
+|---|---|---|
+| rows that move | 40 native `unsupported` -> `run`: testing 10, map 6, cmp 6, sort 5, search 5, x/* 4, ops 3, rand 1 (every row refused at `@8506..8510`) | **the same 40**, empty diff; std-test's only reds before the flip were those 40, `observed run (deeper)` |
+| everything else | the 13 other native refusals stay (pool 3, json 9, `testing/assert_msg_holds`); lupin and wolfc unchanged on 407 | **as predicted**: no other red, no directive mismatch, nothing shallower |
+| std-test summary | conservatism ledger 180 -> 140; mirror-lag rows 2 | **140; 2** |
+| doc-example blocks | 38 native `unsupported` -> `exit(0)` (cmp 2, map 13, ops 6, search 10, sort 7), not the "one block" sc47/sc48 priced; the other 28 stay | **38 -> `exit(0)`; the same 28 stay** (json 26, pool 2) |
+| `cmp/ordering_exhaustive.lu` | `run` on all three lanes | **`run` on all three** |
+
+The operator bridge's two oldest witnesses, `ops/dispatch_tier` and
+`ops/div_zero_trap`, run natively again. `impl Ord for bool` keeps its
+product pattern: its arms are bool literals. The std.range ledger block
+note said `mirror-lag(E0301)`, which sc48 wrote before the measurement.
+It now says what the rows always said: `unsupported`, declined by name.
+
+### wolf-std#37 — `doc-examples` has the mirror-lag word (F-0131 closed)
+
+`LUPIN_MIRROR_LAG` in `xtask/src/doc_examples.rs` (`f746a24`) is
+`(module, refusal, issue)`. The refusal is a code, which demands
+`fail(<code>)` exactly, or a by-name sentence, which demands
+`unsupported` carrying it. `Record` now reads `x-unsupported` /
+`x-unsupported-construct` (`a79b75a`). A heal or a different refusal
+is red, an entry that never fired is red, a compiler lane must still
+reach `exit(0)`, and `selftest` reds an entry whose module has no
+fence. The carrier is `std.range`: its four examples are fenced.
+
+| prediction | predicted | measured |
+|---|---|---|
+| lupin on a std.range example | `unsupported`, "a range has no member `start`" (by name, not `fail`) | **`unsupported` at `resolve`, `x-unsupported`: that sentence** |
+| fences, empty list | exactly 4 reds, all `[lupin]` on `std/range` | **4 `DOC BUG`, `range.lu:{64,81,100,122} [lupin]`; wolfc and native `exit(0)` on all four** |
+| wrong sentence planted | 4 `MIRROR MOVED` + stale entry | **4 + `LUPIN_MIRROR_LAG[0] … never fired`** |
+| module with no fence planted | selftest red | **`every_mirror_lag_entry_has_blocks_to_fence` panics** |
+| with the entry | 440 blocks GREEN | **`doc-examples: 440 block(s), GREEN`** |
+
 ## sc48 — 2026-09-14 — std takes the release: the pin at 0.2.14, the range functions eleven sprints late, and three windows rows that were asserting the wrong host
 
 **The pin moves two releases.** wolf 0.2.12 (`a7f517e`) -> **0.2.14**
