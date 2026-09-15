@@ -34,6 +34,22 @@ silent wrong answer on the checked machine, where a fn-typed parameter
 named like a top-level fn calls the top-level fn (wolf-lang#400). F-0135:
 `sorted`'s costs (wolf-lang#402).
 
+**Written for a rule this pin cannot see.** s165 landed
+`[mem.tier0.mode.read]`'s enforced paragraph on wolf-lang trunk
+(`4b56441`, wolf-lang#366, shipping in 0.2.15): a value moved out of a
+`read` parameter is LENT, and a lent value whose type can reach shared
+storage may not outlive the activation — and a type parameter always
+can. Every combinator here takes a `read` receiver and returns a fresh
+collection, so `filter`, `sorted_by`, `zip`, `enumerate` and
+`range.collect` spell `copy` at the move, and each cost sentence says
+what it costs: `copy` is DEEP on the native tiers from wolf-lang#384
+(`[mem.tier0.move.3]`), so a `List` element copies its buffer, a `str`
+shares its immutable bytes, and a scalar costs nothing. `map` needs none
+(it stores `f`'s return, not an element of `xs`) and `sort_by` needs none
+(its receiver is `mut`), and both say so where a reader will look. wolf
+0.2.14 has no such rule, so all eleven rows are measured green at this
+pin and nothing is added to wolf-std#39's 70 sites.
+
 **Doc truth.** The first gauntlet redded two sc50 examples on all three
 lanes (`sc50-ci-1.log`): §4 classifies a line by its text, so a lambda
 holding `==` in a `let` or `for` line became `if let …` / `if for …`.
