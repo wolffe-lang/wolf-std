@@ -142,6 +142,7 @@ the building.
 | F-0132 | 2026-09-15 | **The windows rig was RED on SIX rows, not three, and the three nobody counted are stack overflows**: `json/number_posture_and_depth`, `json/parse_misses`, `json/parse_shapes` on the CHECKED lane die on `rig (windows-latest)` with `tool error (exit Some(-1073741571), no record): thread 'main' has overflowed its stack` — `STATUS_STACK_OVERFLOW`, a crash and not a verdict — at trunk `2d10219` (run 34686645924, wolf 0.2.12) AND at sc48's head (run 34910870288, wolf 0.2.14), where ubuntu and macOS answer `unsupported`/`exit(0)`. wolf-std#34's "three, not five" counted `directive mismatch` lines; the rig prints a tool error in another shape, so the count was wrong the way F-0126 and F-0127 were wrong: the thing read did not carry the fact. sc48's three #34 rows are GREEN on windows at the head; the step stays ADVISORY RED on these three, and the marker stays until the checked tier sizes its own stack | wolf-lang (the checked tier on windows) + wolf-std (the reading) | [filed: wolf-lang#382](https://github.com/wolffe-lang/wolf-lang/issues/382) |
 | F-0133 | 2026-09-15 | **A list of tuples has one spelling that runs on all three lanes, and it is not the constructor**: `List[(int, T)]()` (and a concrete `List[(int, int)]()`, and a generic-struct `List[Pair[int]]()`) is `unsupported — this prelude container instantiation (generic data)` at RESOLVE on both compiler rungs, eagerly, so one such body in `std.list` darkened every importer (`list/map_tier` went dark on both rungs without calling it); `var out: List[(int, T)] = []` runs on both rungs and is `fail(E0201)` at parse on lupin 0.1.36; `fresh[(int, str)]()` is `E0812: the argument for U must be a type` on both rungs; and `var out: List[(int, T)] = fresh()` over a private `fn fresh[U]() -> List[U]` runs on all three. `std.list.enumerate`/`zip` ship on that helper | [wolf-lang#349](https://github.com/wolffe-lang/wolf-lang/issues/349) (comment), wolf-interp#106 | sc50 probe |
 | F-0134 | 2026-09-15 | **Silent wrong answer on the checked machine: a call through a fn-typed parameter goes to a top-level fn of the same name**: `fn apply(le: fn(int, int) -> bool, …) { le(x, y) }` called as `apply(ge, 1, 2)` in a file that also declares `fn le` prints `true` under `wolf conform-run --checked` and `false` on lupin and native; across the module boundary it made `list.sort_by(mut xs, ge)` sort ascending and `list.is_sorted_by(xs, ge)` answer true. Every callable-tier parameter name in std (`pred`, `better`, `le`, `f`) is exposed to it; `tests/list/sort_by_tier.lu` names its relations `ascending`/`descending` and says why | [wolf-lang#400](https://github.com/wolffe-lang/wolf-lang/issues/400) | sc50 probe |
+| F-0135 | 2026-09-15 | **`[type.comb.set]`'s `sorted[T: cmp.Ord]` is written and ships on no lane at trunk 073aa19**: `use std.cmp` in `std.list` makes every importer native `unsupported` (std.cmp's product pattern; sc49 / wolf-std#31 option 3 removes it, measured against origin/sc49's `std/cmp`: importers three-lane, `sorted` lupin + native); the checked machine declines `a < b` under `T: cmp.Ord` as "trait dispatch on a non-nominal receiver" when `T` is bound through a list read, while the same fn over two `int` bindings runs; and passing the generic `ord_less` as a fn value is "a generic function used as a value (comptime)" at resolve, darkening every importer | [wolf-lang#402](https://github.com/wolffe-lang/wolf-lang/issues/402); wolf-std PR #40 | sc50 probe |
 
 
 ## F-0001 — the std search path
@@ -9910,3 +9911,50 @@ Predicted rows (lupin / wolfc / native):
 | `range/collect_char` (new) | unsupported / run / run | probed; lupin's char range |
 | every other `range/*` row | unchanged (lupin still `unsupported`) | lupin resolves lazily; `collect` names no accessor |
 | `doc-examples` | the two sc50 blocks the first gauntlet redded (`filter`, `enumerate`) green once no statement line holds a relational operator | §4's classification, measured red in `sc50-ci-1.log` |
+
+## F-0135 — `sorted` is written, and its cost is a sibling lane plus one checked row
+
+`wolf-lang#402`, wolf-std PR #40 (sc49). `[type.comb.set]` specifies
+`sorted[T: cmp.Ord](xs: List[T]) -> List[T]` as "`sorted_by` with `<`".
+Measured at wolf 0.2.14 / lupin 0.1.36, the probe program sorting a
+`List[int]` and a `List[str]`, with `list/map_tier` as the importer
+control (it never calls `sorted`):
+
+| body | `std/cmp` | `sorted` lupin / wolfc / native | `map_tier` lupin / wolfc / native |
+|---|---|---|---|
+| a `sorted_by` over a copy with `x < y` inline (the first probe) | trunk | run / unsupported (non-nominal receiver) / unsupported (product pattern) | run / run / **unsupported** |
+| V1: `sorted_by(xs, ord_less)`, `ord_less` generic, as a fn value | trunk | run / unsupported / unsupported ("a generic function used as a value (comptime)", resolve) | run / **unsupported** / **unsupported** |
+| V1 | origin/sc49 `42d42b9` | the same | run / **unsupported** / **unsupported** |
+| V2: the merge calling `ord_less(at(src, b), at(src, a))` directly | trunk | run / unsupported (non-nominal receiver) / unsupported (product pattern) | run / run / **unsupported** |
+| V2 | origin/sc49 `42d42b9` | run / unsupported (non-nominal receiver) / run | run / run / run |
+
+So V2 is the body, and it lands on sc49's merge at run / unsupported /
+run with no importer cost. Before that merge it would take the native
+column from every `std.list` row, which is the "budget a module by its
+worst body" rule `std/x/list_eq` was written under. The checked refusal
+reduces to the issue's twelve lines: `ord_less(xs[0], xs[1])` over a
+`List[int]` declines at `a < b`, and `ord_less(one, two)` over two `int`
+bindings runs. The first minimal attempt used bare literals and stopped
+at `E0502: i32 does not implement Ord` on both rungs, F-0004's literal
+default and not this row, so it was not filed.
+
+### Item 2, predicted and measured
+
+The prediction was committed at `093796b`, before the edit.
+
+| row | predicted | measured |
+|---|---|---|
+| `list/filter_tier`, `fold_tier`, `zip_tier` after renames | run / run / run | **run / run / run** |
+| `list/sort_by_tier` on strict `less` | run / run / run | **run / run / run** |
+| `list/sorted_by_tier` | run / run / run | **run / run / run** |
+| `range/collect_int` | run / run / run | **run / run / run** |
+| `range/collect_char` | unsupported / run / run | **unsupported / run / run** |
+| other `range/*` rows | unchanged | **unchanged** (`is_empty` re-run: unsupported / run / run) |
+| `sorted` | not shipped, a finding | **not shipped**: F-0135, and a sharper cost than predicted, since sc49 removes the native half |
+| `doc-examples`' two red sc50 blocks | green once no statement line compares | per-block probes pass as the extractor renders them; the full gauntlet is the verdict |
+
+No `conforms:` line cites the new anchors: `type.comb.set` and its
+siblings are in the registered `type` namespace and absent from the
+vendored registry at `30731a6`, which `[conf.tag.valid]` reds. They are
+cited in doc prose and move into `conforms:` at the data-pin bump that
+carries `4c046f15`.
