@@ -143,6 +143,7 @@ the building.
 | F-0133 | 2026-09-15 | **A list of tuples has one spelling that runs on all three lanes, and it is not the constructor**: `List[(int, T)]()` (and a concrete `List[(int, int)]()`, and a generic-struct `List[Pair[int]]()`) is `unsupported — this prelude container instantiation (generic data)` at RESOLVE on both compiler rungs, eagerly, so one such body in `std.list` darkened every importer (`list/map_tier` went dark on both rungs without calling it); `var out: List[(int, T)] = []` runs on both rungs and is `fail(E0201)` at parse on lupin 0.1.36; `fresh[(int, str)]()` is `E0812: the argument for U must be a type` on both rungs; and `var out: List[(int, T)] = fresh()` over a private `fn fresh[U]() -> List[U]` runs on all three. `std.list.enumerate`/`zip` ship on that helper | [wolf-lang#349](https://github.com/wolffe-lang/wolf-lang/issues/349) (comment), wolf-interp#106 | sc50 probe |
 | F-0134 | 2026-09-15 | **Silent wrong answer on the checked machine: a call through a fn-typed parameter goes to a top-level fn of the same name**: `fn apply(le: fn(int, int) -> bool, …) { le(x, y) }` called as `apply(ge, 1, 2)` in a file that also declares `fn le` prints `true` under `wolf conform-run --checked` and `false` on lupin and native; across the module boundary it made `list.sort_by(mut xs, ge)` sort ascending and `list.is_sorted_by(xs, ge)` answer true. Every callable-tier parameter name in std (`pred`, `better`, `le`, `f`) is exposed to it; `tests/list/sort_by_tier.lu` names its relations `ascending`/`descending` and says why | [wolf-lang#400](https://github.com/wolffe-lang/wolf-lang/issues/400) | sc50 probe |
 | F-0135 | 2026-09-15 | **`[type.comb.set]`'s `sorted[T: cmp.Ord]` is written and ships on no lane at trunk 073aa19**: `use std.cmp` in `std.list` makes every importer native `unsupported` (std.cmp's product pattern; sc49 / wolf-std#31 option 3 removes it, measured against origin/sc49's `std/cmp`: importers three-lane, `sorted` lupin + native); the checked machine declines `a < b` under `T: cmp.Ord` as "trait dispatch on a non-nominal receiver" when `T` is bound through a list read, while the same fn over two `int` bindings runs; and passing the generic `ord_less` as a fn value is "a generic function used as a value (comptime)" at resolve, darkening every importer | [wolf-lang#402](https://github.com/wolffe-lang/wolf-lang/issues/402); wolf-std PR #40 | sc50 probe |
+| F-0136 | 2026-09-15 | **`push` takes no written mode at wolf 0.2.14, so #385's `take` spelling cannot be adopted before the pin moves**: `(mut out).push(take v)` is `E1007 — \`push\` takes \`value\` as plain \`read\` — no mode is written for it` on BOTH compiler rungs, for a call argument and for a binding alike, while lupin 0.1.36 runs it. A static refusal of the module, so every `std.list` row on both rungs would pay for one function's spelling. sc50's combinators therefore write plain `push` and name the owed `take` in `map`'s doc | wolf-lang#385 (ruled option 3, lane s167) | sc50 probe |
 
 
 ## F-0001 — the std search path
@@ -9958,3 +9959,47 @@ siblings are in the registered `type` namespace and absent from the
 vendored registry at `30731a6`, which `[conf.tag.valid]` reds. They are
 cited in doc prose and move into `conforms:` at the data-pin bump that
 carries `4c046f15`.
+
+## F-0136 — the combinators are written for two unreleased rules, and one of them has no spelling yet
+
+wolf-lang#366 (`[mem.tier0.mode.read]`, enforced on wolf-lang trunk
+`4b56441`, shipping in 0.2.15) makes a value moved out of a `read`
+parameter LENT, and a lent value whose type can reach shared storage may
+not outlive the activation — "and a type parameter always can, because a
+generic body is checked once for every instantiation". Every combinator
+sc50 writes takes a `read` receiver and returns a fresh collection, so
+every one of them is in that rule's sights.
+
+What the rule does NOT reach is the store itself: the clause says the
+builtin that keeps a `read` argument inside its receiver (`push`) is
+wolf-lang#385. That issue is ruled option 3: `push` copies a non-`Copy`
+element by default, and `push(take v)` moves it (`m[k] = v` and
+`xs[i] = v` the same). So for `filter`, `enumerate`, `zip`, `sorted_by`
+and `range.collect` the default copy IS the copy the lent rule needs,
+and an explicit `copy x` would buy a second deep one (`[mem.tier0.move.3]`,
+wolf-lang#384: a `List` element copies its buffer, a `str` shares its
+immutable bytes, a scalar costs nothing). Those bodies write plain
+`push`. They were committed with explicit `copy` at `2f5b6eb`/`e2ff9e0`
+and reverted at `528e7c9` when the #385 ruling arrived; the intermediate
+state is left in the history because it is what the first reading of the
+lent rule produced.
+
+`map` is the one that owns its element — it stores `f`'s return value,
+not an element of `xs` — so option 3's fast path is its spelling:
+`(mut out).push(take f(x))`. It is not written, because at wolf 0.2.14
+it does not exist:
+
+| spelling | lupin 0.1.36 | wolfc | native |
+|---|---|---|---|
+| `(mut out).push(take f(x))` | exit(0) | **fail(E1007)** | **fail(E1007)** |
+| `let v = f(x)` then `(mut out).push(take v)` | exit(0) | **fail(E1007)** | **fail(E1007)** |
+| `(mut out).push(f(x))` | exit(0) | exit(0) | exit(0) |
+
+`E1007` reads "`push` takes `value` as plain `read` — no mode is written
+for it", and it is a static refusal of the whole module: adopting the
+spelling early would turn both compiler columns of every `std.list` row
+into `fail(E1007)` to say one thing about one function. The doc comment
+on `map` carries the owed spelling and this finding; it lands with the
+pin that carries s167. `take` is also NOT the answer anywhere the
+element comes from the receiver: a `take` of a lent binding is E1014 by
+#366's own words.

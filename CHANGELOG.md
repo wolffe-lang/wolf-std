@@ -34,21 +34,25 @@ silent wrong answer on the checked machine, where a fn-typed parameter
 named like a top-level fn calls the top-level fn (wolf-lang#400). F-0135:
 `sorted`'s costs (wolf-lang#402).
 
-**Written for a rule this pin cannot see.** s165 landed
+**Written for two rules this pin cannot see.** s165 landed
 `[mem.tier0.mode.read]`'s enforced paragraph on wolf-lang trunk
 (`4b56441`, wolf-lang#366, shipping in 0.2.15): a value moved out of a
-`read` parameter is LENT, and a lent value whose type can reach shared
-storage may not outlive the activation — and a type parameter always
-can. Every combinator here takes a `read` receiver and returns a fresh
-collection, so `filter`, `sorted_by`, `zip`, `enumerate` and
-`range.collect` spell `copy` at the move, and each cost sentence says
-what it costs: `copy` is DEEP on the native tiers from wolf-lang#384
-(`[mem.tier0.move.3]`), so a `List` element copies its buffer, a `str`
-shares its immutable bytes, and a scalar costs nothing. `map` needs none
-(it stores `f`'s return, not an element of `xs`) and `sort_by` needs none
-(its receiver is `mut`), and both say so where a reader will look. wolf
-0.2.14 has no such rule, so all eleven rows are measured green at this
-pin and nothing is added to wolf-std#39's 70 sites.
+`read` parameter is LENT, may not outlive the activation, and a type
+parameter always counts as able to reach shared storage. Every
+combinator here takes a `read` receiver and returns a fresh collection.
+The store that makes them legal is `push`'s own, which that clause
+explicitly leaves to wolf-lang#385 — **ruled option 3** (lane s167,
+unreleased): `push` copies a non-`Copy` element by default, deeply on
+the native tiers (wolf-lang#384, `[mem.tier0.move.3]`). So `filter`,
+`enumerate`, `zip`, `sorted_by` and `range.collect` write plain `push`
+and say in their cost lines whose copy it is; an explicit `copy` would
+buy a second one (it was written that way at `2f5b6eb` and reverted at
+`528e7c9` when the ruling arrived). `map` owns its element — it stores
+`f`'s return, not an element of `xs` — so option 3's fast path
+`push(take f(x))` is its spelling, and it is NOT written: at 0.2.14 a
+written mode on `push` is `E1007` on both compiler rungs, a static
+refusal of the whole module (F-0136). `sort_by` needs neither, its
+receiver being `mut`. Nothing here is added to wolf-std#39's 70 sites.
 
 **Doc truth.** The first gauntlet redded two sc50 examples on all three
 lanes (`sc50-ci-1.log`): §4 classifies a line by its text, so a lambda
