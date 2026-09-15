@@ -681,3 +681,28 @@ pub fn map[T, U](xs: List[T], f: fn(T) -> U) -> List[U] {
     }
     out
 }
+
+/// A new list holding the elements of `xs` for which `pred` holds, in
+/// their original order; `xs` is read, not consumed. The in-place
+/// sibling (`retain`) is not written: a returning `filter` is the
+/// combinator, and a `mut` twin would be a second name for one walk.
+/// Total: no error row, no traps beyond allocation.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.push(mut xs, 3)
+/// let odds = list.filter(xs, fn(v) v % 2 == 1)
+/// list.len(odds) == 2
+/// (list.last(odds) else 0) == 3
+/// ```
+pub fn filter[T](xs: List[T], pred: fn(T) -> bool) -> List[T] {
+    var out = List[T]()
+    for x in xs {
+        if pred(x) {
+            (mut out).push(x)
+        }
+    }
+    out
+}
