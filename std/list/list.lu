@@ -942,6 +942,26 @@ pub fn sort_by[T](mut xs: List[T], less: fn(T, T) -> bool) {
     xs = src
 }
 
+// BLOCKED at wolf-std trunk 073aa19 — `sorted[T: cmp.Ord](xs: List[T]) ->
+// List[T]`, `[type.comb.set]`'s "`sorted_by` with `<`". The body is
+// written and measured (F-0135): a private `ord_less[T: cmp.Ord](a, b) {
+// a < b }` called directly inside `sort_by`'s merge over a copy. It waits
+// on two rows, and the first is a sibling lane, not the compiler:
+// - `use std.cmp` in this module makes EVERY `std.list` importer native
+//   `unsupported` ("an enum or row test inside a product pattern (deep
+//   trees)", std.cmp's `Ordering` impls; compiler stub 67 item 4). sc49
+//   (wolf-std#31 option 3, PR #40) rewrites those impls as nested
+//   matches, and against its `std/cmp` every importer is three-lane again
+//   and `sorted` runs on lupin and native. It lands here on that merge.
+// - The checked machine then still declines `sorted` itself: "trait
+//   dispatch on a non-nominal receiver" at `a < b` when `T` is bound
+//   through a list read, while the same `<` on two `int` bindings runs
+//   (F-0135). That row is `unsupported` for the one test, not a cost to
+//   importers.
+// Passing `ord_less` as a fn value to `sorted_by` is not an alternative:
+// "a generic function used as a value (comptime)" is refused at resolve on
+// both rungs and darkens every importer.
+
 /// `sort_by`'s returning twin: a fresh list holding `xs`'s elements in
 /// `less`'s order, stably, with `xs` untouched. `less` must be a strict
 /// weak order or the result is merely a permutation. Total: no error
