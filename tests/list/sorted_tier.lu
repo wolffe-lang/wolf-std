@@ -1,0 +1,46 @@
+//! check: run(exit=0, stdout="sorted holds\n")
+//! phase: run
+//! conforms: std.list, generics.mono
+//!
+//! sc50's `sorted`, `[type.comb.set]`'s no-relation sort: `T`'s own
+//! order, the operand untouched, ties kept, the empty and one-element
+//! lists, and a second element type. The checked machine declines the
+//! module's one `T: cmp.Ord` body (wolf-lang#402), so this row is
+//! `unsupported` there and the other `std.list` rows are not.
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 4)
+    list.push(mut xs, 2)
+    list.push(mut xs, 9)
+    list.push(mut xs, 2)
+    list.push(mut xs, 0 - 3)
+
+    let ys = list.sorted(xs)
+    if list.len(ys) == 5 {} else { return 1 }
+    if (list.get(ys, 0) else 0) == 0 - 3 {} else { return 2 }
+    if (list.get(ys, 1) else 0) == 2 {} else { return 3 }
+    if (list.get(ys, 2) else 0) == 2 {} else { return 4 }
+    if (list.get(ys, 4) else 0) == 9 {} else { return 5 }
+    // The operand is read, not consumed, and not reordered.
+    if (list.get(xs, 0) else 0) == 4 {} else { return 6 }
+
+    var empty = List[int]()
+    if list.is_empty(list.sorted(empty)) == true {} else { return 7 }
+    var one = List[int]()
+    list.push(mut one, 7)
+    if (list.first(list.sorted(one)) else 0) == 7 {} else { return 8 }
+
+    var ss = List[str]()
+    list.push(mut ss, "wolf")
+    list.push(mut ss, "a")
+    list.push(mut ss, "std")
+    let ts = list.sorted(ss)
+    if (list.first(ts) else "?") == "a" {} else { return 9 }
+    if (list.last(ts) else "?") == "wolf" {} else { return 10 }
+
+    print("sorted holds")
+    0
+}

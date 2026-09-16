@@ -83,6 +83,8 @@
 //!   nowhere (F-0002/F-0004). The six sit in `std/x/list_eq/` with their
 //!   bodies, and the stub comment below is their home here.
 
+use std.cmp
+
 /// The element at `i`, reading through the language's indexing so an
 /// out-of-range `i` traps `bounds` exactly where the caller would see it
 /// (`[conf.trap.set]`). Private: the public checked spelling is `get`.
@@ -989,26 +991,6 @@ pub fn sort_by[T](mut xs: List[T], less: fn(T, T) -> bool) {
     xs = src
 }
 
-// BLOCKED at wolf-std trunk 073aa19 — `sorted[T: cmp.Ord](xs: List[T]) ->
-// List[T]`, `[type.comb.set]`'s "`sorted_by` with `<`". The body is
-// written and measured (F-0135): a private `ord_less[T: cmp.Ord](a, b) {
-// a < b }` called directly inside `sort_by`'s merge over a copy. It waits
-// on two rows, and the first is a sibling lane, not the compiler:
-// - `use std.cmp` in this module makes EVERY `std.list` importer native
-//   `unsupported` ("an enum or row test inside a product pattern (deep
-//   trees)", std.cmp's `Ordering` impls; compiler stub 67 item 4). sc49
-//   (wolf-std#31 option 3, PR #40) rewrites those impls as nested
-//   matches, and against its `std/cmp` every importer is three-lane again
-//   and `sorted` runs on lupin and native. It lands here on that merge.
-// - The checked machine then still declines `sorted` itself: "trait
-//   dispatch on a non-nominal receiver" at `a < b` when `T` is bound
-//   through a list read, while the same `<` on two `int` bindings runs
-//   (F-0135). That row is `unsupported` for the one test, not a cost to
-//   importers.
-// Passing `ord_less` as a fn value to `sorted_by` is not an alternative:
-// "a generic function used as a value (comptime)" is refused at resolve on
-// both rungs and darkens every importer.
-
 /// `sort_by`'s returning twin: a fresh list holding `xs`'s elements in
 /// `less`'s order, stably, with `xs` untouched. `less` must be a strict
 /// weak order or the result is merely a permutation. Total: no error
@@ -1041,5 +1023,98 @@ pub fn sorted_by[T](xs: List[T], less: fn(T, T) -> bool) -> List[T] {
         (mut out).push(x)
     }
     sort_by(mut out, less)
+    out
+}
+
+/// `a < b` under `T`'s own order, as a fn this module can call. Private:
+/// the public spelling is `sorted`. It exists because a generic fn is
+/// not a fn VALUE at this pin — `sorted_by(xs, ord_less)` is "a generic
+/// function used as a value (comptime)" at resolve on both rungs, and
+/// eagerly, so it would darken every importer (F-0135) — which is also
+/// why `sort_ord` below repeats `sort_by`'s merge instead of calling it
+/// with this relation.
+fn ord_less[T: cmp.Ord](a: T, b: T) -> bool {
+    a < b
+}
+
+/// `sort_by` with `ord_less`, spelled out because the relation cannot
+/// travel as a value (see `ord_less`). Private: the public spelling is
+/// `sorted`. Stable, for the same reason its twin is — the merge takes
+/// from the right run only when the right element is strictly less.
+fn sort_ord[T: cmp.Ord](mut xs: List[T]) {
+    let n = len(xs)
+    if n < 2 {
+        return
+    }
+    var src = xs
+    var width = 1
+    while width < n {
+        var out = List[T]()
+        var i = 0
+        while i < n {
+            var mid = i + width
+            if mid > n {
+                mid = n
+            }
+            var end = mid + width
+            if end > n {
+                end = n
+            }
+            var a = i
+            var b = mid
+            while a < mid {
+                var take_right = false
+                if b < end {
+                    take_right = ord_less(at(src, b), at(src, a))
+                }
+                if take_right {
+                    (mut out).push(at(src, b))
+                    b = b + 1
+                } else {
+                    (mut out).push(at(src, a))
+                    a = a + 1
+                }
+            }
+            while b < end {
+                (mut out).push(at(src, b))
+                b = b + 1
+            }
+            i = end
+        }
+        src = out
+        width = width + width
+    }
+    xs = src
+}
+
+/// A fresh list holding `xs`'s elements in `T`'s own ascending order,
+/// stably, with `xs` untouched. `T: cmp.Ord` is a total order by its own
+/// law, so this needs no relation from the caller. Total: no error row,
+/// no traps beyond allocation.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.sorted()` is
+/// this call. Cost, as the clause states it: `sorted_by` with `<`
+/// (`[type.trait.op]`) — O(n log n) comparisons, O(n) scratch, plus
+/// `push`'s own copy per element (#385 option 3, as the other
+/// combinators).
+///
+/// **Its lanes, and the two rows behind them** (F-0135). It ships at
+/// wolf-std `42d42b9` and not before: until sc49 rewrote `std.cmp`'s
+/// `Ordering` impls without a product pattern, the `use std.cmp` above
+/// made EVERY importer of this module `unsupported` on the native rung,
+/// which is the "budget a module by its worst body" rule. The checked
+/// machine still declines this one function — "trait dispatch on a
+/// non-nominal receiver" at `a < b`, where `T` is bound through a list
+/// read (wolf-lang#402) — so `tests/list/sorted_tier.lu` is
+/// `unsupported` there and nothing else in the module pays for it.
+/// Prose, not a fenced example, for that reason: §4 wants a lane that
+/// refuses honestly, and lupin and native both run it —
+/// `list.sorted(xs)` over `[3, 1, 2]` answers `1, 2, 3`.
+pub fn sorted[T: cmp.Ord](xs: List[T]) -> List[T] {
+    var out = List[T]()
+    for x in xs {
+        (mut out).push(x)
+    }
+    sort_ord(mut out)
     out
 }

@@ -791,6 +791,16 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+[tests."list/sorted_tier.lu"]
+# sc50 item 2: `[type.comb.set]`'s `sorted`, the module's one `T: cmp.Ord`
+# body. It ships at the rebase onto 42d42b9 (sc49 removed std.cmp's
+# product-pattern decline, so `use std.cmp` costs importers nothing).
+# wolfc declines this body alone: "trait dispatch on a non-nominal
+# receiver" at `a < b` (wolf-lang#402, F-0135).
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
 [tests."list/get_hit_miss.lu"]
 lupin = "run"
 # The row raise lives in an imported module's body: wolfc's checked tier
