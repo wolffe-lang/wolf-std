@@ -21,10 +21,15 @@ cited (`5f0a075`). Fenced examples come back for the tier: a std fn value
 crosses the module boundary on all three lanes now (F-0085's refusal is
 gone), and a lambda example is checked `unsupported` only.
 
-**Not written: `sorted`** (`e8b8b72`, F-0135). `use std.cmp` in
-`std.list` darkens every importer natively until sc49's nested-match
-`Ordering` impls land (measured against origin/sc49: importers three-lane),
-and the checked machine then declines `sorted` alone (wolf-lang#402).
+**`sorted` ships on sc49's merge** (F-0135). While trunk was `073aa19`
+it was written and withheld (`e8b8b72`), because `use std.cmp` in
+`std.list` darkened every importer on the native rung. sc49 landed as
+`42d42b9`, sc50 rebased onto it, and `sorted` goes in at run /
+unsupported / run with `map_tier` and `sort_by_tier` three-lane as the
+importer controls. It repeats `sort_by`'s merge in a private `sort_ord`
+because a generic fn is not a fn value at this pin, and the checked
+machine declines that one body ("trait dispatch on a non-nominal
+receiver", wolf-lang#402).
 
 **Findings.** F-0133 (`0dbb5f5`): `List[(int, T)]()` is declined at
 resolve on both compiler rungs, eagerly, for every importer, while the

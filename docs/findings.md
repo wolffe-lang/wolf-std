@@ -9930,7 +9930,12 @@ control (it never calls `sorted`):
 | V2 | origin/sc49 `42d42b9` | run / unsupported (non-nominal receiver) / run | run / run / run |
 
 So V2 is the body, and it lands on sc49's merge at run / unsupported /
-run with no importer cost. Before that merge it would take the native
+run with no importer cost. **It landed.** sc49 merged to trunk as
+`42d42b9`; sc50 rebased onto it, and `sorted` ships with `sort_ord`
+repeating the merge (a generic fn is not a fn value, the V1 row above),
+measured on the rebased tree at exactly run / unsupported / run, with
+`list/map_tier` and `list/sort_by_tier` three-lane as the importer
+controls. What stays open is the checked row alone, wolf-lang#402. Before that merge it would take the native
 column from every `std.list` row, which is the "budget a module by its
 worst body" rule `std/x/list_eq` was written under. The checked refusal
 reduces to the issue's twelve lines: `ord_less(xs[0], xs[1])` over a
@@ -9951,7 +9956,8 @@ The prediction was committed at `093796b`, before the edit.
 | `range/collect_int` | run / run / run | **run / run / run** |
 | `range/collect_char` | unsupported / run / run | **unsupported / run / run** |
 | other `range/*` rows | unchanged | **unchanged** (`is_empty` re-run: unsupported / run / run) |
-| `sorted` | not shipped, a finding | **not shipped**: F-0135, and a sharper cost than predicted, since sc49 removes the native half |
+| `sorted` | not shipped, a finding | **shipped after the rebase** at run / unsupported / run: the prediction held while trunk was `073aa19`, and sc49's merge (`42d42b9`) removed the native half exactly as F-0135 measured it would |
+| `list/sorted_tier` (new, after the rebase) | run / unsupported / run | **run / unsupported / run** |
 | `doc-examples`' two red sc50 blocks | green once no statement line compares | per-block probes pass as the extractor renders them; the full gauntlet is the verdict |
 
 No `conforms:` line cites the new anchors: `type.comb.set` and its
