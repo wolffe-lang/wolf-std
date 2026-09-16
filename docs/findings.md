@@ -144,6 +144,7 @@ the building.
 | F-0134 | 2026-09-15 | **Silent wrong answer on the checked machine: a call through a fn-typed parameter goes to a top-level fn of the same name**: `fn apply(le: fn(int, int) -> bool, …) { le(x, y) }` called as `apply(ge, 1, 2)` in a file that also declares `fn le` prints `true` under `wolf conform-run --checked` and `false` on lupin and native; across the module boundary it made `list.sort_by(mut xs, ge)` sort ascending and `list.is_sorted_by(xs, ge)` answer true. Every callable-tier parameter name in std (`pred`, `better`, `le`, `f`) is exposed to it; `tests/list/sort_by_tier.lu` names its relations `ascending`/`descending` and says why | [wolf-lang#400](https://github.com/wolffe-lang/wolf-lang/issues/400) | sc50 probe |
 | F-0135 | 2026-09-15 | **`[type.comb.set]`'s `sorted[T: cmp.Ord]` is written and ships on no lane at trunk 073aa19**: `use std.cmp` in `std.list` makes every importer native `unsupported` (std.cmp's product pattern; sc49 / wolf-std#31 option 3 removes it, measured against origin/sc49's `std/cmp`: importers three-lane, `sorted` lupin + native); the checked machine declines `a < b` under `T: cmp.Ord` as "trait dispatch on a non-nominal receiver" when `T` is bound through a list read, while the same fn over two `int` bindings runs; and passing the generic `ord_less` as a fn value is "a generic function used as a value (comptime)" at resolve, darkening every importer | [wolf-lang#402](https://github.com/wolffe-lang/wolf-lang/issues/402); wolf-std PR #40 | sc50 probe |
 | F-0136 | 2026-09-15 | **`push` takes no written mode at wolf 0.2.14, so #385's `take` spelling cannot be adopted before the pin moves**: `(mut out).push(take v)` is `E1007 — \`push\` takes \`value\` as plain \`read\` — no mode is written for it` on BOTH compiler rungs, for a call argument and for a binding alike, while lupin 0.1.36 runs it. A static refusal of the module, so every `std.list` row on both rungs would pay for one function's spelling. sc50's combinators therefore write plain `push` and name the owed `take` in `map`'s doc | wolf-lang#385 (ruled option 3, lane s167) | sc50 probe |
+| F-0137 | 2026-09-15 | **A module-keyed `LUPIN_MIRROR_LAG` entry calls a new RUNNING block "the mirror moved"**: sc49's word was keyed by module, true while every `std.range` block went through an accessor; sc50's `range.collect` names none and runs on lupin, so `doc-examples` redded `range.lu:176` with "the mirror moved (a heal, or a different refusal)" while the mirror had not moved at all. Keyed by the call now, one entry per example (`range.is_empty(`, `range.contains(`, `range.len(`, `range.clamp_to(`), the shape `LUPIN_TIER_WAIVERS` already had; the selftest counts blocks writing that call | wolf-std#37 | sc50, caught by the gate itself |
 
 
 ## F-0001 — the std search path
@@ -10009,3 +10010,34 @@ on `map` carries the owed spelling and this finding; it lands with the
 pin that carries s167. `take` is also NOT the answer anywhere the
 element comes from the receiver: a `take` of a lent binding is E1014 by
 #366's own words.
+
+## F-0137 — the mirror-lag word was keyed by module, and the first running block in a lagging module redded the gate
+
+`wolf-std#37`. sc49 landed `mirror-lag` for `doc-examples` and keyed each
+entry by MODULE: `("range", "a range has no member `start`", …)`. Every
+`std.range` block went through an accessor at that moment, so the key
+and the truth agreed. sc50 added `range.collect`, whose example names no
+accessor and reaches `exit(0)` on lupin 0.1.36, and the gate reported
+
+    range.lu:176 [lupin]: LUPIN_MIRROR_LAG[0] says `a range has no member
+    `start``, observed `exit(0)` — the mirror moved (a heal, or a
+    different refusal); re-measure, and retire the entry
+
+on all three hosts (`gates` failed at `doc-examples` in CI run
+35040151339; `rig` was green). The mirror had not moved and nothing was
+stale: the key could not say "these four blocks, not that one".
+
+Keyed by the call now, one entry per example, which is exactly the shape
+`LUPIN_TIER_WAIVERS` next to it already uses and for the same stated
+reason ("never to excuse one function"). Each entry dies on the release
+that runs ITS block instead of on the first sibling that runs, the
+selftest counts blocks writing that call rather than blocks in that
+module, and the const's own test refuses an entry whose needle is not a
+call of its module. Measured after the change: `doc-examples` 448
+blocks GREEN, the four accessor blocks lagging and firing their entries,
+`collect`'s block running on three lanes.
+
+The lesson is the one wolf-lang#177 left and this repo keeps relearning:
+a waiver's KEY is part of its claim. A key coarser than the claim goes
+wrong in the direction that looks like a real failure, which is the good
+direction — but it costs a gauntlet and a CI run to read.

@@ -59,6 +59,13 @@ written mode on `push` is `E1007` on both compiler rungs, a static
 refusal of the whole module (F-0136). `sort_by` needs neither, its
 receiver being `mut`. Nothing here is added to wolf-std#39's 70 sites.
 
+**The mirror-lag word is keyed by the call now** (F-0137, wolf-std#37).
+sc49's entry was keyed by module, which was true until `range.collect`
+became the first `std.range` example the reference machine RUNS; the
+gate then called a new running block "the mirror moved" on all three
+hosts. One entry per example, the shape `LUPIN_TIER_WAIVERS` already
+had, so each retires on the release that runs its own block.
+
 **Doc truth.** The first gauntlet redded two sc50 examples on all three
 lanes (`sc50-ci-1.log`): §4 classifies a line by its text, so a lambda
 holding `==` in a `let` or `for` line became `if let …` / `if for …`.
