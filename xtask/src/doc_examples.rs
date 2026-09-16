@@ -18,9 +18,10 @@
 //! two rungs (checked and, from sc04, native) must reach `exit(0)` or
 //! refuse honestly (`unsupported`); a static rejection (`fail(E…)`) is a
 //! doc bug too. The one exception to the lupin half is the ledger's own
-//! word, `mirror-lag` (`LUPIN_MIRROR_LAG`, wolf-std#37): a module the
+//! word, `mirror-lag` (`LUPIN_MIRROR_LAG`, wolf-std#37): an example the
 //! reference machine has not been shown yet, refused with exactly the
-//! named code or sentence, and red the day it runs.
+//! named code or sentence, and red the day it runs. Keyed by the call it
+//! names, so a module may hold lagging blocks and running ones at once.
 //!
 //! sc01 left "fold examples into tests/ledger.toml" to sc02; sc02's
 //! answer, for the closeout to confirm: NO. The ledger's value is
@@ -189,11 +190,43 @@ const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[];
 ///   gate's rule (wolf-lang#177);
 /// - a mirror-lagged block must still reach `exit(0)` on a compiler
 ///   lane — the word is "the compilers RUN this", never "nobody did".
-pub(crate) const LUPIN_MIRROR_LAG: &[(&str, &str, &str)] = &[(
-    "range",
-    "a range has no member `start`",
-    "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
-)];
+///
+/// `(module, the call that must appear in the block, the refusal, the
+/// issue)`. Keyed by the CALL, not by the module alone, for the reason
+/// `LUPIN_TIER_WAIVERS` is: a module is not all one lane. sc49 wrote
+/// these per module, which was true while every `std.range` block went
+/// through an accessor; sc50's `range.collect` is a `std.range` block
+/// that names no accessor and RUNS on the reference machine, and a
+/// module-keyed entry called that "the mirror moved" — the gate firing
+/// correctly on a key too coarse to say what it meant. One entry per
+/// example keeps the promise this word exists to make: each dies on the
+/// release that runs ITS block, and no sibling block is excused with it.
+pub(crate) const LUPIN_MIRROR_LAG: &[(&str, &str, &str, &str)] = &[
+    (
+        "range",
+        "range.is_empty(",
+        "a range has no member `start`",
+        "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
+    ),
+    (
+        "range",
+        "range.contains(",
+        "a range has no member `start`",
+        "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
+    ),
+    (
+        "range",
+        "range.len(",
+        "a range has no member `start`",
+        "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
+    ),
+    (
+        "range",
+        "range.clamp_to(",
+        "a range has no member `start`",
+        "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
+    ),
+];
 
 /// Does the reference lane's answer hold a mirror-lag entry's refusal?
 /// A code demands exactly that `fail(…)`; a sentence demands
@@ -216,6 +249,14 @@ pub(crate) struct Block {
     origin: String,
     /// The example lines, fence markers stripped.
     lines: Vec<String>,
+}
+
+impl Block {
+    /// Does this block write `needle` anywhere? The key both waiver
+    /// lists use to name one example instead of a whole module.
+    pub(crate) fn mentions(&self, needle: &str) -> bool {
+        self.lines.iter().any(|l| l.contains(needle))
+    }
 }
 
 pub fn doc_examples() -> Result<(), String> {
@@ -273,7 +314,9 @@ pub fn doc_examples() -> Result<(), String> {
         let tier_waiver = LUPIN_TIER_WAIVERS
             .iter()
             .find(|(m, needle, _)| *m == b.module && b.lines.iter().any(|l| l.contains(needle)));
-        let mirror_lag = LUPIN_MIRROR_LAG.iter().position(|(m, _, _)| *m == b.module);
+        let mirror_lag = LUPIN_MIRROR_LAG
+            .iter()
+            .position(|(m, needle, _, _)| *m == b.module && b.mentions(needle));
         let mut any_ran = false;
         let mut tier_waived_here = false;
         for (imp, bin) in &lanes {
@@ -298,7 +341,7 @@ pub fn doc_examples() -> Result<(), String> {
                 any_ran = true;
             }
             if let (Some(i), Impl::Lupin) = (mirror_lag, imp) {
-                let (m, refusal, issue) = LUPIN_MIRROR_LAG[i];
+                let (m, _needle, refusal, issue) = LUPIN_MIRROR_LAG[i];
                 if mirror_lag_holds(refusal, &verdict, reason.as_deref()) {
                     lag_fired[i] = true;
                     lag_ledger.push(format!(
@@ -423,9 +466,9 @@ pub fn doc_examples() -> Result<(), String> {
     if lanes.iter().any(|(imp, _)| matches!(imp, Impl::Lupin)) {
         for (i, fired) in lag_fired.iter().enumerate() {
             if !*fired {
-                let (m, refusal, issue) = LUPIN_MIRROR_LAG[i];
+                let (m, needle, refusal, issue) = LUPIN_MIRROR_LAG[i];
                 reds.push(format!(
-                    "LUPIN_MIRROR_LAG[{i}] ({m}: `{refusal}`, {issue}) never fired — no \
+                    "LUPIN_MIRROR_LAG[{i}] ({m}: `{needle}`, `{refusal}`, {issue}) never fired — no \
                      `std.{m}` block was refused that way on the reference lane, so the \
                      entry asserts a lag that does not happen. RETIRE IT with the flip \
                      (wolf-lang#177's lesson)."
@@ -850,7 +893,12 @@ mod tests {
 
     #[test]
     fn a_mirror_lag_entry_names_a_module_a_refusal_and_an_issue() {
-        for (m, refusal, issue) in LUPIN_MIRROR_LAG {
+        for (m, needle, refusal, issue) in LUPIN_MIRROR_LAG {
+            assert!(
+                needle.starts_with(&format!("{m}.")) && needle.ends_with('('),
+                "{m}: a mirror-lag entry names ONE call of its own module, so it \
+                 cannot excuse a sibling block (`{needle}`)"
+            );
             assert!(
                 !CAPABILITY_MODULES.contains(m),
                 "{m}: a capability module already accepts `unsupported` forever; a mirror \
