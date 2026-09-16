@@ -1,0 +1,18 @@
+//! check: run(exit=trap(overflow))
+//! phase: run
+//! conforms: std.list
+//!
+//! `list.sum` is checked arithmetic, as `search.sum` is: a partial sum
+//! that leaves `int` traps rather than wrapping, and does not raise.
+//! `9223372036854775807` is `int`'s maximum, spelled as a literal so
+//! the file imports `std.list` alone.
+
+use std.list
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 9223372036854775807)
+    list.push(mut xs, 1)
+    let _ = list.sum(xs)
+    0
+}

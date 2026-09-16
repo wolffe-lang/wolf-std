@@ -140,6 +140,11 @@ the building.
 | F-0130 | 2026-09-14 | **An error-set alias inside a std module costs the reference lane EVERY importer, at parse**: wolf 0.2.14 takes `error IoErrors = {not_found, denied, io}` on both rungs; lupin 0.1.36 (pin v0.2.12) refuses it at parse (`fail(E0201)`), and one `error` line appended to a scratch copy of `std/fs/fs.lu` turned `fs/path_helpers.lu` — a row that never names it — from `exit(0)` to `fail(E0201)`. Eighteen lupin rows import `std.fs`, fifteen of them lit by the same bump; sc46's `trait Num` alias cost ONE row because its refusal was at resolve. So the io tier's alias is witnessed (`tests/fs/alias_row.lu`, `run`/`run`/`mirror-lag(E0201)`) and not written into std.fs until the mirror parses the form. The list-literal half of wolf-std#30 has no carrier at all (zero non-doc `List[T]()`-plus-literal-push sites) | wolf-std (the alias's home) + wolf-interp (the mirror at v0.2.12) | [filed: wolf-std#36](https://github.com/wolffe-lang/wolf-std/issues/36) |
 | F-0131 | 2026-09-14 | **`doc-examples` has no mirror-lag word**: a lupin `unsupported` is accepted only for `CAPABILITY_MODULES` or a per-function `LUPIN_TIER_WAIVERS` entry, and a lupin `fail(E…)` never — so a module the mirror has not caught up to (`std.range` at 0.2.14: both compiler rungs run it, lupin declines the accessor BY NAME) cannot fence an example two lanes run to `exit(0)`, and its four examples are prose while the ledger has carried `mirror-lag(E…)` for the same shape since sc46 | wolf-std (the rig's extractor) | [filed: wolf-std#37](https://github.com/wolffe-lang/wolf-std/issues/37) — **CLOSED at sc49 (`f746a24`).** `LUPIN_MIRROR_LAG` is `(module, refusal, issue)`: a CODE demands exactly `fail(<code>)`, a by-name SENTENCE demands `unsupported` carrying it in the record's `x-unsupported` (read since `a79b75a`). A heal or a different refusal on any block of the module is RED, an entry no block fired is RED, a mirror-lagged block must still reach `exit(0)` on a compiler lane, and `selftest` reds an entry whose module has no fence. Both runtime directions seen red on plants before the green. The carrier is `std.range`'s four examples, fenced: 440 blocks GREEN |
 | F-0132 | 2026-09-15 | **The windows rig was RED on SIX rows, not three, and the three nobody counted are stack overflows**: `json/number_posture_and_depth`, `json/parse_misses`, `json/parse_shapes` on the CHECKED lane die on `rig (windows-latest)` with `tool error (exit Some(-1073741571), no record): thread 'main' has overflowed its stack` — `STATUS_STACK_OVERFLOW`, a crash and not a verdict — at trunk `2d10219` (run 34686645924, wolf 0.2.12) AND at sc48's head (run 34910870288, wolf 0.2.14), where ubuntu and macOS answer `unsupported`/`exit(0)`. wolf-std#34's "three, not five" counted `directive mismatch` lines; the rig prints a tool error in another shape, so the count was wrong the way F-0126 and F-0127 were wrong: the thing read did not carry the fact. sc48's three #34 rows are GREEN on windows at the head; the step stays ADVISORY RED on these three, and the marker stays until the checked tier sizes its own stack | wolf-lang (the checked tier on windows) + wolf-std (the reading) | [filed: wolf-lang#382](https://github.com/wolffe-lang/wolf-lang/issues/382) |
+| F-0133 | 2026-09-15 | **A list of tuples has one spelling that runs on all three lanes, and it is not the constructor**: `List[(int, T)]()` (and a concrete `List[(int, int)]()`, and a generic-struct `List[Pair[int]]()`) is `unsupported — this prelude container instantiation (generic data)` at RESOLVE on both compiler rungs, eagerly, so one such body in `std.list` darkened every importer (`list/map_tier` went dark on both rungs without calling it); `var out: List[(int, T)] = []` runs on both rungs and is `fail(E0201)` at parse on lupin 0.1.36; `fresh[(int, str)]()` is `E0812: the argument for U must be a type` on both rungs; and `var out: List[(int, T)] = fresh()` over a private `fn fresh[U]() -> List[U]` runs on all three. `std.list.enumerate`/`zip` ship on that helper | [wolf-lang#349](https://github.com/wolffe-lang/wolf-lang/issues/349) (comment), wolf-interp#106 | sc50 probe |
+| F-0134 | 2026-09-15 | **Silent wrong answer on the checked machine: a call through a fn-typed parameter goes to a top-level fn of the same name**: `fn apply(le: fn(int, int) -> bool, …) { le(x, y) }` called as `apply(ge, 1, 2)` in a file that also declares `fn le` prints `true` under `wolf conform-run --checked` and `false` on lupin and native; across the module boundary it made `list.sort_by(mut xs, ge)` sort ascending and `list.is_sorted_by(xs, ge)` answer true. Every callable-tier parameter name in std (`pred`, `better`, `le`, `f`) is exposed to it; `tests/list/sort_by_tier.lu` names its relations `ascending`/`descending` and says why | [wolf-lang#400](https://github.com/wolffe-lang/wolf-lang/issues/400) | sc50 probe |
+| F-0135 | 2026-09-15 | **`[type.comb.set]`'s `sorted[T: cmp.Ord]` is written and ships on no lane at trunk 073aa19**: `use std.cmp` in `std.list` makes every importer native `unsupported` (std.cmp's product pattern; sc49 / wolf-std#31 option 3 removes it, measured against origin/sc49's `std/cmp`: importers three-lane, `sorted` lupin + native); the checked machine declines `a < b` under `T: cmp.Ord` as "trait dispatch on a non-nominal receiver" when `T` is bound through a list read, while the same fn over two `int` bindings runs; and passing the generic `ord_less` as a fn value is "a generic function used as a value (comptime)" at resolve, darkening every importer | [wolf-lang#402](https://github.com/wolffe-lang/wolf-lang/issues/402); wolf-std PR #40 | sc50 probe |
+| F-0136 | 2026-09-15 | **`push` takes no written mode at wolf 0.2.14, so #385's `take` spelling cannot be adopted before the pin moves**: `(mut out).push(take v)` is `E1007 — \`push\` takes \`value\` as plain \`read\` — no mode is written for it` on BOTH compiler rungs, for a call argument and for a binding alike, while lupin 0.1.36 runs it. A static refusal of the module, so every `std.list` row on both rungs would pay for one function's spelling. sc50's combinators therefore write plain `push` and name the owed `take` in `map`'s doc | wolf-lang#385 (ruled option 3, lane s167) | sc50 probe |
+| F-0137 | 2026-09-15 | **A module-keyed `LUPIN_MIRROR_LAG` entry calls a new RUNNING block "the mirror moved"**: sc49's word was keyed by module, true while every `std.range` block went through an accessor; sc50's `range.collect` names none and runs on lupin, so `doc-examples` redded `range.lu:176` with "the mirror moved (a heal, or a different refusal)" while the mirror had not moved at all. Keyed by the call now, one entry per example (`range.is_empty(`, `range.contains(`, `range.len(`, `range.clamp_to(`), the shape `LUPIN_TIER_WAIVERS` already had; the selftest counts blocks writing that call | wolf-std#37 | sc50, caught by the gate itself |
 
 
 ## F-0001 — the std search path
@@ -9769,3 +9774,270 @@ every line above it that names a test**. A crash writes no record, so
 the ledger cannot carry a word for it and the rows stay as unix
 measures them; the fix is upstream's, and `std-test` stays ADVISORY on
 windows behind three rows the marker's own issue did not know it had.
+
+## sc50 — the combinators, std's half: the ledger prediction, written before the first body
+
+wolf-lang#390 ruled `par` stays (option 1), and s166 writes the clauses
+that name and place the combinators. Item 1 of sc50 is what `std.list`
+can already express at wolf 0.2.14 / lupin 0.1.36 as free functions,
+the shape `any`/`all` have had since sc13. Written 2026-09-15, before
+any body exists in the tree. Three probes were run first, and they
+decide the doc examples rather than the rows, so they are recorded as
+measurements and not as predictions (scratch `sc50-probe`, the three
+`conform-run` lanes over a staged `std/`):
+
+- a std fn value passed across the module boundary
+  (`list.all(xs, unicode.is_ascii)`) runs on all three lanes, so
+  F-0085's refusal is gone at this pin (wolf-lang#116 CLOSED);
+- a nested `fn` inside `main` runs on lupin and native, and the checked
+  machine answers `unsupported — a nested fn in checked execution`;
+- a lambda (`list.any(xs, fn(v) v % 2 == 1)`) runs on lupin and native,
+  and the checked machine answers `unsupported — closures in checked
+  execution`.
+
+The shapes, and the row each new test is predicted to carry
+(lupin / wolfc / native):
+
+| function | signature | predicted row | reasoning |
+|---|---|---|---|
+| `map` | `map[T, U](xs: List[T], f: fn(T) -> U) -> List[U]` | run / run / run | `find_where`'s shape plus a second type parameter and a built `List[U]`; `std.list` imports nothing, so no importer cost |
+| `filter` | `filter[T](xs: List[T], pred: fn(T) -> bool) -> List[T]` | run / run / run | `count_where` that pushes instead of counting |
+| `fold` | `fold[T, A](xs: List[T], init: A, f: fn(A, T) -> A) -> A` | run / run / run | a second type parameter carried through a `var` |
+| `sum` | `sum(xs: List[int]) -> int` | run / run / run; its overflow trap row run / run / run | monomorphic, `std.search.sum`'s contract. A generic `sum` needs `std.ops` for the bound, which imports `std.cmp`, which darkens every `std.list` importer natively (`search/*` is `native = "unsupported"` for exactly that), and `ops` has no zero anyway |
+| `enumerate` | `enumerate[T](xs: List[T]) -> List[(int, T)]` | run / run / run | the least certain of the seven: `map/keys_values_pairs` is native-dark, but for `std.cmp`, not for the tuple list; `map.pairs` returns the same shape |
+| `zip` | `zip[A, B](a: List[A], b: List[B]) -> List[(A, B)]` | run / run / run | `enumerate`'s risk; the shorter list decides the length |
+| `sort_by` | a `bool` relation (`le: fn(T, T) -> bool`), stable merge | body run / run / run; **the name is the open question** | the callable tier allows the body (`is_sorted_by` is its judge, three-lane). `std.sort.sort_by` already owns the name with a `cmp.Ordering` comparator (freight, F-0029), so a second `sort_by` with a different signature is §1's "one concept, one name" broken. Predicted outcome: a finding, not a ship, unless the `Ordering` form now runs |
+
+Doc examples, from the probes: a lambda example is predicted
+`exit(0)` on lupin and native and `unsupported` on the checked machine,
+which `doc-examples` accepts (the compiler lanes may refuse honestly;
+lupin may not). A fenced example with a three-lane verdict needs a fn
+value from `std.list` itself, and no `std.list` function has a
+predicate's shape.
+
+## F-0133 — a list of tuples has one three-lane spelling, and it is not the constructor
+
+`wolf-lang#349` (a comment with these measurements), `wolf-interp#106`.
+sc50 predicted `enumerate` and `zip` at run / run / run on the reasoning
+that `map.pairs` already returns `List[(K, V)]`. The row was right and
+the path was not: `map.pairs` returns the builtin's list and never
+constructs one. Measured at wolf 0.2.14 / lupin 0.1.36, entry files
+staged over `std/`:
+
+| spelling | lupin | wolfc | native |
+|---|---|---|---|
+| `var out = List[(int, T)]()` in a generic fn | exit(0) | unsupported @ resolve | unsupported @ resolve |
+| `var out = List[(int, int)]()` | exit(0) | unsupported @ resolve | unsupported @ resolve |
+| `var out = List[Pair[int]]()` (`struct Pair[T]`) | exit(0) | unsupported @ resolve | unsupported @ resolve |
+| `var out = List[List[T]]()` | exit(0) | exit(0) | exit(0) |
+| `var out: List[(int, T)] = []` | fail(E0201) @ parse | exit(0) | exit(0) |
+| `var out = fresh[(int, str)]()` | exit(0) | fail(E0812) | fail(E0812) |
+| `var out: List[(int, T)] = fresh()`, `fn fresh[U]() -> List[U]` | exit(0) | exit(0) | exit(0) |
+
+Two costs make the choice. The compiler decline is at resolve and it
+reads the whole module, so a constructor in any `std.list` body is a
+dark row for every importer on both rungs (`list/map_tier`, which never
+calls `enumerate`, went `unsupported` on both). The literal's cost is the
+mirror of that, on lupin at parse, which is F-0130's shape. The helper
+costs no lane, has the constructor's semantics, and is private. It
+retires for `[]` when lupin parses the literal, and the constructor
+spelling comes back when wolf-lang#349 closes.
+
+`E0812` on a tuple in type-argument position is a separate sentence
+from #349's (a type is refused where a type is asked for, at typecheck,
+with an error code rather than a decline) and rides the same comment.
+
+## F-0134 — the checked machine calls the top-level fn and not the parameter
+
+`wolf-lang#400`. Found by the first draft of `tests/list/sort_by_tier.lu`,
+which declared `fn le` and `fn ge` and passed `ge` to `list.sort_by`,
+whose relation parameter is named `le`. lupin and native sorted
+descending; the checked machine sorted ascending, answered `true` for
+`is_sorted_by(xs, ge)` on the ascending list, and the file exited 6. The
+one-module reproducer in the issue needs no std: a fn-typed parameter
+named like a top-level fn resolves, at the call, to the top-level fn.
+
+The bisection is the sc14 rule (when two observers disagree, bisect the
+observers): `is_sorted_by` agreeing with the wrong sort looked like the
+sort was right and `first` was wrong, until both were seen to be calling
+the same fn. There is no ledger word for a compiler lane giving a wrong
+answer, and a witness asserting the right one would be a standing red,
+so the test avoids the collision and names the finding. The existing
+`list/relation_tier.lu` declares `fn le` too and passes it only where the
+parameter is `le`, so the confusion is invisible there and masks nothing.
+
+The same re-measure settled `sort_by`'s other question. wolf-lang#23 is
+CLOSED, and `std.sort.sort_by` with a `cmp.Ordering` comparator still
+runs on no lane at 0.2.14 / 0.1.36: lupin declines at resolve (``Ordering`
+is a enum; traits, enums and type-level items have no dynamic semantics
+here``), the checked machine declines `std.cmp`'s module items, and the
+native rung answers `a member access without a recorded type` at
+`.is_lt()`. So F-0029 stays open in this register whatever the upstream
+issue's state, and `std.list.sort_by` ships on the `bool` relation.
+
+## sc50 item 2 — aligned to s166's clauses: the prediction, written before the edit
+
+s166's spec commit is wolf-lang `4c046f15` on branch `s166` (two commits
+on trunk `ceda387`): `[type.method]` and `[type.comb]` in
+`spec/10-types.md` (`acad5737`), `[conc.task.par]` completed in
+`spec/03-concurrency.md`. `[type.comb.set]` assigns `std.list` `map`,
+`filter`, `fold`, `sum`, `sort_by`, `sorted_by`, `sorted`, `enumerate`
+and `zip`, and `std.range` `collect`. `par` is `[type.comb.builtin]`,
+the language's, and not written here. `[type.method.take]` closes #154's
+window: nothing in this branch is named `take` or spells a prefix or
+suffix combinator, so nothing is renamed for it.
+
+Probed before this entry (scratch `sc50-probe`, measurements, not
+predictions):
+- `sorted[T: cmp.Ord]` in `std.list` needs `use std.cmp`, and that import
+  alone turns `list/map_tier` native `unsupported` ("an enum or row test
+  inside a product pattern (deep trees)"), which is every `std.list`
+  importer's native row; the body itself is checked `unsupported`
+  ("trait dispatch on a non-nominal receiver") at `x < y` and runs only
+  on lupin. Predicted outcome: not shipped, a finding.
+- `collect[T](r: range[T]) -> List[T]` (one generic fn, because wolf has
+  no overloading and the clause names both `range[int]` and
+  `range[char]`): over `2..5` exit(0) on all three lanes; over
+  `'a'..='c'` exit(0) on both compiler rungs and `unsupported` on lupin
+  0.1.36 ("a range needs integer endpoints, got char and char"). A
+  monomorphic `collect(r: range[int])` refuses the char range `E0401`.
+
+Predicted rows (lupin / wolfc / native):
+
+| row | predicted | why |
+|---|---|---|
+| `list/filter_tier`, `fold_tier`, `zip_tier` after the parameter renames (`keep`, `step`, `xs`/`ys`, `T`/`U`) | run / run / run, unchanged | a parameter's name is not part of a call |
+| `list/sort_by_tier` on `less` (strict, stable: take the right run only when `less(right, left)`) | run / run / run | the same merge with the test flipped; the test's relations become strict |
+| `list/sorted_by_tier` (new) | run / run / run | `sort_by` over a fresh copy |
+| `range/collect_int` (new) | run / run / run | probed |
+| `range/collect_char` (new) | unsupported / run / run | probed; lupin's char range |
+| every other `range/*` row | unchanged (lupin still `unsupported`) | lupin resolves lazily; `collect` names no accessor |
+| `doc-examples` | the two sc50 blocks the first gauntlet redded (`filter`, `enumerate`) green once no statement line holds a relational operator | §4's classification, measured red in `sc50-ci-1.log` |
+
+## F-0135 — `sorted` is written, and its cost is a sibling lane plus one checked row
+
+`wolf-lang#402`, wolf-std PR #40 (sc49). `[type.comb.set]` specifies
+`sorted[T: cmp.Ord](xs: List[T]) -> List[T]` as "`sorted_by` with `<`".
+Measured at wolf 0.2.14 / lupin 0.1.36, the probe program sorting a
+`List[int]` and a `List[str]`, with `list/map_tier` as the importer
+control (it never calls `sorted`):
+
+| body | `std/cmp` | `sorted` lupin / wolfc / native | `map_tier` lupin / wolfc / native |
+|---|---|---|---|
+| a `sorted_by` over a copy with `x < y` inline (the first probe) | trunk | run / unsupported (non-nominal receiver) / unsupported (product pattern) | run / run / **unsupported** |
+| V1: `sorted_by(xs, ord_less)`, `ord_less` generic, as a fn value | trunk | run / unsupported / unsupported ("a generic function used as a value (comptime)", resolve) | run / **unsupported** / **unsupported** |
+| V1 | origin/sc49 `42d42b9` | the same | run / **unsupported** / **unsupported** |
+| V2: the merge calling `ord_less(at(src, b), at(src, a))` directly | trunk | run / unsupported (non-nominal receiver) / unsupported (product pattern) | run / run / **unsupported** |
+| V2 | origin/sc49 `42d42b9` | run / unsupported (non-nominal receiver) / run | run / run / run |
+
+So V2 is the body, and it lands on sc49's merge at run / unsupported /
+run with no importer cost. **It landed.** sc49 merged to trunk as
+`42d42b9`; sc50 rebased onto it, and `sorted` ships with `sort_ord`
+repeating the merge (a generic fn is not a fn value, the V1 row above),
+measured on the rebased tree at exactly run / unsupported / run, with
+`list/map_tier` and `list/sort_by_tier` three-lane as the importer
+controls. What stays open is the checked row alone, wolf-lang#402. Before that merge it would take the native
+column from every `std.list` row, which is the "budget a module by its
+worst body" rule `std/x/list_eq` was written under. The checked refusal
+reduces to the issue's twelve lines: `ord_less(xs[0], xs[1])` over a
+`List[int]` declines at `a < b`, and `ord_less(one, two)` over two `int`
+bindings runs. The first minimal attempt used bare literals and stopped
+at `E0502: i32 does not implement Ord` on both rungs, F-0004's literal
+default and not this row, so it was not filed.
+
+### Item 2, predicted and measured
+
+The prediction was committed at `093796b`, before the edit.
+
+| row | predicted | measured |
+|---|---|---|
+| `list/filter_tier`, `fold_tier`, `zip_tier` after renames | run / run / run | **run / run / run** |
+| `list/sort_by_tier` on strict `less` | run / run / run | **run / run / run** |
+| `list/sorted_by_tier` | run / run / run | **run / run / run** |
+| `range/collect_int` | run / run / run | **run / run / run** |
+| `range/collect_char` | unsupported / run / run | **unsupported / run / run** |
+| other `range/*` rows | unchanged | **unchanged** (`is_empty` re-run: unsupported / run / run) |
+| `sorted` | not shipped, a finding | **shipped after the rebase** at run / unsupported / run: the prediction held while trunk was `073aa19`, and sc49's merge (`42d42b9`) removed the native half exactly as F-0135 measured it would |
+| `list/sorted_tier` (new, after the rebase) | run / unsupported / run | **run / unsupported / run** |
+| `doc-examples`' two red sc50 blocks | green once no statement line compares | per-block probes pass as the extractor renders them; the full gauntlet is the verdict |
+
+No `conforms:` line cites the new anchors: `type.comb.set` and its
+siblings are in the registered `type` namespace and absent from the
+vendored registry at `30731a6`, which `[conf.tag.valid]` reds. They are
+cited in doc prose and move into `conforms:` at the data-pin bump that
+carries `4c046f15`.
+
+## F-0136 — the combinators are written for two unreleased rules, and one of them has no spelling yet
+
+wolf-lang#366 (`[mem.tier0.mode.read]`, enforced on wolf-lang trunk
+`4b56441`, shipping in 0.2.15) makes a value moved out of a `read`
+parameter LENT, and a lent value whose type can reach shared storage may
+not outlive the activation — "and a type parameter always can, because a
+generic body is checked once for every instantiation". Every combinator
+sc50 writes takes a `read` receiver and returns a fresh collection, so
+every one of them is in that rule's sights.
+
+What the rule does NOT reach is the store itself: the clause says the
+builtin that keeps a `read` argument inside its receiver (`push`) is
+wolf-lang#385. That issue is ruled option 3: `push` copies a non-`Copy`
+element by default, and `push(take v)` moves it (`m[k] = v` and
+`xs[i] = v` the same). So for `filter`, `enumerate`, `zip`, `sorted_by`
+and `range.collect` the default copy IS the copy the lent rule needs,
+and an explicit `copy x` would buy a second deep one (`[mem.tier0.move.3]`,
+wolf-lang#384: a `List` element copies its buffer, a `str` shares its
+immutable bytes, a scalar costs nothing). Those bodies write plain
+`push`. They were committed with explicit `copy` at `2f5b6eb`/`e2ff9e0`
+and reverted at `528e7c9` when the #385 ruling arrived; the intermediate
+state is left in the history because it is what the first reading of the
+lent rule produced.
+
+`map` is the one that owns its element — it stores `f`'s return value,
+not an element of `xs` — so option 3's fast path is its spelling:
+`(mut out).push(take f(x))`. It is not written, because at wolf 0.2.14
+it does not exist:
+
+| spelling | lupin 0.1.36 | wolfc | native |
+|---|---|---|---|
+| `(mut out).push(take f(x))` | exit(0) | **fail(E1007)** | **fail(E1007)** |
+| `let v = f(x)` then `(mut out).push(take v)` | exit(0) | **fail(E1007)** | **fail(E1007)** |
+| `(mut out).push(f(x))` | exit(0) | exit(0) | exit(0) |
+
+`E1007` reads "`push` takes `value` as plain `read` — no mode is written
+for it", and it is a static refusal of the whole module: adopting the
+spelling early would turn both compiler columns of every `std.list` row
+into `fail(E1007)` to say one thing about one function. The doc comment
+on `map` carries the owed spelling and this finding; it lands with the
+pin that carries s167. `take` is also NOT the answer anywhere the
+element comes from the receiver: a `take` of a lent binding is E1014 by
+#366's own words.
+
+## F-0137 — the mirror-lag word was keyed by module, and the first running block in a lagging module redded the gate
+
+`wolf-std#37`. sc49 landed `mirror-lag` for `doc-examples` and keyed each
+entry by MODULE: `("range", "a range has no member `start`", …)`. Every
+`std.range` block went through an accessor at that moment, so the key
+and the truth agreed. sc50 added `range.collect`, whose example names no
+accessor and reaches `exit(0)` on lupin 0.1.36, and the gate reported
+
+    range.lu:176 [lupin]: LUPIN_MIRROR_LAG[0] says `a range has no member
+    `start``, observed `exit(0)` — the mirror moved (a heal, or a
+    different refusal); re-measure, and retire the entry
+
+on all three hosts (`gates` failed at `doc-examples` in CI run
+35040151339; `rig` was green). The mirror had not moved and nothing was
+stale: the key could not say "these four blocks, not that one".
+
+Keyed by the call now, one entry per example, which is exactly the shape
+`LUPIN_TIER_WAIVERS` next to it already uses and for the same stated
+reason ("never to excuse one function"). Each entry dies on the release
+that runs ITS block instead of on the first sibling that runs, the
+selftest counts blocks writing that call rather than blocks in that
+module, and the const's own test refuses an entry whose needle is not a
+call of its module. Measured after the change: `doc-examples` 448
+blocks GREEN, the four accessor blocks lagging and firing their entries,
+`collect`'s block running on three lanes.
+
+The lesson is the one wolf-lang#177 left and this repo keeps relearning:
+a waiver's KEY is part of its claim. A key coarser than the claim goes
+wrong in the direction that looks like a real failure, which is the good
+direction — but it costs a gauntlet and a CI run to read.

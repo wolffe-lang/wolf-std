@@ -1,0 +1,31 @@
+//! check: run(exit=0, stdout="sum holds\n")
+//! phase: run
+//! conforms: std.list
+//!
+//! sc50's `sum` over `List[int]`, on every lane: the empty sum is 0,
+//! negatives cancel, and it agrees with `fold` over an adding fn value,
+//! which is the generic reduction the doc points at.
+
+use std.list
+
+fn add(acc: int, v: int) -> int { acc + v }
+
+fn main() -> !int {
+    var empty = List[int]()
+    if list.sum(empty) == 0 {} else { return 1 }
+
+    var xs = List[int]()
+    list.push(mut xs, 40)
+    list.push(mut xs, 0 - 15)
+    list.push(mut xs, 3)
+    if list.sum(xs) == 28 {} else { return 2 }
+    if list.sum(xs) == list.fold(xs, 0, add) {} else { return 3 }
+
+    var ys = List[int]()
+    list.push(mut ys, 5)
+    list.push(mut ys, 0 - 5)
+    if list.sum(ys) == 0 {} else { return 4 }
+
+    print("sum holds")
+    0
+}

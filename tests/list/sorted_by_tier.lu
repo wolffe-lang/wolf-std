@@ -1,0 +1,48 @@
+//! check: run(exit=0, stdout="sorted_by holds\n")
+//! phase: run
+//! conforms: std.list, type.fn.value, generics.mono
+//!
+//! sc50's `sorted_by`, on every lane: a fresh list in `less`'s order, the
+//! operand untouched, ties kept in input order, the empty list, and a
+//! second element type. Relations are not named `less` (F-0134).
+
+use std.list
+
+fn ascending(a: int, b: int) -> bool { a < b }
+
+fn by_len(a: str, b: str) -> bool { a.len < b.len }
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 4)
+    list.push(mut xs, 2)
+    list.push(mut xs, 9)
+    list.push(mut xs, 2)
+
+    let ys = list.sorted_by(xs, ascending)
+    if list.len(ys) == 4 {} else { return 1 }
+    if (list.get(ys, 0) else 0) == 2 {} else { return 2 }
+    if (list.get(ys, 1) else 0) == 2 {} else { return 3 }
+    if (list.get(ys, 3) else 0) == 9 {} else { return 4 }
+    // The operand is read, not consumed, and not reordered.
+    if (list.get(xs, 0) else 0) == 4 {} else { return 5 }
+    if (list.get(xs, 2) else 0) == 9 {} else { return 6 }
+
+    var empty = List[int]()
+    if list.is_empty(list.sorted_by(empty, ascending)) == true {} else { return 7 }
+
+    // Stability on a second type: "be" and "of" tie and keep their order.
+    var words = List[str]()
+    list.push(mut words, "wolf")
+    list.push(mut words, "be")
+    list.push(mut words, "a")
+    list.push(mut words, "of")
+    let by = list.sorted_by(words, by_len)
+    if (list.get(by, 0) else "?") == "a" {} else { return 8 }
+    if (list.get(by, 1) else "?") == "be" {} else { return 9 }
+    if (list.get(by, 2) else "?") == "of" {} else { return 10 }
+    if (list.get(by, 3) else "?") == "wolf" {} else { return 11 }
+
+    print("sorted_by holds")
+    0
+}

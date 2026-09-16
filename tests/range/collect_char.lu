@@ -1,0 +1,22 @@
+//! check: run(exit=0, stdout="collect char holds\n")
+//! phase: run
+//! conforms: std.range, type.char
+//!
+//! sc50's `collect` over `range[char]`, the clause's second element type,
+//! through the same generic function: both ends of `..=`, the exclusive
+//! `..`, and the empty range.
+
+use std.range
+
+fn main() -> !int {
+    let cs = range.collect('a'..='e')
+    if cs.len == 5 {} else { return 1 }
+    if cs[0] == 'a' {} else { return 2 }
+    if cs[4] == 'e' {} else { return 3 }
+
+    if range.collect('a'..'c').len == 2 {} else { return 4 }
+    if range.collect('x'..'x').len == 0 {} else { return 5 }
+
+    print("collect char holds")
+    0
+}

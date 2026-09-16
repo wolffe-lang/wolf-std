@@ -130,8 +130,14 @@ pub fn sort[T: cmp.Ord](mut xs: List[T]) {
 /// The comparator is a NAMED function today (`sort_by(mut xs, by_age)`);
 /// closures arrive with c05 and change no signature here. Does not
 /// execute at these pins: an `Ordering` produced by an imported module
-/// cannot be examined by this one (F-0029). Prose, not a fenced example,
-/// for that reason.
+/// cannot be examined by this one (F-0029, re-measured at 0.2.14 / 0.1.36
+/// by sc50: no lane). Prose, not a fenced example, for that reason.
+///
+/// The sort that runs is `std.list.sort_by(mut xs, le)` (sc50): the same
+/// mode, the same stable bottom-up merge, on all three lanes, taking a
+/// `bool` relation (`le(a, b)` reads "a may precede b") instead of an
+/// `Ordering`. The comparator's type is the one difference between the
+/// two, and it is stated on both.
 pub fn sort_by[T](mut xs: List[T], by: fn(T, T) -> cmp.Ordering) {
     let n = xs.len
     if n < 2 {

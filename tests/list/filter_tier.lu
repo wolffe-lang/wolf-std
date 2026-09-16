@@ -1,0 +1,45 @@
+//! check: run(exit=0, stdout="filter holds\n")
+//! phase: run
+//! conforms: std.list, type.fn.value, generics.mono
+//!
+//! sc50's `filter` over fn VALUES, on every lane: order kept, operand
+//! untouched, all-pass and none-pass both exact, and a second element
+//! type. Top-level predicates, so the checked machine runs it.
+
+use std.list
+
+fn odd(v: int) -> bool { v % 2 == 1 }
+
+fn negative(v: int) -> bool { v < 0 }
+
+fn short(s: str) -> bool { s.len < 3 }
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 5)
+    list.push(mut xs, 2)
+    list.push(mut xs, 7)
+    list.push(mut xs, 4)
+    list.push(mut xs, 1)
+
+    let odds = list.filter(xs, odd)
+    if list.len(odds) == 3 {} else { return 1 }
+    if (list.get(odds, 0) else 0) == 5 {} else { return 2 }
+    if (list.get(odds, 1) else 0) == 7 {} else { return 3 }
+    if (list.get(odds, 2) else 0) == 1 {} else { return 4 }
+    if list.len(xs) == 5 {} else { return 5 }
+
+    if list.is_empty(list.filter(xs, negative)) == true {} else { return 6 }
+    if list.len(list.filter(odds, odd)) == 3 {} else { return 7 }
+
+    var ss = List[str]()
+    list.push(mut ss, "wolf")
+    list.push(mut ss, "ok")
+    list.push(mut ss, "a")
+    let shorts = list.filter(ss, short)
+    if list.len(shorts) == 2 {} else { return 8 }
+    if (list.first(shorts) else "?") == "ok" {} else { return 9 }
+
+    print("filter holds")
+    0
+}

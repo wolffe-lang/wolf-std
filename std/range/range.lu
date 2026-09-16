@@ -48,6 +48,13 @@
 //! (deeper than the ledger) AND these four blocks on the same day, and
 //! the entry leaves in the commit that flips them.
 //!
+//! **A fifth function, `collect`, is `[type.comb.set]`'s** (sc50, wolf-lang
+//! `4c046f15`): the one combinator whose receiver is a range, and the
+//! one here that reads no accessor. It walks `for x in r`, so lupin
+//! 0.1.36, which resolves lazily, runs it over `range[int]` and
+//! declines `range[char]` itself ("a range needs integer endpoints").
+//! Its int example is fenced for that reason.
+//!
 //! `rev()` and `step_by()` remain BLOCKED on the iterator combinator
 //! surface (F-0008's successor); the combinator that truncates a sequence
 //! is named `limit(n)`, never `take(n)` — `take` is the ownership mode
@@ -136,4 +143,46 @@ pub fn clamp_to(r: range[int], x: int) -> int ! {none} {
         return r.end - 1
     }
     x
+}
+
+/// A fresh list holding every value `r` yields, in iteration order: the
+/// values a `for x in r` would see. `2..5` collects `2, 3, 4`; an empty
+/// or reversed range collects the empty list. One generic function for
+/// both element types the clause names (`range[int]`, `range[char]`),
+/// because wolf has no overloading and a `range[int]` signature refuses
+/// a char range with `E0401` (measured). Total: no error row; traps as
+/// the range's `for` does (`[mem.iter.range]`), and allocation. A
+/// `0..9223372036854775807` collect is a list of that length, which no
+/// host has, so no test here builds one.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `r.collect()`
+/// is this call (`std.range` is `range`'s home module,
+/// `[type.method.home]`). Cost, as the clause states it: one fresh
+/// `List` of the range's length, plus `push`'s own copy per value.
+///
+/// `r` is a `read` parameter and the values escape in the returned list
+/// (`[mem.tier0.mode.read]`, wolf-lang#366, in 0.2.15), and that clause
+/// counts a TYPE PARAMETER as able to reach shared storage always,
+/// "because a generic body is checked once for every instantiation" — so
+/// `T` is in scope for the rule even though the two element types a
+/// range can have are scalars. No `copy` is spelled: the store is
+/// `push`'s, wolf-lang#385 ruled option 3 (s167, unreleased) copies a
+/// non-`Copy` element by default, and a value that reaches no heap
+/// storage is its own copy, so this costs nothing at run time either way
+/// (`[mem.tier0.move.3]`, wolf-lang#384). `take` is not the spelling
+/// here: a value moved out of a `read` parameter is LENT, and a `take`
+/// of a lent binding is E1014 by the same clause.
+///
+/// ```wolf-doc-example
+/// range.collect(2..5).len == 3
+/// range.collect(2..5)[0] == 2
+/// range.collect(1..=3)[2] == 3
+/// range.collect(7..3).len == 0
+/// ```
+pub fn collect[T](r: range[T]) -> List[T] {
+    var out = List[T]()
+    for x in r {
+        (mut out).push(x)
+    }
+    out
 }

@@ -1,5 +1,77 @@
 # Changelog
 
+## sc50 — 2026-09-15 — the combinators, std's half: nine functions on `[type.comb.set]`, two upstream bugs, and `sorted` named where it is missing
+
+wolf-lang#390 ruled `par` stays (option 1). s166's clauses
+(`[type.method]`, `[type.comb]`, wolf-lang `4c046f15`) make `xs.map(f)`
+the free call `list.map(xs, f)` and assign the combinator set to std.
+`par` is the language's builtin and is not written here. The pin is
+unchanged (wolf 0.2.14 / lupin 0.1.36).
+
+**Written, each predicted before its body** (`28a50e0`, `093796b`), and
+each run / run / run unless stated: `map` (`415c611`), `filter` (`c1f1a63`),
+`fold` (`7df0365`), `sum` over `List[int]` with its overflow trap
+(`9a54f73`), `enumerate` (`55fcd9a`), `zip` (`dea21c7`), `sort_by`
+(`1e5f791`, strict `less` at `b31f765`), `sorted_by` (`152ea98`), and
+`std.range.collect` over `range[int]` and `range[char]` (`9450c31`;
+the char row is lupin `unsupported`, where 0.1.36 declines the char
+range). Parameters and costs follow the clause: `keep` (`7362666`),
+`step` (`cf5e491`), `zip[T, U](xs, ys)` (`f6eb721`), anchors and costs
+cited (`5f0a075`). Fenced examples come back for the tier: a std fn value
+crosses the module boundary on all three lanes now (F-0085's refusal is
+gone), and a lambda example is checked `unsupported` only.
+
+**`sorted` ships on sc49's merge** (F-0135). While trunk was `073aa19`
+it was written and withheld (`e8b8b72`), because `use std.cmp` in
+`std.list` darkened every importer on the native rung. sc49 landed as
+`42d42b9`, sc50 rebased onto it, and `sorted` goes in at run /
+unsupported / run with `map_tier` and `sort_by_tier` three-lane as the
+importer controls. It repeats `sort_by`'s merge in a private `sort_ord`
+because a generic fn is not a fn value at this pin, and the checked
+machine declines that one body ("trait dispatch on a non-nominal
+receiver", wolf-lang#402).
+
+**Findings.** F-0133 (`0dbb5f5`): `List[(int, T)]()` is declined at
+resolve on both compiler rungs, eagerly, for every importer, while the
+list literal is lupin `E0201` at parse; `enumerate`/`zip` build through a
+private `fresh[U]()` (wolf-lang#349, commented). F-0134 (`fbe2ad0`): a
+silent wrong answer on the checked machine, where a fn-typed parameter
+named like a top-level fn calls the top-level fn (wolf-lang#400). F-0135:
+`sorted`'s costs (wolf-lang#402).
+
+**Written for two rules this pin cannot see.** s165 landed
+`[mem.tier0.mode.read]`'s enforced paragraph on wolf-lang trunk
+(`4b56441`, wolf-lang#366, shipping in 0.2.15): a value moved out of a
+`read` parameter is LENT, may not outlive the activation, and a type
+parameter always counts as able to reach shared storage. Every
+combinator here takes a `read` receiver and returns a fresh collection.
+The store that makes them legal is `push`'s own, which that clause
+explicitly leaves to wolf-lang#385 — **ruled option 3** (lane s167,
+unreleased): `push` copies a non-`Copy` element by default, deeply on
+the native tiers (wolf-lang#384, `[mem.tier0.move.3]`). So `filter`,
+`enumerate`, `zip`, `sorted_by` and `range.collect` write plain `push`
+and say in their cost lines whose copy it is; an explicit `copy` would
+buy a second one (it was written that way at `2f5b6eb` and reverted at
+`528e7c9` when the ruling arrived). `map` owns its element — it stores
+`f`'s return, not an element of `xs` — so option 3's fast path
+`push(take f(x))` is its spelling, and it is NOT written: at 0.2.14 a
+written mode on `push` is `E1007` on both compiler rungs, a static
+refusal of the whole module (F-0136). `sort_by` needs neither, its
+receiver being `mut`. Nothing here is added to wolf-std#39's 70 sites.
+
+**The mirror-lag word is keyed by the call now** (F-0137, wolf-std#37).
+sc49's entry was keyed by module, which was true until `range.collect`
+became the first `std.range` example the reference machine RUNS; the
+gate then called a new running block "the mirror moved" on all three
+hosts. One entry per example, the shape `LUPIN_TIER_WAIVERS` already
+had, so each retires on the release that runs its own block.
+
+**Doc truth.** The first gauntlet redded two sc50 examples on all three
+lanes (`sc50-ci-1.log`): §4 classifies a line by its text, so a lambda
+holding `==` in a `let` or `for` line became `if let …` / `if for …`.
+Every comparison now rides an assertion line (`ac81cca`), and the
+combinators header says so. `std.sort.sort_by` names its running sibling
+(`c536e6e`); the `BLOCKED(c05)` comment retires (`58bd1d5`).
 ## sc49 — 2026-09-15 — the operator bridge gets its native rung back, and doc-examples learns the mirror-lag word
 
 Pins unchanged: wolf 0.2.14 (`30731a6`), lupin 0.1.36 (`a7f517e`),

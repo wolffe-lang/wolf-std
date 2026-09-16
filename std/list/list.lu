@@ -83,6 +83,8 @@
 //!   nowhere (F-0002/F-0004). The six sit in `std/x/list_eq/` with their
 //!   bodies, and the stub comment below is their home here.
 
+use std.cmp
+
 /// The element at `i`, reading through the language's indexing so an
 /// out-of-range `i` traps `bounds` exactly where the caller would see it
 /// (`[conf.trap.set]`). Private: the public checked spelling is `get`.
@@ -92,6 +94,21 @@
 /// `xs[i]` twice.
 fn at[T](xs: List[T], i: int) -> T {
     xs[i]
+}
+
+/// A fresh empty list of any element type, named through a type
+/// parameter instead of written out. Private, and here for one reason
+/// the tuple-returning combinators share: both compiler rungs decline
+/// `List[(int, T)]()` at resolve, eagerly, so the constructor darkens
+/// every importer of this module and not only its caller ("this
+/// prelude container instantiation (generic data)", wolf-lang#349);
+/// the list-literal spelling `var out: List[(int, T)] = []` compiles
+/// there and is `E0201` at parse on lupin 0.1.36 (wolf-interp#106),
+/// which darkens every importer on the reference lane instead. The same
+/// empty list reached through `U` runs on all three lanes. It retires,
+/// for `[]`, the day lupin parses the literal (F-0133).
+fn fresh[U]() -> List[U] {
+    List[U]()
 }
 
 /// Appends `v` to the end of `xs`, growing it. Amortized constant time
@@ -526,14 +543,17 @@ pub fn repeat[T](xs: List[T], n: int) -> List[T] {
     out
 }
 
-// BLOCKED(c05) — the functional family, every one of them waiting on
-// closures (lambda values as parameters), and named here so nobody
-// re-invents them locally: `map`, `filter`, `fold`, `any`, `all`,
-// `each`, `retain`, `count_if`, `min_by`, `max_by`, `position`. Sorting
-// (`sort`, `sort_by`) is sc04's, and `sorted_by` in the wordcount
-// exemplar is the same closure blocker. No half-shipped variants: a
-// `map` that takes a named function only would be a different API from
-// the one that lands, and callers would have to change twice.
+// The functional family, which this comment listed as BLOCKED(c05) from
+// sc02 until sc50: `any`, `all`, `min_by`, `max_by` and the
+// `count_where`/`index_where`/`find_where` spellings of `count_if` and
+// `position` shipped at sc13 over fn VALUES, and `map`, `filter`, `fold`,
+// `sum`, `enumerate`, `zip` and `sort_by` at sc50 (below). None of them
+// waited for closures in the end: a named fn value was enough, and a
+// lambda passes where one is written. Still unwritten: `each` (a `for`
+// is the language's spelling, and a std name over it would shadow it)
+// and `retain` (`filter` returns the kept list; an in-place twin would
+// be a second name for one walk). `sorted_by` in the wordcount exemplar
+// is `std.sort`'s returning twin, still on the `Ordering` comparator.
 
 // ------------------------------------------------------------------
 // The callable tier (sc13): predicates and relations as fn VALUES —
@@ -643,4 +663,458 @@ pub fn is_sorted_by[T](xs: List[T], le: fn(T, T) -> bool) -> bool {
         have = true
     }
     true
+}
+
+// ------------------------------------------------------------------
+// The combinators (sc50, wolf-lang#390): the free-function half of the
+// method surface s166's clauses place on std data. Same tier, same
+// rules as the callable tier above: a fn VALUE parameter, a walk in
+// order, a fresh list where the answer is a list. Nothing here consumes
+// its operand, so nothing here is spelled `take`.
+//
+// The doc examples are FENCED now, and the reason the tier above is
+// prose has half gone: a std fn value crosses the module boundary on
+// all three lanes at wolf 0.2.14 / lupin 0.1.36 (F-0085's refusal,
+// wolf-lang#116 closed). An example still cannot import a predicate
+// from a second module (§4's one-module note), so it passes a lambda,
+// and the checked machine answers `unsupported — closures in checked
+// execution` for it, which the doc gate accepts from a compiler lane.
+// The three-lane witness for each is its test file, over top-level fns.
+// One more constraint, measured red by the first sc50 gauntlet: §4's
+// extractor classifies a LINE by its text, so a lambda holding `==` or
+// `<` in a `let` or `for` line becomes an `if let …` / `if for …` and
+// fails to parse. A lambda that compares rides inside an assertion line.
+// ------------------------------------------------------------------
+
+/// A new list holding `f(x)` for every `x` in `xs`, in order; `xs` is
+/// read, not consumed. The empty list maps to the empty list. Total: no
+/// error row, no traps beyond allocation and whatever `f` traps.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.map(f)` is
+/// this call (`[type.method.resolve]` step 2), and eager
+/// (`[type.comb.eager]`). Cost, as the clause states it: one fresh
+/// `List[U]` of `xs.len` in the ambient region, and `xs.len` calls of
+/// `f`. A fallible `f` is `par`'s alone (`[conc.task.par]`).
+///
+/// **The one element here that this call OWNS, and the spelling it is
+/// owed.** What this list holds is `f`'s own return value, not an
+/// element moved out of `xs`, so nothing lent escapes
+/// (`[mem.tier0.mode.read]`, wolf-lang#366); `x` is only LENT to `f` for
+/// the call, which is what a `read` parameter is for, and an `f` that
+/// hands its own argument back is the caller's site, not this one.
+/// Because `f(x)` is a temporary this activation owns, the right
+/// spelling under wolf-lang#385 (ruled option 3, s167, unreleased) is
+/// `(mut out).push(take f(x))`, which MOVES it where the default copies.
+/// It is not written yet because it does not exist yet: at wolf 0.2.14
+/// both compiler rungs answer `E1007 — `push` takes `value` as plain
+/// `read`, no mode is written for it` (measured, F-0136), and that is a
+/// static refusal of this whole module, so every `std.list` row on both
+/// rungs would pay for it. It lands with the pin that carries s167, and
+/// the cost line above changes with it.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// let ys = list.map(xs, fn(v) v * 10)
+/// list.len(ys) == 2
+/// (list.last(ys) else 0) == 20
+/// ```
+pub fn map[T, U](xs: List[T], f: fn(T) -> U) -> List[U] {
+    var out = List[U]()
+    for x in xs {
+        (mut out).push(f(x))
+    }
+    out
+}
+
+/// A new list holding the elements of `xs` for which `keep` holds, in
+/// their original order; `xs` is read, not consumed. The in-place
+/// sibling (`retain`) is not written: a returning `filter` is the
+/// combinator, and a `mut` twin would be a second name for one walk.
+/// Total: no error row, no traps beyond allocation.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.filter(keep)`
+/// is this call (`[type.method.resolve]` step 2). Cost, as the clause
+/// states it: one fresh `List[T]` of at most `xs.len` in the ambient
+/// region, and `xs.len` calls of `keep`, plus one element copy per kept
+/// element — `push`'s own, not one spelled here.
+///
+/// **Why no `copy` is written.** `xs` is a `read` parameter, so an
+/// element moved out of it is LENT and may not escape this call
+/// (`[mem.tier0.mode.read]`, wolf-lang#366, in 0.2.15) — and the kept
+/// elements do escape, in the returned list. That clause says in its own
+/// words that it does not reach the builtin store which keeps a `read`
+/// argument inside its receiver; that is wolf-lang#385, **ruled option
+/// 3** (s167, unreleased): `push` COPIES a non-`Copy` element by
+/// default, and `push(take v)` moves it. The default copy is exactly the
+/// copy this function needs, so writing `copy x` here would buy a second
+/// one. `push`'s copy is deep on the native tiers (`[mem.tier0.move.3]`,
+/// wolf-lang#384): a `List` element copies its buffer, a `str` element
+/// shares its immutable bytes, a scalar costs nothing. Nothing is lent
+/// out of this module either way, at this pin or at the next.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.push(mut xs, 3)
+/// list.len(list.filter(xs, fn(v) v % 2 == 1)) == 2
+/// (list.last(list.filter(xs, fn(v) v % 2 == 1)) else 0) == 3
+/// ```
+pub fn filter[T](xs: List[T], keep: fn(T) -> bool) -> List[T] {
+    var out = List[T]()
+    for x in xs {
+        if keep(x) {
+            (mut out).push(x)
+        }
+    }
+    out
+}
+
+/// Combines every element of `xs` into one value, left to right:
+/// `f(… f(f(init, x0), x1) …, xn)`. `init` is the answer for the empty
+/// list. The accumulator's type `A` need not be the element's. Total:
+/// no error row, no traps beyond whatever `step` traps.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.fold(init,
+/// step)` is this call (`[type.method.resolve]` step 2). Cost, as the
+/// clause states it: no allocation of its own, and `xs.len` calls of
+/// `step`, left to right. The clause's `f64` sum is this function:
+/// `xs.fold(0.0, fn(a, x) a + x)`.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.push(mut xs, 3)
+/// list.fold(xs, 0, fn(acc, v) acc + v) == 6
+/// ```
+pub fn fold[T, A](xs: List[T], init: A, step: fn(A, T) -> A) -> A {
+    var acc = init
+    for x in xs {
+        acc = step(acc, x)
+    }
+    acc
+}
+
+/// The sum of `xs`; 0 for the empty list. Traps `overflow` the moment a
+/// partial sum leaves `int` (checked arithmetic, X3), deliberately not a
+/// row: `std.search.sum`'s contract, word for word.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.sum()` is
+/// this call on a `List[int]`, and on any other `List` it is E0403, not
+/// a match. Cost, as the clause states it: none beyond checked addition
+/// left to right (X3).
+///
+/// Monomorphic over `int`, and that is measured, not modest. A generic
+/// `sum[T: ops.Add]` needs `use std.ops`, which imports `std.cmp`, and
+/// every importer of `std.cmp` is `unsupported` on the native rung (the
+/// `search/*` rows carry exactly that), so the bound would cost every
+/// `std.list` importer a lane; `std.ops` has no zero for `T` either. The
+/// generic reduction is `fold`. `std.search.sum` stays: two modules may
+/// share a function name (a program importing both links at this pin,
+/// measured natively on `list.len` beside `bytes.len`), and this one
+/// is the three-lane spelling.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// list.push(mut xs, 3)
+/// list.sum(xs) == 6
+/// ```
+pub fn sum(xs: List[int]) -> int {
+    var total: int = 0
+    for v in xs {
+        total = total + v
+    }
+    total
+}
+
+/// A new list pairing each element of `xs` with its index, in order:
+/// `(0, x0), (1, x1), …`. The shape `for (i, x) in list.enumerate(xs)`
+/// destructures. Total: no error row, no traps beyond allocation.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.enumerate()`
+/// is this call. Cost, as the clause states it: one fresh `List` of
+/// pairs, indices from 0, plus `push`'s own copy of each pair — the
+/// pairs escape with the element inside them
+/// (`[mem.tier0.mode.read]`, wolf-lang#366), and the store that copies
+/// them is wolf-lang#385's, ruled option 3 (s167, unreleased): `push`
+/// copies a non-`Copy` element by default, deeply on the native tiers
+/// (`[mem.tier0.move.3]`, wolf-lang#384) — a scalar costs nothing, a
+/// `str` shares its bytes, a `List` element copies its buffer. No `copy`
+/// is spelled here, because that default is already it.
+///
+/// ```wolf-doc-example
+/// var xs = List[str]()
+/// list.push(mut xs, "a")
+/// list.push(mut xs, "b")
+/// let pairs = list.enumerate(xs)
+/// let second = pairs[1]
+/// second.0 == 1
+/// second.1 == "b"
+/// ```
+pub fn enumerate[T](xs: List[T]) -> List[(int, T)] {
+    var out: List[(int, T)] = fresh()
+    var i = 0
+    for x in xs {
+        (mut out).push((i, x))
+        i = i + 1
+    }
+    out
+}
+
+/// A new list pairing the elements of `xs` and `ys` position by
+/// position: `(x0, y0), (x1, y1), …`, as long as the SHORTER of the two,
+/// so the longer list's tail is dropped rather than trapped on. Both
+/// operands are read, not consumed. Built through the private `fresh`
+/// for the reason `enumerate` is (F-0133). Total: no error row, no traps
+/// beyond allocation.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.zip(ys)` is
+/// this call. Cost, as the clause states it: one fresh `List` of
+/// `min(xs.len, ys.len)` pairs, plus `push`'s own copy of each pair —
+/// BOTH lists are `read` parameters and both elements escape inside the
+/// pairs (`[mem.tier0.mode.read]`, wolf-lang#366), and the copy that
+/// makes that legal is `push`'s under wolf-lang#385, ruled option 3
+/// (s167, unreleased), deep on the native tiers
+/// (`[mem.tier0.move.3]`, wolf-lang#384). It stops at the shorter list
+/// because a length mismatch is not an access out of range.
+///
+/// ```wolf-doc-example
+/// var names = List[str]()
+/// list.push(mut names, "ada")
+/// list.push(mut names, "grace")
+/// var scores = List[int]()
+/// list.push(mut scores, 91)
+/// let rows = list.zip(names, scores)
+/// list.len(rows) == 1
+/// var total = 0
+/// for (n, s) in rows { total = total + s + n.len }
+/// total == 94
+/// ```
+pub fn zip[T, U](xs: List[T], ys: List[U]) -> List[(T, U)] {
+    var out: List[(T, U)] = fresh()
+    let n = len(ys)
+    var i = 0
+    for x in xs {
+        if i >= n {
+            return out
+        }
+        (mut out).push((x, at(ys, i)))
+        i = i + 1
+    }
+    out
+}
+
+/// Sorts `xs` in place, stably, under `less`, where `less(a, b)` reads
+/// "`a` goes before `b`". Equal elements (neither goes before the other)
+/// keep their input order: the merge takes from the right run only when
+/// `less(right, left)` holds. `less` must be a strict weak order or the
+/// result is merely a permutation; std cannot check that and does not
+/// pretend to. Total: no error row, no traps beyond allocation and
+/// whatever `less` traps. `std.sort`'s bottom-up merge, line for line.
+/// The result satisfies `is_sorted_by(xs, fn(a, b) !less(b, a))`.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method
+/// `(mut xs).sort_by(less)` is this call, its receiver's `mut` spelled
+/// (`[type.method.resolve]`, X1). Cost, as the clause states it: stable,
+/// O(n log n) calls of `less`, O(n) scratch in the ambient region, and
+/// no `copy` at all: the receiver is `mut`, not `read`, so no element
+/// here is lent and the sorted elements go back to the caller's own list
+/// (`[mem.tier0.mode.read]`, wolf-lang#366). The returning twin
+/// `sorted_by` pays the copies instead, because its receiver is `read`.
+///
+/// **Why the relation is `bool` and why `std.sort` keeps its own.** The
+/// clause rules it: `std.sort.sort_by` takes a `cmp.Ordering`, and at
+/// wolf 0.2.14 / lupin 0.1.36 it runs on no lane (re-measured for this
+/// function: lupin declines the enum's dynamics at resolve, the checked
+/// machine declines `std.cmp`'s module items, the native rung finds
+/// `.is_lt()` untyped; F-0029). `std.sort`'s `Ordering` pair keeps its
+/// qualified spelling; the method is this one. Same mode, same
+/// stability, same algorithm; the comparator's type is the one
+/// difference, and it is stated on both.
+///
+/// Call shape (a prose example, witnessed by `tests/list/sort_by_tier.lu`
+/// on all three lanes): `fn shorter(a: str, b: str) -> bool { a.len <
+/// b.len }` … then `list.sort_by(mut words, shorter)`. Not fenced: the
+/// call is a statement, and §4's extractor reads a line holding the
+/// relation's `<` as an assertion. `sorted_by`'s example is fenced and
+/// shows the same order. Do not name a top-level fn `less` in a program
+/// that passes a different relation: the checked machine calls it
+/// instead of the argument (F-0134, wolf-lang#400).
+pub fn sort_by[T](mut xs: List[T], less: fn(T, T) -> bool) {
+    let n = len(xs)
+    if n < 2 {
+        return
+    }
+    var src = xs
+    var width = 1
+    while width < n {
+        var out = List[T]()
+        var i = 0
+        while i < n {
+            var mid = i + width
+            if mid > n {
+                mid = n
+            }
+            var end = mid + width
+            if end > n {
+                end = n
+            }
+            var a = i
+            var b = mid
+            while a < mid {
+                var take_right = false
+                if b < end {
+                    take_right = less(at(src, b), at(src, a))
+                }
+                if take_right {
+                    (mut out).push(at(src, b))
+                    b = b + 1
+                } else {
+                    (mut out).push(at(src, a))
+                    a = a + 1
+                }
+            }
+            while b < end {
+                (mut out).push(at(src, b))
+                b = b + 1
+            }
+            i = end
+        }
+        src = out
+        width = width + width
+    }
+    xs = src
+}
+
+/// `sort_by`'s returning twin: a fresh list holding `xs`'s elements in
+/// `less`'s order, stably, with `xs` untouched. `less` must be a strict
+/// weak order or the result is merely a permutation. Total: no error
+/// row, no traps beyond allocation and whatever `less` traps.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method
+/// `xs.sorted_by(less)` is this call, the chain's sort (`corpus/
+/// wordcount.lu`'s `sorted_by`). Cost, as the clause states it:
+/// `sort_by` over a fresh copy, plus `push`'s own copy per element
+/// building that copy — the elements escape in the returned list and
+/// `xs` is a `read` parameter (`[mem.tier0.mode.read]`, wolf-lang#366),
+/// and the store that copies them is wolf-lang#385's, ruled option 3
+/// (s167, unreleased), deep on the native tiers
+/// (`[mem.tier0.move.3]`, wolf-lang#384).
+/// `std.sort.sorted_by` is the `Ordering` twin that runs on no lane
+/// (F-0029) and keeps its qualified spelling.
+///
+/// ```wolf-doc-example
+/// var xs = List[int]()
+/// list.push(mut xs, 3)
+/// list.push(mut xs, 1)
+/// list.push(mut xs, 2)
+/// (list.first(list.sorted_by(xs, fn(a, b) a < b)) else 0) == 1
+/// (list.last(list.sorted_by(xs, fn(a, b) a < b)) else 0) == 3
+/// (list.first(xs) else 0) == 3
+/// ```
+pub fn sorted_by[T](xs: List[T], less: fn(T, T) -> bool) -> List[T] {
+    var out = List[T]()
+    for x in xs {
+        (mut out).push(x)
+    }
+    sort_by(mut out, less)
+    out
+}
+
+/// `a < b` under `T`'s own order, as a fn this module can call. Private:
+/// the public spelling is `sorted`. It exists because a generic fn is
+/// not a fn VALUE at this pin — `sorted_by(xs, ord_less)` is "a generic
+/// function used as a value (comptime)" at resolve on both rungs, and
+/// eagerly, so it would darken every importer (F-0135) — which is also
+/// why `sort_ord` below repeats `sort_by`'s merge instead of calling it
+/// with this relation.
+fn ord_less[T: cmp.Ord](a: T, b: T) -> bool {
+    a < b
+}
+
+/// `sort_by` with `ord_less`, spelled out because the relation cannot
+/// travel as a value (see `ord_less`). Private: the public spelling is
+/// `sorted`. Stable, for the same reason its twin is — the merge takes
+/// from the right run only when the right element is strictly less.
+fn sort_ord[T: cmp.Ord](mut xs: List[T]) {
+    let n = len(xs)
+    if n < 2 {
+        return
+    }
+    var src = xs
+    var width = 1
+    while width < n {
+        var out = List[T]()
+        var i = 0
+        while i < n {
+            var mid = i + width
+            if mid > n {
+                mid = n
+            }
+            var end = mid + width
+            if end > n {
+                end = n
+            }
+            var a = i
+            var b = mid
+            while a < mid {
+                var take_right = false
+                if b < end {
+                    take_right = ord_less(at(src, b), at(src, a))
+                }
+                if take_right {
+                    (mut out).push(at(src, b))
+                    b = b + 1
+                } else {
+                    (mut out).push(at(src, a))
+                    a = a + 1
+                }
+            }
+            while b < end {
+                (mut out).push(at(src, b))
+                b = b + 1
+            }
+            i = end
+        }
+        src = out
+        width = width + width
+    }
+    xs = src
+}
+
+/// A fresh list holding `xs`'s elements in `T`'s own ascending order,
+/// stably, with `xs` untouched. `T: cmp.Ord` is a total order by its own
+/// law, so this needs no relation from the caller. Total: no error row,
+/// no traps beyond allocation.
+///
+/// `[type.comb.set]` (wolf-lang `4c046f15`): the method `xs.sorted()` is
+/// this call. Cost, as the clause states it: `sorted_by` with `<`
+/// (`[type.trait.op]`) — O(n log n) comparisons, O(n) scratch, plus
+/// `push`'s own copy per element (#385 option 3, as the other
+/// combinators).
+///
+/// **Its lanes, and the two rows behind them** (F-0135). It ships at
+/// wolf-std `42d42b9` and not before: until sc49 rewrote `std.cmp`'s
+/// `Ordering` impls without a product pattern, the `use std.cmp` above
+/// made EVERY importer of this module `unsupported` on the native rung,
+/// which is the "budget a module by its worst body" rule. The checked
+/// machine still declines this one function — "trait dispatch on a
+/// non-nominal receiver" at `a < b`, where `T` is bound through a list
+/// read (wolf-lang#402) — so `tests/list/sorted_tier.lu` is
+/// `unsupported` there and nothing else in the module pays for it.
+/// Prose, not a fenced example, for that reason: §4 wants a lane that
+/// refuses honestly, and lupin and native both run it —
+/// `list.sorted(xs)` over `[3, 1, 2]` answers `1, 2, 3`.
+pub fn sorted[T: cmp.Ord](xs: List[T]) -> List[T] {
+    var out = List[T]()
+    for x in xs {
+        (mut out).push(x)
+    }
+    sort_ord(mut out)
+    out
 }

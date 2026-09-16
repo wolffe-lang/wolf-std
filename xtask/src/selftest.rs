@@ -402,8 +402,8 @@ fn every_advisory_step_is_blessed_with_an_issue() {
     }
 }
 
-/// wolf-std#37's static half. A `LUPIN_MIRROR_LAG` entry whose module
-/// carries no fenced block can never fire, and `doc-examples` would only
+/// wolf-std#37's static half. A `LUPIN_MIRROR_LAG` entry whose call
+/// appears in no fenced block can never fire, and `doc-examples` would only
 /// say so twenty minutes into a gauntlet on a box with lupin; this says
 /// it at `cargo test` time, binary or not. The dynamic half (a block that
 /// RUNS on the reference lane is red; an entry nothing fired is red) is
@@ -412,13 +412,16 @@ fn every_advisory_step_is_blessed_with_an_issue() {
 fn every_mirror_lag_entry_has_blocks_to_fence() {
     let repo = repo_root();
     let blocks = doc_examples::collect_blocks(&repo.join("std")).unwrap();
-    for (m, refusal, issue) in doc_examples::LUPIN_MIRROR_LAG {
-        let n = blocks.iter().filter(|b| b.module == *m).count();
+    for (m, needle, refusal, issue) in doc_examples::LUPIN_MIRROR_LAG {
+        let n = blocks
+            .iter()
+            .filter(|b| b.module == *m && b.mentions(needle))
+            .count();
         assert!(
             n > 0,
-            "LUPIN_MIRROR_LAG names `std.{m}` (`{refusal}`, {issue}) and std/{m} carries \
-             no wolf-doc-example block — a lag with nothing to fence is a stale entry; \
-             retire it"
+            "LUPIN_MIRROR_LAG names `std.{m}`'s `{needle}` (`{refusal}`, {issue}) and no \
+             wolf-doc-example block there writes that call — a lag with nothing to fence \
+             is a stale entry; retire it"
         );
     }
 }

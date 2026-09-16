@@ -1,0 +1,36 @@
+//! check: run(exit=0, stdout="fold holds\n")
+//! phase: run
+//! conforms: std.list, type.fn.value, generics.mono
+//!
+//! sc50's `fold` over fn VALUES, on every lane: left to right (a
+//! non-commutative step shows the order), `init` answers the empty
+//! list, and the accumulator's type differs from the element's.
+
+use std.list
+
+fn add(acc: int, v: int) -> int { acc + v }
+
+// Non-commutative: the digits come out in walk order only if the fold
+// is a left fold.
+fn digits(acc: int, v: int) -> int { acc * 10 + v }
+
+fn join(acc: str, v: int) -> str { "{acc}{v}" }
+
+fn main() -> !int {
+    var xs = List[int]()
+    list.push(mut xs, 1)
+    list.push(mut xs, 2)
+    list.push(mut xs, 3)
+
+    if list.fold(xs, 0, add) == 6 {} else { return 1 }
+    if list.fold(xs, 0, digits) == 123 {} else { return 2 }
+    if list.fold(xs, 9, digits) == 9123 {} else { return 3 }
+    if list.fold(xs, ">", join) == ">123" {} else { return 4 }
+
+    var empty = List[int]()
+    if list.fold(empty, 42, add) == 42 {} else { return 5 }
+    if list.fold(empty, "init", join) == "init" {} else { return 6 }
+
+    print("fold holds")
+    0
+}

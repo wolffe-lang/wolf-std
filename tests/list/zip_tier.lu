@@ -1,0 +1,42 @@
+//! check: run(exit=0, stdout="zip holds\n")
+//! phase: run
+//! conforms: std.list, generics.mono
+//!
+//! sc50's `zip`, on every lane: pairs by position, the shorter operand
+//! decides the length from either side, an empty operand yields the
+//! empty list, and the pair carries two different element types.
+
+use std.list
+
+fn main() -> !int {
+    var names = List[str]()
+    list.push(mut names, "ada")
+    list.push(mut names, "grace")
+    list.push(mut names, "barbara")
+    var scores = List[int]()
+    list.push(mut scores, 91)
+    list.push(mut scores, 78)
+
+    // `a` longer than `b`.
+    let rows = list.zip(names, scores)
+    if list.len(rows) == 2 {} else { return 1 }
+    let second = rows[1]
+    if second.0 == "grace" {} else { return 2 }
+    if second.1 == 78 {} else { return 3 }
+
+    // `b` longer than `a`, and the order of the pair follows the operands.
+    let flipped = list.zip(scores, names)
+    if list.len(flipped) == 2 {} else { return 4 }
+    var sum = 0
+    for (s, n) in flipped {
+        sum = sum + s + n.len
+    }
+    if sum == 177 {} else { return 5 }
+
+    var empty = List[int]()
+    if list.is_empty(list.zip(names, empty)) == true {} else { return 6 }
+    if list.is_empty(list.zip(empty, names)) == true {} else { return 7 }
+
+    print("zip holds")
+    0
+}
