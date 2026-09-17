@@ -799,12 +799,12 @@ pub fn handshake_result(
 ) -> HandshakeResult {
     HandshakeResult {
         cipher_suite: cipher_suite,
-        client_handshake_secret: client_handshake_secret,
-        server_handshake_secret: server_handshake_secret,
-        client_application_secret: client_application_secret,
-        server_application_secret: server_application_secret,
-        exporter_master_secret: exporter_master_secret,
-        resumption_master_secret: resumption_master_secret,
+        client_handshake_secret: copy client_handshake_secret,
+        server_handshake_secret: copy server_handshake_secret,
+        client_application_secret: copy client_application_secret,
+        server_application_secret: copy server_application_secret,
+        exporter_master_secret: copy exporter_master_secret,
+        resumption_master_secret: copy resumption_master_secret,
     }
 }
 

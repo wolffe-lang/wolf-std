@@ -209,7 +209,7 @@ pub fn from_str(s: str) -> Value {
 /// (json.len(arr) else 0) == 1
 /// ```
 pub fn from_list(xs: List[Value]) -> Value {
-    Value.Arr(xs)
+    Value.Arr(copy xs)
 }
 
 /// A JSON object over an already-built map. The map's iteration order is
@@ -222,7 +222,7 @@ pub fn from_list(xs: List[Value]) -> Value {
 /// json.type_name(obj) == "obj"
 /// ```
 pub fn from_map(m: Map[str, Value]) -> Value {
-    Value.Obj(m)
+    Value.Obj(copy m)
 }
 
 /// The variant's name — `"null"`, `"bool"`, `"int"`, `"num"`, `"str"`,
@@ -355,7 +355,7 @@ pub fn as_str(v: Value) -> str ! {kind} {
 /// ```
 pub fn as_arr(v: Value) -> List[Value] ! {kind} {
     match v {
-        Arr(xs) => xs,
+        Arr(xs) => copy xs,
         _ => kind,
     }
 }
@@ -370,7 +370,7 @@ pub fn as_arr(v: Value) -> List[Value] ! {kind} {
 /// ```
 pub fn as_obj(v: Value) -> Map[str, Value] ! {kind} {
     match v {
-        Obj(m) => m,
+        Obj(m) => copy m,
         _ => kind,
     }
 }
@@ -515,7 +515,7 @@ fn arr_at(xs: List[Value], i: int) -> Value ! {none} {
     if i >= xs.len {
         return none
     }
-    xs[i]
+    copy xs[i]
 }
 
 /// The keys of an object, in the map's unspecified order; `kind` for

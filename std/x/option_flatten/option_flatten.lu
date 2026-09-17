@@ -34,6 +34,6 @@
 /// `option_flatten.flatten(nest(16)) else 0 - 1` is `4` and
 /// `option_flatten.flatten(nest(6)) else 0 - 1` is `-1`.
 pub fn flatten[T](v: T ! {none} ! {none}) -> T ! {none} {
-    let inner = v else |_| { return none }
+    let inner = copy v else |_| { return none }
     inner
 }

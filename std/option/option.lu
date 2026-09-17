@@ -74,7 +74,7 @@
 /// `fn find(x: int) -> int ! {none}`, `option.or(find(5), 9)` is `5` and
 /// `option.or(find(0), 9)` is `9`.
 pub fn or[T](v: T ! {none}, default: T) -> T {
-    v else default
+    copy v else copy default
 }
 
 // `expect` IS WRITTEN AND IT IS NOT HERE EITHER — `std/x/option_expect`

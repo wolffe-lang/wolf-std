@@ -326,9 +326,9 @@ impl Ord for f64 {
 /// choice). Total: no error row, no traps.
 pub fn min[T: Ord](a: T, b: T) -> T {
     match Ord.cmp(b, a) {
-        Less => b,
-        Equal => a,
-        Greater => a,
+        Less => copy b,
+        Equal => copy a,
+        Greater => copy a,
     }
 }
 
@@ -336,9 +336,9 @@ pub fn min[T: Ord](a: T, b: T) -> T {
 /// stable choice). Total: no error row, no traps.
 pub fn max[T: Ord](a: T, b: T) -> T {
     match Ord.cmp(b, a) {
-        Less => a,
-        Equal => a,
-        Greater => b,
+        Less => copy a,
+        Equal => copy a,
+        Greater => copy b,
     }
 }
 
@@ -352,14 +352,14 @@ pub fn clamp[T: Ord](v: T, lo: T, hi: T) -> T {
         Equal => {},
     }
     match Ord.cmp(v, lo) {
-        Less => return lo,
+        Less => return copy lo,
         Equal => {},
         Greater => {},
     }
     match Ord.cmp(v, hi) {
-        Greater => hi,
-        Less => v,
-        Equal => v,
+        Greater => copy hi,
+        Less => copy v,
+        Equal => copy v,
     }
 }
 

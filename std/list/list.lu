@@ -93,7 +93,7 @@ use std.cmp
 /// single-read rule) — the bodies below call it instead of writing
 /// `xs[i]` twice.
 fn at[T](xs: List[T], i: int) -> T {
-    xs[i]
+    copy xs[i]
 }
 
 /// A fresh empty list of any element type, named through a type
@@ -791,7 +791,7 @@ pub fn filter[T](xs: List[T], keep: fn(T) -> bool) -> List[T] {
 /// list.fold(xs, 0, fn(acc, v) acc + v) == 6
 /// ```
 pub fn fold[T, A](xs: List[T], init: A, step: fn(A, T) -> A) -> A {
-    var acc = init
+    var acc = copy init
     for x in xs {
         acc = step(acc, x)
     }

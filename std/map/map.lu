@@ -258,7 +258,7 @@ pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
 /// map.get_or(m, "z", 0) == 0
 /// ```
 pub fn get_or[K: cmp.Eq, V](m: Map[K, V], k: K, d: V) -> V {
-    get(m, k) else d
+    get(m, k) else copy d
 }
 
 /// Whether `k` is bound. Total: no error row, no traps.

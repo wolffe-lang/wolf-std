@@ -299,7 +299,7 @@ pub fn command(program: str) -> Command {
 /// vec[0] == "grep"
 /// ```
 pub fn from_argv(argv: List[str]) -> Command {
-    Command { argv: argv }
+    Command { argv: copy argv }
 }
 
 /// Append one argument to `c`.
@@ -344,7 +344,7 @@ pub fn push_arg(mut c: Command, value: str) {
 /// vec[0] == "wc"
 /// ```
 pub fn argv(c: Command) -> List[str] {
-    c.argv
+    copy c.argv
 }
 
 /// Start `c` and return the handle of the child, WITHOUT waiting for it.
