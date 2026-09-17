@@ -10041,3 +10041,43 @@ The lesson is the one wolf-lang#177 left and this repo keeps relearning:
 a waiver's KEY is part of its claim. A key coarser than the claim goes
 wrong in the direction that looks like a real failure, which is the good
 direction — but it costs a gauntlet and a CI run to read.
+
+## F-0138 — a transparent error alias is transparent inside its module and opaque outside it
+
+`wolf-std#36`, measured at wolf 0.2.15 / lupin 0.1.37 (sc51). `[type.err.alias]`
+makes `error IoErrors = {not_found, denied, io}` a SPELLING of that row, "the
+same type in both directions with no conversion". sc51 wrote the alias into
+`std/fs/fs.lu` as `pub error IoErrors = {…}` and converted the fourteen
+signatures whose row is exactly those three tags. Inside the module that works:
+`fs/alias_row.lu` runs on both compiler lanes, and every `std.fs` row is
+unchanged.
+
+Naming it from OUTSIDE does not. `fn f(p: str) -> int ! fs.IoErrors { fs.size(p)? }`
+answers
+
+    error[E0602]: this can also fail with `denied`, `io`, `not_found`,
+    which `f`'s row does not include
+      --> tests/fs/alias_row.lu:40:5
+       |
+    39 | fn size_through_alias(path: str) -> int ! fs.IoErrors {
+       |                                  -------------------- the receiving row is declared here
+
+on BOTH rungs — so the qualified spelling resolves to a row that does not carry
+the alias's tags, rather than to the alias. The alias is exported (the name
+resolves; an unknown type is a different diagnostic) but its EXPANSION does not
+cross the module boundary.
+
+Nothing in std is blocked by it: the fourteen signatures name the alias
+unqualified in its own file, and a caller sees the expanded row either way,
+which is the whole point of transparency. What it costs is the witness
+`tests/fs/alias_row.lu` intended: that row keeps its own LOCAL `error IoErrors`
+declaration instead of naming `fs.IoErrors`, so it witnesses the clause rather
+than the module's export of it. Retire the local declaration on the release that
+expands a qualified alias.
+
+The second half is the one worth carrying: wolf-std#36 predicted the alias would
+cost eighteen lupin rows the day the fs tier came on, and that is why sc48 kept
+it out of the module. Re-measured here, the cost is ZERO — lupin 0.1.37 parses
+the form, and all nineteen `std.fs` importers (not eighteen) reach RESOLVE and
+decline for the ordinary absent-builtin reason. The blocker was real and it is
+gone; the count it was stated in was one row light.

@@ -17,28 +17,31 @@
 //! alias (`[type.err.alias.diag]`). The tag that fires is the host's
 //! honest `not_found` for a path under a directory that does not exist.
 //!
-//! **Why the alias lives in this test and not in `std/fs/fs.lu` at this
-//! pin — measured, not chosen.** wolf 0.2.14 takes the form on both
-//! rungs. lupin 0.1.36 conforms to `a7f517e` = v0.2.12 and refuses it
-//! at PARSE (`fail(E0201)`) — and a parse refusal is not lazy: with one
-//! `error` line appended to a scratch copy of `std/fs/fs.lu`,
-//! `fs/path_helpers.lu`, a row that never names the alias, went from
-//! `exit(0)` to `fail(E0201)` on the reference machine. Eighteen lupin
-//! rows import `std.fs`, fifteen of which the SAME bump lit with the fs
-//! tier; naming the row inside the module would put all eighteen at
-//! `mirror-lag(E0201)` on the day they came on. So the row is named
-//! here, at the cost of exactly one lupin row — this one — which is the
-//! shape sc46 chose for `trait Num`'s alias, and `std.fs` takes the
-//! alias the release that mirrors `[type.err.alias]` (wolf-std#30's
-//! residue).
+//! **The alias now lives in `std/fs/fs.lu`, and this row witnesses it
+//! from outside (sc51).** At the 0.2.14 / lupin 0.1.36 pin the alias
+//! could not be written into the module: lupin conformed to `a7f517e`
+//! (v0.2.12), refused `error IoErrors = {…}` at PARSE, and a parse
+//! refusal is not lazy — one `error` line in `std/fs/fs.lu` turned every
+//! lupin importer of the module red, `fs/path_helpers.lu` included, a row
+//! that never names the alias. So sc48 witnessed the clause here with a
+//! LOCAL declaration, at the cost of one row instead of eighteen.
 //!
-//! Lane words: both compiler rungs run — the checked machine performs
-//! real host operations on the fs tier — and lupin is
-//! `mirror-lag(E0201)` on the `error` item.
+//! Re-measured at lupin 0.1.37 (sc51): the parse refusal is GONE. With the
+//! alias inside the module, all nineteen lupin importers of `std.fs` reach
+//! RESOLVE and decline for the ordinary reason (no `fs_*` builtins on that
+//! declaration is KEPT, and here is why, measured: naming the module's
+//! alias from outside — `-> int ! fs.IoErrors` — does NOT expand at this
+//! pin. wolf 0.2.15 answers E0602, "this can also fail with `denied`,
+//! `io`, `not_found`, which `size_through_alias`'s row does not include",
+//! so the qualified spelling resolves to a row WITHOUT the alias's tags.
+//! Transparency holds inside the module and does not cross the module
+//! boundary. Filed as F-0138; std/fs's own fourteen signatures are
+//! unaffected, because they name the alias unqualified in its own file,
+//! and callers see the expanded row either way.
 
 use std.fs
-
 error IoErrors = {not_found, denied, io}
+
 
 fn size_through_alias(path: str) -> int ! IoErrors {
     fs.size(path)?

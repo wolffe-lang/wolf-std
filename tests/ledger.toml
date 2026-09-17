@@ -3786,7 +3786,7 @@ wolfc = "run"
 native = "run"
 
 [tests."fs/alias_row.lu"]
-lupin = "mirror-lag(E0201)"  # sc48: `error IoErrors = {…}` does not PARSE on lupin 0.1.36 (pin v0.2.12, before `[type.err.alias]`) — the ledger's second mirror-lag row, and the reason the alias is witnessed here rather than written into std/fs (one row's cost instead of eighteen)
+lupin = "unsupported"  # sc51: the mirror-lag RETIRES at lupin 0.1.37 — the alias parses there, so this row declines at RESOLVE for the ordinary reason (no `fs_*` builtins), like every other std.fs importer. Measured with the alias INSIDE std/fs/fs.lu: all nineteen importers reach resolve, zero E0201
 wolfc = "run"
 native = "run"
 

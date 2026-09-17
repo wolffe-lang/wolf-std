@@ -138,6 +138,11 @@
 //! unknown-name one (``unsupported: `fs_read_dir` does not resolve``,
 //! measured) rather than a reasoned decline — but lupin resolves module
 //! bodies LAZILY, so the pure path helpers RUN there:
+
+/// The row fourteen signatures below carry, named once (`[type.err.alias]`).
+/// Transparent: the alias and the expanded row are the same type in
+/// both directions, and the diagnostic still names tags (`[type.err.alias.diag]`).
+pub error IoErrors = {not_found, denied, io}
 //! `tests/fs/path_helpers.lu` is a lupin `run` row at this pin, which is
 //! a property of the lane split rather than a leak. The posture is the
 //! rig's to record once (`CONTRIBUTING.md`, the ledger's fs section)
@@ -217,7 +222,7 @@ pub fn read_text(path: str) -> str ! {not_found, denied, io, utf8} {
 /// (fs.read_text("doc-write-text.tmp") else "?") == "beta"
 /// fs.remove("doc-write-text.tmp")?
 /// ```
-pub fn write_text(path: str, text: str) -> () ! {not_found, denied, io} {
+pub fn write_text(path: str, text: str) -> () ! IoErrors {
     fs_write_text(path, text)?
 }
 
@@ -262,7 +267,7 @@ pub fn write_text(path: str, text: str) -> () ! {not_found, denied, io} {
 /// (fs.read_text("doc-append.tmp") else "?") == "one\ntwo\n"
 /// fs.remove("doc-append.tmp")?
 /// ```
-pub fn append_text(path: str, text: str) -> () ! {not_found, denied, io} {
+pub fn append_text(path: str, text: str) -> () ! IoErrors {
     let fd = append_fd(path)?
     defer fs_close(fd) else |_| {}
     fs_write(fd, text)?
@@ -294,7 +299,7 @@ pub fn append_text(path: str, text: str) -> () ! {not_found, denied, io} {
 /// back[2] as int == 255
 /// fs.remove("doc-read-bytes.tmp")?
 /// ```
-pub fn read_bytes(path: str) -> List[byte] ! {not_found, denied, io} {
+pub fn read_bytes(path: str) -> List[byte] ! IoErrors {
     fs_read_bytes(path)?
 }
 
@@ -434,7 +439,7 @@ pub fn is_dir(path: str) -> bool {
 /// (fs.size("doc-size-absent.tmp") else 0 - 1) == 0 - 1
 /// fs.remove("doc-size.tmp")?
 /// ```
-pub fn size(path: str) -> int ! {not_found, denied, io} {
+pub fn size(path: str) -> int ! IoErrors {
     fs_size(path)?
 }
 
@@ -472,7 +477,7 @@ pub fn size(path: str) -> int ! {not_found, denied, io} {
 /// (fs.modified_ms("doc-modified-absent.tmp") else 0 - 1) == 0 - 1
 /// fs.remove("doc-modified.tmp")?
 /// ```
-pub fn modified_ms(path: str) -> int ! {not_found, denied, io} {
+pub fn modified_ms(path: str) -> int ! IoErrors {
     fs_modified_ms(path)?
 }
 
@@ -495,7 +500,7 @@ pub fn modified_ms(path: str) -> int ! {not_found, denied, io} {
 /// fs.remove("doc-remove.tmp")?
 /// fs.exists("doc-remove.tmp") == false
 /// ```
-pub fn remove(path: str) -> () ! {not_found, denied, io} {
+pub fn remove(path: str) -> () ! IoErrors {
     fs_remove(path)?
 }
 
@@ -534,7 +539,7 @@ pub fn remove(path: str) -> () ! {not_found, denied, io} {
 /// fs.remove("doc-copy-src.tmp")?
 /// fs.remove("doc-copy-dst.tmp")?
 /// ```
-pub fn copy_file(from: str, to: str) -> () ! {not_found, denied, io} {
+pub fn copy_file(from: str, to: str) -> () ! IoErrors {
     let raw = fs_read_bytes(from)?
     fs_write_bytes(to, raw) else |e| match e {
         not_found => { return not_found },
@@ -591,7 +596,7 @@ pub fn copy_file(from: str, to: str) -> () ! {not_found, denied, io} {
 /// (fs.read_text("doc-move-dst.tmp") else "?") == "pack\n"
 /// fs.remove("doc-move-dst.tmp")?
 /// ```
-pub fn move_file(from: str, to: str) -> () ! {not_found, denied, io} {
+pub fn move_file(from: str, to: str) -> () ! IoErrors {
     var by_hand = false
     fs_rename(from, to) else |e| match e {
         not_found => { return not_found },
@@ -727,7 +732,7 @@ pub fn create_dir_all(path: str) -> () ! {denied, io} {
 /// fs.remove_dir("doc-remove-dir.tmp")?
 /// fs.exists("doc-remove-dir.tmp") == false
 /// ```
-pub fn remove_dir(path: str) -> () ! {not_found, denied, io} {
+pub fn remove_dir(path: str) -> () ! IoErrors {
     fs_remove_dir(path)?
 }
 
@@ -755,7 +760,7 @@ pub fn remove_dir(path: str) -> () ! {not_found, denied, io} {
 /// fs.remove_dir_all("doc-remove-all.tmp")?
 /// fs.exists("doc-remove-all.tmp") == false
 /// ```
-pub fn remove_dir_all(path: str) -> () ! {not_found, denied, io} {
+pub fn remove_dir_all(path: str) -> () ! IoErrors {
     fs_remove_dir_all(path)?
 }
 
@@ -782,7 +787,7 @@ pub fn remove_dir_all(path: str) -> () ! {not_found, denied, io} {
 /// fs.close(take f)?
 /// fs.remove("doc-open.tmp")?
 /// ```
-pub fn open(path: str) -> File ! {not_found, denied, io} {
+pub fn open(path: str) -> File ! IoErrors {
     File { fd: fs_open(path)? }
 }
 
@@ -816,7 +821,7 @@ pub fn open(path: str) -> File ! {not_found, denied, io} {
 /// (fs.read_text("doc-open-append.tmp") else "?") == "one\ntwo\nthree\n"
 /// fs.remove("doc-open-append.tmp")?
 /// ```
-pub fn open_append(path: str) -> File ! {not_found, denied, io} {
+pub fn open_append(path: str) -> File ! IoErrors {
     File { fd: append_fd(path)? }
 }
 
@@ -1083,7 +1088,7 @@ pub struct Stat {
 /// fs.remove("doc-fstat.tmp")?
 /// st.kind == 0 && st.size == 6 && st.modified_ms > 0
 /// ```
-pub fn fstat(mut f: File) -> Stat ! {not_found, denied, io} {
+pub fn fstat(mut f: File) -> Stat ! IoErrors {
     let got = fs_fstat(f.fd)?
     Stat { kind: got[0], size: got[1], modified_ms: got[2] }
 }
@@ -1182,7 +1187,7 @@ pub fn file_name(path: str) -> str ! {none} {
 /// gets a truthful coarsening rather than a wrong tag, and neither
 /// appears in any public signature — which is what keeps `append_text`
 /// and `open_append` from carrying rows they can never raise.
-fn append_fd(path: str) -> int ! {not_found, denied, io} {
+fn append_fd(path: str) -> int ! IoErrors {
     fs_open_mode(path, 2) else |e| match e {
         not_found => { return not_found },
         denied => { return denied },
