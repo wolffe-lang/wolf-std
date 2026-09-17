@@ -278,45 +278,44 @@ fn sub(b: List[byte], from: int, to: int) -> List[byte] {
 /// A cursor over one wire message: `pos` never passes `end`, truncation
 /// is `decode_error`, and a non-byte element on the wire is too.
 struct Rd {
-    b: List[byte],
     pos: int,
     end: int,
 }
 
 /// One byte, advancing.
-fn rd_u8(mut r: Rd) -> int ! {decode_error} {
+fn rd_u8(b: List[byte], mut r: Rd) -> int ! {decode_error} {
     if r.pos >= r.end {
         return decode_error
     }
-    let v = r.b[r.pos] as int
+    let v = b[r.pos] as int
     r.pos = r.pos + 1
     v
 }
 
 /// A big-endian uint16, advancing.
-fn rd_u16(mut r: Rd) -> int ! {decode_error} {
-    let hi = rd_u8(mut r)?
-    let lo = rd_u8(mut r)?
+fn rd_u16(b: List[byte], mut r: Rd) -> int ! {decode_error} {
+    let hi = rd_u8(b, mut r)?
+    let lo = rd_u8(b, mut r)?
     hi * 256 + lo
 }
 
 /// A big-endian uint24, advancing.
-fn rd_u24(mut r: Rd) -> int ! {decode_error} {
-    let hi = rd_u8(mut r)?
-    let mid = rd_u8(mut r)?
-    let lo = rd_u8(mut r)?
+fn rd_u24(b: List[byte], mut r: Rd) -> int ! {decode_error} {
+    let hi = rd_u8(b, mut r)?
+    let mid = rd_u8(b, mut r)?
+    let lo = rd_u8(b, mut r)?
     hi * 65536 + mid * 256 + lo
 }
 
 /// `n` raw bytes, advancing.
-fn rd_take(mut r: Rd, n: int) -> List[byte] ! {decode_error} {
+fn rd_take(b: List[byte], mut r: Rd, n: int) -> List[byte] ! {decode_error} {
     if n < 0 {
         return decode_error
     }
     if r.end - r.pos < n {
         return decode_error
     }
-    let out = sub(r.b, r.pos, r.pos + n)
+    let out = sub(b, r.pos, r.pos + n)
     r.pos = r.pos + n
     out
 }
@@ -435,25 +434,25 @@ fn hrr_random() -> List[byte] {
 /// ServerHello and asserts every extracted field byte-for-byte.
 pub fn parse_server_hello(msg: List[byte]) -> ServerHelloView ! {decode_error} {
     let n = msg.len
-    var r = Rd { b: msg, pos: 0, end: n }
-    let mtype = rd_u8(mut r)?
+    var r = Rd { pos: 0, end: n }
+    let mtype = rd_u8(msg, mut r)?
     if mtype != handshake.hs_server_hello() {
         return decode_error
     }
-    let blen = rd_u24(mut r)?
+    let blen = rd_u24(msg, mut r)?
     if blen != n - 4 {
         return decode_error
     }
-    let ver = rd_u16(mut r)?
-    let random = rd_take(mut r, 32)?
-    let echo_len = rd_u8(mut r)?
+    let ver = rd_u16(msg, mut r)?
+    let random = rd_take(msg, mut r, 32)?
+    let echo_len = rd_u8(msg, mut r)?
     if echo_len > 32 {
         return decode_error
     }
-    let echo = rd_take(mut r, echo_len)?
-    let suite = rd_u16(mut r)?
-    let comp = rd_u8(mut r)?
-    let ext_len = rd_u16(mut r)?
+    let echo = rd_take(msg, mut r, echo_len)?
+    let suite = rd_u16(msg, mut r)?
+    let comp = rd_u8(msg, mut r)?
+    let ext_len = rd_u16(msg, mut r)?
     if ext_len != r.end - r.pos {
         return decode_error
     }
@@ -461,8 +460,8 @@ pub fn parse_server_hello(msg: List[byte]) -> ServerHelloView ! {decode_error} {
     var group = 0 - 1
     var share = List[byte]()
     while r.pos < r.end {
-        let et = rd_u16(mut r)?
-        let el = rd_u16(mut r)?
+        let et = rd_u16(msg, mut r)?
+        let el = rd_u16(msg, mut r)?
         if el > r.end - r.pos {
             return decode_error
         }
@@ -473,17 +472,17 @@ pub fn parse_server_hello(msg: List[byte]) -> ServerHelloView ! {decode_error} {
             if el != 2 {
                 return decode_error
             }
-            selected = rd_u16(mut r)?
+            selected = rd_u16(msg, mut r)?
         } else if et == 51 {
             // key_share (ServerHello): ONE KeyShareEntry.
-            group = rd_u16(mut r)?
-            let klen = rd_u16(mut r)?
+            group = rd_u16(msg, mut r)?
+            let klen = rd_u16(msg, mut r)?
             if klen != stop - r.pos {
                 return decode_error
             }
-            share = rd_take(mut r, klen)?
+            share = rd_take(msg, mut r, klen)?
         } else {
-            let skipped = rd_take(mut r, el)?
+            let skipped = rd_take(msg, mut r, el)?
             if skipped.len != el {
                 return decode_error
             }
@@ -560,26 +559,26 @@ pub fn check_negotiation(v: ServerHelloView) -> int ! {
 /// this profile turns on them). ct: public.
 pub fn check_encrypted_extensions(msg: List[byte]) -> int ! {decode_error} {
     let n = msg.len
-    var r = Rd { b: msg, pos: 0, end: n }
-    let mtype = rd_u8(mut r)?
+    var r = Rd { pos: 0, end: n }
+    let mtype = rd_u8(msg, mut r)?
     if mtype != handshake.hs_encrypted_extensions() {
         return decode_error
     }
-    let blen = rd_u24(mut r)?
+    let blen = rd_u24(msg, mut r)?
     if blen != n - 4 {
         return decode_error
     }
-    let ext_len = rd_u16(mut r)?
+    let ext_len = rd_u16(msg, mut r)?
     if ext_len != r.end - r.pos {
         return decode_error
     }
     while r.pos < r.end {
-        let skipped_type = rd_u16(mut r)?
+        let skipped_type = rd_u16(msg, mut r)?
         if skipped_type < 0 {
             return decode_error
         }
-        let el = rd_u16(mut r)?
-        let body = rd_take(mut r, el)?
+        let el = rd_u16(msg, mut r)?
+        let body = rd_take(msg, mut r, el)?
         if body.len != el {
             return decode_error
         }
@@ -598,33 +597,33 @@ pub fn check_encrypted_extensions(msg: List[byte]) -> int ! {decode_error} {
 /// 432-octet certificate and asserts the bytes verbatim.
 pub fn certificate_chain_of(msg: List[byte]) -> List[byte] ! {decode_error} {
     let n = msg.len
-    var r = Rd { b: msg, pos: 0, end: n }
-    let mtype = rd_u8(mut r)?
+    var r = Rd { pos: 0, end: n }
+    let mtype = rd_u8(msg, mut r)?
     if mtype != handshake.hs_certificate() {
         return decode_error
     }
-    let blen = rd_u24(mut r)?
+    let blen = rd_u24(msg, mut r)?
     if blen != n - 4 {
         return decode_error
     }
-    let ctx_len = rd_u8(mut r)?
-    let ctx = rd_take(mut r, ctx_len)?
+    let ctx_len = rd_u8(msg, mut r)?
+    let ctx = rd_take(msg, mut r, ctx_len)?
     if ctx.len != ctx_len {
         return decode_error
     }
-    let list_len = rd_u24(mut r)?
+    let list_len = rd_u24(msg, mut r)?
     if list_len != r.end - r.pos {
         return decode_error
     }
     var chain = List[byte]()
     while r.pos < r.end {
-        let dlen = rd_u24(mut r)?
-        let der_bytes = rd_take(mut r, dlen)?
+        let dlen = rd_u24(msg, mut r)?
+        let der_bytes = rd_take(msg, mut r, dlen)?
         for b in der_bytes {
             (mut chain).push(b)
         }
-        let elen = rd_u16(mut r)?
-        let eskip = rd_take(mut r, elen)?
+        let elen = rd_u16(msg, mut r)?
+        let eskip = rd_take(msg, mut r, elen)?
         if eskip.len != elen {
             return decode_error
         }
@@ -646,21 +645,21 @@ pub struct CertVerifyView {
 /// uint16-prefixed signature filling the body. ct: public.
 pub fn certificate_verify_of(msg: List[byte]) -> CertVerifyView ! {decode_error} {
     let n = msg.len
-    var r = Rd { b: msg, pos: 0, end: n }
-    let mtype = rd_u8(mut r)?
+    var r = Rd { pos: 0, end: n }
+    let mtype = rd_u8(msg, mut r)?
     if mtype != handshake.hs_certificate_verify() {
         return decode_error
     }
-    let blen = rd_u24(mut r)?
+    let blen = rd_u24(msg, mut r)?
     if blen != n - 4 {
         return decode_error
     }
-    let scheme = rd_u16(mut r)?
-    let slen = rd_u16(mut r)?
+    let scheme = rd_u16(msg, mut r)?
+    let slen = rd_u16(msg, mut r)?
     if slen != r.end - r.pos {
         return decode_error
     }
-    let sig = rd_take(mut r, slen)?
+    let sig = rd_take(msg, mut r, slen)?
     CertVerifyView { scheme: scheme, sig: sig }
 }
 
@@ -670,19 +669,19 @@ pub fn certificate_verify_of(msg: List[byte]) -> CertVerifyView ! {decode_error}
 /// `handshake.accept_finished`'s job).
 pub fn finished_of(msg: List[byte]) -> List[byte] ! {decode_error} {
     let n = msg.len
-    var r = Rd { b: msg, pos: 0, end: n }
-    let mtype = rd_u8(mut r)?
+    var r = Rd { pos: 0, end: n }
+    let mtype = rd_u8(msg, mut r)?
     if mtype != handshake.hs_finished() {
         return decode_error
     }
-    let blen = rd_u24(mut r)?
+    let blen = rd_u24(msg, mut r)?
     if blen != n - 4 {
         return decode_error
     }
     if blen != 32 {
         return decode_error
     }
-    rd_take(mut r, 32)?
+    rd_take(msg, mut r, 32)?
 }
 
 // ---------------------------------------------------------------------
@@ -939,9 +938,9 @@ pub fn begin(
     write_all(fd, plaintext_record(record.content_type_handshake(), copy ch))?
     Pending {
         fd: fd,
-        scalar: key_seed,
-        hostname: hostname,
-        anchors: anchors,
+        scalar: copy key_seed,
+        hostname: copy hostname,
+        anchors: copy anchors,
         now: now,
         transcript: ch,
     }
@@ -1437,7 +1436,7 @@ pub fn named[T](
             return Row("unknown_critical")
         },
     }
-    hit
+    copy hit
 }
 
 /// The NAME of the row that refused `v`, or `"ok"` when `v` carries a

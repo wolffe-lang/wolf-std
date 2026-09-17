@@ -194,7 +194,6 @@ fn set_le(a: List[byte], b: List[byte]) -> bool {
 // ---------------------------------------------------------------------
 
 struct Rd {
-    b: List[byte],
     pos: int,
     end: int,
 }
@@ -207,11 +206,11 @@ struct Tlv {
 
 /// One byte, advancing. Truncation (reading past the window) is the
 /// canonical `der` rejection — never an out-of-bounds read.
-fn rd_byte(mut r: Rd) -> int ! {der} {
+fn rd_byte(b: List[byte], mut r: Rd) -> int ! {der} {
     if r.pos >= r.end {
         return der
     }
-    let v = r.b[r.pos] as int
+    let v = b[r.pos] as int
     r.pos = r.pos + 1
     v
 }
@@ -226,13 +225,13 @@ fn rd_byte(mut r: Rd) -> int ! {der} {
 /// mandatory — a long form whose value fits the short form, or a
 /// leading zero length octet), and a length exceeding the bytes that
 /// REMAIN in the window (the overrun class).
-fn rd_tag_len(mut r: Rd) -> Tlv ! {der} {
-    let t = rd_byte(mut r)?
+fn rd_tag_len(b: List[byte], mut r: Rd) -> Tlv ! {der} {
+    let t = rd_byte(b, mut r)?
     if t % 32 == 31 {
         return der
     }
     let cons = t / 32 % 2 == 1
-    let first = rd_byte(mut r)?
+    let first = rd_byte(b, mut r)?
     var length = 0
     if first < 128 {
         length = first
@@ -250,7 +249,7 @@ fn rd_tag_len(mut r: Rd) -> Tlv ! {der} {
         var acc = 0
         var i = 0
         while i < n {
-            let d = rd_byte(mut r)?
+            let d = rd_byte(b, mut r)?
             if i == 0 {
                 if d == 0 {
                     return der
@@ -274,11 +273,11 @@ fn rd_tag_len(mut r: Rd) -> Tlv ! {der} {
 /// encodes class, constructed bit and number at once, so a primitive
 /// SEQUENCE or a constructed INTEGER is rejected by the same equality).
 /// Returns the content length.
-fn rd_expect(mut r: Rd, tag: int) -> int ! {der} {
+fn rd_expect(b: List[byte], mut r: Rd, tag: int) -> int ! {der} {
     // Destructured where the header is born (sc30, [gram.pat.struct]):
     // the constructedness bit is not this check's business, so `..`
     // says so.
-    let Tlv { tag: got, len, .. } = rd_tag_len(mut r)?
+    let Tlv { tag: got, len, .. } = rd_tag_len(b, mut r)?
     if got != tag {
         return der
     }
@@ -287,13 +286,13 @@ fn rd_expect(mut r: Rd, tag: int) -> int ! {der} {
 
 /// Skip `n` content bytes (already validated against the window by the
 /// header read that produced `n`).
-fn rd_skip(mut r: Rd, n: int) {
+fn rd_skip(b: List[byte], mut r: Rd, n: int) {
     r.pos = r.pos + n
 }
 
 /// The content bytes of length `n` from the cursor, advancing.
-fn rd_take(mut r: Rd, n: int) -> List[byte] {
-    let out = sub(r.b, r.pos, r.pos + n)
+fn rd_take(b: List[byte], mut r: Rd, n: int) -> List[byte] {
+    let out = sub(b, r.pos, r.pos + n)
     r.pos = r.pos + n
     out
 }
@@ -330,12 +329,12 @@ fn int_minimal(bs: List[byte]) -> bool {
 
 /// A small non-negative INTEGER as an `int` (the version field, the
 /// pathLenConstraint): content minimal, non-negative, at most 4 octets.
-fn rd_small_int(mut r: Rd) -> int ! {der} {
-    let n = rd_expect(mut r, 2)?
+fn rd_small_int(b: List[byte], mut r: Rd) -> int ! {der} {
+    let n = rd_expect(b, mut r, 2)?
     if n > 4 {
         return der
     }
-    let bs = rd_take(mut r, n)
+    let bs = rd_take(b, mut r, n)
     if !int_minimal(bs) {
         return der
     }
@@ -351,12 +350,12 @@ fn rd_small_int(mut r: Rd) -> int ! {der} {
 
 /// BOOLEAN (X.690 §8.2 + §11.1): one octet, and DER restricts TRUE to
 /// 0xFF exactly — 0x01 is BER and rejected.
-fn rd_boolean(mut r: Rd) -> bool ! {der} {
-    let n = rd_expect(mut r, 1)?
+fn rd_boolean(b: List[byte], mut r: Rd) -> bool ! {der} {
+    let n = rd_expect(b, mut r, 1)?
     if n != 1 {
         return der
     }
-    let v = rd_byte(mut r)?
+    let v = rd_byte(b, mut r)?
     if v == 0 {
         return false
     }
@@ -371,12 +370,12 @@ fn rd_boolean(mut r: Rd) -> bool ! {der} {
 /// minimality), the final octet's continuation bit clear, and each arc
 /// capped well under `int` so the checked arithmetic can never trap on
 /// adversarial input — an oversized arc is a `der` rejection instead.
-fn rd_oid(mut r: Rd) -> str ! {der} {
-    let n = rd_expect(mut r, 6)?
+fn rd_oid(b: List[byte], mut r: Rd) -> str ! {der} {
+    let n = rd_expect(b, mut r, 6)?
     if n == 0 {
         return der
     }
-    let bs = rd_take(mut r, n)
+    let bs = rd_take(b, mut r, n)
     var out = ""
     var acc = 0
     var in_sub = false
@@ -548,13 +547,13 @@ fn build_ts(y: int, mo: int, d: int, h: int, mi: int, s: int) -> int ! {der} {
 /// (§4.1.2.5.2: no fractional seconds, Z mandatory) — and the profile's
 /// split is enforced BOTH ways: dates through 2049 MUST be UTCTime, so
 /// a GeneralizedTime year before 2050 is a `der` rejection (§4.1.2.5).
-fn rd_time(mut r: Rd) -> int ! {der} {
-    let t = rd_tag_len(mut r)?
+fn rd_time(b: List[byte], mut r: Rd) -> int ! {der} {
+    let t = rd_tag_len(b, mut r)?
     if t.tag == 23 {
         if t.len != 13 {
             return der
         }
-        let bs = rd_take(mut r, 13)
+        let bs = rd_take(b, mut r, 13)
         if bs[12] as int != 90 {
             return der
         }
@@ -574,7 +573,7 @@ fn rd_time(mut r: Rd) -> int ! {der} {
         if t.len != 15 {
             return der
         }
-        let bs = rd_take(mut r, 15)
+        let bs = rd_take(b, mut r, 15)
         if bs[14] as int != 90 {
             return der
         }
@@ -630,27 +629,27 @@ struct Exts {
 /// RFC 8410 §3: the Ed25519 identifier MUST have absent parameters —
 /// present parameters (even NULL) reject. Other algorithms' parameters
 /// are carried opaquely (RSA's NULL, ECDSA's named curve).
-fn rd_alg(mut r: Rd) -> Alg ! {der} {
+fn rd_alg(b: List[byte], mut r: Rd) -> Alg ! {der} {
     let start = r.pos
-    let n = rd_expect(mut r, 48)?
+    let n = rd_expect(b, mut r, 48)?
     let stop = r.pos + n
     let saved = r.end
     r.end = stop
-    let dotted = rd_oid(mut r)?
+    let dotted = rd_oid(b, mut r)?
     if dotted == "1.3.101.112" {
         if r.pos != stop {
             return der
         }
     }
     if r.pos < stop {
-        let p = rd_tag_len(mut r)?
-        rd_skip(mut r, p.len)
+        let p = rd_tag_len(b, mut r)?
+        rd_skip(b, mut r, p.len)
     }
     if r.pos != stop {
         return der
     }
     r.end = saved
-    let raw = sub(r.b, start, stop)
+    let raw = sub(b, start, stop)
     Alg { dotted: dotted, raw: raw }
 }
 
@@ -658,17 +657,17 @@ fn rd_alg(mut r: Rd) -> Alg ! {der} {
 /// (2.5.4.3) value must be UTF8String or PrintableString (RFC 5280
 /// §4.1.2.4's profile for new certificates), validated and returned;
 /// every other attribute's value is carried opaquely (any single TLV).
-fn rd_atv(mut r: Rd) -> str ! {der} {
-    let n = rd_expect(mut r, 48)?
+fn rd_atv(b: List[byte], mut r: Rd) -> str ! {der} {
+    let n = rd_expect(b, mut r, 48)?
     let stop = r.pos + n
     let saved = r.end
     r.end = stop
-    let attr = rd_oid(mut r)?
-    let vt = rd_tag_len(mut r)?
+    let attr = rd_oid(b, mut r)?
+    let vt = rd_tag_len(b, mut r)?
     var cn = ""
     if attr == "2.5.4.3" {
         if vt.tag == 12 {
-            let bs = rd_take(mut r, vt.len)
+            let bs = rd_take(b, mut r, vt.len)
             let s = str_from_utf8(bs) else |_| {
                 return der
             }
@@ -677,7 +676,7 @@ fn rd_atv(mut r: Rd) -> str ! {der} {
             if vt.tag != 19 {
                 return der
             }
-            let bs = rd_take(mut r, vt.len)
+            let bs = rd_take(b, mut r, vt.len)
             if !printable_ok(bs) {
                 return der
             }
@@ -687,7 +686,7 @@ fn rd_atv(mut r: Rd) -> str ! {der} {
             cn = s
         }
     } else {
-        rd_skip(mut r, vt.len)
+        rd_skip(b, mut r, vt.len)
     }
     if r.pos != stop {
         return der
@@ -703,15 +702,15 @@ fn rd_atv(mut r: Rd) -> str ! {der} {
 /// linkage) compares these bytes exactly, the reading DER's canonical
 /// encodings license (the §7.1 caseIgnoreMatch machinery is named
 /// residue with the rest of the internationalized-name work).
-fn rd_name(mut r: Rd) -> NameInfo ! {der} {
+fn rd_name(b: List[byte], mut r: Rd) -> NameInfo ! {der} {
     let start = r.pos
-    let n = rd_expect(mut r, 48)?
+    let n = rd_expect(b, mut r, 48)?
     let stop = r.pos + n
     let saved = r.end
     r.end = stop
     var cn = ""
     while r.pos < stop {
-        let rdn_len = rd_expect(mut r, 49)?
+        let rdn_len = rd_expect(b, mut r, 49)?
         if rdn_len == 0 {
             return der
         }
@@ -722,11 +721,11 @@ fn rd_name(mut r: Rd) -> NameInfo ! {der} {
         var have_prev = false
         while r.pos < rdn_stop {
             let atv_start = r.pos
-            let got = rd_atv(mut r)?
+            let got = rd_atv(b, mut r)?
             if got != "" {
                 cn = got
             }
-            let enc = sub(r.b, atv_start, r.pos)
+            let enc = sub(b, atv_start, r.pos)
             if have_prev {
                 if !set_le(prev, enc) {
                     return der
@@ -741,7 +740,7 @@ fn rd_name(mut r: Rd) -> NameInfo ! {der} {
         return der
     }
     r.end = saved
-    let raw = sub(r.b, start, stop)
+    let raw = sub(b, start, stop)
     NameInfo { raw: raw, cn: cn }
 }
 
@@ -749,21 +748,21 @@ fn rd_name(mut r: Rd) -> NameInfo ! {der} {
 /// subjectPublicKey BIT STRING }. The BIT STRING must have zero unused
 /// bits (every SPKI this profile reads is whole octets), and an
 /// Ed25519 key must be exactly 32 bytes (RFC 8410 §4).
-fn rd_spki(mut r: Rd) -> Spki ! {der} {
-    let n = rd_expect(mut r, 48)?
+fn rd_spki(b: List[byte], mut r: Rd) -> Spki ! {der} {
+    let n = rd_expect(b, mut r, 48)?
     let stop = r.pos + n
     let saved = r.end
     r.end = stop
-    let alg = rd_alg(mut r)?
-    let bn = rd_expect(mut r, 3)?
+    let alg = rd_alg(b, mut r)?
+    let bn = rd_expect(b, mut r, 3)?
     if bn == 0 {
         return der
     }
-    let unused = rd_byte(mut r)?
+    let unused = rd_byte(b, mut r)?
     if unused != 0 {
         return der
     }
-    let key = rd_take(mut r, bn - 1)
+    let key = rd_take(b, mut r, bn - 1)
     if alg.dotted == "1.3.101.112" {
         if key.len != 32 {
             return der
@@ -782,18 +781,18 @@ fn rd_spki(mut r: Rd) -> Spki ! {der} {
 /// the RFC forbids pathLenConstraint without cA TRUE.
 fn parse_bc(bs: List[byte]) -> Exts ! {der} {
     let bn0 = bs.len
-    var r = Rd { b: bs, pos: 0, end: bn0 }
-    let n = rd_expect(mut r, 48)?
+    var r = Rd { pos: 0, end: bn0 }
+    let n = rd_expect(bs, mut r, 48)?
     let stop = r.pos + n
     var is_ca = false
     var path_len = 0 - 1
     if r.pos < stop {
-        let t = rd_tag_len(mut r)?
+        let t = rd_tag_len(bs, mut r)?
         if t.tag == 1 {
             if t.len != 1 {
                 return der
             }
-            let v = rd_byte(mut r)?
+            let v = rd_byte(bs, mut r)?
             if v == 0 {
                 return der
             }
@@ -802,7 +801,7 @@ fn parse_bc(bs: List[byte]) -> Exts ! {der} {
             }
             is_ca = true
             if r.pos < stop {
-                path_len = rd_small_int(mut r)?
+                path_len = rd_small_int(bs, mut r)?
             }
         } else {
             if t.tag != 2 {
@@ -834,16 +833,16 @@ fn parse_bc(bs: List[byte]) -> Exts ! {der} {
 /// (digitalSignature = 1, keyCertSign = 32, cRLSign = 64, ...).
 fn parse_ku(bs: List[byte]) -> int ! {der} {
     let bn0 = bs.len
-    var r = Rd { b: bs, pos: 0, end: bn0 }
-    let n = rd_expect(mut r, 3)?
+    var r = Rd { pos: 0, end: bn0 }
+    let n = rd_expect(bs, mut r, 3)?
     if n < 2 {
         return der
     }
-    let unused = rd_byte(mut r)?
+    let unused = rd_byte(bs, mut r)?
     if unused > 7 {
         return der
     }
-    let content = rd_take(mut r, n - 1)
+    let content = rd_take(bs, mut r, n - 1)
     if r.pos != bn0 {
         return der
     }
@@ -895,15 +894,15 @@ fn parse_ku(bs: List[byte]) -> int ! {der} {
 /// opaquely — present, unmatched (the residue line in the header).
 fn parse_san(bs: List[byte]) -> List[str] ! {der} {
     let bn0 = bs.len
-    var r = Rd { b: bs, pos: 0, end: bn0 }
-    let n = rd_expect(mut r, 48)?
+    var r = Rd { pos: 0, end: bn0 }
+    let n = rd_expect(bs, mut r, 48)?
     if n == 0 {
         return der
     }
     let stop = r.pos + n
     var out = List[str]()
     while r.pos < stop {
-        let t = rd_tag_len(mut r)?
+        let t = rd_tag_len(bs, mut r)?
         let cls = t.tag / 64
         if cls != 2 {
             return der
@@ -916,7 +915,7 @@ fn parse_san(bs: List[byte]) -> List[str] ! {der} {
             if t.len == 0 {
                 return der
             }
-            let bs2 = rd_take(mut r, t.len)
+            let bs2 = rd_take(bs, mut r, t.len)
             if !ia5_ok(bs2) {
                 return der
             }
@@ -925,7 +924,7 @@ fn parse_san(bs: List[byte]) -> List[str] ! {der} {
             }
             (mut out).push(name)
         } else {
-            rd_skip(mut r, t.len)
+            rd_skip(bs, mut r, t.len)
         }
     }
     if r.pos != stop {
@@ -947,12 +946,12 @@ fn parse_san(bs: List[byte]) -> List[str] ! {der} {
 /// way (the structure is sound), and validation answers the RFC's
 /// mandated rejection (`unknown_critical`) so the parse/validate split
 /// survives real-world certificates.
-fn rd_exts(mut r: Rd) -> Exts ! {der} {
-    let outer = rd_expect(mut r, 163)?
+fn rd_exts(b: List[byte], mut r: Rd) -> Exts ! {der} {
+    let outer = rd_expect(b, mut r, 163)?
     let outer_stop = r.pos + outer
     let outer_saved = r.end
     r.end = outer_stop
-    let n = rd_expect(mut r, 48)?
+    let n = rd_expect(b, mut r, 48)?
     if n == 0 {
         return der
     }
@@ -966,11 +965,11 @@ fn rd_exts(mut r: Rd) -> Exts ! {der} {
     var crit_unknown = ""
     var seen = List[str]()
     while r.pos < stop {
-        let en = rd_expect(mut r, 48)?
+        let en = rd_expect(b, mut r, 48)?
         let e_stop = r.pos + en
         let e_saved = r.end
         r.end = e_stop
-        let id = rd_oid(mut r)?
+        let id = rd_oid(b, mut r)?
         var dup = false
         for s in seen {
             if s == id {
@@ -983,10 +982,10 @@ fn rd_exts(mut r: Rd) -> Exts ! {der} {
         (mut seen).push(id)
         var critical = false
         let peek = r.pos
-        let t = rd_tag_len(mut r)?
+        let t = rd_tag_len(b, mut r)?
         if t.tag == 1 {
             r.pos = peek
-            let c = rd_boolean(mut r)?
+            let c = rd_boolean(b, mut r)?
             if !c {
                 return der
             }
@@ -994,8 +993,8 @@ fn rd_exts(mut r: Rd) -> Exts ! {der} {
         } else {
             r.pos = peek
         }
-        let vn = rd_expect(mut r, 4)?
-        let inner = rd_take(mut r, vn)
+        let vn = rd_expect(b, mut r, 4)?
+        let inner = rd_take(b, mut r, vn)
         if r.pos != e_stop {
             return der
         }
@@ -1095,23 +1094,23 @@ pub struct Cert {
 /// ct: public data; no secret is present.
 pub fn parse(bytes: List[byte]) -> Cert ! {der} {
     let n0 = bytes.len
-    var r = Rd { b: bytes, pos: 0, end: n0 }
-    let outer = rd_expect(mut r, 48)?
+    var r = Rd { pos: 0, end: n0 }
+    let outer = rd_expect(bytes, mut r, 48)?
     let outer_stop = r.pos + outer
     if outer_stop != n0 {
         return der
     }
     let tbs_start = r.pos
-    let tn = rd_expect(mut r, 48)?
+    let tn = rd_expect(bytes, mut r, 48)?
     let tbs_stop = r.pos + tn
     let saved = r.end
     r.end = tbs_stop
     var version = 1
     let peek = r.pos
-    let first = rd_tag_len(mut r)?
+    let first = rd_tag_len(bytes, mut r)?
     if first.tag == 160 {
         let v_stop = r.pos + first.len
-        let v = rd_small_int(mut r)?
+        let v = rd_small_int(bytes, mut r)?
         if r.pos != v_stop {
             return der
         }
@@ -1122,14 +1121,14 @@ pub fn parse(bytes: List[byte]) -> Cert ! {der} {
     } else {
         r.pos = peek
     }
-    let sn = rd_expect(mut r, 2)?
+    let sn = rd_expect(bytes, mut r, 2)?
     if sn == 0 {
         return der
     }
     if sn > 20 {
         return der
     }
-    let serial = rd_take(mut r, sn)
+    let serial = rd_take(bytes, mut r, sn)
     if !int_minimal(serial) {
         return der
     }
@@ -1141,17 +1140,17 @@ pub fn parse(bytes: List[byte]) -> Cert ! {der} {
             return der
         }
     }
-    let tbs_alg = rd_alg(mut r)?
-    let issuer = rd_name(mut r)?
-    let vn = rd_expect(mut r, 48)?
+    let tbs_alg = rd_alg(bytes, mut r)?
+    let issuer = rd_name(bytes, mut r)?
+    let vn = rd_expect(bytes, mut r, 48)?
     let v_stop = r.pos + vn
-    let not_before = rd_time(mut r)?
-    let not_after = rd_time(mut r)?
+    let not_before = rd_time(bytes, mut r)?
+    let not_after = rd_time(bytes, mut r)?
     if r.pos != v_stop {
         return der
     }
-    let subject = rd_name(mut r)?
-    let spki = rd_spki(mut r)?
+    let subject = rd_name(bytes, mut r)?
+    let spki = rd_spki(bytes, mut r)?
     var exts = Exts {
         has_bc: false,
         is_ca: false,
@@ -1163,7 +1162,7 @@ pub fn parse(bytes: List[byte]) -> Cert ! {der} {
     }
     if r.pos < tbs_stop {
         let peek2 = r.pos
-        let nxt = rd_tag_len(mut r)?
+        let nxt = rd_tag_len(bytes, mut r)?
         if nxt.tag == 129 {
             return der
         }
@@ -1177,26 +1176,26 @@ pub fn parse(bytes: List[byte]) -> Cert ! {der} {
             return der
         }
         r.pos = peek2
-        exts = rd_exts(mut r)?
+        exts = rd_exts(bytes, mut r)?
     }
     if r.pos != tbs_stop {
         return der
     }
     r.end = saved
-    let tbs = sub(r.b, tbs_start, tbs_stop)
-    let outer_alg = rd_alg(mut r)?
+    let tbs = sub(bytes, tbs_start, tbs_stop)
+    let outer_alg = rd_alg(bytes, mut r)?
     if !bytes_eq(outer_alg.raw, tbs_alg.raw) {
         return der
     }
-    let bn = rd_expect(mut r, 3)?
+    let bn = rd_expect(bytes, mut r, 3)?
     if bn == 0 {
         return der
     }
-    let unused = rd_byte(mut r)?
+    let unused = rd_byte(bytes, mut r)?
     if unused != 0 {
         return der
     }
-    let sig = rd_take(mut r, bn - 1)
+    let sig = rd_take(bytes, mut r, bn - 1)
     if r.pos != outer_stop {
         return der
     }
@@ -1250,8 +1249,8 @@ pub fn cert_end(chain: List[byte], offset: int) -> int ! {der} {
         return der
     }
     let n0 = chain.len
-    var r = Rd { b: chain, pos: offset, end: n0 }
-    let n = rd_expect(mut r, 48)?
+    var r = Rd { pos: offset, end: n0 }
+    let n = rd_expect(chain, mut r, 48)?
     r.pos + n
 }
 
