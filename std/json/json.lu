@@ -713,7 +713,7 @@ fn parse_array(mut c: Cursor, depth: int) -> Value ! {syntax, deep, overflow} {
     while going {
         skip_ws(mut c)
         let v = parse_value(mut c, depth + 1)?
-        (mut out).push(v)
+        (mut out).push(take v)
         skip_ws(mut c)
         let b = byte_at(c.text, c.i)
         if b == 44 {

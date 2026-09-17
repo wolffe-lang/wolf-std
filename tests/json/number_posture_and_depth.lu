@@ -34,7 +34,7 @@ fn nest(depth: int) -> json.Value {
     var i: int = 0
     while i < depth {
         var xs = List[json.Value]()
-        (mut xs).push(v)
+        (mut xs).push(take v)
         v = json.from_list(xs)
         i = i + 1
     }
