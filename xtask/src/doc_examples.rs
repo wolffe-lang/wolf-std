@@ -202,30 +202,14 @@ const LUPIN_TIER_WAIVERS: &[(&str, &str, &str)] = &[];
 /// example keeps the promise this word exists to make: each dies on the
 /// release that runs ITS block, and no sibling block is excused with it.
 pub(crate) const LUPIN_MIRROR_LAG: &[(&str, &str, &str, &str)] = &[
-    (
-        "range",
-        "range.is_empty(",
-        "a range has no member `start`",
-        "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
-    ),
-    (
-        "range",
-        "range.contains(",
-        "a range has no member `start`",
-        "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
-    ),
-    (
-        "range",
-        "range.len(",
-        "a range has no member `start`",
-        "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
-    ),
-    (
-        "range",
-        "range.clamp_to(",
-        "a range has no member `start`",
-        "wolf-std#37 — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]` (s158)",
-    ),
+    // EMPTY at sc51. The four `std.range` accessor entries sc49 wrote and
+    // sc50 re-keyed per call are RETIRED here: lupin 0.1.37 mirrors
+    // `[type.range.accessor]`, so `range.is_empty(`, `range.contains(`,
+    // `range.len(` and `range.clamp_to(` all reach `exit(0)` on the
+    // reference lane and every one of the four reported "never fired —
+    // the entry asserts a lag that does not happen". Retired WITH the
+    // flip, which is wolf-lang#177's lesson and the reason the gate
+    // refuses a waiver that has stopped being true.
 ];
 
 /// Does the reference lane's answer hold a mirror-lag entry's refusal?
