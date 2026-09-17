@@ -137,14 +137,20 @@ pub struct Advisory {
 /// every host — the gate that would have caught wolf-std#34 at sc43,
 /// on the author's box, before the push.
 pub const ADVISORY_STEPS: &[Advisory] = &[
-    // EMPTY from sc51, and that is the point: no step in `ci.yml` is
-    // advisory on any host any more. sc47 narrowed this from
-    // `runner.os != 'macOS'` to `runner.os == 'Windows'` and said
-    // plainly that windows was NOT proved healthy. It is now: at wolf
-    // 0.2.15 the windows differential's red list is 18 ledger
-    // advancements and nothing else — no `directive mismatch`, no
-    // `tool error`, no STATUS_STACK_OVERFLOW — the same 18 ubuntu and
-    // macOS report at the same head. wolf-std#34 closes here.
+    // sc47 narrowed this from `${{ runner.os != 'macOS' }}` and said
+    // plainly that windows was NOT proved healthy. sc51 re-measured and
+    // the REASON changed while the marker stayed: wolf-std#34's three
+    // json stack overflows are gone at wolf 0.2.15 (s161's 64 MiB stack
+    // for the checked machine), and what holds the marker now is the
+    // lupin lane flakily exceeding std-test's 60s ceiling on long crypto
+    // vectors -- a different set of rows each run, and only on windows.
+    // Raising STD_TEST_TIMEOUT_SECS there, proved over consecutive runs,
+    // is what retires this entry.
+    Advisory {
+        command: "cargo xtask std-test",
+        expr: "${{ runner.os == 'Windows' }}",
+        issue: "wolf-std#34",
+    },
 ];
 
 /// One `cargo …` invocation of the workflow, with the advisory marker of
