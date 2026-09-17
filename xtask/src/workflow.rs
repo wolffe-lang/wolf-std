@@ -137,17 +137,14 @@ pub struct Advisory {
 /// every host — the gate that would have caught wolf-std#34 at sc43,
 /// on the author's box, before the push.
 pub const ADVISORY_STEPS: &[Advisory] = &[
-    // sc47: narrowed from `${{ runner.os != 'macOS' }}`. ubuntu is
-    // REQUIRED from this commit — `std-test: GREEN` on
-    // `rig (ubuntu-latest)` at four consecutive heads (34602166418,
-    // 34618995826, 34668184512, 34672768728) — and windows is the only
-    // host left, behind three native net/process rows that arrived when
-    // wolf-std#18 lit the native rung there.
-    Advisory {
-        command: "cargo xtask std-test",
-        expr: "${{ runner.os == 'Windows' }}",
-        issue: "wolf-std#34",
-    },
+    // EMPTY from sc51, and that is the point: no step in `ci.yml` is
+    // advisory on any host any more. sc47 narrowed this from
+    // `runner.os != 'macOS'` to `runner.os == 'Windows'` and said
+    // plainly that windows was NOT proved healthy. It is now: at wolf
+    // 0.2.15 the windows differential's red list is 18 ledger
+    // advancements and nothing else — no `directive mismatch`, no
+    // `tool error`, no STATUS_STACK_OVERFLOW — the same 18 ubuntu and
+    // macOS report at the same head. wolf-std#34 closes here.
 ];
 
 /// One `cargo …` invocation of the workflow, with the advisory marker of

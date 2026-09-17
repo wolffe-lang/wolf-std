@@ -239,11 +239,19 @@ jobs:
       # verbatim; a `; rc=$?` tail would make this step read LOCAL-ONLY.
       - name: std-test (the differential; three lanes, three hosts)
         id: std_test
-        # REQUIRED on ubuntu and macOS. ADVISORY on windows only, behind
-        # wolf-std#34's three native net/process rows. Blessed in
-        # `workflow::ADVISORY_STEPS`; changing it here without changing
-        # it there reds `rig` on all three hosts.
-        continue-on-error: ${{ runner.os == 'Windows' }}
+        # REQUIRED ON ALL THREE HOSTS from sc51. windows was the last
+        # advisory host, behind wolf-std#34: three native net/process
+        # rows (fixed at sc48) and then three json STACK OVERFLOWS on the
+        # checked machine that no ledger word could describe. s161 gave
+        # that machine its own 64 MiB stack and wolf 0.2.15 ships it, so
+        # at this pin the windows differential reports NO crash and NO
+        # directive mismatch: its red list is 18 rows, every one a ledger
+        # advancement, and byte-identical to ubuntu's at the same head
+        # (run 35223247575). A host that fails identically to a required
+        # host has nothing left to excuse.
+        #
+        # `workflow::ADVISORY_STEPS` is empty now; adding a marker back
+        # here without blessing it there reds `rig` on all three hosts.
         run: cargo xtask std-test
       # The step above is the only advisory step in this file. This one
       # exists so that being advisory is never the same as being quiet:
