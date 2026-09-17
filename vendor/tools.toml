@@ -783,7 +783,23 @@
 # `fs/path_helpers.lu`. That is why std/fs carries no alias at this pin
 # (wolf-std#30). wolf-interp#102 (the imported alias expands no bound)
 # is still open, so `ops/num_alias_tier.lu` keeps `mirror-lag(E0501)`.
-version = "0.1.36"
+# sc51 BUMP: 0.1.36 -> 0.1.37 (r20, released 2026-09-17), the release
+# that mirrors `[type.err.alias]` and so unblocks wolf-std#36. Acquired
+# by digest from the release, the whole archive into `.wolf-bin/` (never
+# a source build), verified from `--version`: `lupin 0.1.37 (wolf-interp,
+# reference interpreter at pin 41695e7)`. Archive
+# `lupin-0.1.37-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `478545b54377dacd51665f3b22eccf97336b5ebc193a43502b5c70a7cd121cba`;
+# the binary `lupin` BY NAME, sha256
+# `494fc13e30d44a57790ebf1757275599c753a18dbfd619d5c22498b047d0fbef`.
+#
+# ITS CONFORMANCE PIN IS UNREACHABLE IN wolf-lang. 41695e7 is not an
+# ancestor of trunk and not the v0.2.15 tag; r20 preserved it at
+# `refs/tags/lupin-0.1.37-conformance-pin`. doctor compares the string
+# the binary prints against this key and never resolves it, so nothing
+# here needs it reachable — but a reader who tries to `git show` it in
+# the submodule gets nothing unless that tag is fetched.
+version = "0.1.37"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -798,7 +814,8 @@ version = "0.1.36"
 # pin = "4c60946081e1d1e65dd4b3d98cd69ac86bdf1d38"  (superseded, sc43 era — is43's 0.1.31 at wolf-lang v0.2.9)
 # pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"  (superseded, sc44/sc45 era — is45's 0.1.33 at wolf-lang v0.2.10)
 # pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"  (superseded, sc46/sc47 era — is46's 0.1.34 at wolf-lang v0.2.11)
-pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"
+# pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"  (superseded, sc48/sc49/sc50 era — is47/is49's 0.1.35 and 0.1.36, both at wolf-lang v0.2.12)
+pin = "41695e78437fbf3644accad40ddb4804737d4440"
 # (sc46: 0.1.34 crosses to v0.2.11 and lands ON a tag for the second
 #  bump running. The gap to the data pin below NARROWS to one release
 #  — s154 and s156 — from sc44's 91 commits, and both halves are at
@@ -961,7 +978,35 @@ pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"
 # pin = "02c1e88f23931d8258cb3ed3041baf8548dff3f2"
 
 [wolf]
-version = "0.2.14"
+# sc51 BUMP: 30731a6 (v0.2.14) -> 2e4ca76 (v0.2.15), one release (r20,
+# 2026-09-17). The data pin was AT 30731a6, so the DATA delta and the
+# BINARY delta are one span again: 30731a6..2e4ca76, +26 anchors and 0
+# removed. Acquired by digest from the release, the whole archive pair
+# into `.wolf-bin/` (never a source build on any box), verified from
+# `--version`: `wolf 0.2.15 (wolfgang, pin 2e4ca76)`, pairing line
+# `paired with lupin 0.1.37 (reference interpreter), pin 41695e7` — TRUE
+# of this box's pair at this box's pins (F-0064's happy case). Archive
+# `wolf-0.2.15-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `dd28150cc4a87966ef545f6f1875f04767657a6194f2d1908e6e250bac2ab89d`.
+#
+# THE BINARY `wolf`, BY NAME — the only digest that identifies this pin:
+#   x86_64-unknown-linux-gnu
+#     `0ede3f66eebb4c04f799dacf088bb1dbc6124bbb60395595a2bb2394f74b7fad`
+#   aarch64-apple-darwin
+#     `957a521004775ef2fa004b3d159be1ea39b225edcc7969ff81b745d547e68a0c`
+#
+# AND WHY "BY NAME" IS NOT A STYLE NOTE. The archive ships a second
+# executable-bit file, `_wolf`. It is not a second compiler: it is the
+# zsh completion script `wolf --completions zsh` emits, 1913 bytes of
+# UTF-8 beginning `#compdef wolf`. Its sha256 is
+# `2d1e48018333e3dd70473b34dfc78723f91f71d44a3d95287b68ce85fbbc2221`
+# in ALL SIX archives measured at sc51 — 0.2.13, 0.2.14 and 0.2.15 on
+# x86_64-linux, and 0.2.13 and 0.2.15 on aarch64-darwin. `_wolf` sorts
+# before `wolf` in ASCII, so a verifier that hashes "the first binary it
+# finds" reads a CONSTANT at every pin on every platform: it cannot go
+# red, at any release, ever. That check is not merely wrong, it is
+# unfalsifiable. Hash `wolf` by name.
+version = "0.2.15"
 # sc48 BUMP: a7f517e (v0.2.12) -> 30731a6 (v0.2.14), TWO releases —
 # s157/s158 (0.2.13, "the literals and the papercuts III") and s159/s160
 # (0.2.14, "the string runtime and the papercuts IV"). The data pin was
@@ -2507,4 +2552,5 @@ version = "0.2.14"
 # pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"  (superseded, sc43 era — r15's v0.2.10-tag pin, the one lupin 0.1.33 now conforms to)
 # pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"  (superseded, sc44/sc45 era — r16's v0.2.11-tag pin, the one lupin 0.1.34 now conforms to)
 # pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"  (superseded, sc46/sc47 era — r17's v0.2.12-tag pin, the one lupin 0.1.35 and 0.1.36 both conform to)
-pin = "30731a6509443ade03724707345da9ceb86a88bf"
+# pin = "30731a6509443ade03724707345da9ceb86a88bf"  (superseded, sc48/sc49/sc50 era — the v0.2.14-tag pin)
+pin = "2e4ca769b396219585a07ff18492529c944672d9"
