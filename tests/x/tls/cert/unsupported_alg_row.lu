@@ -41,14 +41,21 @@ fn main() -> !int {
     // Each parse is destructured where it is born (sc30,
     // [gram.pat.struct]), fields renamed apart since both certificates
     // share main's scope; `..` leaves what this witness does not pin.
-    let cert.Cert { subject_cn: rsa_cn, sig_alg: rsa_sig_alg, spki_alg: rsa_spki_alg, has_san: rsa_has_san, .. } = cert.parse(rsa) else |_| {
+    let cert.Cert {
+        subject_cn: rsa_cn,
+        sig_alg: rsa_sig_alg,
+        spki_alg: rsa_spki_alg,
+        has_san: rsa_has_san,
+        ..
+    } = cert.parse(rsa) else |_| {
         return 2
     }
     assert(rsa_cn == "rsa.wolf.example", "rsa subject CN parsed")
     assert(cert.alg_name(rsa_sig_alg) == "rsa", "rsa signature algorithm classified")
     assert(cert.alg_name(rsa_spki_alg) == "rsa", "rsa SPKI classified")
     assert(rsa_has_san, "rsa SAN parsed")
-    let cert.Cert { subject_cn: ec_cn, sig_alg: ec_sig_alg, spki_alg: ec_spki_alg, .. } = cert.parse(ecdsa) else |_| {
+    let cert.Cert { subject_cn: ec_cn, sig_alg: ec_sig_alg, spki_alg: ec_spki_alg, .. } = cert.
+        parse(ecdsa) else |_| {
         return 2
     }
     assert(ec_cn == "ecdsa.wolf.example", "ecdsa subject CN parsed")
