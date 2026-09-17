@@ -517,7 +517,7 @@ native = "run"
 
 [tests."option/or_else_default.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."option/to_list_roundtrip.lu"]
@@ -526,17 +526,17 @@ lupin = "run"
 # runs clean to mem and the checked tier answers `unsupported` for the row
 # raise alone (F-0015). Depth 1 -> 0 in the rig's ranking; an advance in
 # truth, since nothing is refused any more.
-wolfc = "unsupported"
+wolfc = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."option/exists_marking.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 [tests."option/is_none_marking.lu"]
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 native = "run"  # dd6d13c: generic-nominal ctors+methods lower (c21/c22)
 
 # ---- std.errors: the payload taxonomy (sc06) ----
@@ -977,7 +977,7 @@ lupin = "run"
 # question rather than a parse gap — the resident's trigger
 # (wolf-lang#34) half-fired, and the closeout reads it with that
 # sentence in hand.
-wolfc = "unsupported"
+wolfc = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 # 87405ac (sc16 bump): s109 RULED the meaning — nested rows FLATTEN
 # ([gram.type.row.flatten], one of the two anchors this bump adds) — and
 # the native rung now executes the flattened row end to end: the file
@@ -996,7 +996,7 @@ lupin = "run"
 # machine types it and then refuses to MODEL it — "unsupported: control
 # flow in an argument" at mem — so the row moved from a rejection to a
 # modelling refusal, which is an advance wearing an unsupported verdict.
-wolfc = "unsupported"
+wolfc = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 native = "run"
 
 [tests."x/testing_text/starts_with_pass.lu"]
@@ -1258,7 +1258,7 @@ native = "run"
 # module's trait items. ----
 
 [tests."ops/num_alias_tier.lu"]
-lupin = "mirror-lag(E0501)"  # sc46: an alias through an IMPORT expands no bound (wolf-interp#102) — the ledger's first mirror-lag row
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `mirror-lag(E0501)`)
 wolfc = "run"
 native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
@@ -1362,32 +1362,32 @@ native = "run"
 # sc50 item 2: the same generic `collect` over `range[char]`. lupin 0.1.36
 # declines the char range itself at resolve ("a range needs integer
 # endpoints, got char and char"), a whole-program refusal; both rungs run.
-lupin = "unsupported"
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 
 [tests."range/is_empty.lu"]
-lupin = "unsupported"  # sc48: `run` -> `unsupported`, DELIBERATE and shallower — the body moved from the iteration probe to `r.start >= r.end` (the contract's spelling), and lupin 0.1.36 declines the accessor by name ("a range has no member `start`"); the row comes back with the mirror
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"  # sc48 binary bump (wolf 0.2.14): `[type.range]` (s158) — `range[int]` is a nameable type, the E0301 both rungs answered since sc04 is gone
 native = "run"  # sc48 binary bump (wolf 0.2.14): same — the type resolves and the rung lowers the body
 
 [tests."range/contains.lu"]
-lupin = "unsupported"  # sc48: declined BY NAME at resolve — "a range has no member `start`" — lupin 0.1.36 mirrors v0.2.12, before `[type.range.accessor]`; a whole-program refusal, so `unsupported` and not `mirror-lag`
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 
 [tests."range/len.lu"]
-lupin = "unsupported"  # sc48: "a range has no member `start`", as contains.lu
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 
 [tests."range/len_overflow_trap.lu"]
-lupin = "unsupported"  # sc48: "a range has no member `start`" — declined one rung before the arithmetic that traps on the compiler rungs
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 
 [tests."range/clamp_to.lu"]
-lupin = "unsupported"  # sc48: "a range has no member `start`", as contains.lu
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 
@@ -2307,12 +2307,12 @@ wolfc = "run"
 native = "run"
 
 [tests."fs/directories_and_metadata.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 
 [tests."fs/chunk_stream.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 
@@ -2326,7 +2326,7 @@ native = "run"
 # tag can ride out as the FUNCTION with no `else` firing, so this row is also
 # the standing measurement that it does not here.
 [tests."fs/exists_row.lu"]
-lupin = "unsupported"
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 
@@ -3781,12 +3781,12 @@ wolfc = "run"
 native = "run"
 
 [tests."fs/fstat_rows.lu"]
-lupin = "unsupported"  # sc40: the fs tier's by-design decline, as above
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 
 [tests."fs/alias_row.lu"]
-lupin = "unsupported"  # sc51: the mirror-lag RETIRES at lupin 0.1.37 — the alias parses there, so this row declines at RESOLVE for the ordinary reason (no `fs_*` builtins), like every other std.fs importer. Measured with the alias INSIDE std/fs/fs.lu: all nineteen importers reach resolve, zero E0201
+lupin = "run"  # sc51: advanced at wolf 0.2.15 / lupin 0.1.37 (was `unsupported`)
 wolfc = "run"
 native = "run"
 

@@ -10077,7 +10077,31 @@ expands a qualified alias.
 
 The second half is the one worth carrying: wolf-std#36 predicted the alias would
 cost eighteen lupin rows the day the fs tier came on, and that is why sc48 kept
-it out of the module. Re-measured here, the cost is ZERO — lupin 0.1.37 parses
-the form, and all nineteen `std.fs` importers (not eighteen) reach RESOLVE and
-decline for the ordinary absent-builtin reason. The blocker was real and it is
-gone; the count it was stated in was one row light.
+it out of the module. Re-measured here, the cost is ZERO. The blocker was real
+and it is gone.
+
+**CORRECTION, and it is this finding's real lesson.** The first draft of this
+entry, and commit `03ecee6`'s message, said the cost was zero *because lupin
+0.1.37 has no `fs_*` builtins, so every importer declines at RESOLVE*. That is
+wrong, and the way it was measured is the interesting part. The rig invokes the
+interpreter with `--std-root <staged root>`; the measurement used the
+environment variable `WOLF_STD`, which is the COMPILER's knob and which lupin
+ignores. So both arms of the experiment — the module with the alias and the
+module without it — read lupin's ambient std stub and neither read the tree
+under test. They agreed because they were the same run twice, which is
+`sprints/wave-45.md`'s "a comparison of two empty strings is not a match" in a
+new costume: the control was not a control.
+
+Re-measured with `--std-root`, against a genuinely alias-free copy of `std/`:
+lupin 0.1.37 **has the fs tier lit** (is48's bump landed), `fs/text_round_trip.lu`
+runs there, `fs/path_helpers.lu` runs identically with and without the alias in
+the module, and `fs/alias_row.lu` reaches `exit(0)` with stdout sha
+`5e8c6308…` — byte-identical to the checked lane's. So the row flips
+`mirror-lag(E0201)` -> **`run`**, exactly as wolf-std#36 item 2 predicted, and
+not to `unsupported` as the first draft recorded. `cargo xtask ci` caught the
+wrong word because the ledger is checked in both directions: it reported
+`ledger says unsupported, observed run`. The gate was the control the
+measurement lacked.
+
+Eighteen rows advance at this pin in total, all in that direction; none goes
+shallower.
