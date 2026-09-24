@@ -799,7 +799,24 @@
 # the binary prints against this key and never resolves it, so nothing
 # here needs it reachable — but a reader who tries to `git show` it in
 # the submodule gets nothing unless that tag is fetched.
-version = "0.1.37"
+# sc52 BUMP: 0.1.37 -> 0.1.38 (is53, released 2026-09-22), for one
+# reason: B117. `map.remove` wants the language's `m.remove(k)`
+# (`[type.map]`, wolf-lang#344), and lupin 0.1.37 does not have it:
+# wolf-interp `6219dcf` ("Map.remove erases through a mut receiver") is an
+# ancestor of `v0.1.38` and not of `v0.1.37`. Acquired by digest from the
+# release, the whole archive into `.wolf-bin/` (never a source build),
+# verified from `--version`: `lupin 0.1.38 (wolf-interp, reference
+# interpreter at pin 2e4ca76)`. Archive
+# `lupin-0.1.38-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `828b5c5571644107a1b123490b5e188da50020676c6b15b0bc53a899a7cc520b`
+# (the release's reported digest, matched); the binary `lupin` BY NAME,
+# sha256 `f202d47fb7a543ea842b8219cf6ecf94b80b0ca52d88e8ce201f26f95a1f6665`.
+#
+# ITS CONFORMANCE PIN IS THIS REPOSITORY'S DATA PIN. 2e4ca76 is wolf-lang
+# v0.2.15, which is what `vendor/upstream/PIN` already records, so the
+# 0.1.37-era note above about an unreachable pin retires with this bump,
+# and the data pin does not move (sc52 takes only what B117 needs).
+version = "0.1.38"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -815,7 +832,8 @@ version = "0.1.37"
 # pin = "662b14c6e10e4ee4628d788eb166f3f66b3e63f3"  (superseded, sc44/sc45 era — is45's 0.1.33 at wolf-lang v0.2.10)
 # pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"  (superseded, sc46/sc47 era — is46's 0.1.34 at wolf-lang v0.2.11)
 # pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"  (superseded, sc48/sc49/sc50 era — is47/is49's 0.1.35 and 0.1.36, both at wolf-lang v0.2.12)
-pin = "41695e78437fbf3644accad40ddb4804737d4440"
+# pin = "41695e78437fbf3644accad40ddb4804737d4440"  (superseded, sc51 era — is51's 0.1.37, preserved at refs/tags/lupin-0.1.37-conformance-pin)
+pin = "2e4ca769b396219585a07ff18492529c944672d9"
 # (sc46: 0.1.34 crosses to v0.2.11 and lands ON a tag for the second
 #  bump running. The gap to the data pin below NARROWS to one release
 #  — s154 and s156 — from sc44's 91 commits, and both halves are at
@@ -1006,7 +1024,22 @@ pin = "41695e78437fbf3644accad40ddb4804737d4440"
 # finds" reads a CONSTANT at every pin on every platform: it cannot go
 # red, at any release, ever. That check is not merely wrong, it is
 # unfalsifiable. Hash `wolf` by name.
-version = "0.2.15"
+# sc52 BUMP: 0.2.15 -> 0.2.16 (r21, released 2026-09-24), the binary
+# only. 0.2.16 is the release lupin 0.1.38 is paired with, and it is the
+# compiler every downstream pins (B151). The DATA pin stays at 2e4ca76
+# (v0.2.15): no test here needs a 0.2.16 anchor, and a data bump is its
+# own commit when one does. Acquired by digest from the release, the
+# whole archive into `.wolf-bin/`, verified from `--version`:
+# `wolf 0.2.16 (wolfgang, pin 93a5fe5)`, pairing line `paired with lupin
+# 0.1.38 (reference interpreter), pin 2e4ca76`. Archive
+# `wolf-0.2.16-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `84e30c05e56b89fde2fe6e27eec8f7cec0a6aae6e1464a2993fcfc87a7a1829e`
+# (the release's reported digest, matched).
+#
+# THE BINARY `wolf`, BY NAME (see sc51's note below for why):
+#   x86_64-unknown-linux-gnu
+#     `b53b5328f6c020b7e77ee0be6fbdd9bbe41cdf49a185a263cd40218a1a3877c4`
+version = "0.2.16"
 # sc48 BUMP: a7f517e (v0.2.12) -> 30731a6 (v0.2.14), TWO releases —
 # s157/s158 (0.2.13, "the literals and the papercuts III") and s159/s160
 # (0.2.14, "the string runtime and the papercuts IV"). The data pin was
@@ -2553,4 +2586,5 @@ version = "0.2.15"
 # pin = "c9237c11d081d5649825b5293bcff6d2814a5ad2"  (superseded, sc44/sc45 era — r16's v0.2.11-tag pin, the one lupin 0.1.34 now conforms to)
 # pin = "a7f517e1f667f142ffaf61b57aa2bff06e32b520"  (superseded, sc46/sc47 era — r17's v0.2.12-tag pin, the one lupin 0.1.35 and 0.1.36 both conform to)
 # pin = "30731a6509443ade03724707345da9ceb86a88bf"  (superseded, sc48/sc49/sc50 era — the v0.2.14-tag pin)
-pin = "2e4ca769b396219585a07ff18492529c944672d9"
+# pin = "2e4ca769b396219585a07ff18492529c944672d9"  (superseded, sc51 era — the v0.2.15-tag pin)
+pin = "93a5fe504593ca7642b78ba83b4986e7a03cfe71"
