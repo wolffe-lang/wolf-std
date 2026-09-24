@@ -10182,3 +10182,72 @@ the only thing that resolves a name. Both upstream halves are already
 filed, so the lane files **no** new wolf-lang issue for either one. It
 comments the exact missing call on #346 and #217. Falsified if any
 builtin in 0.2.16's `[os.*]` builtin list can serve either surface.
+
+### Measured (sc52), beside each prediction
+
+**Pins, measured.** Both archives were fetched from the releases and
+matched the reported digests (`wolf-0.2.16-x86_64-unknown-linux-gnu.tar.gz`
+`84e30c05…`, `lupin-0.1.38-x86_64-unknown-linux-gnu.tar.gz` `828b5c55…`).
+`--version` prints `wolf 0.2.16 (wolfgang, pin 93a5fe5)` and `lupin 0.1.38
+(wolf-interp, reference interpreter at pin 2e4ca76)`, and doctor passes on all
+three lanes. The pin bump alone (`fbbc86c`) moved three ledger rows: `pool/`
+`alloc_and_deref`, `free_then_deref_traps` and `alloc_after_free` went from
+`unsupported` to `run` on the native lane (s173, wolf-lang `1b9f232b`, "the
+pool on every lane"), and they are ledgered in `03d3f79`. The only other
+reds on kasumi were two lupin timeouts (`curve25519/wycheproof_x25519_shared_p2`
+and `_p8`), taken at a load average near 10 from other lanes. Run alone,
+`_p2` answers its ledgered `unsupported` (the 50M-step budget) in 24.65 s.
+That is #34's mechanism on a busy linux host (P2 below).
+
+**P1, B117: the shape held, and the red was one budget off.** The body
+is `(mut m).remove(k)`, the signature is unchanged, and the doc example
+is unchanged and green on all three lanes (`doc-examples: 448 block(s),
+GREEN` on kasumi). `tests/map/remove_many.lu` was committed alone
+(`e3d2a54`) and probed one lane at a time on kasumi against trunk's body,
+at wolf 0.2.16 and lupin 0.1.38:
+
+| lane | trunk body (`e3d2a54`) | fixed body (`f8c606a`) |
+|---|---|---|
+| lupin | `unsupported` — "did not terminate within 50000000 evaluation steps", **191.4 s**, 2.0 GB | `exit(0)`, 1.33 s, 14 MB |
+| wolfc (`conform-run --checked`) | `unsupported` — "step budget exhausted", 7.3 s, 1.1 GB | `exit(0)`, 0.06 s, 12 MB |
+| native | `exit(0)`, 10.2 s, 347 MB | `exit(0)`, 0.16 s, 89 MB |
+
+Two lanes were red, as predicted. The prediction named the checked tier's
+**byte** budget, and the record names its **step** budget, so that half of the
+prediction was wrong. Under `std-test`, lupin's 191 s shows up as a 60 s
+timeout rather than as its own word. It is red either way.
+
+**The benchmark**, native executable (`wolf build`, the default tier; the
+run is timed and the build is not), 10,000 `Map[int, int]` keys removed
+front first through `map.remove`, on kasumi (the program exactly as run):
+
+    use std.map
+
+    fn main() -> int {
+        let n = 10000
+        var m = Map[int, int]()
+        var i = 0
+        while i < n {
+            m[i] = i
+            i = i + 1
+        }
+        i = 0
+        var sum = 0
+        while i < n {
+            sum = sum + (map.remove(mut m, i) else 0)
+            i = i + 1
+        }
+        print("{sum} {m.len}\n")
+        0
+    }
+
+| body | wall | peak RSS | output |
+|---|---|---|---|
+| trunk (`pairs()` rebuild) | **396.10 s** | 3,632,528 KB | `49995000 0` |
+| `(mut m).remove(k)` | **0.14 s** | 2,908 KB | `49995000 0` |
+
+That is about **2,800x** in time and 1,250x in peak memory, against a
+predicted floor of 100x and a builtin under 1 s. The prediction held. The
+memory column is the arena's: every rebuild's map is abandoned and nothing
+frees it (wolf-lang#416). kasumi's load average was about 9 from other
+lanes throughout, which cannot account for three orders of magnitude.
