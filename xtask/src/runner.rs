@@ -788,7 +788,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn slowest_sorts_descending_and_states_the_ceiling_share() {
         let t = |ms: u64, w: &str| (Duration::from_millis(ms), w.to_string());
