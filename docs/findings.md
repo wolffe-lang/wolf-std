@@ -145,7 +145,7 @@ the building.
 | F-0135 | 2026-09-15 | **`[type.comb.set]`'s `sorted[T: cmp.Ord]` is written and ships on no lane at trunk 073aa19**: `use std.cmp` in `std.list` makes every importer native `unsupported` (std.cmp's product pattern; sc49 / wolf-std#31 option 3 removes it, measured against origin/sc49's `std/cmp`: importers three-lane, `sorted` lupin + native); the checked machine declines `a < b` under `T: cmp.Ord` as "trait dispatch on a non-nominal receiver" when `T` is bound through a list read, while the same fn over two `int` bindings runs; and passing the generic `ord_less` as a fn value is "a generic function used as a value (comptime)" at resolve, darkening every importer | [wolf-lang#402](https://github.com/wolffe-lang/wolf-lang/issues/402); wolf-std PR #40 | sc50 probe |
 | F-0136 | 2026-09-15 | **`push` takes no written mode at wolf 0.2.14, so #385's `take` spelling cannot be adopted before the pin moves**: `(mut out).push(take v)` is `E1007 — \`push\` takes \`value\` as plain \`read\` — no mode is written for it` on BOTH compiler rungs, for a call argument and for a binding alike, while lupin 0.1.36 runs it. A static refusal of the module, so every `std.list` row on both rungs would pay for one function's spelling. sc50's combinators therefore write plain `push` and name the owed `take` in `map`'s doc | wolf-lang#385 (ruled option 3, lane s167) | sc50 probe |
 | F-0137 | 2026-09-15 | **A module-keyed `LUPIN_MIRROR_LAG` entry calls a new RUNNING block "the mirror moved"**: sc49's word was keyed by module, true while every `std.range` block went through an accessor; sc50's `range.collect` names none and runs on lupin, so `doc-examples` redded `range.lu:176` with "the mirror moved (a heal, or a different refusal)" while the mirror had not moved at all. Keyed by the call now, one entry per example (`range.is_empty(`, `range.contains(`, `range.len(`, `range.clamp_to(`), the shape `LUPIN_TIER_WAIVERS` already had; the selftest counts blocks writing that call | wolf-std#37 | sc50, caught by the gate itself |
-| F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52, predictions open |
+| F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52: B117 FIXED (`f8c606a`); #34 ceiling 180 s on windows (`1a1d060`), REQUIRED proposed in PR #46; #4/#5 blocked upstream (wolf-lang#217, #346 — exact calls commented); F-0011's capacity ask rides wolf-lang#416 item 2 |
 
 
 ## F-0001 — the std search path
@@ -10251,3 +10251,106 @@ predicted floor of 100x and a builtin under 1 s. The prediction held. The
 memory column is the arena's: every rebuild's map is abandoned and nothing
 frees it (wolf-lang#416). kasumi's load average was about 9 from other
 lanes throughout, which cannot account for three orders of magnitude.
+
+**P2, wolf-std#34: the cause held, the per-vector count was wrong by a
+factor of about 30, and the number held.**
+
+*What the rows are.* On lupin all five rows are `unsupported` with "the
+program did not terminate within 50000000 evaluation steps". That is
+lupin's own refusal, reached by running to the budget, and it is the
+ledgered word. The step count does not depend on the host. The wall
+time does.
+
+*The per-vector count was wrong.* I predicted lupin would finish at most 2
+of `cavp_sha384_long`'s 128 vectors before refusing. Measured on kasumi by
+truncating the file to its first k `assert` blocks and running lupin
+0.1.38 on each: k = 58 answers `exit(0)` in 26.27 s, and k = 59 is
+`unsupported` in 27.11 s. So **lupin completes 58 of the 128 vectors**
+(through `Len 46960`) and refuses on the 59th. The 58th vector costs
+0.92 s (26.27 − 25.35 at k = 57), about 45 blocks, so about **20 ms per
+128-byte block on kasumi**. That is half the ~40 ms in the generated
+header, which is a lupin-0.1.14-era figure. Cumulative time grows
+faster than k (k = 16: 1.94 s, k = 32: 7.63 s, k = 48: 18.98 s),
+because each vector is 792 bits longer than the one before. The
+"at most 2 vectors" prediction came from that stale header and not from
+a measurement.
+
+*Where the time goes on windows.* The runner's per-line timestamps give
+each test's wall time: the gap between consecutive `test …: staged`
+lines, all lanes together. Over the nineteen windows logs read before
+the change (the 0.1.37 era and trunk), the five rows came in at 30–67 s,
+and the whole std-test step took **1574 s to 2801 s**. That spread in
+runner speed of about 1.8x is the only variable: the slow runners put
+`sha384_long` at 64–70 s, and those are the runs where it timed out. At
+the 60 s ceiling, 8 of the **15** windows runs at lupin 0.1.37 timed out, and
+so did the trunk-content run `6bca34c` (36029493146), all on these rows and
+none on any other. The prediction above says "13". That was a miscount of
+the same list, corrected here and not in the prediction.
+
+*The fix, and the number.* `STD_TEST_TIMEOUT_SECS` is 180 on windows and 60
+everywhere else (`1a1d060`). std-test now prints its slowest invocations
+against the ceiling (`a26405b`), so the margin is read directly and not
+inferred from a green. The windows `rig` job at 180 s:
+
+| run | head | event | std-test step | outcome | slowest lupin row |
+|---|---|---|---|---|---|
+| 36030524889 | `5affaca` | push | 45m56s | failure (the 3 pool rows, fixed in `03d3f79`) | 60.2 s `cavp_sha384_long` |
+| 36032030033 | `5affaca` | pull_request | 44m56s | failure (the same 3 pool rows) | 58.8 s `cavp_sha384_long` |
+| 36033278922 | `03d3f79` | push | 47m28s | **success** | **63.2 s** `cavp_sha384_long`, 62.0 s `cavp_sha512_long` |
+| 36034452438 | `b94f001` | push | 26m42s | **success** | 36.9 s `cavp_sha512_long` |
+
+No timeout on any of them, and none of the four reds was a timeout. The
+`03d3f79` run is the direct evidence: two rows took more than 60 s and
+passed, so at the old ceiling that run would have gone red on
+`sha384_long` and `sha512_long`. The worst row seen is 63.2 s, about 35%
+of the ceiling. The prediction was that the slowest row on kasumi takes
+20–40 s and on windows 60–100 s, with none over 120 s. kasumi's head run
+(`03d3f79`, green) topped out at 36.0 s. Windows topped out at 63.2 s,
+inside the band. Nothing came near 120 s. **The number held.** The lupin
+rows at the top of the table vary from run to run (`x25519_zero`,
+`hkdf*_full`, `cavp_siggen`), because many rows sit at the same step
+budget. So the ceiling is per host, not per row, which is what the
+earlier "the set moves between runs" was describing.
+
+*What REQUIRED needs.* Nothing more in this branch. The marker and the
+`ADVISORY_STEPS` blessing are still in place on purpose (the contract:
+proposed, not set). The proposal is a two-file diff, verified on kasumi
+(`cargo clippy -D warnings` clean, `cargo test` 86/86 including the
+blessing selftest with an empty list). It is in PR #46's body, together
+with the branch-protection change it implies.
+
+**P3, wolf-std#4 and #5: both need upstream, as predicted, and neither needed
+a new filing.** At wolf 0.2.16 (`93a5fe50`) and at wolf-lang trunk `a565d4b9`,
+the `[os.*]` builtin list in `spec/11-os.md` is identical: 56 `fs_`/`net_`/
+`os_` lines, and the grep that counted them is the same one that found
+`fs_create`, so it can see where a new builtin would appear. No builtin
+carries permission bits (#5), and no builtin resolves a name without
+dialling it (#4). Both upstream halves were already filed (wolf-lang#346 for
+#5, #217 for #4), so the lane commented the exact missing call on each
+instead of filing a duplicate: `fs_create_mode(path, bits) -> int ! {denied,
+exists, invalid, io, unsupported}` plus a `mode` element on `fs_fstat`
+(wolf-lang#346 comment 5818463384), and `net_resolve(name, within_ms) ->
+List[str] ! {not_found, timeout, io}` (wolf-lang#217 comment 5818463618).
+Writing either one in std today would mean emulating the capability
+(spawning `chmod`, or a DNS client that bypasses the host resolver), and
+§14 forbids that.
+
+**F-0011, read and answered (B152).** API-CONVENTIONS §8: "No capacity API
+without a capacity. `reserve` is not shipped while the builtin exposes no
+capacity at all: a no-op documented as a hint would be a lie (F-0011)." It
+still holds at wolf 0.2.16 and wolf-lang trunk `a565d4b9`. No spec clause
+gives `List` a capacity accessor or a reserving constructor, so a reserved
+list and an unreserved one cannot be told apart, and `std.list.reserve`
+could only be a no-op or a forced rebuild. bu07's result, that sizing
+`tac`'s list from `fs_fstat` did not help, is what F-0011 predicts, not a
+separate fact. Knowing the final size is useless when there is no call to
+pass it to. The list is still filled by `push`, still doubles, and
+`[mem.region.account.1]` keeps a grown container's abandoned buffers
+charged in an ambient region that frees nothing. That is the residual 2x
+(515 MB for a 256 MiB input). The capacity ask was filed nowhere upstream
+under its own name. wolf-lang#11, which F-0011 went out as, never mentions
+it. It is item 2 of wolf-lang#416 ("A capacity surface on `List`"), and
+the lane added `tac` there as a second customer (comment 5818634750). The
+day the language ships one, `list.reserve` lands with the signature already
+written in `std/list/list.lu`'s BLOCKED note. No std code changes in this
+lane.
