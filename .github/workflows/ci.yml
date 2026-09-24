@@ -279,7 +279,6 @@ jobs:
         #
         # Blessed in `workflow::ADVISORY_STEPS`; changing it here without
         # changing it there reds `rig` on all three hosts.
-        continue-on-error: ${{ runner.os == 'Windows' }}
         env:
           STD_TEST_TIMEOUT_SECS: ${{ runner.os == 'Windows' && '180' || '60' }}
         run: cargo xtask std-test

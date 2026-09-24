@@ -137,27 +137,8 @@ pub struct Advisory {
 /// every host — the gate that would have caught wolf-std#34 at sc43,
 /// on the author's box, before the push.
 pub const ADVISORY_STEPS: &[Advisory] = &[
-    // sc47 narrowed this from `${{ runner.os != 'macOS' }}` and said
-    // plainly that windows was NOT proved healthy. sc51 re-measured and
-    // the REASON changed while the marker stayed: wolf-std#34's three
-    // json stack overflows are gone at wolf 0.2.15 (s161's 64 MiB stack
-    // for the checked machine), and what holds the marker now is the
-    // lupin lane flakily exceeding std-test's 60s ceiling on long crypto
-    // vectors -- a different set of rows each run, and only on windows.
-    // Raising STD_TEST_TIMEOUT_SECS there, proved over consecutive runs,
-    // is what retires this entry.
-    //
-    // sc52 raised it to 180 s on windows alone (ci.yml's step `env:`),
-    // because those rows are lupin step-budget refusals whose wall time is
-    // the runner's speed (F-0139). The entry stays until the slowest-
-    // invocations table std-test now prints has held on consecutive
-    // windows runs. Dropping it is proposed in sc52's PR and is not done
-    // here.
-    Advisory {
-        command: "cargo xtask std-test",
-        expr: "${{ runner.os == 'Windows' }}",
-        issue: "wolf-std#34",
-    },
+    // sc52 (wolf-std#34): empty. std-test gates on every host;
+    // a new advisory step must be blessed here with its issue.
 ];
 
 /// One `cargo …` invocation of the workflow, with the advisory marker of
