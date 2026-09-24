@@ -911,6 +911,11 @@ lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch throu
 wolfc = "run"  # sc44 pin bump (c9237c1)
 native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
+[tests."map/remove_many.lu"]
+lupin = "run"  # sc52 (B117): 3000 removes through the language's `m.remove(k)`; the pairs() rebuild ran past the 50M-step budget here
+wolfc = "run"  # sc52 (B117): the rebuild ran past the checked tier's budget
+native = "run"  # sc52 (B117)
+
 # ---- sc02: std.pool (X5 — the two-phase protocol and the stale-handle
 # trap execute in both) ----
 

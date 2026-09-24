@@ -1,0 +1,85 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map, type.map
+//!
+//! B117: `map.remove` at size. The test builds a 3000-entry map and
+//! removes every key through `map.remove`: the front thousand in order,
+//! then the back thousand in reverse, then the middle thousand odd keys
+//! first. It checks every returned value, the survivors' order after the
+//! first two passes (`pairs()` still starts at 1000 and ends at 1999),
+//! that a second remove of a gone key misses, and that the map ends
+//! empty.
+//!
+//! This is the row that tells the two bodies apart. The old body
+//! rebuilt the whole map through `pairs()` on every call, so 3000
+//! removes cost about N^2 entry copies. That ran past lupin's 50M-step
+//! budget and the checked tier's byte budget, which never refunds, so
+//! both answered `unsupported`. The language's `m.remove(k)`
+//! (`[type.map]`, wolf-lang#344) is one scan and one shift with nothing
+//! allocated, and it runs on all three lanes. The measurement is in
+//! `docs/findings.md` F-0139.
+
+use std.map
+
+fn main() -> !int {
+    let n = 3000
+    var m = Map[int, int]()
+    var i = 0
+    while i < n {
+        m[i] = i * 7
+        i = i + 1
+    }
+    if m.len == n {} else { return 1 }
+
+    // The front thousand, in insertion order.
+    i = 0
+    while i < 1000 {
+        let v = map.remove(mut m, i) else -1
+        if v == i * 7 {} else { return 2 }
+        i = i + 1
+    }
+    // The back thousand, newest first.
+    i = n - 1
+    while i >= 2000 {
+        let v = map.remove(mut m, i) else -1
+        if v == i * 7 {} else { return 3 }
+        i = i - 1
+    }
+    if m.len == 1000 {} else { return 4 }
+
+    // The survivors keep the order they were first bound in.
+    var first = -1
+    var last = -1
+    var seen = 0
+    for pair in m.pairs() {
+        if seen == 0 {
+            first = pair.0
+        }
+        last = pair.0
+        seen = seen + 1
+    }
+    if first == 1000 {} else { return 5 }
+    if last == 1999 {} else { return 6 }
+    if seen == 1000 {} else { return 7 }
+
+    // A key already gone misses and leaves the map as it was.
+    let miss = map.remove(mut m, 0) else -1
+    if miss == -1 {} else { return 8 }
+    if m.len == 1000 {} else { return 9 }
+
+    // The middle thousand: the odd keys, then the even ones.
+    i = 1001
+    while i < 2000 {
+        let v = map.remove(mut m, i) else -1
+        if v == i * 7 {} else { return 10 }
+        i = i + 2
+    }
+    i = 1000
+    while i < 2000 {
+        let v = map.remove(mut m, i) else -1
+        if v == i * 7 {} else { return 11 }
+        i = i + 2
+    }
+    if m.len == 0 {} else { return 12 }
+    0
+}
