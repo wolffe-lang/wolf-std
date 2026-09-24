@@ -260,9 +260,28 @@ jobs:
         # STD_TEST_TIMEOUT_SECS on windows and prove it over consecutive
         # runs -- which is its own change, not a rider on a pin bump.
         #
+        # sc52 RAISES THAT CEILING, ON WINDOWS ALONE, TO 180 s. The five
+        # rows are not slow answers. They are step-budget refusals:
+        # `cavp_sha{256,384,512}_long`, `p256/rfc6979_p256` and
+        # `p256/sign_verify_smoke` are `unsupported` on lupin because
+        # lupin runs to its 50M-evaluation-step budget and then refuses.
+        # The step count is the same on every host, and the time taken to
+        # reach it is the runner's speed. `windows-latest` runners differ
+        # by about 1.8x from run to run: this step took 1574 s to 2801 s
+        # over the nineteen windows logs sc52 read. On the slow runners
+        # the five rows land at 55-67 s, per-test, from the log's own
+        # timestamps (F-0139). Every other host keeps 60 s. std-test now
+        # ends with its slowest invocations against the ceiling, so the
+        # margin is printed on every run and not inferred from a green.
+        # The marker stays until that table has held on consecutive runs.
+        # Dropping the marker is proposed in sc52's PR and is not done
+        # here.
+        #
         # Blessed in `workflow::ADVISORY_STEPS`; changing it here without
         # changing it there reds `rig` on all three hosts.
         continue-on-error: ${{ runner.os == 'Windows' }}
+        env:
+          STD_TEST_TIMEOUT_SECS: ${{ runner.os == 'Windows' && '180' || '60' }}
         run: cargo xtask std-test
       # The step above is the only advisory step in this file. This one
       # exists so that being advisory is never the same as being quiet:

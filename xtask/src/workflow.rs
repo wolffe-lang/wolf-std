@@ -146,6 +146,13 @@ pub const ADVISORY_STEPS: &[Advisory] = &[
     // vectors -- a different set of rows each run, and only on windows.
     // Raising STD_TEST_TIMEOUT_SECS there, proved over consecutive runs,
     // is what retires this entry.
+    //
+    // sc52 raised it to 180 s on windows alone (ci.yml's step `env:`),
+    // because those rows are lupin step-budget refusals whose wall time is
+    // the runner's speed (F-0139). The entry stays until the slowest-
+    // invocations table std-test now prints has held on consecutive
+    // windows runs. Dropping it is proposed in sc52's PR and is not done
+    // here.
     Advisory {
         command: "cargo xtask std-test",
         expr: "${{ runner.os == 'Windows' }}",
