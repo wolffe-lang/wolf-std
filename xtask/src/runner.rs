@@ -17,7 +17,7 @@ use crate::{anchors, repo_root};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// What one implementation achieved on one test, in ledger vocabulary.
 #[derive(Debug, Clone, PartialEq)]
@@ -264,6 +264,9 @@ pub fn std_test() -> Result<(), String> {
     let mut divergent_rows: Vec<String> = Vec::new();
     let mut mirror_lag_rows: Vec<String> = Vec::new();
     let mut divergences: Vec<serde_json::Value> = Vec::new();
+    // Every lane invocation's wall time, timed-out ones included, so the
+    // ceiling's margin is printed on every host on every run (wolf-std#34).
+    let mut timings: Vec<(Duration, String)> = Vec::new();
     let mut ran = 0usize;
 
     for test in &tests {
@@ -310,7 +313,13 @@ pub fn std_test() -> Result<(), String> {
                 ));
                 continue;
             }
-            let rec = match invoke(*imp, &resolved.path, &staged, &check, &phase, ceiling) {
+            let started = Instant::now();
+            let got = invoke(*imp, &resolved.path, &staged, &check, &phase, ceiling);
+            timings.push((
+                started.elapsed(),
+                format!("tests/{test} [{}]", imp.ledger_name()),
+            ));
+            let rec = match got {
                 Ok(rec) => rec,
                 Err(e) => {
                     reds.push(format!("tests/{test} [{}]: {e}", imp.ledger_name()));
@@ -558,12 +567,43 @@ pub fn std_test() -> Result<(), String> {
     for line in &conservatism {
         println!("  {line}");
     }
+    println!(
+        "std-test: the slowest lane invocations against the {}s ceiling \
+         (wolf-std#34; STD_TEST_TIMEOUT_SECS overrides):",
+        ceiling.as_secs()
+    );
+    for line in slowest(&timings, SLOWEST_SHOWN, ceiling) {
+        println!("  {line}");
+    }
     if reds.is_empty() {
         println!("std-test: GREEN");
         Ok(())
     } else {
         Err(reds.join("\n"))
     }
+}
+
+/// How many rows of the slowest-invocations table every run prints.
+const SLOWEST_SHOWN: usize = 8;
+
+/// The `n` slowest lane invocations, slowest first, each with its share
+/// of the ceiling. A timed-out invocation is printed at the ceiling or
+/// just past it, so a red and a near-miss read the same way. This is the
+/// margin wolf-std#34 needed and no run printed: the per-test lines say
+/// only that a test finished, and a green says nothing about how close it
+/// came to the ceiling.
+fn slowest(timings: &[(Duration, String)], n: usize, ceiling: Duration) -> Vec<String> {
+    let mut sorted: Vec<&(Duration, String)> = timings.iter().collect();
+    sorted.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+    let ceil = ceiling.as_secs_f64().max(f64::MIN_POSITIVE);
+    sorted
+        .into_iter()
+        .take(n)
+        .map(|(d, what)| {
+            let secs = d.as_secs_f64();
+            format!("{secs:7.1}s  {:3.0}%  {what}", 100.0 * secs / ceil)
+        })
+        .collect()
 }
 
 fn invoke(
@@ -748,6 +788,27 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn slowest_sorts_descending_and_states_the_ceiling_share() {
+        let t = |ms: u64, w: &str| (Duration::from_millis(ms), w.to_string());
+        let rows = [
+            t(1_000, "tests/a.lu [lupin]"),
+            t(61_500, "tests/b.lu [lupin]"),
+            t(30_000, "tests/c.lu [native]"),
+            t(30_000, "tests/b.lu [wolfc]"),
+        ];
+        let got = slowest(&rows, 3, Duration::from_secs(60));
+        assert_eq!(
+            got,
+            [
+                "   61.5s  102%  tests/b.lu [lupin]",
+                "   30.0s   50%  tests/b.lu [wolfc]",
+                "   30.0s   50%  tests/c.lu [native]",
+            ]
+        );
+        assert!(slowest(&[], 8, Duration::from_secs(60)).is_empty());
+    }
     #[test]
     fn mirror_lag_matches_only_that_static_refusal() {
         // The word's whole contract, both directions (wolf-std#27).
