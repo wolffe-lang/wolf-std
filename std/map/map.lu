@@ -289,21 +289,21 @@ pub fn has[K: cmp.Eq, V](m: Map[K, V], k: K) -> bool {
 /// (map.remove(mut m, "a") else 0 - 1) == 0 - 1
 /// ```
 ///
-/// The implementation cost this signature hides is UNCHANGED by
-/// s152 and worth restating because the rest of the header moved: no
-/// builtin erases a key, so the body rebuilds the map without it.
-/// wolf-lang#11's D50 approved a key-erase builtin and s152 did not add
-/// one, so the cost stands and so does the filing.
+/// Delegates to the language's `m.remove(k)` (`[type.map]`; D50 on
+/// wolf-lang#11, landed as wolf-lang#344), whose semantics are therefore
+/// this function's contract. The erase happens in place. The survivors
+/// keep their order, and a miss leaves the map unchanged. Its cost is the
+/// clause's: one scan to the key and a shift of the entries after it,
+/// with nothing allocated and nothing freed. Until sc52 this body rebuilt
+/// the whole map through `pairs()`, about N^2 entry copies to empty an
+/// N-entry map one key at a time. That ran past lupin's and the checked
+/// tier's step budgets at 3000 keys (`tests/map/remove_many.lu`), and
+/// the language had shipped the erase a release earlier (B117).
+/// The `[K: cmp.Eq]` bound stays, because it is the module's key
+/// protocol (`[type.map.key]`) and removing it would change the signature.
+/// The body no longer calls it.
 pub fn remove[K: cmp.Eq, V](mut m: Map[K, V], k: K) -> V ! {none} {
-    let v = get(m, k)?
-    var out = Map[K, V]()
-    for pair in m.pairs() {
-        if !cmp.Eq.eq(pair.0, k) {
-            out[pair.0] = pair.1
-        }
-    }
-    m = out
-    v
+    (mut m).remove(k)
 }
 
 /// Increments the count `k` is bound to and returns the new count,

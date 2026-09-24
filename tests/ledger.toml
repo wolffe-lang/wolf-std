@@ -912,8 +912,8 @@ wolfc = "run"  # sc44 pin bump (c9237c1)
 native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 [tests."map/remove_many.lu"]
-lupin = "run"  # sc52 (B117): 3000 removes through the language's `m.remove(k)`; the pairs() rebuild ran past the 50M-step budget here
-wolfc = "run"  # sc52 (B117): the rebuild ran past the checked tier's budget
+lupin = "run"  # sc52 (B117): 1.3 s on kasumi through the language's `m.remove(k)`; trunk's pairs() rebuild answered `did not terminate within 50000000 evaluation steps` after 191 s (F-0139)
+wolfc = "run"  # sc52 (B117): trunk's rebuild answered `step budget exhausted` (F-0139)
 native = "run"  # sc52 (B117)
 
 # ---- sc02: std.pool (X5 — the two-phase protocol and the stale-handle
