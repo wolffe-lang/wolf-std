@@ -145,6 +145,7 @@ the building.
 | F-0135 | 2026-09-15 | **`[type.comb.set]`'s `sorted[T: cmp.Ord]` is written and ships on no lane at trunk 073aa19**: `use std.cmp` in `std.list` makes every importer native `unsupported` (std.cmp's product pattern; sc49 / wolf-std#31 option 3 removes it, measured against origin/sc49's `std/cmp`: importers three-lane, `sorted` lupin + native); the checked machine declines `a < b` under `T: cmp.Ord` as "trait dispatch on a non-nominal receiver" when `T` is bound through a list read, while the same fn over two `int` bindings runs; and passing the generic `ord_less` as a fn value is "a generic function used as a value (comptime)" at resolve, darkening every importer | [wolf-lang#402](https://github.com/wolffe-lang/wolf-lang/issues/402); wolf-std PR #40 | sc50 probe |
 | F-0136 | 2026-09-15 | **`push` takes no written mode at wolf 0.2.14, so #385's `take` spelling cannot be adopted before the pin moves**: `(mut out).push(take v)` is `E1007 — \`push\` takes \`value\` as plain \`read\` — no mode is written for it` on BOTH compiler rungs, for a call argument and for a binding alike, while lupin 0.1.36 runs it. A static refusal of the module, so every `std.list` row on both rungs would pay for one function's spelling. sc50's combinators therefore write plain `push` and name the owed `take` in `map`'s doc | wolf-lang#385 (ruled option 3, lane s167) | sc50 probe |
 | F-0137 | 2026-09-15 | **A module-keyed `LUPIN_MIRROR_LAG` entry calls a new RUNNING block "the mirror moved"**: sc49's word was keyed by module, true while every `std.range` block went through an accessor; sc50's `range.collect` names none and runs on lupin, so `doc-examples` redded `range.lu:176` with "the mirror moved (a heal, or a different refusal)" while the mirror had not moved at all. Keyed by the call now, one entry per example (`range.is_empty(`, `range.contains(`, `range.len(`, `range.clamp_to(`), the shape `LUPIN_TIER_WAIVERS` already had; the selftest counts blocks writing that call | wolf-std#37 | sc50, caught by the gate itself |
+| F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52, predictions open |
 
 
 ## F-0001 — the std search path
@@ -10105,3 +10106,79 @@ measurement lacked.
 
 Eighteen rows advance at this pin in total, all in that direction; none goes
 shallower.
+
+## F-0139 — sc52's predictions, before the first edit
+
+Written at wolf-std trunk `070884c` before any file under `std/`, `tests/`,
+`xtask/` or `.github/` changed. Each prediction carries the number that
+falsifies it. The measurements are appended below them, not written over
+them.
+
+**Pins.** Trunk pins wolf 0.2.15 / lupin 0.1.37. `m.remove(k)` is in the
+0.2.15 spec (`[type.map]`, wolf-lang#344) but lupin 0.1.37 does not have
+it: wolf-interp `6219dcf` ("Map.remove erases through a mut receiver") is
+an ancestor of `v0.1.38` and not of `v0.1.37`. So B117 needs the binary
+pin at wolf 0.2.16 / lupin 0.1.38 and nothing more. lupin 0.1.38 names
+pin `2e4ca76`, which is this repository's data pin already, so the data
+pin does not move.
+
+### P1. B117: the shape, and the test that is red at trunk
+
+- **Shape.** `map.remove`'s body becomes one delegation,
+  `(mut m).remove(k)`. The signature stays
+  `remove[K: cmp.Eq, V](mut m: Map[K, V], k: K) -> V ! {none}`, the
+  doc example stays, and the "no builtin erases a key" paragraph is
+  replaced by the builtin's cost sentence (one scan to the key, one shift,
+  nothing freed).
+- **The red test is `tests/map/remove_many.lu`.** It builds a
+  `Map[int, int]` of **3000** entries, removes every key (from the front,
+  the back and the middle), checks each returned value and the survivors'
+  order, and ends at `len == 0`. At trunk's body with the new binaries it
+  is red on two lanes: **lupin `unsupported`** (its 50M-step budget;
+  about 12.5·N² steps at N = 3000) and **wolfc `unsupported`** (the
+  checked tier's byte budget, since every rebuild allocates a fresh map
+  and the budget never refunds). **native `run`.** After the fix: `run`
+  on all three. This is falsified if trunk's body runs on lupin or on
+  wolfc at N = 3000.
+- **Benchmark, 10k keys removed, native lane on kasumi.** Trunk's body
+  is **at least 100x** slower than the builtin, and the builtin finishes
+  in **under 1 s**. Falsified below 100x.
+
+### P2. wolf-std#34: the cause, and the number that makes REQUIRED possible
+
+- **Vector counts.** `cavp_sha384_long` and `cavp_sha512_long` hold 128
+  vectors each (1816..102400 bits), `cavp_sha256_long` holds 64;
+  `p256/rfc6979_p256` has 2 signatures and `p256/sign_verify_smoke` has
+  one round trip.
+- **Cause.** On all five rows the lupin ledger word is `unsupported`,
+  which lupin reaches by running to its **50M-evaluation-step budget**
+  and refusing. The lane's wall time is therefore the time lupin takes to
+  run 50M steps over the row, and has nothing to do with how many
+  vectors the file holds or whether the answer is right. The step count
+  is the same on every host, and windows runners are slower, so windows
+  alone crosses 60 s. Over the 13 windows runs at the 0.1.37 pin, 8
+  timed out (`sha384_long` 8, `sha512_long` 5, `rfc6979_p256` 1,
+  `sign_verify_smoke` 1). **Per-vector time on windows**: lupin
+  completes **at most 2** of `sha384_long`'s vectors before it refuses,
+  at about 80 ms per 128-byte block (twice the header's ~40 ms linux
+  figure).
+- **The number.** On kasumi the slowest lupin row takes **20–40 s**. On
+  `windows-latest` the same rows take **60–100 s**, and **none exceeds
+  120 s**. The fix is a ceiling raised on windows alone, to **180 s**, and
+  the reason is that the verdict is a step budget and not a clock. The
+  rows are not split (a split would turn a budget refusal into a
+  different refusal and add rows) and they are not skipped (the lupin
+  word is observed today and would stop being observed). Falsified if
+  any windows lupin row exceeds 120 s, or if one times out at 180 s.
+
+### P3. wolf-std#4 and #5: which one needs upstream
+
+**Both need upstream, and neither can be written in std without emulating
+the capability, which §14 forbids.** #5 needs a create-with-mode (or
+chmod) builtin. wolf-lang#346 is open and nothing like it exists in the
+`fs_*` set at 0.2.16 or at wolf-lang trunk. #4 needs a `net_resolve` with
+a deadline. wolf-lang#217 is open, and at 0.2.16 `net_connect` is still
+the only thing that resolves a name. Both upstream halves are already
+filed, so the lane files **no** new wolf-lang issue for either one. It
+comments the exact missing call on #346 and #217. Falsified if any
+builtin in 0.2.16's `[os.*]` builtin list can serve either surface.
