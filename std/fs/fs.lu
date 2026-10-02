@@ -54,8 +54,11 @@
 //! `fs_read_chunk`, `fs_write_chunk`, `fs_read_dir`, `fs_create_dir`,
 //! `fs_create_dir_all`, `fs_remove_dir`, `fs_remove_dir_all`,
 //! `fs_rename`, `fs_is_file`, `fs_is_dir`, `fs_size`,
-//! `fs_modified_ms`) — so their semantics are part of this module's
-//! contract and are documented per function. std owns everything else:
+//! `fs_modified_ms`), s142's `fs_fstat`, and s199's three
+//! (`fs_seek`, `fs_tell`, `fs_read_at` — wolf-lang#426, with the
+//! standard streams as handles 0, 1 and 2, #424) — so their semantics
+//! are part of this module's contract and are documented per
+//! function. std owns everything else:
 //! the `File` value, the consuming `close`, the mode choice behind
 //! `append_text`/`open_append`, `move_file`'s fast path and its
 //! fallback, and the path arithmetic. The LANGUAGE owns nothing here;
@@ -1092,6 +1095,191 @@ pub struct Stat {
 pub fn fstat(mut f: File) -> Stat ! IoErrors {
     let got = fs_fstat(f.fd)?
     Stat { kind: got[0], size: got[1], modified_ms: got[2] }
+}
+
+/// The process's standard input, as a `File`.
+///
+/// `[os.fs.std]` (wolf-lang#424): the handle numbers 0, 1 and 2 are the
+/// three streams the process was started with, and no open ever answers
+/// one of them. This is that number in this module's type, so the
+/// handle calls below can ask what standard input IS — a regular file
+/// (`fstat(mut f)?.kind == 0`, and then its size), a pipe or a terminal
+/// (`kind` 2) — and, when it is a file, read it at an offset without
+/// reading forward to get there.
+///
+/// **What it serves, at this pin:** `fstat`, `seek`, `seek_by`,
+/// `seek_end`, `tell` and `read_at`. **What it does not:** `read`,
+/// `read_chunk`, `write`, `write_chunk` and `close` answer `io` on it,
+/// as on any handle no open made — reading and writing the standard
+/// streams as bytes is wolf-lang#405's, and this doc moves with it.
+/// Nothing here closes the stream, and there is no way to: `close`
+/// answers `io`.
+///
+/// Total, and reaches nothing until a call is made on the value.
+/// Capability `fs` for the calls that take it.
+///
+/// The example runs with descriptor 1 a pipe — the rig's — and a pipe
+/// has no position, so the seek is refused (`unseekable`, by name;
+/// `tests/fs/std_handles.lu` asserts the tag):
+///
+/// ```wolf-doc-example
+/// var o = fs.stdout()
+/// let at = fs.seek(mut o, 0) else 0 - 7
+/// at == 0 - 7
+/// ```
+pub fn stdin() -> File {
+    File { fd: 0 }
+}
+
+/// The process's standard output, as a `File` — `stdin`'s doc in every
+/// respect, for descriptor 1. Writing through it is `io` at this pin
+/// (wolf-lang#405); `std.io.write` is the writer.
+pub fn stdout() -> File {
+    File { fd: 1 }
+}
+
+/// The process's standard error, as a `File` — `stdin`'s doc in every
+/// respect, for descriptor 2. `std.io.write_err` is the writer.
+pub fn stderr() -> File {
+    File { fd: 2 }
+}
+
+/// Move `f`'s position to byte `off` from the START of the file, and
+/// answer it.
+///
+/// `[os.fs.seek]` (wolf-lang#426), whence 0. Rows: `invalid` when `off`
+/// is below zero (decided before the host is touched, and the position
+/// does not move), `unseekable` when the handle has no position — a
+/// pipe, a fifo, a socket, a terminal — and `io` for a closed or forged
+/// handle or a host failure. A position past the end is legal; a read
+/// there is `eof`. Never traps.
+///
+/// `unseekable` is its own tag because the response to it is: a
+/// program that wanted to skip ahead reads forward instead, as `tail`
+/// does through a pipe. Three functions rather than one with a `whence`
+/// argument, because a bare `int` whose meaning is the contract is the
+/// shape §14 names in a type or a name — `seek_end(mut f, 0 - 10)`
+/// cannot be misread, `seek(mut f, 0 - 10, 2)` can.
+///
+/// `mut f` because the position moves.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_seek`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-seek.tmp", "0123456789")?
+/// var f = fs.open("doc-seek.tmp")?
+/// (fs.seek(mut f, 6) else 0) == 6
+/// let rest = fs.read_chunk(mut f, 8) else List[byte]()
+/// rest.len == 4
+/// fs.close(take f)?
+/// fs.remove("doc-seek.tmp")?
+/// ```
+pub fn seek(mut f: File, off: int) -> int ! {invalid, io, unseekable} {
+    fs_seek(f.fd, off, 0)?
+}
+
+/// Move `f`'s position by `delta` bytes from where it is, and answer
+/// the new position from the start.
+///
+/// `[os.fs.seek]`, whence 1. Rows as `seek`'s: `invalid` when the move
+/// would land below zero (the position does not move), `unseekable`,
+/// `io`. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_seek`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-seek-by.tmp", "0123456789")?
+/// var f = fs.open("doc-seek-by.tmp")?
+/// let head = fs.read_chunk(mut f, 2) else List[byte]()
+/// head.len == 2
+/// (fs.seek_by(mut f, 3) else 0) == 5
+/// fs.close(take f)?
+/// fs.remove("doc-seek-by.tmp")?
+/// ```
+pub fn seek_by(mut f: File, delta: int) -> int ! {invalid, io, unseekable} {
+    fs_seek(f.fd, delta, 1)?
+}
+
+/// Move `f`'s position to `off` bytes from the END of the file — zero
+/// is the end, negative is before it — and answer it from the start.
+///
+/// `[os.fs.seek]`, whence 2. `seek_end(mut f, 0)` answers the file's
+/// size, the way `tail` finds where to walk back from. Rows as
+/// `seek`'s: `invalid` when the position would land below zero,
+/// `unseekable`, `io`. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_seek`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-seek-end.tmp", "0123456789")?
+/// var f = fs.open("doc-seek-end.tmp")?
+/// (fs.seek_end(mut f, 0) else 0) == 10
+/// (fs.seek_end(mut f, 0 - 3) else 0) == 7
+/// let last = fs.read_chunk(mut f, 8) else List[byte]()
+/// last.len == 3
+/// fs.close(take f)?
+/// fs.remove("doc-seek-end.tmp")?
+/// ```
+pub fn seek_end(mut f: File, off: int) -> int ! {invalid, io, unseekable} {
+    fs_seek(f.fd, off, 2)?
+}
+
+/// `f`'s position, from the start of the file, without moving it.
+///
+/// `[os.fs.tell]` (wolf-lang#426). A handle fresh from `open` answers 0;
+/// after reads of `a` and `b` bytes it answers `a + b`. Rows:
+/// `unseekable` for a handle with no position, `io` for a closed or
+/// forged handle or a host failure. Never traps.
+///
+/// `mut f` for the stream rule (§14): the call site spells that the
+/// handle is in play, as `fstat` does.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_tell`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-tell.tmp", "wolves")?
+/// var f = fs.open("doc-tell.tmp")?
+/// let head = fs.read_chunk(mut f, 4) else List[byte]()
+/// head.len == 4
+/// (fs.tell(mut f) else 0) == 4
+/// fs.close(take f)?
+/// fs.remove("doc-tell.tmp")?
+/// ```
+pub fn tell(mut f: File) -> int ! {io, unseekable} {
+    fs_tell(f.fd)?
+}
+
+/// Up to `max` bytes of `f` starting at byte `off`, leaving `f`'s own
+/// position exactly where it was.
+///
+/// `[os.fs.read_at]` (wolf-lang#426) — `pread`. The order is the fd
+/// tier's: the handle (closed or forged is `io`), then the offset
+/// (below zero is `invalid`), then `max` (at or below zero answers the
+/// empty list and touches nothing), the 1 MiB cap `read_chunk` carries,
+/// and no bytes at a positive `max` is `eof` — the offset is at or past
+/// the end. `unseekable` for a handle with no position. Never traps.
+///
+/// This is the read for a program that knows where the bytes are:
+/// `tail -n 10` takes the size from `fstat` and walks back a block at a
+/// time, touching a few kilobytes of a file of any size, where reading
+/// forward touched all of it. Because the position does not move, two
+/// readers of one `File` need no seek between them.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_read_at`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-read-at.tmp", "0123456789")?
+/// var f = fs.open("doc-read-at.tmp")?
+/// let mid = fs.read_at(mut f, 5, 3) else List[byte]()
+/// mid.len == 3
+/// mid[0] as int == 53
+/// (fs.tell(mut f) else 1) == 0
+/// fs.close(take f)?
+/// fs.remove("doc-read-at.tmp")?
+/// ```
+pub fn read_at(mut f: File, off: int, max: int) -> List[byte] ! {eof, invalid, io, unseekable} {
+    fs_read_at(f.fd, off, max)?
 }
 
 /// `base` and `name` joined with a single `/`.

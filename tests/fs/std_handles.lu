@@ -1,0 +1,81 @@
+//! check: run(exit=0, stdout="stdout seek: unseekable\nstdout tell: unseekable\nstderr read_at: unseekable\nstdout close: io")
+//! phase: run
+//! conforms: std.fs, os.fs, err.row
+//!
+//! (The clause anchors — `os.fs.seek`, `os.fs.tell`, `os.fs.read_at`,
+//! `os.fs.std` — join this line at the pin bump that vendors them; the
+//! pinned registry names `os.fs` and no s199 clause yet, and the rig
+//! refuses a tag it cannot resolve, `[conf.tag.valid]`.)
+//!
+//! `[os.fs.std]` through `std.fs` (s199, wolf-lang#424): `fs.stdout()`
+//! and `fs.stderr()` are descriptors 1 and 2, which the rig wires to
+//! pipes on every lane (the native rung's `conform-run` captures both,
+//! the checked machine and lupin observe in a process whose 1 and 2 are
+//! the rig's pipes). A pipe has no position, so every offset call is
+//! refused BY NAME — `unseekable`, never `io` — on every tier-1 host
+//! (unix answers the host's `ESPIPE`; windows asks first and refuses
+//! anything that is not a regular file, as the clause says).
+//!
+//! The last line pins the clause's limit at this pin: a standard stream
+//! is not a handle this process opened, and `close` on it is `io`
+//! (reading and writing the streams as bytes is wolf-lang#405's).
+//! What descriptor 0 IS here — the rig's null device — is not asserted:
+//! its `fstat` kind and its seek differ by host and say nothing about
+//! the clause; the file-versus-pipe witness is upstream's
+//! `fs_std_lanes.rs`, which sets descriptor 0 itself.
+
+use std.fs
+
+fn seek_line() -> str {
+    var o = fs.stdout()
+    let at = fs.seek(mut o, 0) else |e| {
+        return match e {
+            invalid => "invalid",
+            unseekable => "unseekable",
+            io => "io",
+        }
+    }
+    "answered {at}"
+}
+
+fn tell_line() -> str {
+    var o = fs.stdout()
+    let at = fs.tell(mut o) else |e| {
+        return match e {
+            unseekable => "unseekable",
+            io => "io",
+        }
+    }
+    "answered {at}"
+}
+
+fn read_at_line() -> str {
+    var r = fs.stderr()
+    let got = fs.read_at(mut r, 0, 4) else |e| {
+        return match e {
+            eof => "eof",
+            invalid => "invalid",
+            unseekable => "unseekable",
+            io => "io",
+        }
+    }
+    "answered {got.len}"
+}
+
+fn close_line() -> str {
+    let o = fs.stdout()
+    fs.close(take o) else |e| {
+        return match e {
+            io => "io",
+        }
+    }
+    "closed"
+}
+
+fn main() -> int {
+    print("stdout seek: {seek_line()}")
+    print("stdout tell: {tell_line()}")
+    print("stderr read_at: {read_at_line()}")
+    print("stdout close: {close_line()}")
+    0
+}
