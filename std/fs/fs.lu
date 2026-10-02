@@ -54,8 +54,11 @@
 //! `fs_read_chunk`, `fs_write_chunk`, `fs_read_dir`, `fs_create_dir`,
 //! `fs_create_dir_all`, `fs_remove_dir`, `fs_remove_dir_all`,
 //! `fs_rename`, `fs_is_file`, `fs_is_dir`, `fs_size`,
-//! `fs_modified_ms`) — so their semantics are part of this module's
-//! contract and are documented per function. std owns everything else:
+//! `fs_modified_ms`), s142's `fs_fstat`, and s199's three
+//! (`fs_seek`, `fs_tell`, `fs_read_at` — wolf-lang#426, with the
+//! standard streams as handles 0, 1 and 2, #424) — so their semantics
+//! are part of this module's contract and are documented per
+//! function. std owns everything else:
 //! the `File` value, the consuming `close`, the mode choice behind
 //! `append_text`/`open_append`, `move_file`'s fast path and its
 //! fallback, and the path arithmetic. The LANGUAGE owns nothing here;
