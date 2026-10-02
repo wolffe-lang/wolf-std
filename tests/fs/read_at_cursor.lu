@@ -1,6 +1,11 @@
 //! check: run(exit=0, stdout="head: 01\nat 5: 567\ntell: 2\nnext: 23\nat end: eof\nempty: 0\nnegative: invalid")
 //! phase: run
-//! conforms: std.fs, os.fs.read_at, os.fs.tell, err.row, err.propagate
+//! conforms: std.fs, os.fs, err.row, err.propagate
+//!
+//! (The clause anchors — `os.fs.seek`, `os.fs.tell`, `os.fs.read_at`,
+//! `os.fs.std` — join this line at the pin bump that vendors them; the
+//! pinned registry names `os.fs` and no s199 clause yet, and the rig
+//! refuses a tag it cannot resolve, `[conf.tag.valid]`.)
 //!
 //! `[os.fs.read_at]` through `std.fs` (s199, wolf-lang#426): the bytes
 //! at an offset, and the handle's own position left exactly where it
