@@ -1119,19 +1119,13 @@ pub fn fstat(mut f: File) -> Stat ! IoErrors {
 /// Capability `fs` for the calls that take it.
 ///
 /// The example runs with descriptor 1 a pipe — the rig's — and a pipe
-/// has no position, so the seek is refused by name, never by `io`:
+/// has no position, so the seek is refused (`unseekable`, by name;
+/// `tests/fs/std_handles.lu` asserts the tag):
 ///
 /// ```wolf-doc-example
 /// var o = fs.stdout()
-/// var refused = false
-/// fs.seek(mut o, 0) else |e| match e {
-///     unseekable => {
-///         refused = true
-///         0
-///     },
-///     _ => 0,
-/// }
-/// refused
+/// let at = fs.seek(mut o, 0) else 0 - 7
+/// at == 0 - 7
 /// ```
 pub fn stdin() -> File {
     File { fd: 0 }
