@@ -1118,9 +1118,10 @@ pub fn fstat(mut f: File) -> Stat ! IoErrors {
 /// Total, and reaches nothing until a call is made on the value.
 /// Capability `fs` for the calls that take it.
 ///
+/// The example runs with descriptor 1 a pipe — the rig's — and a pipe
+/// has no position, so the seek is refused by name, never by `io`:
+///
 /// ```wolf-doc-example
-/// // The rig hands every example a pipe on descriptor 1, and a pipe
-/// // has no position: the seek is refused by name, not by `io`.
 /// var o = fs.stdout()
 /// var refused = false
 /// fs.seek(mut o, 0) else |e| match e {
