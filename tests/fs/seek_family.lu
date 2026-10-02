@@ -49,9 +49,11 @@ fn main() -> !int {
 
     let a = fs.read_chunk(mut f, 3)?
     let b = fs.read_chunk(mut f, 4)?
-    print("tell: {fs.tell(mut f)?}")
+    let told = fs.tell(mut f)?
+    print("tell: {told}")
 
-    print("end: {fs.seek_end(mut f, 0)?}")
+    let end = fs.seek_end(mut f, 0)?
+    print("end: {end}")
     var at_end = "bytes"
     fs.read_chunk(mut f, 4) else |e| match e {
         eof => {
@@ -62,17 +64,24 @@ fn main() -> !int {
     }
     print("at end: {at_end}")
 
-    print("back: {fs.seek_end(mut f, 0 - 3)?}")
+    let back = fs.seek_end(mut f, 0 - 3)?
+    print("back: {back}")
     let last = fs.read_chunk(mut f, 16)?
     print("last: {str_from_utf8(last)?}")
 
-    print("seek: {fs.seek(mut f, 2)?}")
-    print("seek_by: {fs.seek_by(mut f, 3)?}")
-    print("past end: {fs.seek_end(mut f, 4)?}")
+    let start = fs.seek(mut f, 2)?
+    print("seek: {start}")
+    let moved = fs.seek_by(mut f, 3)?
+    print("seek_by: {moved}")
+    let past = fs.seek_end(mut f, 4)?
+    print("past end: {past}")
 
-    print("bad offset: {seek_row(mut f, 0 - 1)}")
-    print("below zero: {seek_by_row(mut f, 0 - 100)}")
-    print("unmoved: {fs.tell(mut f)?}")
+    let bad = seek_row(mut f, 0 - 1)
+    print("bad offset: {bad}")
+    let below = seek_by_row(mut f, 0 - 100)
+    print("below zero: {below}")
+    let unmoved = fs.tell(mut f)?
+    print("unmoved: {unmoved}")
 
     fs.close(take f)?
     fs.remove("seek-family.tmp")?

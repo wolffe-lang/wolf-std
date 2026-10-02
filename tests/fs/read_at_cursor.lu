@@ -36,14 +36,17 @@ fn main() -> !int {
     print("head: {str_from_utf8(head)?}")
     let mid = fs.read_at(mut f, 5, 3)?
     print("at 5: {str_from_utf8(mid)?}")
-    print("tell: {fs.tell(mut f)?}")
+    let told = fs.tell(mut f)?
+    print("tell: {told}")
     let next = fs.read_chunk(mut f, 2)?
     print("next: {str_from_utf8(next)?}")
 
-    print("at end: {read_at_row(mut f, 10, 4)}")
+    let at_end = read_at_row(mut f, 10, 4)
+    print("at end: {at_end}")
     let empty = fs.read_at(mut f, 3, 0)?
     print("empty: {empty.len}")
-    print("negative: {read_at_row(mut f, 0 - 1, 4)}")
+    let negative = read_at_row(mut f, 0 - 1, 4)
+    print("negative: {negative}")
 
     fs.close(take f)?
     fs.remove("read-at.tmp")?
