@@ -1,0 +1,46 @@
+//! check: run(exit=0, stdout="head: 01\nat 5: 567\ntell: 2\nnext: 23\nat end: eof\nempty: 0\nnegative: invalid")
+//! phase: run
+//! conforms: std.fs, os.fs.read_at, os.fs.tell, err.row, err.propagate
+//!
+//! `[os.fs.read_at]` through `std.fs` (s199, wolf-lang#426): the bytes
+//! at an offset, and the handle's own position left exactly where it
+//! was. Two bytes read forward, three read at offset 5, and the
+//! position still says 2 — the next forward read is bytes 2 and 3. A
+//! read at the size is `eof`, a `max` of zero is the empty list, and a
+//! negative offset is `invalid`.
+
+use std.fs
+
+fn read_at_row(mut f: fs.File, off: int, max: int) -> str {
+    let got = fs.read_at(mut f, off, max) else |e| {
+        return match e {
+            eof => "eof",
+            invalid => "invalid",
+            unseekable => "unseekable",
+            io => "io",
+        }
+    }
+    str_from_utf8(got) else "utf8"
+}
+
+fn main() -> !int {
+    fs.write_text("read-at.tmp", "0123456789")?
+    var f = fs.open("read-at.tmp")?
+
+    let head = fs.read_chunk(mut f, 2)?
+    print("head: {str_from_utf8(head)?}")
+    let mid = fs.read_at(mut f, 5, 3)?
+    print("at 5: {str_from_utf8(mid)?}")
+    print("tell: {fs.tell(mut f)?}")
+    let next = fs.read_chunk(mut f, 2)?
+    print("next: {str_from_utf8(next)?}")
+
+    print("at end: {read_at_row(mut f, 10, 4)}")
+    let empty = fs.read_at(mut f, 3, 0)?
+    print("empty: {empty.len}")
+    print("negative: {read_at_row(mut f, 0 - 1, 4)}")
+
+    fs.close(take f)?
+    fs.remove("read-at.tmp")?
+    0
+}

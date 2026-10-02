@@ -1,0 +1,79 @@
+//! check: run(exit=0, stdout="tell: 7\nend: 10\nat end: eof\nback: 7\nlast: 789\nseek: 2\nseek_by: 5\npast end: 14\nbad offset: invalid\nbelow zero: invalid\nunmoved: 14")
+//! phase: run
+//! conforms: std.fs, os.fs.seek, os.fs.tell, err.row, err.propagate
+//!
+//! `[os.fs.seek]` and `[os.fs.tell]` through `std.fs` (s199,
+//! wolf-lang#426): `seek` counts from the start, `seek_by` from the
+//! position, `seek_end` from the end, and `tell` reads the position
+//! without moving it. Before s199 nothing in wolf named an offset, so a
+//! program that wanted the last bytes of a file read all of it.
+//!
+//! The relations, on every lane that executes the fs tier: reads of 3
+//! and 4 bytes leave the position at 7; the end is the size and a read
+//! there is `eof`; three back from the end reads the last three; a
+//! position past the end is legal and reads `eof`; a start below zero
+//! and a move below zero are `invalid`, and neither moves the position.
+
+use std.fs
+
+fn seek_row(mut f: fs.File, off: int) -> str {
+    let at = fs.seek(mut f, off) else |e| {
+        return match e {
+            invalid => "invalid",
+            unseekable => "unseekable",
+            io => "io",
+        }
+    }
+    "{at}"
+}
+
+fn seek_by_row(mut f: fs.File, delta: int) -> str {
+    let at = fs.seek_by(mut f, delta) else |e| {
+        return match e {
+            invalid => "invalid",
+            unseekable => "unseekable",
+            io => "io",
+        }
+    }
+    "{at}"
+}
+
+fn main() -> !int {
+    fs.write_text("seek-family.tmp", "0123456789")?
+    var f = fs.open("seek-family.tmp")?
+
+    let a = fs.read_chunk(mut f, 3)?
+    let b = fs.read_chunk(mut f, 4)?
+    print("tell: {fs.tell(mut f)?}")
+
+    print("end: {fs.seek_end(mut f, 0)?}")
+    var at_end = "bytes"
+    fs.read_chunk(mut f, 4) else |e| match e {
+        eof => {
+            at_end = "eof"
+            List[byte]()
+        },
+        io => List[byte](),
+    }
+    print("at end: {at_end}")
+
+    print("back: {fs.seek_end(mut f, 0 - 3)?}")
+    let last = fs.read_chunk(mut f, 16)?
+    print("last: {str_from_utf8(last)?}")
+
+    print("seek: {fs.seek(mut f, 2)?}")
+    print("seek_by: {fs.seek_by(mut f, 3)?}")
+    print("past end: {fs.seek_end(mut f, 4)?}")
+
+    print("bad offset: {seek_row(mut f, 0 - 1)}")
+    print("below zero: {seek_by_row(mut f, 0 - 100)}")
+    print("unmoved: {fs.tell(mut f)?}")
+
+    fs.close(take f)?
+    fs.remove("seek-family.tmp")?
+    let read = a.len + b.len
+    if read != 7 {
+        return 1
+    }
+    0
+}

@@ -3807,3 +3807,24 @@ native = "run"
 lupin = "run"   # sc40: three lanes, stdout sha 2737b541 identical on all three
 wolfc = "run"
 native = "run"
+
+# ---- s199 (wolf-lang#426, #424): the handle's offset and the standard
+# streams. Measured at wolf-lang s199's head (PR wolf-lang#512) and lupin
+# at wolf-interp s199's head: three lanes. The pinned wolf 0.2.20 and
+# lupin 0.1.43 predate the builtins (`fs_seek` is E0301 there, and
+# `unsupported` at resolve on lupin), so these rows go green on the pin
+# bump that carries s199, not before — the PR says so.
+[tests."fs/seek_family.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."fs/read_at_cursor.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."fs/std_handles.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
