@@ -146,6 +146,7 @@ the building.
 | F-0136 | 2026-09-15 | **`push` takes no written mode at wolf 0.2.14, so #385's `take` spelling cannot be adopted before the pin moves**: `(mut out).push(take v)` is `E1007 — \`push\` takes \`value\` as plain \`read\` — no mode is written for it` on BOTH compiler rungs, for a call argument and for a binding alike, while lupin 0.1.36 runs it. A static refusal of the module, so every `std.list` row on both rungs would pay for one function's spelling. sc50's combinators therefore write plain `push` and name the owed `take` in `map`'s doc | wolf-lang#385 (ruled option 3, lane s167) | sc50 probe |
 | F-0137 | 2026-09-15 | **A module-keyed `LUPIN_MIRROR_LAG` entry calls a new RUNNING block "the mirror moved"**: sc49's word was keyed by module, true while every `std.range` block went through an accessor; sc50's `range.collect` names none and runs on lupin, so `doc-examples` redded `range.lu:176` with "the mirror moved (a heal, or a different refusal)" while the mirror had not moved at all. Keyed by the call now, one entry per example (`range.is_empty(`, `range.contains(`, `range.len(`, `range.clamp_to(`), the shape `LUPIN_TIER_WAIVERS` already had; the selftest counts blocks writing that call | wolf-std#37 | sc50, caught by the gate itself |
 | F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52: B117 FIXED (`f8c606a`); #34 ceiling 180 s on windows (`1a1d060`), REQUIRED proposed in PR #46; #4/#5 blocked upstream (wolf-lang#217, #346 — exact calls commented); F-0011's capacity ask rides wolf-lang#416 item 2 |
+| F-0140 | 2026-10-03 | **sc53's predictions, committed before the 0.2.22 / 0.1.45 archives were unpacked** — the binary pin to wolf 0.2.22 / lupin 0.1.45 by digest, the data pin to v0.2.22, wolf-std#48 (s199's `seek`/`tell`/`read_at` and the standard streams) carried, wolf-std#49's cell. Every predicted ledger move by file and lane, the counts before and after, and the std sites the new compiler could refuse. Measurements land beside each prediction in this section | wolf-std (this repo) | sc53: open |
 
 
 ## F-0001 — the std search path
@@ -10354,3 +10355,114 @@ the lane added `tac` there as a second customer (comment 5818634750). The
 day the language ships one, `list.reserve` lands with the signature already
 written in `std/list/list.lu`'s BLOCKED note. No std code changes in this
 lane.
+
+## F-0140 — sc53's predictions, before the archives
+
+Written at `543b216` (this branch, on wolf-std#48's head `791c2cad`)
+before the wolf 0.2.22 or lupin 0.1.45 archive was downloaded or
+unpacked anywhere. The baseline is the ledger at `791c2cad` and the one
+measured std-test closest to the new pair: s199's run at wolf-lang
+`1483f4c5` (a 0.2.21+dev build) with lupin 0.1.44, which was RED on one
+line only, `testing/assert_msg_holds.lu [native]` (kasumi
+`~/lanes/s199/evidence/std-test-head-1483f4c5.log`). That build predates
+s207, kw01-kw05 and kw03 (`git merge-base --is-ancestor a6063222
+1483f4c5` fails), so everything those lanes changed is predicted here
+from their CHANGELOG entries and a scan of this tree, not measured.
+Measurements are appended below, never written over.
+
+### P1. The pin
+
+- `vendor/tools.toml`: `[wolf] version = "0.2.22"`, pin key
+  `8e36bc1a0f92bbbbc6861b10d5b2638f76412d6a` (the v0.2.22 tag);
+  `[lupin] version = "0.1.45"`, pin key
+  `dfcc2f13…` (lupin 0.1.45's spec pin, wolf-lang v0.2.21, per its
+  CHANGELOG). Predicted `--version` lines: `wolf 0.2.22 (wolfgang, pin
+  8e36bc1)`, `paired with lupin 0.1.45 (reference interpreter), pin
+  dfcc2f1`, and `lupin 0.1.45 (wolf-interp, reference interpreter at pin
+  dfcc2f1)`. Falsified by any other string.
+- Archive digests as GitHub reports them (the CI acquisition step
+  checks the same values): wolf linux x86-64 `df0f2fea…`, linux aarch64
+  `64e35e43…`, macOS aarch64 `19606e1e…`, windows `a302e134…`; lupin
+  linux x86-64 `907cfb1a…`, linux aarch64 `d4bf3432…`, macOS aarch64
+  `08b1de12…`, windows zip `9b5e5836…`. Falsified by a mismatch on
+  arrival.
+- **The data pin moves too**, `2e4ca769` (v0.2.15) -> `8e36bc1a`
+  (v0.2.22), in its own commit: anchors 524 -> 569, **+45, 0 removed**
+  (key sets diffed both ways before this was written), every new
+  anchor's namespace already in `REGISTERED_NS`, and
+  `05-conformance.md` gains §3a `[conf.exit]` only. It is what #48's
+  `7f846a3` was waiting for: the three new tests cite `os.fs.seek`,
+  `os.fs.tell`, `os.fs.read_at` and `os.fs.std` once it lands.
+  Falsified if `sync-pin` or `[conf.tag.valid]` refuses anything.
+
+### P2. The ledger moves, every one
+
+Ledger at `791c2cad`: 423 rows. lupin `run` 365 / `unsupported` 58;
+wolfc `run` 369 / `unsupported` 53 / `fail(E1013)` 1; native `run` 412
+/ `unsupported` 10 / `fail(E1013)` 1. Conservatism ledger 123 entries.
+
+| file | lane | ledger | predicted | why |
+|---|---|---|---|---|
+| `testing/assert_msg_holds.lu` | native | `unsupported` | `run` | s202 (#398, 0.2.21): an assert message is any `str` on native; wolf-std#49 |
+
+**One move, on every host.** Nothing else changes word on ubuntu or
+macOS. After: native `run` 413 / `unsupported` 9 / `fail(E1013)` 1;
+lupin and wolfc unchanged; conservatism ledger **122**. std-test: 423
+tests, forward tags 803 (s199's count at `a362de1`; the tool bump
+moves no `std.*` tag), divergent 0, mirror-lag 0, slow skips 0.
+
+The three rows #48 adds (`fs/seek_family.lu`, `fs/read_at_cursor.lu`,
+`fs/std_handles.lu`) are `run` on all three lanes, as #48 measured at
+the s199 heads. They are red at the old pin by construction (CI run
+37074486142); they are not moves, they are the rows reaching the
+ledger they were written with.
+
+**Windows, predicted RED on one cell**: `fs/std_handles.lu [lupin]`
+observed `unsupported` on `rig (windows-latest)`. lupin 0.1.45's
+CHANGELOG: "On windows the four calls on 0..2 are declined by name".
+The ledger has one word per lane for every host, so no ledger edit can
+fix it; the remedy is chosen after the measurement and named in this
+section. The checked and native lanes on windows answer
+`unseekable` through `GetFileType` and run. Falsified by a green
+windows `std-test`.
+
+Not predicted to move, with the reason, so a move is a finding:
+- the seven json native `unsupported` rows: "enum payload slots with
+  conflicting types across variants (spilled union layout, c06)",
+  probed at `1483f4c5`; no 0.2.17-0.2.22 entry touches that layout;
+- the two json wolfc rows, the CAVP/Wycheproof/P-256/x25519 step- and
+  depth-budget rows on lupin and wolfc: no budget moved;
+- `list/mutate_while_iterating_trap.lu` `fail(E1013)`: one error, so
+  s203's first-diagnostic rule cannot pick another code;
+- lupin's `unsupported` rows (`comptime_refuses`, `cmp`/`sort` tiers,
+  `io/input_*`, `env/args_and_vars`, the inherit/adopt postures).
+
+### P3. Std sites the new compiler could refuse: none
+
+Scanned in this tree (474 `.lu` files):
+- **E0817 / E0818** (kw01, the closed attribute set): no `#[…]`
+  attribute outside comments; no `extern` ABI string.
+- **E1010 for a `for` piece past its region** (s207): four `region`
+  sites (`std/mem/budget`, `tests/mem/budget/ledger_relations.lu`,
+  `tests/list/freeze_then_read.lu`, `tests/strbuf/region_build_and_freeze.lu`);
+  none binds a `words`/`lines`/`split` piece or a region-built `str`
+  across the region's end.
+- **E0415** (s202, an unannotated binding whose literal does not fit
+  `i32`): 0 bindings whose initializer is literals only and exceeds
+  2^31-1.
+- **`[type.numlit.cast.narrow]`** (kw03): 685 `as byte`, 279 `as int`,
+  73 `as wrapping[u64]`, 4 `as char`. Every `wrapping[u64] -> int` site
+  in sha2, chacha20, rand and tls/record is masked to 32 bits or fewer
+  first (sha2 splits 64-bit words into halves for exactly this reason),
+  and every `int as wrapping[u64]` is the clause's spelling for the
+  bits. So no cast traps on native/release and none reaches #551's
+  checked refusal (a `u64` above `i64::MAX`). Falsified by any
+  `trap(overflow)` or a new checked `unsupported` naming a cast.
+- **First handle 3** (s199): no test asserts a handle's number; the
+  stale-handle rows forge 4242+ or close what they opened.
+- lupin 0.1.45 risks, not predicted to fire: E0402 for `trim` with an
+  argument (std's calls are the module's `str.trim(s)`, a module
+  receiver), E0401 for a typed tail in a unit context, E1007 for a moded
+  nested fn.
+
+Falsified by any `fail(E…)` on a row ledgered `run`.
