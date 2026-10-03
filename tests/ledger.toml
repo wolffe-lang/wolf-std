@@ -680,7 +680,7 @@ native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are 
 [tests."testing/assert_msg_holds.lu"]
 lupin = "run"
 wolfc = "run"
-native = "unsupported"
+native = "run"  # sc53 pin bump (wolf 0.2.22): `unsupported` -> `run` — s202 (#398, shipped in 0.2.21) lowers any `str` assert message into the trap block on native; observed before this edit (F-0140, wolf-std#49)
 
 [tests."testing/assert_msg_trap.lu"]
 lupin = "run"
@@ -3810,10 +3810,13 @@ native = "run"
 
 # ---- s199 (wolf-lang#426, #424): the handle's offset and the standard
 # streams. Measured at wolf-lang s199's head (PR wolf-lang#512) and lupin
-# at wolf-interp s199's head: three lanes. The pinned wolf 0.2.20 and
-# lupin 0.1.43 predate the builtins (`fs_seek` is E0301 there, and
-# `unsupported` at resolve on lupin), so these rows go green on the pin
-# bump that carries s199, not before — the PR says so.
+# at wolf-interp s199's head: three lanes. The pin they were written
+# against was wolf 0.2.16 / lupin 0.1.38 (this sentence first said 0.2.20
+# / 0.1.43; CI run 37074486142 acquired 0.2.16 and 0.1.38), which predate
+# the builtins (`fs_seek` is E0301 there, and `unsupported` at resolve on
+# lupin). sc53 carried them to wolf 0.2.22 / lupin 0.1.45, the release
+# pair that ships s199, and observed all three on three lanes there
+# before any word in this file moved (F-0140).
 [tests."fs/seek_family.lu"]
 lupin = "run"
 wolfc = "run"
