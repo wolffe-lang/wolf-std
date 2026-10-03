@@ -1,11 +1,6 @@
 //! check: run(exit=0, stdout="stdout seek: unseekable\nstdout tell: unseekable\nstderr read_at: unseekable\nstdout close: io")
 //! phase: run
-//! conforms: std.fs, os.fs, err.row
-//!
-//! (The clause anchors — `os.fs.seek`, `os.fs.tell`, `os.fs.read_at`,
-//! `os.fs.std` — join this line at the pin bump that vendors them; the
-//! pinned registry names `os.fs` and no s199 clause yet, and the rig
-//! refuses a tag it cannot resolve, `[conf.tag.valid]`.)
+//! conforms: std.fs, os.fs.std, os.fs.seek, os.fs.tell, os.fs.read_at, err.row
 //!
 //! `[os.fs.std]` through `std.fs` (s199, wolf-lang#424): `fs.stdout()`
 //! and `fs.stderr()` are descriptors 1 and 2, which the rig wires to
