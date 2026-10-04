@@ -66,6 +66,18 @@ to its honest dynamic outcome). The runner demands EXACTLY the named
 observation, so a heal reads as a red and the flip to `run` is
 deliberate; each row's comment cites its finding.
 
+One qualifier, for any lane (sc53): a **host-scoped cell**,
+`lupin-windows` / `wolfc-windows` / `native-windows` beside the lane's
+own key, replaces that lane's word on a windows host and is ignored
+elsewhere. It is for an answer a CLAUSE makes depend on the host, and
+for nothing else: the first carrier is `fs/std_handles.lu`, where
+`[os.fs.std]`'s host posture has lupin decline the offset calls on
+descriptors 0..2 on windows by name while linux and macOS serve them
+(observed in CI run 37161453649). A runner that merely differs is a red
+to investigate, and a host that answers two ways is `unstable(…)`. The
+cell must differ from its lane's word, is one outcome (never a set), and
+every `std-test` run names it on every host (`host-scoped cells: N`).
+
 The rig fails CI when reality is deeper OR shallower than the ledger.
 Advancing an entry (an upstream pin bump taught a tool a new trick) is
 deliberate: its own commit, saying which upstream change earned it.
