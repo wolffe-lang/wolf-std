@@ -10,6 +10,19 @@
 //! earns its own column rather than hiding inside `wolfc`.
 //! A test passing deeper than its ledger claims fails CI — advancement
 //! is deliberate, in its own commit.
+//!
+//! **A host-scoped cell** (sc53): `lupin-windows`, `wolfc-windows` or
+//! `native-windows` beside a lane's key replaces that lane's expectation
+//! on a windows host and is ignored on every other host. It exists for a
+//! lane whose answer a CLAUSE makes depend on the host — the first
+//! carrier is `[os.fs.std]`'s host posture, under which lupin declines
+//! the offset calls on descriptors 0..2 on windows by name while linux
+//! and macOS serve them — and never for a lane that merely behaves
+//! differently on one runner (that is a red to investigate, or
+//! `unstable(…)`'s F-0048 if the SAME host answers two ways). It must
+//! differ from its lane's key, it is one measured outcome (never
+//! `unstable(…)`), and every `std-test` run on every host names each
+//! one, so a host cell is louder than the row it qualifies.
 
 use crate::tomlite;
 use std::collections::BTreeMap;
@@ -205,6 +218,51 @@ pub struct Entry {
     pub lupin: Expect,
     pub wolfc: Expect,
     pub native: Expect,
+    /// The `-windows` cells, by lane, where a row has them (sc53).
+    pub windows: HostCells,
+}
+
+/// A row's host-scoped cells: `Some` where `<lane>-windows` is written.
+#[derive(Debug, Clone, Default)]
+pub struct HostCells {
+    pub lupin: Option<Expect>,
+    pub wolfc: Option<Expect>,
+    pub native: Option<Expect>,
+}
+
+/// The suffix that scopes a lane's cell to windows hosts.
+pub const WINDOWS_SUFFIX: &str = "-windows";
+
+impl Entry {
+    /// What `lane` (`lupin`, `wolfc` or `native`) is expected to do on a
+    /// host that is (`windows`) or is not windows.
+    pub fn want(&self, lane: &str, windows: bool) -> &Expect {
+        let (base, host) = match lane {
+            "lupin" => (&self.lupin, &self.windows.lupin),
+            "wolfc" => (&self.wolfc, &self.windows.wolfc),
+            "native" => (&self.native, &self.windows.native),
+            other => unreachable!("unknown lane `{other}`"),
+        };
+        match host {
+            Some(h) if windows => h,
+            _ => base,
+        }
+    }
+
+    /// Every host-scoped cell of this row, as (lane, elsewhere, windows).
+    pub fn host_scoped(&self) -> Vec<(&'static str, &Expect, &Expect)> {
+        let mut out = Vec::new();
+        for (lane, base, host) in [
+            ("lupin", &self.lupin, &self.windows.lupin),
+            ("wolfc", &self.wolfc, &self.windows.wolfc),
+            ("native", &self.native, &self.windows.native),
+        ] {
+            if let Some(h) = host {
+                out.push((lane, base, h));
+            }
+        }
+        out
+    }
 }
 
 pub type Ledger = BTreeMap<String, Entry>;
@@ -224,19 +282,35 @@ pub fn parse(text: &str, what: &str) -> Result<Ledger, String> {
         let mut lupin = None;
         let mut wolfc = None;
         let mut native = None;
-        for (k, v, line) in &section.entries {
-            let slot = match k.as_str() {
-                "lupin" => &mut lupin,
-                "wolfc" => &mut wolfc,
-                "native" => &mut native,
-                other => {
+        let mut windows = HostCells::default();
+        for (key, v, line) in &section.entries {
+            let (k, host) = match key.strip_suffix(WINDOWS_SUFFIX) {
+                Some(lane) => (lane.to_string(), true),
+                None => (key.clone(), false),
+            };
+            let slot = match (k.as_str(), host) {
+                ("lupin", false) => &mut lupin,
+                ("wolfc", false) => &mut wolfc,
+                ("native", false) => &mut native,
+                ("lupin", true) => &mut windows.lupin,
+                ("wolfc", true) => &mut windows.wolfc,
+                ("native", true) => &mut windows.native,
+                _ => {
                     return Err(format!(
-                        "{what}:{line}: unknown lane `{other}` (lupin, wolfc, native)"
+                        "{what}:{line}: unknown lane `{key}` (lupin, wolfc, native, \
+                         each optionally `{WINDOWS_SUFFIX}`)"
                     ))
                 }
             };
             let expect =
                 parse_expect(v).ok_or_else(|| format!("{what}:{line}: bad expectation `{v}`"))?;
+            if host && matches!(expect, Expect::Unstable(_)) {
+                return Err(format!(
+                    "{what}:{line}: `{key}` is one host's measured outcome; \
+                     `unstable(…)` is a set for ONE host answering two ways (F-0048) \
+                     and cannot be host-scoped"
+                ));
+            }
             if k == "lupin"
                 && match &expect {
                     Expect::Fail(_) => true,
@@ -277,6 +351,18 @@ pub fn parse(text: &str, what: &str) -> Result<Ledger, String> {
                 "{what}: `{test}` must record all three lanes (`lupin`, `wolfc`, `native`)"
             ));
         };
+        for (lane, base, host) in [
+            ("lupin", &lupin, &windows.lupin),
+            ("wolfc", &wolfc, &windows.wolfc),
+            ("native", &native, &windows.native),
+        ] {
+            if host.as_ref() == Some(base) {
+                return Err(format!(
+                    "{what}: `{test}`: `{lane}{WINDOWS_SUFFIX}` repeats `{lane}` — a \
+                     host-scoped cell exists only where the host changes the answer"
+                ));
+            }
+        }
         if ledger
             .insert(
                 test.clone(),
@@ -284,6 +370,7 @@ pub fn parse(text: &str, what: &str) -> Result<Ledger, String> {
                     lupin,
                     wolfc,
                     native,
+                    windows,
                 },
             )
             .is_some()
@@ -382,6 +469,63 @@ mod tests {
         assert_eq!(e.native, Expect::Unsupported);
         assert!(depth(&Expect::Run) > depth(&Expect::Fail("E1".into())));
         assert!(depth(&Expect::Fail("E1".into())) > depth(&Expect::Unsupported));
+    }
+
+    #[test]
+    fn host_scoped_cells_replace_their_lane_on_windows_only() {
+        let l = parse(
+            "[tests.\"fs/std_handles.lu\"]\nlupin = \"run\"\n\
+             lupin-windows = \"unsupported\"\nwolfc = \"run\"\nnative = \"run\"\n",
+            "l",
+        )
+        .unwrap();
+        let e = &l["fs/std_handles.lu"];
+        assert_eq!(e.want("lupin", false), &Expect::Run);
+        assert_eq!(e.want("lupin", true), &Expect::Unsupported);
+        // A lane with no host cell answers the same on every host.
+        assert_eq!(e.want("wolfc", true), &Expect::Run);
+        assert_eq!(e.want("native", true), &Expect::Run);
+        assert_eq!(
+            e.host_scoped(),
+            vec![("lupin", &Expect::Run, &Expect::Unsupported)]
+        );
+        // No host cell, nothing host-scoped.
+        let plain = parse(
+            "[tests.\"a.lu\"]\nlupin = \"run\"\nwolfc = \"run\"\nnative = \"run\"\n",
+            "l",
+        )
+        .unwrap();
+        assert!(plain["a.lu"].host_scoped().is_empty());
+    }
+
+    #[test]
+    fn host_scoped_cells_are_held_to_their_lanes_rules() {
+        let row = |extra: &str| {
+            parse(
+                &format!(
+                    "[tests.\"a.lu\"]\nlupin = \"run\"\nwolfc = \"run\"\nnative = \"run\"\n{extra}"
+                ),
+                "l",
+            )
+        };
+        // Repeating the lane's own word says nothing: refused.
+        assert!(row("lupin-windows = \"run\"\n").is_err());
+        // The lane's grammar still holds under the suffix.
+        assert!(row("lupin-windows = \"fail(E0301)\"\n").is_err());
+        assert!(row("wolfc-windows = \"slow\"\n").is_err());
+        assert!(row("native-windows = \"mirror-lag(E0201)\"\n").is_err());
+        // One measured outcome, never a set.
+        assert!(row("wolfc-windows = \"unstable(run|unsupported)\"\n").is_err());
+        // Only windows, only the three lanes.
+        assert!(row("lupin-macos = \"unsupported\"\n").is_err());
+        assert!(row("checked-windows = \"unsupported\"\n").is_err());
+        // A host cell needs its lane's own cell beside it.
+        assert!(parse(
+            "[tests.\"a.lu\"]\nlupin-windows = \"unsupported\"\nwolfc = \"run\"\nnative = \"run\"\n",
+            "l"
+        )
+        .is_err());
+        assert!(row("native-windows = \"fail(E0301)\"\n").is_ok());
     }
 
     #[test]

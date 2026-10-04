@@ -261,6 +261,7 @@ pub fn std_test() -> Result<(), String> {
     let mut conservatism: Vec<String> = Vec::new();
     let mut unstable: Vec<String> = Vec::new();
     let mut slow_skips: Vec<String> = Vec::new();
+    let mut host_rows: Vec<String> = Vec::new();
     let mut divergent_rows: Vec<String> = Vec::new();
     let mut mirror_lag_rows: Vec<String> = Vec::new();
     let mut divergences: Vec<serde_json::Value> = Vec::new();
@@ -287,6 +288,20 @@ pub fn std_test() -> Result<(), String> {
         let scratch = repo.join("target/stage").join(test.replace('/', "__"));
         let staged = stage::stage_test(&entry, &repo.join("std"), &scratch)?;
         let expect = &ledger[test];
+        // A host-scoped cell (sc53) is named on EVERY host, the one it
+        // applies to and the ones it does not, so the qualification is
+        // never quieter than the row.
+        for (lane, elsewhere, on_windows) in expect.host_scoped() {
+            host_rows.push(format!(
+                "host({lane}): {test} — `{on_windows}` on windows, `{elsewhere}` \
+                 elsewhere; this host: {}",
+                if cfg!(windows) {
+                    "windows"
+                } else {
+                    "not windows"
+                }
+            ));
+        }
 
         let mut runtime_records: Vec<(Impl, Record)> = Vec::new();
         for (imp, resolved) in &lanes {
@@ -299,11 +314,7 @@ pub fn std_test() -> Result<(), String> {
             // lane is not invoked; the skip is printed in its own ledger
             // below, louder than a `run`, and is owed a re-measure at
             // every pin bump.
-            let want_pre = match imp {
-                Impl::Lupin => &expect.lupin,
-                Impl::Wolf => &expect.wolfc,
-                Impl::Native => &expect.native,
-            };
+            let want_pre = expect.want(imp.ledger_name(), cfg!(windows));
             if matches!(want_pre, Expect::Slow) {
                 slow_skips.push(format!(
                     "slow({}): {test} — in-lane semantics, skipped at the \
@@ -434,11 +445,7 @@ pub fn std_test() -> Result<(), String> {
             ) {
                 runtime_records.push((*imp, rec.clone()));
             }
-            let want = match imp {
-                Impl::Lupin => &expect.lupin,
-                Impl::Wolf => &expect.wolfc,
-                Impl::Native => &expect.native,
-            };
+            let want = expect.want(imp.ledger_name(), cfg!(windows));
             let got = achieved.as_expect();
             if let Expect::Unstable(set) = want {
                 // A row the pin answers nondeterministically (sc07, F-0048):
@@ -544,14 +551,18 @@ pub fn std_test() -> Result<(), String> {
     println!(
         "std-test: {ran} test(s); forward tags: {forward_tags}; \
          conservatism ledger: {} entr{}; unstable rows: {}; slow skips: {}; \
-         divergent rows: {}; mirror-lag rows: {}",
+         divergent rows: {}; mirror-lag rows: {}; host-scoped cells: {}",
         conservatism.len(),
         if conservatism.len() == 1 { "y" } else { "ies" },
         unstable.len(),
         slow_skips.len(),
         divergent_rows.len(),
-        mirror_lag_rows.len()
+        mirror_lag_rows.len(),
+        host_rows.len()
     );
+    for line in &host_rows {
+        println!("  {line}");
+    }
     for line in &unstable {
         println!("  {line}");
     }
