@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="stdout seek: unseekable\nstdout tell: unseekable\nstderr read_at: unseekable\nstdout close: io")
+//! check: run(exit=0, stdout="stdout seek: unseekable\nstdout tell: unseekable\nstderr read_at: unseekable-or-io\nstdout close: io")
 //! phase: run
 //! conforms: std.fs, os.fs.std, os.fs.seek, os.fs.tell, os.fs.read_at, err.row
 //!
@@ -6,10 +6,23 @@
 //! and `fs.stderr()` are descriptors 1 and 2, which the rig wires to
 //! pipes on every lane (the native rung's `conform-run` captures both,
 //! the checked machine and lupin observe in a process whose 1 and 2 are
-//! the rig's pipes). A pipe has no position, so every offset call is
-//! refused BY NAME — `unseekable`, never `io` — on every tier-1 host
+//! the rig's pipes). A pipe has no position, so the clause refuses every
+//! offset call BY NAME — `unseekable`, never `io` — on every tier-1 host
 //! (unix answers the host's `ESPIPE`; windows asks first and refuses
-//! anything that is not a regular file, as the clause says).
+//! anything that is not a regular file). macOS's positional read is the
+//! one exception measured, below. On windows lupin declines all four
+//! calls on 0..2 by name, which is `[os.fs.std]`'s host posture and this
+//! row's `lupin-windows` ledger cell.
+//!
+//! The read_at line accepts EITHER `unseekable` or `io`, on purpose and
+//! for one reason. `[os.fs.read_at]` says a handle with no offset is
+//! `unseekable`, and linux answers that. But descriptor 2 is the WRITE end
+//! of a pipe, and Darwin's `pread` checks the access mode before the type:
+//! it returns `EBADF`, so every macOS machine answers `io` (CI run
+//! 37161453649, `rig (macos-latest)`; wolf-lang#566, wolf-interp#187).
+//! The line goes back to `unseekable` alone when those close. Until then,
+//! the line fails on any other answer, and the seek and tell lines stay
+//! exact on every host.
 //!
 //! The last line pins the clause's limit at this pin: a standard stream
 //! is not a handle this process opened, and `close` on it is `io`
@@ -50,8 +63,10 @@ fn read_at_line() -> str {
         return match e {
             eof => "eof",
             invalid => "invalid",
-            unseekable => "unseekable",
-            io => "io",
+            // One answer for two tags, by host (see the header):
+            // wolf-lang#566.
+            unseekable => "unseekable-or-io",
+            io => "unseekable-or-io",
         }
     }
     "answered {got.len}"
