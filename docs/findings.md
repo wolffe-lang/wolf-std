@@ -147,7 +147,7 @@ the building.
 | F-0137 | 2026-09-15 | **A module-keyed `LUPIN_MIRROR_LAG` entry calls a new RUNNING block "the mirror moved"**: sc49's word was keyed by module, true while every `std.range` block went through an accessor; sc50's `range.collect` names none and runs on lupin, so `doc-examples` redded `range.lu:176` with "the mirror moved (a heal, or a different refusal)" while the mirror had not moved at all. Keyed by the call now, one entry per example (`range.is_empty(`, `range.contains(`, `range.len(`, `range.clamp_to(`), the shape `LUPIN_TIER_WAIVERS` already had; the selftest counts blocks writing that call | wolf-std#37 | sc50, caught by the gate itself |
 | F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52: B117 FIXED (`f8c606a`); #34 ceiling 180 s on windows (`1a1d060`), REQUIRED proposed in PR #46; #4/#5 blocked upstream (wolf-lang#217, #346 — exact calls commented); F-0011's capacity ask rides wolf-lang#416 item 2 |
 | F-0140 | 2026-10-03 | **sc53's predictions, committed before the 0.2.22 / 0.1.45 archives were unpacked** — the binary pin to wolf 0.2.22 / lupin 0.1.45 by digest, the data pin to v0.2.22, wolf-std#48 (s199's `seek`/`tell`/`read_at` and the standard streams) carried, wolf-std#49's cell. Every predicted ledger move by file and lane, the counts before and after, and the std sites the new compiler could refuse. Measurements land beside each prediction in this section | wolf-std (this repo) | sc53: P1 and P3 held; P2 held on linux and windows (the predicted windows red is the ledger's first host-scoped cell, `d91c91a`, `7dc13a1`) and MISSED on macOS: `fs/std_handles`' positional read on stderr answers `io` there on every machine (CI run 37161453649), filed wolf-lang#566 / wolf-interp#187, the line accepts either tag (`4f49852`) |
-| F-0141 | 2026-10-04 | **sc54's predictions, committed before the 0.2.23 / 0.1.46 archives were unpacked** — the binary pin to wolf 0.2.23 / lupin 0.1.46 by digest, the data pin to v0.2.23, zero predicted ledger moves with every candidate named, kw09's module `const` measured for std (F-0025), and the rig's three remaining hash-only report paths. Measurements land beside each prediction in this section | wolf-std (this repo) | open (sc54) |
+| F-0141 | 2026-10-04 | **sc54's predictions, committed before the 0.2.23 / 0.1.46 archives were unpacked** — the binary pin to wolf 0.2.23 / lupin 0.1.46 by digest, the data pin to v0.2.23, zero predicted ledger moves with every candidate named, kw09's module `const` measured for std (F-0025), and the rig's three remaining hash-only report paths. Measurements land beside each prediction in this section | wolf-std (this repo) | sc54: P1-P4 held, zero ledger moves on linux; MISSED a W0304 (`std.errors.offset_of` shadows 0.2.23's prelude `offset_of`), renamed `byte_offset` (`27e0eac`); corrects F-0140's hash-only premise |
 
 
 ## F-0001 — the std search path
@@ -10678,3 +10678,78 @@ before the fix:
    After: the observed stdout too.
 
 No ledger word and no test file changes for this.
+
+### Measured (2026-10-04)
+
+**P1 held.** The archives arrived at the reported digests on kasumi
+(`wolf-0.2.23-x86_64-unknown-linux-gnu.tar.gz` `6f505eb5…`,
+`lupin-0.1.46-x86_64-unknown-linux-gnu.tar.gz` `d13a0379…`;
+`~/lanes/sc54/evidence/acquire.log`, `55229da9…`). Members by name:
+`wolf` `97b5404b…`, `lupin` `fa4e6c35…`, `libwolf_rt.a` `5af08d0e…`,
+`_wolf` `2d1e4801…` (the completion script, unchanged). The three
+`--version` strings are the predicted ones, word for word. The data
+pin: `sync-pin` "snapshot == submodule at pin (registry AND clause) —
+OK" with the submodule checked out at `8edac3ee`; `doctor` "pin:
+8edac3e matches vendor/tools.toml — OK".
+
+**P2 held: zero moves.** The first run with the new pair, before
+anything else changed (kasumi, `a9b3545` — the two pin commits on
+F-0141, since replayed as `b252b0d` and `49d0c71` behind the rename
+below; `std-test-g1-a9b3545.log`, `cb7860d6…`), was GREEN: 423 tests,
+forward tags 803, conservatism ledger 122, unstable 0, slow skips 0,
+divergent 0, mirror-lag 0, host-scoped cells 1, lanes-observed
+336 / 16 / 49 / 22, no SKIP line. Every gate of that run green
+(`fmt`, `clippy`, `cargo test --nocapture` with 0 SKIP lines,
+`sync-pin`, `doctor`, `ledger-check`, `lint-conventions`, `fmt-lu` 474
+fixed points at 0.2.23, `gen-vectors --check`, `doc-examples` 454
+blocks, `ulp` 200 exact).
+
+| file | lane | ledger | predicted | observed |
+|---|---|---|---|---|
+| (none) | | | no move | no move |
+
+**P3 held.** `~/lanes/sc54/evidence/probe-kw09-const.log`
+(`e2c0a53a…`): a std-shaped module with `pub const K` and
+`pub const INT_MAX = 9223372036854775807` read inside the module runs
+`exit(0)` on lupin, checked and native; `kmod.K` read from an importer
+runs on lupin and is `unsupported` on checked ("module items in checked
+execution") and native ("a member access without a recorded type") —
+wolf-lang#579. std does not take module `const` yet; F-0025 waits on
+#579.
+
+**P4 held.** Each of the three report paths is seen red by a planted
+break before it is trusted: `~/lanes/sc54/evidence/plant-rig-report.diff`
+(`d2180f40…`) undoes the three, and `cargo test -p xtask runner::tests`
+fails exactly the three new tests (`plant-rig-report-c78510c.log`,
+`fd76fbdf…`, 4 passed / 3 failed); the commit passes all seven
+(`fix-rig-report-c78510c.log`, `06813894…`).
+
+**MISSED: a W0304 the prediction never looked for.** wolf 0.2.23's
+prelude gains `size_of`, `align_of` and `offset_of` (kw08), and a module
+item with a prelude name shadows it for its whole module (W0304, an
+error under `--deny-warnings`). `std.errors.offset_of` is the one std
+item with any of the three names. F-0141 scanned for the constructs the
+CHANGELOGs refuse and not for names the prelude TAKES; the orchestrator
+relayed it from bu16 (boreutils' own `bore.offset_of`) after the
+archives were unpacked. std-test could not have caught it: the rig's
+warning gate reads the entry file only (F-0053), and through
+`--std-root` the compiler surfaces no warning from a std module. The
+witness compiles `std/errors/errors.lu` as a package-local module
+(`~/lanes/sc54/evidence/probe-w0304.log`, `a59f0e8d…`): `wolf build
+--deny-warnings` is `error[W0304]: this function shadows the prelude
+name `offset_of`` before and builds and runs after. Renamed to
+`errors.byte_offset` in its own commit ahead of the pin (`27e0eac`),
+with its two test callers; no ledger word moves for it (both rows
+`run` on every lane before and after). A downstream calling
+`errors.offset_of` must follow the rename.
+
+### Correction to F-0140
+
+F-0140's macOS paragraph says "The rig prints the hash and not the
+bytes. Hashing the candidates found exactly one preimage". The rig
+printed the bytes: `cefb89c` (wolf-std#20, 2026-09-10) appends
+`observed stdout: "…"` to every directive stdout mismatch, and the
+job F-0140 cites printed it under each of its three hash lines (run
+37161453649, job 111315568947). The diagnosis it reached was right;
+the premise that the bytes were unavailable was not, and the track
+queued a rig fix on it. P4 above is what was actually still hash-only.
