@@ -147,6 +147,7 @@ the building.
 | F-0137 | 2026-09-15 | **A module-keyed `LUPIN_MIRROR_LAG` entry calls a new RUNNING block "the mirror moved"**: sc49's word was keyed by module, true while every `std.range` block went through an accessor; sc50's `range.collect` names none and runs on lupin, so `doc-examples` redded `range.lu:176` with "the mirror moved (a heal, or a different refusal)" while the mirror had not moved at all. Keyed by the call now, one entry per example (`range.is_empty(`, `range.contains(`, `range.len(`, `range.clamp_to(`), the shape `LUPIN_TIER_WAIVERS` already had; the selftest counts blocks writing that call | wolf-std#37 | sc50, caught by the gate itself |
 | F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52: B117 FIXED (`f8c606a`); #34 ceiling 180 s on windows (`1a1d060`), REQUIRED proposed in PR #46; #4/#5 blocked upstream (wolf-lang#217, #346 — exact calls commented); F-0011's capacity ask rides wolf-lang#416 item 2 |
 | F-0140 | 2026-10-03 | **sc53's predictions, committed before the 0.2.22 / 0.1.45 archives were unpacked** — the binary pin to wolf 0.2.22 / lupin 0.1.45 by digest, the data pin to v0.2.22, wolf-std#48 (s199's `seek`/`tell`/`read_at` and the standard streams) carried, wolf-std#49's cell. Every predicted ledger move by file and lane, the counts before and after, and the std sites the new compiler could refuse. Measurements land beside each prediction in this section | wolf-std (this repo) | sc53: P1 and P3 held; P2 held on linux and windows (the predicted windows red is the ledger's first host-scoped cell, `d91c91a`, `7dc13a1`) and MISSED on macOS: `fs/std_handles`' positional read on stderr answers `io` there on every machine (CI run 37161453649), filed wolf-lang#566 / wolf-interp#187, the line accepts either tag (`4f49852`) |
+| F-0141 | 2026-10-04 | **sc54's predictions, committed before the 0.2.23 / 0.1.46 archives were unpacked** — the binary pin to wolf 0.2.23 / lupin 0.1.46 by digest, the data pin to v0.2.23, zero predicted ledger moves with every candidate named, kw09's module `const` measured for std (F-0025), and the rig's three remaining hash-only report paths. Measurements land beside each prediction in this section | wolf-std (this repo) | open (sc54) |
 
 
 ## F-0001 — the std search path
@@ -10538,3 +10539,142 @@ call and accepts either tag on that line (`4f49852`), naming the
 issues. The seek and tell lines stay exact on every host. Nothing in
 `std/` moves: `std.fs.read_at` passes the machine's row through, as it
 must.
+
+
+## F-0141 — sc54's predictions, before the archives
+
+Written at `f50c7c3` (branch `sc54`, on trunk `6a0df5e`) before the wolf
+0.2.23 or lupin 0.1.46 archive was downloaded or unpacked anywhere. The
+baseline is the ledger at `6a0df5e` and sc53's last kasumi gauntlet at
+that sha (`~/lanes/sc53/evidence/std-test-g3-6a0df5e.log`, GREEN).
+Measurements are appended below, never written over.
+
+### P1. The pin
+
+- `vendor/tools.toml`: `[wolf] version = "0.2.23"`, pin key
+  `8edac3eeb48632b32f02ef41ea87d484d1423492` (the v0.2.23 tag);
+  `[lupin] version = "0.1.46"`, pin key `8e36bc1a…` (lupin 0.1.46's
+  spec pin, wolf-lang v0.2.22, per its CHANGELOG). Predicted
+  `--version` lines: `wolf 0.2.23 (wolfgang, pin 8edac3e)`, `paired
+  with lupin 0.1.46 (reference interpreter), pin 8e36bc1`, and `lupin
+  0.1.46 (wolf-interp, reference interpreter at pin 8e36bc1)`.
+  Falsified by any other string.
+- Archive digests as GitHub reports them: wolf linux x86-64
+  `6f505eb5…`, linux aarch64 `f3b31984…`, macOS aarch64 `92c918f2…`,
+  windows `eb8497cb…`; lupin linux x86-64 `d13a0379…`, linux aarch64
+  `b84018ba…`, macOS aarch64 `320bf428…`, windows zip `495ad265…`.
+  Falsified by a mismatch on arrival. The member `_wolf` is still the
+  zsh completion script, `2d1e4801…` (no CHANGELOG entry touches it).
+- **The data pin moves too**, `8e36bc1a` (v0.2.22) -> `8edac3ee`
+  (v0.2.23), in its own commit: anchors 569 -> 586, **+17, 0 removed**
+  (key sets diffed both ways), all under `abi` and `mem`, both already
+  in `REGISTERED_NS`; `05-conformance.md` byte-identical. No std test
+  cites any of the seventeen, so nothing else moves with it. Falsified
+  if `sync-pin` or `[conf.tag.valid]` refuses anything.
+
+### P2. The ledger moves: none
+
+Ledger at `6a0df5e`: 423 rows. lupin `run` 365 / `unsupported` 58;
+wolfc `run` 369 / `unsupported` 53 / `fail(E1013)` 1; native `run` 413
+/ `unsupported` 9 / `fail(E1013)` 1; one host-scoped cell
+(`fs/std_handles.lu` `lupin-windows = "unsupported"`). Conservatism
+ledger 122.
+
+| file | lane | ledger | predicted | why |
+|---|---|---|---|---|
+| (none) | | | | |
+
+**Zero moves, on every host.** After the pin: the same counts, word for
+word; std-test 423 tests, forward tags 803, conservatism 122, unstable
+0, slow skips 0, divergent 0, mirror-lag 0, host-scoped cells 1; on
+linux the lanes-observed spread stays 336 / 16 / 49 / 22 (three / two /
+one / zero runtime records). `doc-examples` 454 blocks GREEN; `fmt-lu`
+474 files, each a fixed point of `wolf fmt` at 0.2.23; `ulp` 200 rows
+exact.
+
+Every candidate, with the reason it does not move, so a move is a
+finding:
+
+- **Ruling #34** (an else-less `if` at a fallible fn's tail discards its
+  raise; a bare tag there is `unsupported`). Of 540 fallible fns in the
+  474 `.lu` files (scanned with braced rows read as rows), two end in an
+  else-less `if`: `std/mem/budget/budget.lu` `with_cap` (then-block
+  tail `return exhausted`) and `std/fs/fs.lu` `move_file` (tail
+  `fs_remove(from)?`). A `return` and a `?` are untouched by the ruling,
+  as s208 measured for the same two sites. lupin's mirror (an else-less
+  `if` is `()`) has no reader: no `.lu` file uses an `if` as a value.
+- **kw09 module state** (E1301, E0705, E0821): no `.lu` file declares a
+  module `const`, `let`, `var` or `extern "c" let`.
+- **kw06, kw07, kw08** (`*p`, the provenance methods, volatile,
+  `repr(c, packed/align)`, the layout queries): no raw-pointer type and
+  no `#[…]` attribute outside comments in any `.lu` file.
+- **lupin is70**: no annotated binding with a row (`let x: T ! … = e`,
+  #180's E0602); no `errdefer` (#179's E0607); no attribute or `extern`
+  (#174's E0817/E0818, #181's E1302 narrowing); no `return` out of a
+  region block (#178; the six region sites are `budget.charged`,
+  `under_cap`'s sugar block, two tests' first-class regions and
+  `ledger_relations`' sugar block, none returns through its `}`); the
+  first-diagnostic order (#175) moves only refusals, and lupin's column
+  holds none.
+- **wolfc's 53 `unsupported` rows**: trait/enum/impl module items in
+  checked execution (`list/sorted_tier`, `x/list_eq`), the json rows,
+  C1 structured concurrency (`mem/budget/breach_is_a_row`), the
+  process postures, `net/adopt_rows`, `x/tls/client/loopback_handshake`,
+  `x/jose/jws_eddsa_vectors` and the crypto depth- and step-budget rows.
+  kw09 changes how the checked machine holds module STATE, not module
+  items; no CHANGELOG entry moves a budget.
+- **native's 9 json rows** ("enum payload slots with conflicting types
+  across variants", the spilled union layout, c06): kw08's layout work
+  is `#[repr(c)]` structs only.
+- **lupin's 58 `unsupported` rows**: the cmp/sort tiers, the
+  comptime-refusal rows, `io/input_*`, `env/args_and_vars`, the
+  process and adopt postures and the crypto step-budget rows (lupin's
+  50M-step budget is unchanged in 0.1.46's CHANGELOG).
+- **`list/mutate_while_iterating_trap.lu` `fail(E1013)`**: one error,
+  so no ordering rule picks another code.
+
+**Windows**: `fs/std_handles.lu`'s `lupin-windows = "unsupported"`
+holds (0.1.46 says nothing of `[os.fs.std]`'s host posture). **macOS**:
+`fs/std_handles.lu` stays green on its per-line tolerance, because
+#187 is unchanged in 0.1.46 and #566 is open. Falsified by any red on
+either host, and a ceiling red under host load is not a verdict
+(wave-49, s183/s184): it is re-run quiet before it is read.
+
+### P3. kw09's module `const` and std: not yet
+
+std's one consumer is F-0025: `std.math`'s `int_max()`/`int_min()` are
+functions because a module `const` cost two of the three lanes. At
+0.2.23 the declaring module compiles a `const`, but std's use is
+cross-module (`math.INT_MAX` from an importer), and that is
+wolf-lang#579, open. Predicted on a two-file witness shaped like
+std.math (a module with `pub const K: int = 7` and a `pub fn` reading
+it; an entry reading `m.K` and calling the fn): reading `K` INSIDE its
+module runs on lupin, wolfc and native; reading `m.K` from the importer
+runs on lupin and is refused on wolfc (`unsupported`) and native ("a
+member access without a recorded type"). So std does not take module
+`const` in this lane, and F-0025 waits on #579. Falsified if the
+importer's read runs on both compiler lanes.
+
+### P4. The rig: three report paths that still show a hash and no bytes
+
+The fix the track queued ("print the actual stdout on a mismatch, not
+only its sha256") is already in the rig: `cefb89c` (wolf-std#20,
+2026-09-10) prints `observed stdout: "…"` under a directive's stdout
+mismatch, and sc53's own macOS job printed it (run 37161453649, job
+111315568947, the three lines after each `stdout hash mismatch`). F-0140
+said the rig printed only the hash; it did not. What is still
+hash-only, and what this lane changes, each seen red by a unit test
+before the fix:
+
+1. A cross-lane **DIVERGENCE (stdout)**: the red line names the two
+   verdicts (`exit(0)` and `exit(0)`) and no bytes; the JSONL carries
+   the two hashes. After: both lanes' observed stdout under the line,
+   and `stdout_inline` in the JSONL.
+2. A directive mismatch whose record carries **no `stdout_inline`**
+   (`[proto.record.fields]` inlines at most 4096 bytes): nothing after
+   the hash, so a reader cannot tell "not inlined" from "the rig never
+   prints it". After: a line saying the record carries the hash only.
+3. A **moved `divergent(stdout)`** row: the red names the verdict only.
+   After: the observed stdout too.
+
+No ledger word and no test file changes for this.
