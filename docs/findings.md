@@ -146,7 +146,7 @@ the building.
 | F-0136 | 2026-09-15 | **`push` takes no written mode at wolf 0.2.14, so #385's `take` spelling cannot be adopted before the pin moves**: `(mut out).push(take v)` is `E1007 — \`push\` takes \`value\` as plain \`read\` — no mode is written for it` on BOTH compiler rungs, for a call argument and for a binding alike, while lupin 0.1.36 runs it. A static refusal of the module, so every `std.list` row on both rungs would pay for one function's spelling. sc50's combinators therefore write plain `push` and name the owed `take` in `map`'s doc | wolf-lang#385 (ruled option 3, lane s167) | sc50 probe |
 | F-0137 | 2026-09-15 | **A module-keyed `LUPIN_MIRROR_LAG` entry calls a new RUNNING block "the mirror moved"**: sc49's word was keyed by module, true while every `std.range` block went through an accessor; sc50's `range.collect` names none and runs on lupin, so `doc-examples` redded `range.lu:176` with "the mirror moved (a heal, or a different refusal)" while the mirror had not moved at all. Keyed by the call now, one entry per example (`range.is_empty(`, `range.contains(`, `range.len(`, `range.clamp_to(`), the shape `LUPIN_TIER_WAIVERS` already had; the selftest counts blocks writing that call | wolf-std#37 | sc50, caught by the gate itself |
 | F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52: B117 FIXED (`f8c606a`); #34 ceiling 180 s on windows (`1a1d060`), REQUIRED proposed in PR #46; #4/#5 blocked upstream (wolf-lang#217, #346 — exact calls commented); F-0011's capacity ask rides wolf-lang#416 item 2 |
-| F-0140 | 2026-10-03 | **sc53's predictions, committed before the 0.2.22 / 0.1.45 archives were unpacked** — the binary pin to wolf 0.2.22 / lupin 0.1.45 by digest, the data pin to v0.2.22, wolf-std#48 (s199's `seek`/`tell`/`read_at` and the standard streams) carried, wolf-std#49's cell. Every predicted ledger move by file and lane, the counts before and after, and the std sites the new compiler could refuse. Measurements land beside each prediction in this section | wolf-std (this repo) | sc53: every prediction held (P1-P3); one ceiling timeout on a loaded kasumi did not recur; the windows red arrived as predicted (CI run 37161453649) and is the ledger's first host-scoped cell (`d91c91a`, `7dc13a1`) |
+| F-0140 | 2026-10-03 | **sc53's predictions, committed before the 0.2.22 / 0.1.45 archives were unpacked** — the binary pin to wolf 0.2.22 / lupin 0.1.45 by digest, the data pin to v0.2.22, wolf-std#48 (s199's `seek`/`tell`/`read_at` and the standard streams) carried, wolf-std#49's cell. Every predicted ledger move by file and lane, the counts before and after, and the std sites the new compiler could refuse. Measurements land beside each prediction in this section | wolf-std (this repo) | sc53: P1 and P3 held; P2 held on linux and windows (the predicted windows red is the ledger's first host-scoped cell, `d91c91a`, `7dc13a1`) and MISSED on macOS: `fs/std_handles`' positional read on stderr answers `io` there on every machine (CI run 37161453649), filed wolf-lang#566 / wolf-interp#187, the line accepts either tag (`4f49852`) |
 
 
 ## F-0001 — the std search path
@@ -10519,3 +10519,22 @@ any host; no `trap(overflow)` and no checked refusal naming a cast.
 `fmt-lu`: 474 files, every one a fixed point of `wolf fmt` at 0.2.22.
 `doc-examples`: 454 blocks GREEN on kasumi and on all three gates jobs.
 `ulp`: 200 rows exact. Nothing in `std/` changed for the new compiler.
+
+**P2 MISSED on macOS, and it was not a ledger word.** `rig (macos-latest)`
+of run 37161453649 (job 111315568947) was RED on `fs/std_handles.lu` on
+all three lanes: "directive mismatch — stdout hash mismatch", observed
+sha256 `8f63af53…`. The rig prints the hash and not the bytes. Hashing
+the candidates found exactly one preimage:
+`stdout seek: unseekable\nstdout tell: unseekable\nstderr read_at: io\nstdout close: io\n`.
+Descriptor 2 is the write end of the rig's pipe, and Darwin's `pread`
+checks the access mode (`EBADF`, mapped to `io`) before the file type
+(`ESPIPE`, `unseekable`). Linux checks the type first. `[os.fs.read_at]`
+says a handle with no offset is `unseekable`, so every macOS machine
+misses the clause on this one call. F-0140 did not see it coming:
+s199's measurements were all on linux, and upstream's
+`fs_std_lanes.rs` sets descriptor 0, which is readable. Filed
+wolf-lang#566 and wolf-interp#187 with this witness. The test keeps the
+call and accepts either tag on that line (`4f49852`), naming the
+issues. The seek and tell lines stay exact on every host. Nothing in
+`std/` moves: `std.fs.read_at` passes the machine's row through, as it
+must.

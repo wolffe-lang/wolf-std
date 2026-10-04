@@ -24,6 +24,11 @@ assert message, wolf-std#49; `0550326`). One cell is host-scoped:
 `[os.fs.std]` has lupin decline the offset calls on 0..2 by name
 (`7dc13a1`, observed in CI run 37161453649). The rig learned the
 spelling for that, `<lane>-windows` (`d91c91a`, CONTRIBUTING `c6d596d`).
+One answer F-0140 missed: on macOS a positional read of stderr (a
+write-only pipe end) answers `io` on every machine, where
+`[os.fs.read_at]` says `unseekable`. Filed as wolf-lang#566 and
+wolf-interp#187; `fs/std_handles` accepts either tag on that one line
+(`4f49852`).
 
 **Nothing in `std/` changed for the new compiler.** No std site is
 refused by 0.2.17-0.2.22's new rules (E0415, E0611, E0816, E0817,
