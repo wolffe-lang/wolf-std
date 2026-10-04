@@ -19,8 +19,8 @@ fn main() -> !int {
     let a = errors.describe(bad_digit)
     let b = errors.describe(unknown)
     print("{a} | {b}")
-    if errors.offset_of(bad_digit) != 3 { return 1 }
-    if errors.offset_of(unknown) != 0 { return 2 }
+    if errors.byte_offset(bad_digit) != 3 { return 1 }
+    if errors.byte_offset(unknown) != 0 { return 2 }
     if bad_digit.kind != 1 { return 3 }
     if !(errors.describe(ended) == "unexpected end of input at byte 4") { return 4 }
     if !(errors.describe(trailing) == "trailing text after a complete value at byte 11") {

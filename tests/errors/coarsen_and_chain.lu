@@ -38,7 +38,7 @@ fn main() -> !int {
     var kind: int = 0 - 1
     var text = ""
     let miss = digit_value("x") else |Parse(p)| {
-        offset = errors.offset_of(p)
+        offset = errors.byte_offset(p)
         kind = p.kind
         text = errors.describe_failure(errors.coarsen(p))
         0 - 1

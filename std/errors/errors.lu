@@ -110,16 +110,20 @@ pub fn parse_err(offset: int, kind: int) -> ParseErr {
 }
 
 /// The byte offset `e` reports. The named accessor of the `offset` field
-/// — the `offset_of` convention every position-carrying payload in std
+/// — the `byte_offset` convention every position-carrying payload in std
 /// answers to, so that a caller reads one spelling across payload types.
+///
+/// Named `byte_offset`, not `offset_of` (its name until sc54): wolf 0.2.23
+/// puts `offset_of` in the prelude (kw08's layout query), and a module
+/// item with a prelude name shadows it for the whole module (W0304).
 ///
 /// Total: no rows, no traps.
 ///
 /// ```wolf-doc-example
-/// errors.offset_of(errors.parse_err(12, 1)) == 12
-/// errors.offset_of(errors.parse_err(0, 0)) == 0
+/// errors.byte_offset(errors.parse_err(12, 1)) == 12
+/// errors.byte_offset(errors.parse_err(0, 0)) == 0
 /// ```
-pub fn offset_of(e: ParseErr) -> int {
+pub fn byte_offset(e: ParseErr) -> int {
     e.offset
 }
 
