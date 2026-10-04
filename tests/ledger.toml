@@ -3829,5 +3829,12 @@ native = "run"
 
 [tests."fs/std_handles.lu"]
 lupin = "run"
+# sc53: the ledger's first host-scoped cell. `[os.fs.std]`'s host posture
+# (wolf-lang v0.2.22, spec/11-os.md): lupin, "whose source admits no
+# `unsafe` and so no `GetFileType`, declines the four calls on 0, 1 and 2
+# on windows BY NAME". Predicted in F-0140 before the archives; observed
+# `unsupported` on rig (windows-latest), CI run 37161453649 (job
+# 111315568877), the one red of that run. linux and macOS serve the calls.
+lupin-windows = "unsupported"
 wolfc = "run"
 native = "run"
