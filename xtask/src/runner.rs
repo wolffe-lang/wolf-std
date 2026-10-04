@@ -391,9 +391,10 @@ pub fn std_test() -> Result<(), String> {
                     reds.push(format!(
                         "tests/{test} [{}]: ledger says `divergent({obs})`, \
                          observed `{}` — the divergence moved (a heal or a new \
-                         shape); re-measure and flip the row deliberately",
+                         shape); re-measure and flip the row deliberately{}",
                         imp.ledger_name(),
-                        rec.verdict
+                        rec.verdict,
+                        exit_text(&rec)
                     ));
                 }
                 continue;
@@ -520,16 +521,14 @@ pub fn std_test() -> Result<(), String> {
                     "class": class,
                     "a": {"impl": a.impl_name, "verdict": a.verdict.to_string(),
                            "phase_reached": a.phase_reached,
-                           "stdout_sha256": a.stdout_sha256},
+                           "stdout_sha256": a.stdout_sha256,
+                           "stdout_inline": a.stdout_inline},
                     "b": {"impl": b.impl_name, "verdict": b.verdict.to_string(),
                            "phase_reached": b.phase_reached,
-                           "stdout_sha256": b.stdout_sha256},
+                           "stdout_sha256": b.stdout_sha256,
+                           "stdout_inline": b.stdout_inline},
                 }));
-                reds.push(format!(
-                    "tests/{test}: DIVERGENCE ({class}) — {} says {}, {} says {} \
-                     (a finding for the upstream divergence log)",
-                    a.impl_name, a.verdict, b.impl_name, b.verdict
-                ));
+                reds.push(divergence_line(test, class, a, b));
             }
         }
         ran += 1;
@@ -750,10 +749,23 @@ fn classify(rec: &Record, check: &Check) -> Result<Achieved, String> {
 /// spend it. Capped, so a generated row that prints a megabyte cannot
 /// turn one red line into a log nobody reads, and escaped, so a
 /// trailing-newline difference is visible rather than invisible.
+///
+/// sc54: the hash-only case says so. `[proto.record.fields]` inlines at
+/// most 4096 bytes and hashes always, so a record with a hash and no
+/// inline text is legal — and printing nothing after the hash there left
+/// a reader unable to tell "not inlined" from "this rig never prints
+/// the bytes" (F-0140 read it the second way, F-0141 corrects it).
 fn observed_text(rec: &Record) -> String {
     const CAP: usize = 400;
     let Some(text) = &rec.stdout_inline else {
-        return String::new();
+        return match &rec.stdout_sha256 {
+            Some(_) => "\n    observed stdout: not inline in the record (hash only; \
+                        [proto.record.fields] inlines at most 4096 bytes)"
+                .to_string(),
+            None => {
+                "\n    observed stdout: \"\" (no output: the record carries no hash)".to_string()
+            }
+        };
     };
     let shown: String = text
         .chars()
@@ -766,6 +778,37 @@ fn observed_text(rec: &Record) -> String {
         ""
     };
     format!("\n    observed stdout: \"{shown}\"{tail}")
+}
+
+/// `observed_text` for a record that EXITED, and nothing otherwise: a
+/// trap or a refusal has no stdout worth a line.
+fn exit_text(rec: &Record) -> String {
+    if matches!(rec.verdict, Verdict::Exit(_)) {
+        observed_text(rec)
+    } else {
+        String::new()
+    }
+}
+
+/// The red line for a cross-lane divergence (sc54). Before, a `stdout`
+/// divergence read "wolfc says exit(0), native says exit(0)": the one
+/// class whose whole content is the bytes printed none of them, and the
+/// JSONL beside it carried two hashes. Each lane's stdout now follows,
+/// labelled, under every class where a lane exited.
+fn divergence_line(test: &str, class: &str, a: &Record, b: &Record) -> String {
+    let label = |r: &Record| {
+        exit_text(r).replacen("observed stdout:", &format!("{} stdout:", r.impl_name), 1)
+    };
+    format!(
+        "tests/{test}: DIVERGENCE ({class}) — {} says {}, {} says {} \
+         (a finding for the upstream divergence log){}{}",
+        a.impl_name,
+        a.verdict,
+        b.impl_name,
+        b.verdict,
+        label(a),
+        label(b)
+    )
 }
 
 fn diff_class(a: &Record, b: &Record) -> Option<&'static str> {
@@ -890,6 +933,60 @@ mod tests {
             classify(&rec(Verdict::Fail("E0301".into()), None), &fail).unwrap(),
             Achieved::Satisfies
         );
+    }
+
+    fn inline(verdict: Verdict, sha: Option<&str>, text: Option<&str>) -> Record {
+        Record {
+            stdout_inline: text.map(str::to_string),
+            ..rec(verdict, sha)
+        }
+    }
+
+    #[test]
+    fn a_stdout_mismatch_prints_the_bytes_or_says_why_it_cannot() {
+        let want = Check::Run {
+            exit: ExitExpect::Code(0),
+            stdout: Some("seek: unseekable".into()),
+        };
+        let got = inline(Verdict::Exit(0), Some("8f63"), Some("seek: io\n"));
+        let red = classify(&got, &want).unwrap_err();
+        assert!(red.contains(r#"observed stdout: "seek: io\n""#), "{red}");
+        // Hash present, text absent: legal past 4096 bytes, and SAID.
+        let red = classify(&rec(Verdict::Exit(0), Some("8f63")), &want).unwrap_err();
+        assert!(red.contains("not inline in the record (hash only"), "{red}");
+        // No hash, no text: the program wrote nothing.
+        let red = classify(&rec(Verdict::Exit(0), None), &want).unwrap_err();
+        assert!(red.contains(r#"observed stdout: "" (no output"#), "{red}");
+    }
+
+    #[test]
+    fn a_stdout_divergence_prints_both_lanes_bytes() {
+        let a = Record {
+            impl_name: "wolfc".into(),
+            ..inline(Verdict::Exit(0), Some("aa"), Some("io\n"))
+        };
+        let b = Record {
+            impl_name: "native".into(),
+            ..inline(Verdict::Exit(0), Some("bb"), Some("unseekable\n"))
+        };
+        let line = divergence_line("fs/x.lu", "stdout", &a, &b);
+        assert!(line.contains("DIVERGENCE (stdout)"), "{line}");
+        assert!(line.contains(r#"wolfc stdout: "io\n""#), "{line}");
+        assert!(line.contains(r#"native stdout: "unseekable\n""#), "{line}");
+        // A trap has no stdout line.
+        let t = Record {
+            impl_name: "lupin".into(),
+            ..rec(Verdict::Trap("bounds".into()), None)
+        };
+        let line = divergence_line("fs/x.lu", "verdict", &a, &t);
+        assert!(!line.contains("lupin stdout"), "{line}");
+    }
+
+    #[test]
+    fn exit_text_is_for_exits_only() {
+        assert!(exit_text(&inline(Verdict::Exit(3), Some("aa"), Some("x"))).contains(r#""x""#));
+        assert_eq!(exit_text(&rec(Verdict::Trap("bounds".into()), None)), "");
+        assert_eq!(exit_text(&rec(Verdict::Unsupported, None)), "");
     }
 
     #[test]
