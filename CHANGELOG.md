@@ -1,5 +1,35 @@
 # Changelog
 
+## sc53 — 2026-10-03 — std at wolf 0.2.22 / lupin 0.1.45, with s199's offset calls and the standard streams
+
+**The pin.** wolf 0.2.16 -> **0.2.22** and lupin 0.1.38 -> **0.1.45**,
+both from the release archives by digest (`vendor/tools.toml`, `eeea3fa`;
+linux x86-64 `df0f2fea…` and `907cfb1a…`). The data pin moves with
+them, v0.2.15 -> v0.2.22 (`2e4ca76` -> `8e36bc1`, +45 anchors, none
+removed, `f188467`). Predicted before the
+archives were unpacked (F-0140, `14c49e3`) and measured beside it.
+
+**Carried: wolf-std#48** (s199's std half, its eight commits kept as
+they were authored, head `791c2cad`): `fs.seek`, `fs.seek_by`,
+`fs.seek_end`, `fs.tell` and `fs.read_at`, and `fs.stdin()`,
+`fs.stdout()`, `fs.stderr()` as `File`s, over wolf-lang s199's
+`fs_seek`/`fs_tell`/`fs_read_at` and `[os.fs.std]`. Its three tests
+cite the s199 clause anchors now that the data pin vendors them
+(`0038484`) and run on all three lanes.
+
+**The ledger, re-counted.** One word moved on every host:
+`testing/assert_msg_holds.lu` native `unsupported` -> `run` (s202's
+assert message, wolf-std#49; `0550326`). One cell is host-scoped:
+`fs/std_handles.lu` lupin is `unsupported` on windows, where
+`[os.fs.std]` has lupin decline the offset calls on 0..2 by name
+(`7dc13a1`, observed in CI run 37161453649). The rig learned the
+spelling for that, `<lane>-windows` (`d91c91a`, CONTRIBUTING `c6d596d`).
+
+**Nothing in `std/` changed for the new compiler.** No std site is
+refused by 0.2.17-0.2.22's new rules (E0415, E0611, E0816, E0817,
+E1010 for a `for` piece, the narrowing cast); every cast in the crypto
+modules was already masked into range.
+
 ## sc50 — 2026-09-15 — the combinators, std's half: nine functions on `[type.comb.set]`, two upstream bugs, and `sorted` named where it is missing
 
 wolf-lang#390 ruled `par` stays (option 1). s166's clauses
