@@ -1,5 +1,34 @@
 # Changelog
 
+## sc54 — 2026-10-04 — std at wolf 0.2.23 / lupin 0.1.46
+
+**The pin.** wolf 0.2.22 -> **0.2.23** and lupin 0.1.45 -> **0.1.46**,
+both from the release archives by digest (`vendor/tools.toml`, `b252b0d`;
+linux x86-64 `6f505eb5…` and `d13a0379…`). The data pin moves with
+them, v0.2.22 -> v0.2.23 (`8e36bc1` -> `8edac3e`, +17 anchors, none
+removed, `49d0c71`). Predicted before the archives were unpacked
+(F-0141, `b410a44`) and measured beside it.
+
+**Renamed: `errors.offset_of` -> `errors.byte_offset`** (`27e0eac`).
+0.2.23's prelude gains `offset_of` (kw08), and a module item with a
+prelude name shadows it (W0304, an error under `--deny-warnings`). A
+caller of `errors.offset_of` must follow the rename.
+
+**The ledger, re-counted: no word moved,** as predicted, with every
+candidate named in F-0141 (ruling #34's two std tails end in `return`
+and `?`; nothing in std uses module state, raw pointers, attributes,
+`errdefer` or a row-annotated binding).
+
+**Module `const`: not yet.** A `pub const` read from an importer is
+`unsupported` on the checked and native lanes at 0.2.23
+(wolf-lang#579), so `math.int_max()`/`int_min()` stay functions
+(F-0025).
+
+**The rig.** A cross-lane stdout DIVERGENCE, a moved `divergent(stdout)`
+row and a hash-only record now print the bytes or say why they cannot
+(`c78510c`). The directive mismatch already printed them since
+`cefb89c`; F-0140's premise that it did not is corrected in F-0141.
+
 ## sc53 — 2026-10-03 — std at wolf 0.2.22 / lupin 0.1.45, with s199's offset calls and the standard streams
 
 **The pin.** wolf 0.2.16 -> **0.2.22** and lupin 0.1.38 -> **0.1.45**,
