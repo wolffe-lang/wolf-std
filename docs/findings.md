@@ -146,7 +146,7 @@ the building.
 | F-0136 | 2026-09-15 | **`push` takes no written mode at wolf 0.2.14, so #385's `take` spelling cannot be adopted before the pin moves**: `(mut out).push(take v)` is `E1007 — \`push\` takes \`value\` as plain \`read\` — no mode is written for it` on BOTH compiler rungs, for a call argument and for a binding alike, while lupin 0.1.36 runs it. A static refusal of the module, so every `std.list` row on both rungs would pay for one function's spelling. sc50's combinators therefore write plain `push` and name the owed `take` in `map`'s doc | wolf-lang#385 (ruled option 3, lane s167) | sc50 probe |
 | F-0137 | 2026-09-15 | **A module-keyed `LUPIN_MIRROR_LAG` entry calls a new RUNNING block "the mirror moved"**: sc49's word was keyed by module, true while every `std.range` block went through an accessor; sc50's `range.collect` names none and runs on lupin, so `doc-examples` redded `range.lu:176` with "the mirror moved (a heal, or a different refusal)" while the mirror had not moved at all. Keyed by the call now, one entry per example (`range.is_empty(`, `range.contains(`, `range.len(`, `range.clamp_to(`), the shape `LUPIN_TIER_WAIVERS` already had; the selftest counts blocks writing that call | wolf-std#37 | sc50, caught by the gate itself |
 | F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52: B117 FIXED (`f8c606a`); #34 ceiling 180 s on windows (`1a1d060`), REQUIRED proposed in PR #46; #4/#5 blocked upstream (wolf-lang#217, #346 — exact calls commented); F-0011's capacity ask rides wolf-lang#416 item 2 |
-| F-0140 | 2026-10-03 | **sc53's predictions, committed before the 0.2.22 / 0.1.45 archives were unpacked** — the binary pin to wolf 0.2.22 / lupin 0.1.45 by digest, the data pin to v0.2.22, wolf-std#48 (s199's `seek`/`tell`/`read_at` and the standard streams) carried, wolf-std#49's cell. Every predicted ledger move by file and lane, the counts before and after, and the std sites the new compiler could refuse. Measurements land beside each prediction in this section | wolf-std (this repo) | sc53: open |
+| F-0140 | 2026-10-03 | **sc53's predictions, committed before the 0.2.22 / 0.1.45 archives were unpacked** — the binary pin to wolf 0.2.22 / lupin 0.1.45 by digest, the data pin to v0.2.22, wolf-std#48 (s199's `seek`/`tell`/`read_at` and the standard streams) carried, wolf-std#49's cell. Every predicted ledger move by file and lane, the counts before and after, and the std sites the new compiler could refuse. Measurements land beside each prediction in this section | wolf-std (this repo) | sc53: every prediction held (P1-P3); one ceiling timeout on a loaded kasumi did not recur; the windows red arrived as predicted (CI run 37161453649) and is the ledger's first host-scoped cell (`d91c91a`, `7dc13a1`) |
 
 
 ## F-0001 — the std search path
@@ -10466,3 +10466,56 @@ Scanned in this tree (474 `.lu` files):
   nested fn.
 
 Falsified by any `fail(E…)` on a row ledgered `run`.
+
+### Measured (2026-10-03)
+
+**P1 held.** The archives arrived at the reported digests on kasumi
+(`wolf-0.2.22-x86_64-unknown-linux-gnu.tar.gz` `df0f2fea…`,
+`lupin-0.1.45-x86_64-unknown-linux-gnu.tar.gz` `907cfb1a…`) and in CI on
+all three hosts (run 37161453649: macOS `19606e1e…` / `08b1de12…`,
+windows `a302e134…` / `9b5e5836…`). Members by name: `wolf`
+`56f90a92…`, `lupin` `6b88de73…`, `libwolf_rt.a` `dbf8ccb5…`, `_wolf`
+`2d1e4801…` (the completion script, as at every pin since sc51). The
+three `--version` strings are the predicted ones, word for word. The
+data pin: `sync-pin` clean, and the four s199 anchors resolve
+(`0038484` puts them back on the three tests' `conforms:` lines;
+`[conf.tag.valid]` raised nothing).
+
+**P2 held, on every host.** The first run with the new pair, before any
+ledger word moved (kasumi, `14c49e3`,
+`~/lanes/sc53/evidence/std-test-pre-ledger-14c49e3.log`, `3f727fb8…`),
+was RED on exactly the predicted line,
+`testing/assert_msg_holds.lu [native]: ledger says unsupported, observed
+run`, and on one more line nobody predicted:
+`x/crypto/p256/wycheproof_p256_p4.lu [lupin]: timed out after 60s`. That
+row is one of the step-budget rows that answer `unsupported` in 25-33 s
+idle; the run went at load 9-14 from other lanes, and the same row
+answered its ledger word inside the ceiling at `0550326` (load 5;
+`std-test-g1-0550326.log`, `191f583a…`, GREEN). A ceiling red decided
+by host load is not a verdict (wave-49, s183/s184), so it moves nothing.
+After `0550326`: 423 tests, forward tags 803, conservatism ledger
+**122**, unstable 0, slow skips 0, divergent 0, mirror-lag 0 — each the
+predicted number, on kasumi and on `rig (ubuntu-latest)` of run
+37161453649. #48's three rows: "3 lane(s) observed" on linux.
+
+**The windows red, as predicted.** `rig (windows-latest)` of run
+37161453649 (job 111315568877):
+`tests/fs/std_handles.lu [lupin]: ledger says run, observed unsupported
+(shallower than the ledger claims …)`, "2 lane(s) observed" for that
+test, and nothing else red on that host. The spec makes it the answer,
+not a defect: `[os.fs.std]`'s host posture at v0.2.22 says lupin
+"declines the four calls on 0, 1 and 2 on windows BY NAME", so nothing
+is filed upstream. The ledger had no way to say "this lane, this host",
+so the rig gained one: `<lane>-windows` (`d91c91a`), seen red by a
+planted break (`Entry::want` ignoring the host cell fails
+`host_scoped_cells_replace_their_lane_on_windows_only`; kasumi
+`~/lanes/sc53/evidence/plant-host-cell.log`), and the row carries
+`lupin-windows = "unsupported"` (`7dc13a1`). `unstable(…)` was the
+other spelling available and it was refused: it would have let linux and
+macOS lose the row to `unsupported` silently.
+
+**P3 held.** No row ledgered `run` answered `fail(E…)` on any lane, on
+any host; no `trap(overflow)` and no checked refusal naming a cast.
+`fmt-lu`: 474 files, every one a fixed point of `wolf fmt` at 0.2.22.
+`doc-examples`: 454 blocks GREEN on kasumi and on all three gates jobs.
+`ulp`: 200 rows exact. Nothing in `std/` changed for the new compiler.
