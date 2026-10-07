@@ -854,7 +854,28 @@
 # ITS CONFORMANCE PIN IS wolf-lang v0.2.22 (`8e36bc1a`), one release
 # behind the compiler and the data pin below (v0.2.23), the same
 # one-behind shape 0.1.45 had.
-version = "0.1.46"
+# sc55 BUMP: 0.1.46 -> 0.1.48 (r29's 0.1.47 and r30's 0.1.48, both
+# skipped by this repo until now; released 2026-10-05 and 2026-10-07),
+# the lupin half of wolf 0.2.25: s209's mirror of ruling #36 (row L4,
+# 0.1.47), is72's `--trace-places` and is73's re-pin blockers (0.1.48).
+# Acquired by digest from the release, the whole archive into
+# `.wolf-bin/` (never a source build), verified from `--version`:
+# `lupin 0.1.48 (wolf-interp, reference interpreter at pin 294d626)`.
+# Archive `lupin-0.1.48-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `81cfd77af5c983830b3bc8ddab2a5ba762408ac770e3229032c36d54958d93d8`
+# (the release's reported digest, matched on kasumi); the binary `lupin`
+# BY NAME, sha256
+# `734caee607d2dcbec0ec20e3dab8662f3972cdc151d4e6003d63d1060579fa0e`.
+# The other three archives, as GitHub reports them and as CI checks
+# them on arrival: aarch64-apple-darwin `27d86060…`,
+# aarch64-unknown-linux-gnu `a5c30957…`, x86_64-pc-windows-msvc (a zip)
+# `9e4ea090…`.
+#
+# ITS CONFORMANCE PIN MOVES for the first time since sc53: wolf-lang
+# v0.2.24 (`294d626d`), the re-pin 0.1.47 could not take (#190, #188).
+# Still one release behind the compiler and the data pin below
+# (v0.2.25), the same one-behind shape 0.1.45 and 0.1.46 had.
+version = "0.1.48"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -873,7 +894,8 @@ version = "0.1.46"
 # pin = "41695e78437fbf3644accad40ddb4804737d4440"  (superseded, sc51 era — is51's 0.1.37, preserved at refs/tags/lupin-0.1.37-conformance-pin)
 # pin = "2e4ca769b396219585a07ff18492529c944672d9"  (superseded, sc52 era — is53's 0.1.38 at wolf-lang v0.2.15)
 # pin = "dfcc2f13e7c73182bdd41fc9bec2802c7da3b024"  (superseded, sc53 era — is69's 0.1.45 at wolf-lang v0.2.21)
-pin = "8e36bc1a0f92bbbbc6861b10d5b2638f76412d6a"
+# pin = "8e36bc1a0f92bbbbc6861b10d5b2638f76412d6a"  (superseded, sc54 era — 0.1.46 and the unadopted 0.1.47, both at wolf-lang v0.2.22)
+pin = "294d626dd596122285d5df954762e3aee3e5db71"
 # (sc46: 0.1.34 crosses to v0.2.11 and lands ON a tag for the second
 #  bump running. The gap to the data pin below NARROWS to one release
 #  — s154 and s156 — from sc44's 91 commits, and both halves are at
@@ -1113,7 +1135,31 @@ pin = "8e36bc1a0f92bbbbc6861b10d5b2638f76412d6a"
 #   x86_64-unknown-linux-gnu
 #     `97b5404b6d795008653cb3e95596be6bc2fae9cd3be8bf7c946f5f57bb5d53b1`
 # (`_wolf` is still `2d1e4801…`, the zsh completion script.)
-version = "0.2.23"
+# sc55 BUMP: 0.2.23 -> 0.2.25, TWO releases (no 0.2.24 bump landed
+# here). 0.2.24 (r29, 2026-10-06): kw11 atomics, kw12 the allocator
+# hook, s209 row L4, s210 (#585 module strings, #570 the pool), s211,
+# s212 (`wolf prelude`); the prelude name `fence` (no std declaration
+# draws W0304). 0.2.25 (r30, 2026-10-07): s214's #598/#601/#600, so
+# binaries gain reloads after calls; F-0142 predicted s214's 157 native
+# / 38 release wolf-std binaries by name, and zero ledger moves.
+# Acquired by digest from the release, the whole archive into
+# `.wolf-bin/`, verified from `--version`: `wolf 0.2.25 (wolfgang, pin
+# 6710f9e)`, pairing line `paired with lupin 0.1.48 (reference
+# interpreter), pin 294d626` — TRUE of this box's pair.
+# Archive `wolf-0.2.25-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `9d91f533ba233bfa0ae5490b567c4b9e15cb77c3e7c997912828ef2b7b2183f8`
+# (the release's reported digest, matched on kasumi). The other three:
+# aarch64-apple-darwin `202c8d6c…`, aarch64-unknown-linux-gnu
+# `6b0bb90d…`, x86_64-pc-windows-msvc `9debee73…`. The archive has
+# carried `libwolf_rt_none.a` since 0.2.24 (`110f062a…` here); nothing
+# in this repo links it.
+#
+# THE BINARY `wolf`, BY NAME (see sc51's note below for why):
+#   x86_64-unknown-linux-gnu
+#     `8373b0cdcb30a43c8ef3700627bcb2bdd7ee19ca625384c8823fdb1021f3d0d6`
+# (`_wolf`, the zsh completion script, MOVED at 0.2.24 to `a368c8ec…`
+# from `2d1e4801…`: `wolf prelude` is a new subcommand.)
+version = "0.2.25"
 # sc48 BUMP: a7f517e (v0.2.12) -> 30731a6 (v0.2.14), TWO releases —
 # s157/s158 (0.2.13, "the literals and the papercuts III") and s159/s160
 # (0.2.14, "the string runtime and the papercuts IV"). The data pin was
@@ -2663,4 +2709,5 @@ version = "0.2.23"
 # pin = "2e4ca769b396219585a07ff18492529c944672d9"  (superseded, sc51 era — the v0.2.15-tag pin)
 # pin = "93a5fe504593ca7642b78ba83b4986e7a03cfe71"  (superseded, sc52 era — the v0.2.16-tag pin)
 # pin = "8e36bc1a0f92bbbbc6861b10d5b2638f76412d6a"  (superseded, sc53 era — the v0.2.22-tag pin)
-pin = "8edac3eeb48632b32f02ef41ea87d484d1423492"
+# pin = "8edac3eeb48632b32f02ef41ea87d484d1423492"  (superseded, sc54 era — the v0.2.23-tag pin)
+pin = "6710f9e0cbc3a7264349093751ce7a46a407e473"
