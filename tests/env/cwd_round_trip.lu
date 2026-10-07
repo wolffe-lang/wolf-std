@@ -1,0 +1,47 @@
+//! check: run(exit=0, stdout="moved=true\nrelative_read=found\nends_inner=true\nback=true\nmissing=not_found\nonto_a_file=io\ncleaned=true")
+//! phase: run
+//! conforms: std.env, os.fs.chdir, os.fs.path, err.row, err.propagate
+//!
+//! **s215: `env.set_cwd` then a relative read.** After the change a
+//! relative path names a file under the new directory, `env.cwd()` answers
+//! it, and changing back to the first answer restores it exactly. A
+//! missing directory is `not_found`; a path naming a FILE is `io` (the
+//! host's ENOTDIR). The test leaves the directory where it found it.
+
+use std.env
+use std.fs
+
+fn cd(path: str) -> str {
+    env.set_cwd(path) else |e| {
+        return match e {
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let start = env.cwd()?
+    fs.create_dir_all("s215-cwd/inner")?
+    fs.write_text("s215-cwd/inner/note.txt", "found")?
+    let moved = cd("s215-cwd/inner") == "ok"
+    print("moved={moved}")
+    let text = fs.read_text("note.txt")?
+    print("relative_read={text}")
+    let here = env.cwd()?
+    let ends = here.ends_with("inner")
+    print("ends_inner={ends}")
+    env.set_cwd(start)?
+    let back = env.cwd()? == start
+    print("back={back}")
+    let missing = cd("s215-cwd/no-such-dir")
+    print("missing={missing}")
+    let onto = cd("s215-cwd/inner/note.txt")
+    print("onto_a_file={onto}")
+    fs.remove_dir_all("s215-cwd")?
+    let gone = !fs.exists("s215-cwd")
+    print("cleaned={gone}")
+    0
+}

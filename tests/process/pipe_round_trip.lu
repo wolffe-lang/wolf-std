@@ -1,0 +1,36 @@
+//! check: run(exit=0, stdout="ends_above_2=true\nread=howl\nthen=eof\nread_end_is_terminal=false")
+//! phase: run
+//! conforms: std.process, os.proc.pipe, err.row, err.propagate
+//!
+//! **s215: `process.pipe()` is two `std.fs` files.** Written to through
+//! `fs.write`, closed through `fs.close`, read through `fs.read` — no
+//! child, so the test is deterministic on every host and every lane. The
+//! read after the writer's close is `eof`: that is what tells a reader of
+//! a child's output that the child is done writing. A pipe end is not a
+//! terminal (`io.is_terminal`).
+
+use std.fs
+use std.io
+use std.process
+
+fn main() -> !int {
+    var p = process.pipe()?
+    print("ends_above_2={p.read.fd > 2 && p.write.fd > 2}")
+    fs.write(mut p.write, "howl")?
+    fs.close(take p.write)?
+    let got = fs.read(mut p.read, 64)?
+    print("read={got}")
+    var then = "data"
+    fs.read(mut p.read, 64) else |e| match e {
+        eof => {
+            then = "eof"
+            ""
+        },
+        _ => "",
+    }
+    print("then={then}")
+    let tty = io.is_terminal(p.read)?
+    print("read_end_is_terminal={tty}")
+    fs.close(take p.read)?
+    0
+}

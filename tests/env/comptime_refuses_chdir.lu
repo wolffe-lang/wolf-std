@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.env, comptime.sandbox, comptime.sandbox.io
+//!
+//! **D33 for `env.set_cwd` (s215), held one level down at `os_chdir`**:
+//! moving the COMPILER's working directory acts on the machine that
+//! compiles, the sandbox table's `io` reason. The row is handled locally
+//! (F-0069) and the facade is called at run time to keep the import used.
+
+use std.env
+
+comptime fn probe() -> int {
+    os_chdir("/") else |_| {}
+    0
+}
+
+fn main() -> !int {
+    const Z = probe()
+    let key = env.entry_key("A=B")
+    print("key: {key} z: {Z}")
+    0
+}

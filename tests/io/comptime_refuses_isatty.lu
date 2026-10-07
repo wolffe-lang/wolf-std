@@ -1,0 +1,21 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.io, comptime.sandbox, comptime.sandbox.io
+//!
+//! **D33 for `io.is_terminal` (s215), held one level down at
+//! `os_isatty`**: probing the compiler's terminal acts on the machine that
+//! compiles (`io`). The row is handled locally (F-0069); the facade's
+//! writer runs at run time to keep the import used.
+
+use std.io
+
+comptime fn probe() -> int {
+    let t = os_isatty(0) else |_| false
+    if t { 1 } else { 0 }
+}
+
+fn main() -> !int {
+    const T = probe()
+    io.write_line("t: {T}")
+    0
+}

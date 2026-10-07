@@ -1,0 +1,31 @@
+//! check: run(exit=0, stdout="closed_is_well_formed=true")
+//! phase: run
+//! conforms: std.process, os.proc.fds, err.row, err.else
+//!
+//! **s215: `close_fd` is an entry like any other.** A command whose map
+//! closes descriptor 0 is well-formed: for a program no host has it is
+//! `not_found` on unix and `unsupported` on windows (which places no map),
+//! never `invalid`. lupin refuses a close BY NAME — closing a child's
+//! descriptor between fork and exec needs `unsafe`, which it forbids — so
+//! this row is apart from `map_rows.lu` and lupin's column says so.
+
+use std.process
+
+fn main() -> !int {
+    var d = process.command("wolf-s215-no-such-program")
+    process.close_fd(mut d, 0)
+    var u = "started"
+    var ch = process.start(d) else |e| {
+        u = match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+        process.Child { slot: 0 - 1 }
+    }
+    let _code = process.wait(take ch) else 0
+    print("closed_is_well_formed={u == "not_found" || u == "unsupported"}")
+    0
+}
