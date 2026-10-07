@@ -92,13 +92,24 @@
 //! repository ran a child at all (F-0066); `tests/process/prefork_handoff.lu`
 //! is the first, and it is what caught this.
 //!
-//! So: a child's output and diagnostics go WHERE THIS PROGRAM'S GO, and a
-//! child can read this program's input. A library that spawns a helper is
-//! putting that helper's chatter into its caller's streams — plan for it.
-//! **What is still missing is CAPTURE, and F-0065 is unchanged in that
-//! half**: no builtin wires a pipe, so `output(c) -> str` has nowhere to
-//! read FROM even though the child is speaking. Inheriting is not
-//! capturing, and the two were being confused by one wrong sentence.
+//! So: a child's output and diagnostics go WHERE THIS PROGRAM'S GO. Its
+//! input does not: `[os.proc.spawn]` wires a child's descriptor 0 to the
+//! null device, and the sentence that stood here until s215 ("a child can
+//! read this program's input") was never what the clause said. A library
+//! that spawns a helper is putting that helper's chatter into its
+//! caller's streams — plan for it.
+//!
+//! **Capture arrived at s215, and it is a map, not a mode.** wolf-lang
+//! s215 added `os_pipe` and `os_spawn_fds` (`[os.proc.pipe]`,
+//! `[os.proc.fds]`): a `Command` now carries a DESCRIPTOR MAP, built with
+//! `set_stdin`, `set_stdout`, `set_stderr`, `set_fd` and `close_fd`, and
+//! `pipe()` makes the two `std.fs` files a map hands down. A pipeline is
+//! two commands and a pipe; `2>&1` is one file given to two descriptors;
+//! `5<file` is `set_fd(mut c, 5, f)`. The map is DATA — a list of
+//! (child descriptor, file) pairs the builders keep — so nothing here
+//! parses a redirection either: a shell that reads `2>&1` from a script
+//! parses it itself and calls the builders. F-0065's capture half closes
+//! with this; its other items stay below.
 //! Filed upstream as [wolf-lang#256](https://github.com/wolffe-lang/wolf-lang/issues/256):
 //! `[os.proc]` never states the posture, and `[os.proc.inherit]`'s
 //! "descriptors 0, 1 and 2 are the spawn's ordinary stdio" is the only
@@ -124,12 +135,13 @@
 //! ```text
 //! output(c: Command) -> str ! {not_found, denied, signal, io}
 //! stdin_text(mut c: Command, text: str)
-//!     A child's CAPTURED stdout, and text written to its stdin. No
-//!     builtin wires a pipe (F-0065). The child's stdio is inherited,
-//!     not closed (sc39's correction above), so the child is speaking —
-//!     into this program's own streams, where nothing can read it back.
-//!     Inheriting is not capturing. Still the single biggest hole in the
-//!     module and the one the book's pargrep chapter will feel first.
+//!     A child's whole stdout as a `str`, and text written to its stdin,
+//!     as one call each. Buildable since s215 from `pipe` and the map,
+//!     and left out on purpose until a consumer needs the convenience:
+//!     the only correct `output` reads the pipe WHILE the child runs (a
+//!     child that fills a pipe nobody drains blocks forever), which
+//!     wants a task, and the first consumer (pelt) does its own
+//!     plumbing.
 //! env_for(mut c: Command, name: str, value: str)
 //! current_dir(mut c: Command, path: str)
 //!     A child's environment and working directory. `os_spawn` inherits
@@ -219,6 +231,7 @@
 //! `process.exe()` whose only caller would be a test this module still
 //! cannot write is surface without a use.
 
+use std.fs
 use std.net
 
 /// A program and its arguments, as the argument VECTOR the host receives.
@@ -237,6 +250,7 @@ use std.net
 /// time".
 pub struct Command {
     argv: List[str],
+    fds: List[int],
 }
 
 /// A started child process: this machine's handle on it.
@@ -273,7 +287,7 @@ pub struct Child {
 pub fn command(program: str) -> Command {
     var argv = List[str]()
     (mut argv).push(program)
-    Command { argv: argv }
+    Command { argv: argv, fds: List[int]() }
 }
 
 /// A `Command` from a whole argument vector: element 0 is the program, the
@@ -299,7 +313,7 @@ pub fn command(program: str) -> Command {
 /// vec[0] == "grep"
 /// ```
 pub fn from_argv(argv: List[str]) -> Command {
-    Command { argv: copy argv }
+    Command { argv: copy argv, fds: List[int]() }
 }
 
 /// Append one argument to `c`.
@@ -347,18 +361,138 @@ pub fn argv(c: Command) -> List[str] {
     copy c.argv
 }
 
+/// The two ends of a pipe: what is written to `write` is read from
+/// `read`, in order, and `read` answers `eof` once every copy of `write`
+/// is closed — this program's and every child's.
+///
+/// Both fields are `std.fs` files, so `fs.read`, `fs.read_chunk`,
+/// `fs.write`, `fs.write_chunk` and `fs.close` serve them, and either end
+/// can be handed to a child with `set_stdin`, `set_stdout`, `set_stderr`
+/// or `set_fd`. Neither end reaches a child unless a map names it: both
+/// are close-on-exec (`[os.proc.pipe]`).
+pub struct Pipe {
+    read: fs.File,
+    write: fs.File,
+}
+
+/// A new pipe.
+///
+/// Rows: `io` when the host cannot make one (the process is out of
+/// descriptors). Never traps.
+///
+/// **Close what you handed down.** A child given `write` holds its own
+/// copy; this program's copy is still open after `start`, and a reader of
+/// `read` never sees `eof` while any copy is. The pipeline idiom is: make
+/// the pipe, start both stages, close this program's two ends, wait.
+///
+/// Capability `io`; refused at comptime (D33). Delegates to `os_pipe`
+/// (wolf-lang s215).
+///
+/// A prose example, because a doc example imports exactly the documented
+/// module (§4) and the ends are read and written with `std.fs`:
+/// `let p = process.pipe()?`, `fs.write(mut p.write, "howl")?`,
+/// `fs.close(take p.write)?`, then `fs.read(mut p.read, 64)` answers
+/// `"howl"` and the next read `eof`. `tests/process/pipe_round_trip.lu`
+/// holds exactly that.
+pub fn pipe() -> Pipe ! {io} {
+    let (r, w) = os_pipe()?
+    Pipe { read: fs.File { fd: r }, write: fs.File { fd: w } }
+}
+
+/// The child gets `f` as descriptor `child` — a shell's `N<file`,
+/// `N>file` or `N>&M`, spelled as data: `child` is the number the CHILD
+/// sees, and `f` is a file this program holds (`fs.open`'s, a pipe end,
+/// or `fs.stdin()`/`fs.stdout()`/`fs.stderr()` for this program's own
+/// streams).
+///
+/// Total: nothing is checked or opened until `start`. Naming `child`
+/// again replaces the earlier entry, so the last builder call wins, as a
+/// shell's last redirection does. A `child` outside `0..255` is accepted
+/// here and is `start`'s `invalid` row; a closed or forged `f` is
+/// `start`'s `io`. Pure and comptime-safe — the map is data.
+///
+/// `f` is READ, not consumed: this program still owns its copy and must
+/// close it (see `pipe`). Descriptors above 2 are served by the compiler's
+/// machines on linux and macOS; lupin serves 0, 1 and 2 only and refuses
+/// a higher one by name.
+///
+/// A prose example (a `File` is `std.fs`'s, which a doc example cannot
+/// import, §4): with `p = process.pipe()?`, `set_fd(mut c, 5, p.read)` on
+/// `process.command("cat")` plus the argument `/dev/fd/5` is
+/// `cat /dev/fd/5 5<&r`; wolf-lang's `proc_fd_lanes.rs` runs that shape.
+pub fn set_fd(mut c: Command, child: int, f: fs.File) {
+    place(mut c, child, f.fd)
+}
+
+/// The child's standard input is `f` — `set_fd(mut c, 0, f)`.
+pub fn set_stdin(mut c: Command, f: fs.File) {
+    place(mut c, 0, f.fd)
+}
+
+/// The child's standard output is `f` — `set_fd(mut c, 1, f)`. With a
+/// pipe's `write` end this is how a caller captures what a child prints.
+pub fn set_stdout(mut c: Command, f: fs.File) {
+    place(mut c, 1, f.fd)
+}
+
+/// The child's standard error is `f` — `set_fd(mut c, 2, f)`. Given the
+/// same file as `set_stdout`, this is a shell's `2>&1`.
+pub fn set_stderr(mut c: Command, f: fs.File) {
+    place(mut c, 2, f.fd)
+}
+
+/// Descriptor `child` is CLOSED in the child — a shell's `N<&-`. Same
+/// rules as `set_fd`; lupin refuses a close by name.
+///
+/// ```wolf-doc-example
+/// var c = process.command("ls")
+/// process.close_fd(mut c, 2)
+/// process.argv(c).len == 1
+/// ```
+pub fn close_fd(mut c: Command, child: int) {
+    place(mut c, child, 0 - 1)
+}
+
+/// One `(child, source)` pair into the map, replacing an earlier entry
+/// for the same child: `os_spawn_fds` refuses a map that names a child
+/// twice, so the builders keep it a function of the child.
+fn place(mut c: Command, child: int, source: int) {
+    var kept = List[int]()
+    var i = 0
+    while i + 1 < c.fds.len {
+        if c.fds[i] != child {
+            (mut kept).push(c.fds[i])
+            (mut kept).push(c.fds[i + 1])
+        }
+        i = i + 2
+    }
+    (mut kept).push(child)
+    (mut kept).push(source)
+    c.fds = kept
+}
+
 /// Start `c` and return the handle of the child, WITHOUT waiting for it.
 ///
 /// Rows: `not_found` when no such program exists — and for an EMPTY argv,
 /// which names no program at all; `denied` when the host refuses to
-/// execute it; `io` for every other host failure. Never traps.
+/// execute it; `io` for every other host failure, and for a `File` in the
+/// descriptor map that is closed or forged. Two rows belong to the map
+/// alone and a command without one never raises them: `invalid` for a
+/// map the builders could not make well-formed (a child descriptor
+/// outside `0..255`), and `unsupported` where the host places no map —
+/// windows, by name. Never traps, and a call that answers `invalid`,
+/// `unsupported` or the map's `io` has started nothing.
 ///
-/// The child inherits this process's environment and working directory,
-/// and its three standard streams as well: its output and its
-/// diagnostics go where THIS program's go, and it can read this
-/// program's input (measured at sc39; the clause that said "null device"
-/// here was wrong, see the module header). What no caller can do is
-/// CAPTURE any of it — no builtin wires a pipe (F-0065).
+/// **Without a map** the child inherits this process's environment and
+/// working directory, and its standard OUTPUT and ERROR: what it writes
+/// goes where this program's writes go. Its standard INPUT is the null
+/// device — it reads end-of-file at once and never this program's input
+/// (`[os.proc.spawn]`; this doc said "it can read this program's input"
+/// until s215, which the clause never did). **With a map** (`set_stdin`,
+/// `set_stdout`, `set_stderr`, `set_fd`, `close_fd`) each descriptor it
+/// names is what the child gets, and the rest keep that posture — so
+/// `set_stdout(mut c, p.write)` with `p = process.pipe()?` is how a caller
+/// CAPTURES a child's output, F-0065's half that inheriting never was.
 /// A started child MUST be waited for —
 /// `wait(take ch)` is what reaps it — or it stays a zombie on every unix
 /// until this process exits.
@@ -372,15 +506,32 @@ pub fn argv(c: Command) -> List[str] {
 /// that borrowed the keyword's word for the other one would have invited
 /// the confusion the type system then has to unpick.
 ///
-/// Capability `Exec`; refused at comptime (D33). Delegates to `os_spawn`.
+/// Capability `Exec`; refused at comptime (D33). Delegates to `os_spawn`,
+/// or to `os_spawn_fds` (wolf-lang s215, `[os.proc.fds]`) when the
+/// command carries a descriptor map.
 ///
 /// ```wolf-doc-example
 /// var missing = process.command("wolf-sc11-no-such-program-here")
 /// var child = process.start(missing) else |_| { process.Child { slot: -1 } }
 /// (process.wait(take child) else -1) == -1
 /// ```
-pub fn start(c: Command) -> Child ! {not_found, denied, io} {
-    Child { slot: os_spawn(c.argv)? }
+pub fn start(c: Command) -> Child ! {unsupported, invalid, not_found, denied, io} {
+    if c.fds.len == 0 {
+        return Child { slot: os_spawn(c.argv)? }
+    }
+    var exe = ""
+    var args = List[str]()
+    var named = false
+    for a in c.argv {
+        if named {
+            (mut args).push(a)
+        } else {
+            exe = a
+            named = true
+        }
+    }
+    if !named { return not_found }
+    Child { slot: os_spawn_fds(exe, args, c.fds)? }
 }
 
 /// Start `c` with `inherit` handed down to the child, and answer the
@@ -435,6 +586,11 @@ pub fn start(c: Command) -> Child ! {not_found, denied, io} {
 /// not bound anything yet, or a caller that just wants the same spawn,
 /// writes the empty list and gets an answer rather than an
 /// `unsupported`.
+///
+/// A `Command` that carries a descriptor map is `unsupported` here: the
+/// listener set and the map are two spawns' contracts, and
+/// `[os.proc.fds]` keeps them apart because a net handle and a file handle
+/// are different numbering spaces. Use `start` for the map.
 ///
 /// Rows: `unsupported` where the host or the tier does not serve a
 /// NON-EMPTY set, BY NAME — windows (handle inheritance exists there,
@@ -498,6 +654,7 @@ pub fn start_with(c: Command, inherit: List[net.Listener]) -> Child ! {
         }
     }
     if !named { return not_found }
+    if c.fds.len > 0 { return unsupported }
     var fds = List[int]()
     for l in inherit {
         (mut fds).push(l.fd)
@@ -561,14 +718,17 @@ pub fn kill(mut ch: Child) -> () ! {io} {
 
 /// Start `c`, wait for it, and answer its exit code.
 ///
-/// Rows: the union of `start`'s and `wait`'s — `not_found`, `denied`,
-/// `signal`, `io`, each meaning exactly what it means there. Never traps.
+/// Rows: the union of `start`'s and `wait`'s — `unsupported`, `invalid`,
+/// `not_found`, `denied`, `signal`, `io`, each meaning exactly what it
+/// means there. Never traps.
 ///
 /// This is the whole operation for the commonest case, where a program
 /// runs another program and cares only how it ended. It blocks for as long
 /// as the child runs, it reaps the child (so nothing is left behind), and
-/// it cannot be interrupted at this pin. What it cannot do is give you the
-/// child's output — nothing can, yet (F-0065).
+/// it cannot be interrupted at this pin. It gives you the child's output
+/// only through a map: `run` blocks until the child exits, so a child
+/// that fills a pipe nobody is reading blocks with it — capture with
+/// `start`, read the pipe, then `wait`.
 ///
 /// Capability `Exec`; refused at comptime (D33). Delegates to `os_spawn`
 /// and `os_wait`.
@@ -577,7 +737,7 @@ pub fn kill(mut ch: Child) -> () ! {io} {
 /// let missing = process.command("wolf-sc11-no-such-program-here")
 /// (process.run(missing) else -1) == -1
 /// ```
-pub fn run(c: Command) -> int ! {not_found, denied, signal, io} {
+pub fn run(c: Command) -> int ! {unsupported, invalid, not_found, denied, signal, io} {
     var ch = start(c)?
     wait(take ch)?
 }
