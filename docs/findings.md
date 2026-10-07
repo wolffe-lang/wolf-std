@@ -148,6 +148,7 @@ the building.
 | F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52: B117 FIXED (`f8c606a`); #34 ceiling 180 s on windows (`1a1d060`), REQUIRED proposed in PR #46; #4/#5 blocked upstream (wolf-lang#217, #346 — exact calls commented); F-0011's capacity ask rides wolf-lang#416 item 2 |
 | F-0140 | 2026-10-03 | **sc53's predictions, committed before the 0.2.22 / 0.1.45 archives were unpacked** — the binary pin to wolf 0.2.22 / lupin 0.1.45 by digest, the data pin to v0.2.22, wolf-std#48 (s199's `seek`/`tell`/`read_at` and the standard streams) carried, wolf-std#49's cell. Every predicted ledger move by file and lane, the counts before and after, and the std sites the new compiler could refuse. Measurements land beside each prediction in this section | wolf-std (this repo) | sc53: P1 and P3 held; P2 held on linux and windows (the predicted windows red is the ledger's first host-scoped cell, `d91c91a`, `7dc13a1`) and MISSED on macOS: `fs/std_handles`' positional read on stderr answers `io` there on every machine (CI run 37161453649), filed wolf-lang#566 / wolf-interp#187, the line accepts either tag (`4f49852`) |
 | F-0141 | 2026-10-04 | **sc54's predictions, committed before the 0.2.23 / 0.1.46 archives were unpacked** — the binary pin to wolf 0.2.23 / lupin 0.1.46 by digest, the data pin to v0.2.23, zero predicted ledger moves with every candidate named, kw09's module `const` measured for std (F-0025), and the rig's three remaining hash-only report paths. Measurements land beside each prediction in this section | wolf-std (this repo) | sc54: P1-P4 held, zero ledger moves on linux; MISSED a W0304 (`std.errors.offset_of` shadows 0.2.23's prelude `offset_of`), renamed `byte_offset` (`27e0eac`); corrects F-0140's hash-only premise |
+| F-0142 | 2026-10-07 | **sc55's predictions, committed before the 0.2.24 / 0.2.25 / 0.1.47 / 0.1.48 archives were unpacked** — the binary pin to wolf 0.2.25 / lupin 0.1.48 by digest (the lupin pin key moves to v0.2.24), the data pin to v0.2.25 (+9 anchors), zero predicted ledger moves, and s214's 157 native / 38 release binary moves by name, each added loads only, behaviour identical |
 
 
 ## F-0001 — the std search path
@@ -10753,3 +10754,282 @@ job F-0140 cites printed it under each of its three hash lines (run
 37161453649, job 111315568947). The diagnosis it reached was right;
 the premise that the bytes were unavailable was not, and the track
 queued a rig fix on it. P4 above is what was actually still hash-only.
+
+
+## F-0142 — sc55's predictions, before the archives
+
+Written at `b599391` (branch `sc55`, on trunk `2f389a7`) before the wolf
+0.2.24 or 0.2.25 or lupin 0.1.47 or 0.1.48 archive was downloaded or
+unpacked anywhere. The bump spans two compiler releases (no 0.2.24 bump
+landed) and two lupin releases. The baseline is the ledger at `2f389a7`
+and sc54's last kasumi gauntlet at that sha
+(`~/lanes/sc54/evidence/std-test-g2-2f389a7.log` `5cbdb5c7…`, GREEN).
+Measurements are appended below, never written over.
+
+### P1. The pin
+
+- `vendor/tools.toml`: `[wolf] version = "0.2.25"`, pin key
+  `6710f9e0cbc3a7264349093751ce7a46a407e473` (the v0.2.25 tag);
+  `[lupin] version = "0.1.48"`, pin key `294d626dd596122285d5df954762e3aee3e5db71`
+  (lupin 0.1.48's spec pin, wolf-lang v0.2.24, per its CHANGELOG). The
+  lupin pin key MOVES for the first time since sc53 (0.1.45, 0.1.46 and
+  0.1.47 all sat at `8e36bc1a`). Predicted `--version` lines: `wolf
+  0.2.25 (wolfgang, pin 6710f9e)`, `paired with lupin 0.1.48 (reference
+  interpreter), pin 294d626`, and `lupin 0.1.48 (wolf-interp, reference
+  interpreter at pin 294d626)`. Falsified by any other string.
+- Archive digests as GitHub reports them: wolf 0.2.25 linux x86-64
+  `9d91f533…`, linux aarch64 `6b0bb90d…`, macOS aarch64 `202c8d6c…`,
+  windows `9debee73…`; lupin 0.1.48 linux x86-64 `81cfd77a…`, linux
+  aarch64 `a5c30957…`, macOS aarch64 `27d86060…`, windows zip
+  `9e4ea090…`. Falsified by a mismatch on arrival. The wolf archive
+  gains a member since 0.2.23, `libwolf_rt_none.a` (kw12, 0.2.24);
+  `_wolf` is still the zsh completion script `2d1e4801…`.
+- **The data pin moves**, `8edac3ee` (v0.2.23) -> `6710f9e0` (v0.2.25),
+  in its own commit: anchors 586 -> 595, **+9, 0 removed** (key sets
+  diffed both ways), all added at v0.2.24 under `conc` and `mem`, both
+  already in `REGISTERED_NS`; `05-conformance.md` byte-identical. No std
+  file cites any of the nine. Falsified if `sync-pin` or
+  `[conf.tag.valid]` refuses anything.
+- **The planted break** (a gate the bump touches): the lupin pin key is
+  the half of this bump that is easy to forget, because it sat still for
+  three releases. A commit that moves `[lupin] version` to 0.1.48 and
+  leaves `pin = "8e36bc1a…"` must red `cargo xtask doctor` on every CI
+  host (the `doctor` step of the `rig` job), and be reverted.
+
+### P2. The ledger moves: none
+
+Ledger at `2f389a7`: 423 rows. lupin `run` 365 / `unsupported` 58;
+wolfc `run` 369 / `unsupported` 53 / `fail(E1013)` 1; native `run` 413
+/ `unsupported` 9 / `fail(E1013)` 1; one host-scoped cell
+(`fs/std_handles.lu` `lupin-windows = "unsupported"`). Conservatism
+ledger 122.
+
+| file | lane | ledger | predicted | why |
+|---|---|---|---|---|
+| (none) | | | | |
+
+**Zero moves, on every host.** After the pin: the same counts, word for
+word; std-test 423 tests, forward tags 803, conservatism 122, divergent
+0, mirror-lag 0, host-scoped cells 1; on linux the lanes-observed spread
+stays 336 / 16 / 49 / 22. `doc-examples` 454 blocks GREEN; `fmt-lu` 474
+files, each a fixed point of `wolf fmt` at 0.2.25; `ulp` 200 rows exact.
+lupin's slowest invocations stay under the 60 s ceiling (sc54: 28.2 s
+worst on kasumi); is72's trace is off unless asked, so no lupin row
+slows by more than host noise.
+
+Every candidate, with the reason it does not move, so a move is a
+finding:
+
+- **0.2.24 `fence`** (W0304): no declaration named `fence` in any .lu.
+- **0.2.24 #589** (a keyword member on a new line at the item's column):
+  no such continuation; the one `.`-ended line
+  (`tests/x/tls/cert/unsupported_alg_row.lu:57`, `cert.` then an
+  indented `parse(…)`) is an indented non-keyword member.
+- **0.2.24 #585** (module string literals cooked): no .lu file has a
+  column-0 `let`, `const` or `var`, so no module string exists to move.
+- **0.2.24 L4 / atomics / the allocator hook / E1308 / E1309**: no raw
+  pointer type, no `unsafe`, no atomic in any .lu file; the checked
+  machine's new `g[i].f` read through a raw element has no reader here.
+- **0.2.24 #570** (the pool no longer strands a task): the process and
+  net rows that spawn run green already; a fix of a stall moves no word.
+- **0.2.25 #598/#601/#600**: std has no module `var`, no raw pointer and
+  no `extern "c" let`, so no wrong answer here was live (s214 measured
+  195/195 identical). Binaries change; answers do not (P3).
+- **lupin 0.1.47 L4, 0.1.48 is73** (module initializers, extern let,
+  section, packed/align, layout queries): no reader in std. **is72**
+  `--trace-places`: off by default, and the rig never passes it.
+- **wolfc's 53 / native's 9 / lupin's 58 `unsupported` rows**: the same
+  refusals and step budgets as sc54's F-0141 list; no CHANGELOG entry of
+  the four releases names a budget or any of those refusals.
+- **`list/mutate_while_iterating_trap.lu` `fail(E1013)`**: one error.
+
+**Windows**: `fs/std_handles.lu`'s `lupin-windows = "unsupported"` holds.
+**macOS**: `fs/std_handles.lu` stays green on its per-line tolerance
+(#566 and wolf-interp#187 open). Falsified by any red on either host;
+a ceiling red under load is re-run quiet before it is read.
+
+### P3. The binaries that move: s214's set, by name, and nothing else
+
+Method (kasumi, all three compilers from their release archives, linux
+x86-64): every `tests/**/*.lu` at `2f389a7` built `wolf build
+[--release] --no-cache` with `WOLF_STD` at `2f389a7`'s `std/` and ONE
+runtime archive for all three (`WOLF_RT_LIB` = 0.2.25's `libwolf_rt.a`,
+so #570's runtime change cannot move a byte), as s214 did; sha256 of
+each binary compared pairwise.
+
+- **The build set is identical on all three compilers**: 393 native and
+  392 release build; the same 30 native and 31 release refuse with the
+  same exit codes (the refusal rows, the nine json rows at rc 4, and
+  `list/sort_by_tier` on release).
+- **0.2.23 -> 0.2.24: zero binaries change**, native and release (the
+  release notes say hosted programs are byte-identical for kw11, kw12,
+  s209, s211, s212; #585 has no site here). Falsified by any changed
+  binary.
+- **0.2.24 -> 0.2.25: exactly s214's set**, 157 native and 38 release
+  (s214's `compare.txt` `c2c0769b…`, its wolf-std rows extracted
+  `95dba2f3…`). Falsified by any name added or missing. Native:
+
+```text
+bytes__at_out_of_range_trap bytes__lend_across_calls
+bytes__search_and_affixes bytes__slice_out_of_order_trap
+bytes__slice_past_end_trap bytes__to_str_border bytes__to_str_row
+bytes__utf8_validation bytes__view_and_access hex__decode_misses
+hex__decode_str_rows hex__decode_text hex__encode_text
+hex__round_trip net__reuse_port sort__floats_total_order
+x__crypto__chacha20__counter_wrap_trap
+x__crypto__chacha20__flipped_tag_row
+x__crypto__chacha20__key_len_trap x__crypto__chacha20__known_answers
+x__crypto__chacha20__nonce_len_trap
+x__crypto__chacha20__rfc8439_a1_block
+x__crypto__chacha20__rfc8439_a2_cipher
+x__crypto__chacha20__rfc8439_a3_poly1305
+x__crypto__chacha20__rfc8439_a4_poly_key
+x__crypto__chacha20__rfc8439_a5_aead
+x__crypto__chacha20__truncated_box_row
+x__crypto__chacha20__wycheproof_invalid_p1
+x__crypto__chacha20__wycheproof_invalid_p2
+x__crypto__chacha20__wycheproof_invalid_smoke
+x__crypto__chacha20__wycheproof_valid_p1
+x__crypto__chacha20__wycheproof_valid_p2
+x__crypto__chacha20__wycheproof_valid_p3
+x__crypto__chacha20__wycheproof_valid_p4
+x__crypto__chacha20__wycheproof_valid_p5
+x__crypto__chacha20__wycheproof_valid_p6
+x__crypto__chacha20__wycheproof_valid_p7
+x__crypto__chacha20__wycheproof_valid_p8
+x__crypto__chacha20__wycheproof_valid_smoke
+x__crypto__curve25519__ed25519_rfc8032_s71
+x__crypto__curve25519__ed25519_smoke
+x__crypto__curve25519__ed25519_verify_rejects
+x__crypto__curve25519__field_identities
+x__crypto__curve25519__reject_zero_row
+x__crypto__curve25519__scalar_len_trap
+x__crypto__curve25519__wycheproof_ed25519_p1
+x__crypto__curve25519__wycheproof_ed25519_p2
+x__crypto__curve25519__wycheproof_ed25519_p3
+x__crypto__curve25519__wycheproof_ed25519_p4
+x__crypto__curve25519__wycheproof_ed25519_smoke
+x__crypto__curve25519__wycheproof_x25519_shared_p1
+x__crypto__curve25519__wycheproof_x25519_shared_p10
+x__crypto__curve25519__wycheproof_x25519_shared_p11
+x__crypto__curve25519__wycheproof_x25519_shared_p12
+x__crypto__curve25519__wycheproof_x25519_shared_p13
+x__crypto__curve25519__wycheproof_x25519_shared_p2
+x__crypto__curve25519__wycheproof_x25519_shared_p3
+x__crypto__curve25519__wycheproof_x25519_shared_p4
+x__crypto__curve25519__wycheproof_x25519_shared_p5
+x__crypto__curve25519__wycheproof_x25519_shared_p6
+x__crypto__curve25519__wycheproof_x25519_shared_p7
+x__crypto__curve25519__wycheproof_x25519_shared_p8
+x__crypto__curve25519__wycheproof_x25519_shared_p9
+x__crypto__curve25519__wycheproof_x25519_shared_smoke
+x__crypto__curve25519__wycheproof_x25519_zero
+x__crypto__curve25519__wycheproof_x25519_zero_smoke
+x__crypto__curve25519__x25519_rfc7748_chain
+x__crypto__curve25519__x25519_rfc7748_s52
+x__crypto__curve25519__x25519_rfc7748_s61_dh
+x__crypto__p256__cavp_siggen_p256 x__crypto__p256__cavp_sigver_p256
+x__crypto__p256__der_codec x__crypto__p256__field_self_test
+x__crypto__p256__private_key_trap x__crypto__p256__rfc6979_p256
+x__crypto__p256__sign_verify_smoke
+x__crypto__p256__verify_reject_early
+x__crypto__p256__wycheproof_p256_p1
+x__crypto__p256__wycheproof_p256_p2
+x__crypto__p256__wycheproof_p256_p3
+x__crypto__p256__wycheproof_p256_p4
+x__crypto__p256__wycheproof_p256_p5
+x__crypto__p256__wycheproof_p256_p6
+x__crypto__p256__wycheproof_p256_p7
+x__crypto__p256__wycheproof_p256_p8 x__crypto__sha2__cavp_sha256_long
+x__crypto__sha2__cavp_sha256_monte
+x__crypto__sha2__cavp_sha256_short_p1
+x__crypto__sha2__cavp_sha256_short_p2
+x__crypto__sha2__cavp_sha384_long x__crypto__sha2__cavp_sha384_monte
+x__crypto__sha2__cavp_sha384_short_p1
+x__crypto__sha2__cavp_sha384_short_p2
+x__crypto__sha2__cavp_sha384_short_p3
+x__crypto__sha2__cavp_sha384_short_p4
+x__crypto__sha2__cavp_sha512_long x__crypto__sha2__cavp_sha512_monte
+x__crypto__sha2__cavp_sha512_short_p1
+x__crypto__sha2__cavp_sha512_short_p2
+x__crypto__sha2__cavp_sha512_short_p3
+x__crypto__sha2__cavp_sha512_short_p4
+x__crypto__sha2__hkdf_expand_cap_trap
+x__crypto__sha2__incremental_chunking x__crypto__sha2__known_answers
+x__crypto__sha2__rfc4231_hmac x__crypto__sha2__rfc5869_hkdf
+x__crypto__sha2__wycheproof_hkdf256_full
+x__crypto__sha2__wycheproof_hkdf256_smoke
+x__crypto__sha2__wycheproof_hkdf384_full
+x__crypto__sha2__wycheproof_hkdf384_smoke
+x__crypto__sha2__wycheproof_hkdf512_full
+x__crypto__sha2__wycheproof_hkdf512_smoke x__jose__acme_envelope
+x__jose__base64url_jose x__jose__jwk_thumbprint
+x__jose__jws_eddsa_vectors x__jose__jws_smoke
+x__tls__cert__chain_bad_signature_row x__tls__cert__chain_expired_row
+x__tls__cert__chain_not_ca_row x__tls__cert__chain_not_yet_valid_row
+x__tls__cert__chain_unknown_critical_row x__tls__cert__chain_valid
+x__tls__cert__chain_valid_with_root
+x__tls__cert__chain_wrong_anchor_row
+x__tls__cert__chain_wrong_name_row
+x__tls__cert__der_conformance_suite x__tls__cert__der_mutation_suite
+x__tls__cert__der_reject_row x__tls__cert__p256_bad_signature_row
+x__tls__cert__p256_chain_valid x__tls__cert__parse_fields
+x__tls__cert__unsupported_alg_row x__tls__client__loopback_handshake
+x__tls__client__negative_battery
+x__tls__client__rfc8448_parse_vectors x__tls__client__row_naming
+x__tls__handshake__bad_random_trap x__tls__handshake__ecdhe_zero_row
+x__tls__handshake__finished x__tls__handshake__finished_reject_row
+x__tls__handshake__key_schedule x__tls__handshake__message_bytes
+x__tls__handshake__reordered_flight_row
+x__tls__handshake__state_machine x__tls__handshake__transcript_hash
+x__tls__record__chacha_records x__tls__record__derived_secrets
+x__tls__record__hkdf_label_encoding x__tls__record__iv_len_trap
+x__tls__record__negative_seq_trap x__tls__record__record_framing
+x__tls__record__record_nonce x__tls__record__reject_tampered_row
+x__tls__record__short_record_row x__tls__record__traffic_keys
+x__tls__record__unexpected_inner_row
+```
+
+  Release:
+
+```text
+net__reuse_port x__crypto__curve25519__ed25519_rfc8032_s71
+x__crypto__curve25519__ed25519_smoke
+x__crypto__curve25519__ed25519_verify_rejects
+x__crypto__curve25519__field_identities
+x__crypto__curve25519__wycheproof_ed25519_p1
+x__crypto__curve25519__wycheproof_ed25519_p2
+x__crypto__curve25519__wycheproof_ed25519_p3
+x__crypto__curve25519__wycheproof_ed25519_p4
+x__crypto__curve25519__wycheproof_ed25519_smoke
+x__jose__base64url_jose x__jose__jws_eddsa_vectors x__jose__jws_smoke
+x__tls__cert__chain_bad_signature_row x__tls__cert__chain_expired_row
+x__tls__cert__chain_not_ca_row x__tls__cert__chain_not_yet_valid_row
+x__tls__cert__chain_unknown_critical_row x__tls__cert__chain_valid
+x__tls__cert__chain_valid_with_root
+x__tls__cert__chain_wrong_anchor_row
+x__tls__cert__chain_wrong_name_row
+x__tls__cert__der_conformance_suite x__tls__cert__der_mutation_suite
+x__tls__cert__der_reject_row x__tls__cert__p256_bad_signature_row
+x__tls__cert__p256_chain_valid x__tls__cert__parse_fields
+x__tls__cert__unsupported_alg_row x__tls__client__loopback_handshake
+x__tls__client__negative_battery
+x__tls__client__rfc8448_parse_vectors x__tls__client__row_naming
+x__tls__handshake__finished x__tls__handshake__key_schedule
+x__tls__handshake__message_bytes x__tls__handshake__transcript_hash
+x__tls__record__chacha_records
+```
+
+- **Every changed program's lowering WIR differs only by added loads and
+  the pure ops computed from them** (s214's `wirclass.py` classification,
+  copied, not edited: 0 `EFFECT-OR-FEWER`); calls, stores and control
+  flow equal. Falsified by any effect op or any fewer op.
+- **Behaviour identical**: `conform-run --native/--release --json` with
+  0.2.24 and with 0.2.25 on every changed test gives the same verdict
+  and the same `stdout_inline`, 195/195. Falsified by any difference.
+
+### P4. Nothing else moves
+
+`cargo test --workspace` 91 passed; clippy and fmt clean; `sync-pin`,
+`doctor`, `ledger-check`, `lint-conventions`, `gen-vectors --check`
+green. No std source file changes in this lane.
