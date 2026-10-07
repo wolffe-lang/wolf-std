@@ -24,6 +24,11 @@
 //! rendered string out of data live in `std.fmt` (§11's split), and this
 //! module is where the result goes.
 //!
+//! **`is_terminal` (s215) is the one function here that takes a handle**,
+//! so this module imports `std.fs` for the `File` it asks about; it is
+//! the terminal question a prompt depends on, which is why it lives with
+//! the prompt rather than with the files.
+//!
 //! **Capability: `io` (I13).** The four writers and the line read reach the
 //! host's standard streams, are tagged `io` in the toolchain's sandbox
 //! table, and are categorically refused at comptime (D33): a `comptime
@@ -98,6 +103,31 @@
 //! no `read_line` and no injectable stdin, by design and with a sentence in
 //! the refusal — unchanged at 0.1.8). The capability posture is the rig's to
 //! record once rather than each test's to restate.
+
+use std.fs
+
+/// Whether `f` names a terminal — the question an interactive program
+/// asks before it prompts: a shell reads with a prompt only when its
+/// input is one.
+///
+/// Rows: `io` when `f` is closed or forged — "not a terminal" and "not a
+/// handle" are different answers, so the second is never `false`. Never
+/// traps. `fs.stdin()`, `fs.stdout()` and `fs.stderr()` ask the
+/// process's own streams; a file or a pipe end (`std.process.pipe`) asks
+/// that handle.
+///
+/// Capability `io`; refused at comptime (D33). Delegates to `os_isatty`
+/// (wolf-lang s215, `[os.fs.isatty]`).
+///
+/// A prose example, because a doc example imports exactly the documented
+/// module (§4) and cannot reach `std.fs` for a `File`: under the test rig,
+/// which wires standard input to the null device,
+/// `io.is_terminal(fs.stdin())` is `false` — a device, not a terminal —
+/// and `tests/io/is_terminal_rows.lu` holds it with a pipe end and a
+/// forged handle.
+pub fn is_terminal(f: fs.File) -> bool ! {io} {
+    os_isatty(f.fd)?
+}
 
 /// Write `text` to standard output exactly as given — no newline, no
 /// reformatting.
