@@ -3838,3 +3838,53 @@ lupin = "run"
 lupin-windows = "unsupported"
 wolfc = "run"
 native = "run"
+
+# s215 (wolf-lang `[os.proc.fds]`, `[os.proc.pipe]`, `[os.fs.chdir]`,
+# `[os.fs.isatty]`; pelt's H2) — the std half: `process.pipe`, the
+# `Command` descriptor map, `env.cwd`/`set_cwd`, `io.is_terminal`. Every
+# row spawns nothing (F-0066's discipline), so all three lanes run them at
+# the s215 heads; the three comptime witnesses are E0701 on the compiler
+# rungs and `unsupported` on lupin, as `process/comptime_refuses.lu` is.
+# At the pinned wolf 0.2.24 / lupin 0.1.47 none of the four builtins
+# exists, so every test that uses std.process, std.env or std.io is
+# E0301 on wolfc and native until the pin bump carries s215 (the compiler
+# type-checks every body of a module a program uses).
+[tests."process/pipe_round_trip.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."process/map_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."process/close_fd_row.lu"]
+lupin = "unsupported"  # s215: a close in a map is refused by name — no unsafe to close a child's descriptor
+wolfc = "run"
+native = "run"
+
+[tests."process/comptime_refuses_pipe.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."env/cwd_round_trip.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."env/comptime_refuses_chdir.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."io/is_terminal_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."io/comptime_refuses_isatty.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

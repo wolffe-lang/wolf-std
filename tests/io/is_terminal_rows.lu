@@ -1,0 +1,32 @@
+//! check: run(exit=0, stdout="stdin=false\npipe=false\nforged=io")
+//! phase: run
+//! conforms: std.io, os.fs.isatty, err.row
+//!
+//! **s215: `io.is_terminal`.** The rig wires standard input to the null
+//! device — a device, not a terminal — and a pipe end is a pipe; a forged
+//! `File` is `io`, never `false`, because "not a terminal" and "not a
+//! handle" are different answers. A terminal itself is witnessed under
+//! `script(1)` in wolf-lang's `proc_fd_lanes.rs`: the rig has none.
+
+use std.fs
+use std.io
+use std.process
+
+fn row(f: fs.File) -> str {
+    let t = io.is_terminal(f) else |e| {
+        return match e {
+            io => "io",
+        }
+    }
+    "{t}"
+}
+
+fn main() -> !int {
+    print("stdin={row(fs.stdin())}")
+    var p = process.pipe()?
+    print("pipe={row(p.read)}")
+    print("forged={row(fs.File { fd: 999999 })}")
+    fs.close(take p.read)?
+    fs.close(take p.write)?
+    0
+}

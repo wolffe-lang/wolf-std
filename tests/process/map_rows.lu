@@ -1,0 +1,51 @@
+//! check: run(exit=0, stdout="out_of_range=invalid\nshape_before_sources=invalid\nreplaced_is_well_formed=true")
+//! phase: run
+//! conforms: std.process, os.proc.fds, err.row, err.else
+//!
+//! **s215: the descriptor map's rows that start nothing.** A child
+//! descriptor outside `0..255` is `invalid` at `start`, before any file is
+//! looked at — so a map holding a forged `File` as well is still
+//! `invalid`, not `io` (`[os.proc.fds]`'s order). Naming descriptor 1
+//! twice REPLACES the first entry (a map that named it twice would itself
+//! be `invalid`), so the command is well-formed, and what they answer for a program no host has is
+//! `not_found` on unix and `unsupported` on windows, which places no map —
+//! the test asserts "not `invalid`", which is the builders' contract, and
+//! stays deterministic on every host. No program is ever started. A close
+//! is `close_fd_row.lu`, apart, because lupin refuses a close by name.
+
+use std.fs
+use std.process
+
+fn tag(c: process.Command) -> str {
+    var ch = process.start(c) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    let _code = process.wait(take ch) else 0
+    "started"
+}
+
+fn main() -> !int {
+    let ghost = "wolf-s215-no-such-program"
+    var p = process.pipe()?
+    var a = process.command(ghost)
+    process.set_fd(mut a, 300, p.read)
+    print("out_of_range={tag(a)}")
+    var b = process.command(ghost)
+    process.set_stdout(mut b, fs.File { fd: 999999 })
+    process.set_fd(mut b, 256, p.write)
+    print("shape_before_sources={tag(b)}")
+    var c = process.command(ghost)
+    process.set_stdout(mut c, p.write)
+    process.set_stdout(mut c, p.write)
+    let t = tag(c)
+    print("replaced_is_well_formed={t == "not_found" || t == "unsupported"}")
+    fs.close(take p.read)?
+    fs.close(take p.write)?
+    0
+}

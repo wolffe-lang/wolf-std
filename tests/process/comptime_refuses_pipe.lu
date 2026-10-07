@@ -1,0 +1,31 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.io
+//!
+//! **D33 for `process.pipe` (s215), held one level down at `os_pipe`** —
+//! `comptime_refuses.lu`'s reasons, unchanged: a `comptime fn` cannot call
+//! across a module boundary at this pin (F-0051), and the row is handled
+//! locally because `?` in a `comptime fn` is outside the engine's subset
+//! (F-0069). `os_pipe` is `io` in the sandbox table — making a descriptor
+//! acts on the machine that compiles. `os_spawn_fds` (`exec`) is not
+//! witnessed here: its `List` arguments are outside the engine's subset
+//! and would answer `unsupported` for the argument, the reason
+//! `comptime_refuses.lu` uses `os_kill`; wolf-lang pins its `exec` entry
+//! in `crates/wolf_sema/tests/sandbox_s215.rs`. The pair is read as
+//! `p.0`, not destructured: a tuple PATTERN in a `let` is outside the
+//! engine's subset too and answered `unsupported` (measured at the s215
+//! heads, `std-heads-2f389a7f+wip.log` 18e9a236…).
+
+use std.process
+
+comptime fn probe() -> int {
+    let p = os_pipe() else |_| { (0, 0) }
+    p.0
+}
+
+fn main() -> !int {
+    const R = probe()
+    let c = process.command("ls")
+    print("argv: {process.argv(c).len} r: {R}")
+    0
+}
