@@ -1,6 +1,9 @@
 //! check: run(exit=0, stdout="ends_above_2=true\nread=howl\nthen=eof\nread_end_is_terminal=false")
 //! phase: run
-//! conforms: std.process, os.proc.pipe, err.row, err.propagate
+//! conforms: std.process, os.proc, err.row, err.propagate
+//!
+//! (Conforms to `os.proc`: the pinned anchor registry has no `os.proc.pipe` until the
+//! pin bump carries wolf-lang s215 — `[conf.tag.valid]`, s199's precedent.)
 //!
 //! **s215: `process.pipe()` is two `std.fs` files.** Written to through
 //! `fs.write`, closed through `fs.close`, read through `fs.read` — no

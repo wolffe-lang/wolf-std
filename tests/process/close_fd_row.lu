@@ -1,6 +1,9 @@
 //! check: run(exit=0, stdout="closed_is_well_formed=true")
 //! phase: run
-//! conforms: std.process, os.proc.fds, err.row, err.else
+//! conforms: std.process, os.proc, err.row, err.else
+//!
+//! (Conforms to `os.proc`: the pinned anchor registry has no `os.proc.fds` until the
+//! pin bump carries wolf-lang s215 — `[conf.tag.valid]`, s199's precedent.)
 //!
 //! **s215: `close_fd` is an entry like any other.** A command whose map
 //! closes descriptor 0 is well-formed: for a program no host has it is
