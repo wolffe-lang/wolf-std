@@ -148,7 +148,7 @@ the building.
 | F-0139 | 2026-09-24 | **sc52's predictions, committed before the first edit** — B117 (`map.remove` rebuilds the map though `m.remove(k)` is the language's since wolf 0.2.15 / lupin 0.1.38), wolf-std#34 (the windows lupin timeouts on long CAVP rows), wolf-std#4/#5 (which needs upstream first). Measurements land beside each prediction in this section | wolf-std (this repo) | sc52: B117 FIXED (`f8c606a`); #34 ceiling 180 s on windows (`1a1d060`), REQUIRED proposed in PR #46; #4/#5 blocked upstream (wolf-lang#217, #346 — exact calls commented); F-0011's capacity ask rides wolf-lang#416 item 2 |
 | F-0140 | 2026-10-03 | **sc53's predictions, committed before the 0.2.22 / 0.1.45 archives were unpacked** — the binary pin to wolf 0.2.22 / lupin 0.1.45 by digest, the data pin to v0.2.22, wolf-std#48 (s199's `seek`/`tell`/`read_at` and the standard streams) carried, wolf-std#49's cell. Every predicted ledger move by file and lane, the counts before and after, and the std sites the new compiler could refuse. Measurements land beside each prediction in this section | wolf-std (this repo) | sc53: P1 and P3 held; P2 held on linux and windows (the predicted windows red is the ledger's first host-scoped cell, `d91c91a`, `7dc13a1`) and MISSED on macOS: `fs/std_handles`' positional read on stderr answers `io` there on every machine (CI run 37161453649), filed wolf-lang#566 / wolf-interp#187, the line accepts either tag (`4f49852`) |
 | F-0141 | 2026-10-04 | **sc54's predictions, committed before the 0.2.23 / 0.1.46 archives were unpacked** — the binary pin to wolf 0.2.23 / lupin 0.1.46 by digest, the data pin to v0.2.23, zero predicted ledger moves with every candidate named, kw09's module `const` measured for std (F-0025), and the rig's three remaining hash-only report paths. Measurements land beside each prediction in this section | wolf-std (this repo) | sc54: P1-P4 held, zero ledger moves on linux; MISSED a W0304 (`std.errors.offset_of` shadows 0.2.23's prelude `offset_of`), renamed `byte_offset` (`27e0eac`); corrects F-0140's hash-only premise |
-| F-0142 | 2026-10-07 | **sc55's predictions, committed before the 0.2.24 / 0.2.25 / 0.1.47 / 0.1.48 archives were unpacked** — the binary pin to wolf 0.2.25 / lupin 0.1.48 by digest (the lupin pin key moves to v0.2.24), the data pin to v0.2.25 (+9 anchors), zero predicted ledger moves, and s214's 157 native / 38 release binary moves by name, each added loads only, behaviour identical |
+| F-0142 | 2026-10-07 | **sc55's predictions, committed before the 0.2.24 / 0.2.25 / 0.1.47 / 0.1.48 archives were unpacked** — the binary pin to wolf 0.2.25 / lupin 0.1.48 by digest (the lupin pin key moves to v0.2.24), the data pin to v0.2.25 (+9 anchors), zero predicted ledger moves, and s214's 157 native / 38 release binary moves by name, each added loads only, behaviour identical. Measurements land beside each prediction in this section | wolf-std (this repo) | sc55: P1 held (missed `_wolf`, the zsh completion, which moved at 0.2.24); P2 held, zero ledger moves; P3 held on the set (157 native / 38 release, s214's names, loads only, 431/431 identical behaviour) and missed on the method (native DWARF carries the compiler version, so raw hashes move every native binary); no new W0304 |
 
 
 ## F-0001 — the std search path
@@ -11033,3 +11033,105 @@ x__tls__record__chacha_records
 `cargo test --workspace` 91 passed; clippy and fmt clean; `sync-pin`,
 `doctor`, `ledger-check`, `lint-conventions`, `gen-vectors --check`
 green. No std source file changes in this lane.
+
+### Measured (2026-10-07)
+
+**P1 held, with one miss in a member nobody reads.** The four archives
+arrived at the reported digests on kasumi (`wolf-0.2.23…` `6f505eb5…`,
+`wolf-0.2.24…` `501d6d3f…`, `wolf-0.2.25-x86_64-unknown-linux-gnu.tar.gz`
+`9d91f533…`, `lupin-0.1.48-x86_64-unknown-linux-gnu.tar.gz` `81cfd77a…`;
+`~/lanes/sc55/evidence/acquire.log` `e3b15f52…`). Members by name at
+0.2.25: `wolf` `8373b0cd…`, `libwolf_rt.a` `6ac563e7…`,
+`libwolf_rt_none.a` `110f062a…`; `lupin` `734caee6…`. The three
+`--version` strings are the predicted ones, word for word. **MISSED:**
+`_wolf` is not `2d1e4801…`; it moved at 0.2.24 to `a368c8ec…` (the zsh
+completion gains `wolf prelude`, s212). The prediction copied sc54's
+"no CHANGELOG entry touches it" without reading the new subcommand into
+it. Nothing here consumes the member. The data pin: `sync-pin`
+"snapshot == submodule at pin (registry AND clause) — OK" with the
+submodule at `6710f9e0`; `doctor` "pin: 6710f9e matches
+vendor/tools.toml — OK".
+
+**The planted break was red where predicted.** `0ba3b6e` moved lupin's
+version to 0.1.48 and left its pin key at `8e36bc1a`. CI run
+37700512991 failed step `doctor` on all three `rig` jobs (ubuntu
+113062579627, windows 113062579652, macOS 113062579656): "lupin:
+--version names pin 294d626, recorded pin is 8e36bc1". Every archive
+arrived at its digest on all three hosts in the same run. Reverted in
+`cccfda7`; the tree is `06beb2d`'s again.
+
+**P2 held: zero moves.** g1 on kasumi at `06beb2d` (the two pin
+commits on F-0142, nothing else; `std-test-g1-06beb2d.log`
+`01e1a9d5…`): GREEN, 423 tests, forward tags 803, conservatism ledger
+122, unstable 0, slow skips 0, divergent 0, mirror-lag 0, host-scoped
+cells 1, lanes observed 336 / 16 / 49 / 22. Its `unsupported(…)` and
+`host(…)` lines are byte-identical, sorted, to sc54's g2 at `2f389a7`.
+Every other gate of the run exited 0 with 0 SKIP lines: `fmt`, `clippy`,
+`cargo test --workspace -- --nocapture` (91 passed), `sync-pin`,
+`doctor`, `ledger-check`, `lint-conventions` (423 conforming),
+`fmt-lu` (474 fixed points at 0.2.25), `gen-vectors --check`,
+`doc-examples` (454 blocks), `ulp` (200 exact).
+
+| file | lane | ledger | predicted | observed |
+|---|---|---|---|---|
+| (none) | | | no move | no move (kasumi; CI below) |
+
+**lupin did not slow; the host did.** g1's slowest lupin invocation was
+`curve25519/wycheproof_ed25519_p3` at 45.7 s (76% of the ceiling), where
+sc54 measured 24.6 s. The run started at load average 18.9 (other
+lanes). The same four slowest rows, run interleaved through lupin
+0.1.46, 0.1.47 and 0.1.48 from their archives (0.1.46 `d13a0379…`,
+0.1.47 `0ddc4ff3…`), three times each, at load 2.6–5.6, take the same
+time on all three versions to within a second (`ed25519_p3` 23.3–24.5 s
+on each, `cavp_sha384_long` 27.7–28.5 s, `p256/sign_verify_smoke`
+23.0–23.9 s; `~/lanes/sc55/evidence/lupin-speed.log` `77bb8aca…`).
+They are step-budget rows (`unsupported` on every version), so the wall
+time is the time to spend 50M steps, and is72's trace costs nothing
+when it is off.
+
+**No new W0304.** sc54 missed one because the rig's warning gate reads
+only the entry file. This time every declaration in the 474 .lu files
+was checked against `wolf prelude --json` at 0.2.25 (117 names with
+`w0304: true`, `fence` among them; `w0304-scan.log` `3651bb21…`). Four
+std items carry such a name: `cmp.min`, `fs.read_text`, `list.zip` and
+the TLS handshake's `u16`. Each module, compiled package-local under
+`--deny-warnings`, draws the same W0304 at 0.2.23 and at 0.2.25
+(`probe-w0304.log` `1c6d88ad…`), so they are standing design and not
+this bump's. No declaration is named `fence`.
+
+**P3 held on the set, and missed on the method.** All on kasumi from
+the archives (`down.log`; `builds.txt` `14123e41…`). The build set
+held: 393 native and 392 release on each of the three compilers, and
+the same 61 refusals (30 native, 31 release, the same exit codes) on
+all three. **MISSED:** a raw sha256 moves EVERY native binary between
+any two releases (393/393, `compare-0.2.23-0.2.24.txt` `b8239a3f…`).
+The native tier writes the compiler's version into DWARF
+(`DW_AT_producer: wolf v0 (wolfgang 0.2.24)`), so two releases never
+link the same bytes. With the same compiler, two builds are identical,
+and release writes no such string. s214 compared two builds that
+carried the same version string, so it never saw this. With debug info
+and the build-id note removed (`objcopy --strip-debug --remove-section
+.note.gnu.build-id`; code, data and symbols kept; `cmp-norm.log`
+`c47138ed…`), the prediction held exactly:
+
+| comparison | native changed | release changed |
+|---|---|---|
+| 0.2.23 -> 0.2.24 | 0 / 393 | 0 / 392 |
+| 0.2.24 -> 0.2.25 | 157 / 393 | 38 / 392 |
+| 0.2.23 -> 0.2.25 | 157 / 393 | 38 / 392 (the same set) |
+
+- The 0.2.24 -> 0.2.25 set is s214's, name for name: the extracted list
+  hashes to `95dba2f3…`, the hash of the list committed above. All 38
+  release programs are in the native 157.
+- **Added loads only.** The 157 programs whose lowering WIR differs are
+  exactly the 157 native binaries that changed. s214's `wirclass.py`
+  rule (copied, the PURE pattern unchanged) puts all 157 in
+  `loads+pure-only`, with 0 `EFFECT-OR-FEWER`. The other 236 are
+  `wir-same`. Net over the 157: +3420 `load`, +444 `ptr.off`, +444
+  `icmp.ult`, +64 `irem.chk`, +64 `zext`. No call, store or control op
+  changed count (`wirclass.log` `87366e16…`).
+- **Behaviour identical.** `conform-run --native/--release --json` ran
+  through 0.2.24 and 0.2.25 on every program that changed by raw hash
+  (all 393 native, the 38 release), with one runtime archive. Verdict,
+  `stdout_inline` and `stdout_sha256` were equal on 431 of 431
+  (`behave.log` `51983a17…`).
