@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — s215: a child's descriptors, a pipe, the working directory, isatty
+
+**Needs the pin bump that carries wolf-lang s215 and its lupin mirror**
+(`os_spawn_fds`, `os_pipe`, `os_chdir`, `os_isatty`). Until then every
+test that uses `std.process`, `std.env` or `std.io` is E0301 on wolfc and
+native, because the compiler type-checks every body of a module a program
+uses.
+
+- **`std.process`**: a `Command` carries a descriptor map, built with
+  `set_stdin`, `set_stdout`, `set_stderr`, `set_fd(mut c, child, f)` and
+  `close_fd(mut c, child)`; naming a descriptor again replaces it. `pipe()`
+  answers a `Pipe { read, write }` of two `std.fs` files. `start` and `run`
+  delegate to `os_spawn_fds` when the command is mapped and gain the rows
+  `unsupported` (windows places no map) and `invalid` (a child descriptor
+  outside 0..255). `start_with` answers `unsupported` for a mapped command.
+  Capture is a map plus a pipe; there is still no shell and no string is
+  parsed. The module doc's claim that a child "can read this program's
+  input" is corrected: an unmapped child's stdin is the null device.
+- **`std.env`**: `cwd()` and `set_cwd(path)` land together (F-0067).
+- **`std.io`**: `is_terminal(f: fs.File) -> bool ! {io}`.
+- Tests: `process/{pipe_round_trip,map_rows,close_fd_row,
+  comptime_refuses_pipe}`, `env/{cwd_round_trip,comptime_refuses_chdir}`,
+  `io/{is_terminal_rows,comptime_refuses_isatty}`.
+
 ## sc54 — 2026-10-04 — std at wolf 0.2.23 / lupin 0.1.46
 
 **The pin.** wolf 0.2.22 -> **0.2.23** and lupin 0.1.45 -> **0.1.46**,
