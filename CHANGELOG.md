@@ -1,5 +1,33 @@
 # Changelog
 
+## sc55 — 2026-10-07 — std at wolf 0.2.25 / lupin 0.1.48
+
+**The pin.** wolf 0.2.23 -> **0.2.25** and lupin 0.1.46 -> **0.1.48**,
+two releases each (no 0.2.24 bump landed here). Both come from the
+release archives by digest (`vendor/tools.toml`, `b54133f`; linux x86-64
+`9d91f533…` and `81cfd77a…`). lupin's pin key moves to wolf-lang v0.2.24
+(`294d626d`) for the first time since sc53. The data pin moves
+v0.2.23 -> v0.2.25 (`8edac3e` -> `6710f9e`, +9 anchors, none removed,
+`06beb2d`). F-0142 (`6467ab1`) predicted all of it before the archives
+were unpacked, and the measurements sit beside it.
+
+**The ledger, re-counted: no word moved,** as predicted. No .lu file
+declares a module binding (#585), a raw pointer (row L4, #598), an
+atomic or anything named `fence`. lupin 0.1.48's slowest rows take the
+same time as 0.1.46's.
+
+**Binaries change; answers do not.** 0.2.25 reloads foreign memory after
+a call (s214). 157 native and 38 release test binaries change, exactly
+the set s214 named. Each changes by added loads only. Every build whose bytes changed (431,
+including every native one) gives the same verdict and stdout under
+0.2.24 and 0.2.25. 0.2.24 changes no binary. Compare native binaries across
+releases with debug info stripped: the DWARF producer string carries the
+compiler's version.
+
+**A planted break, seen red.** Bumping lupin's version without its pin
+key reds `doctor` on all three CI hosts (run 37700512991, `0ba3b6e`,
+reverted in `cccfda7`).
+
 ## sc54 — 2026-10-04 — std at wolf 0.2.23 / lupin 0.1.46
 
 **The pin.** wolf 0.2.22 -> **0.2.23** and lupin 0.1.45 -> **0.1.46**,
