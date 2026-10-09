@@ -3845,10 +3845,13 @@ native = "run"
 # row spawns nothing (F-0066's discipline), so all three lanes run them at
 # the s215 heads; the three comptime witnesses are E0701 on the compiler
 # rungs and `unsupported` on lupin, as `process/comptime_refuses.lu` is.
-# At the pinned wolf 0.2.24 / lupin 0.1.47 none of the four builtins
-# exists, so every test that uses std.process, std.env or std.io is
-# E0301 on wolfc and native until the pin bump carries s215 (the compiler
-# type-checks every body of a module a program uses).
+# At wolf 0.2.24 / lupin 0.1.47 none of the four builtins existed, so
+# every test that used std.process, std.env or std.io was E0301 on wolfc
+# and native until a pin carried s215 (the compiler type-checks every
+# body of a module a program uses). sc57's pin (wolf 0.2.26 / lupin
+# 0.1.49) carries it: every word below was observed as written on linux
+# (kasumi) and on CI's three hosts before this comment moved, with one
+# windows cell added (close_fd_row, below).
 [tests."process/pipe_round_trip.lu"]
 lupin = "run"
 wolfc = "run"
