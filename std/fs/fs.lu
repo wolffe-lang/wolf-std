@@ -1278,12 +1278,8 @@ pub struct Entry {
 /// fs.create_dir("doc-entries.tmp/sub")?
 /// fs.write_text("doc-entries.tmp/f", "x")?
 /// let es = fs.entries("doc-entries.tmp")?
-/// var dirs = 0
-/// for e in es {
-///     if e.kind == 1 { dirs = dirs + 1 }
-/// }
 /// fs.remove_dir_all("doc-entries.tmp")?
-/// es.len == 2 && dirs == 1
+/// es.len == 2 && es[0].kind + es[1].kind == 1
 /// ```
 pub fn entries(path: str) -> List[Entry] ! IoErrors {
     let rows = fs_read_dir_entries(path)?
