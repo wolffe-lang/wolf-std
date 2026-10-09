@@ -1097,6 +1097,203 @@ pub fn fstat(mut f: File) -> Stat ! IoErrors {
     Stat { kind: got[0], size: got[1], modified_ms: got[2] }
 }
 
+/// The full stat record of one path: what `ls -l` shows.
+///
+/// `[os.fs.stat]` (wolf-lang#625, #536). Twenty host words, named. The
+/// first three are `Stat`'s, in its units — `kind`, `size` in bytes,
+/// `modified_ms` from the Unix epoch — and `kind` is finer here: **0**
+/// regular file, **1** directory, **2** anything the host does not name,
+/// **3** symbolic link, **4** fifo, **5** socket, **6** character device,
+/// **7** block device.
+///
+/// `have` says which words the host ANSWERED: bit `i` for word `i` of
+/// the clause's table (0 kind, 1 size, 2 modified_ms, 3 have, 4 mode,
+/// 5 nlink, 6 uid, 7 gid, 8 blocks, 9 dev, 10 ino, 11 rdev, 12–13 atime,
+/// 14–15 mtime, 16–17 ctime, 18–19 btime). A word whose bit is clear is
+/// 0 and is the host's refusal, by name — windows answers no `mode`,
+/// `nlink`, owner, `blocks`, identity or `ctime`; linux answers a birth
+/// time only where the filesystem keeps one. `answered(info, word)` reads
+/// the bit.
+///
+/// `mode` is the permission bits with set-user-id, set-group-id and
+/// sticky (`0o7777`), the file type being `kind`. `blocks` is in 512-byte
+/// units. `dev` and `ino` are the file's identity: two paths name one
+/// file when both agree — compare them, never order them. A time is a
+/// `timespec`: whole seconds from the epoch (negative before it) and
+/// nanoseconds in `0..999999999`.
+///
+/// **A new type, not a wider `Stat`**: `Stat`'s three fields are built by
+/// literal in programs that already exist, and a wider struct would
+/// refuse every one of them.
+pub struct Info {
+    kind: int,
+    size: int,
+    modified_ms: int,
+    have: int,
+    mode: int,
+    nlink: int,
+    uid: int,
+    gid: int,
+    blocks: int,
+    dev: int,
+    ino: int,
+    rdev: int,
+    atime_s: int,
+    atime_ns: int,
+    mtime_s: int,
+    mtime_ns: int,
+    ctime_s: int,
+    ctime_ns: int,
+    btime_s: int,
+    btime_ns: int,
+}
+
+fn info_of(w: List[int]) -> Info {
+    Info {
+        kind: w[0],
+        size: w[1],
+        modified_ms: w[2],
+        have: w[3],
+        mode: w[4],
+        nlink: w[5],
+        uid: w[6],
+        gid: w[7],
+        blocks: w[8],
+        dev: w[9],
+        ino: w[10],
+        rdev: w[11],
+        atime_s: w[12],
+        atime_ns: w[13],
+        mtime_s: w[14],
+        mtime_ns: w[15],
+        ctime_s: w[16],
+        ctime_ns: w[17],
+        btime_s: w[18],
+        btime_ns: w[19],
+    }
+}
+
+/// The record of `path`, FOLLOWING a final symbolic link: what the link
+/// names. A dangling link is `not_found`.
+///
+/// `[os.fs.stat]`: one host call (`stat`). Rows: `not_found`, `denied`,
+/// `io` — `size`'s. Never traps. Capability `fs`; refused at comptime
+/// (D33). Delegates to `fs_stat`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-stat.tmp", "wolves")?
+/// let info = fs.stat("doc-stat.tmp")?
+/// fs.remove("doc-stat.tmp")?
+/// info.kind == 0 && info.size == 6 && fs.answered(info, 2)
+/// ```
+pub fn stat(path: str) -> Info ! IoErrors {
+    let w = fs_stat(path)?
+    info_of(w)
+}
+
+/// The record of `path` ITSELF, a symbolic link included: a link is
+/// `kind` 3, its `size` the length of its target, its times its own.
+/// On anything that is not a link it is `stat`'s answer.
+///
+/// `[os.fs.stat]`: one host call (`lstat`). Rows as `stat`'s; a dangling
+/// link answers a record here and `not_found` there. Capability `fs`;
+/// refused at comptime (D33). Delegates to `fs_lstat`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-lstat.tmp", "x")?
+/// let a = fs.lstat("doc-lstat.tmp")?
+/// let b = fs.stat("doc-lstat.tmp")?
+/// fs.remove("doc-lstat.tmp")?
+/// a.kind == b.kind && a.size == b.size
+/// ```
+pub fn lstat(path: str) -> Info ! IoErrors {
+    let w = fs_lstat(path)?
+    info_of(w)
+}
+
+/// Whether the host answered word `word` of `info` (`Info`'s table);
+/// false for a word outside `0..20`. Total.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-answered.tmp", "x")?
+/// let info = fs.stat("doc-answered.tmp")?
+/// fs.remove("doc-answered.tmp")?
+/// fs.answered(info, 0) && fs.answered(info, 14) && !fs.answered(info, 20)
+/// ```
+pub fn answered(info: Info, word: int) -> bool {
+    if word < 0 || word >= 20 {
+        return false
+    }
+    var bit = 1
+    var i = 0
+    while i < word {
+        bit = bit * 2
+        i = i + 1
+    }
+    (info.have / bit) % 2 == 1
+}
+
+/// The target a symbolic link stores, as the host stored it: bytes,
+/// verbatim — a name need not be UTF-8 (`str_from_utf8` when it is).
+/// Not resolved and not checked: a dangling link reads back its target.
+///
+/// `[os.fs.readlink]`. Rows: `invalid` when `path` exists and is not a
+/// link, `not_found`, `denied`, `io`. Capability `fs`; refused at
+/// comptime (D33). Delegates to `fs_read_link`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-read-link.tmp", "x")?
+/// var not_a_link = false
+/// fs.read_link("doc-read-link.tmp") else |_| {
+///     not_a_link = true
+///     List[byte]()
+/// }
+/// fs.remove("doc-read-link.tmp")?
+/// not_a_link == true
+/// ```
+pub fn read_link(path: str) -> List[byte] ! {not_found, denied, invalid, io} {
+    fs_read_link(path)?
+}
+
+/// One directory entry: its own kind (`Info`'s codes; a link is 3, never
+/// what it names; 2 when the host gave none) and its name's bytes.
+pub struct Entry {
+    kind: int,
+    name: List[byte],
+}
+
+/// The entries of the directory `path` in the order the host keeps them
+/// — NOT sorted — without `.` and `..`, each with its own kind.
+///
+/// `[os.fs.readdir]` (wolf-lang#626). A name that is not UTF-8 is listed
+/// like any other: `name` is bytes, so this listing has no `utf8` row
+/// and one odd name cannot fail it (`read_dir` keeps its sorted `str`
+/// names and its `utf8`). The order differs between filesystems, so a
+/// program that wants one sorts. Rows: `not_found`, `denied`, `io`.
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_read_dir_entries`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir("doc-entries.tmp")?
+/// fs.create_dir("doc-entries.tmp/sub")?
+/// fs.write_text("doc-entries.tmp/f", "x")?
+/// let es = fs.entries("doc-entries.tmp")?
+/// var dirs = 0
+/// for e in es {
+///     if e.kind == 1 { dirs = dirs + 1 }
+/// }
+/// fs.remove_dir_all("doc-entries.tmp")?
+/// es.len == 2 && dirs == 1
+/// ```
+pub fn entries(path: str) -> List[Entry] ! IoErrors {
+    let rows = fs_read_dir_entries(path)?
+    var out = List[Entry]()
+    for r in rows {
+        (mut out).push(Entry { kind: r[0] as int, name: r[1..] })
+    }
+    out
+}
+
 /// The process's standard input, as a `File`.
 ///
 /// `[os.fs.std]` (wolf-lang#424): the handle numbers 0, 1 and 2 are the
