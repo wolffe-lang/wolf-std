@@ -11315,3 +11315,76 @@ four lupin `unsupported` rows); forward tags 826 plus the forward-
 namespace tags of the two new rows; host-scoped cells 1; divergent 0;
 mirror-lag 0. doc-examples 457 blocks GREEN (s215's three); fmt-lu 484
 files. Falsified by any other number.
+
+### Measured (sc57, appended; nothing above is edited)
+
+All on kasumi unless a CI run is named. Evidence under
+`~/lanes/sc57/evidence/` on kasumi.
+
+- **P1 held.** All four archives arrived at their reported digests
+  (`acquire.log` `656efc19…`): wolf 0.2.26 linux x86-64 `05acdc5e…`,
+  lupin 0.1.49 `84911a35…`; members `wolf` `272e0888…`, `libwolf_rt.a`
+  `679d77e1…`, `lupin` `6d057eb1…`; `_wolf` still `a368c8ec…`. The three
+  `--version` strings are the predicted ones, word for word. Data pin
+  +12 / 0, `sync-pin` "snapshot == submodule at pin" at `89dc139`.
+  CI at `dc16e19` (the two pin commits, trunk's tests) is run
+  37976747879: all six jobs `success`, every archive checked on arrival
+  on its host.
+- **P2 held exactly.** g1 at `dc16e19`: every step exit 0, 0 SKIP lines;
+  `std-test-g1-dc16e19.log` (`a9245ecd…`) GREEN, 423 tests, forward tags
+  803, conservatism 122, host-scoped cells 1, observed 336 / 16 / 49 /
+  22, and its `unsupported(…)`/`host(…)` lines hash identically to
+  sc55's g2 (`16eb7647…` both). No wolfc row graduated: s213's operators
+  reached none of the 53. doc-examples 454 GREEN, fmt-lu 474, ulp 200,
+  91 cargo tests. The slowest lupin row read 37.6 s there at a load of
+  10–27 (another lane's builds and this lane's own compare job); quiet,
+  interleaved, 0.1.48 against 0.1.49 on the four slowest rows twice
+  each, the two agree within 2 % (`lupin-speed.log` `472b1cd0…`:
+  sha256_long 26.2/26.1, 25.4/24.9 s; sha384_long 29.2/29.0, 29.9/29.6;
+  sign_verify_smoke 25.6/26.1, 25.7/25.8; rfc6979 25.1/25.6, 25.1/25.4).
+- **P3 held exactly.** `down.log`: 423 files × two tiers × two compilers,
+  one runtime archive (0.2.26's). Built native 393 / release 392 by both,
+  the same 61 refusals with the same codes (`fail-*.txt` `a8d67a2a…`
+  both, `codes-*.txt` `7adc120c…` both). Raw: native 393/393 changed (the
+  DWARF producer string), release 392/392 same. Stripped
+  (`compare-norm.txt` `21076c96…`): **0 / 393 native, 0 / 392 release
+  changed.**
+- **P4: one miss, on windows.** The seven s215 commits cherry-picked
+  with one conflict (CHANGELOG.md's top), none in code. At `3230ebd`
+  (g2, linux) every s215 word held. CI run 37977426283 at `3230ebd`
+  (the first time any host but kasumi ran these rows on their pin) was
+  green on ubuntu and macOS and red on windows on ONE row:
+  `process/close_fd_row.lu [lupin]: ledger says unsupported, observed
+  run` (rig windows job 113979117434). The reason is the clause's
+  refusal order (`[os.proc.fds]`: shape, then the host, then sources,
+  then the program): on windows lupin answers the host's `unsupported`
+  to a non-empty map before it looks at the close, and the row accepts
+  `unsupported` as well-formed. Recorded as the ledger's second
+  host-scoped cell, `lupin-windows = "run"`. The risk I named,
+  `is_terminal_rows`' `stdin=false` on windows' `NUL`, did NOT
+  materialize: all three lanes ran it there (3 lanes observed), so
+  every compiler and lupin answer `false` for `NUL`. Windows then
+  observed 342 / 17 / 49 / 25, not the predicted 341 / 18 / 49 / 25,
+  because of the same row.
+- **P5: #52 held; #54's plant missed on lupin.** `fs/std_bytes_rows.lu`
+  runs on all three lanes and hosts in program order. My first draft
+  named a helper `read_line`, which W0304 refuses (it shadows the
+  prelude's `read_line`); renamed before any commit. The new `has`
+  answers presence for a `List`-valued map on every lane (the index read
+  takes nothing out). The planted old body (`ee69d30`, CI run
+  37980674075) went red in `std-test` on ubuntu (job 113990074570) and
+  macOS (job 113990076316) on exactly two lines,
+  `has_allocates_nothing.lu [wolfc]` and `[native]` (`charged_zero` false),
+  and **green on lupin**: lupin 0.1.49 does not charge a `pairs()` list to
+  the ambient region at all (`probe-pairs-charge.log` `e0cad38c…`: a
+  `pairs()` list inside `in r` leaves `region_bytes(r)` at 0 on lupin, >0
+  on checked and native; a pushed list is charged on all three). Filed as
+  wolf-interp#220. The row's lupin word stays `run`, which is true; the
+  witness's teeth are the two compiler lanes until #220 closes. `get`
+  keeps its `pairs()` walk: #54 named `has`, and `get` must return the
+  value (a `List` value through the index read is a different question).
+- **P6 held on linux and macOS.** g2 at `3230ebd`: 433 tests, forward
+  tags 829 (826 + `std.fs`, `err.row` and `std.map` from the two new
+  rows), conservatism 126, host-scoped cells 1 (2 after `df69739`),
+  observed 342 / 17 / 49 / 25, doc-examples 457, fmt-lu 484, ulp 200,
+  every step 0 SKIP lines (`std-test-g2-3230ebd.log` `082cdcc6…`).
