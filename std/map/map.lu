@@ -263,6 +263,14 @@ pub fn get_or[K: cmp.Eq, V](m: Map[K, V], k: K, d: V) -> V {
 
 /// Whether `k` is bound. Total: no error row, no traps.
 ///
+/// It asks the map itself — the index read `m[k]`, whose `none` row IS
+/// "absent" (`[mem.map.absent]`) — and allocates nothing. Until sc57 this
+/// body walked `m.pairs()`, which builds a fresh `List` of every entry in
+/// the caller's region on every call: about 6.4 KB a call at 200 entries,
+/// never freed in a long-running loop (wolf-std#54, measured on pelt's
+/// variable lookups). `tests/map/has_allocates_nothing.lu` holds the
+/// region's ledger at zero across a hit and a miss.
+///
 /// ```wolf-doc-example
 /// var m = Map[str, int]()
 /// m["a"] = 1
@@ -270,12 +278,8 @@ pub fn get_or[K: cmp.Eq, V](m: Map[K, V], k: K, d: V) -> V {
 /// map.has(m, "z") == false
 /// ```
 pub fn has[K: cmp.Eq, V](m: Map[K, V], k: K) -> bool {
-    for pair in m.pairs() {
-        if cmp.Eq.eq(pair.0, k) {
-            return true
-        }
-    }
-    false
+    let _v = m[k] else { return false }
+    true
 }
 
 /// Removes `k`'s entry and returns the value it was bound to; `none`

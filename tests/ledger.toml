@@ -3899,3 +3899,11 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# wolf-std#54: `map.has` answers from the index read and allocates
+# nothing — a first-class region's ledger stays at zero across a hit and
+# a miss on a 200-entry map built outside it, and a `List`-valued map
+# answers presence without the value leaving the map.
+[tests."map/has_allocates_nothing.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"

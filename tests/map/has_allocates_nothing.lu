@@ -1,0 +1,47 @@
+//! check: run(exit=0, stdout="hit=true miss=false charged_zero=true\nlists hit=true miss=false")
+//! phase: run
+//! conforms: std.map, type.map, mem.map.absent, mem.region.account.1
+//!
+//! **wolf-std#54: `map.has` allocates nothing.** It walked `m.pairs()`,
+//! which builds a fresh `List[(K, V)]` of every entry in the CALLER's
+//! ambient region on each call, so a membership test cost O(n) bytes that
+//! a long-running loop never frees (an arena frees wholesale). It now asks
+//! the index read, whose `none` row is "absent".
+//!
+//! The witness is a region's own ledger (`[mem.region.account.1]`, read
+//! through `std.mem.budget.charged`): a first-class region is created,
+//! `has` runs inside `in r { … }` on a 200-entry map built OUTSIDE it,
+//! once for a bound key and once for an absent one, and the region's
+//! charge is still zero afterwards. Zero, not a count, because the units
+//! are per tier (`tests/mem/budget/ledger_relations.lu`), and zero is the
+//! one number every tier agrees means "nothing was allocated here". The
+//! old body charged the 200-pair list to `r` on every lane.
+//!
+//! The second line is a map whose values are not `Copy` (`List[int]`):
+//! the index read must answer presence without taking the value out.
+
+use std.map
+use std.mem.budget
+
+fn main() -> int {
+    var m = Map[str, int]()
+    for i in 0..200 {
+        m["VAR_{i}"] = i
+    }
+    let r = region()
+    var hit = false
+    var miss = true
+    in r {
+        hit = map.has(m, "VAR_7")
+        miss = map.has(m, "no-such-var")
+    }
+    let zero = budget.charged(r) == 0
+    print("hit={hit} miss={miss} charged_zero={zero}")
+
+    var lists = Map[str, List[int]]()
+    var xs = List[int]()
+    (mut xs).push(1)
+    lists["a"] = xs
+    print("lists hit={map.has(lists, "a")} miss={map.has(lists, "b")}")
+    0
+}
