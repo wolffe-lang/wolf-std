@@ -1,10 +1,12 @@
 //! check: fail(E0701)
 //! phase: typecheck
-//! conforms: std.env, comptime.sandbox, comptime.sandbox.io
+//! conforms: std.env, comptime.sandbox, comptime.sandbox.env
 //!
 //! **D33 for `env.set_cwd` (s215), held one level down at `os_chdir`**:
-//! moving the COMPILER's working directory acts on the machine that
-//! compiles, the sandbox table's `io` reason. The row is handled locally
+//! moving the COMPILER's working directory changes the process context
+//! the compiler runs in, the sandbox table's `env` reason (ruling #54,
+//! `os_chdir` with `os_cwd` and `env_set`; this row said `io` until the
+//! pin carried the ruling, wolf 0.2.26). The row is handled locally
 //! (F-0069) and the facade is called at run time to keep the import used.
 
 use std.env
