@@ -1,9 +1,6 @@
 //! check: run(exit=0, stdout="moved=true\nrelative_read=found\nends_inner=true\nback=true\nmissing=not_found\nonto_a_file=io\ncleaned=true")
 //! phase: run
-//! conforms: std.env, os.fs, os.fs.path, err.row, err.propagate
-//!
-//! (Conforms to `os.fs`: the pinned anchor registry has no `os.fs.chdir` until the
-//! pin bump carries wolf-lang s215 — `[conf.tag.valid]`, s199's precedent.)
+//! conforms: std.env, os.fs.chdir, os.fs.path, err.row, err.propagate
 //!
 //! **s215: `env.set_cwd` then a relative read.** After the change a
 //! relative path names a file under the new directory, `env.cwd()` answers

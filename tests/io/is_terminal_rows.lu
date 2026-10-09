@@ -1,9 +1,6 @@
 //! check: run(exit=0, stdout="stdin=false\npipe=false\nforged=io")
 //! phase: run
-//! conforms: std.io, os.fs, err.row
-//!
-//! (Conforms to `os.fs`: the pinned anchor registry has no `os.fs.isatty` until the
-//! pin bump carries wolf-lang s215 — `[conf.tag.valid]`, s199's precedent.)
+//! conforms: std.io, os.fs.isatty, err.row
 //!
 //! **s215: `io.is_terminal`.** The rig wires standard input to the null
 //! device — a device, not a terminal — and a pipe end is a pipe; a forged
