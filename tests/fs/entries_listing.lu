@@ -22,7 +22,7 @@ fn kind_of(es: List[fs.Entry], want: str) -> int {
 
 fn main() -> !int {
     let dir = "s218-entries.tmp"
-    fs.remove_dir_all(dir) else |_| { }
+    fs.remove_dir_all(dir) else |_| {}
     fs.create_dir(dir)?
     fs.write_text(dir + "/z", "")?
     fs.create_dir(dir + "/sub")?
