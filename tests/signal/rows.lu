@@ -1,0 +1,45 @@
+//! check: run(exit=0, stdout="meanings=511\ninterrupt=16\npoll_empty=io\npoll_none=0\nignore_empty=io\nreset_outside=io")
+//! phase: run
+//! conforms: std.signal, os.signal, err.row
+//!
+//! (Conforms to `os.signal`: the pinned anchor registry has no
+//! `os.signal.disp` or `os.signal.poll` until the pin bump carries
+//! wolf-lang s219 — `[conf.tag.valid]`, s199's precedent.)
+//!
+//! **s219: `std.signal`'s rows that change nothing, on every host.** The
+//! nine meanings are distinct bits (their sum is 511); a poll of an empty
+//! set is `io` and of a meaning never listened for is 0; `ignore` of an
+//! empty set and `reset` of a bit outside the meanings are `io` before
+//! anything changes. Ctrl-C itself is witnessed through a pseudo-terminal
+//! in wolf-lang's `ctrl_c_lanes.rs`: this rig has none.
+
+use std.signal
+
+fn main() -> !int {
+    let v1 = signal.reload() + signal.terminate() + signal.quit() + signal.upgrade()
+    let tty = signal.interrupt() + signal.suspend() + signal.bg_read() + signal.bg_write()
+    let all = v1 + tty + signal.child()
+    print("meanings={all}")
+    print("interrupt={signal.interrupt()}")
+    let pe = signal.poll(0) else |_| -1
+    print(if pe == -1 { "poll_empty=io" } else { "poll_empty={pe}" })
+    let pn = signal.poll(signal.interrupt())?
+    print("poll_none={pn}")
+    var ie = "ok"
+    signal.ignore(0) else |e| {
+        ie = match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    print("ignore_empty={ie}")
+    var ro = "ok"
+    signal.reset(512) else |e| {
+        ro = match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    print("reset_outside={ro}")
+    0
+}

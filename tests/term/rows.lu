@@ -1,0 +1,30 @@
+//! check: run(exit=0, stdout="packed=260\nround_trip=true\nraw_keeps_signals=true\nclamped=16776967")
+//! phase: run
+//! conforms: std.term, os.host, err.row
+//!
+//! (Conforms to `os.host`: the pinned anchor registry has no `os.term`
+//! until the pin bump carries wolf-lang s219 — `[conf.tag.valid]`.)
+//!
+//! **s219: `std.term`'s pure half, on every host.** `raw` of a canonical
+//! mode with echo and signals is not canonical, no echo, signals kept,
+//! `min` 1, `time` 0 — packed, 4 + 256 = 260, the mode wolf-lang's
+//! `raw.lu` witness sets; `unpack` of a pack is the mode again; fields
+//! outside 0..255 are clamped, so `pack` never makes an `invalid` mode.
+//! A terminal itself is witnessed in wolf-lang's `ctrl_c_lanes.rs`.
+
+use std.term
+
+fn main() -> !int {
+    let cooked = term.Mode { canonical: true, echo: true, signals: true, min: 1, time: 0 }
+    let r = term.raw(cooked)
+    let p = term.pack(r)
+    print("packed={p}")
+    let back = term.unpack(p)
+    let flags = back.canonical == r.canonical && back.echo == r.echo && back.signals == r.signals
+    let same = flags && back.min == r.min && back.time == r.time
+    print("round_trip={same}")
+    print("raw_keeps_signals={r.signals}")
+    let wild = term.Mode { canonical: true, echo: true, signals: true, min: 999, time: 999 }
+    print("clamped={term.pack(wild)}")
+    0
+}

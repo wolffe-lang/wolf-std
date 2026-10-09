@@ -3919,3 +3919,27 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# s219 (wolf-lang#622): std.signal, std.term and process.start_job. Red by
+# construction until the pin carries wolf-lang s219's builtins (E0301 on
+# the compilers, `does not resolve` on lupin); lupin's mirror serves the
+# poll and the dispositions' shape rows, the job spawn, pid and status.
+[tests."signal/rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."signal/comptime_refuses_poll.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."term/rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."process/job_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"

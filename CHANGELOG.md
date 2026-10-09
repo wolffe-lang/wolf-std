@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — s219: std.signal, std.term, and jobs in std.process
+
+**Needs the pin bump that carries wolf-lang s219 and its lupin mirror**
+(eleven builtins, wolf-lang#622). On top of sc57, which landed s215's std half.
+Until then every test that uses `std.signal`, `std.term` or
+`std.process` is E0301 on wolfc and native.
+
+- **`std.signal`** (new): the nine meanings by name (`interrupt()` is
+  Ctrl-C), `listen`, `wait`, `poll` (never waits; 0 for none yet),
+  `ignore`, `reset` (the host default) and `raise`. No handler, ever: a
+  disposition is default, ignored or an event.
+- **`std.term`** (new): `Mode { canonical, echo, signals, min, time }`
+  with `pack`/`unpack`, `mode`, `set_mode` and `raw`; `foreground`,
+  `set_foreground` and `group` for job control.
+- **`std.process`**: `start_job(c, group, defaults)` and
+  `start_foreground(c, group, tty, defaults)` (a process group, the
+  terminal handed before the program runs, meanings set back to default
+  in the child), `pid`, `wait_status` (`-N` for a death by signal N) and
+  `killed_by`.
+- Tests: `signal/rows.lu`, `signal/comptime_refuses_poll.lu`,
+  `term/rows.lu`, `process/job_rows.lu`, with their ledger rows.
+
 ## sc57 — 2026-10-09 — std at wolf 0.2.26 / lupin 0.1.49, with s215's wrappers
 
 **The pin.** wolf 0.2.25 -> **0.2.26** and lupin 0.1.48 -> **0.1.49**,

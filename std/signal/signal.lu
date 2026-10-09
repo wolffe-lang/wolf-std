@@ -1,0 +1,93 @@
+//! member: true
+//!
+//! std.signal — what a signal does to this process, and hearing one as an
+//! event. Stability tier: core. The facade over wolf-lang's
+//! `[os.signal]` family (s114, s188, s219).
+//!
+//! **A signal is named by its MEANING, never its number** (`[os.signal.set]`):
+//! `reload()` is `SIGHUP`, `interrupt()` is the terminal's Ctrl-C, and a
+//! set is the bitwise OR of meanings — `signal.interrupt() | signal.quit()`.
+//! The nine meanings are functions here because a module of the library
+//! carries no constants; each answers its bit.
+//!
+//! **Three dispositions, nothing else.** A meaning's signal either does
+//! what the host does by default (`reset`), nothing (`ignore`), or arrives
+//! as an event (`listen`, then `wait` or `poll`). There is no handler: no
+//! wolf code ever runs when a signal arrives (`[os.signal.model]`). The
+//! last call for a meaning wins.
+//!
+//! **What a child inherits** is what `exec` leaves (`[os.signal.disp]`): an
+//! ignored meaning stays ignored in every child, a listened one is the
+//! default there. That is why a shell LISTENS for `interrupt()` rather than
+//! ignoring it — it survives Ctrl-C and its `sleep` still dies of it — and
+//! why `std.process.start_job` takes the meanings to set back to default in
+//! a child the shell ignores for itself.
+//!
+//! **Errors are rows.** An empty set, or a bit outside the nine meanings,
+//! is `io`; windows answers `unsupported` to `ignore` and `reset`, and a
+//! listen for a terminal or child meaning there is `io` (the console has
+//! none of them).
+//!
+//! **Capability: `exec` (I13)** — signal control is process control, tagged
+//! `exec` in the sandbox table and refused at comptime (D33). The meaning
+//! functions reach nothing and are comptime-safe.
+
+/// Re-read configuration (`SIGHUP`).
+pub fn reload() -> int { 1 }
+
+/// Shut down now (`SIGTERM`).
+pub fn terminate() -> int { 2 }
+
+/// Shut down after draining (`SIGQUIT`; the terminal's Ctrl-\).
+pub fn quit() -> int { 4 }
+
+/// Swap in a new binary (`SIGUSR2`).
+pub fn upgrade() -> int { 8 }
+
+/// The terminal's interrupt character, Ctrl-C (`SIGINT`).
+pub fn interrupt() -> int { 16 }
+
+/// The terminal's suspend character, Ctrl-Z (`SIGTSTP`).
+pub fn suspend() -> int { 32 }
+
+/// A background process group read the terminal (`SIGTTIN`).
+pub fn bg_read() -> int { 64 }
+
+/// A background process group wrote to, or set, the terminal (`SIGTTOU`).
+pub fn bg_write() -> int { 128 }
+
+/// A child stopped or ended (`SIGCHLD`).
+pub fn child() -> int { 256 }
+
+/// Hear every meaning in `set` as an event (`os_signal_listen`); ends an
+/// ignore of them.
+pub fn listen(set: int) -> () ! {io} {
+    os_signal_listen(set)?
+}
+
+/// Park until a meaning in `set` arrives; that meaning.
+pub fn wait(set: int) -> int ! {io} {
+    os_signal_wait(set)?
+}
+
+/// The oldest meaning in `set` that has arrived, taken; 0 when none has.
+/// Never waits (`[os.signal.poll]`).
+pub fn poll(set: int) -> int ! {io} {
+    os_signal_poll(set)?
+}
+
+/// Every meaning in `set` does nothing to this process — and to every
+/// child it starts (`[os.signal.disp]`).
+pub fn ignore(set: int) -> () ! {unsupported, io} {
+    os_signal_ignore(set)?
+}
+
+/// Every meaning in `set` does what the host does by default.
+pub fn reset(set: int) -> () ! {unsupported, io} {
+    os_signal_default(set)?
+}
+
+/// Send `meaning` to this process (`os_signal_raise`).
+pub fn raise(meaning: int) -> () ! {io} {
+    os_signal_raise(meaning)?
+}

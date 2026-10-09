@@ -686,6 +686,79 @@ pub fn start_with(c: Command, inherit: List[net.Listener]) -> Child ! {
 /// var forged = process.Child { slot: 4242 }
 /// (process.wait(take forged) else -1) == -1
 /// ```
+/// The argv split as the spawn builtins take it: the program, then its
+/// arguments; `None`-free — an empty argv answers `not_found` at the call.
+fn split_argv(c: Command) -> (str, List[str], bool) {
+    var exe = ""
+    var args = List[str]()
+    var named = false
+    for a in c.argv {
+        if named {
+            (mut args).push(a)
+        } else {
+            exe = a
+            named = true
+        }
+    }
+    (exe, args, named)
+}
+
+/// **s219 (`[os.proc.job]`): start `c` as a job.** `group` -1 leaves the
+/// child in this process's group, 0 makes it the leader of a new group
+/// (whose id is `pid(child)`), a positive id joins that group — a
+/// pipeline's later stages join the first's. `defaults` is a set of
+/// `std.signal` meanings set back to the default in the child: a shell
+/// that ignores `quit()` for itself passes it, so its children do not
+/// inherit the ignore. Everything else is `start`'s, the descriptor map
+/// included.
+pub fn start_job(c: Command, group: int, defaults: int) -> Child ! {
+    unsupported,
+    invalid,
+    not_found,
+    denied,
+    io,
+} {
+    let (exe, args, named) = split_argv(c)
+    if !named { return not_found }
+    Child { slot: os_spawn_job(exe, args, c.fds, group, -1, defaults)? }
+}
+
+/// `start_job`, and the job's group takes the terminal `tty` as its
+/// foreground before the program runs (no race: the child does it before
+/// `exec`, the parent again after). Take the terminal back with
+/// `term.set_foreground(tty, term.group())` when the job ends.
+pub fn start_foreground(c: Command, group: int, tty: fs.File, defaults: int) -> Child ! {
+    unsupported,
+    invalid,
+    not_found,
+    denied,
+    io,
+} {
+    let (exe, args, named) = split_argv(c)
+    if !named { return not_found }
+    Child { slot: os_spawn_job(exe, args, c.fds, group, tty.fd, defaults)? }
+}
+
+/// The child's operating-system process id (`io` once it is reaped).
+pub fn pid(ch: Child) -> int ! {io} {
+    os_proc_pid(ch.slot)?
+}
+
+/// **s219 (`[os.proc.status]`): wait, and say how it ended.** The exit
+/// code (0..255), or `-N` for a child ended by signal N — the number a
+/// shell reports as `128 + N` (`killed_by` reads it). Reaps, as `wait`.
+pub fn wait_status(take ch: Child) -> int ! {io} {
+    os_wait_status(ch.slot)?
+}
+
+/// The signal number a `wait_status` names, or 0 for an exit.
+pub fn killed_by(status: int) -> int {
+    if status < 0 {
+        return 0 - status
+    }
+    0
+}
+
 pub fn wait(take ch: Child) -> int ! {signal, io} {
     os_wait(ch.slot)?
 }
