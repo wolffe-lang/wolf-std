@@ -3888,3 +3888,14 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# sc57 (wolf 0.2.26 / lupin 0.1.49). wolf-std#52: `[os.fs.std]`'s bytes
+# through std.fs — a write to 1 in program order with `print`, a read of
+# 0 (the rig's null device) to `eof`, `close` still `io`. lupin 0.1.49
+# serves the four byte calls on 0..2 on every host, windows included
+# (only the OFFSET calls are declined there, `fs/std_handles.lu`'s cell).
+[tests."fs/std_bytes_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+

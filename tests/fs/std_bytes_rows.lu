@@ -1,0 +1,70 @@
+//! check: run(exit=0, stdout="one\ntwo\nthree\nfour\nstdin read: eof\nstdin chunk: eof\nstdout close: io")
+//! phase: run
+//! conforms: std.fs, os.fs.std, err.row
+//!
+//! `[os.fs.std]`'s bytes through `std.fs` (wolf-lang s200, #405;
+//! wolf-std#52): from wolf 0.2.26 `fs.read`, `fs.read_chunk`, `fs.write`
+//! and `fs.write_chunk` serve descriptors 0, 1 and 2 as the descriptors
+//! themselves, where every one of them answered `io` before. Three
+//! claims, each a line of the golden:
+//!
+//!  - **A write to 1 lands in program order with `print`.** `two` goes
+//!    through `fs.write` and `four` through `fs.write_chunk`, between
+//!    `print`s, and the captured stream reads `one two three four`. On the
+//!    native tiers the runtime writes the descriptor under `print`'s lock;
+//!    the checked machine and lupin write into the same capture `print`
+//!    writes. A reorder is a red on the first line that moved.
+//!  - **A read of 0 is the stream itself.** The rig wires standard input
+//!    to the null device, so both byte reads answer `eof` at once, never
+//!    `io` (which is what they answered at 0.2.25 for any handle no open
+//!    made).
+//!  - **`close` on a standard stream is still `io`** — the one call the
+//!    clause leaves where it was (`fs/std_handles.lu` holds the offset
+//!    calls).
+
+use std.fs
+
+fn stdin_read() -> str {
+    var i = fs.stdin()
+    let got = fs.read(mut i, 16) else |e| {
+        return match e {
+            eof => "eof",
+            io => "io",
+            utf8 => "utf8",
+        }
+    }
+    "answered {got.len}"
+}
+
+fn stdin_chunk() -> str {
+    var i = fs.stdin()
+    let got = fs.read_chunk(mut i, 16) else |e| {
+        return match e {
+            eof => "eof",
+            io => "io",
+        }
+    }
+    "answered {got.len}"
+}
+
+fn close_line() -> str {
+    let o = fs.stdout()
+    fs.close(take o) else |e| {
+        return match e {
+            io => "io",
+        }
+    }
+    "closed"
+}
+
+fn main() -> !int {
+    var o = fs.stdout()
+    print("one")
+    fs.write(mut o, "two\n")?
+    print("three")
+    fs.write_chunk(mut o, "four\n".bytes())?
+    print("stdin read: {stdin_read()}")
+    print("stdin chunk: {stdin_chunk()}")
+    print("stdout close: {close_line()}")
+    0
+}
