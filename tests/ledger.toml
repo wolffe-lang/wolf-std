@@ -3861,6 +3861,15 @@ native = "run"
 
 [tests."process/close_fd_row.lu"]
 lupin = "unsupported"  # s215: a close in a map is refused by name — no unsafe to close a child's descriptor
+# sc57: the ledger's second host-scoped cell, and `[os.proc.fds]`'s
+# refusal ORDER is its clause: shape (`invalid`), then the HOST (windows
+# answers `unsupported` to any non-empty map), then the sources, then the
+# program. On windows lupin reaches the host's `unsupported` before it
+# ever looks at the close, and the row accepts `unsupported` as
+# well-formed, so lupin RUNS it there. Not predicted (F-0143 P4 said
+# `unsupported` on every host); observed on CI run 37977426283, rig
+# (windows-latest) job 113979117434, the run's one red, at 3230ebd.
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
