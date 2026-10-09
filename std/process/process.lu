@@ -385,8 +385,10 @@ pub struct Pipe {
 /// `read` never sees `eof` while any copy is. The pipeline idiom is: make
 /// the pipe, start both stages, close this program's two ends, wait.
 ///
-/// Capability `io`; refused at comptime (D33). Delegates to `os_pipe`
-/// (wolf-lang s215).
+/// Capability `exec` (ruling #54: a pipe exists to wire a child, so
+/// `os_pipe` is charged with the spawn family, not `io`); refused at
+/// comptime (D33). Delegates to `os_pipe` (wolf-lang s215,
+/// `[os.proc.pipe]`).
 ///
 /// A prose example, because a doc example imports exactly the documented
 /// module (§4) and the ends are read and written with `std.fs`:
