@@ -1,5 +1,23 @@
 # Changelog
 
+## s218 — unreleased — std.fs: the full stat record, lstat, read_link, entries (wolf-lang#625, #626)
+
+`std.fs` names wolf-lang s218's four builtins. **`fs.Info`** is the
+twenty-word record (kind with links, fifos, sockets and devices told
+apart; size; `modified_ms`; the `have` mask; mode, nlink, uid, gid,
+blocks, dev, ino, rdev; access, modification, change and birth times as
+seconds and nanoseconds); **`fs.stat(path)`** follows a final link and
+**`fs.lstat(path)`** answers the link itself; **`fs.answered(info,
+word)`** reads the mask, so a program tells a word the host refused
+(windows: mode, owner, identity, ctime) from a zero. **`fs.read_link`**
+answers a link's target as bytes (`invalid` on a non-link).
+**`fs.Entry`** and **`fs.entries(path)`** list a directory in the
+host's own order, each entry its own kind and its name's bytes, so a
+name that is not UTF-8 is listed rather than failing the listing.
+`fs.Stat` and `fs.read_dir` are unchanged. Needs the wolf and lupin
+releases that carry s218: at the 0.2.26 / 0.1.49 pin every `std.fs`
+user is E0301 until the pin moves.
+
 ## sc57 — 2026-10-09 — std at wolf 0.2.26 / lupin 0.1.49, with s215's wrappers
 
 **The pin.** wolf 0.2.25 -> **0.2.26** and lupin 0.1.48 -> **0.1.49**,
