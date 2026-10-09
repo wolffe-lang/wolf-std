@@ -1,6 +1,10 @@
 //! check: run(exit=0, stdout="entries: 3\nf: 0\nsub: 1\nz: 0\nread_link of a file: invalid\nread_link of nothing: not_found")
 //! phase: run
-//! conforms: std.fs, os.fs.readdir, os.fs.readlink, err.row
+//! conforms: std.fs, err.row
+//! (The clause tags `os.fs.readdir` and `os.fs.readlink` join `conforms:` at the pin bump that
+//! carries them: the pinned registry, wolf-lang v0.2.25, has no such
+//! anchor, and `[conf.tag.valid]` refuses one it cannot resolve.)
+//!
 //!
 //! s218 (wolf-lang#626, `[os.fs.readdir]`): `fs.entries` lists a
 //! directory in the host's own order with each entry's own kind and its
