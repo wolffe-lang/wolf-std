@@ -3919,3 +3919,18 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# s218 (wolf-lang#625, #626): std.fs stat, lstat, answered, read_link and
+# entries over the four s218 builtins. Every lane runs them once the pin
+# carries the builtins (the release after wolf 0.2.26 / lupin 0.1.49 at
+# the earliest); at the 0.2.26 / 0.1.49 pin they cannot resolve, so this
+# PR is red by construction until that bump, as s215's wolf-std#53 was.
+[tests."fs/stat_record.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."fs/entries_listing.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"

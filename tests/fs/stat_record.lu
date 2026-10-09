@@ -1,0 +1,62 @@
+//! check: run(exit=0, stdout="kind: 0\nsize: 6\nagrees: yes\nlstat is stat: yes\nanswered 0..3: yes\ndirectory: 1\nmissing: not_found")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate
+//! (The clause tags `os.fs.stat` join `conforms:` at the pin bump that
+//! carries them: the pinned registry, wolf-lang v0.2.26, has no such
+//! anchor, and `[conf.tag.valid]` refuses one it cannot resolve.)
+//!
+//!
+//! s218 (wolf-lang#625, `[os.fs.stat]`): `fs.stat` and `fs.lstat` name
+//! the twenty-word record. On a file the program makes, the record's
+//! first words are `fs.fstat`'s and the path calls' answers in their
+//! units; `lstat` and `stat` agree on a file that is not a link; words
+//! 0..3 are answered on every host; a directory is kind 1; a missing
+//! path is `not_found`. The link cases are wolf-lang's
+//! `fs_stat_lanes` gate (the language makes no links).
+
+use std.fs
+
+fn main() -> !int {
+    fs.write_text("s218-stat.tmp", "wolves")?
+    let info = fs.stat("s218-stat.tmp")?
+    let own = fs.lstat("s218-stat.tmp")?
+    var f = fs.open("s218-stat.tmp")?
+    let st = fs.fstat(mut f)?
+    fs.close(take f)?
+    print("kind: {info.kind}")
+    print("size: {info.size}")
+    var agrees = "no"
+    if info.size == st.size && info.modified_ms == st.modified_ms && info.kind == st.kind {
+        agrees = "yes"
+    }
+    print("agrees: {agrees}")
+    var same = "no"
+    if own.ino == info.ino && own.size == info.size && own.mtime_ns == info.mtime_ns {
+        same = "yes"
+    }
+    print("lstat is stat: {same}")
+    var all = "no"
+    if fs.answered(info, 0) &&
+        fs.answered(info, 1) &&
+        fs.answered(info, 2) &&
+        fs.answered(info, 3) {
+        all = "yes"
+    }
+    print("answered 0..3: {all}")
+    fs.remove("s218-stat.tmp")?
+    fs.create_dir("s218-stat-dir.tmp")?
+    let d = fs.stat("s218-stat-dir.tmp")?
+    fs.remove_dir("s218-stat-dir.tmp")?
+    print("directory: {d.kind}")
+    var row = "none"
+    fs.stat("s218-stat-missing.tmp") else |e| {
+        row = match e {
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+        d
+    }
+    print("missing: {row}")
+    0
+}

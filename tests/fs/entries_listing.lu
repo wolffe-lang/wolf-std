@@ -1,0 +1,66 @@
+//! check: run(exit=0, stdout="entries: 3\nf: 0\nsub: 1\nz: 0\nread_link of a file: invalid\nread_link of nothing: not_found")
+//! phase: run
+//! conforms: std.fs, err.row
+//! (The clause tags `os.fs.readdir` and `os.fs.readlink` join `conforms:` at the pin bump that
+//! carries them: the pinned registry, wolf-lang v0.2.26, has no such
+//! anchor, and `[conf.tag.valid]` refuses one it cannot resolve.)
+//!
+//!
+//! s218 (wolf-lang#626, `[os.fs.readdir]`): `fs.entries` lists a
+//! directory in the host's own order with each entry's own kind and its
+//! name as bytes. The order differs per filesystem, so this test looks
+//! each name up rather than printing the order. `fs.read_link` of a
+//! file is `invalid` and of a missing path `not_found`.
+
+use std.fs
+
+fn kind_of(es: List[fs.Entry], want: str) -> int {
+    for e in es {
+        let n = str_from_utf8(e.name) else ""
+        if n == want {
+            return e.kind
+        }
+    }
+    0 - 1
+}
+
+fn main() -> !int {
+    let dir = "s218-entries.tmp"
+    fs.remove_dir_all(dir) else |_| {}
+    fs.create_dir(dir)?
+    fs.write_text(dir + "/z", "")?
+    fs.create_dir(dir + "/sub")?
+    fs.write_text(dir + "/f", "x")?
+    let es = fs.entries(dir)?
+    print("entries: {es.len}")
+    let kf = kind_of(es, "f")
+    let ks = kind_of(es, "sub")
+    let kz = kind_of(es, "z")
+    print("f: {kf}")
+    print("sub: {ks}")
+    print("z: {kz}")
+    var a = "ok"
+    fs.read_link(dir + "/f") else |e| {
+        a = match e {
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+        List[byte]()
+    }
+    print("read_link of a file: {a}")
+    var b = "ok"
+    fs.read_link(dir + "/nope") else |e| {
+        b = match e {
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+        List[byte]()
+    }
+    print("read_link of nothing: {b}")
+    fs.remove_dir_all(dir)?
+    0
+}
