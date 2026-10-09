@@ -1,6 +1,10 @@
 //! check: run(exit=0, stdout="kind: 0\nsize: 6\nagrees: yes\nlstat is stat: yes\nanswered 0..3: yes\ndirectory: 1\nmissing: not_found")
 //! phase: run
-//! conforms: std.fs, os.fs.stat, err.row, err.propagate
+//! conforms: std.fs, err.row, err.propagate
+//! (The clause tags `os.fs.stat` join `conforms:` at the pin bump that
+//! carries them: the pinned registry, wolf-lang v0.2.25, has no such
+//! anchor, and `[conf.tag.valid]` refuses one it cannot resolve.)
+//!
 //!
 //! s218 (wolf-lang#625, `[os.fs.stat]`): `fs.stat` and `fs.lstat` name
 //! the twenty-word record. On a file the program makes, the record's
