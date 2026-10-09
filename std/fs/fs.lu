@@ -1230,7 +1230,7 @@ pub fn answered(info: Info, word: int) -> bool {
         bit = bit * 2
         i = i + 1
     }
-    (info.have / bit) % 2 == 1
+    info.have / bit % 2 == 1
 }
 
 /// The target a symbolic link stores, as the host stored it: bytes,
@@ -1244,12 +1244,12 @@ pub fn answered(info: Info, word: int) -> bool {
 /// ```wolf-doc-example
 /// fs.write_text("doc-read-link.tmp", "x")?
 /// var not_a_link = false
-/// fs.read_link("doc-read-link.tmp") else |_| {
+/// let t = fs.read_link("doc-read-link.tmp") else |_| {
 ///     not_a_link = true
 ///     List[byte]()
 /// }
 /// fs.remove("doc-read-link.tmp")?
-/// not_a_link == true
+/// not_a_link == true && t.len == 0
 /// ```
 pub fn read_link(path: str) -> List[byte] ! {not_found, denied, invalid, io} {
     fs_read_link(path)?
