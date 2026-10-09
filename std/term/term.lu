@@ -1,0 +1,116 @@
+//! member: true
+//!
+//! std.term — the controlling terminal: whose turn it is, and how it reads.
+//! Stability tier: core. The facade over wolf-lang's `[os.term]` (s219).
+//!
+//! **Whose turn.** One process group at a time is the terminal's
+//! FOREGROUND: the group its Ctrl-C, Ctrl-\ and Ctrl-Z signal and the only
+//! one that may read it. A job-control shell hands the foreground to a job
+//! (`std.process.start_job` does it in the child, before the job runs) and
+//! takes it back with `set_foreground(tty, group())` when the job ends.
+//! The setters block `SIGTTOU` for their own duration, so a shell outside
+//! the foreground is not stopped for taking its terminal back.
+//!
+//! **How it reads.** A `Mode` is the four things an interactive program
+//! changes: `canonical` (a line at a time, with the terminal's own
+//! editing), `echo`, `signals` (Ctrl-C, Ctrl-\ and Ctrl-Z become signals)
+//! and, when not canonical, how a read waits — `min` bytes, or `time`
+//! tenths of a second. Every other setting is left as found, so a mode
+//! read and set back restores exactly what was changed. Nothing restores
+//! it for you at exit: save it, change it, put it back
+//! (`term.set_mode(tty, saved)`).
+//!
+//! **Errors are rows.** A handle that is closed, forged or not a terminal
+//! is `io`; a mode outside the bits is `invalid` (unreachable through
+//! `Mode`, whose fields are clamped); every call is `unsupported` on
+//! windows.
+//!
+//! **Capability:** `foreground`, `mode` and `set_mode` are `io` (they act on
+//! a descriptor the program holds, as `io.is_terminal`); `set_foreground`
+//! is `exec` (process control) and `group` `env` (process context).
+
+use std.fs
+
+/// The terminal's mode, unpacked (`[os.term.mode]`).
+pub struct Mode {
+    canonical: bool,
+    echo: bool,
+    signals: bool,
+    min: int,
+    time: int,
+}
+
+fn clamp(n: int) -> int {
+    if n < 0 {
+        return 0
+    }
+    if n > 255 {
+        return 255
+    }
+    n
+}
+
+/// The packed int the builtin reads: canonical=1, echo=2, signals=4, `min`
+/// in bits 8..15, `time` in bits 16..23.
+pub fn pack(m: Mode) -> int {
+    var v = 0
+    if m.canonical {
+        v = v + 1
+    }
+    if m.echo {
+        v = v + 2
+    }
+    if m.signals {
+        v = v + 4
+    }
+    v + clamp(m.min) * 256 + clamp(m.time) * 65536
+}
+
+/// The `Mode` a packed int names.
+pub fn unpack(v: int) -> Mode {
+    Mode {
+        canonical: v % 2 == 1,
+        echo: (v / 2) % 2 == 1,
+        signals: (v / 4) % 2 == 1,
+        min: (v / 256) % 256,
+        time: (v / 65536) % 256,
+    }
+}
+
+/// The terminal's mode now.
+pub fn mode(tty: fs.File) -> Mode ! {unsupported, io} {
+    unpack(os_term_mode(tty.fd)?)
+}
+
+/// Set the terminal's mode (output already written drains first; input
+/// already typed is kept).
+pub fn set_mode(tty: fs.File, m: Mode) -> () ! {unsupported, invalid, io} {
+    os_term_set_mode(tty.fd, pack(m))?
+}
+
+/// `m` with input a key at a time: not canonical, no echo, one byte per
+/// read, no timer. `signals` is kept, so Ctrl-C still interrupts.
+pub fn raw(m: Mode) -> Mode {
+    Mode {
+        canonical: false,
+        echo: false,
+        signals: m.signals,
+        min: 1,
+        time: 0,
+    }
+}
+
+/// The terminal's foreground process group.
+pub fn foreground(tty: fs.File) -> int ! {unsupported, io} {
+    os_term_foreground(tty.fd)?
+}
+
+/// Make `group_id` the terminal's foreground process group.
+pub fn set_foreground(tty: fs.File, group_id: int) -> () ! {unsupported, io} {
+    os_term_set_foreground(tty.fd, group_id)?
+}
+
+/// This process's own process group.
+pub fn group() -> int ! {unsupported} {
+    os_pgid()?
+}
