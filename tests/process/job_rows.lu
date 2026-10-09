@@ -1,0 +1,38 @@
+//! check: run(exit=0, stdout="group=invalid\npid=io\nstatus=io\nkilled_by_2=2\nexit_is_0=0")
+//! phase: run
+//! conforms: std.process, os.proc, err.row
+//!
+//! (Conforms to `os.proc`: the pinned anchor registry has no
+//! `os.proc.job` until the pin bump carries wolf-lang s219.)
+//!
+//! **s219: `start_job`'s and the status's rows that start nothing.** A
+//! group below -1 is `invalid` before the program is looked for, on every
+//! host; a forged `Child` has no pid and no status (`io`); `killed_by`
+//! reads `-N` as N and an exit as 0. The live rows — a group leader, a
+//! joiner, `-9` for a killed child — are wolf-lang's `status.lu`.
+
+use std.process
+
+fn main() -> !int {
+    var g = "ok"
+    let c = process.command("no-such-program-s219")
+    var ch = process.start_job(c, -2, 0) else |e| {
+        g = match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+        print("group={g}")
+        let p = process.pid(process.Child { slot: 4096 }) else |_| -1
+        print(if p == -1 { "pid=io" } else { "pid={p}" })
+        let s = process.wait_status(take process.Child { slot: 4096 }) else |_| -1000
+        print(if s == -1000 { "status=io" } else { "status={s}" })
+        print("killed_by_2={process.killed_by(-2)}")
+        print("exit_is_0={process.killed_by(0)}")
+        return 0
+    }
+    print("started {process.pid(ch)?}")
+    1
+}

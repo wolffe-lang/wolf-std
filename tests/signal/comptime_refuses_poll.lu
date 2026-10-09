@@ -1,0 +1,21 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.signal, comptime.sandbox, comptime.sandbox.exec
+//!
+//! **D33 for `std.signal` (s219), held one level down at
+//! `os_signal_poll`**: signal control is process control (`exec`), and a
+//! compile may not listen for, ignore or take a signal. The row is handled
+//! locally (F-0069); the meaning function runs at run time to keep the
+//! import used.
+
+use std.signal
+
+comptime fn probe() -> int {
+    os_signal_poll(16) else |_| 0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {signal.interrupt()}")
+    0
+}
