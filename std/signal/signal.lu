@@ -34,20 +34,28 @@
 
 /// Re-read configuration (`SIGHUP`).
 pub fn reload() -> int { 1 }
+
 /// Shut down now (`SIGTERM`).
 pub fn terminate() -> int { 2 }
+
 /// Shut down after draining (`SIGQUIT`; the terminal's Ctrl-\).
 pub fn quit() -> int { 4 }
+
 /// Swap in a new binary (`SIGUSR2`).
 pub fn upgrade() -> int { 8 }
+
 /// The terminal's interrupt character, Ctrl-C (`SIGINT`).
 pub fn interrupt() -> int { 16 }
+
 /// The terminal's suspend character, Ctrl-Z (`SIGTSTP`).
 pub fn suspend() -> int { 32 }
+
 /// A background process group read the terminal (`SIGTTIN`).
 pub fn bg_read() -> int { 64 }
+
 /// A background process group wrote to, or set, the terminal (`SIGTTOU`).
 pub fn bg_write() -> int { 128 }
+
 /// A child stopped or ended (`SIGCHLD`).
 pub fn child() -> int { 256 }
 

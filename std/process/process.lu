@@ -711,7 +711,13 @@ fn split_argv(c: Command) -> (str, List[str], bool) {
 /// that ignores `quit()` for itself passes it, so its children do not
 /// inherit the ignore. Everything else is `start`'s, the descriptor map
 /// included.
-pub fn start_job(c: Command, group: int, defaults: int) -> Child ! {unsupported, invalid, not_found, denied, io} {
+pub fn start_job(c: Command, group: int, defaults: int) -> Child ! {
+    unsupported,
+    invalid,
+    not_found,
+    denied,
+    io,
+} {
     let (exe, args, named) = split_argv(c)
     if !named { return not_found }
     Child { slot: os_spawn_job(exe, args, c.fds, group, -1, defaults)? }
@@ -721,7 +727,13 @@ pub fn start_job(c: Command, group: int, defaults: int) -> Child ! {unsupported,
 /// foreground before the program runs (no race: the child does it before
 /// `exec`, the parent again after). Take the terminal back with
 /// `term.set_foreground(tty, term.group())` when the job ends.
-pub fn start_foreground(c: Command, group: int, tty: fs.File, defaults: int) -> Child ! {unsupported, invalid, not_found, denied, io} {
+pub fn start_foreground(c: Command, group: int, tty: fs.File, defaults: int) -> Child ! {
+    unsupported,
+    invalid,
+    not_found,
+    denied,
+    io,
+} {
     let (exe, args, named) = split_argv(c)
     if !named { return not_found }
     Child { slot: os_spawn_job(exe, args, c.fds, group, tty.fd, defaults)? }

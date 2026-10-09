@@ -70,10 +70,10 @@ pub fn pack(m: Mode) -> int {
 pub fn unpack(v: int) -> Mode {
     Mode {
         canonical: v % 2 == 1,
-        echo: (v / 2) % 2 == 1,
-        signals: (v / 4) % 2 == 1,
-        min: (v / 256) % 256,
-        time: (v / 65536) % 256,
+        echo: v / 2 % 2 == 1,
+        signals: v / 4 % 2 == 1,
+        min: v / 256 % 256,
+        time: v / 65536 % 256,
     }
 }
 
