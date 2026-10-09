@@ -11135,3 +11135,183 @@ and the build-id note removed (`objcopy --strip-debug --remove-section
   (all 393 native, the 38 release), with one runtime archive. Verdict,
   `stdout_inline` and `stdout_sha256` were equal on 431 of 431
   (`behave.log` `51983a17…`).
+
+## F-0143 — sc57's predictions, before the archives
+
+Written at `5948901` (branch `sc57`, on trunk `0f74ec5`) before the wolf
+0.2.26 or lupin 0.1.49 archive was downloaded or unpacked anywhere. The
+bump is one release on each side. It carries wolf-std#53 (s215's std
+half, head `91e0bbb5`, based on sc54's `2f389a7`) rebased into this
+series, #52's doc and #54's `map.has`. The baseline is the ledger at
+`0f74ec5` and sc55's last kasumi gauntlet at that sha
+(`~/lanes/sc55/evidence/std-test-g2-0f74ec5.log` `ff09f320…`, GREEN:
+423 tests, forward tags 803, conservatism 122, lanes observed
+336 / 16 / 49 / 22), and s215's at its heads
+(`~/lanes/s215/evidence/std-heads-91e0bbb5.log` `65bf842a…`, GREEN: 431
+tests, forward tags 826, conservatism 126, observed 340 / 17 / 49 / 25,
+doc-examples 457 blocks, fmt-lu 482 files). Measurements are appended
+below, never written over.
+
+### P1. The pin
+
+- `vendor/tools.toml`: `[wolf] version = "0.2.26"`, pin key
+  `89dc139443da38078df6093568da87bc6d0ee6f9` (the v0.2.26 tag);
+  `[lupin] version = "0.1.49"`, pin key `294d626dd596122285d5df954762e3aee3e5db71`
+  UNCHANGED (0.1.49's spec pin is still v0.2.24, now two releases behind
+  the compiler). Predicted `--version` lines: `wolf 0.2.26 (wolfgang,
+  pin 89dc139)`, `paired with lupin 0.1.49 (reference interpreter), pin
+  294d626`, and `lupin 0.1.49 (wolf-interp, reference interpreter at pin
+  294d626)`. Falsified by any other string.
+- Archive digests as GitHub reports them: wolf 0.2.26 linux x86-64
+  `05acdc5e…`, linux aarch64 `8b019b64…`, macOS aarch64 `8ea7ef3b…`,
+  windows `9cb6958d…`; lupin 0.1.49 linux x86-64 `84911a35…`, linux
+  aarch64 `e1f53d15…`, macOS aarch64 `ad188d58…`, windows zip
+  `ebff44ab…`. Falsified by a mismatch on arrival. The archive members
+  are 0.2.25's (`wolf`, `_wolf`, `libwolf_rt.a`, `libwolf_rt_none.a`, the
+  docs); `_wolf` (the zsh completion script) is predicted to stay
+  `a368c8ec…`, since 0.2.26 adds no subcommand.
+- **The data pin moves**, `6710f9e0` (v0.2.25) -> `89dc1394` (v0.2.26),
+  in its own commit: anchors 595 -> 607, **+12, 0 removed** (key sets
+  diffed both ways from wolf-lang's `spec/anchors.json`):
+  `mem.list.bytes`, `mem.region.copyout`, `mem.static.4`,
+  `mem.unsafe.raw.5`, `os.fs.chdir`, `os.fs.copy`, `os.fs.error`,
+  `os.fs.isatty`, `os.proc.fds`, `os.proc.pipe`, `type.fn.never`,
+  `type.int.not`, all in namespaces already in `REGISTERED_NS`;
+  `05-conformance.md` byte-identical. No std file at `0f74ec5` cites any
+  of the twelve. Falsified if `sync-pin` or `[conf.tag.valid]` refuses
+  anything.
+
+### P2. The ledger at the pin alone (trunk's tests, no s215): no move
+
+Ledger at `0f74ec5`: 423 rows. lupin `run` 365 / `unsupported` 58;
+wolfc `run` 369 / `unsupported` 53 / `fail(E1013)` 1; native `run` 413
+/ `unsupported` 9 / `fail(E1013)` 1; one host-scoped cell. **Zero moves,
+on every host**: std-test 423 tests, forward tags 803, conservatism 122,
+host-scoped cells 1, observed 336 / 16 / 49 / 22 on linux and macOS,
+335 / 17 / 49 / 22 on windows (the `fs/std_handles.lu` cell).
+
+Every candidate, with the reason it does not move, so a move is a
+finding:
+
+- **10 new prelude names** (W0304): none declared in any .lu; `never`
+  is a LOCAL in 10 test files and is exempt by the CHANGELOG's words.
+  Falsified by any W0304 on a `never` local.
+- **s213, the checked machine runs `&`, `|`, `^` on plain integers**
+  where it refused them. This is the one change that could GRADUATE a
+  wolfc `unsupported` row to `run`, which this ledger reds on. The 53
+  wolfc rows: `json/number_posture_and_depth`, `parse_misses`,
+  `pretty_and_escape` (an imported module's enum, F-0029);
+  `list/sorted_tier` (#402, trait dispatch on a non-nominal receiver);
+  `mem/budget/breach_is_a_row` (the task layer, C1); `net/adopt_rows`,
+  `process/prefork_handoff`, `process/start_with_inherit_rows` (refused
+  by name, `[os.proc.inherit]`); `x/list_eq/dedup_and_affixes`; and the
+  crypto and TLS rows (`x/crypto/{curve25519,p256}/*`, the sha2 long,
+  monte and hkdf rows, `x/jose/jws_eddsa_vectors`, `x/tls/cert/p256_*`,
+  `x/tls/client/loopback_handshake`), which are the checked machine's
+  step budget, not an operator: their `_short` siblings run there today.
+  None is predicted to move. If one does, the operator was its reason
+  and the flip is a measurement, made in its own commit.
+- **s213's `!` on integers, `m.K`, `p[i].f`, `-> never`**: no .lu file
+  spells any of them (each was a refusal until now).
+- **s216 #618** (a `str` call result held past a region is E1010): s216
+  measured wolf-std's 423 test files, same verdicts, byte-identical.
+- **s200**: the four byte calls serve 0..2; `fs/std_handles.lu` asserts
+  only the OFFSET calls and `close`, which are unchanged, so it holds on
+  every lane. lupin 0.1.49 serves the byte calls on windows but still
+  declines the offset calls there, so its `lupin-windows` cell holds.
+  s200 ran wolf-std's 71 host-family rows under `conform-run --checked`
+  at trunk and head with identical answers.
+- **s217**: no `wolf.pkg` here; no build is a package build.
+- **lupin 0.1.49** (is74 volatile/atomics; the four lanes' mirrors): no
+  std reader of volatile or atomics; the mirrors only add names. The
+  lupin `unsupported` rows (the comptime refusals, `env/args_and_vars`,
+  `io/input_*`, `cmp/ordering_exhaustive`, `cmp/primitive_impls_tier`,
+  `sort/generic_contract`, `testing/comparison_contract`, the crypto
+  step budgets, the inherit rows) are unchanged.
+- **lupin speed**: the four slowest rows (`cavp_sha384_long`,
+  `cavp_sha512_long`, `rfc6979_p256`, `sign_verify_smoke`) within host
+  noise of 0.1.48 (sc55: 24–29 s on kasumi quiet). is74's per-atomic
+  clocks touch no std row.
+- doc-examples 454 blocks GREEN; fmt-lu 474 files, each a fixed point of
+  `wolf fmt` at 0.2.26; ulp 200 rows exact; gen-vectors clean.
+
+### P3. The binaries: none moves
+
+Every test at `0f74ec5` built by wolf 0.2.25 and by 0.2.26, native and
+release, `--no-cache`, with ONE runtime archive (0.2.26's
+`libwolf_rt.a`, so only the compiler's output is compared), compared
+with debug info and the build-id note stripped (sc55's method):
+**0 of 393 native and 0 of 392 release change**, and the same 61 files
+are refused by both compilers with the same codes. Why: every 0.2.26
+lane measured its downstream objects byte-identical (s200 boreutils and
+lobo release objects; s213 boreutils and lobo; s215 188 objects; s216
+1808 builds including these 423 files), and nothing in 0.2.26 changes
+the lowering of a construct std already spells. Raw (unstripped) native
+binaries all move (the DWARF producer string), as at sc55. Falsified by
+one stripped difference.
+
+### P4. s215's rows on the pin (rebased, docs to ruling #54)
+
+The seven s215 commits cherry-pick onto the pin with one conflict at
+most (CHANGELOG.md's top, where sc55's entry now sits) and no code
+conflict, since sc55 touched no `.lu` file.
+
+- **Docs to ruling #54** (`crates/wolf_sema/src/ctfe/intrinsics.rs:189-191`
+  at `89dc1394`): `env.set_cwd` is `env` (the module header's sentence
+  and the fn doc, which said `io`); `process.pipe` is `exec` (its fn doc
+  said `io`); `io.is_terminal` stays `io`. The two comptime witnesses'
+  conforms move `comptime.sandbox.io` -> `comptime.sandbox.env`
+  (`env/comptime_refuses_chdir.lu`) and `comptime.sandbox.exec`
+  (`process/comptime_refuses_pipe.lu`), with their reason sentences. The
+  E0701 itself does not move (the row checks the code).
+- **Their conforms move to the new anchors** (91e0bbb said "until the
+  bump"): `os.proc.fds` (map_rows, close_fd_row), `os.proc.pipe`
+  (pipe_round_trip), `os.fs.chdir` (cwd_round_trip), `os.fs.isatty`
+  (is_terminal_rows). All registered at `89dc1394`, so `[conf.tag.valid]`
+  passes and the forward count does not move.
+- **Every s215 ledger word holds as written**, now on all THREE hosts
+  for the first time (CI only ever saw them red by construction):
+  `pipe_round_trip`, `map_rows`, `cwd_round_trip`, `is_terminal_rows`
+  run on lupin, wolfc and native; `close_fd_row` lupin `unsupported`
+  (a close is refused by name), compilers run; the three comptime rows
+  lupin `unsupported`, compilers run (E0701). On windows: `map_rows`
+  answers `invalid` twice (shape is refused before the host) and
+  `unsupported` for the well-formed map, which the row accepts;
+  `close_fd_row` likewise; `pipe_round_trip` and `cwd_round_trip` run.
+  **The risk I name:** `is_terminal_rows`' `stdin=false` on windows,
+  where the rig's standard input is `NUL`, a character device that the
+  C runtime's `_isatty` calls a terminal. Predicted `false` on all three
+  lanes (a console-mode test answers `false` for `NUL`); falsified by
+  `stdin=true` on any windows lane.
+
+### P5. #52 and #54
+
+- **#52**: `fs.stdin()`/`stdout()`/`stderr()`'s doc moves to `[os.fs.std]`
+  at 0.2.26 (the four byte calls serve 0..2; `close` stays `io`), and a
+  new row `fs/std_bytes_rows.lu` writes bytes to descriptor 1 through
+  `fs.write` and `fs.write_chunk` between two `print`s and reads
+  descriptor 0 (the rig's null device) to `eof`: run on lupin, wolfc and
+  native on all three hosts, output in program order.
+- **#54**: `map.has` answers from the index read (`m[k] else`) instead
+  of walking `m.pairs()`. New row `map/has_allocates_nothing.lu`: inside
+  `in r { … }` over a first-class region, `has` on a 200-entry
+  `Map[str, int]` (a hit and a miss) leaves `budget.charged(r) == 0`
+  (`[mem.region.account.1]`), and `has` on a `Map[str, List[int]]`
+  answers the same as before. Run on all three lanes and hosts. **The
+  planted break**: the old body (the `pairs()` walk) back in `has`
+  makes that row red on every lane on every CI host (charged > 0), in
+  the `std-test` step; reverted.
+- `get` has the same `pairs()` shape and is not in #54; it stays, and
+  the reason is written beside it if the index read cannot return a
+  non-`Copy` value on some lane.
+
+### P6. The head
+
+433 tests (423 + s215's 8 + 2): lupin `run` 371 / `unsupported` 62;
+wolfc `run` 379 / `unsupported` 53 / `fail(E1013)` 1; native `run` 423 /
+`unsupported` 9 / `fail(E1013)` 1. Observed 342 / 17 / 49 / 25 on linux
+and macOS (341 / 18 / 49 / 25 on windows); conservatism 126 (s215's
+four lupin `unsupported` rows); forward tags 826 plus the forward-
+namespace tags of the two new rows; host-scoped cells 1; divergent 0;
+mirror-lag 0. doc-examples 457 blocks GREEN (s215's three); fmt-lu 484
+files. Falsified by any other number.
