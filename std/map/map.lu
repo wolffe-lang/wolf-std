@@ -278,12 +278,8 @@ pub fn get_or[K: cmp.Eq, V](m: Map[K, V], k: K, d: V) -> V {
 /// map.has(m, "z") == false
 /// ```
 pub fn has[K: cmp.Eq, V](m: Map[K, V], k: K) -> bool {
-    for pair in m.pairs() {
-        if cmp.Eq.eq(pair.0, k) {
-            return true
-        }
-    }
-    false
+    let _v = m[k] else { return false }
+    true
 }
 
 /// Removes `k`'s entry and returns the value it was bound to; `none`
