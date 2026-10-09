@@ -20,8 +20,8 @@ fn main() -> !int {
     let p = term.pack(r)
     print("packed={p}")
     let back = term.unpack(p)
-    let same = back.canonical == r.canonical && back.echo == r.echo
-        && back.signals == r.signals && back.min == r.min && back.time == r.time
+    let flags = back.canonical == r.canonical && back.echo == r.echo && back.signals == r.signals
+    let same = flags && back.min == r.min && back.time == r.time
     print("round_trip={same}")
     print("raw_keeps_signals={r.signals}")
     let wild = term.Mode { canonical: true, echo: true, signals: true, min: 999, time: 999 }

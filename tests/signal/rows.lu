@@ -7,7 +7,7 @@
 //! wolf-lang s219 — `[conf.tag.valid]`, s199's precedent.)
 //!
 //! **s219: `std.signal`'s rows that change nothing, on every host.** The
-//! nine meanings are distinct bits (their OR is 511); a poll of an empty
+//! nine meanings are distinct bits (their sum is 511); a poll of an empty
 //! set is `io` and of a meaning never listened for is 0; `ignore` of an
 //! empty set and `reset` of a bit outside the meanings are `io` before
 //! anything changes. Ctrl-C itself is witnessed through a pseudo-terminal
@@ -16,9 +16,9 @@
 use std.signal
 
 fn main() -> !int {
-    let all = signal.reload() | signal.terminate() | signal.quit() | signal.upgrade()
-        | signal.interrupt() | signal.suspend() | signal.bg_read() | signal.bg_write()
-        | signal.child()
+    let v1 = signal.reload() + signal.terminate() + signal.quit() + signal.upgrade()
+    let tty = signal.interrupt() + signal.suspend() + signal.bg_read() + signal.bg_write()
+    let all = v1 + tty + signal.child()
     print("meanings={all}")
     print("interrupt={signal.interrupt()}")
     let pe = signal.poll(0) else |_| -1
