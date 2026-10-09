@@ -1,12 +1,22 @@
 # Changelog
 
-## Unreleased — s215: a child's descriptors, a pipe, the working directory, isatty
+## sc57 — 2026-10-09 — std at wolf 0.2.26 / lupin 0.1.49, with s215's wrappers
 
-**Needs the pin bump that carries wolf-lang s215 and its lupin mirror**
-(`os_spawn_fds`, `os_pipe`, `os_chdir`, `os_isatty`). Until then every
-test that uses `std.process`, `std.env` or `std.io` is E0301 on wolfc and
-native, because the compiler type-checks every body of a module a program
-uses.
+**The pin.** wolf 0.2.25 -> **0.2.26** and lupin 0.1.48 -> **0.1.49**,
+from the release archives by digest (`vendor/tools.toml`; linux x86-64
+`05acdc5e…` and `84911a35…`). lupin's pin key stays at wolf-lang v0.2.24
+(`294d626d`), now two releases behind. The data pin moves v0.2.25 ->
+v0.2.26 (`6710f9e` -> `89dc139`, +12 anchors, none removed). F-0143
+predicted it before the archives were unpacked; the measurements sit
+beside it.
+
+**Trunk's 423 tests: no word moved, no binary moved.** The ten new
+prelude names shadow nothing here (`never` is exempt). Built by 0.2.25
+and 0.2.26 with one runtime archive and stripped of debug info, 0 of 393
+native and 0 of 392 release binaries differ.
+
+**s215's std half lands here** (wolf-std#53, rebased from sc54's base;
+it needed the builtins this pin carries):
 
 - **`std.process`**: a `Command` carries a descriptor map, built with
   `set_stdin`, `set_stdout`, `set_stderr`, `set_fd(mut c, child, f)` and
@@ -23,6 +33,28 @@ uses.
 - Tests: `process/{pipe_round_trip,map_rows,close_fd_row,
   comptime_refuses_pipe}`, `env/{cwd_round_trip,comptime_refuses_chdir}`,
   `io/{is_terminal_rows,comptime_refuses_isatty}`.
+- **Ruling #54's categories**: `env.set_cwd` is `env` and `process.pipe`
+  is `exec` (the docs said `io`); `io.is_terminal` stays `io`. The two
+  comptime witnesses say so, and the rows conform to `os.proc.fds`,
+  `os.proc.pipe`, `os.fs.chdir` and `os.fs.isatty`.
+- **One windows cell.** `process/close_fd_row.lu` runs on lupin on
+  windows (`lupin-windows = "run"`): `[os.proc.fds]` refuses a map by host
+  before lupin refuses the close.
+
+**wolf-std#52.** `fs.stdin()`/`stdout()`/`stderr()` serve `read`,
+`read_chunk`, `write` and `write_chunk` from 0.2.26 (`[os.fs.std]`); the
+doc says so, and `fs/std_bytes_rows.lu` writes descriptor 1 between two
+`print`s and reads descriptor 0 to `eof`.
+
+**wolf-std#54.** `map.has` asks the index read and allocates nothing (it
+built a list of every entry per call). `map/has_allocates_nothing.lu`
+holds a region's ledger at zero; the old body reds it on wolfc and native.
+lupin does not charge `pairs()` to a region at all (wolf-interp#220).
+
+**A planted break, seen red.** The old `has` body back in place reds
+`std-test` on that row on ubuntu and macOS (run 37980674075, `ee69d30`,
+reverted in `fa88f48`).
+
 ## sc55 — 2026-10-07 — std at wolf 0.2.25 / lupin 0.1.48
 
 **The pin.** wolf 0.2.23 -> **0.2.25** and lupin 0.1.46 -> **0.1.48**,
