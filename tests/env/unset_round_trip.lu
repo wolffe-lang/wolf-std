@@ -1,0 +1,43 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.env, err.row, err.else, err.propagate
+//!
+//! `unset` beside `set` (wolf-lang s225, `[os.env.unset]`): a variable
+//! set then removed is `missing` to `get` and false to `has`; removing a
+//! variable that was never there succeeds; the names `set` refuses are
+//! `invalid` here too; and removing is not `set(name, "")` — an empty
+//! value is still a value. No ambient variable is needed, so the test
+//! answers the same on every machine, each over its own environment (the
+//! checked machine's and lupin's overlays, the native rung's real one).
+//!
+//! Red by construction until the pin carries wolf-lang s225 (E0301 on
+//! the compilers, `unsupported` on lupin).
+
+use std.env
+
+fn main() -> !int {
+    env.set("WOLF_STD_UNSET_A", "tarn")?
+    if !env.has("WOLF_STD_UNSET_A") { return 1 }
+    env.unset("WOLF_STD_UNSET_A")?
+    if env.has("WOLF_STD_UNSET_A") { return 2 }
+    if (env.get("WOLF_STD_UNSET_A") else "<absent>") != "<absent>" { return 3 }
+
+    // Absent already: the outcome holds, so it is not a row.
+    env.unset("WOLF_STD_UNSET_NEVER_SET")?
+
+    // An empty value is a value; removing is a different operation.
+    env.set("WOLF_STD_UNSET_EMPTY", "")?
+    if !env.has("WOLF_STD_UNSET_EMPTY") { return 4 }
+    env.unset("WOLF_STD_UNSET_EMPTY")?
+    if env.has("WOLF_STD_UNSET_EMPTY") { return 5 }
+
+    var refusals: int = 0
+    env.unset("") else |_| { refusals = refusals + 1 }
+    env.unset("WOLF=STD") else |_| { refusals = refusals + 1 }
+    if refusals != 2 { return 6 }
+
+    // A later set brings the name back.
+    env.set("WOLF_STD_UNSET_A", "again")?
+    if (env.get("WOLF_STD_UNSET_A") else "?") != "again" { return 7 }
+    0
+}

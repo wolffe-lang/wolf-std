@@ -765,6 +765,52 @@ pub fn is_success(exit_code: int) -> bool {
     exit_code == 0
 }
 
+/// Replace THIS program with the one `c` names — an exec, not a spawn.
+///
+/// The process stays (its id, its parent, its controlling terminal) and
+/// its program goes: the new one receives `c`'s whole argument vector
+/// (element 0 is both the program to find and the name it is handed),
+/// `env` as its ENTIRE environment — `NAME=VALUE` entries, the shape
+/// `std.env.vars()` answers, so `env.vars()` passed through keeps the
+/// current environment and an empty list starts from none — and `c`'s
+/// descriptor map (`set_fd`, `set_stdin`, …, `close_fd`) applied to this
+/// process's own descriptors. One difference from `start`: a descriptor
+/// the map does not name keeps what this process has, so an exec'd
+/// program reads this program's standard input (a child started with
+/// `start` reads the null device). Every file this program opened and
+/// did not map is closed by the exec.
+///
+/// A program name without a `/` is searched along the `PATH` entry of
+/// `env`, or `/usr/bin:/bin` when `env` has none — the new program's
+/// search path, decided from the call's own arguments, not from this
+/// process's environment.
+///
+/// **On success this function does not return.** A call that returns has
+/// failed, and its row says how: `invalid` for an empty vector, an `env`
+/// entry with no `=` or an empty name, or a map `start` would refuse;
+/// `unsupported` on a host with no exec (windows), by name; `io` for a map
+/// naming a closed file; `not_found` when no program is found; `denied`
+/// when the one found may not be run. A failed exec leaves this process as
+/// it was, its descriptors included.
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to `os_exec`
+/// (wolf-lang s225, `[os.proc.exec]`). lupin serves descriptors 0, 1 and
+/// 2 in the map and refuses any other by name, as it does for `start`.
+///
+/// ```wolf-doc-example
+/// var refused = false
+/// let none = process.from_argv(List[str]())
+/// process.exec(none, List[str]()) else |_| { refused = true }
+/// refused == true
+/// ```
+pub fn exec(c: Command, env: List[str]) -> () ! {unsupported, invalid, not_found, denied, io} {
+    var exe = ""
+    if c.argv.len > 0 {
+        exe = c.argv[0]
+    }
+    os_exec(exe, c.argv, env, c.fds)?
+}
+
 /// End THIS process immediately with `code`.
 ///
 /// Never returns — no `defer` runs, no buffer is flushed by std, and no

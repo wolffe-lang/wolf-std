@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### s225 — `std.env.unset` and `std.process.exec` (wolf-lang#534); needs the pin that carries wolf-lang s225
+
+- **`env.unset(name) -> () ! {invalid}`** removes a variable: `get` is
+  `missing` after it, `has` false, a child started later does not
+  receive it; absent is not an error; `set`'s names are `invalid`. It
+  leaves the module's "reviewed contracts, blocked" list, where it sat
+  because no builtin could remove a variable and `set(name, "")` is a
+  different operation.
+- **`process.exec(c, env) -> () ! {unsupported, invalid, not_found,
+  denied, io}`** replaces this program with `c`: its whole argv
+  (element 0 the program and its name), `env` as the new program's
+  entire environment (`env.vars()` keeps the current one), and `c`'s
+  descriptor map applied to this process — with one difference from
+  `start`, stated on the function: an unmapped 0, 1 and 2 stay this
+  process's own. On success it does not return.
+- Three tests (`env/unset_round_trip.lu`, `env/comptime_refuses_unset.lu`,
+  `process/exec_rows.lu`) with their ledger rows; red by construction at
+  the 0.2.26 pin (E0301 on the compilers, `unsupported` on lupin 0.1.49),
+  green under wolf-lang s225's head binaries and its lupin mirror.
+
 ## sc57 — 2026-10-09 — std at wolf 0.2.26 / lupin 0.1.49, with s215's wrappers
 
 **The pin.** wolf 0.2.25 -> **0.2.26** and lupin 0.1.48 -> **0.1.49**,
