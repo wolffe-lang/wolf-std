@@ -3919,3 +3919,22 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# s225 (wolf-lang#534): std.env.unset and std.process.exec. Red by
+# construction until the pin carries wolf-lang s225's builtins (E0301 on
+# the compilers, `unsupported` on lupin 0.1.49); lupin's mirror
+# (wolf-interp s225) serves env_unset and exec's rows.
+[tests."env/unset_round_trip.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."env/comptime_refuses_unset.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."process/exec_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
