@@ -148,15 +148,18 @@
 //! from the other direction. The `f64` half is a contract below and the
 //! reason is measured, not principled.
 //!
-//! **A duplicate key answers its FIRST occurrence at this tier, and the
-//! duplicates COUNT.** Measured at these pins (F-0088): `get` on
-//! `{"a": 1, "a": 2}` at `"a"` is `1` and `len` of that object is 2,
-//! where `std.json.parse` of the same text keeps the LAST occurrence
-//! and counts one member (a `Map` assignment, and the wider ecosystem's
-//! last-wins reading). Both readings are RFC 8259-legal and neither
-//! corpus witness pins one, so the seam is FILED for a ruling rather
-//! than absorbed here, and `tests/x/json/dom_typed_reads.lu` holds the
-//! measurement so a ruling flips a row instead of rotting a sentence.
+//! **A repeated key is last-wins, one member per key** (wolf-lang
+//! `[os.json.dup]`, ruling B22, wolf-lang#124; it retires F-0088). An
+//! object holds one member per name, at the position where the name
+//! first appears, with the value of its LAST occurrence: `get` on
+//! `{"a": 1, "a": 2}` at `"a"` is `2` and `len` of that object is 1,
+//! which is what `std.json.parse` (a `Map` assignment) answers for the
+//! same text, so the two read surfaces now agree. A path walks through
+//! the last container a repeated name holds, and `text_of` a nested
+//! object carries the name once; the root's text is the document's own,
+//! repeats included. The kernels answered FIRST-wins and counted every
+//! repeat through wolf 0.2.26 / lupin 0.1.49;
+//! `tests/x/json/dom_typed_reads.lu` holds the ruled reading.
 //!
 //! **Every read re-parses the document.** `get` on a ten-megabyte text is
 //! a ten-megabyte parse, and ten reads are ten parses. That is the
