@@ -1,0 +1,41 @@
+//! check: run(exit=0, stdout="empty argv: invalid\nbare entry: invalid\nempty name: invalid\nodd map: invalid\nstill here")
+//! phase: run
+//! conforms: std.process, err.row, err.else
+//!
+//! `exec`'s rows that replace nothing (wolf-lang s225, `[os.proc.exec]`).
+//! An exec that SUCCEEDS replaces the test, so this file holds the rows
+//! decided before any program is looked for — the call's SHAPE, which is
+//! `invalid` on every host, windows included (where a well-formed exec is
+//! `unsupported`): an empty vector, an environment entry with no `=`, one
+//! with an empty name, and a map `start` would refuse too. Each returns,
+//! so the program is still here at the end. The replacing witnesses are
+//! the toolchain's (`crates/wolf_driver/tests/exec_lanes.rs`, unix).
+//!
+//! Red by construction until the pin carries wolf-lang s225.
+
+use std.process
+
+fn row(c: process.Command, env: List[str]) -> str {
+    process.exec(c, env) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    "returned"
+}
+
+fn main() -> !int {
+    let ghost = "wolf-std-s225-no-such-program"
+    print("empty argv: {row(process.from_argv(List[str]()), ["A=1"])}")
+    print("bare entry: {row(process.command(ghost), ["A"])}")
+    print("empty name: {row(process.command(ghost), ["=1"])}")
+    var odd = process.command(ghost)
+    process.close_fd(mut odd, 300)
+    print("odd map: {row(odd, ["A=1"])}")
+    print("still here")
+    0
+}
