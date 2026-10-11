@@ -1,9 +1,6 @@
 //! check: run(exit=0, stdout="group=invalid\npid=io\nstatus=io\nkilled_by_2=2\nexit_is_0=0")
 //! phase: run
-//! conforms: std.process, os.proc, err.row
-//!
-//! (Conforms to `os.proc`: the pinned anchor registry has no
-//! `os.proc.job` until the pin bump carries wolf-lang s219.)
+//! conforms: std.process, os.proc.job, os.proc.status, err.row
 //!
 //! **s219: `start_job`'s and the status's rows that start nothing.** A
 //! group below -1 is `invalid` before the program is looked for, on every

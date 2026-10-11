@@ -1,6 +1,6 @@
 //! check: run(exit=0)
 //! phase: run
-//! conforms: std.env, err.row, err.else, err.propagate
+//! conforms: std.env, os.env.unset, err.row, err.else, err.propagate
 //!
 //! `unset` beside `set` (wolf-lang s225, `[os.env.unset]`): a variable
 //! set then removed is `missing` to `get` and false to `has`; removing a
@@ -9,9 +9,6 @@
 //! value is still a value. No ambient variable is needed, so the test
 //! answers the same on every machine, each over its own environment (the
 //! checked machine's and lupin's overlays, the native rung's real one).
-//!
-//! Red by construction until the pin carries wolf-lang s225 (E0301 on
-//! the compilers, `unsupported` on lupin).
 
 use std.env
 
