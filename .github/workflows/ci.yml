@@ -134,6 +134,16 @@ jobs:
           # `xtask/src/bins.rs` resolves (`.wolf-bin/`, then
           # `native_rt()` looking beside the driver), so it lands whole.
           tar -xzf "dl/$wa" -C .wolf-bin --strip-components=1
+          # sc58: since wolf 0.2.27 the archive carries `std/` (wolf-std at
+          # `std/STD-REV`) and the compiler reads it when nothing names a
+          # root. The rig stages THIS checkout's `std/` and passes
+          # `--std-root` on every invocation, so the bundled copy is never
+          # the subject here; it is removed so that no invocation can fall
+          # back to it and pass on a std this commit did not write.
+          if [ -d .wolf-bin/std ]; then
+            echo "archive std at $(cat .wolf-bin/std/STD-REV 2>/dev/null || echo '(no STD-REV)'): removed, the rig stages this checkout's std/"
+            rm -rf .wolf-bin/std
+          fi
           case "$lz" in
             tar.gz) tar -xzf "dl/$la" -C dl ;;
             # git-bash on the windows image does not ship `unzip`
@@ -511,6 +521,16 @@ jobs:
           # `xtask/src/bins.rs` resolves (`.wolf-bin/`, then
           # `native_rt()` looking beside the driver), so it lands whole.
           tar -xzf "dl/$wa" -C .wolf-bin --strip-components=1
+          # sc58: since wolf 0.2.27 the archive carries `std/` (wolf-std at
+          # `std/STD-REV`) and the compiler reads it when nothing names a
+          # root. The rig stages THIS checkout's `std/` and passes
+          # `--std-root` on every invocation, so the bundled copy is never
+          # the subject here; it is removed so that no invocation can fall
+          # back to it and pass on a std this commit did not write.
+          if [ -d .wolf-bin/std ]; then
+            echo "archive std at $(cat .wolf-bin/std/STD-REV 2>/dev/null || echo '(no STD-REV)'): removed, the rig stages this checkout's std/"
+            rm -rf .wolf-bin/std
+          fi
           case "$lz" in
             tar.gz) tar -xzf "dl/$la" -C dl ;;
             # git-bash on the windows image does not ship `unzip`
