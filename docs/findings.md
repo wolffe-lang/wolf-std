@@ -11388,3 +11388,183 @@ All on kasumi unless a CI run is named. Evidence under
   rows), conservatism 126, host-scoped cells 1 (2 after `df69739`),
   observed 342 / 17 / 49 / 25, doc-examples 457, fmt-lu 484, ulp 200,
   every step 0 SKIP lines (`std-test-g2-3230ebd.log` `082cdcc6…`).
+
+## F-0144 — sc58's predictions, before the archives
+
+Written at `610de43` (branch `sc58`, on trunk `87ba162`) before the wolf
+0.2.27 or lupin 0.1.50 archive was downloaded or unpacked by this lane
+anywhere. The bump is one release on each side; it carries four waiting
+PRs, rebased in the order #57 (s218), #60 (s225), #56 (s219), #59
+(s224). The baseline is the ledger at `87ba162` (433 rows: lupin `run`
+371 / `unsupported` 62; wolfc `run` 379 / `unsupported` 53 /
+`fail(E1013)` 1; native `run` 423 / `unsupported` 9 / `fail(E1013)` 1;
+two host-scoped cells) and sc57's last kasumi gauntlet at that sha
+(`~/lanes/sc57/evidence/std-test-g3b-87ba162.log`, GREEN: 433 tests,
+forward tags 829, conservatism 126, observed 342 / 17 / 49 / 25,
+doc-examples 457 blocks, fmt-lu 484 files, ulp 200). Measurements are
+appended below, never written over.
+
+### P1. The pin
+
+- `vendor/tools.toml`: `[wolf] version = "0.2.27"`, pin key
+  `0ddda6b7ab9f899aeeea13a66b3427f8422b8a0f` (the v0.2.27 tag);
+  `[lupin] version = "0.1.50"`, pin key
+  `294d626dd596122285d5df954762e3aee3e5db71` UNCHANGED (0.1.50's spec
+  pin is still v0.2.24, now three releases behind the compiler).
+  Predicted `--version` lines: `wolf 0.2.27 (wolfgang, pin 0ddda6b)`,
+  `paired with lupin 0.1.50 (reference interpreter), pin 294d626`, and
+  `lupin 0.1.50 (wolf-interp, reference interpreter at pin 294d626)`.
+  Falsified by any other string.
+- Archive digests as GitHub reports them: wolf 0.2.27 linux x86-64
+  `5e17eebe…`, linux aarch64 `c475e5dc…`, macOS aarch64 `ea461a76…`,
+  windows `ac784416…`; lupin 0.1.50 linux x86-64 `e2867a35…`, linux
+  aarch64 `a0c0c707…`, macOS aarch64 `2cbd192d…`, windows zip
+  `420e02c0…`. Falsified by a mismatch on arrival.
+- **The wolf archive has a new member, `std/`** (with `std/STD-REV`
+  naming `87ba16208da8ea642dd463fa89ff3a1ec80ceba1` and the two licence
+  files beside the tree); `diff -r` of the archive's `std/` against this
+  repository's `std/` at `87ba162` is empty apart from `STD-REV`. The
+  lupin archive has no `std/`. `_wolf` stays `a368c8ec…` (0.2.27 adds no
+  subcommand). `libwolf_rt.a` moves.
+- **The bundled std is never what this rig reads.** Every lane
+  invocation passes `--std-root <staged>/std` (runner, doc-examples,
+  ulp, selftest), which wins over the copy beside the binary. So with
+  the archive unpacked whole into `.wolf-bin/` (CI's layout) and with
+  `.wolf-bin/std` removed, the gates answer the same. CI removes
+  `.wolf-bin/std` after unpacking anyway, so that no tool can fall back
+  to a std this repository did not stage. Falsified by any verdict that
+  differs between the two layouts.
+- **The data pin moves**, `89dc1394` (v0.2.26) -> `0ddda6b7` (v0.2.27),
+  in its own commit: anchors 607 -> 623, **+16, 0 removed** (key sets
+  diffed both ways from wolf-lang's `spec/anchors.json` at the tag):
+  `abi.target.none.ambient`, `os.env.unset`, `os.fs.readdir`,
+  `os.fs.readlink`, `os.fs.stat`, `os.json`, `os.json.dup`,
+  `os.proc.exec`, `os.proc.job`, `os.proc.status`, `os.signal.disp`,
+  `os.signal.poll`, `os.term`, `os.term.mode`, `os.term.note`,
+  `type.wrap.div`, all in namespaces already in `REGISTERED_NS`.
+  Falsified if `sync-pin` or `[conf.tag.valid]` refuses anything.
+
+### P2. The pin alone (trunk's 433 tests): one row red, nothing else moves
+
+- **std-test is RED on exactly one test, on three lines**:
+  `tests/x/json/dom_typed_reads.lu` on `[lupin]`, `[wolfc]` and
+  `[native]`, each `expected exit(0), observed exit(33)` (row 33 holds
+  the first-wins reading; all four machines are last-wins at this pin).
+  The same three lines on linux, macOS and windows. Everything else as
+  at `87ba162`: 433 tests, forward tags 829, conservatism 126,
+  host-scoped cells 2, observed 341 / 17 / 49 / 26 (the one test falls
+  from three lanes to none). Falsified by a fourth line or a missing
+  one.
+- No other ledger word moves. The candidates and why not:
+  - **17 new prelude names** (W0304): no `.lu` file under `std/` or
+    `tests/` declares one (a grep for a `fn`, `let`, `var`, `const`,
+    `struct`, `enum` or `type` of each found none; the one mention is the
+    comment in `std/env/env.lu` that #60 retires).
+  - **s220** (unsigned 64-bit values print as themselves; `-x` on a
+    plain unsigned type traps): the crypto modules keep 64-bit words in
+    `wrapping[u64]` and print hex through their own digit tables, and
+    the vector rows compare bytes. No row prints a `u64` above
+    `i64::MAX` through interpolation. If one does, its stdout moves and
+    the row is a finding.
+  - **s225's checked child sees `env_set`**: no test starts a program
+    that reads a variable.
+  - **s222** (the root arena) and **s224's runtime rebuild**: layout,
+    not behaviour; `mem/budget/*` and `map/has_allocates_nothing` hold
+    region ledgers, not root-arena addresses, and stay as they are.
+  - **lupin 0.1.50**: the mirrors add names; the 62 `unsupported` rows
+    stay (none is waiting on a name 0.1.50 adds).
+- doc-examples 457 blocks GREEN (no example reads a repeated key);
+  fmt-lu 484 files, each a fixed point of `wolf fmt` at 0.2.27; ulp 200
+  rows exact; gen-vectors clean; lint-conventions 433.
+- **Release against native** (`wolf conform-run --json`, each test in
+  its own scratch directory, `--std-root` this repository's `std/`):
+  the two answer alike on 432 of 433; the one is
+  `list/sort_by_tier.lu`, refused by name on release and `exit(0)` on
+  native. `x/json/dom_typed_reads.lu` is `exit(33)` on both.
+
+### P3. #57 (s218): `std.fs` stat, lstat, answered, read_link, entries
+
+Nine commits, no conflict (the first PR onto the pin). 435 tests.
+
+- `fs/stat_record.lu` and `fs/entries_listing.lu`: `run` on lupin,
+  wolfc and native, on linux, macOS and windows, as their ledger rows
+  say. Release answers as native on both.
+- Their `conforms:` lines gain the clause tags the pin now publishes
+  (`os.fs.stat`; `os.fs.readdir`, `os.fs.readlink`), in a commit of this
+  lane's after the nine; the forward count is not moved by that.
+- Forward tags 829 -> 834; conservatism 126; observed 343 / 17 / 49 /
+  26 (still with the json row red); doc-examples 457 -> 462 (five new
+  blocks in `std/fs/fs.lu`); fmt-lu 486.
+- **The risks I name, both on windows:** `read_link` of a regular file
+  answering `io` rather than `invalid` (the host has no `EINVAL` for
+  "not a reparse point"), and `stat_record`'s `agrees` comparing
+  `modified_ms` from a path call against an open handle's. Predicted to
+  hold; falsified by a windows stdout mismatch on either row.
+
+### P4. #60 (s225): `std.env.unset`, `std.process.exec`
+
+Five commits. Conflicts: `CHANGELOG.md`'s top and `tests/ledger.toml`'s
+tail (both PRs append at the same place), kept both sides. 438 tests.
+
+- `env/unset_round_trip.lu` and `process/exec_rows.lu`: `run` on all
+  three lanes and hosts. `env/comptime_refuses_unset.lu`: lupin
+  `unsupported`, compilers `run` (E0701 at typecheck).
+- Forward tags 834 -> 844; conservatism 126 -> 127; observed 345 / 17 /
+  49 / 27; doc-examples 462 -> 464; fmt-lu 489.
+- **The risk I name:** `process/exec_rows.lu` on windows under lupin.
+  sc57's one miss was this shape (lupin answered the host's
+  `unsupported` before it looked at the call), and this row prints
+  `invalid` four times. Predicted `invalid` on every lane on windows;
+  falsified by an `unsupported` there.
+
+### P5. #56 (s219): `std.signal`, `std.term`, process jobs
+
+Nine commits. Conflicts: `CHANGELOG.md`, `tests/ledger.toml`, and
+`std/process/process.lu` (s225's `exec` and s219's job functions both
+append to it), kept both sides. 442 tests.
+
+- `signal/rows.lu`, `term/rows.lu`, `process/job_rows.lu`: `run` on all
+  three lanes and hosts (lupin refuses the terminal calls by name, and
+  `term/rows.lu` reaches only the pure half, which lupin resolves
+  lazily). `signal/comptime_refuses_poll.lu`: lupin `unsupported`,
+  compilers `run`.
+- Their `conforms:` lines gain `os.signal.disp` and `os.signal.poll`
+  (signal/rows), `os.term.mode` (term/rows), `os.proc.job` and
+  `os.proc.status` (process/job_rows), and s225's rows gain
+  `os.env.unset` and `os.proc.exec`.
+- Forward tags 844 -> 853; conservatism 127 -> 128; observed 348 / 17 /
+  49 / 28; doc-examples 464 (s219 adds no example block); fmt-lu 495
+  (two new modules, four tests).
+- **The risks I name, on windows:** `signal/rows.lu` prints
+  `ignore_empty=io` and `reset_outside=io`, and windows answers
+  `unsupported` to `ignore` and `reset`; the row holds only if the shape
+  is refused before the host on every lane. `process/job_rows.lu`
+  prints `group=invalid` for the same reason. `poll_none=0` needs a poll
+  of a never-listened meaning to be 0 there. Predicted to hold on all
+  three; falsified by a windows stdout mismatch, most likely on lupin.
+
+### P6. #59 (s224): the json row and the header
+
+Three commits, no conflict. 442 tests.
+
+- `tests/x/json/dom_typed_reads.lu` rows 33 and 34 hold `2` and `1`,
+  and **std-test goes GREEN** on every lane and host: the three red
+  lines of P2 are the only ones this branch ever shows.
+- `std/x/json/json.lu`'s header says last-wins. The other std text that
+  states the behaviour (`std/json/json.lu`: the module header and three
+  fn docs) already says last-wins for `std.json.parse`; it is made to
+  say that both read surfaces now agree. `docs/findings.md` F-0088 is
+  marked resolved.
+- **The planted break:** rows 33 and 34 put back to `1` and `2` at the
+  head makes `std-test` red on that one test on all three lanes on all
+  three CI hosts; reverted.
+
+### P7. The head
+
+442 tests: lupin `run` 378 / `unsupported` 64; wolfc `run` 388 /
+`unsupported` 53 / `fail(E1013)` 1; native `run` 432 / `unsupported` 9 /
+`fail(E1013)` 1. Observed 349 / 17 / 49 / 27; forward tags 853;
+conservatism 128; host-scoped cells 2; divergent 0; mirror-lag 0.
+doc-examples 464 blocks GREEN; fmt-lu 495 files; ulp 200; release
+equals native on 441 of 442 (`list/sort_by_tier.lu`). Falsified by any
+other number.
