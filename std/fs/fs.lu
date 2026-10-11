@@ -1566,6 +1566,334 @@ pub fn file_name(path: str) -> str ! {none} {
     rest
 }
 
+/// Set the permission bits of what is at `path` to exactly `mode`.
+///
+/// `[os.fs.mode]` (wolf-lang#346): `chmod`. `mode` is the twelve bits
+/// `Info.mode` reads — the nine permission bits with set-user-id,
+/// set-group-id and sticky — written in octal, `0o640`; the umask plays
+/// no part. A final symbolic link is FOLLOWED: the call changes what
+/// the link names, never the link.
+///
+/// Rows: `invalid` when `mode` is outside `0..=0o7777`, decided before
+/// the host is asked; `not_found` when nothing is at `path` (a dangling
+/// link included); `denied` when this process does not own the file;
+/// `unsupported` on a host with no permission bits (windows, by name);
+/// `io` otherwise. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_set_mode`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-set-mode.tmp", "x")?
+/// var row = "ok"
+/// fs.set_mode("doc-set-mode.tmp", 0o600) else |_| { row = "refused" }
+/// let info = fs.stat("doc-set-mode.tmp")?
+/// fs.remove("doc-set-mode.tmp")?
+/// (row == "ok" && info.mode == 0o600) || (row == "refused" && !fs.answered(info, 4))
+/// ```
+pub fn set_mode(path: str, mode: int) -> () ! {not_found, denied, invalid, unsupported, io} {
+    fs_set_mode(path, mode)?
+}
+
+/// Create a NEW file at `path` that only its owner can read or write,
+/// open for reading and writing.
+///
+/// `[os.fs.create.mode]` (wolf-lang#346, wolf-std#5): one exclusive
+/// create with mode `0o600`, so the file is never readable by anyone
+/// else, not even for the instant between a `create` and a `set_mode` —
+/// the shape a key, a token or a temporary file wants. It never reuses a
+/// file that is already there.
+///
+/// Rows: `exists` when anything is at `path`; `not_found` when the
+/// parent directory is missing; `denied` when the host refuses;
+/// `unsupported` on a host with no permission bits (windows, by name: a
+/// private file there is an access-control list, which this call does
+/// not pretend to write); `io` otherwise. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_open_perm`.
+///
+/// ```wolf-doc-example
+/// var made = true
+/// var f = fs.create_private("doc-create-private.tmp") else |_| {
+///     made = false
+///     fs.create("doc-create-private.tmp")?
+/// }
+/// fs.close(take f)?
+/// let info = fs.stat("doc-create-private.tmp")?
+/// fs.remove("doc-create-private.tmp")?
+/// !made || info.mode == 0o600
+/// ```
+pub fn create_private(path: str) -> File ! {exists, not_found, denied, unsupported, io} {
+    let fd = fs_open_perm(path, 4, 0o600) else |e| match e {
+        exists => { return exists },
+        not_found => { return not_found },
+        denied => { return denied },
+        unsupported => { return unsupported },
+        invalid => { return io },
+        io => { return io },
+    }
+    File { fd: fd }
+}
+
+/// `create`, with the permission bits the file gets if this call
+/// creates it: `mode` less the process's umask (`env.umask`).
+///
+/// `[os.fs.create.mode]`. An existing file is truncated and KEEPS its
+/// mode. `mode` is the nine permission bits; the three above them are
+/// set afterwards with `set_mode`, because the hosts disagree about
+/// them at a creation.
+///
+/// Rows: `invalid` when `mode` is outside `0..=0o777`; `not_found`,
+/// `denied`; `unsupported` on a host with no permission bits; `io`
+/// otherwise. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_open_perm`.
+///
+/// ```wolf-doc-example
+/// var refused = false
+/// var f = fs.create_with_mode("doc-create-mode.tmp", 0o1000) else |_| {
+///     refused = true
+///     fs.create("doc-create-mode.tmp")?
+/// }
+/// fs.close(take f)?
+/// fs.remove("doc-create-mode.tmp")?
+/// refused == true
+/// ```
+pub fn create_with_mode(path: str, mode: int) -> File ! {
+    not_found,
+    denied,
+    invalid,
+    unsupported,
+    io,
+} {
+    let fd = fs_open_perm(path, 1, mode) else |e| match e {
+        not_found => { return not_found },
+        denied => { return denied },
+        invalid => { return invalid },
+        unsupported => { return unsupported },
+        exists => { return io },
+        io => { return io },
+    }
+    File { fd: fd }
+}
+
+/// `create_dir`, with the directory's permission bits: `mode` less the
+/// process's umask.
+///
+/// `[os.fs.create.mode]`. One level, as `create_dir`; `mkdir -m` is this
+/// call and then `set_mode`, since `-m` is not subject to the umask.
+///
+/// Rows: `invalid` when `mode` is outside `0..=0o777`; `exists`,
+/// `not_found`, `denied`; `unsupported` on a host with no permission
+/// bits; `io` otherwise. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_create_dir_mode`.
+///
+/// ```wolf-doc-example
+/// var row = "ok"
+/// fs.create_dir_mode("doc-dir-mode.tmp", 0o1000) else |_| { row = "refused" }
+/// row == "refused" && !fs.exists("doc-dir-mode.tmp")
+/// ```
+pub fn create_dir_mode(path: str, mode: int) -> () ! {
+    exists,
+    not_found,
+    denied,
+    invalid,
+    unsupported,
+    io,
+} {
+    fs_create_dir_mode(path, mode)?
+}
+
+/// Make `path` a symbolic link whose target is `target`, stored
+/// verbatim.
+///
+/// `[os.fs.symlink]` (wolf-lang#698): `ln -s target path`. The target
+/// is not resolved, not checked and not made absolute — `read_link`
+/// reads the same bytes back — so a relative target means what the host
+/// makes it mean when the link is followed, and a link to nothing is
+/// made like any other.
+///
+/// Rows: `invalid` when `target` is empty; `exists` when anything is
+/// already at `path` (the call never replaces); `not_found` when the
+/// parent directory is missing; `denied`; `unsupported` on a host
+/// without unprivileged symbolic links (windows, by name); `io`
+/// otherwise. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_symlink`.
+///
+/// ```wolf-doc-example
+/// var row = "ok"
+/// fs.symlink("", "doc-symlink.tmp") else |_| { row = "refused" }
+/// row == "refused" && !fs.exists("doc-symlink.tmp")
+/// ```
+pub fn symlink(target: str, path: str) -> () ! {
+    exists,
+    not_found,
+    denied,
+    invalid,
+    unsupported,
+    io,
+} {
+    fs_symlink(target, path)?
+}
+
+/// Make `path` a second name of the file `existing` names.
+///
+/// `[os.fs.link]` (wolf-lang#699): `ln existing path`. One file under
+/// two names: bytes written through either are read through the other,
+/// and removing one name leaves the file under the other. A final
+/// symbolic link in `existing` is NOT followed — the new name is a
+/// second name of the link. The call never replaces, which makes it the
+/// atomic publish `move_file` is not: write a temporary, `link` it into
+/// place, and `exists` says someone was first.
+///
+/// Rows: `exists` when anything is at `path`; `not_found` when
+/// `existing` or `path`'s parent is missing; `cross_device` across two
+/// file systems (copy instead); `denied` for a directory, and wherever
+/// the host refuses; `io` otherwise. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_link`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-link-a.tmp", "wolves")?
+/// fs.link("doc-link-a.tmp", "doc-link-b.tmp")?
+/// fs.remove("doc-link-a.tmp")?
+/// let kept = fs.read_text("doc-link-b.tmp")?
+/// fs.remove("doc-link-b.tmp")?
+/// kept == "wolves"
+/// ```
+pub fn link(existing: str, path: str) -> () ! {exists, not_found, denied, cross_device, io} {
+    fs_link(existing, path)?
+}
+
+/// One time `set_times` writes: a moment, "now", or "leave it".
+///
+/// `[os.fs.times]`. `s` is whole seconds from the Unix epoch (negative
+/// before it) and `ns` nanoseconds in `0..999999999` — `Info`'s
+/// `mtime_s`/`mtime_ns`, so what `stat` read can be written back — or
+/// `ns` is one of the clause's two special values, which `time_now` and
+/// `time_keep` build so that no caller writes the numbers.
+pub struct Time {
+    s: int,
+    ns: int,
+}
+
+/// The moment `s` seconds and `ns` nanoseconds from the Unix epoch.
+///
+/// ```wolf-doc-example
+/// let t = fs.time(1577854800, 123456789)
+/// t.s == 1577854800 && t.ns == 123456789
+/// ```
+pub fn time(s: int, ns: int) -> Time {
+    Time { s: s, ns: ns }
+}
+
+/// "Now": the HOST's clock at the `set_times` call, not a clock this
+/// program read (`[os.fs.times]`'s `-1`).
+///
+/// ```wolf-doc-example
+/// fs.time_now().ns == 0 - 1
+/// ```
+pub fn time_now() -> Time {
+    Time { s: 0, ns: 0 - 1 }
+}
+
+/// "Leave this time as it is" (`[os.fs.times]`'s `-2`): how one time is
+/// set and the other kept, with no read in between.
+///
+/// ```wolf-doc-example
+/// fs.time_keep().ns == 0 - 2
+/// ```
+pub fn time_keep() -> Time {
+    Time { s: 0, ns: 0 - 2 }
+}
+
+/// Set the access time and the modification time of what is at `path`,
+/// following a final symbolic link.
+///
+/// `[os.fs.times]` (wolf-lang#700): one host call. Each of `atime` and
+/// `mtime` is a `time(s, ns)`, `time_now()` or `time_keep()`, so one
+/// call sets both, sets one and keeps the other, or stamps now —
+/// `touch`, `touch -a`, `touch -m`, and the last step of `cp -p`. A
+/// file system keeps the precision it has (windows 100 ns steps; some
+/// keep seconds): compare what `stat` reads back, not what was asked.
+///
+/// Rows: `invalid` when a `Time`'s `ns` is neither a count below one
+/// second nor one of the two special values; `not_found`; `denied`;
+/// `io` otherwise. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_set_times`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-set-times.tmp", "x")?
+/// fs.set_times("doc-set-times.tmp", fs.time_keep(), fs.time(1500000000, 0))?
+/// let info = fs.stat("doc-set-times.tmp")?
+/// fs.remove("doc-set-times.tmp")?
+/// info.mtime_s == 1500000000 && info.modified_ms == 1500000000000
+/// ```
+pub fn set_times(path: str, atime: Time, mtime: Time) -> () ! {not_found, denied, invalid, io} {
+    fs_set_times(path, atime.s, atime.ns, mtime.s, mtime.ns, true)?
+}
+
+/// `set_times` on `path` ITSELF: a final symbolic link's own times, its
+/// target's left alone (`touch -h`). On a path that is not a link it is
+/// `set_times`.
+///
+/// `[os.fs.times]`. Rows as `set_times`'s. lupin, which has no host
+/// call for a link's own times, declines a link here by name.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_set_times`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-link-times.tmp", "x")?
+/// fs.set_link_times("doc-link-times.tmp", fs.time_keep(), fs.time(1400000000, 0))?
+/// let info = fs.lstat("doc-link-times.tmp")?
+/// fs.remove("doc-link-times.tmp")?
+/// info.mtime_s == 1400000000
+/// ```
+pub fn set_link_times(path: str, atime: Time, mtime: Time) -> () ! {
+    not_found,
+    denied,
+    invalid,
+    io,
+} {
+    fs_set_times(path, atime.s, atime.ns, mtime.s, mtime.ns, false)?
+}
+
+/// Make the file behind `f` exactly `len` bytes long.
+///
+/// `[os.fs.truncate]` (wolf-lang#702): shorter, the tail gone; or
+/// longer, the new bytes zeros no write stored. The handle's position
+/// does NOT move, so a write after a truncation lands where the last
+/// one ended.
+///
+/// Rows: `invalid` when `len` is negative; `io` for every host refusal
+/// — a handle not open for writing, a directory, a pipe — and for a
+/// closed or forged handle. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_truncate`.
+///
+/// ```wolf-doc-example
+/// var f = fs.create("doc-truncate.tmp")?
+/// fs.write(mut f, "0123456789")?
+/// fs.truncate(mut f, 4)?
+/// fs.close(take f)?
+/// let size = fs.size("doc-truncate.tmp")?
+/// fs.remove("doc-truncate.tmp")?
+/// size == 4
+/// ```
+pub fn truncate(mut f: File, len: int) -> () ! {invalid, io} {
+    fs_truncate(f.fd, len)?
+}
+
 /// An append-mode descriptor for `path`, with the two tags mode 2 cannot
 /// reach coarsened to `io`.
 ///
