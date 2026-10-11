@@ -149,7 +149,8 @@
 //! reason is measured, not principled.
 //!
 //! **A repeated key is last-wins, one member per key** (wolf-lang
-//! `[os.json.dup]`, ruling B22, wolf-lang#124; it retires F-0088). An
+//! `[os.json.dup]`, rulings B22 and #61, wolf-lang#124; it retires
+//! F-0088). A JSON object is a map: `len` counts names, not occurrences. An
 //! object holds one member per name, at the position where the name
 //! first appears, with the value of its LAST occurrence: `get` on
 //! `{"a": 1, "a": 2}` at `"a"` is `2` and `len` of that object is 1,
@@ -300,6 +301,8 @@ pub fn type_name(doc: str, path: str) -> str ! {parse, missing} {
 }
 
 /// How many elements an array has, or members an object has, at `path`.
+/// A name an object repeats is one member (ruling #61: `len` counts
+/// names).
 ///
 /// Rows: `parse`, `missing`, and `kind` for a scalar — a number has no
 /// length, and answering 1 or 0 would be a guess about which question was
@@ -687,6 +690,7 @@ pub fn text_of(n: Node) -> str ! {parse, missing} {
 }
 
 /// How many elements an array node has, or members an object node has.
+/// A name an object repeats is one member (ruling #61).
 ///
 /// Rows: `kind` for a scalar — a number has no length, and answering 0
 /// or 1 would be a guess about which question was asked (`len`'s rule,

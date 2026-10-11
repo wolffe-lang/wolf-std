@@ -107,7 +107,12 @@
 //! assignment and not a policy this module implements; a document with
 //! duplicate keys is legal and its readings differ across libraries, so
 //! the rule is stated here and held as a test rather than left to be
-//! inferred from the container.
+//! inferred from the container. It is also the language's ruled reading
+//! (ruling #61, wolf-lang `[os.json.dup]`): a JSON object is a map, one
+//! member per name, at the position of its first appearance, holding its
+//! last value, and `len` counts names. `std.x.json`'s kernels read the
+//! same text the same way from wolf 0.2.27 / lupin 0.1.50 on; before
+//! that they answered the first occurrence and counted every repeat.
 
 use std.bytes
 use std.fmt
