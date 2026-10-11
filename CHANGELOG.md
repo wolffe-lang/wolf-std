@@ -1,30 +1,52 @@
 # Changelog
 
-## Unreleased — s219: std.signal, std.term, and jobs in std.process
+## sc58 — 2026-10-11 — std at wolf 0.2.27 / lupin 0.1.50, with stat, exec, signals and the terminal
 
-**Needs the pin bump that carries wolf-lang s219 and its lupin mirror**
-(eleven builtins, wolf-lang#622). On top of sc57, which landed s215's std half.
-Until then every test that uses `std.signal`, `std.term` or
-`std.process` is E0301 on wolfc and native.
+**The pin.** wolf 0.2.26 -> **0.2.27** and lupin 0.1.49 -> **0.1.50**,
+from the release archives by digest (`vendor/tools.toml`; linux x86-64
+`5e17eebe…` and `e2867a35…`). lupin's pin key stays at wolf-lang v0.2.24
+(`294d626d`), now three releases behind. The data pin moves v0.2.26 ->
+v0.2.27 (`89dc139` -> `0ddda6b`, +16 anchors, none removed). F-0144
+predicted it before the archives were unpacked; the measurements sit
+beside it.
 
-- **`std.signal`** (new): the nine meanings by name (`interrupt()` is
-  Ctrl-C), `listen`, `wait`, `poll` (never waits; 0 for none yet),
-  `ignore`, `reset` (the host default) and `raise`. No handler, ever: a
-  disposition is default, ignored or an event.
-- **`std.term`** (new): `Mode { canonical, echo, signals, min, time }`
-  with `pack`/`unpack`, `mode`, `set_mode` and `raw`; `foreground`,
-  `set_foreground` and `group` for job control.
-- **`std.process`**: `start_job(c, group, defaults)` and
-  `start_foreground(c, group, tty, defaults)` (a process group, the
-  terminal handed before the program runs, meanings set back to default
-  in the child), `pid`, `wait_status` (`-N` for a death by signal N) and
-  `killed_by`.
-- Tests: `signal/rows.lu`, `signal/comptime_refuses_poll.lu`,
-  `term/rows.lu`, `process/job_rows.lu`, with their ledger rows.
+**The archive ships a std, and this repository does not read it.** From
+0.2.27 the wolf archive carries wolf-std (`87ba162`, sc57) as `std/`
+beside the binary and the compiler reads it when nothing names a root.
+The rig stages this checkout's `std/` and passes `--std-root` on every
+invocation, so its answers are this tree's; CI removes the bundled copy
+after unpacking so nothing can fall back to it. The gates answer the
+same with the copy left in place.
 
-## Unreleased
+**Trunk's 433 tests at the pin: one row moved.**
+`x/json/dom_typed_reads.lu` exits 33 on lupin, wolfc and native: its
+rows 33 and 34 held the first-wins reading of a repeated json name, and
+every machine is last-wins from this pin on. s224's commits below flip
+the rows. Nothing else moved; release answers as native on 432 of the
+433 (`list/sort_by_tier.lu` is refused by name on release, as before).
 
-### s225 — `std.env.unset` and `std.process.exec` (wolf-lang#534); needs the pin that carries wolf-lang s225
+Four waiting changes land on the pin, each written against a
+development build of its compiler lane and green here on the published
+archives:
+
+**`std.fs`: the full stat record, `lstat`, `read_link`, `entries`**
+(wolf-std#57, wolf-lang s218, #625, #626).
+`std.fs` names wolf-lang s218's four builtins. **`fs.Info`** is the
+twenty-word record (kind with links, fifos, sockets and devices told
+apart; size; `modified_ms`; the `have` mask; mode, nlink, uid, gid,
+blocks, dev, ino, rdev; access, modification, change and birth times as
+seconds and nanoseconds); **`fs.stat(path)`** follows a final link and
+**`fs.lstat(path)`** answers the link itself; **`fs.answered(info,
+word)`** reads the mask, so a program tells a word the host refused
+(windows: mode, owner, identity, ctime) from a zero. **`fs.read_link`**
+answers a link's target as bytes (`invalid` on a non-link).
+**`fs.Entry`** and **`fs.entries(path)`** list a directory in the
+host's own order, each entry its own kind and its name's bytes, so a
+name that is not UTF-8 is listed rather than failing the listing.
+`fs.Stat` and `fs.read_dir` are unchanged.
+
+**`std.env.unset` and `std.process.exec`** (wolf-std#60, wolf-lang
+s225, #534).
 
 - **`env.unset(name) -> () ! {invalid}`** removes a variable: `get` is
   `missing` after it, `has` false, a child started later does not
@@ -39,28 +61,36 @@ Until then every test that uses `std.signal`, `std.term` or
   descriptor map applied to this process — with one difference from
   `start`, stated on the function: an unmapped 0, 1 and 2 stay this
   process's own. On success it does not return.
-- Three tests (`env/unset_round_trip.lu`, `env/comptime_refuses_unset.lu`,
-  `process/exec_rows.lu`) with their ledger rows; red by construction at
-  the 0.2.26 pin (E0301 on the compilers, `unsupported` on lupin 0.1.49),
-  green under wolf-lang s225's head binaries and its lupin mirror.
 
-## s218 — unreleased — std.fs: the full stat record, lstat, read_link, entries (wolf-lang#625, #626)
+**`std.signal`, `std.term`, and jobs in `std.process`** (wolf-std#56,
+wolf-lang s219, #622).
 
-`std.fs` names wolf-lang s218's four builtins. **`fs.Info`** is the
-twenty-word record (kind with links, fifos, sockets and devices told
-apart; size; `modified_ms`; the `have` mask; mode, nlink, uid, gid,
-blocks, dev, ino, rdev; access, modification, change and birth times as
-seconds and nanoseconds); **`fs.stat(path)`** follows a final link and
-**`fs.lstat(path)`** answers the link itself; **`fs.answered(info,
-word)`** reads the mask, so a program tells a word the host refused
-(windows: mode, owner, identity, ctime) from a zero. **`fs.read_link`**
-answers a link's target as bytes (`invalid` on a non-link).
-**`fs.Entry`** and **`fs.entries(path)`** list a directory in the
-host's own order, each entry its own kind and its name's bytes, so a
-name that is not UTF-8 is listed rather than failing the listing.
-`fs.Stat` and `fs.read_dir` are unchanged. Needs the wolf and lupin
-releases that carry s218: at the 0.2.26 / 0.1.49 pin every `std.fs`
-user is E0301 until the pin moves.
+- **`std.signal`** (new): the nine meanings by name (`interrupt()` is
+  Ctrl-C), `listen`, `wait`, `poll` (never waits; 0 for none yet),
+  `ignore`, `reset` (the host default) and `raise`. No handler, ever: a
+  disposition is default, ignored or an event.
+- **`std.term`** (new): `Mode { canonical, echo, signals, min, time }`
+  with `pack`/`unpack`, `mode`, `set_mode` and `raw`; `foreground`,
+  `set_foreground` and `group` for job control.
+- **`std.process`**: `start_job(c, group, defaults)` and
+  `start_foreground(c, group, tty, defaults)` (a process group, the
+  terminal handed before the program runs, meanings set back to default
+  in the child), `pid`, `wait_status` (`-N` for a death by signal N) and
+  `killed_by`.
+
+**`std.x.json` reads a repeated key last-wins** (wolf-std#59, wolf-lang
+s224, #124, ruling #61). A JSON object is a map: one member per name,
+at the position of its first appearance, holding its last value, and
+`len` counts names. `get` on `{"a": 1, "a": 2}` at `"a"` was `1` and
+is `2`; `len` of that object was 2 and is 1. `std.json.parse` always
+read it this way, so the two read surfaces now agree, and both module
+headers say so. F-0088 is resolved.
+
+**Tests.** Nine new rows: `fs/stat_record`, `fs/entries_listing`,
+`env/unset_round_trip`, `env/comptime_refuses_unset`,
+`process/exec_rows`, `signal/rows`, `signal/comptime_refuses_poll`,
+`term/rows`, `process/job_rows`. The seven that run conform to the
+clauses the data pin now publishes. 442 tests; doc-examples 464 blocks.
 
 ## sc57 — 2026-10-09 — std at wolf 0.2.26 / lupin 0.1.49, with s215's wrappers
 
