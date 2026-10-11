@@ -1,0 +1,54 @@
+//! check: run(exit=0, stdout="swapped: yes\nrestored: yes\ninvalid: invalid")
+//! phase: run
+//! conforms: std.env, err.row, err.propagate
+//!
+//! s230 (wolf-lang#704): `env.umask` sets the process's file mode
+//! creation mask and answers the one it replaced, so a read is two
+//! calls. The masks used keep every owner bit (0o027 and the one
+//! found), and the test puts back what it found. windows has no mask
+//! and answers `unsupported` by name; there the first two lines are
+//! true because nothing changed. A mask outside 0o777 is `invalid` on
+//! every host. lupin has no host call for the mask and declines the
+//! program by name (its ledger word).
+
+use std.env
+
+fn swap(mask: int) -> int {
+    let old = env.umask(mask) else |e| {
+        return match e {
+            unsupported => 0 - 1,
+            invalid => 0 - 2,
+        }
+    }
+    old
+}
+
+fn main() -> !int {
+    let first = swap(0o027)
+    var swapped = "no"
+    var restored = "no"
+    if first == 0 - 1 {
+        swapped = "yes"
+        restored = "yes"
+    } else {
+        let mine = swap(first)
+        if mine == 0o027 {
+            swapped = "yes"
+        }
+        if swap(first) == first {
+            restored = "yes"
+        }
+    }
+    print("swapped: {swapped}")
+    print("restored: {restored}")
+    var row = "ok"
+    env.umask(0o1000) else |e| {
+        row = match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+        0
+    }
+    print("invalid: {row}")
+    0
+}

@@ -1,0 +1,88 @@
+//! check: run(exit=0, stdout="set_mode: invalid\ncreate_with_mode: invalid\ncreate_dir_mode: invalid\nsymlink: invalid\nset_times: invalid\ntruncate: invalid\nmade nothing: yes")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate
+//!
+//! s230 (wolf-lang#346, #698, #700, #702): the SHAPE rows of `std.fs`'s
+//! calls that change a file, the same on every host. Each wrapper hands
+//! its arguments to the builtin, which judges them before it asks the
+//! host anything: a mode outside its bits, an empty link target, a
+//! `Time` whose nanoseconds are none of the three kinds, a negative
+//! length — each is `invalid`, on windows too (where the well-formed
+//! call would be `unsupported`), and nothing is created.
+
+use std.fs
+
+fn main() -> !int {
+    let p = "s230-rows-never-made.tmp"
+    var row = "ok"
+    fs.set_mode(p, 0o10000) else |e| {
+        row = match e {
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    print("set_mode: {row}")
+    row = "ok"
+    var f = fs.create_with_mode(p, 0o1000) else |e| {
+        row = match e {
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            unsupported => "unsupported",
+            io => "io",
+        }
+        fs.stdout()
+    }
+    print("create_with_mode: {row}")
+    row = "ok"
+    fs.create_dir_mode(p, 0o1000) else |e| {
+        row = match e {
+            invalid => "invalid",
+            exists => "exists",
+            not_found => "not_found",
+            denied => "denied",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    print("create_dir_mode: {row}")
+    row = "ok"
+    fs.symlink("", p) else |e| {
+        row = match e {
+            invalid => "invalid",
+            exists => "exists",
+            not_found => "not_found",
+            denied => "denied",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    print("symlink: {row}")
+    row = "ok"
+    fs.set_times(p, fs.time(0, 1000000000), fs.time_keep()) else |e| {
+        row = match e {
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    print("set_times: {row}")
+    row = "ok"
+    fs.truncate(mut f, 0 - 1) else |e| {
+        row = match e {
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    print("truncate: {row}")
+    var nothing = "no"
+    if !fs.exists(p) {
+        nothing = "yes"
+    }
+    print("made nothing: {nothing}")
+    0
+}
