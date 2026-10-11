@@ -3921,10 +3921,11 @@ wolfc = "run"
 native = "run"
 
 # s218 (wolf-lang#625, #626): std.fs stat, lstat, answered, read_link and
-# entries over the four s218 builtins. Every lane runs them once the pin
-# carries the builtins (the release after wolf 0.2.26 / lupin 0.1.49 at
-# the earliest); at the 0.2.26 / 0.1.49 pin they cannot resolve, so this
-# PR is red by construction until that bump, as s215's wolf-std#53 was.
+# entries over the four s218 builtins. At the 0.2.26 / 0.1.49 pin they
+# could not resolve. sc58's pin (wolf 0.2.27 / lupin 0.1.50) carries
+# them: every word below was observed as written on linux (kasumi) and
+# on CI's three hosts (run 38111886126) before this comment moved;
+# release answers as native on both rows (kasumi).
 [tests."fs/stat_record.lu"]
 lupin = "run"
 wolfc = "run"
@@ -3936,9 +3937,13 @@ wolfc = "run"
 native = "run"
 
 # s225 (wolf-lang#534): std.env.unset and std.process.exec. Red by
-# construction until the pin carries wolf-lang s225's builtins (E0301 on
-# the compilers, `unsupported` on lupin 0.1.49); lupin's mirror
-# (wolf-interp s225) serves env_unset and exec's rows.
+# construction until a pin carried wolf-lang s225's builtins (E0301 on
+# the compilers, `unsupported` on lupin 0.1.49). sc58's pin (wolf 0.2.27
+# / lupin 0.1.50) carries them and lupin's mirror: every word below was
+# observed as written on linux (kasumi) and on CI's three hosts (run
+# 38111886126) before this comment moved. On windows a well-formed exec
+# is `unsupported`, and exec_rows holds only shapes, which are `invalid`
+# there on all three lanes.
 [tests."env/unset_round_trip.lu"]
 lupin = "run"
 wolfc = "run"
@@ -3955,9 +3960,14 @@ wolfc = "run"
 native = "run"
 
 # s219 (wolf-lang#622): std.signal, std.term and process.start_job. Red by
-# construction until the pin carries wolf-lang s219's builtins (E0301 on
-# the compilers, `does not resolve` on lupin); lupin's mirror serves the
-# poll and the dispositions' shape rows, the job spawn, pid and status.
+# construction until a pin carried wolf-lang s219's builtins (E0301 on
+# the compilers, `does not resolve` on lupin). sc58's pin (wolf 0.2.27 /
+# lupin 0.1.50) carries them; lupin's mirror serves the poll and the
+# dispositions' shape rows, the job spawn, pid and status, and refuses
+# the terminal calls by name (term/rows reaches only the pure half).
+# Every word below was observed as written on linux (kasumi) and on CI's
+# three hosts (run 38111886126) before this comment moved: on windows
+# the shape rows are refused before the host on all three lanes.
 [tests."signal/rows.lu"]
 lupin = "run"
 wolfc = "run"
