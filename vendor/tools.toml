@@ -898,7 +898,30 @@
 # ITS CONFORMANCE PIN DOES NOT MOVE: still wolf-lang v0.2.24
 # (`294d626d`), so it is now TWO releases behind the compiler and the
 # data pin below (v0.2.26). The pin key below is unchanged on purpose.
-version = "0.1.49"
+# sc58 BUMP: 0.1.49 -> 0.1.50 (r32, released 2026-10-11), the lupin half
+# of wolf 0.2.27: the mirrors of s220 (a wrapping product past `i128`),
+# s219 (the signal poll and dispositions, the job spawn, pid and status;
+# the terminal calls are refused by name), s225 (`env_unset`, `os_exec`),
+# s224 (json: a repeated name is last-wins, one member per name), s218
+# (`fs_stat`, `fs_lstat`, `fs_read_link`, `fs_read_dir_entries`) and
+# s204 (a `std/` beside the binary is its last std root; this rig always
+# passes `--std-root`). Acquired by digest from the release, verified
+# from `--version`: `lupin 0.1.50 (wolf-interp, reference interpreter at
+# pin 294d626)`.
+# Archive `lupin-0.1.50-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `e2867a3515d4691f073f9ef30f4fe3e0fc6201f280bf24e87a42ce66562f1d93`
+# (the release's reported digest, matched on kasumi); the binary `lupin`
+# BY NAME, sha256
+# `3a476442322b50e033f90c4ed43841b334a85ced49d454ead74b149357a60f15`.
+# The other three archives, as GitHub reports them and as CI checks
+# them on arrival: aarch64-apple-darwin `2cbd192d…`,
+# aarch64-unknown-linux-gnu `a0c0c707…`, x86_64-pc-windows-msvc (a zip)
+# `420e02c0…`. The archive ships no `std/`.
+#
+# ITS CONFORMANCE PIN DOES NOT MOVE: still wolf-lang v0.2.24
+# (`294d626d`), now THREE releases behind the compiler and the data pin
+# below (v0.2.27). The pin key below is unchanged on purpose.
+version = "0.1.50"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -1210,7 +1233,40 @@ pin = "294d626dd596122285d5df954762e3aee3e5db71"
 #     `272e088815a2f79f845c8671c09fc0baf5021231fa0dad03116eb6d6e5faa83d`
 # (`_wolf`, the zsh completion script, is still `a368c8ec…`: 0.2.26
 # adds no subcommand.)
-version = "0.2.26"
+# sc58 BUMP: 0.2.26 -> 0.2.27 (r32, 2026-10-11): s218 (`fs_stat`,
+# `fs_lstat`, `fs_read_link`, `fs_read_dir_entries`: wolf-std#57 rides on
+# this bump), s225 (`env_unset`, `os_exec`: #60), s219 (the signal
+# dispositions and poll, `os_spawn_job`, pid and status, the terminal:
+# #56), s224 (a repeated json name is last-wins: #59 flips the one row
+# that held first-wins), s220 (unsigned 64-bit values print as
+# themselves), s221 (`ffi` at a C declaration; this repo declares none),
+# s222 (the root arena), s223 (freestanding only). Seventeen new prelude
+# names; no std or test declaration draws W0304. F-0144 predicted one
+# red test at trunk's rows (`x/json/dom_typed_reads.lu`, row 33) until
+# #59.
+#
+# **THE ARCHIVE NOW CARRIES `std/`** (s204): wolf-std `87ba162` beside
+# the binary, `std/STD-REV` naming it, and that copy is the compiler's
+# default std root. This rig never reads it: every lane invocation
+# passes `--std-root` at the tree it staged. CI unpacks the archive into
+# `.wolf-bin/` and then removes `.wolf-bin/std`, so no tool can fall
+# back to a std this repository did not stage.
+# Acquired by digest from the release, verified from `--version`: `wolf
+# 0.2.27 (wolfgang, pin 0ddda6b)`, pairing line `paired with lupin
+# 0.1.50 (reference interpreter), pin 294d626` — TRUE of this box's pair.
+# Archive `wolf-0.2.27-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `5e17eebed7ffbb3ee10bc669c653145903db7f591f250a096f791e4e6f377001`
+# (the release's reported digest, matched on kasumi). The other three:
+# aarch64-apple-darwin `ea461a76…`, aarch64-unknown-linux-gnu
+# `c475e5dc…`, x86_64-pc-windows-msvc `ac784416…`. `libwolf_rt.a`
+# `ab575b27…`, `libwolf_rt_none.a` `46544be6…` (nothing here links it).
+#
+# THE BINARY `wolf`, BY NAME (see sc51's note below for why):
+#   x86_64-unknown-linux-gnu
+#     `6f5713a2de457cc20ae078f692f65c599ddf38522af7b624a95648af4c0d1e16`
+# (`_wolf`, the zsh completion script, is still `a368c8ec…`: 0.2.27
+# adds no subcommand.)
+version = "0.2.27"
 # sc48 BUMP: a7f517e (v0.2.12) -> 30731a6 (v0.2.14), TWO releases —
 # s157/s158 (0.2.13, "the literals and the papercuts III") and s159/s160
 # (0.2.14, "the string runtime and the papercuts IV"). The data pin was
@@ -2762,4 +2818,5 @@ version = "0.2.26"
 # pin = "8e36bc1a0f92bbbbc6861b10d5b2638f76412d6a"  (superseded, sc53 era — the v0.2.22-tag pin)
 # pin = "8edac3eeb48632b32f02ef41ea87d484d1423492"  (superseded, sc54 era — the v0.2.23-tag pin)
 # pin = "6710f9e0cbc3a7264349093751ce7a46a407e473"  (superseded, sc55 era — the v0.2.25-tag pin)
-pin = "89dc139443da38078df6093568da87bc6d0ee6f9"
+# pin = "89dc139443da38078df6093568da87bc6d0ee6f9"  (superseded, sc57 era — the v0.2.26-tag pin)
+pin = "0ddda6b7ab9f899aeeea13a66b3427f8422b8a0f"
