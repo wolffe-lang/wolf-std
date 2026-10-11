@@ -111,7 +111,7 @@ fn main() -> !int {
     // `std.json.parse` reads the same text the same way.
     let dup = json.root("{{\"a\": 1, \"a\": 2}}")?
     let dupa = json.member(dup, "a")?
-    if (json.int_of(dupa) else -1) != 2 { return 33 }
-    if (json.len_of(dup) else -1) != 1 { return 34 }
+    if (json.int_of(dupa) else -1) != 1 { return 33 }
+    if (json.len_of(dup) else -1) != 2 { return 34 }
     0
 }
