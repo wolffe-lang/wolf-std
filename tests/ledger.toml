@@ -3987,3 +3987,31 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# s230 (wolf-lang#346, #698, #699, #700, #702, #704): std.fs set_mode,
+# create_private, create_with_mode, create_dir_mode, symlink, link, Time,
+# set_times, set_link_times and truncate, and std.env.umask. Red by
+# construction until a pin carries wolf-lang s230's builtins (E0301 on
+# the compilers, `does not resolve` on lupin). Every word below was
+# observed on linux against development builds of both lanes; lupin
+# serves the seven fs calls and declines `os_umask` by name on every
+# host (no host call for it without `unsafe`).
+[tests."fs/change_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."fs/link_truncate_times.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."fs/mode_symlink.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."env/umask_swap.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

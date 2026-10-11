@@ -1,0 +1,88 @@
+//! check: run(exit=0, stdout="set_mode: yes\ncreate_private: yes\ncreate_dir_mode: yes\nsymlink: yes")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate
+//!
+//! s230 (wolf-lang#346, #698): `fs.set_mode`, `fs.create_private`,
+//! `fs.create_dir_mode` and `fs.symlink` — each a host CAPABILITY, so
+//! each line is asserted on both sides: where the host serves the call
+//! its effect is read back through `fs.stat`/`fs.lstat` (the exact
+//! mode; a private file 0o600 that refuses to be created twice; a
+//! directory 0o700; a link that reads back its target and reads
+//! through), and where it answers `unsupported` (windows, by name)
+//! nothing was made and the record answers no mode either.
+
+use std.fs
+
+fn main() -> !int {
+    fs.write_text("s230-m.tmp", "12345")?
+    var served = true
+    fs.set_mode("s230-m.tmp", 0o640) else |_| { served = false }
+    let info = fs.stat("s230-m.tmp")?
+    var ok = "no"
+    if served && info.mode == 0o640 || !served && !fs.answered(info, 4) {
+        ok = "yes"
+    }
+    print("set_mode: {ok}")
+
+    served = true
+    var f = fs.create_private("s230-p.tmp") else |_| {
+        served = false
+        fs.stdout()
+    }
+    ok = "no"
+    if served {
+        fs.close(take f)?
+        let p = fs.stat("s230-p.tmp")?
+        var twice = "made"
+        var g = fs.create_private("s230-p.tmp") else |e| {
+            twice = match e {
+                exists => "exists",
+                not_found => "not_found",
+                denied => "denied",
+                unsupported => "unsupported",
+                io => "io",
+            }
+            fs.stdout()
+        }
+        if p.mode == 0o600 && twice == "exists" {
+            ok = "yes"
+        }
+        fs.remove("s230-p.tmp")?
+    } else if !fs.exists("s230-p.tmp") {
+        ok = "yes"
+    }
+    print("create_private: {ok}")
+
+    served = true
+    fs.create_dir_mode("s230-d.tmp", 0o700) else |_| { served = false }
+    ok = "no"
+    if served {
+        let d = fs.stat("s230-d.tmp")?
+        if d.mode == 0o700 && d.kind == 1 {
+            ok = "yes"
+        }
+        fs.remove_dir("s230-d.tmp")?
+    } else if !fs.exists("s230-d.tmp") {
+        ok = "yes"
+    }
+    print("create_dir_mode: {ok}")
+
+    served = true
+    fs.symlink("s230-m.tmp", "s230-l.tmp") else |_| { served = false }
+    ok = "no"
+    if served {
+        let own = fs.lstat("s230-l.tmp")?
+        let target = fs.read_link("s230-l.tmp")?
+        let through = fs.read_text("s230-l.tmp")?
+        let named = str_from_utf8(target) else "?"
+        if own.kind == 3 && named == "s230-m.tmp" && through == "12345" {
+            ok = "yes"
+        }
+        fs.remove("s230-l.tmp")?
+    } else if !fs.exists("s230-l.tmp") {
+        ok = "yes"
+    }
+    print("symlink: {ok}")
+    fs.remove("s230-m.tmp")?
+    0
+}

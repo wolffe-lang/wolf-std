@@ -1,0 +1,69 @@
+//! check: run(exit=0, stdout="second name reads: more wolves\nagain: exists\nafter remove: more wolves\ntruncated: 4\nmtime: 1500000000.7654300\natime kept: yes\nnow is now: yes\nmissing: not_found")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate
+//!
+//! s230 (wolf-lang#699, #702, #700): `fs.link`, `fs.truncate` and
+//! `fs.set_times`, on files the program makes, on every host. A hard
+//! link is a second name of one file and never replaces; a truncation
+//! sets the length; `set_times` sets one time, keeps the other
+//! (`time_keep`), and stamps the host's now (`time_now`) — read back
+//! through `fs.stat`. The nanoseconds are a multiple of 100 because
+//! windows keeps 100 ns steps.
+
+use std.fs
+use std.time
+
+fn main() -> !int {
+    fs.write_text("s230-a.tmp", "wolves")?
+    fs.link("s230-a.tmp", "s230-b.tmp")?
+    fs.write_text("s230-a.tmp", "more wolves")?
+    let via = fs.read_text("s230-b.tmp")?
+    print("second name reads: {via}")
+    var row = "ok"
+    fs.link("s230-a.tmp", "s230-b.tmp") else |e| {
+        row = match e {
+            exists => "exists",
+            not_found => "not_found",
+            denied => "denied",
+            cross_device => "cross_device",
+            io => "io",
+        }
+    }
+    print("again: {row}")
+    fs.remove("s230-a.tmp")?
+    let kept = fs.read_text("s230-b.tmp")?
+    print("after remove: {kept}")
+    var f = fs.open_append("s230-b.tmp")?
+    fs.truncate(mut f, 4)?
+    fs.close(take f)?
+    let size = fs.size("s230-b.tmp")?
+    print("truncated: {size}")
+    fs.set_times("s230-b.tmp", fs.time(1000000000, 0), fs.time(1500000000, 7654300))?
+    let first = fs.stat("s230-b.tmp")?
+    print("mtime: {first.mtime_s}.{first.mtime_ns}")
+    fs.set_times("s230-b.tmp", fs.time_keep(), fs.time_now())?
+    let second = fs.stat("s230-b.tmp")?
+    var kept_atime = "no"
+    if second.atime_s == 1000000000 {
+        kept_atime = "yes"
+    }
+    print("atime kept: {kept_atime}")
+    let clock = time.unix_ms() / 1000
+    var now = "no"
+    if second.mtime_s > clock - 120 && second.mtime_s < clock + 120 {
+        now = "yes"
+    }
+    print("now is now: {now}")
+    fs.remove("s230-b.tmp")?
+    row = "ok"
+    fs.set_times("s230-b.tmp", fs.time_keep(), fs.time_now()) else |e| {
+        row = match e {
+            not_found => "not_found",
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    print("missing: {row}")
+    0
+}
