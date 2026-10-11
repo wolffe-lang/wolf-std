@@ -11575,3 +11575,123 @@ conservatism 128; host-scoped cells 2; divergent 0; mirror-lag 0.
 doc-examples 464 blocks GREEN; fmt-lu 495 files; ulp 200; release
 equals native on 441 of 442 (`list/sort_by_tier.lu`). Falsified by any
 other number.
+
+### Measured (sc58, appended; nothing above is edited)
+
+On kasumi (linux x86-64) unless a CI run is named. Evidence under
+`~/lanes/sc58/evidence/` on kasumi; a log is named with the first eight
+digits of its sha256.
+
+- **P1 held, with one detail off.** The four archives arrived at their
+  reported digests (`acquire.log` `eb017fba…`): wolf 0.2.27 linux x86-64
+  `5e17eebe…`, lupin 0.1.50 `e2867a35…`; members `wolf` `6f5713a2…`,
+  `libwolf_rt.a` `ab575b27…`, `libwolf_rt_none.a` `46544be6…`, `lupin`
+  `3a476442…`; `_wolf` still `a368c8ec…`. The three `--version` strings
+  are the predicted ones, word for word. CI checked the macOS
+  (`ea461a76…`, `2cbd192d…`) and windows (`ac784416…`, `420e02c0…`)
+  archives on arrival in run 38111756948. The archive's `std/` is 55
+  files with `STD-REV` `87ba16208da8ea642dd463fa89ff3a1ec80ceba1`, and
+  `diff -rq` against this repository's `std/` at the pin commit names
+  three files only: `STD-REV`, `LICENSE` and `LICENSE-EXCEPTION`. **The
+  detail I had wrong:** the two licence files sit INSIDE `std/`, not
+  beside it. Data pin +16 / 0 removed, `sync-pin` "snapshot == submodule
+  at pin (registry AND clause)" at `0ddda6b`.
+- **The bundled std is not what the rig reads: held.** At `dc32e7a` (the
+  tree of the head but for comments and this file), `std-test` and
+  `doc-examples` with the archive's `std/` left in `.wolf-bin/`
+  (`std-test-keepstd-dc32e7a.log` `65fd2ba3…`) and with it removed and
+  the whole run under `taskset -c 0-3`
+  (`std-test-taskset-dc32e7a.log` `ddbaa848…`) are both GREEN, 442
+  tests, and their per-test and per-lane lines hash identically
+  (`1cb00d8c…` both). The bundled copy has no `std.signal` and no
+  `fs.stat`: had any lane read it, nine tests would have failed to
+  resolve.
+- **P2 held exactly, on every host.** g1 at `24fd464` (the pin, trunk's
+  tests): every step exit 0 but `std-test`, 0 SKIP lines;
+  `std-test-g1-24fd464.log` (`d2560fcf…`) RED on exactly the three
+  predicted lines (`tests/x/json/dom_typed_reads.lu` on `[lupin]`,
+  `[wolfc]`, `[native]`: `expected exit(0), observed exit(33)`), 433
+  tests, forward tags 829, conservatism 126, host-scoped cells 2,
+  observed 341 / 17 / 49 / 26; doc-examples 457 GREEN, fmt-lu 484, ulp
+  200, 91 cargo tests. CI run 38111756948 at `24fd464`: the three `rig`
+  jobs failed in `std-test` on the same three lines and nothing else
+  (ubuntu job 114388607731, macOS 114388607753, windows 114388607520),
+  the three `gates` jobs passed. Release against native
+  (`tiers-pin-24fd464.log` `bb14649e…`, table `ccea940a…`): 432 of 433
+  alike; `list/sort_by_tier.lu` is `exit(0)` on native and `unsupported`
+  on release ("a vtable slot `@at_most.fv` outside this object's
+  subset"); `x/json/dom_typed_reads.lu` is `exit(33)` on native, release
+  and checked. One number to watch, not a move: under five concurrent
+  gauntlets the slowest lupin row reached 52.9 s of the 60 s ceiling
+  (`x/crypto/p256/wycheproof_p256_p3.lu`); quiet it is 26 s.
+- **P3 held exactly; neither windows risk materialized.** The nine s218
+  commits applied with no conflict. At `ee8df83`
+  (`std-test-s57-ee8df83.log` `487dec37…`): 435 tests, the same three
+  red lines and no other, forward tags 834, conservatism 126, observed
+  343 / 17 / 49 / 26, doc-examples 462, fmt-lu 486.
+- **P4 held exactly.** The five s225 commits conflicted where predicted
+  (`tests/ledger.toml`'s tail in `417f8cb`'s pick, `CHANGELOG.md`'s top
+  in `11850cb`'s), both resolved by keeping both sides, checked by
+  subset against both parents. At `11850cb` (`std-test-s60-11850cb.log`
+  `72b4c8b1…`): 438 tests, the same three red lines, forward tags 844,
+  conservatism 127, observed 345 / 17 / 49 / 27, doc-examples 464,
+  fmt-lu 489.
+- **P5: the numbers held; one predicted conflict did not happen.** The
+  nine s219 commits conflicted in `tests/ledger.toml` (`e9ea62e`) and
+  `CHANGELOG.md` (`f67ee5d`); `std/process/process.lu`, where I
+  predicted a third, merged cleanly (s219's job functions sit after
+  `start_with`, s225's `exec` after `is_success`). At `d2db4e7`
+  (`std-test-s56-d2db4e7.log` `963eda1d…`): 442 tests, the same three
+  red lines, forward tags 853, conservatism 128, observed 348 / 17 / 49
+  / 28, doc-examples 464, fmt-lu 495.
+- **P6 held.** The three s224 commits applied with no conflict. At
+  `88b3da1` (`std-test-s59-88b3da1.log` `2240ad2a…`) std-test is GREEN:
+  442 tests, observed 349 / 17 / 49 / 27. Both read surfaces were probed
+  on the document `{"o": {"a": 1, "b": 2, "a": 3}}`
+  (`probe-json-dup.log` `c4f36086…`): on lupin and the checked machine
+  `std.json` and `std.x.json` both answer keys `[a, b]`, length 2, `a` =
+  3 and re-render the object as `{"a":3,"b":2}`; the root's text is the
+  document's own. The native and release machines refuse `std.json` by
+  name (its `Value` enum's spilled payload), as before, so the two
+  surfaces can be compared there only through `std.x.json`, which
+  `dom_typed_reads` does.
+- **P7 held on linux, macOS and windows.** CI run 38111886126 at
+  `30613cc` (the four PRs and the conforms commit): all six jobs
+  success; `std-test` GREEN on each host with 442 tests, forward tags
+  853, conservatism 128, host-scoped cells 2, observed 349 / 17 / 49 /
+  27 (ubuntu job 114388976784, macOS 114388976878, windows
+  114388976740). **Every windows risk I named held the other way:** all
+  nine new rows answered their ledger words there, the seven that run on
+  three lanes each, so `read_link` of a regular file is `invalid` on
+  windows, the signal and job shape rows are refused before the host on
+  lupin too, and `exec_rows` prints `invalid` four times. No host-scoped
+  cell was added. Release against native at `dc32e7a`
+  (`tiers-head-dc32e7a.log` `37d7327e…`, table `6ed4303c…`): 441 of 442
+  alike, the one `list/sort_by_tier.lu`; each of the seven new run rows
+  answers `exit(0)` with one stdout digest on native, release and
+  checked, and the two comptime rows are `fail(E0701)` on all three.
+- **The planted break went red where predicted, on every host.** With
+  rows 33 and 34 put back to `1` and `2` (`876a989`), CI run 38114818278
+  failed in `std-test` on all three `rig` jobs (ubuntu job 114397506330,
+  macOS 114397506352, windows 114397506205), each on exactly three
+  lines, `tests/x/json/dom_typed_reads.lu` on `[lupin]`, `[wolfc]` and
+  `[native]`: `expected exit(0), observed exit(33)`, with 442 tests
+  staged; its three `gates` jobs passed (they do not run `std-test`).
+  Reverted by `5944e28`, whose tree is `dc32e7a`'s.
+- **The head candidate.** g2 at `88c23ef` (everything but this
+  paragraph's commit): every one of the twelve steps exit 0, 0 SKIP
+  lines; `std-test-g2-88c23ef.log` (`7df67025…`) GREEN, 442 tests,
+  forward tags 853, conservatism 128, host-scoped cells 2, observed 349
+  / 17 / 49 / 27, lint-conventions 442, fmt-lu 495, doc-examples 464,
+  ulp 200, 91 cargo tests.
+- **wolf-lang#660 and #665**, the two soundness holes 0.2.27 shares with
+  0.2.26: neither shape is in this tree at the head. The only `in r {
+  … }` blocks are in `tests/map/has_allocates_nothing.lu` and
+  `tests/mem/budget/ledger_relations.lu`, and neither hands a
+  region-built string to a callee beside a `mut` argument; no `.send(`
+  and no channel type exists under `std/` or `tests/`.
+- **Not measured:** the release machine on macOS or windows (CI runs
+  lupin, checked and native); linux aarch64 at all; a live terminal, a
+  delivered signal, a real exec, a link, a non-UTF-8 name (no row here
+  reaches them; wolf-lang's `ctrl_c_lanes`, `exec_lanes` and
+  `fs_stat_lanes` do).
