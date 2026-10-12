@@ -67,6 +67,16 @@ what #62 left to this pin: `env/comptime_refuses_umask` and
 `fs/link_own_times`, which reaches lupin's second refusal. 449 tests;
 doc-examples 477 blocks.
 
+**Two windows answers, found by CI.** `fs/link_truncate_times` truncated
+an `fs.open_append` handle and exited 1 on every windows lane: a handle
+that may only append is one windows will not let set a length (inferred
+from `[os.fs.truncate]` and the doc example that passes there; the rig
+does not print the failing stdout). It now truncates a handle from
+`fs.create`, with the same output. Use a write handle with
+`fs.truncate` on windows. And on windows lupin runs
+`fs/link_own_times`: with no unprivileged link the row sets the file's
+own times, which lupin serves (the ledger's third host-scoped cell).
+
 ## sc58 — 2026-10-11 — std at wolf 0.2.27 / lupin 0.1.50, with stat, exec, signals and the terminal
 
 **The pin.** wolf 0.2.26 -> **0.2.27** and lupin 0.1.49 -> **0.1.50**,
