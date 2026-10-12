@@ -4050,7 +4050,16 @@ native = "run"
 # the same call there. Observed on kasumi: `run` on checked, native and
 # release with one stdout; lupin's record `unsupported`, naming
 # `fs_set_times(…, false)`.
+#
+# The ledger's third host-scoped cell. On windows the host makes no
+# unprivileged link, so the row sets the FILE's own times (the same call
+# there, [os.fs.times]) and lupin serves it: `run`, with the row's one
+# stdout. Not predicted (F-0145 P5 said `unsupported` on every host and
+# named this as the risk); observed on CI run 38212337440, rig
+# (windows-latest) job 114689092418. lupin's refusal by name is asserted
+# on linux and macOS.
 [tests."fs/link_own_times.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
