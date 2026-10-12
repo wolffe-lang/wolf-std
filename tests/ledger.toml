@@ -3567,7 +3567,16 @@ native = "run"
 
 [tests."mem/budget/breach_is_a_row.lu"]
 lupin = "run"
-wolfc = "unsupported"  # sc32: "structured concurrency in checked execution (C1 deferred)" @mem — the checked tier defers the whole task layer, and D68's containment IS a proc
+# sc59: the checked column moves `unsupported` -> `run`. Since wolf
+# 0.2.28 the checked machine runs tasks (s226, ruling #63; C1 retired),
+# so the proc that IS D68's containment executes there. The record (kasumi,
+# the published 0.2.28 archive, `conform-run --json --checked`, the pin
+# commit's tree): `exit(0)`, stdout `roomy true | breached true | reclaimed
+# true | zero_cap true`, sha256 `05c2dc7a…`, the same digest native and
+# release answer; std-test at the pin read it as the one row deeper than
+# the ledger (F-0145). sc32's word, kept as history: "structured
+# concurrency in checked execution (C1 deferred)" @mem.
+wolfc = "run"
 native = "run"
 
 [tests."mem/budget/negative_cap_trap.lu"]
