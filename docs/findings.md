@@ -11848,3 +11848,98 @@ tail; the move above is at line 3570; `std/fs/fs.lu` and
 - **The planted break:** the breach row's checked column put back to
   `unsupported` at the head makes `std-test` red on exactly that one
   line on all three CI hosts; reverted.
+
+### Measured (sc59, appended; nothing above is edited)
+
+On kasumi (linux x86-64) unless hasu or a CI run is named. Evidence
+under `~/lanes/sc59/evidence/` on kasumi and hasu; a log is named with
+the first eight digits of its sha256.
+
+- **P1 held, every word.** All eight archives arrived at their
+  reported digests, each read twice (`acquire.log` `358f5937…`): wolf
+  0.2.28 linux x86-64 `3215f321…`, aarch64 `f2697a69…`, macOS
+  `656ab553…`, windows `bb9e2f5f…`; lupin 0.1.51 `d8f62dd1…`,
+  `e29d02bf…`, `2b11a7d1…`, `06ccce94…`. Members: `wolf` `39644daa…`,
+  `libwolf_rt.a` `d856cb81…`, `libwolf_rt_none.a` `362c112f…`, `lupin`
+  `583c573b…`, `_wolf` still `a368c8ec…`. The three `--version` strings
+  are the predicted ones; `GLIBC_2.34`. The archive's `std/` is 57 files
+  (53 `.lu`), `STD-REV` `98e1b7bcac3a…`, and `diff -rq` against `std/`
+  at `98e1b7b` names exactly `STD-REV`, `LICENSE` and
+  `LICENSE-EXCEPTION`. Data pin +11 / 0 removed (the eleven named),
+  `sync-pin` "snapshot == submodule at pin (registry AND clause)", 13
+  registered and 15 reserved namespaces as before. CI checked the macOS
+  and windows pairs on arrival in every run below.
+- **P2 held exactly.** g1 at `31994b1` (the pin, trunk's tests): every
+  step exit 0 but `std-test`, 0 SKIP lines; `std-test-g1-31994b1.log`
+  (`71086290…`) RED on exactly the predicted line,
+  `tests/mem/budget/breach_is_a_row.lu [wolfc]: ledger says
+  unsupported, observed run`; 442 tests, forward tags 853, conservatism
+  127, host-scoped cells 2, observed 350 / 16 / 49 / 27; doc-examples
+  464 GREEN, fmt-lu 495, ulp 200, lint-conventions 442, 91 cargo tests.
+  Release against native (`tiers/pin/table.txt` `51e465c8…`): 441 of
+  442 alike, the one `list/sort_by_tier.lu`.
+- **P3 held.** The checked record (`conform-run --json --checked`, the
+  pin's tree): `exit(0)`, stdout `roomy true | breached true | reclaimed
+  true | zero_cap true`, `05c2dc7a…`, the digest native and release
+  answer. Moved in `c2d6b96`.
+- **P4 held on linux and macOS; one windows risk materialized, in a
+  row I did not name.** #62's four commits applied with no conflict
+  (authorship kept; the empty notes commit kept with `--allow-empty`).
+  On kasumi all four rows answer as predicted on lupin, checked, native
+  and release (`probe1.log`); lupin's `env/umask_swap` record is
+  `unsupported` naming `os_umask` ("the standard library has none and
+  this machine has no `unsafe` to make one"). **Windows**, CI run
+  38212337440 (rig windows-latest, job 114689092418):
+  `fs/link_truncate_times.lu` exited 1 on lupin, wolfc and native. The
+  rig does not print a failing exit's stdout, so the line is INFERRED,
+  not read: the row truncated an `fs.open_append` handle, wolf-lang's
+  own witness (`corpus/fs/truncate.lu`) truncates a read-write handle,
+  `std.fs.truncate`'s doc example truncates an `fs.create` handle and
+  passed on windows in the same run's `gates` job, and
+  `[os.fs.truncate]` says windows answers access denied for a handle not
+  open for writing. The row now writes its text back through `fs.create`
+  and truncates that (`c0db559`); its stdout is unchanged, and it is
+  green on windows on all three lanes (run 38221365650). The three
+  named risks did not materialize.
+- **P5 held but for one cell.** The comptime rows are `fail(E0701)` on
+  checked, native and release; lupin's record names its comptime
+  refusal. `fs/link_own_times.lu` runs on the three compiler machines
+  with one stdout, and lupin's record is `unsupported` naming
+  `fs_set_times("sc59-l.tmp", …, false)` ("a link cannot be opened as
+  itself, and this machine has no `unsafe` for the host call"): the
+  second named refusal, asserted on linux (kasumi, hasu) and macOS (CI).
+  **Two things I did not predict.** (1) The rig runs every lane in one
+  staged directory, and lupin's refusal ends its run after the link is
+  made; the next lane found the dangling link and printed `missing: ok`
+  (kasumi g2 at `5dedda0`, `std-test-g2-5dedda0.log`). The row clears
+  both names first (`5708bee`). (2) On windows lupin RUNS the row (no
+  unprivileged link, so the call lands on the file itself, which lupin
+  serves): the risk I named, the other way round. Ledgered as the third
+  host-scoped cell, `lupin-windows = "run"` (`0618b26`).
+- **The head.** At `0618b26`, hasu (quiet, load 1.6): std-test GREEN
+  (`std-test-hasu-tree-b064c04.log` `6b3ec212…`), 449 tests, forward
+  tags 874, conservatism 131, host-scoped cells 3 (P5 said 2),
+  observed 353 / 18 / 49 / 29; doc-examples 477 GREEN; kasumi at the
+  same sha: ledger-check 449, lint-conventions 449, fmt-lu 502,
+  gen-vectors clean, sync-pin OK. Release against native at `5dedda0`
+  (`tiers/head/table.txt` `27d59546…`): 448 of 449, the one
+  `list/sort_by_tier.lu`. CI run 38221365650 at `0618b26`: all six jobs
+  success; std-test GREEN with 449 tests on ubuntu, macOS and windows
+  (conservatism 131, 131, 130: windows' lupin runs `link_own_times`);
+  doc-examples 477 GREEN on all three.
+- **kasumi's own full gauntlets were red on time, not on answers.** g2
+  (`5dedda0`) and g3 (`0c8ab20`) ran at load 12 to 18 from other lanes:
+  two and ten lupin crypto and tls rows hit the 60 s ceiling (their
+  quiet times are 25 to 33 s), and nothing else was red but the row
+  fixed above. `0c8ab20`'s tree (`e94e9d1`) on hasu was GREEN
+  (`std-test-hasu-tree-e94e9d1.log` `a49ad8b7…`), 449 tests, 0 SKIP.
+- **The planted break went red where predicted on linux and macOS.**
+  With the breach row's checked column put back to `unsupported`
+  (`3e0bef7`, run at `5708bee`), CI run 38212337440 failed in std-test on
+  ubuntu (job 114689092433) and macOS (114689092394) on exactly that one
+  line; windows (114689092418) showed it beside the two windows findings
+  above. The `gates` jobs passed. Reverted by `0c8ab20`.
+- **Not measured:** linux aarch64 at all (archives digest-checked only);
+  the release machine on macOS or windows; the windows stdout of the
+  failing truncate (inferred, above); a umask's effect on a creation in
+  this repository's rows (wolf-lang's `fs_change_lanes` does it).
