@@ -8,7 +8,12 @@
 //! sets the length; `set_times` sets one time, keeps the other
 //! (`time_keep`), and stamps the host's now (`time_now`) — read back
 //! through `fs.stat`. The nanoseconds are a multiple of 100 because
-//! windows keeps 100 ns steps.
+//! windows keeps 100 ns steps. The truncation is on a handle opened for
+//! writing (`fs.create`, the text written back): an append handle
+//! (`fs.open_append`) truncated on linux and exited 1 on every windows
+//! lane (sc59, CI run 38212337440), as `[os.fs.truncate]`'s windows
+//! posture reads — a handle that may only append is not one the host
+//! lets set a length.
 
 use std.fs
 use std.time
@@ -33,7 +38,8 @@ fn main() -> !int {
     fs.remove("s230-a.tmp")?
     let kept = fs.read_text("s230-b.tmp")?
     print("after remove: {kept}")
-    var f = fs.open_append("s230-b.tmp")?
+    var f = fs.create("s230-b.tmp")?
+    fs.write(mut f, kept)?
     fs.truncate(mut f, 4)?
     fs.close(take f)?
     let size = fs.size("s230-b.tmp")?
