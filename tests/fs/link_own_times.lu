@@ -1,0 +1,49 @@
+//! check: run(exit=0, stdout="own mtime: 1400000000\ntarget: yes\nmissing: not_found")
+//! phase: run
+//! conforms: std.fs, err.row, err.propagate, os.fs.times, os.fs.symlink
+//!
+//! s230 (wolf-lang#700): `fs.set_link_times` sets a symbolic link's OWN
+//! times (`follow` false, `touch -h`), read back through `fs.lstat`,
+//! and leaves the file it names alone, read back through `fs.stat`.
+//! Where the host makes no unprivileged link (windows, `unsupported` by
+//! name) the same call is made on the file itself, where the two are
+//! one call ([os.fs.times]), and the file takes the time. A missing
+//! path is `not_found`. lupin declines a link's own times by name
+//! (ruling #67 R10): this row is that refusal's witness here.
+
+use std.fs
+
+fn main() -> !int {
+    fs.write_text("sc59-t.tmp", "wolves")?
+    fs.set_times("sc59-t.tmp", fs.time(1000000000, 0), fs.time(1000000000, 0))?
+    var name = "sc59-l.tmp"
+    var linked = true
+    fs.symlink("sc59-t.tmp", name) else |_| { linked = false }
+    if !linked {
+        name = "sc59-t.tmp"
+    }
+    fs.set_link_times(name, fs.time_keep(), fs.time(1400000000, 0))?
+    let own = fs.lstat(name)?
+    print("own mtime: {own.mtime_s}")
+    let target = fs.stat("sc59-t.tmp")?
+    var ok = "no"
+    if linked && target.mtime_s == 1000000000 || !linked && target.mtime_s == 1400000000 {
+        ok = "yes"
+    }
+    print("target: {ok}")
+    if linked {
+        fs.remove(name)?
+    }
+    fs.remove("sc59-t.tmp")?
+    var row = "ok"
+    fs.set_link_times("sc59-l.tmp", fs.time_keep(), fs.time_now()) else |e| {
+        row = match e {
+            not_found => "not_found",
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    print("missing: {row}")
+    0
+}

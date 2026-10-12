@@ -4040,3 +4040,17 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# sc59: lupin's SECOND named refusal reached by a row. lupin 0.1.51
+# serves `fs_set_times` with `follow` true and refuses it with `follow`
+# false (a link's own times; ruling #67 R10), as it refuses `os_umask`
+# (`env/umask_swap.lu` above). This row sets a link's own mtime through
+# `fs.set_link_times` and reads it back with `fs.lstat`; where the host
+# makes no unprivileged link (windows) it sets the file's own, which is
+# the same call there. Observed on kasumi: `run` on checked, native and
+# release with one stdout; lupin's record `unsupported`, naming
+# `fs_set_times(…, false)`.
+[tests."fs/link_own_times.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
