@@ -4024,3 +4024,19 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# sc59: the comptime witnesses #62 left to the lane that bumps the pin.
+# D33 one level down at the builtin, as `env/comptime_refuses_unset.lu`
+# is: `os_umask` (the `env` reason, with `env_set`, `env_unset` and
+# `os_chdir`) and `fs_set_mode` (the filesystem's). Each is
+# `fail(E0701)` on the checked, native and release machines (kasumi,
+# wolf 0.2.28); lupin has no comptime tier and says so by name.
+[tests."env/comptime_refuses_umask.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_set_mode.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

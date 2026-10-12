@@ -1,0 +1,23 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.env, comptime.sandbox, comptime.sandbox.env, os.fs.umask
+//!
+//! **D33 for `env.umask` (wolf-lang s230), held one level down at
+//! `os_umask`**: the mask is the COMPILER's process state once a compile
+//! runs it, and every file the compiler then writes would carry it — the
+//! sandbox table's `env` reason, with `env_set`, `env_unset` and
+//! `os_chdir`. The row is handled locally (F-0069) and the facade is
+//! called at run time to keep the import used.
+
+use std.env
+
+comptime fn probe() -> int {
+    os_umask(0o022) else |_| 0
+}
+
+fn main() -> !int {
+    const Z = probe()
+    let key = env.entry_key("A=B")
+    print("key: {key} z: {Z}")
+    0
+}

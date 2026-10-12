@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.mode
+//!
+//! **D33 for `fs.set_mode` (wolf-lang s230), held one level down at
+//! `fs_set_mode`**: a compile may not change a file's mode, any more than
+//! it may read or write the file. The row is handled locally (F-0069)
+//! and a pure `std.fs` helper runs at run time to keep the import used.
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_set_mode("sc59-never-made.tmp", 0o600) else |_| {}
+    0
+}
+
+fn main() -> !int {
+    const Z = probe()
+    let p = fs.join("a", "b")
+    print("p: {p} z: {Z}")
+    0
+}
