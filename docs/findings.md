@@ -11695,3 +11695,156 @@ digits of its sha256.
   delivered signal, a real exec, a link, a non-UTF-8 name (no row here
   reaches them; wolf-lang's `ctrl_c_lanes`, `exec_lanes` and
   `fs_stat_lanes` do).
+
+## F-0145 — sc59's predictions, before the archives
+
+Written on branch `sc59` (on trunk `98e1b7b`) before the wolf 0.2.28 or
+lupin 0.1.51 archive was downloaded or unpacked by this lane anywhere.
+The bump is one release on each side; it carries #62 (s230's std half,
+branch `s230`, head `4f3bbe0`, four commits) and moves one ledger row
+that 0.2.28's CHANGELOG names. The baseline is the ledger at `98e1b7b`
+(442 rows: lupin `run` 378 / `unsupported` 64; wolfc `run` 388 /
+`unsupported` 53 / `fail(E1013)` 1; native `run` 432 / `unsupported` 9
+/ `fail(E1013)` 1; two host-scoped cells, counted on kasumi from the
+file) and sc58's measured head (F-0144: 442 tests, forward tags 853,
+conservatism 128, host-scoped cells 2, observed 349 / 17 / 49 / 27 by
+lanes 3 / 2 / 1 / 0, doc-examples 464, fmt-lu 495, ulp 200). r33
+measured this tree under 0.2.28 release candidates and the published
+lupin 0.1.51 (wolf `sprints/release/r33-evidence.md`): one red row,
+`mem/budget/breach_is_a_row.lu [wolfc]`. Measurements are appended
+below, never written over.
+
+### P1. The pin
+
+- `vendor/tools.toml`: `[wolf] version = "0.2.28"`, pin key
+  `f71ece8e1ad2234940040d300359888932ad67af` (the v0.2.28 tag);
+  `[lupin] version = "0.1.51"`, pin key
+  `294d626dd596122285d5df954762e3aee3e5db71` UNCHANGED (0.1.51's spec
+  pin is still v0.2.24, now four releases behind). Predicted
+  `--version` lines: `wolf 0.2.28 (wolfgang, pin f71ece8)`, `paired
+  with lupin 0.1.51 (reference interpreter), pin 294d626`, and `lupin
+  0.1.51 (wolf-interp, reference interpreter at pin 294d626)`.
+  Falsified by any other string.
+- Archive digests as GitHub reports them: wolf 0.2.28 linux x86-64
+  `3215f321…`, linux aarch64 `f2697a69…`, macOS aarch64 `656ab553…`,
+  windows `bb9e2f5f…`; lupin 0.1.51 linux x86-64 `d8f62dd1…`, linux
+  aarch64 `e29d02bf…`, macOS aarch64 `2b11a7d1…`, windows zip
+  `06ccce94…`. Falsified by a mismatch on arrival.
+- The wolf archive's `std/` carries `STD-REV`
+  `98e1b7bcac3a6167fba18a4d37adcf9e8a76e704`, which is THIS branch's
+  base, so `diff -rq` of the archive's `std/` against `std/` at the pin
+  commit names exactly `STD-REV`, `LICENSE` and `LICENSE-EXCEPTION`.
+  CI already removes `.wolf-bin/std` (sc58); no workflow change is
+  needed. `_wolf` stays `a368c8ec…` (0.2.28 adds no subcommand).
+  `libwolf_rt.a` moves (s228, s230). The lupin archive has no `std/`.
+- **The data pin moves**, `0ddda6b7` (v0.2.27) -> `f71ece8e` (v0.2.28),
+  in its own commit: anchors 623 -> 634, **+11, 0 removed** (key sets
+  diffed both ways from wolf-lang's `spec/anchors.json` at the two
+  tags): `exec.checked.race`, `exec.checked.sched`,
+  `exec.checked.task`, `os.fs.change.note`, `os.fs.create.mode`,
+  `os.fs.link`, `os.fs.mode`, `os.fs.symlink`, `os.fs.times`,
+  `os.fs.truncate`, `os.fs.umask`; the vendored clause
+  `05-conformance.md` moves (s226's `[exec.checked.*]` text) with its
+  namespace lists unchanged. Falsified if `sync-pin`, the namespace
+  test or `[conf.tag.valid]` refuses anything.
+
+### P2. The pin alone (trunk's 442 tests): one row red, nothing else moves
+
+- **std-test is RED on exactly one line**: `tests/mem/budget/
+  breach_is_a_row.lu [wolfc]: ledger says unsupported, observed run`
+  (deeper than the ledger claims). The checked machine runs tasks since
+  s226 (ruling #63), and this row's containment is a `spawn proc`. The
+  same one line on linux, macOS and windows in CI. Everything else as at
+  `98e1b7b`: 442 tests, forward tags 853, **conservatism 127** (the
+  row's `unsupported(wolfc)` entry leaves), host-scoped cells 2,
+  **observed 350 / 16 / 49 / 27** (the row rises from two lanes to
+  three). Falsified by a second line or a missing one.
+- No other ledger word moves. The candidates and why not:
+  - **Eight new prelude names** (W0304): no `.lu` file under `std/` or
+    `tests/` declares one (r33's grep at `98e1b7bc`; #62's wrappers are
+    `fs.set_mode` etc., module members, not the builtin names).
+  - **The four new E1010 shapes** (s227, s228, s229): their censuses
+    moved no wolf-std row; the only `in r { … }` blocks are in
+    `map/has_allocates_nothing` and `mem/budget/ledger_relations`, and
+    no file under `std/` or `tests/` sends on a channel or spawns.
+  - **s226 elsewhere**: no other row's checked column is `unsupported`
+    for a task construct (the `negative_cap_trap` sibling already runs:
+    its guard traps before the `spawn proc`).
+  - **s228** (`List` slice charge, runtime bytes): `mem/budget/*` print
+    relations, never counts; no row's verdict depends on a slice's
+    charge.
+  - **lupin 0.1.51**: the s230 mirror adds names; the 64 `unsupported`
+    rows stay.
+- doc-examples 464 blocks GREEN; fmt-lu 495 files, each a fixed point of
+  `wolf fmt` at 0.2.28; ulp 200; gen-vectors clean; lint-conventions
+  442.
+- **Release against native** (`wolf conform-run --json`, each test in
+  its own scratch directory): alike on 441 of 442, the one
+  `list/sort_by_tier.lu` (refused by name on release), as r33 measured.
+
+### P3. The ledger move (own commit)
+
+`[tests."mem/budget/breach_is_a_row.lu"] wolfc = "run"`, the comment
+naming s226 and ruling #63 and this lane's record. std-test GREEN: 442
+tests, forward tags 853, conservatism 127, observed 350 / 16 / 49 / 27.
+Ledger: wolfc `run` 389 / `unsupported` 52 / `fail(E1013)` 1. The
+record: the checked machine's `exit(0)` with the directive's stdout
+(`roomy true | breached true | reclaimed true | zero_cap true`, one
+digest with lupin and native).
+
+### P4. #62 (s230): the wrappers
+
+Four commits, **no conflict** (#62's ledger rows append at the file's
+tail; the move above is at line 3570; `std/fs/fs.lu` and
+`std/env/env.lu` are untouched by the pin). 446 tests.
+
+- `fs/change_rows.lu`, `fs/link_truncate_times.lu`,
+  `fs/mode_symlink.lu`: `run` on lupin, wolfc and native, on linux,
+  macOS and windows. `env/umask_swap.lu`: lupin `unsupported` (it
+  refuses `os_umask` by name: the record's `x-unsupported` names the
+  builtin), wolfc and native `run`, on all three hosts.
+- std-test GREEN: 446 tests, forward tags 865 (+12: `std.fs`/`std.env`,
+  `err.row`, `err.propagate` on each), conservatism 128, observed 353 /
+  17 / 49 / 27. doc-examples **477** blocks GREEN (+13, the number s230
+  measured against its development builds); fmt-lu 499; lint-conventions
+  446; ulp 200.
+- Release equals native on 445 of 446; each of the three run rows
+  answers `exit(0)` with one stdout digest on native, release and
+  checked, and `env/umask_swap.lu` the same on those three.
+- **The risks I name, on windows:** `fs/mode_symlink.lu` and
+  `fs/change_rows.lu` under lupin (a host refusal there must arrive as
+  the `unsupported` ROW, not as a refusal of the run), and
+  `fs/link_truncate_times.lu`'s `mtime: 1500000000.7654300` (100 ns
+  steps keep it). Predicted to hold; falsified by a windows stdout or
+  verdict mismatch.
+
+### P5. What #62 left to this lane
+
+- The four rows' `conforms:` lines gain the clauses the pin now
+  publishes (`os.fs.mode`, `os.fs.create.mode`, `os.fs.symlink`,
+  `os.fs.link`, `os.fs.times`, `os.fs.truncate`, `os.fs.umask`), all in
+  the registered `os` namespace: the forward count does not move.
+- **Two comptime-refusal rows**, D33 one level down at the builtin, as
+  `env/comptime_refuses_unset.lu` is: `env/comptime_refuses_umask.lu`
+  (`os_umask` in a `comptime fn`) and `fs/comptime_refuses_set_mode.lu`
+  (`fs_set_mode`). Each `fail(E0701)` on wolfc and native, lupin
+  `unsupported` (no comptime tier). Falsified if either compiles: a
+  `comptime fn` that changes the compiler's mask or a file's mode would
+  be a sandbox hole, filed, never ledgered as `run`.
+- **lupin's second named refusal reached by a row**:
+  `fs/link_own_times.lu` sets a symbolic link's own modification time
+  with `fs.set_link_times` and reads it back through `fs.lstat`, the
+  target's untouched (where the host has no unprivileged link, windows,
+  the same call on the file itself). wolfc and native `run` on all
+  three hosts; lupin `unsupported` on all three, the record naming
+  `fs_set_times` with `follow` false. **The risk:** lupin on windows
+  answering the link's refusal before it reaches the times.
+- Head: **449 tests**; forward tags 874; conservatism 131; host-scoped
+  cells 2; observed 353 / 18 / 49 / 29. Ledger: lupin `run` 381 /
+  `unsupported` 68; wolfc `run` 396 / `unsupported` 52 / `fail(E1013)`
+  1; native `run` 439 / `unsupported` 9 / `fail(E1013)` 1. doc-examples
+  477; fmt-lu 502; ulp 200; release equals native on 448 of 449.
+  Falsified by any other number.
+- **The planted break:** the breach row's checked column put back to
+  `unsupported` at the head makes `std-test` red on exactly that one
+  line on all three CI hosts; reverted.
