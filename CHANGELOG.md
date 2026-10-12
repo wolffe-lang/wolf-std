@@ -1,5 +1,72 @@
 # Changelog
 
+## sc59 — 2026-10-12 — std at wolf 0.2.28 / lupin 0.1.51, with the calls that change a file
+
+**The pin.** wolf 0.2.27 -> **0.2.28** and lupin 0.1.50 -> **0.1.51**,
+from the release archives by digest (`vendor/tools.toml`; linux x86-64
+`3215f321…` and `d8f62dd1…`). lupin's pin key stays at wolf-lang v0.2.24
+(`294d626d`), now four releases behind. The data pin moves v0.2.27 ->
+v0.2.28 (`0ddda6b` -> `f71ece8`, +11 anchors, none removed; the vendored
+conformance clause takes s226's `[exec.checked.*]` text). F-0145
+predicted it before the archives were unpacked; the measurements sit
+beside it. 0.2.28's archive bundles this repository at `98e1b7b` (sc58)
+as its `std/`; the rig still stages its own.
+
+**Trunk's 442 tests at the pin: one row moved, the right way.** The
+checked machine runs tasks from 0.2.28 (wolf-lang s226, ruling #63), so
+`mem/budget/breach_is_a_row.lu` — whose budget containment IS a proc —
+runs there to `exit(0)` with the bytes lupin and native print, where the
+ledger said the machine declined it. Its checked column moves to `run`,
+in its own commit, with the record. Nothing else moved: no prelude name
+is shadowed, none of 0.2.28's new E1010 shapes is in this tree, and
+release answers as native on 441 of 442 (`list/sort_by_tier.lu` is
+refused by name on release, as before).
+
+**`std.fs` and `std.env`: the calls that change a file** (wolf-std#62,
+wolf-lang s230, #346, #698, #699, #700, #702, #704; ruling #67's std
+spellings, each as implemented). Each wrapper is one builtin.
+
+- **`fs.set_mode(path, mode)`** — `chmod`: the permission, set-id and
+  sticky bits become exactly `mode` (`0..=0o7777`), following a link.
+- **`fs.create_private(path)`** — a new file, exclusive, `0o600` from
+  its first instant (wolf-std#5): no moment at which a key is readable.
+  **`fs.create_with_mode(path, mode)`** and **`fs.create_dir_mode(path,
+  mode)`** — `create` and `create_dir` with the permission bits the
+  creation uses (`0..=0o777`, less the umask).
+- **`fs.symlink(target, path)`** stores `target` verbatim, as
+  `fs.read_link` reads it back; **`fs.link(existing, path)`** makes a
+  second name and never replaces.
+- **`fs.Time`**, built by **`fs.time(s, ns)`**, **`fs.time_now()`** and
+  **`fs.time_keep()`**, and **`fs.set_times(path, atime, mtime)`** /
+  **`fs.set_link_times(path, atime, mtime)`** (a link's own, `touch
+  -h`): one call sets both times, one and keeps the other, or stamps the
+  host's now; no caller writes the builtin's `-1`/`-2`.
+- **`fs.truncate(mut f, len)`** — the file behind a handle becomes
+  exactly `len` bytes; the offset does not move.
+- **`env.umask(mask)`** sets the process's file mode creation mask and
+  answers the one it replaced (reading it is two calls). The mask is the
+  process's — every task's and every child's — and on the checked machine
+  it is the real one.
+- **Every call judges its arguments first** (`invalid`, the same on
+  every host), then answers `unsupported` by name where the host has no
+  such operation: on windows `set_mode`, the three moded creations,
+  `symlink` and `umask`; `link`, the times and `truncate` are served
+  there. The seven `fs` builtins charge `fs` and `os_umask` charges
+  `env`; a `comptime fn` that calls `fs_set_mode` or `os_umask` is E0701
+  (D33), each witnessed by a row.
+- **lupin 0.1.51 serves the seven `fs` calls but two**: it refuses
+  `env.umask` and `fs.set_link_times` by name (no host call without
+  `unsafe`; ruling #67 R10). Their rows are `unsupported` on lupin.
+
+**Tests.** Seven new rows. #62's four — `fs/change_rows`,
+`fs/link_truncate_times`, `fs/mode_symlink` and `env/umask_swap` — now
+conform to the clauses the data pin publishes (`os.fs.mode`,
+`create.mode`, `symlink`, `link`, `times`, `truncate`, `umask`); and
+what #62 left to this pin: `env/comptime_refuses_umask` and
+`fs/comptime_refuses_set_mode` (E0701 on the compilers) and
+`fs/link_own_times`, which reaches lupin's second refusal. 449 tests;
+doc-examples 477 blocks.
+
 ## sc58 — 2026-10-11 — std at wolf 0.2.27 / lupin 0.1.50, with stat, exec, signals and the terminal
 
 **The pin.** wolf 0.2.26 -> **0.2.27** and lupin 0.1.49 -> **0.1.50**,
