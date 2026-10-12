@@ -9,11 +9,17 @@
 //! name) the same call is made on the file itself, where the two are
 //! one call ([os.fs.times]), and the file takes the time. A missing
 //! path is `not_found`. lupin declines a link's own times by name
-//! (ruling #67 R10): this row is that refusal's witness here.
+//! (ruling #67 R10): this row is that refusal's witness here. The rig
+//! runs every lane in one staged directory and lupin's refusal ends its
+//! run after the link is made, so the row first clears both names
+//! (measured: without it the next lane found the dangling link and its
+//! last line read `missing: ok`).
 
 use std.fs
 
 fn main() -> !int {
+    fs.remove("sc59-l.tmp") else |_| {}
+    fs.remove("sc59-t.tmp") else |_| {}
     fs.write_text("sc59-t.tmp", "wolves")?
     fs.set_times("sc59-t.tmp", fs.time(1000000000, 0), fs.time(1000000000, 0))?
     var name = "sc59-l.tmp"
