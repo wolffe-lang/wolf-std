@@ -1,6 +1,6 @@
 //! check: run(exit=0, stdout="second name reads: more wolves\nagain: exists\nafter remove: more wolves\ntruncated: 4\nmtime: 1500000000.7654300\natime kept: yes\nnow is now: yes\nmissing: not_found")
 //! phase: run
-//! conforms: std.fs, err.row, err.propagate
+//! conforms: std.fs, err.row, err.propagate, os.fs.link, os.fs.truncate, os.fs.times
 //!
 //! s230 (wolf-lang#699, #702, #700): `fs.link`, `fs.truncate` and
 //! `fs.set_times`, on files the program makes, on every host. A hard

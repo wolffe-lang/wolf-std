@@ -1,6 +1,6 @@
 //! check: run(exit=0, stdout="swapped: yes\nrestored: yes\ninvalid: invalid")
 //! phase: run
-//! conforms: std.env, err.row, err.propagate
+//! conforms: std.env, err.row, err.propagate, os.fs.umask
 //!
 //! s230 (wolf-lang#704): `env.umask` sets the process's file mode
 //! creation mask and answers the one it replaced, so a read is two
