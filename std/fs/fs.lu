@@ -1867,6 +1867,107 @@ pub fn set_link_times(path: str, atime: Time, mtime: Time) -> () ! {
     fs_set_times(path, atime.s, atime.ns, mtime.s, mtime.ns, false)?
 }
 
+/// The word `set_owner` and its kin read as "leave this id as it is".
+///
+/// Total and pure. It is -1, the builtin tier's own word
+/// (`[os.fs.owner]`); the name exists so no caller writes the number —
+/// `time_keep`'s reason.
+///
+/// ```wolf-doc-example
+/// fs.owner_keep() == 0 - 1
+/// ```
+pub fn owner_keep() -> int {
+    -1
+}
+
+/// Set the owner and the group of what is at `path`, following a final
+/// symbolic link — `chown`.
+///
+/// `[os.fs.owner]` (wolf-lang#701): one host call. `uid` and `gid` are
+/// the ids `stat` answers (`Info.uid`, `Info.gid`), or `owner_keep()` to
+/// leave one as it is — so `chgrp` is `set_owner(p, fs.owner_keep(),
+/// gid)`. **Who may** is the host's rule: the super-user may set any
+/// owner; anyone else may move a file they own to a group they are in,
+/// and may not give a file away. **The host clears the set-user-id and
+/// set-group-id bits** when an owner changes, so a program that wants
+/// them sets the owner first and the mode after (`set_mode`) — `cp -p`'s
+/// order.
+///
+/// Rows: `invalid` when an id is neither `owner_keep()` nor in
+/// `0..=4294967294` (decided before the host), or is one the host has
+/// no mapping for; `denied` when this process may not make the change;
+/// `not_found` (a dangling link included); `unsupported` on a host with
+/// no owners (windows, by name); `io` otherwise. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_set_owner`.
+///
+/// ```wolf-doc-example
+/// var refused = false
+/// fs.set_owner("doc-set-owner.tmp", 0 - 2, fs.owner_keep()) else |_| { refused = true }
+/// refused == true
+/// ```
+pub fn set_owner(path: str, uid: int, gid: int) -> () ! {
+    not_found,
+    denied,
+    invalid,
+    unsupported,
+    io,
+} {
+    fs_set_owner(path, uid, gid, true)?
+}
+
+/// `set_owner` on `path` ITSELF: a final symbolic link's own owner and
+/// group, its target's left alone (`chown -h`). On a path that is not a
+/// link it is `set_owner`.
+///
+/// `[os.fs.owner]`. Rows as `set_owner`'s; a dangling link is changed
+/// like any other, since nothing is followed.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_set_owner`.
+///
+/// ```wolf-doc-example
+/// var refused = false
+/// let keep = fs.owner_keep()
+/// fs.set_link_owner("doc-set-link-owner.tmp", keep, 4294967295) else |_| { refused = true }
+/// refused == true
+/// ```
+pub fn set_link_owner(path: str, uid: int, gid: int) -> () ! {
+    not_found,
+    denied,
+    invalid,
+    unsupported,
+    io,
+} {
+    fs_set_owner(path, uid, gid, false)?
+}
+
+/// Set the owner and the group of the file behind `f` — `fchown`.
+///
+/// `[os.fs.owner]`: the file the handle holds, whatever its name is by
+/// now, so a rename between a creation and this call cannot send the
+/// change to another file. `stdin()`, `stdout()` and `stderr()` are
+/// handles too: handing a terminal to the user a program is about to
+/// become is this call on the stream.
+///
+/// Rows: `invalid` and `denied` as `set_owner`'s; `unsupported` on a
+/// host with no owners (windows, by name); `io` for a closed or forged
+/// handle and for every other host refusal. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_set_owner_fd`.
+///
+/// ```wolf-doc-example
+/// var refused = false
+/// var out = fs.stdout()
+/// fs.set_file_owner(mut out, 0 - 2, 0 - 2) else |_| { refused = true }
+/// refused == true
+/// ```
+pub fn set_file_owner(mut f: File, uid: int, gid: int) -> () ! {denied, invalid, unsupported, io} {
+    fs_set_owner_fd(f.fd, uid, gid)?
+}
+
 /// Make the file behind `f` exactly `len` bytes long.
 ///
 /// `[os.fs.truncate]` (wolf-lang#702): shorter, the tail gone; or
