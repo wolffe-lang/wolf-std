@@ -4081,7 +4081,8 @@ native = "run"
 # sc60: std's wrappers over s232's builtins (spellings proposed in the
 # PR, rulings owed there). Every word below was observed on kasumi
 # (wolf 0.2.29 / lupin 0.1.52) on lupin, the checked machine, native and
-# release before its row was added, and again under `taskset -c 0-3`.
+# release before its row was added, and again under `taskset -c 0-3`;
+# then on CI's three hosts (run 38334811882) as written.
 #
 # `signal/send_rows.lu`: the `invalid` shapes of `send` and `number`.
 # The shape precedes the host and lupin answers every shape row (ruling
@@ -4096,8 +4097,9 @@ native = "run"
 # machine admits no `unsafe` and std has no `sigaction`"), the row's
 # first call. On windows the builtin answers the host's `unsupported`
 # ROW on every machine, lupin included, so the program runs there: a
-# host-scoped cell, predicted in F-0146 from lupin's source and held to
-# CI's windows job.
+# host-scoped cell, predicted in F-0146 from lupin's source and
+# observed on CI run 38334811882, rig (windows-latest) job 115092399664
+# (three lanes observed; two on ubuntu and macOS).
 [tests."signal/ignored_rows.lu"]
 lupin = "unsupported"
 lupin-windows = "run"
@@ -4142,7 +4144,7 @@ native = "run"
 # machine admits no `unsafe` and std has no `kill(pid, sig)`"), reached
 # by the row's first send; on windows it answers the host's
 # `unsupported` ROW and the program runs — the second host-scoped cell
-# of this lane, predicted like the first.
+# of this lane, predicted like the first and observed in the same job.
 [tests."env/self_ids.lu"]
 lupin = "run"
 wolfc = "run"
