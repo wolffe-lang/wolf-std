@@ -1,0 +1,56 @@
+//! check: run(exit=0, stdout="user: wolf 1000 1000 [A Wolf] [/home/wolf] [/bin/sh]\nempty fields: cub 1001 1001 [] [] []\nminus two: 4294967294 4294967294\ngroup: pack 2000 2 wolf,cub\nno members: 0 trailing comma: 1\nuser rows: six=parse eight=parse no_name=parse word_uid=parse spaced_gid=parse minus_one=parse too_big=parse empty=parse\ngroup rows: three=parse five=parse no_name=parse word_gid=parse")
+//! phase: run
+//! conforms: std.os.users, err.row
+//!
+//! **s236: one line of `passwd(5)` and one of `group(5)`.** A user line
+//! is seven `:`-separated fields and a group line four; fields are cut
+//! at `:` and nothing is trimmed, so an empty comment, home or shell is
+//! an empty string and a name is never empty. An id is decimal,
+//! `0..=4294967294`; a leading `-` counts down from 4294967296 as the
+//! host reads it (macOS writes `nobody` as `-2`), which makes `-1` no
+//! id at all. Everything else is the `parse` row, never a trap and
+//! never a guessed value. Pure: every lane runs it, and it needs no
+//! account on any host.
+
+use std.os.users
+
+fn user_row(line: str) -> str {
+    users.parse_user(line) else |e| {
+        return match e {
+            parse => "parse",
+        }
+    }
+    "ok"
+}
+
+fn group_row(line: str) -> str {
+    users.parse_group(line) else |e| {
+        return match e {
+            parse => "parse",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let u = users.parse_user("wolf:x:1000:1000:A Wolf:/home/wolf:/bin/sh")?
+    print("user: {u.name} {u.uid} {u.gid} [{u.comment}] [{u.home}] [{u.shell}]")
+    let bare = users.parse_user("cub:x:1001:1001:::")?
+    print(
+        "empty fields: {bare.name} {bare.uid} {bare.gid} [{bare.comment}] [{bare.home}] [{bare.shell}]",
+    )
+    let nobody = users.parse_user("nobody:*:-2:-2:Unprivileged User:/var/empty:/usr/bin/false")?
+    print("minus two: {nobody.uid} {nobody.gid}")
+    let g = users.parse_group("pack:x:2000:wolf,cub")?
+    print("group: {g.name} {g.gid} {g.members.len} {g.members[0]},{g.members[1]}")
+    let lone = users.parse_group("lone:x:2001:")?
+    let trailing = users.parse_group("den:x:2002:wolf,")?
+    print("no members: {lone.members.len} trailing comma: {trailing.members.len}")
+    print(
+        "user rows: six={user_row("a:x:1:1:c:/h")} eight={user_row("a:x:1:1:c:/h:/s:extra")} no_name={user_row(":x:1:1:c:/h:/s")} word_uid={user_row("a:x:one:1:c:/h:/s")} spaced_gid={user_row("a:x:1: 1:c:/h:/s")} minus_one={user_row("a:x:-1:1:c:/h:/s")} too_big={user_row("a:x:4294967295:1:c:/h:/s")} empty={user_row("")}",
+    )
+    print(
+        "group rows: three={group_row("g:x:1")} five={group_row("g:x:1:a:b")} no_name={group_row(":x:1:a")} word_gid={group_row("g:x:one:a")}",
+    )
+    0
+}

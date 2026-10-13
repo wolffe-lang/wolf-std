@@ -1,0 +1,121 @@
+//! check: run(exit=0, stdout="users: 3 root,wolf,cub\ngroups: 4 root,wolf,pack,den\nby name: wolf 1000 /home/wolf\nby id: root\nfirst wins: wolf\nmissing: none none none none\ngroup by name: 2000 by id: den\ngroups of wolf: 1000 2000 3000\ngroups of cub: 1001 2000\ngroups of a stranger: 77\na repeated group is listed once: 1000 2000")
+//! phase: run
+//! conforms: std.os.users, err.row
+//!
+//! **s236: the two files, whole.** `users` and `groups` read every
+//! account line of a text in the file's order and pass over what is not
+//! one — a blank line, a `#` comment (macOS's file opens with them), a
+//! `+`/`-` compatibility entry, a malformed line — because one bad line
+//! must not lock every user out. The lookups take the FIRST match, as
+//! the host's reader does, and answer `none` when there is none.
+//! `groups_of` is the list a login gives a process: the user's own
+//! group first, then each group that lists the name, in the file's
+//! order, each id once — the third argument of `process.set_ids`. The
+//! texts are this file's own: it reads no account from any host.
+
+use std.os.users
+
+fn passwd() -> str {
+    "##\n# User Database\n##\nroot:x:0:0:root:/root:/bin/sh\n\nwolf:x:1000:1000:A Wolf:/home/wolf:/bin/sh\nnot a line\n+::::::\ncub:x:1001:1001::/home/cub:\nwolf:x:4242:4242:a second wolf:/tmp:/bin/false\n"
+}
+
+fn group() -> str {
+    "root:x:0:\nwolf:x:1000:\n# comment\npack:x:2000:cub,wolf\nbroken:x:\nden:x:3000:wolf\n"
+}
+
+fn names_of_users(all: List[users.User]) -> str {
+    var out = ""
+    for u in all {
+        if out.len > 0 {
+            out = out + ","
+        }
+        out = out + u.name
+    }
+    out
+}
+
+fn names_of_groups(all: List[users.Group]) -> str {
+    var out = ""
+    for g in all {
+        if out.len > 0 {
+            out = out + ","
+        }
+        out = out + g.name
+    }
+    out
+}
+
+fn ids(list: List[int]) -> str {
+    var out = ""
+    for g in list {
+        if out.len > 0 {
+            out = out + " "
+        }
+        out = out + "{g}"
+    }
+    out
+}
+
+fn user_miss(text: str, name: str) -> str {
+    users.user_named(text, name) else |e| {
+        return match e {
+            none => "none",
+        }
+    }
+    "found"
+}
+
+fn uid_miss(text: str, uid: int) -> str {
+    users.user_by_id(text, uid) else |e| {
+        return match e {
+            none => "none",
+        }
+    }
+    "found"
+}
+
+fn group_miss(text: str, name: str) -> str {
+    users.group_named(text, name) else |e| {
+        return match e {
+            none => "none",
+        }
+    }
+    "found"
+}
+
+fn gid_miss(text: str, gid: int) -> str {
+    users.group_by_id(text, gid) else |e| {
+        return match e {
+            none => "none",
+        }
+    }
+    "found"
+}
+
+fn main() -> !int {
+    let all = users.users(passwd())
+    // The second `wolf` line is a user line too; the lookups take the
+    // first, the listing keeps the file's order — and its count.
+    print("users: {all.len - 1} {names_of_users(all[0..3])}")
+    let gs = users.groups(group())
+    print("groups: {gs.len} {names_of_groups(gs)}")
+    let wolf = users.user_named(passwd(), "wolf")?
+    print("by name: {wolf.name} {wolf.uid} {wolf.home}")
+    let root = users.user_by_id(passwd(), 0)?
+    print("by id: {root.name}")
+    let first = users.user_by_id(passwd(), 1000)?
+    print("first wins: {first.name}")
+    print(
+        "missing: {user_miss(passwd(), "fox")} {uid_miss(passwd(), 5)} {group_miss(group(), "fox")} {gid_miss(group(), 5)}",
+    )
+    let pack = users.group_named(group(), "pack")?
+    let den = users.group_by_id(group(), 3000)?
+    print("group by name: {pack.gid} by id: {den.name}")
+    print("groups of wolf: {ids(users.groups_of(group(), "wolf", 1000))}")
+    print("groups of cub: {ids(users.groups_of(group(), "cub", 1001))}")
+    print("groups of a stranger: {ids(users.groups_of(group(), "fox", 77))}")
+    print(
+        "a repeated group is listed once: {ids(users.groups_of("wolf:x:1000:wolf\npack:x:2000:wolf\npack2:x:2000:wolf\n", "wolf", 1000))}",
+    )
+    0
+}

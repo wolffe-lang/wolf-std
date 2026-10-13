@@ -1,0 +1,96 @@
+//! check: run(exit=0, stdout="shape: invalid invalid invalid\nos_error: 0\nleave: true same: true by handle: true\nmissing: true\nunchanged: true")
+//! phase: run
+//! conforms: std.fs, err.row
+//!
+//! **s236: `fs.set_owner`, `fs.set_link_owner`, `fs.set_file_owner` —
+//! the rows that change nothing.** No test may change a file's owner on
+//! a host, so this one asks only what leaves it alone: an id that is no
+//! id (`invalid`, before the host: nothing is asked of it and no host
+//! number is left behind), both ids kept (`fs.owner_keep()`), and the
+//! owner the file already has — by path, on the link itself (the file
+//! is no link, so it is the same call) and on a handle. Where the host
+//! has owners (`fs.stat` answers one) each is ok; where it has none
+//! (windows) each is `unsupported`, by name. A missing path is
+//! `not_found` there and `unsupported` here. The file's owner is read
+//! before and after. Owners that DO change are witnessed upstream,
+//! inside a throwaway container (wolf-lang `ids_lanes`). Every lane
+//! runs it: lupin serves the three through the standard library. (The
+//! clause is wolf-lang's `[os.fs.owner]`, which the data pin does not
+//! publish yet.)
+
+use std.fs
+
+fn owner_row(path: str, uid: int, gid: int) -> str {
+    fs.set_owner(path, uid, gid) else |e| {
+        return match e {
+            not_found => "not_found",
+            denied => "denied",
+            invalid => "invalid",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn link_row(path: str, uid: int, gid: int) -> str {
+    fs.set_link_owner(path, uid, gid) else |e| {
+        return match e {
+            not_found => "not_found",
+            denied => "denied",
+            invalid => "invalid",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn file_row(mut f: fs.File, uid: int, gid: int) -> str {
+    fs.set_file_owner(mut f, uid, gid) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let p = "target/s236-owner-rows.tmp"
+    var out = fs.stdout()
+    let on_handle = file_row(mut out, 0 - 2, 0 - 2)
+    print(
+        "shape: {owner_row(p, 0 - 2, fs.owner_keep())} {link_row(p, fs.owner_keep(), 4294967295)} {on_handle}",
+    )
+    print("os_error: {os_error()}")
+    fs.create_dir_all("target")?
+    fs.write_text(p, "x")?
+    let before = fs.stat(p)?
+    var want = "unsupported"
+    if fs.answered(before, 6) {
+        want = "ok"
+    }
+    let leave = owner_row(p, fs.owner_keep(), fs.owner_keep())
+    let same = link_row(p, before.uid, before.gid)
+    var f = fs.open(p)?
+    let by_handle = file_row(mut f, before.uid, fs.owner_keep())
+    fs.close(take f)?
+    print("leave: {leave == want} same: {same == want} by handle: {by_handle == want}")
+    let missing = owner_row(
+        "target/s236-owner-rows-never-made.tmp",
+        fs.owner_keep(),
+        fs.owner_keep(),
+    )
+    var want_missing = "unsupported"
+    if want == "ok" {
+        want_missing = "not_found"
+    }
+    print("missing: {missing == want_missing}")
+    let after = fs.stat(p)?
+    fs.remove(p)?
+    print("unchanged: {after.uid == before.uid && after.gid == before.gid}")
+    0
+}
