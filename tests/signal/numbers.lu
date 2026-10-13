@@ -1,0 +1,109 @@
+//! check: run(exit=0, stdout="asked=28\nanswered_all_or_none=true\nxcu_seven=true\ndistinct=true")
+//! phase: run
+//! conforms: std.signal, os.signal.number, os.signal.set, err.row
+//!
+//! **sc60: `signal.number` for every meaning of the table.** A number is
+//! the HOST's (`USER` is 10 on linux and 30 on macOS), so this row prints
+//! none: it asserts what every unix host shares — all twenty-eight
+//! meanings have a number, the numbers are distinct and above 0, and the
+//! seven XCU `kill` fixes are those (`reload` 1, `interrupt` 2, `quit` 3,
+//! `abort` 6, `kill` 9, `alarm` 14, `terminate` 15). A host that does not
+//! number signals (windows) answers `unsupported` for all twenty-eight
+//! and none; there the last two lines are true of an empty answer, and
+//! the second line is the one that says which host this is NOT: some
+//! numbered, some not. lupin serves the linux and macOS numberings
+//! (ruling #70 R9) and runs this on every host.
+
+use std.signal
+
+fn table() -> List[int] {
+    [
+        signal.reload(),
+        signal.terminate(),
+        signal.quit(),
+        signal.upgrade(),
+        signal.interrupt(),
+        signal.suspend(),
+        signal.bg_read(),
+        signal.bg_write(),
+        signal.child(),
+        signal.user(),
+        signal.alarm(),
+        signal.broken_pipe(),
+        signal.abort(),
+        signal.continued(),
+        signal.resize(),
+        signal.urgent(),
+        signal.virtual_alarm(),
+        signal.profile_alarm(),
+        signal.cpu_limit(),
+        signal.file_limit(),
+        signal.kill(),
+        signal.stop(),
+        signal.segment_fault(),
+        signal.bus_error(),
+        signal.arithmetic(),
+        signal.illegal(),
+        signal.breakpoint(),
+        signal.bad_syscall(),
+    ]
+}
+
+/// The host's number, 0 where the host has none, -1 for a refused shape.
+fn number_or(meaning: int) -> int {
+    let n = signal.number(meaning) else |e| {
+        return match e {
+            invalid => -1,
+            unsupported => 0,
+        }
+    }
+    n
+}
+
+fn main() -> !int {
+    let ms = table()
+    var numbers = List[int]()
+    var answered = 0
+    for m in ms {
+        let n = number_or(m)
+        if n > 0 {
+            answered += 1
+        }
+        (mut numbers).push(n)
+    }
+    print("asked={ms.len}")
+    print("answered_all_or_none={answered == ms.len || answered == 0}")
+    if answered == 0 {
+        var every_unsupported = true
+        for n in numbers {
+            if n != 0 {
+                every_unsupported = false
+            }
+        }
+        print("xcu_seven={every_unsupported}")
+        print("distinct={every_unsupported}")
+        return 0
+    }
+    let seven = number_or(signal.reload()) == 1 &&
+        number_or(signal.interrupt()) == 2 &&
+        number_or(signal.quit()) == 3 &&
+        number_or(signal.abort()) == 6 &&
+        number_or(signal.kill()) == 9 &&
+        number_or(signal.alarm()) == 14 &&
+        number_or(signal.terminate()) == 15
+    print("xcu_seven={seven}")
+    var unique = true
+    var i = 0
+    while i < numbers.len {
+        var j = i + 1
+        while j < numbers.len {
+            if numbers[i] == numbers[j] {
+                unique = false
+            }
+            j += 1
+        }
+        i += 1
+    }
+    print("distinct={unique}")
+    0
+}

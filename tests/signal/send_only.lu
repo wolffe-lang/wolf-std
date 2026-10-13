@@ -1,0 +1,48 @@
+//! check: run(exit=0, stdout="kill=1048576\nstop=2097152\nsegment_fault=4194304\nbus_error=8388608\narithmetic=16777216\nillegal=33554432\nbreakpoint=67108864\nbad_syscall=134217728\nsum=267386880\nreset_kill=io\nignore_stop=io\npoll_fault=io")
+//! phase: run
+//! conforms: std.signal, os.signal.set, os.signal.set.stable, os.signal.disp, os.signal.poll, err.row
+//!
+//! **sc60: the eight send-only meanings, each at its published bit, and
+//! refused by every call that takes a set.** `[os.signal.set]` gives
+//! `KILL`, `STOP` and the six fault signals bits 20..27: a program may
+//! send one (`signal.send`) and ask its number, and may not listen for,
+//! ignore or reset it — a set holding one is `io` by the one shape rule,
+//! and nothing changes. The bits are permanent
+//! (`[os.signal.set.stable]`), so they are pinned here by name as
+//! `signal/meanings.lu` pins the twenty. Shape rows only: every lane, on
+//! every host.
+
+use std.signal
+
+fn main() -> !int {
+    print("kill={signal.kill()}")
+    print("stop={signal.stop()}")
+    print("segment_fault={signal.segment_fault()}")
+    print("bus_error={signal.bus_error()}")
+    print("arithmetic={signal.arithmetic()}")
+    print("illegal={signal.illegal()}")
+    print("breakpoint={signal.breakpoint()}")
+    print("bad_syscall={signal.bad_syscall()}")
+    let a = signal.kill() + signal.stop() + signal.segment_fault() + signal.bus_error()
+    let b = signal.arithmetic() + signal.illegal() + signal.breakpoint() + signal.bad_syscall()
+    print("sum={a + b}")
+    var rk = "ok"
+    signal.reset(signal.kill()) else |e| {
+        rk = match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    print("reset_kill={rk}")
+    var is = "ok"
+    signal.ignore(signal.stop() | signal.interrupt()) else |e| {
+        is = match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    print("ignore_stop={is}")
+    let pf = signal.poll(signal.segment_fault()) else |_| -1
+    print(if pf == -1 { "poll_fault=io" } else { "poll_fault={pf}" })
+    0
+}

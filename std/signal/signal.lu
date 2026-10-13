@@ -10,7 +10,9 @@
 //! The meanings are functions here because a module of the library
 //! carries no constants; each answers its bit. Twenty are LISTENABLE —
 //! every signal POSIX names that a program may catch (`reload()` …
-//! `file_limit()`), the ones a set may hold.
+//! `file_limit()`), the ones a set may hold. Eight more are SEND-ONLY
+//! (`kill()`, `stop()` and the six fault signals): `send` and `number`
+//! take them and nothing else does.
 //!
 //! **A meaning's bit never changes, and a program never writes one**
 //! (`[os.signal.set.stable]`). Every meaning a release has published
@@ -125,6 +127,38 @@ pub fn cpu_limit() -> int { 262144 }
 
 /// The file-size limit was passed (`SIGXFSZ`).
 pub fn file_limit() -> int { 524288 }
+
+// The eight meanings below may only be SENT (`send`) and asked the
+// number of (`number`): no process can catch or ignore the first two,
+// and a program that returned from a real fault would run it again. A
+// set that holds one is `io` from every set-taking call.
+
+/// End the process now; it cannot be caught or ignored (`SIGKILL`).
+/// Send-only.
+pub fn kill() -> int { 1048576 }
+
+/// Stop the process; it cannot be caught or ignored (`SIGSTOP`).
+/// Send-only; `continued()` is what starts it again.
+pub fn stop() -> int { 2097152 }
+
+/// An invalid memory reference (`SIGSEGV`). Send-only.
+pub fn segment_fault() -> int { 4194304 }
+
+/// An access to an undefined part of a memory object (`SIGBUS`).
+/// Send-only.
+pub fn bus_error() -> int { 8388608 }
+
+/// An erroneous arithmetic operation (`SIGFPE`). Send-only.
+pub fn arithmetic() -> int { 16777216 }
+
+/// An illegal instruction (`SIGILL`). Send-only.
+pub fn illegal() -> int { 33554432 }
+
+/// A trace or breakpoint trap (`SIGTRAP`). Send-only.
+pub fn breakpoint() -> int { 67108864 }
+
+/// A bad system call (`SIGSYS`). Send-only.
+pub fn bad_syscall() -> int { 134217728 }
 
 /// Hear every meaning in `set` as an event (`os_signal_listen`); ends an
 /// ignore of them.
