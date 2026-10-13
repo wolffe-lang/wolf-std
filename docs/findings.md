@@ -11943,3 +11943,199 @@ the first eight digits of its sha256.
   the release machine on macOS or windows; the windows stdout of the
   failing truncate (inferred, above); a umask's effect on a creation in
   this repository's rows (wolf-lang's `fs_change_lanes` does it).
+
+## F-0146 — sc60's predictions, before the archives
+
+Written on branch `sc60` (on trunk `d7c2968`) before the wolf 0.2.29 or
+lupin 0.1.52 archive was downloaded or unpacked by this lane anywhere,
+and before any program was run. The bump is one release on each side.
+What I read first, and so cannot claim to predict blind: 0.2.29's
+CHANGELOG and r34's evidence file (wolf
+`sprints/release/r34-evidence.md`), which measured this tree under the
+release and found one red test; `spec/11-os.md` at the tag; lupin's
+builtin arms at `v0.1.52` (`src/eval/builtin.rs`). The baseline is
+sc59's measured head (F-0145: 449 tests, forward tags 874, conservatism
+131, host-scoped cells 3, observed 353 / 18 / 49 / 29 by lanes 3 / 2 /
+1 / 0, doc-examples 477, fmt-lu 502, ulp 200; ledger lupin `run` 381 /
+`unsupported` 68, wolfc `run` 396 / `unsupported` 52 / `fail(E1013)` 1,
+native `run` 439 / `unsupported` 9 / `fail(E1013)` 1). Measurements are
+appended below, never written over.
+
+### P1. The pin
+
+- `vendor/tools.toml`: `[wolf] version = "0.2.29"`, pin key
+  `6ffe7c6056eeb8c661b37e38d99b91166e8c1add` (the v0.2.29 tag, not
+  wolf-lang's trunk, which is one lane further on); `[lupin] version =
+  "0.1.52"`, pin key `294d626dd596122285d5df954762e3aee3e5db71`
+  UNCHANGED (0.1.52's spec pin is still v0.2.24, five releases behind).
+  Predicted `--version` lines: `wolf 0.2.29 (wolfgang, pin 6ffe7c6)`,
+  `paired with lupin 0.1.52 (reference interpreter), pin 294d626`, and
+  `lupin 0.1.52 (wolf-interp, reference interpreter at pin 294d626)`.
+  Falsified by any other string.
+- Archive digests as GitHub reports them: wolf 0.2.29 linux x86-64
+  `ae466e85…`, linux aarch64 `584b8fc2…`, macOS aarch64 `a79928ba…`,
+  windows `e8a37a7f…`; lupin 0.1.52 linux x86-64 `f5194b74…`, linux
+  aarch64 `ac612122…`, macOS aarch64 `66dc74d8…`, windows zip
+  `0ffbbdd1…`. Falsified by a mismatch on arrival, each read twice.
+- The wolf archive's `std/` carries `STD-REV`
+  `d7c2968cbba1a855a58b4aabf3e55edcf7282992`, THIS branch's base, so
+  `diff -rq` of the archive's `std/` against `std/` at the pin commit
+  names exactly `STD-REV`, `LICENSE` and `LICENSE-EXCEPTION`. CI still
+  removes `.wolf-bin/std`; no workflow change is needed. `libwolf_rt.a`
+  moves (s231, s232). **`_wolf` moves** off `a368c8ec…`: s235 added
+  `wolf lsp --std-root`, and the completion script lists flags.
+  Falsified if it is still `a368c8ec…` (then the script does not carry
+  that flag). The lupin archive has no `std/`.
+- **The data pin moves**, `f71ece8e` (v0.2.28) -> `6ffe7c60` (v0.2.29),
+  in its own commit: anchors 634 -> 640, **+6, 0 removed** (key sets
+  diffed both ways from wolf-lang's `spec/anchors.json` at the two
+  tags): `os.proc.self`, `os.signal.ignored`, `os.signal.number`,
+  `os.signal.send`, `os.signal.set.stable`, `os.signal.shell.note`, all
+  in the registered `os` namespace. The vendored clause
+  `05-conformance.md` does NOT move (no diff between the tags), so the
+  commit is the gitlink, `PIN` and `anchors.json`. Falsified if
+  `sync-pin`, the namespace test or `[conf.tag.valid]` refuses anything.
+
+### P2. The pin alone (trunk's 449 tests): one test red, on all three lanes
+
+- **std-test is RED on exactly one file, `tests/signal/rows.lu`, three
+  lines**: `[wolfc]` and `[native]` a directive mismatch (the program
+  prints `reset_outside=ok` where the directive says `reset_outside=io`:
+  `signal.reset(512)` is a reset of `USER` since s232) and `[lupin]`
+  `ledger says run, observed unsupported` (0.1.52 passes 512 as a
+  well-formed set and then refuses `os_signal_default` by name: no
+  `sigaction` without `unsafe`). The same three lines on linux and
+  macOS. **Windows, the risk I name:** `os_signal_default` is
+  `unsupported` there for every well-formed set, so the compilers print
+  `reset_outside=unsupported` (still a mismatch, another word) and
+  lupin answers that row and RUNS, printing the same; red on all three
+  lanes there too, each as a directive mismatch. Falsified by a red
+  line in any other file, or a lane of this file that is green.
+- Counts beside it, with less confidence (I have not read how the rig
+  counts a mismatching lane): 449 tests, forward tags 874, host-scoped
+  cells 3; conservatism 132 on linux and macOS if the count is of
+  observed refusals (lupin's new one), 131 if it is the ledger's;
+  observed lanes 352 / 19 / 49 / 29 if a mismatching run still counts
+  as observed.
+- No other ledger word moves. The candidates and why not:
+  - **Five new prelude names** (W0304): no `.lu` file under `std/` or
+    `tests/` declares one (r34's grep at `d7c2968c`).
+  - **The one shape rule** (a set with a bit that is not listenable is
+    `io` for `listen`, `wait` and `poll` too): the only set-taking
+    calls in `tests/` are `signal/rows.lu`'s, and
+    `process/job_rows.lu` passes `defaults` 0 behind a group the shape
+    refuses first.
+  - **s231** (a worker per parked task): no row parks more than a
+    handful of tasks; none prints a thread or worker count.
+  - **`BROKEN_PIPE` across a spawn**: no row ignores a signal and then
+    starts a child.
+  - **s235**: the language server; nothing here runs it.
+  - **lupin 0.1.52**: s232's mirror adds five names and widens the set
+    shape; its 68 `unsupported` rows stay, plus the one above.
+- doc-examples 477 blocks GREEN; fmt-lu 502 files, each a fixed point of
+  `wolf fmt` at 0.2.29; ulp 200; gen-vectors clean; lint-conventions
+  449.
+- **Release against native** (`wolf conform-run --json`, each test in
+  its own scratch directory): alike on 448 of 449, the one
+  `list/sort_by_tier.lu` (refused by name on release), as r34 measured;
+  `signal/rows.lu` is one of the 448 (both print `reset_outside=ok`).
+
+### P3. `tests/signal/rows.lu`: the outside bit
+
+The bit moves from 512 to **2^62 (4611686018427387904)**. Read from
+`[os.signal.set]` at v0.2.29: bits 0..19 are the listenable meanings,
+20..27 the send-only ones, so every bit from 28 up is unpublished; and
+`[os.signal.set.stable]` hands new meanings the LOWEST unpublished bit,
+in order, so bit 28 is the next to be taken and bit 62, the highest bit
+of a non-negative `int`, is the last that rule can reach (512 was the
+lowest unpublished bit when s219's row took it, which is how it came to
+mean `USER`). With it: `reset_outside=io` on the checked, native and
+release machines and on lupin (which answers a set's shape before it
+declines the disposition), on every host (the shape precedes the host
+on windows). The ledger row stays `run` on three lanes: **no ledger
+word moves in this lane for any existing row**. Falsified if any
+machine answers anything but `io` for 2^62 (a 32-bit truncation of the
+set would answer `io` for an empty set by accident; a row that passes
+2^62 OR-ed with a listenable meaning tells the two apart).
+
+### P4. `std.signal`: the twenty meanings
+
+Eleven more functions, each answering its bit from the table:
+`user` 512, `alarm` 1024, `broken_pipe` 2048, `abort` 4096, `continued`
+8192, `resize` 16384, `urgent` 32768, `virtual_alarm` 65536,
+`profile_alarm` 131072, `cpu_limit` 262144, `file_limit` 524288.
+`CONTINUE` cannot be spelled `continue` (a keyword,
+`spec/grammar.ebnf`): a ruling owed, `continued` recommended. None
+draws W0304 (none is a prelude name in `spec/prelude.json` at the tag).
+
+- A row of the twenty bits (`signal/meanings.lu`): each function answers
+  the table's bit, the twenty are distinct single bits, their OR is
+  1048575. Pure: `run` on lupin, checked and native on every host, and
+  the release machine equals native.
+- A row that hears each (`signal/heard.lu`): for each of the twenty,
+  `listen`, `raise`, then `poll` answers that meaning and a second poll
+  0 (s232's guarantee that a poll never trails a raise). `run` on the
+  checked, native and release machines on linux and macOS. **On
+  windows** only `reload`, `terminate`, `quit` and `upgrade` can be
+  listened for and the other sixteen answer `io` at the listen
+  (`[os.signal.platform]`); the row reads the host from
+  `signal.number`'s `unsupported` and asserts that shape there, printing
+  one stdout on every host. **lupin never listens**: `unsupported` on
+  every host, its record naming `os_signal_listen`. Risks I name: a
+  machine that delivers `child`, `continued` or `urgent` (ignored by
+  default on unix) differently from the rest; the checked machine's
+  real handler for `suspend`, `bg_read`, `bg_write` under a rig with no
+  terminal; `broken_pipe` under a test host that ignores `SIGPIPE`.
+
+### P5. The wrappers (spellings proposed in the PR; rulings owed there)
+
+`signal.send(pid, meaning)`, `signal.number(meaning)`,
+`signal.ignored()`, and this process's ids as `env.pid()` and
+`env.ppid()` (they charge `env`, ruling #70 R8, as `env.umask` does
+under #67; `process.pid` is already a CHILD's id). The eight send-only
+meanings get names too, in a commit of their own (`kill`, `stop`,
+`segment_fault`, `bus_error`, `arithmetic`, `illegal`, `breakpoint`,
+`bad_syscall`), because a `send` with no name for `KILL` would have a
+caller write a bit.
+
+- **lupin refuses two of the five by name**: `os_signal_send` (after
+  its shape rows, which it answers `invalid`) and `os_signal_ignored`,
+  each "this machine admits no `unsafe`"; it serves `os_pid`, `os_ppid`
+  and `os_signal_number`. On WINDOWS lupin answers both refusals as the
+  host's `unsupported` ROW instead, so a row that reaches them runs
+  there: two new host-scoped cells (`lupin-windows = "run"`), 3 -> 5.
+- Rows: `signal/send_rows.lu` (the `invalid` shapes of `send` and
+  `number`: four lanes, every host, lupin `run`); `signal/numbers.lu`
+  (every meaning of the 28 has a number, distinct, the seven XCU `kill`
+  fixes — 1, 2, 3, 6, 9, 14, 15 — as fixed; on windows every one
+  `unsupported`; lupin `run`); `signal/send_self.lu` (a send of 0 to
+  this process's id is ok, a send of `user` to it is heard by a
+  `wait`; lupin `unsupported` naming `os_signal_send`,
+  `lupin-windows = "run"`); `signal/ignored_rows.lu` (`ignored()`
+  gains a meaning on `ignore`, loses it on `reset` and on `listen`,
+  every other bit as it started; lupin `unsupported` naming
+  `os_signal_ignored`, `lupin-windows = "run"`); `env/self_ids.lu`
+  (`pid` above 0 and stable; `ppid` above 0 and not the pid where the
+  host has one; lupin `run`).
+- Three comptime rows, D33 one level down at the builtin:
+  `signal/comptime_refuses_send.lu` (`exec`),
+  `env/comptime_refuses_pid.lu` (`env`),
+  `signal/comptime_refuses_number.lu` (no capability, refused because
+  the compiling host's number is not the running one's): each
+  `fail(E0701)` on the compilers, lupin `unsupported`. Falsified if any
+  compiles.
+- Under `taskset -c 0-3` on kasumi every signal and process row answers
+  as on sixteen cpus.
+
+### P6. The head
+
+459 tests (449 + 10); host-scoped cells 5; ledger lupin `run` 385 /
+`unsupported` 74 (+4 run: meanings, send_rows, numbers, self_ids; +6
+unsupported: heard, send_self, ignored_rows, three comptime rows),
+wolfc `run` 406 / `unsupported` 52 / `fail(E1013)` 1, native `run` 449
+/ `unsupported` 9 / `fail(E1013)` 1. std-test and doc-examples GREEN on
+linux, macOS and windows; release equals native on all but
+`list/sort_by_tier.lu`. No literal signal bit in `std/` outside the
+meaning table in `std/signal/signal.lu`. Falsified by any other count,
+which I will report beside the reason (a row split or merged as the
+work goes is a reason; a lane answering another word is a finding).
