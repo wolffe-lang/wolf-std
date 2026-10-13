@@ -12139,3 +12139,135 @@ linux, macOS and windows; release equals native on all but
 meaning table in `std/signal/signal.lu`. Falsified by any other count,
 which I will report beside the reason (a row split or merged as the
 work goes is a reason; a lane answering another word is a finding).
+
+### Measured (sc60, appended; nothing above is edited)
+
+On kasumi (linux x86-64, quiet: load about 1) unless a CI run is named.
+Evidence under `~/lanes/sc60/evidence/` on kasumi and
+`~/lanes/sc60/logs/` on nomad-1; a log is named with the first eight
+digits of its sha256. Every job was started with `setsid`, a pid file
+and default signal dispositions (`SigBlk 0`, `SigIgn 0` printed in each
+job's first line), strict: `--nocapture`, 0 `SKIP` lines in every log.
+
+- **P1 held but for one word.** All eight archives arrived at their
+  reported digests, each read twice (`acquire.log` `720cde49…`): wolf
+  0.2.29 linux x86-64 `ae466e85…`, aarch64 `584b8fc2…`, macOS
+  `a79928ba…`, windows `e8a37a7f…`; lupin 0.1.52 `f5194b74…`,
+  `ac612122…`, `66dc74d8…`, `0ffbbdd1…`. Members: `wolf` `07f12158…`,
+  `libwolf_rt.a` `fa0a0ae5…`, `libwolf_rt_none.a` `fdd229bb…`, `lupin`
+  `74043b0a…` (the bytes r34 recorded). The three `--version` strings
+  are the predicted ones; `GLIBC_2.34` on both. The archive's `std/` is
+  57 files (53 `.lu`), `STD-REV` `d7c2968cbba1…`, and `diff -rq`
+  against `std/` at `d7c2968` names exactly `STD-REV`, `LICENSE` and
+  `LICENSE-EXCEPTION`. Data pin +6 / 0 removed (the six named),
+  `sync-pin` "snapshot == submodule at pin (registry AND clause)", 13
+  registered and 15 reserved namespaces as before. **Falsified: `_wolf`
+  is still `a368c8ec…`.** I predicted s235's `wolf lsp --std-root` would
+  move the completion script; it did not.
+- **P2 held on every host, the windows words included.** g1 at
+  `84b10f3` (the pin, trunk's tests): every step exit 0 but `std-test`;
+  `std-test-g1-84b10f3.log` (`64718f8a…`) RED on exactly the three
+  predicted lines of `tests/signal/rows.lu` — `[lupin]: ledger says
+  run, observed unsupported`, `[wolfc]` and `[native]` a stdout mismatch
+  whose observed hash `84f2ced0…` is the directive's text with
+  `reset_outside=ok` — and nothing else; 449 tests, forward tags 874,
+  host-scoped cells 3; doc-examples 477 GREEN, fmt-lu 502, ulp 200,
+  lint-conventions 449, 91 cargo tests. CI run 38329841884 at `84b10f3`
+  failed in `std-test` on the same one file on all three hosts: ubuntu
+  (job 115076867745) and macOS (115076867704) the same three lines;
+  **windows (115076867678) three directive mismatches, lupin's among
+  them, each with hash `a626db98…`, the directive's text with
+  `reset_outside=unsupported`** — the risk I named, as named. The three
+  `gates` jobs passed. Of the counts I hedged: conservatism is the
+  LEDGER's (131 on linux and macOS, 130 on windows, unmoved), and a
+  mismatching lane is not counted as observed, so the lanes read 352 /
+  18 / 49 / 30, not 352 / 19 / 49 / 29.
+- **P3 held.** With 2^62 the row prints `reset_outside=io` and
+  `reset_mixed=io` on lupin, checked, native and release (kasumi), and
+  on all three hosts in CI (run 38329907295 at `53c6f3f`: std-test GREEN,
+  450 tests, on ubuntu, macOS and windows). No ledger word moved for
+  any existing row. Learned on the way: a bare `let big =
+  4611686018427387904` is E0415 (an undecided literal defaults to
+  `i32`), so the row passes the literal where a parameter types it.
+- **P4 held, with one row shaped differently and lupin's refusal
+  spelled differently.** The eleven functions answer their bits on four
+  machines (`signal/meanings.lu`, one stdout); `fn continue()` is E0008
+  on all four; no name draws W0304. `signal/heard.lu` hears all twenty
+  on checked, native and release, five rounds under `taskset -c 0-3`
+  and one on a single cpu (`taskset-probe1.log`); none of the three
+  risks I named materialized on linux. lupin's record is `unsupported`,
+  and what it says is "`os_signal_listen` does not resolve": the name
+  is absent there, not declined with a reason. A planted wrong bit
+  (`user()` answering 1024, in a scratch copy) prints `user=1024` on
+  lupin and native, which the directive refuses
+  (`plant-table-bit.log`).
+- **P5: the spellings held; one comptime row does not exist.** On four
+  machines: `signal/send_rows.lu` (eight `invalid` rows, one stdout,
+  lupin included), `signal/numbers.lu` (28 asked, all answered, the XCU
+  seven as fixed, distinct; lupin included), `env/self_ids.lu` (lupin
+  included), `signal/send_self.lu` and `signal/ignored_rows.lu` (one
+  stdout on checked, native and release). **lupin's two refusals, by
+  name** (the records, kasumi `p1/out/`): `send_self` — "`os_signal_send`
+  signals a process by id: this machine admits no `unsafe` and std has
+  no `kill(pid, sig)` ([os.signal.send], [os.term.note] R8)";
+  `ignored_rows` — "`os_signal_ignored` reads a signal's disposition:
+  this machine admits no `unsafe` and std has no `sigaction`
+  ([os.signal.ignored], [os.term.note] R8)". `os_signal_send` and
+  `os_pid` in a `comptime fn` are `fail(E0701)` on checked, native and
+  release. **Falsified: `os_signal_number` at comptime is not E0701.**
+  The three compilers answer `unsupported`, by name ("`os_signal_number`
+  at comptime (a signal's number is the running host's, not the
+  compiling one's)"): refused, as the clause says, but as a construct
+  the machine declines and not as a sandbox diagnostic, so no directive
+  can hold it and `signal/comptime_refuses_number.lu` was not added.
+  One more row than planned, `signal/send_only.lu` (the eight send-only
+  bits, and `reset`, `ignore` and `poll` refusing a set that holds one:
+  four machines, one stdout). Not planned and found: `<<` on a plain
+  `int` is `unsupported` on the checked machine ("this operator in
+  checked execution"), so the table writes each bit as a number.
+- **P6, the head.** g3 at `74a9275`: every step exit 0;
+  `std-test-g3-74a9275.log` (`d212520e…`) GREEN, **459 tests**, forward
+  tags 896, conservatism 136, host-scoped cells 5, observed 358 / 21 /
+  49 / 31; doc-examples **481** GREEN (`c06ebf4b…`; +4: `send`,
+  `number`, `pid`, `ppid`), fmt-lu 512, lint-conventions 459, ulp 200.
+  Release against native (`tiers/head/table.txt` `dfc15bca…`): 458 of
+  459 alike, the one `list/sort_by_tier.lu`. The count is the predicted
+  459 by a different sum (one comptime row fewer, `send_only` more), so
+  the ledger is lupin `run` 386 / `unsupported` 73, wolfc `run` 406 /
+  `unsupported` 52 / `fail(E1013)` 1, native `run` 449 / `unsupported` 9
+  / `fail(E1013)` 1.
+- **Three hosts.** CI run 38334811882 at `74a9275`: all six jobs
+  success, each log read, not only its conclusion. std-test GREEN with
+  459 tests on ubuntu (job 115092399771), macOS (115092399483) and
+  windows (115092399664): conservatism 136 / 136 / 133, host-scoped
+  cells 5; doc-examples 481 GREEN on all three; 0 `SKIP` lines in the
+  three rig logs. **The windows predictions held, every one**: lupin
+  RUNS `signal/send_self.lu` and `signal/ignored_rows.lu` there (three
+  lanes observed for each: the two `lupin-windows = "run"` cells), the
+  compilers print each row's one stdout from its `unsupported` branch,
+  `signal/heard.lu` answers twenty there as four heard and sixteen
+  named gaps on checked and native, `env/self_ids.lu`,
+  `signal/numbers.lu`, `signal/send_rows.lu`, `signal/send_only.lu` and
+  `signal/meanings.lu` run on three lanes. On linux and macOS lupin's
+  word for `send_self` and `ignored_rows` is `unsupported`, as on
+  kasumi.
+- **Four cpus.** The whole of std-test and doc-examples under `taskset
+  -c 0-3` at `74a9275` (`std-test-ts4-74a9275.log` `fcb7557a…`): GREEN,
+  459 tests, the same counts, 481 blocks.
+- **Slips, disclosed.** One of my probe scripts copied a test file to
+  `/tmp/x` on kasumi, where the lane's rule is `~/lanes/sc60/` only; I
+  compared it to its source and removed it in the next command. Two
+  rows reached a local commit before the formatter had re-laid them
+  (kasumi's first head gauntlet was red in `fmt-lu` on exactly those
+  two); folded into their commit before anything but the lane's own
+  kasumi clone had it. I read `pgrep -f` once on kasumi to see which
+  row a job was on; nothing was killed.
+- **Not measured:** linux aarch64 at all (archives digest-checked
+  only); the release machine on macOS or windows; a `signal.send` that
+  answers `not_found` or `denied`, or that ends another process
+  (wolf-lang's `signal_shell_lanes` does; no row here starts a real
+  program); `signal.ignored()` as a process STARTED ignoring something
+  (the row asserts relations only); a console-sent `terminate()` or
+  `quit()` on windows (the row raises its own); whether wolf-lang has
+  an issue for `<<` on the checked machine (I searched and found only
+  the closed #130, which is `wrapping[T]`'s).
