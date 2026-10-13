@@ -1,0 +1,56 @@
+//! check: run(exit=0, stdout="could_signal_self=true\nheard_own_send=true")
+//! phase: run
+//! conforms: std.signal, std.env, os.signal.send, os.signal.wait, os.proc.self, err.row
+//!
+//! **sc60: a well-formed `signal.send`, to the one process a test may
+//! signal — itself.** A send of 0 to `env.pid()` sends nothing and
+//! answers ok: the process exists and may be signalled. A send of
+//! `user()` to it, listened for first, is a process-directed raise and
+//! the `wait` that follows returns that meaning (a wait, not a poll: the
+//! host may hand a process-directed signal to another thread, and a wait
+//! is causally pinned either way). On a host with no such call (windows)
+//! both sends answer `unsupported`, by name, and the row says the same
+//! two words true for that reason: the host is read from the first
+//! send's own row. **lupin declines a well-formed send by name** (no
+//! `kill(pid, sig)` without `unsafe`, ruling #70 R9); the send of 0 comes
+//! first so that refusal names `os_signal_send`.
+
+use std.signal
+use std.env
+
+fn main() -> !int {
+    let me = env.pid()
+    var hosted = true
+    var could = true
+    signal.send(me, 0) else |e| {
+        could = false
+        hosted = match e {
+            unsupported => false,
+            invalid => true,
+            not_found => true,
+            denied => true,
+            io => true,
+        }
+    }
+    if !hosted {
+        var second = "ok"
+        signal.send(me, signal.user()) else |e| {
+            second = match e {
+                unsupported => "unsupported",
+                invalid => "invalid",
+                not_found => "not_found",
+                denied => "denied",
+                io => "io",
+            }
+        }
+        print("could_signal_self={second == "unsupported"}")
+        print("heard_own_send={second == "unsupported"}")
+        return 0
+    }
+    print("could_signal_self={could}")
+    signal.listen(signal.user())?
+    signal.send(me, signal.user())?
+    let got = signal.wait(signal.user())?
+    print("heard_own_send={got == signal.user()}")
+    0
+}

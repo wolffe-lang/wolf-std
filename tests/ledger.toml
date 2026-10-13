@@ -4134,3 +4134,28 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# sc60: `env.pid` and `env.ppid` (ruling owed, R2 in the PR).
+# `env/self_ids.lu` runs on three lanes (lupin serves both ids).
+# `signal/send_self.lu` is the well-formed send: lupin declines
+# `os_signal_send` BY NAME (the record: "signals a process by id: this
+# machine admits no `unsafe` and std has no `kill(pid, sig)`"), reached
+# by the row's first send; on windows it answers the host's
+# `unsupported` ROW and the program runs — the second host-scoped cell
+# of this lane, predicted like the first.
+[tests."env/self_ids.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."signal/send_self.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# D33 one level down at `os_pid` (`env`).
+[tests."env/comptime_refuses_pid.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

@@ -1,0 +1,21 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.env, comptime.sandbox, comptime.sandbox.env
+//!
+//! **D33 for `env.pid` (sc60), held one level down at `os_pid`**: this
+//! process's id is process context (`env`, ruling #70 R8), and at
+//! comptime "this process" is the compiler. `os_pid` has no row to
+//! handle; the pure entry helper runs at run time to keep the import
+//! used.
+
+use std.env
+
+comptime fn probe() -> int {
+    os_pid()
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {env.entry_key("A=b")}")
+    0
+}

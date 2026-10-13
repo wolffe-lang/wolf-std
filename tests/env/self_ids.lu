@@ -1,0 +1,34 @@
+//! check: run(exit=0, stdout="pid_above_zero=true\npid_is_stable=true\nparent=true")
+//! phase: run
+//! conforms: std.env, std.signal, os.proc.self, os.signal.number, err.row
+//!
+//! **sc60: `env.pid` and `env.ppid`.** The ids are the host's, so the row
+//! prints none: this process's id is above 0 and the same on a second
+//! read; its parent's is above 0 and is not its own. A host with no
+//! parent call (windows) answers `unsupported`, by name, and the row
+//! holds it to that: `parent` is true when the id is a parent's, or when
+//! the row is `unsupported` AND the host is the one that numbers no
+//! signals either (`signal.number`'s `unsupported`) — never on a unix
+//! host. Every lane runs it; lupin serves both ids through the standard
+//! library (ruling #70 R9).
+
+use std.env
+use std.signal
+
+fn main() -> !int {
+    let me = env.pid()
+    print("pid_above_zero={me > 0}")
+    print("pid_is_stable={me == env.pid()}")
+    var numbered = true
+    signal.number(signal.terminate()) else |_| {
+        numbered = false
+        0
+    }
+    let parent = env.ppid() else |_| -1
+    if parent == -1 {
+        print("parent={!numbered}")
+        return 0
+    }
+    print("parent={numbered && parent > 0 && parent != me}")
+    0
+}
