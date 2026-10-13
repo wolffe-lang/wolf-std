@@ -1,0 +1,68 @@
+//! check: run(exit=0, stdout="reload=1\nterminate=2\nquit=4\nupgrade=8\ninterrupt=16\nsuspend=32\nbg_read=64\nbg_write=128\nchild=256\nuser=512\nalarm=1024\nbroken_pipe=2048\nabort=4096\ncontinued=8192\nresize=16384\nurgent=32768\nvirtual_alarm=65536\nprofile_alarm=131072\ncpu_limit=262144\nfile_limit=524288\nsum=1048575\nor=1048575")
+//! phase: run
+//! conforms: std.signal, os.signal.set, os.signal.set.stable
+//!
+//! **sc60: the twenty listenable meanings, each at its published bit.**
+//! `[os.signal.set]` at wolf 0.2.29 gives every signal POSIX lets a
+//! program catch a bit (0..19), and `[os.signal.set.stable]` makes each
+//! permanent: a released bit is never reassigned. This row is that rule
+//! held against `std.signal`'s table, one line a meaning, so an edit to
+//! any bit is red by its name. The sum and the OR of the twenty are both
+//! 1048575: twenty distinct single bits, the whole listenable set. The
+//! numbers are written here and nowhere in `std/` but the table itself —
+//! a program names a meaning, and this is the test that the names keep
+//! meaning what a release said.
+
+use std.signal
+
+fn main() -> !int {
+    print("reload={signal.reload()}")
+    print("terminate={signal.terminate()}")
+    print("quit={signal.quit()}")
+    print("upgrade={signal.upgrade()}")
+    print("interrupt={signal.interrupt()}")
+    print("suspend={signal.suspend()}")
+    print("bg_read={signal.bg_read()}")
+    print("bg_write={signal.bg_write()}")
+    print("child={signal.child()}")
+    print("user={signal.user()}")
+    print("alarm={signal.alarm()}")
+    print("broken_pipe={signal.broken_pipe()}")
+    print("abort={signal.abort()}")
+    print("continued={signal.continued()}")
+    print("resize={signal.resize()}")
+    print("urgent={signal.urgent()}")
+    print("virtual_alarm={signal.virtual_alarm()}")
+    print("profile_alarm={signal.profile_alarm()}")
+    print("cpu_limit={signal.cpu_limit()}")
+    print("file_limit={signal.file_limit()}")
+    let v1 = signal.reload() + signal.terminate() + signal.quit() + signal.upgrade()
+    let s219 = signal.interrupt() +
+        signal.suspend() +
+        signal.bg_read() +
+        signal.bg_write() +
+        signal.child()
+    let a = signal.user() +
+        signal.alarm() +
+        signal.broken_pipe() +
+        signal.abort() +
+        signal.continued()
+    let b = signal.resize() + signal.urgent() + signal.virtual_alarm() + signal.profile_alarm()
+    let c = signal.cpu_limit() + signal.file_limit()
+    print("sum={v1 + s219 + a + b + c}")
+    let o1 = signal.reload() | signal.terminate() | signal.quit() | signal.upgrade()
+    let o2 = signal.interrupt() |
+        signal.suspend() |
+        signal.bg_read() |
+        signal.bg_write() |
+        signal.child()
+    let o3 = signal.user() |
+        signal.alarm() |
+        signal.broken_pipe() |
+        signal.abort() |
+        signal.continued()
+    let o4 = signal.resize() | signal.urgent() | signal.virtual_alarm() | signal.profile_alarm()
+    let o5 = signal.cpu_limit() | signal.file_limit()
+    print("or={o1 | o2 | o3 | o4 | o5}")
+    0
+}
