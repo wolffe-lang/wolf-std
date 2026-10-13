@@ -884,6 +884,46 @@ pub fn exec(c: Command, env: List[str]) -> () ! {unsupported, invalid, not_found
     os_exec(exe, c.argv, env, c.fds)?
 }
 
+/// Make THIS process another user, for good.
+///
+/// **s236 (`[os.proc.ids.set]`).** After it the process is user `uid`,
+/// group `gid`, with exactly the supplementary groups `groups` — its
+/// real, effective and saved ids all, in every thread. It is what `su`,
+/// `login` and a server that has bound its low port do, and it is one
+/// call because the three changes have one safe order (the groups, the
+/// group ids, the user ids) that a program must not be able to get
+/// wrong: the other order leaves the old group and the old groups
+/// behind. There is no way back, no "leave this one" word, and no
+/// temporary form; do what needs the old user first. The numbers come
+/// from the account files: `std.os.users` reads them.
+///
+/// **It returns in one of two states and no other** — every id as
+/// asked, or every id as it was. A refusal before anything changed is a
+/// row; a refusal after a change is put back and read back before it
+/// is a row; and if that cannot be done, or the ids read back are not
+/// the ones asked for, or an old id can still be taken, the process
+/// ENDS (one line on standard error and an abort) rather than run as
+/// partly one user and partly another.
+///
+/// Rows: `invalid` for an id outside `0..=4294967294` or more than
+/// 65536 groups (decided before the host), and for an id the host has
+/// no mapping for; `denied` for a process that may not change its ids;
+/// `unsupported` on every host but linux, by name (macOS has no way to
+/// read a drop back); `io` otherwise. Never traps.
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to
+/// `os_set_ids` (wolf-lang s236). lupin answers the `invalid` rows and
+/// declines a well-formed call by name.
+///
+/// ```wolf-doc-example
+/// var refused = false
+/// process.set_ids(0 - 1, 0, List[int]()) else |_| { refused = true }
+/// refused == true
+/// ```
+pub fn set_ids(uid: int, gid: int, groups: List[int]) -> () ! {denied, invalid, unsupported, io} {
+    os_set_ids(uid, gid, groups)?
+}
+
 /// End THIS process immediately with `code`.
 ///
 /// Never returns — no `defer` runs, no buffer is flushed by std, and no
