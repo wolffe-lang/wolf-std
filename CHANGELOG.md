@@ -1,5 +1,73 @@
 # Changelog
 
+## sc60 — 2026-10-13 — std at wolf 0.2.29 / lupin 0.1.52: every signal by name, and this process's ids
+
+**The pin.** wolf 0.2.28 -> **0.2.29** and lupin 0.1.51 -> **0.1.52**,
+from the release archives by digest (`vendor/tools.toml`; linux x86-64
+`ae466e85…` and `f5194b74…`). lupin's pin key stays at wolf-lang v0.2.24
+(`294d626d`), now five releases behind. The data pin moves v0.2.28 ->
+v0.2.29 (`f71ece8` -> `6ffe7c6`, +6 anchors, none removed:
+`os.proc.self`, `os.signal.ignored`, `os.signal.number`,
+`os.signal.send`, `os.signal.set.stable`, `os.signal.shell.note`).
+F-0146 predicted it before the archives were fetched; the measurements
+sit beside it. 0.2.29's archive bundles this repository at `d7c2968`
+(sc59) as its `std/`; the rig still stages its own.
+
+**Trunk's 449 tests at the pin: one red, the one 0.2.29 shipped with.**
+`tests/signal/rows.lu` used 512 as "a bit outside the meanings"; wolf
+0.2.29 (s232, ruling #70) made 512 `USER`, so its `signal.reset(512)`
+reset `SIGUSR1` and answered ok, and lupin 0.1.52 declined the
+disposition by name. The row now uses **2^62**: `[os.signal.set]`
+publishes bits 0..27, a new meaning takes the lowest unpublished bit
+(`[os.signal.set.stable]`), and bit 62 is the last that rule can reach.
+A second reset holds it beside a listenable meaning. No ledger word
+moved for any existing row.
+
+**A signal's bit is permanent, and `std.signal` is where the bits
+live.** `[os.signal.set.stable]` (new in 0.2.29): a published meaning
+keeps its bit forever and a program names meanings, never bits or host
+numbers. `std.signal`'s header says so, and its meaning functions are
+the one table in `std/` that writes a bit.
+
+- **Eleven more listenable meanings**, the table's names: `user()`
+  (`SIGUSR1`), `alarm()`, `broken_pipe()`, `abort()`, `continued()`
+  (`SIGCONT`; `continue` is a keyword), `resize()` (`SIGWINCH`),
+  `urgent()`, `virtual_alarm()`, `profile_alarm()`, `cpu_limit()`,
+  `file_limit()`. With the first nine, every signal POSIX lets a
+  program catch: `listen`, `wait`, `poll`, `ignore`, `reset` and `raise`
+  take any of the twenty.
+- **Eight send-only meanings**: `kill()`, `stop()`, `segment_fault()`,
+  `bus_error()`, `arithmetic()`, `illegal()`, `breakpoint()`,
+  `bad_syscall()`. `send` and `number` take them; a set that holds one
+  is `io`.
+- **One shape rule** (the builtins', stated in the header): an empty
+  set, or one holding any bit that is not a listenable meaning, is `io`
+  from every set-taking call and nothing changes.
+- **`signal.send(pid, meaning)`** — `kill(2)` for one process; a
+  meaning of 0 asks "is there such a process, and may I signal it".
+  Rows `invalid` (the shape, first, on every host), `unsupported`
+  (windows), `not_found`, `denied`, `io`. Capability `exec`.
+- **`signal.number(meaning)`** — the number THIS host gives a meaning
+  (`kill -l`, `trap … 13`, `128 + N`); `invalid` for anything but one
+  meaning, `unsupported` on windows. No capability.
+- **`signal.ignored()`** — the listenable meanings this process ignores
+  now; read first, what it was started ignoring (`trap`, `nohup`).
+  `unsupported` on windows. Capability `env`.
+- **`env.pid()`** and **`env.ppid()`** — this process's id and its
+  parent's (`$$`, `$PPID`); `ppid` is `unsupported` on windows.
+  Capability `env`. `process.pid` stays a child's id.
+- **Spellings are proposed, not ruled** (the PR's first section):
+  `continued`, `env.pid`/`env.ppid` rather than `std.process`,
+  `signal.send`, and whether the eight send-only meanings have names.
+  Each is in a commit of its own.
+- **lupin 0.1.52 serves `env.pid`, `env.ppid`, `signal.number` and
+  every shape row; it refuses a well-formed `signal.send` and
+  `signal.ignored` by name** (no host call without `unsafe`; ruling #70
+  R9), and it never listens. Their rows are `unsupported` on lupin.
+- A `comptime fn` that calls `os_signal_send` or `os_pid` is E0701
+  (D33), each witnessed by a row; `os_signal_number` at comptime is
+  refused by name.
+
 ## sc59 — 2026-10-12 — std at wolf 0.2.28 / lupin 0.1.51, with the calls that change a file
 
 **The pin.** wolf 0.2.27 -> **0.2.28** and lupin 0.1.50 -> **0.1.51**,
