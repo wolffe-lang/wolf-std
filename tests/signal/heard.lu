@@ -1,0 +1,85 @@
+//! check: run(exit=0, stdout="meanings=20\nheard_or_named_gap=20\ntaken_once=true")
+//! phase: run
+//! conforms: std.signal, os.signal.listen, os.signal.raise, os.signal.poll, os.signal.platform, os.signal.set
+//!
+//! **sc60: each of the twenty listenable meanings is HEARD.** For each:
+//! `listen`, `raise`, and the `poll` that follows answers that meaning —
+//! s232's guarantee that a poll never trails a raise (`[os.signal.poll]`,
+//! wolf-lang#691) — and a second poll answers 0: taken once. A raise
+//! happens only after its listen answered ok, so no signal here ever
+//! meets its default action.
+//!
+//! **Windows hears four** (`[os.signal.platform]`): `reload`,
+//! `terminate`, `quit` and `upgrade` by this process's own raise; a
+//! listen for any of the other sixteen is `io`, a named gap. The row
+//! reads the host from `signal.number` (`unsupported` where signals have
+//! no numbers) and counts a meaning when it is heard, or, on that host
+//! alone and for those sixteen alone, when its listen is `io`. Twenty
+//! either way; a meaning that is neither is not counted.
+//!
+//! **lupin never listens** (`os_signal_listen` is declined by name), so
+//! its word is `unsupported` on every host.
+
+use std.signal
+
+fn table() -> List[int] {
+    [
+        signal.reload(),
+        signal.terminate(),
+        signal.quit(),
+        signal.upgrade(),
+        signal.interrupt(),
+        signal.suspend(),
+        signal.bg_read(),
+        signal.bg_write(),
+        signal.child(),
+        signal.user(),
+        signal.alarm(),
+        signal.broken_pipe(),
+        signal.abort(),
+        signal.continued(),
+        signal.resize(),
+        signal.urgent(),
+        signal.virtual_alarm(),
+        signal.profile_alarm(),
+        signal.cpu_limit(),
+        signal.file_limit(),
+    ]
+}
+
+fn main() -> !int {
+    var numbered = true
+    signal.number(signal.terminate()) else |_| {
+        numbered = false
+        0
+    }
+    let console = signal.reload() | signal.terminate() | signal.quit() | signal.upgrade()
+    let ms = table()
+    var counted = 0
+    var once = true
+    for m in ms {
+        var armed = true
+        signal.listen(m) else |_| {
+            armed = false
+        }
+        if !armed {
+            if !numbered && m & console == 0 {
+                counted += 1
+            }
+            continue
+        }
+        signal.raise(m)?
+        let got = signal.poll(m)?
+        if got == m {
+            counted += 1
+        }
+        let again = signal.poll(m)?
+        if again != 0 {
+            once = false
+        }
+    }
+    print("meanings={ms.len}")
+    print("heard_or_named_gap={counted}")
+    print("taken_once={once}")
+    0
+}

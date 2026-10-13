@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.signal, comptime.sandbox, comptime.sandbox.exec
+//!
+//! **D33 for `signal.send` (sc60), held one level down at
+//! `os_signal_send`**: a signal to a process is process control (`exec`,
+//! ruling #70 R8), and a compile may not signal anything on the machine
+//! that compiles it. The row is handled locally (F-0069); the meaning
+//! function runs at run time to keep the import used.
+
+use std.signal
+
+comptime fn probe() -> int {
+    os_signal_send(1, 0) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {signal.terminate()}")
+    0
+}

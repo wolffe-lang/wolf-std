@@ -19,10 +19,9 @@
 //! has published. So a set stored by one release means the same to the
 //! next, and the only spelling of a meaning that is portable is its NAME:
 //! call the function, never write the bit and never a host's signal
-//! number. The builtin `os_signal_number` is the one way from a meaning
-//! to the number this host gives it (`USER` is 10 on linux and 30 on
-//! macOS), for the places a number is the interface — `kill -l`,
-//! `trap … 13`, `128 + N`.
+//! number. `number` is the one way from a meaning to the number this
+//! host gives it (`USER` is 10 on linux and 30 on macOS), for the places
+//! a number is the interface — `kill -l`, `trap … 13`, `128 + N`.
 //!
 //! **Three dispositions, nothing else.** A meaning's signal either does
 //! what the host does by default (`reset`), nothing (`ignore`), or arrives
@@ -44,12 +43,17 @@
 //! the first four meanings can be listened for — the console sends
 //! `terminate()` and `quit()`, and `reload()` and `upgrade()` arrive only
 //! by this process's own `raise` — so a listen for any of the other
-//! sixteen is `io` there, and `ignore` and `reset` answer `unsupported`
+//! sixteen is `io` there, and `ignore`, `reset`, `ignored`, `send` and
+//! `number` answer `unsupported`, the last two after their own shape
 //! (`[os.signal.platform]`).
 //!
-//! **Capability: `exec` (I13)** — signal control is process control, tagged
-//! `exec` in the sandbox table and refused at comptime (D33). The meaning
-//! functions reach nothing and are comptime-safe.
+//! **Capability: `exec` (I13)** — signal control is process control:
+//! `listen`, `wait`, `poll`, `ignore`, `reset`, `raise` and `send` are
+//! tagged `exec` in the sandbox table. `ignored` READS this process's
+//! context and is `env` (ruling #70 R8, with `os_pgid`); `number` reads
+//! the host's numbering and charges nothing. All of them are refused at
+//! comptime (D33). The meaning functions reach nothing and are
+//! comptime-safe.
 
 // THE TABLE (`[os.signal.set]`). These functions are the one place in
 // `std/` where a signal's bit is written, and each bit is permanent
@@ -153,4 +157,73 @@ pub fn reset(set: int) -> () ! {unsupported, io} {
 /// Send `meaning` to this process (`os_signal_raise`).
 pub fn raise(meaning: int) -> () ! {io} {
     os_signal_raise(meaning)?
+}
+
+/// **s232 (`[os.signal.send]`): send `meaning`'s signal to the process
+/// `pid`** — `kill(2)` for one process. `meaning` is one meaning of the
+/// table, or 0, which sends nothing and answers the same rows: "is there
+/// such a process, and may I signal it". A process id names whichever
+/// process holds it NOW (a child already reaped may have passed its id
+/// on); `std.process.kill` on a `Child` has no such hazard. A send to
+/// this process's own id is a process-directed `raise`.
+///
+/// Rows, in the order they are decided: `invalid` when `pid` is not
+/// above 0 or does not fit a process id, or `meaning` is neither 0 nor
+/// exactly one meaning (nothing is sent); `unsupported` on a host with
+/// no such call (windows, by name); then the target's — `not_found`
+/// when no process has that id, `denied` when this process may not
+/// signal it, `io` otherwise. Never traps. lupin answers the shape and
+/// declines the send itself by name (no host call without `unsafe`).
+///
+/// Capability `exec`; refused at comptime (D33). Delegates to
+/// `os_signal_send`.
+///
+/// ```wolf-doc-example
+/// var row = "sent"
+/// signal.send(0, signal.terminate()) else |_| { row = "refused" }
+/// row == "refused"
+/// ```
+pub fn send(pid: int, meaning: int) -> () ! {unsupported, invalid, not_found, denied, io} {
+    os_signal_send(pid, meaning)?
+}
+
+/// **s232 (`[os.signal.number]`): the number THIS host gives `meaning`**
+/// — what `kill -l` prints, what `trap … 13` names and what a shell's
+/// `128 + N` decodes. It differs between hosts, which is why nothing
+/// else in this module takes or answers one.
+///
+/// Rows: `invalid` for anything but exactly one meaning of the table;
+/// `unsupported` on a host that does not number signals (windows).
+/// Never traps.
+///
+/// Carries no capability (it reads the host's numbering and nothing
+/// else), and is refused at comptime all the same: the compiling host's
+/// number is not the running one's (D33). Delegates to
+/// `os_signal_number`.
+///
+/// ```wolf-doc-example
+/// let n = signal.number(signal.interrupt()) else |_| 1
+/// n >= 1
+/// let none = signal.number(0) else |_| 0 - 1
+/// none == 0 - 1
+/// ```
+pub fn number(meaning: int) -> int ! {invalid, unsupported} {
+    os_signal_number(meaning)?
+}
+
+/// **s232 (`[os.signal.ignored]`): the set of listenable meanings this
+/// process ignores NOW.** It changes nothing. Read before the program's
+/// own first `ignore`, `reset` or `listen`, it is what the process was
+/// STARTED ignoring — what a shell's `trap` must leave alone and what
+/// makes `nohup` work. A listened meaning is not ignored.
+///
+/// Rows: `unsupported` on a host with no dispositions (windows). Never
+/// traps. lupin declines by name (no `sigaction` without `unsafe`), so
+/// the example is prose: `signal.ignored()? & signal.reload() != 0`
+/// asks whether this program runs under `nohup`.
+///
+/// Capability `env` (ruling #70 R8); refused at comptime (D33).
+/// Delegates to `os_signal_ignored`.
+pub fn ignored() -> int ! {unsupported} {
+    os_signal_ignored()?
 }

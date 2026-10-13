@@ -4077,3 +4077,46 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# sc60: std's wrappers over s232's builtins (spellings proposed in the
+# PR, rulings owed there). Every word below was observed on kasumi
+# (wolf 0.2.29 / lupin 0.1.52) on lupin, the checked machine, native and
+# release before its row was added, and again under `taskset -c 0-3`.
+#
+# `signal/send_rows.lu`: the `invalid` shapes of `send` and `number`.
+# The shape precedes the host and lupin answers every shape row (ruling
+# #70 R9): three lanes.
+[tests."signal/send_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# `signal/ignored_rows.lu`: lupin's refusal of `os_signal_ignored` BY
+# NAME is its word (the record: "reads a signal's disposition: this
+# machine admits no `unsafe` and std has no `sigaction`"), the row's
+# first call. On windows the builtin answers the host's `unsupported`
+# ROW on every machine, lupin included, so the program runs there: a
+# host-scoped cell, predicted in F-0146 from lupin's source and held to
+# CI's windows job.
+[tests."signal/ignored_rows.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# `signal/heard.lu`: each of the twenty listened for, raised and polled.
+# lupin never listens: `os_signal_listen` does not resolve there, on any
+# host.
+[tests."signal/heard.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# D33 one level down at `os_signal_send` (`exec`): `fail(E0701)` on the
+# checked, native and release machines; lupin has no comptime tier and
+# says so by name. (`os_signal_number` at comptime is refused by NAME on
+# the compilers, `unsupported` and not E0701, so it has no row: F-0146.)
+[tests."signal/comptime_refuses_send.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

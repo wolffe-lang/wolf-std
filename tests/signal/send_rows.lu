@@ -1,0 +1,52 @@
+//! check: run(exit=0, stdout="send_pid_zero=invalid\nsend_pid_negative=invalid\nsend_wide_pid=invalid\nsend_two_meanings=invalid\nsend_unpublished=invalid\nnumber_zero=invalid\nnumber_two_meanings=invalid\nnumber_unpublished=invalid")
+//! phase: run
+//! conforms: std.signal, os.signal.send, os.signal.number, os.signal.set, err.row
+//!
+//! **sc60: `signal.send`'s and `signal.number`'s SHAPE rows, which signal
+//! nothing, on every host and every lane.** A send is refused by its
+//! shape (`invalid`) before the host is asked (`[os.signal.send]`): a pid
+//! not above 0, a pid wider than a process id, a meaning that is two
+//! meanings, a bit no release publishes. A number is `invalid` for
+//! anything but exactly one meaning (`[os.signal.number]`). The shape
+//! precedes the host, so windows answers these words too, and lupin
+//! answers every one (ruling #70 R9) — it declines only a well-formed
+//! send, which `signal/send_self.lu` reaches. The unpublished bit is
+//! 2^62, `signal/rows.lu`'s, for its reason.
+
+use std.signal
+
+fn send_row(pid: int, meaning: int) -> str {
+    signal.send(pid, meaning) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn number_row(meaning: int) -> str {
+    let n = signal.number(meaning) else |e| {
+        return match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+    }
+    "{n}"
+}
+
+fn main() -> !int {
+    let two = signal.terminate() | signal.user()
+    print("send_pid_zero={send_row(0, signal.terminate())}")
+    print("send_pid_negative={send_row(-1, signal.terminate())}")
+    print("send_wide_pid={send_row(4611686018427387904, 0)}")
+    print("send_two_meanings={send_row(1, two)}")
+    print("send_unpublished={send_row(1, 4611686018427387904)}")
+    print("number_zero={number_row(0)}")
+    print("number_two_meanings={number_row(two)}")
+    print("number_unpublished={number_row(4611686018427387904)}")
+    0
+}

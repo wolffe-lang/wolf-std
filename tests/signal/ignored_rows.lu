@@ -1,0 +1,56 @@
+//! check: run(exit=0, stdout="within_listenable=true\nignore_adds=true\nreset_removes=true\nlisten_is_not_ignored=true\nothers_untouched=true")
+//! phase: run
+//! conforms: std.signal, os.signal.ignored, os.signal.disp, os.signal.listen, err.row
+//!
+//! **sc60: `signal.ignored()` reads what `ignore`, `reset` and `listen`
+//! set.** What this process was STARTED ignoring is the rig's business
+//! (a job under `nohup` starts ignoring `reload()`), so the row asserts
+//! relations on one meaning, `user()`, and that no other bit moves: the
+//! answer holds only listenable meanings; an `ignore` adds the meaning; a
+//! `reset` removes it; a `listen` leaves it not ignored
+//! (`[os.signal.ignored]`: "a listened meaning is not ignored"). On a
+//! host with no dispositions (windows) the first read answers
+//! `unsupported` and every line is true for that reason. **lupin declines
+//! the read by name** (no `sigaction` without `unsafe`, ruling #70 R9);
+//! it is this row's first call, so the refusal names `os_signal_ignored`.
+
+use std.signal
+
+fn listenable() -> int {
+    let v1 = signal.reload() | signal.terminate() | signal.quit() | signal.upgrade()
+    let tty = signal.interrupt() | signal.suspend() | signal.bg_read() | signal.bg_write()
+    let a = signal.child() | signal.user() | signal.alarm() | signal.broken_pipe()
+    let b = signal.abort() | signal.continued() | signal.resize() | signal.urgent()
+    let c = signal.virtual_alarm() | signal.profile_alarm() | signal.cpu_limit()
+    v1 | tty | a | b | c | signal.file_limit()
+}
+
+fn main() -> !int {
+    let m = signal.user()
+    let before = signal.ignored() else |_| -1
+    if before == -1 {
+        print("within_listenable=true")
+        print("ignore_adds=true")
+        print("reset_removes=true")
+        print("listen_is_not_ignored=true")
+        print("others_untouched=true")
+        return 0
+    }
+    print("within_listenable={(before & !listenable()) == 0}")
+    signal.ignore(m)?
+    let ignoring = signal.ignored()?
+    print("ignore_adds={(ignoring & m) == m}")
+    signal.reset(m)?
+    let after_reset = signal.ignored()?
+    print("reset_removes={(after_reset & m) == 0}")
+    signal.ignore(m)?
+    signal.listen(m)?
+    let listening = signal.ignored()?
+    print("listen_is_not_ignored={(listening & m) == 0}")
+    signal.reset(m)?
+    let rest = !m
+    let base = before & rest
+    let same = ignoring & rest == base && after_reset & rest == base
+    print("others_untouched={same && (listening & rest) == base}")
+    0
+}
