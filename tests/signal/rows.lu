@@ -1,15 +1,40 @@
-//! check: run(exit=0, stdout="meanings=511\ninterrupt=16\npoll_empty=io\npoll_none=0\nignore_empty=io\nreset_outside=io")
+//! check: run(exit=0, stdout="meanings=511\ninterrupt=16\npoll_empty=io\npoll_none=0\nignore_empty=io\nreset_outside=io\nreset_mixed=io")
 //! phase: run
 //! conforms: std.signal, os.signal.set, os.signal.disp, os.signal.poll, err.row
 //!
 //! **s219: `std.signal`'s rows that change nothing, on every host.** The
-//! nine meanings are distinct bits (their sum is 511); a poll of an empty
-//! set is `io` and of a meaning never listened for is 0; `ignore` of an
-//! empty set and `reset` of a bit outside the meanings are `io` before
-//! anything changes. Ctrl-C itself is witnessed through a pseudo-terminal
-//! in wolf-lang's `ctrl_c_lanes.rs`: this rig has none.
+//! first nine meanings are distinct bits (their sum is 511); a poll of an
+//! empty set is `io` and of a meaning never listened for is 0; `ignore`
+//! of an empty set and `reset` of a bit outside the meanings are `io`
+//! before anything changes. Ctrl-C itself is witnessed through a
+//! pseudo-terminal in wolf-lang's `ctrl_c_lanes.rs`: this rig has none.
+//!
+//! **The outside bit is 2^62, and it was 512 until sc60.** 512 was the
+//! lowest bit no release published when s219 wrote this row; wolf 0.2.29
+//! (s232) made it `USER`, so `reset(512)` became a reset of `SIGUSR1` and
+//! this row went red in the release's own archive. `[os.signal.set]` at
+//! 0.2.29 publishes bits 0..27 (twenty listenable, eight send-only), and
+//! `[os.signal.set.stable]` gives a new meaning the LOWEST unpublished
+//! bit, so bit 28 is next and bit 62 — the highest bit of a non-negative
+//! `int` — is the last that rule can reach. A test, not `std/`, is where
+//! a bit with no name is written: it has none by construction. The
+//! second reset holds that bit beside a listenable one: `io` again, so
+//! the refusal is the unpublished bit's and not an empty set's (a machine
+//! that kept only the low 32 bits of a set would answer the first row by
+//! accident and reset `INTERRUPT` on the second).
 
 use std.signal
+
+fn reset_row(set: int) -> str {
+    var r = "ok"
+    signal.reset(set) else |e| {
+        r = match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    r
+}
 
 fn main() -> !int {
     let v1 = signal.reload() + signal.terminate() + signal.quit() + signal.upgrade()
@@ -29,13 +54,7 @@ fn main() -> !int {
         }
     }
     print("ignore_empty={ie}")
-    var ro = "ok"
-    signal.reset(512) else |e| {
-        ro = match e {
-            io => "io",
-            unsupported => "unsupported",
-        }
-    }
-    print("reset_outside={ro}")
+    print("reset_outside={reset_row(4611686018427387904)}")
+    print("reset_mixed={reset_row(4611686018427387904 | signal.interrupt())}")
     0
 }
