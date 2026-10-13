@@ -1,0 +1,48 @@
+//! check: run(exit=0, stdout="ids: true\ngroups: true\nowner of a new file is the effective user: true")
+//! phase: run
+//! conforms: std.env, std.fs, err.row
+//!
+//! **s236: `env.uid`, `env.euid`, `env.gid`, `env.egid`, `env.groups`.**
+//! The ids are the host's, so the row prints none of them: the four are
+//! served together or `unsupported` together (windows has no such ids,
+//! and answers by name), the supplementary groups with them, each a
+//! number from 0; and a file this process creates is owned by its
+//! EFFECTIVE user — `fs.stat`'s own word for the owner, the one fact
+//! about the ids a program can check without being told who it is.
+//! lupin has no host call for an id and declines `os_uid` by name; on
+//! windows it answers the row and runs. (The clause is wolf-lang's
+//! `[os.proc.ids]`, which the data pin does not publish yet.)
+
+use std.env
+use std.fs
+
+fn main() -> !int {
+    let uid = env.uid() else |_| -1
+    let euid = env.euid() else |_| -1
+    let gid = env.gid() else |_| -1
+    let egid = env.egid() else |_| -1
+    let served = uid >= 0
+    print("ids: {(euid >= 0) == served && (gid >= 0) == served && (egid >= 0) == served}")
+    var groups_served = true
+    var all_ids = true
+    let gs = env.groups() else |e| {
+        groups_served = match e {
+            unsupported => false,
+            io => true,
+        }
+        List[int]()
+    }
+    for g in gs {
+        all_ids = all_ids && g >= 0 && g <= 4294967294
+    }
+    print("groups: {groups_served == served && all_ids}")
+    fs.create_dir_all("target")?
+    fs.write_text("target/s236-who-ids.tmp", "x")?
+    let info = fs.stat("target/s236-who-ids.tmp")?
+    fs.remove("target/s236-who-ids.tmp")?
+    let owned = fs.answered(info, 6)
+    print(
+        "owner of a new file is the effective user: {owned == served && (!owned || info.uid == euid)}",
+    )
+    0
+}

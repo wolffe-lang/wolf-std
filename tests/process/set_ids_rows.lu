@@ -1,0 +1,38 @@
+//! check: run(exit=0, stdout="shape: invalid invalid invalid")
+//! phase: run
+//! conforms: std.process, err.row
+//!
+//! **s236: `process.set_ids` — the shape rows, and nothing else.** No
+//! test may change who it runs as on a host, so this one asks only for
+//! what is refused before the host is asked: a user id of -1 (there is
+//! no "leave" word here), a group id one past the largest id, and a
+//! group list holding a negative number. Each is `invalid` on every
+//! host and every lane, lupin's included. The drop itself — read back
+//! in every thread and by a child, the way back refused, a refusal at
+//! the last step put back whole — is witnessed upstream as the
+//! super-user inside a throwaway container (wolf-lang `ids_lanes`);
+//! what a user is told on a host is `process/set_ids_refused.lu`. (The
+//! clause is wolf-lang's `[os.proc.ids.set]`, which the data pin does
+//! not publish yet.)
+
+use std.process
+
+fn set_row(uid: int, gid: int, groups: List[int]) -> str {
+    process.set_ids(uid, gid, groups) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let none = List[int]()
+    print(
+        "shape: {set_row(0 - 1, 0, none)} {set_row(0, 4294967295, none)} {set_row(0, 0, [0, 0 - 1])}",
+    )
+    0
+}

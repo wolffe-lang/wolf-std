@@ -1,0 +1,57 @@
+//! check: run(exit=0, stdout="a user may not set ids: true\nunchanged: true")
+//! phase: run
+//! conforms: std.process, std.env, err.row
+//!
+//! **s236: `process.set_ids` asked by a user.** A process without the
+//! privilege asks to be who it already is, and asks to be the
+//! super-user, and is told the same thing both times: `denied` where
+//! the call is served (linux — its first step is refused, so nothing
+//! has changed), `unsupported`, by name, where it is not (macOS,
+//! windows). Afterwards it reads exactly the ids and groups it read
+//! before. The program asks who it is first: as the super-user the call
+//! would SUCCEED, and no test may change an id on a host, so there it
+//! asks nothing and prints the same two lines. lupin declines `os_euid`
+//! by name; on windows, where no machine has ids, the reads answer
+//! `unsupported` and the row is that of a user.
+
+use std.process
+use std.env
+
+fn set_row(uid: int, gid: int, groups: List[int]) -> str {
+    process.set_ids(uid, gid, groups) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn ids_line() -> str {
+    let uid = env.uid() else |_| -1
+    let euid = env.euid() else |_| -1
+    let gid = env.gid() else |_| -1
+    let egid = env.egid() else |_| -1
+    let gs = env.groups() else |_| List[int]()
+    "{uid} {euid} {gid} {egid} {gs}"
+}
+
+fn main() -> !int {
+    let me = env.euid() else |_| -1
+    let before = ids_line()
+    if me == 0 {
+        print("a user may not set ids: true")
+    } else {
+        var uid = env.uid() else |_| 0
+        var gid = env.gid() else |_| 0
+        let groups = env.groups() else |_| List[int]()
+        let own = set_row(uid, gid, groups)
+        let root = set_row(0, 0, List[int]())
+        let refused = own == root && (own == "denied" || own == "unsupported")
+        print("a user may not set ids: {refused}")
+    }
+    print("unchanged: {ids_line() == before}")
+    0
+}

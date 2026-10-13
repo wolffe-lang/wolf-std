@@ -4169,3 +4169,46 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# s236 (wolf-lang#633, #701, #742; rulings owed): who the process runs
+# as, a file's owner, the drop, and the account files' reader.
+# `std.os.users` is pure parsing — it names no builtin — so its two
+# rows run on every lane at any pin.
+[tests."os/users/parse_lines.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."os/users/whole_files.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# The owner calls that change nothing: lupin serves `fs_set_owner` and
+# `fs_set_owner_fd` through the standard library, so three lanes.
+[tests."fs/owner_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# The drop's shape rows are answered before the host on every lane.
+[tests."process/set_ids_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# The reads: lupin declines `os_uid` (and `os_euid`) BY NAME on a host
+# that has ids — it has no host call for one without `unsafe` — and on
+# windows, where no machine has such ids, it answers the `unsupported`
+# ROW and the programs run.
+[tests."env/who_ids.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+[tests."process/set_ids_refused.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
