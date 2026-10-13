@@ -1,0 +1,345 @@
+//! member: true
+//!
+//! std.os.users — the machine's ACCOUNTS, as its two plain files write
+//! them: a user line of `passwd(5)` and a group line of `group(5)`.
+//! Stability tier: core.
+//!
+//! **Pure parsing, and nothing else.** Every function here takes TEXT
+//! the caller already holds and answers from it. Nothing in this module
+//! opens a file, asks a name service (NSS, a directory server, a
+//! cache), or reaches the host at all: it carries no capability and it
+//! runs at comptime. The program that wants the machine's accounts
+//! reads them itself and says where from —
+//! `users.user_named(fs.read_text("/etc/passwd")?, "wolf")` — so the
+//! file it trusted is in its own source, which is what `su`, `login`,
+//! `id` and `ls -l` need and all a module without a name service can
+//! honestly offer. A host that keeps its accounts somewhere else (a
+//! directory service, macOS's for most of its users) is not answered by
+//! these files, and this module does not pretend otherwise.
+//!
+//! **What it is for.** `std.env.uid` and `std.fs.stat` answer NUMBERS;
+//! this is where a number gets its name and a name its number, and
+//! where the three arguments of `std.process.set_ids` come from:
+//! `user_named` gives the user and group ids, `groups_of` the
+//! supplementary groups.
+//!
+//! **The two lines.**
+//!
+//! ```text
+//! name:password:uid:gid:comment:home:shell         a user  (7 fields)
+//! name:password:gid:member,member,…                a group (4 fields)
+//! ```
+//!
+//! The fields are cut at `:` and at nothing else; none is trimmed. A
+//! line is well formed when it has exactly that many fields, its name
+//! is not empty and its ids are decimal. The password field is carried
+//! by neither type: on every current host it is a placeholder (`x`,
+//! `*`), the real one being in a file this module does not read.
+//!
+//! **An id** is `0..=4294967294`. A leading `-` is read the way the
+//! host reads it — as that many below 4294967296 — because macOS writes
+//! `nobody` as `-2`, which is 4294967294; `-1` is therefore no id (it
+//! is every host call's "leave this one alone") and a line carrying it
+//! is malformed.
+//!
+//! **Errors are rows, never traps** (D30, §2). Two tags:
+//!
+//! - `parse` — one line is not a user (or a group) line: `parse_user`,
+//!   `parse_group`.
+//! - `none` — the text holds no such account: the four lookups.
+//!
+//! The readers of a whole text (`users`, `groups`, the lookups,
+//! `groups_of`) SKIP what is not an account line — a blank line, a `#`
+//! comment (macOS's file opens with ten), a `+`/`-` compatibility
+//! entry, a malformed line — instead of failing the file for it: one
+//! bad line must not lock every user out, and `parse_user` is there for
+//! the program that wants to report it.
+
+/// One user: a line of `passwd(5)`, less its password field.
+pub struct User {
+    /// The login name. Never empty.
+    name: str,
+    /// The user id, `0..=4294967294`.
+    uid: int,
+    /// The user's own (primary) group id.
+    gid: int,
+    /// The comment field: usually the full name. May be empty.
+    comment: str,
+    /// The home directory. May be empty.
+    home: str,
+    /// The login shell; empty means the host's default.
+    shell: str,
+}
+
+/// One group: a line of `group(5)`, less its password field.
+pub struct Group {
+    /// The group's name. Never empty.
+    name: str,
+    /// The group id, `0..=4294967294`.
+    gid: int,
+    /// The users written as members, in the file's order. A user whose
+    /// OWN group this is (their `User.gid`) is usually not listed.
+    members: List[str],
+}
+
+/// A decimal id field. Private: the one place the id rule lives.
+fn id_of(field: str) -> int ! {parse} {
+    var digits = field
+    var negative = false
+    if field.starts_with("-") {
+        negative = true
+        digits = field[1..]
+    }
+    if digits.len == 0 || digits.len > 10 {
+        return parse
+    }
+    // Annotated: the reference machine keeps an unannotated literal
+    // binding at `i32` (wolf-interp#173), and an id needs 33 bits.
+    var value: int = 0
+    for raw in digits.bytes() {
+        let c = raw as int
+        if c < 48 || c > 57 {
+            return parse
+        }
+        value = value * 10 + (c - 48)
+    }
+    if negative {
+        value = 4294967296 - value
+    }
+    if value < 0 || value > 4294967294 {
+        return parse
+    }
+    value
+}
+
+/// Is `line` one the whole-text readers pass over without trying it: a
+/// blank line, a `#` comment, a `+` or `-` compatibility entry?
+fn skipped(line: str) -> bool {
+    line.len == 0 || line.starts_with("#") || line.starts_with("+") || line.starts_with("-")
+}
+
+/// One user line, parsed.
+///
+/// Total over text and PURE — comptime-safe, reaching no host. The line
+/// is taken as written, without its newline.
+///
+/// Rows: `parse` when `line` does not have exactly seven `:`-separated
+/// fields, its name is empty, or its user or group id is not a decimal
+/// id (the module header says what an id is). Never traps.
+///
+/// ```wolf-doc-example
+/// let u = users.parse_user("wolf:x:1000:1000:A Wolf:/home/wolf:/bin/sh")?
+/// u.name == "wolf" && u.uid == 1000 && u.gid == 1000
+/// u.comment == "A Wolf" && u.home == "/home/wolf" && u.shell == "/bin/sh"
+/// let nobody = users.parse_user("nobody:*:-2:-2:Unprivileged User:/var/empty:/usr/bin/false")?
+/// nobody.uid == 4294967294
+/// ```
+pub fn parse_user(line: str) -> User ! {parse} {
+    let f = line.split(":")
+    if f.len != 7 || f[0].len == 0 {
+        return parse
+    }
+    let uid = id_of(f[2])?
+    let gid = id_of(f[3])?
+    User { name: f[0], uid: uid, gid: gid, comment: f[4], home: f[5], shell: f[6] }
+}
+
+/// One group line, parsed.
+///
+/// Total over text and PURE. The member list is cut at `,`; an empty
+/// piece (a trailing comma, an empty list) is not a member.
+///
+/// Rows: `parse` when `line` does not have exactly four `:`-separated
+/// fields, its name is empty, or its group id is not a decimal id.
+/// Never traps.
+///
+/// ```wolf-doc-example
+/// let g = users.parse_group("pack:x:2000:wolf,cub")?
+/// g.name == "pack" && g.gid == 2000 && g.members.len == 2 && g.members[1] == "cub"
+/// let empty = users.parse_group("lone:x:2001:")?
+/// empty.members.len == 0
+/// ```
+pub fn parse_group(line: str) -> Group ! {parse} {
+    let f = line.split(":")
+    if f.len != 4 || f[0].len == 0 {
+        return parse
+    }
+    let gid = id_of(f[2])?
+    var members = List[str]()
+    for m in f[3].split(",") {
+        if m.len > 0 {
+            (mut members).push(m)
+        }
+    }
+    Group { name: f[0], gid: gid, members: members }
+}
+
+/// Every user in `text` — the text of a `passwd(5)` file — in the
+/// file's order.
+///
+/// Total and PURE. A line that is not a user line (blank, a `#`
+/// comment, a `+`/`-` entry, malformed) is passed over; `parse_user`
+/// says why one line is refused.
+///
+/// ```wolf-doc-example
+/// let all = users.users("# accounts\nroot:x:0:0:root:/root:/bin/sh\nbroken line\nwolf:x:1000:1000::/home/wolf:\n")
+/// all.len == 2 && all[0].name == "root" && all[1].uid == 1000
+/// ```
+pub fn users(text: str) -> List[User] {
+    var out = List[User]()
+    for line in text.lines() {
+        if skipped(line) {
+            continue
+        }
+        let u = parse_user(line) else |_| {
+            continue
+        }
+        (mut out).push(u)
+    }
+    out
+}
+
+/// Every group in `text` — the text of a `group(5)` file — in the
+/// file's order.
+///
+/// Total and PURE. Lines that are not group lines are passed over, as
+/// `users` passes them.
+///
+/// ```wolf-doc-example
+/// let all = users.groups("root:x:0:\npack:x:2000:wolf,cub\n\n")
+/// all.len == 2 && all[1].name == "pack" && all[1].members[0] == "wolf"
+/// ```
+pub fn groups(text: str) -> List[Group] {
+    var out = List[Group]()
+    for line in text.lines() {
+        if skipped(line) {
+            continue
+        }
+        let g = parse_group(line) else |_| {
+            continue
+        }
+        (mut out).push(g)
+    }
+    out
+}
+
+/// The FIRST user in `text` named `name` — what `su name` looks up.
+///
+/// PURE. The first line wins, as it does for the host's own reader.
+///
+/// Rows: `none` when no user line carries that name. Never traps.
+///
+/// ```wolf-doc-example
+/// let text = "root:x:0:0:root:/root:/bin/sh\nwolf:x:1000:1000::/home/wolf:/bin/sh\n"
+/// let u = users.user_named(text, "wolf")?
+/// u.uid == 1000 && u.home == "/home/wolf"
+/// let missing = users.user_named(text, "cub") else |_| users.parse_user("none:x:7:7:::")?
+/// missing.uid == 7
+/// ```
+pub fn user_named(text: str, name: str) -> User ! {none} {
+    for u in users(text) {
+        if u.name == name {
+            return u
+        }
+    }
+    return none
+}
+
+/// The FIRST user in `text` whose id is `uid` — the name `ls -l` and
+/// `id` print for a number.
+///
+/// PURE. Two names may share an id; the first line wins.
+///
+/// Rows: `none` when no user line carries that id. Never traps.
+///
+/// ```wolf-doc-example
+/// let text = "root:x:0:0:root:/root:/bin/sh\nwolf:x:1000:1000::/home/wolf:/bin/sh\n"
+/// let u = users.user_by_id(text, 0)?
+/// u.name == "root"
+/// ```
+pub fn user_by_id(text: str, uid: int) -> User ! {none} {
+    for u in users(text) {
+        if u.uid == uid {
+            return u
+        }
+    }
+    return none
+}
+
+/// The FIRST group in `text` named `name` — what `chgrp name` looks up.
+///
+/// PURE.
+///
+/// Rows: `none` when no group line carries that name. Never traps.
+///
+/// ```wolf-doc-example
+/// let g = users.group_named("root:x:0:\npack:x:2000:wolf\n", "pack")?
+/// g.gid == 2000
+/// ```
+pub fn group_named(text: str, name: str) -> Group ! {none} {
+    for g in groups(text) {
+        if g.name == name {
+            return g
+        }
+    }
+    return none
+}
+
+/// The FIRST group in `text` whose id is `gid`.
+///
+/// PURE.
+///
+/// Rows: `none` when no group line carries that id. Never traps.
+///
+/// ```wolf-doc-example
+/// let g = users.group_by_id("root:x:0:\npack:x:2000:wolf\n", 2000)?
+/// g.name == "pack"
+/// ```
+pub fn group_by_id(text: str, gid: int) -> Group ! {none} {
+    for g in groups(text) {
+        if g.gid == gid {
+            return g
+        }
+    }
+    return none
+}
+
+/// The groups user `name` belongs to, by the group file's `text`:
+/// `gid` — the user's own group, from their `User.gid` — first, then
+/// the id of every group that lists `name` as a member, in the file's
+/// order, each id once.
+///
+/// This is the list a login gives a process (`initgroups`, as far as
+/// the file alone decides it), and the third argument of
+/// `std.process.set_ids`: `process.set_ids(u.uid, u.gid,
+/// users.groups_of(group_text, u.name, u.gid))`.
+///
+/// Total and PURE.
+///
+/// ```wolf-doc-example
+/// let text = "root:x:0:\nwolf:x:1000:\npack:x:2000:cub,wolf\nden:x:3000:wolf\nfox:x:4000:fox\n"
+/// let gs = users.groups_of(text, "wolf", 1000)
+/// gs.len == 3 && gs[0] == 1000 && gs[1] == 2000 && gs[2] == 3000
+/// ```
+pub fn groups_of(text: str, name: str, gid: int) -> List[int] {
+    var out = List[int]()
+    (mut out).push(gid)
+    for g in groups(text) {
+        var listed = false
+        for m in g.members {
+            if m == name {
+                listed = true
+            }
+        }
+        var seen = false
+        for have in out {
+            if have == g.gid {
+                seen = true
+            }
+        }
+        if listed && !seen {
+            (mut out).push(g.gid)
+        }
+    }
+    out
+}
