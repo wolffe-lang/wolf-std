@@ -12341,3 +12341,51 @@ iexten`, `min = 1`, `time = 0`.
   directive (raw's two new fields) and stays `run` on four; no other
   row moves; doc-examples 481 unchanged. The same counts on CI's three
   hosts at 0.2.29. Falsified by any other count.
+
+### Measured (sc61, appended; nothing above is edited)
+
+On kasumi (linux x86-64, CachyOS, Python 3.14.7, GNU `stty`). wolf
+0.2.29 is the release archive (`ae466e85…`, read twice against the
+release API), lupin 0.1.52 (`f5194b74…`); the candidate is wolf-lang
+`6655e873` built by this lane with `cargo xtask dist` (archive
+`cddcf618…`, `wolf` `60863db4…`), which reports `wolf 0.2.29+dev.6655e87`
+(the version is not yet bumped at that commit). Logs committed under
+`docs/sc61-witness/`, named by run; the summary is
+`witness-summary.log`.
+
+- **P1 held.** The fresh pty reads `runtime=263` on 0.2.29 and
+  `runtime=287` on the candidate, on all five runs of each.
+- **P2 held.** Trunk's std under 0.2.29: GREEN on all five
+  (`witness-0229-std9e5bd6b.log`). Under the candidate: RED on all five
+  (`witness-cand-std9e5bd6b.log`): after trip `icanon echo isig -ixon
+  -iexten`, after raw `-icanon -echo isig -ixon -iexten`, after back
+  `icanon echo isig -ixon -iexten`; `read=263` where the runtime said
+  287 — `pack(mode)` is where the two bits were lost.
+- **P3 held.** The head's std (`e58cdc2`) under 0.2.29: GREEN on all
+  five; trip and back exact, raw leaves `ixon iexten` on (0.2.29 cannot
+  clear them). Under the candidate: GREEN on all five; trip exact
+  (`read=287`), raw `-ixon -iexten` (R1), back exact.
+- **P4 held for the terminal half.** `set_mode(unpack(287))` is
+  `invalid` on 0.2.29 on all five runs and `ok` on the candidate — the
+  contract's `io` was wrong, the v0.2.29 spec's `invalid` right. Not
+  measured: the same mode on a handle that is not a terminal.
+- **P5 held.** The machines: the native and release binaries (`wolf
+  build`, `wolf build --release`) and `wolf conform-run --json` with
+  `--checked`, `--native` and `--release`; one answer across the five
+  per wolf and std. lupin 0.1.52 (`lupin conform-run --json`) refuses
+  by name: "`os_term_mode` asks the terminal or the process group:
+  this machine admits no `unsafe` and std has no call for it
+  ([os.term], [os.term.note] R8)". lupin's conform-run passes no
+  environment to the program (it answered on standard input).
+- **P6 held.** kasumi gauntlet at `e58cdc2` (every CI step;
+  `std-test-g1-e58cdc2.log` `fcbb2d9f…`): std-test GREEN, **460**
+  tests, forward tags 897, conservatism 136, host-scoped cells 5,
+  lanes 359 / 21 / 49 / 31; doc-examples 481 GREEN; fmt-lu, lint,
+  ledger-check (460), gen-vectors, ulp 200, cargo test, clippy, fmt,
+  doctor exit 0; 0 `SKIP` lines. `sync-pin` was red on the first try
+  for the harness's own reason (a blobless reference clone could not
+  serve the submodule's blobs) and exit 0 on a full clone
+  (`sync-pin-g1b-e58cdc2.log` `0d01c007…`). `term/rows.lu` and
+  `term/round_trip.lu` answered one stdout on lupin, checked, native and
+  release under both wolfs.
+- **Not predicted:** nothing moved that I did not name.
