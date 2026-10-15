@@ -1,0 +1,20 @@
+//! check: fail(E0301)
+//! phase: typecheck
+//! conforms: std.term, std.signal
+//!
+//! **sc62b (ruling #82): `term.wait_input` is gone.** The wait on a
+//! descriptor and a signal set moved to `signal.wait_fd`, the signal
+//! family's (any descriptor serves, not only a terminal). A program that
+//! still names the old spelling does not resolve: E0301 on the compiler,
+//! and lupin says the name does not resolve. Red the day the old name
+//! comes back beside the new one.
+
+use std.fs
+use std.signal
+use std.term
+
+fn main() -> !int {
+    let m = term.wait_input(fs.stdin(), signal.resize()) else |_| { return 1 }
+    print("m: {m}")
+    0
+}

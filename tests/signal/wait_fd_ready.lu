@@ -1,9 +1,10 @@
 //! check: run(exit=0, stdout="a file is ready at once: true\na closed handle: true")
 //! phase: run
-//! conforms: std.term, std.signal, os.signal.wait.fd, err.row
+//! conforms: std.signal, os.signal.wait.fd, err.row
 //!
-//! **sc62: `term.wait_input` on a handle that is always ready.** A
-//! regular file always has something to read (or its end), so a wait on
+//! **sc62: `signal.wait_fd` on a handle that is always ready** (ruling
+//! #82; `term.wait_input` until sc62b). A regular file always has
+//! something to read (or its end), so a wait on
 //! it with a well-formed set answers 0 at once and reads nothing; a
 //! closed handle is `io`. On windows both are `unsupported` (after the
 //! shape, before the handle), so the row prints "ready, or not served"
@@ -13,10 +14,9 @@
 
 use std.fs
 use std.signal
-use std.term
 
 fn row(f: fs.File) -> str {
-    let m = term.wait_input(f, signal.resize()) else |e| {
+    let m = signal.wait_fd(f, signal.resize()) else |e| {
         return match e {
             io => "io",
             unsupported => "unsupported",

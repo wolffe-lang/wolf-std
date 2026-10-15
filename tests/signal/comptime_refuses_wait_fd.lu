@@ -1,14 +1,14 @@
 //! check: fail(E0701)
 //! phase: typecheck
-//! conforms: std.term, comptime.sandbox, comptime.sandbox.exec, os.signal.wait.fd
+//! conforms: std.signal, comptime.sandbox, comptime.sandbox.exec, os.signal.wait.fd
 //!
-//! **D33 for `term.wait_input` (sc62), held one level down at
+//! **D33 for `signal.wait_fd` (sc62, ruling #82), held one level down at
 //! `os_signal_wait_fd`**: a wait on a signal is signal control (`exec`,
 //! ruling #73 R5), and a compile may not park on the machine that
-//! compiles it. The row is handled locally (F-0069); a pure `std.term`
+//! compiles it. The row is handled locally (F-0069); a pure `std.signal`
 //! helper runs at run time to keep the import used.
 
-use std.term
+use std.signal
 
 comptime fn probe() -> int {
     let m = os_signal_wait_fd(0, 16384) else |_| { return 1 }
@@ -17,6 +17,6 @@ comptime fn probe() -> int {
 
 fn main() -> !int {
     const P = probe()
-    print("p: {P} {term.char_disabled()}")
+    print("p: {P} {signal.resize()}")
     0
 }

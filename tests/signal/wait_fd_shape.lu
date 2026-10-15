@@ -1,8 +1,9 @@
 //! check: run(exit=0, stdout="empty=io\noutside=io\nsend_only=io\nmixed=io")
 //! phase: run
-//! conforms: std.term, std.signal, os.signal.wait.fd, os.signal.set, err.row
+//! conforms: std.signal, os.signal.wait.fd, os.signal.set, err.row
 //!
-//! **sc62: `term.wait_input`'s shape rows**, answered before the handle
+//! **sc62: `signal.wait_fd`'s shape rows** (ruling #82;
+//! `term.wait_input` until sc62b), answered before the handle
 //! is looked at and before the host is asked (`[os.signal.wait.fd]`'s
 //! order of refusal): an empty set, a bit outside the meanings (2^62,
 //! as `signal/rows.lu`), a send-only meaning (`kill()`), and a
@@ -12,10 +13,9 @@
 
 use std.fs
 use std.signal
-use std.term
 
 fn row(f: fs.File, set: int) -> str {
-    let m = term.wait_input(f, set) else |e| {
+    let m = signal.wait_fd(f, set) else |e| {
         return match e {
             io => "io",
             unsupported => "unsupported",
