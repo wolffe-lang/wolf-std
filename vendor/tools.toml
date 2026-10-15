@@ -968,7 +968,30 @@
 # ITS CONFORMANCE PIN DOES NOT MOVE: still wolf-lang v0.2.24
 # (`294d626d`), now FIVE releases behind the compiler and the data pin
 # below (v0.2.29). The pin key below is unchanged on purpose.
-version = "0.1.52"
+# sc62 BUMP: 0.1.52 -> 0.1.53 (r35, released 2026-10-15), the lupin half
+# of wolf 0.2.30: the mirrors of s234 and s236. It answers the shape rows
+# of `os_signal_wait_fd` (a refused set is `io`) and of `os_set_ids`
+# (`invalid`), serves `fs_set_owner` and `fs_set_owner_fd` through the
+# standard library, and refuses `os_term_size`, `os_term_chars`,
+# `os_signal_wait_fd`, the five id reads and a well-formed `os_set_ids`
+# by name (no `ioctl`, `tcgetattr`, `poll` or id call without `unsafe`).
+# Acquired by digest from the release, verified from `--version`:
+# `lupin 0.1.53 (wolf-interp, reference interpreter at pin 294d626)`.
+# Archive `lupin-0.1.53-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `5db5533236578008625885c7e3ed0a21084b8fa064219808ae668dedb0edccaa`
+# (the release's reported digest, matched on kasumi, read twice); the
+# binary `lupin` BY NAME, sha256
+# `c373156b39dfc8e287a6173331697f7b4f7bdacf2921c74daa2eb74a1c768bf2`.
+# The other three archives, as GitHub reports them and as CI checks
+# them on arrival (each also fetched and matched on kasumi):
+# aarch64-apple-darwin `997b71a5…`, aarch64-unknown-linux-gnu
+# `7874ec27…`, x86_64-pc-windows-msvc (a zip) `a9924fd3…`. The archive
+# ships no `std/`.
+#
+# ITS CONFORMANCE PIN DOES NOT MOVE: still wolf-lang v0.2.24
+# (`294d626d`), now SIX releases behind the compiler and the data pin
+# below (v0.2.30). The pin key below is unchanged on purpose.
+version = "0.1.53"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -1375,7 +1398,34 @@ pin = "294d626dd596122285d5df954762e3aee3e5db71"
 #     `07f1215832be38f619b966510eb48ee2d6c13f51343502c7cf82ab87e3901c80`
 # (`_wolf`, the zsh completion script, is still `a368c8ec…`. F-0146
 # predicted s235's `wolf lsp --std-root` would move it; it did not.)
-version = "0.2.29"
+# sc62 BUMP: 0.2.29 -> 0.2.30 (r35, 2026-10-15): s755 (the 0.2.29
+# straight-line crash), s233 (must-join, E1010), s234 (the terminal:
+# `os_term_size`, `os_term_chars`, `os_signal_wait_fd`, mode bits `FLOW`
+# and `EXTENDED`) and s236 (the ids: `os_uid`, `os_euid`, `os_gid`,
+# `os_egid`, `os_groups`, `fs_set_owner`, `fs_set_owner_fd`,
+# `os_set_ids`). Eleven new prelude names; no std or test declaration
+# draws W0304. The spec gains eight anchors (F-0148 P2).
+#
+# The archive's `std/` is wolf-std `fd6bcdc` (sc61, `STD-REV`), this
+# branch's base: `diff -rq` against `std/` names only `STD-REV` and the
+# two licences. The rig still never reads it (every lane passes
+# `--std-root`; CI removes `.wolf-bin/std`, sc58).
+# Acquired by digest from the release, verified from `--version`: `wolf
+# 0.2.30 (wolfgang, pin 1b37f36)`, pairing line `paired with lupin
+# 0.1.53 (reference interpreter), pin 294d626` — TRUE of this box's pair.
+# Archive `wolf-0.2.30-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `4e55b39ed243d3e8ed3be24f716186529e1942935464476d47c4bc983329fe89`
+# (the release's reported digest, matched on kasumi, read twice). The
+# other three, each also fetched and matched on kasumi:
+# aarch64-apple-darwin `f3257e74…`, aarch64-unknown-linux-gnu
+# `34237d4a…`, x86_64-pc-windows-msvc `2772a997…`. `libwolf_rt.a`
+# `b0fb9bce…`, `libwolf_rt_none.a` `4c9650a1…` (nothing here links it).
+#
+# THE BINARY `wolf`, BY NAME (see sc51's note below for why):
+#   x86_64-unknown-linux-gnu
+#     `061641568eabc2fb552d7ee4fce6e7fd0503d47b64cf6e1744b981e96d8781a2`
+# (`_wolf`, the zsh completion script, is still `a368c8ec…`.)
+version = "0.2.30"
 # sc48 BUMP: a7f517e (v0.2.12) -> 30731a6 (v0.2.14), TWO releases —
 # s157/s158 (0.2.13, "the literals and the papercuts III") and s159/s160
 # (0.2.14, "the string runtime and the papercuts IV"). The data pin was
@@ -2930,4 +2980,5 @@ version = "0.2.29"
 # pin = "89dc139443da38078df6093568da87bc6d0ee6f9"  (superseded, sc57 era — the v0.2.26-tag pin)
 # pin = "0ddda6b7ab9f899aeeea13a66b3427f8422b8a0f"  (superseded, sc58 era — the v0.2.27-tag pin)
 # pin = "f71ece8e1ad2234940040d300359888932ad67af"  (superseded, sc59 era — the v0.2.28-tag pin)
-pin = "6ffe7c6056eeb8c661b37e38d99b91166e8c1add"
+# pin = "6ffe7c6056eeb8c661b37e38d99b91166e8c1add"  (superseded, sc60 era — the v0.2.29-tag pin)
+pin = "1b37f368228db92eca505c8c4cd3c531ea60be48"
