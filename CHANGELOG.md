@@ -1,5 +1,58 @@
 # Changelog
 
+## sc62 — 2026-10-15 — std at wolf 0.2.30 / lupin 0.1.53: who a process runs as, a file's owner, and what a line editor asks of the terminal
+
+**The pin.** wolf 0.2.29 -> **0.2.30** and lupin 0.1.52 -> **0.1.53**,
+from the release archives by digest (`vendor/tools.toml`; linux x86-64
+`4e55b39e…` and `5db55332…`). lupin's pin key stays at wolf-lang v0.2.24
+(`294d626d`), now six releases behind. The data pin moves v0.2.29 ->
+v0.2.30 (`6ffe7c6` -> `1b37f368`, +8 anchors, none removed:
+`os.fs.owner`, `os.proc.ids`, `os.proc.ids.note`, `os.proc.ids.set`,
+`os.signal.wait.fd`, `os.term.chars`, `os.term.editor.note`,
+`os.term.size`). 0.2.30's archive bundles this repository at `fd6bcdc`
+(sc61). Trunk's 460 tests and 481 doc examples are green at the bare
+pin. F-0148 predicted it before the archives were fetched.
+
+**Who a process runs as, and a file's owner (s236, ruling #78).** This
+carries draft #65's six commits onto the pin (superseding it):
+`env.uid`, `euid`, `gid`, `egid`, `groups` (`env`); `fs.set_owner`,
+`set_link_owner`, `set_file_owner` and `owner_keep` (`fs`);
+`process.set_ids`, the permanent drop, whole or the process ends
+(`exec`); and `std.os.users`, a pure reader of `passwd(5)` and
+`group(5)` lines. Spellings S1–S4 as ruled (#78). The rows now conform
+to the pinned clauses; two comptime refusals added (`env.uid`,
+`fs.set_owner`, E0701). `os_set_ids` has no comptime row: its `List`
+argument cannot be built at comptime, so the call is `unsupported`
+there before the sandbox is asked.
+
+**What a line editor asks of the terminal (s234, ruling #73).** In
+`std.term`, beside sc61's `flow` and `extended`:
+
+- `term.size(tty) -> Size` (`rows`, `columns`; 0 for a size never
+  told), over `os_term_size`;
+- `term.chars(tty) -> Chars`, the twelve special characters by name
+  (`erase` … `discard`, -1 = `term.char_disabled()` for one that is
+  disabled), over `os_term_chars`; `term.chars_from(list)` is the pure
+  mapping;
+- `term.wait_input(tty, set) -> int`, a meaning from `set` or 0 when
+  `tty` has input, nothing read, over `os_signal_wait_fd` (`exec`).
+
+**Their spellings are a ruling owed (T1–T3)**, each implemented as
+recommended in its own commit. lupin answers `wait_input`'s shape rows
+and declines the three calls by name. `raw`'s doc now cites ruling #81
+(it clears `flow` and `extended`).
+
+**Witnesses.** `docs/sc62-witness/`: on a pty (`pty.py`), size, chars
+and both ends of the wait on five machines (the native and release
+binaries, `conform-run --checked`, `--native`, `--release`), the same
+under `taskset -c 0-3`, red with a planted rows/columns swap; lupin
+refuses each call by name. In throwaway `--network none` containers
+(`ids-container.sh`), as root and as user 1000, the owner calls and the
+drop on four machines; nothing on the host changes owner.
+
+**Counts.** std-test 460 -> **474** (#65's six rows, two comptime
+refusals, six `term/` rows), doc examples 481 -> **497**.
+
 ## sc61 — 2026-10-15 — std.term keeps flow and extended (before wolf 0.2.30)
 
 **The defect, owed under ruling #73 R4.** wolf 0.2.30 carries s234:
