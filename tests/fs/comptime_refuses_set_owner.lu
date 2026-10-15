@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.owner
+//!
+//! **D33 for `fs.set_owner` (s236, ruling #78), held one level down at
+//! `fs_set_owner`**: a compile may not change a file's owner, any more
+//! than its mode (R6: `fs`). The row is handled locally (F-0069) and a
+//! pure `std.fs` helper runs at run time to keep the import used.
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_set_owner("sc62-never-made.tmp", -1, -1, true) else |_| {}
+    0
+}
+
+fn main() -> !int {
+    const Z = probe()
+    let p = fs.join("a", "b")
+    print("p: {p} z: {Z} keep: {fs.owner_keep()}")
+    0
+}

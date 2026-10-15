@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.env, comptime.sandbox, comptime.sandbox.env, os.proc.ids
+//!
+//! **D33 for `env.uid` (s236, ruling #78), held one level down at
+//! `os_uid`**: who this process runs as is process context (`env`, R6),
+//! and at comptime "this process" is the compiler. The row is handled
+//! locally (F-0069); the pure entry helper runs at run time to keep the
+//! import used.
+
+use std.env
+
+comptime fn probe() -> int {
+    let u = os_uid() else |_| { return 1 }
+    u
+}
+
+fn main() -> !int {
+    const U = probe()
+    print("u: {U} {env.entry_key("A=b")}")
+    0
+}

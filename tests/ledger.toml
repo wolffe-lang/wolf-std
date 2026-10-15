@@ -4212,3 +4212,18 @@ lupin = "unsupported"
 lupin-windows = "run"
 wolfc = "run"
 native = "run"
+
+# s236's comptime refusals (ruling #78 R6), owed by #65 and added at the
+# 0.2.30 pin (sc62): D33 one level down at `os_uid` (`env`) and
+# `fs_set_owner` (`fs`). lupin has no comptime tier. `os_set_ids` has no
+# row: its `List` argument cannot be built at comptime, so the call is
+# `unsupported` there before the sandbox is asked (measured, sc62).
+[tests."env/comptime_refuses_uid.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_set_owner.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
