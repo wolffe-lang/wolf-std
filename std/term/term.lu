@@ -142,3 +142,29 @@ pub fn set_foreground(tty: fs.File, group_id: int) -> () ! {unsupported, io} {
 pub fn group() -> int ! {unsupported} {
     os_pgid()?
 }
+
+/// The terminal's window size (`[os.term.size]`): `rows` lines of
+/// `columns` cells each.
+pub struct Size {
+    rows: int,
+    columns: int,
+}
+
+/// The window's size as the terminal holds it: what the emulator last
+/// told it, or what `stty rows … cols …` set (`TIOCGWINSZ`).
+///
+/// A size the terminal was never told is 0 (a pseudo-terminal nobody
+/// sized): fall back on `COLUMNS` or 80, as without the call. When the
+/// window changes, the foreground group hears `signal.resize()`, and the
+/// next call answers the new size.
+///
+/// Rows: `io` for a handle that is closed, forged or not a terminal;
+/// `unsupported` on windows. Never traps. lupin declines by name (it has
+/// no `ioctl`), so the example is prose: `term.size(tty)?.columns` is the
+/// width an editor lays a line out in.
+///
+/// Capability `io` (uncharged, as `mode`). Delegates to `os_term_size`.
+pub fn size(tty: fs.File) -> Size ! {unsupported, io} {
+    let (r, c) = os_term_size(tty.fd)?
+    Size { rows: r, columns: c }
+}
