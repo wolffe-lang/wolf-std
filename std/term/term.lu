@@ -252,3 +252,33 @@ pub fn chars_from(v: List[int]) -> Chars {
 pub fn chars(tty: fs.File) -> Chars ! {unsupported, io} {
     chars_from(os_term_chars(tty.fd)?)
 }
+
+/// Wait until `tty` has something to read or a meaning in `set` is
+/// delivered (`[os.signal.wait.fd]`): the meaning, taken off the queue
+/// as `signal.wait` takes it, or **0** when `tty` is ready — a byte, the
+/// end of input or a hang-up — with nothing read, so the read that
+/// follows says which. A meaning wins when both are ready; one delivered
+/// or pending before the call is answered at once. The meanings must be
+/// listened for first (`signal.listen`).
+///
+/// This is the wait an interactive program blocks in instead of a read:
+/// a delivered signal never tears a read, so an editor reading keys
+/// would learn of a resize or a `kill` only when the next key came. It
+/// has no deadline; with `canonical` off, `Mode.min` and `Mode.time`
+/// time the read that follows. Any readable handle serves, not only a
+/// terminal.
+///
+/// Rows: `io` for a set the shape rule refuses — empty, or holding a
+/// bit that is not a listenable meaning — before anything else; then
+/// `unsupported` on windows; then `io` for a closed or forged handle.
+/// Never traps. lupin answers the shape rows and declines a well-formed
+/// call by name (it has no `poll`).
+///
+/// Capability `exec` (signal control, with `signal.wait`); refused at
+/// comptime (D33). Delegates to `os_signal_wait_fd`. The example is
+/// prose, since a handle comes from `std.fs`: an editor listens for
+/// `signal.resize()`, then loops on `term.wait_input(tty, set)?`,
+/// redrawing on a meaning and reading a key on 0.
+pub fn wait_input(tty: fs.File, set: int) -> int ! {unsupported, io} {
+    os_signal_wait_fd(tty.fd, set)?
+}
