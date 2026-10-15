@@ -1,6 +1,6 @@
 //! check: run(exit=0, stdout="shape: invalid invalid invalid\nos_error: 0\nleave: true same: true by handle: true\nmissing: true\nunchanged: true")
 //! phase: run
-//! conforms: std.fs, err.row
+//! conforms: std.fs, os.fs.owner, err.row
 //!
 //! **s236: `fs.set_owner`, `fs.set_link_owner`, `fs.set_file_owner` —
 //! the rows that change nothing.** No test may change a file's owner on
@@ -14,9 +14,8 @@
 //! `not_found` there and `unsupported` here. The file's owner is read
 //! before and after. Owners that DO change are witnessed upstream,
 //! inside a throwaway container (wolf-lang `ids_lanes`). Every lane
-//! runs it: lupin serves the three through the standard library. (The
-//! clause is wolf-lang's `[os.fs.owner]`, which the data pin does not
-//! publish yet.)
+//! runs it: lupin serves the three through the standard library
+//! (`[os.fs.owner]`).
 
 use std.fs
 

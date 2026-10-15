@@ -1,6 +1,6 @@
 //! check: run(exit=0, stdout="shape: invalid invalid invalid")
 //! phase: run
-//! conforms: std.process, err.row
+//! conforms: std.process, os.proc.ids.set, err.row
 //!
 //! **s236: `process.set_ids` — the shape rows, and nothing else.** No
 //! test may change who it runs as on a host, so this one asks only for
@@ -11,9 +11,8 @@
 //! in every thread and by a child, the way back refused, a refusal at
 //! the last step put back whole — is witnessed upstream as the
 //! super-user inside a throwaway container (wolf-lang `ids_lanes`);
-//! what a user is told on a host is `process/set_ids_refused.lu`. (The
-//! clause is wolf-lang's `[os.proc.ids.set]`, which the data pin does
-//! not publish yet.)
+//! what a user is told on a host is `process/set_ids_refused.lu`
+//! (`[os.proc.ids.set]`).
 
 use std.process
 

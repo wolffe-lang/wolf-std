@@ -1,6 +1,6 @@
 //! check: run(exit=0, stdout="ids: true\ngroups: true\nowner of a new file is the effective user: true")
 //! phase: run
-//! conforms: std.env, std.fs, err.row
+//! conforms: std.env, std.fs, os.proc.ids, err.row
 //!
 //! **s236: `env.uid`, `env.euid`, `env.gid`, `env.egid`, `env.groups`.**
 //! The ids are the host's, so the row prints none of them: the four are
@@ -10,8 +10,7 @@
 //! EFFECTIVE user — `fs.stat`'s own word for the owner, the one fact
 //! about the ids a program can check without being told who it is.
 //! lupin has no host call for an id and declines `os_uid` by name; on
-//! windows it answers the row and runs. (The clause is wolf-lang's
-//! `[os.proc.ids]`, which the data pin does not publish yet.)
+//! windows it answers the row and runs (`[os.proc.ids]`).
 
 use std.env
 use std.fs
