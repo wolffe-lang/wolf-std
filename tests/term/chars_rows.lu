@@ -1,0 +1,37 @@
+//! check: run(exit=0, stdout="a file is not a terminal: true\na closed handle: true\nthe same row: true")
+//! phase: run
+//! conforms: std.term, os.term.chars, err.row
+//!
+//! **sc62: `term.chars`'s rows, where the rig has no terminal.** As
+//! `term/size_rows.lu`: a regular file and a closed handle are both
+//! `io` on the unix hosts and `unsupported` on windows, and neither
+//! traps. A terminal's characters are witnessed under a pty in
+//! `docs/sc62-witness/`. lupin has no `tcgetattr` and declines
+//! `os_term_chars` by name.
+
+use std.fs
+use std.term
+
+fn tag(f: fs.File) -> str {
+    let c = term.chars(f) else |e| {
+        return match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "served {c.erase}"
+}
+
+fn main() -> !int {
+    fs.write_text("sc62-chars.tmp", "x")?
+    var f = fs.open("sc62-chars.tmp")?
+    let fd_of_f = f.fd
+    let file_row = tag(f)
+    fs.close(take f)?
+    let closed_row = tag(fs.File { fd: fd_of_f })
+    fs.remove("sc62-chars.tmp")?
+    print("a file is not a terminal: {file_row == "io" || file_row == "unsupported"}")
+    print("a closed handle: {closed_row == "io" || closed_row == "unsupported"}")
+    print("the same row: {file_row == closed_row}")
+    0
+}

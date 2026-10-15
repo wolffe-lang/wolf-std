@@ -1,0 +1,41 @@
+//! check: run(exit=0, stdout="a file is ready at once: true\na closed handle: true")
+//! phase: run
+//! conforms: std.term, std.signal, os.signal.wait.fd, err.row
+//!
+//! **sc62: `term.wait_input` on a handle that is always ready.** A
+//! regular file always has something to read (or its end), so a wait on
+//! it with a well-formed set answers 0 at once and reads nothing; a
+//! closed handle is `io`. On windows both are `unsupported` (after the
+//! shape, before the handle), so the row prints "ready, or not served"
+//! and one stdout serves every host. A wait a signal or a key ends is
+//! witnessed under a pty in `docs/sc62-witness/`. lupin has no `poll`
+//! and declines a well-formed `os_signal_wait_fd` by name.
+
+use std.fs
+use std.signal
+use std.term
+
+fn row(f: fs.File) -> str {
+    let m = term.wait_input(f, signal.resize()) else |e| {
+        return match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "{m}"
+}
+
+fn main() -> !int {
+    fs.write_text("sc62-wait-ready.tmp", "x")?
+    var f = fs.open("sc62-wait-ready.tmp")?
+    let fd_of_f = f.fd
+    let ready = row(f)
+    let text = fs.read_text("sc62-wait-ready.tmp")?
+    fs.close(take f)?
+    let closed = row(fs.File { fd: fd_of_f })
+    fs.remove("sc62-wait-ready.tmp")?
+    let served = ready != "unsupported"
+    print("a file is ready at once: {(ready == "0" && text == "x") || !served}")
+    print("a closed handle: {(closed == "io" && served) || (closed == "unsupported" && !served)}")
+    0
+}

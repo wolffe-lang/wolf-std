@@ -1,0 +1,39 @@
+//! check: run(exit=0, stdout="a file is not a terminal: true\na closed handle: true\nthe same row: true")
+//! phase: run
+//! conforms: std.term, os.term.size, err.row
+//!
+//! **sc62: `term.size`'s rows, where the rig has no terminal.** A
+//! regular file is not a terminal and a closed handle names nothing:
+//! both are `io` on the unix hosts and `unsupported` on windows, as for
+//! every `[os.term]` call, and neither traps. The row prints which
+//! happened only as "refused, and the same both times", so one stdout
+//! serves every host. A terminal itself is witnessed under a pty in
+//! `docs/sc62-witness/` (the rig has none). lupin has no `ioctl` and
+//! declines `os_term_size` by name.
+
+use std.fs
+use std.term
+
+fn tag(f: fs.File) -> str {
+    let s = term.size(f) else |e| {
+        return match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "served {s.rows}x{s.columns}"
+}
+
+fn main() -> !int {
+    fs.write_text("sc62-size.tmp", "x")?
+    var f = fs.open("sc62-size.tmp")?
+    let fd_of_f = f.fd
+    let file_row = tag(f)
+    fs.close(take f)?
+    let closed_row = tag(fs.File { fd: fd_of_f })
+    fs.remove("sc62-size.tmp")?
+    print("a file is not a terminal: {file_row == "io" || file_row == "unsupported"}")
+    print("a closed handle: {closed_row == "io" || closed_row == "unsupported"}")
+    print("the same row: {file_row == closed_row}")
+    0
+}

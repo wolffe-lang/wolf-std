@@ -1,0 +1,37 @@
+//! check: run(exit=0, stdout="empty=io\noutside=io\nsend_only=io\nmixed=io")
+//! phase: run
+//! conforms: std.term, std.signal, os.signal.wait.fd, os.signal.set, err.row
+//!
+//! **sc62: `term.wait_input`'s shape rows**, answered before the handle
+//! is looked at and before the host is asked (`[os.signal.wait.fd]`'s
+//! order of refusal): an empty set, a bit outside the meanings (2^62,
+//! as `signal/rows.lu`), a send-only meaning (`kill()`), and a
+//! listenable meaning beside an outside bit are each `io`, and nothing
+//! waits. The same on every host, windows included, and on lupin, which
+//! answers the shape rows and declines only a well-formed call.
+
+use std.fs
+use std.signal
+use std.term
+
+fn row(f: fs.File, set: int) -> str {
+    let m = term.wait_input(f, set) else |e| {
+        return match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "answered {m}"
+}
+
+fn main() -> !int {
+    fs.write_text("sc62-wait-shape.tmp", "x")?
+    var f = fs.open("sc62-wait-shape.tmp")?
+    print("empty={row(f, 0)}")
+    print("outside={row(f, 4611686018427387904)}")
+    print("send_only={row(f, signal.kill())}")
+    print("mixed={row(f, signal.resize() | 4611686018427387904)}")
+    fs.close(take f)?
+    fs.remove("sc62-wait-shape.tmp")?
+    0
+}

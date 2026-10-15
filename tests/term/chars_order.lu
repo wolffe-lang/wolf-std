@@ -1,0 +1,37 @@
+//! check: run(exit=0, stdout="twelve=1 2 3 4 5 6 7 8 9 10 11 12\nshort=127 -1 -1\nlonger=12\ndisabled=-1")
+//! phase: run
+//! conforms: std.term, os.term.chars
+//!
+//! **sc62: `term.chars_from` reads `[os.term.chars]`'s order**: erase,
+//! kill, interrupt, quit, suspend, end of file, word erase, literal
+//! next, start, stop, reprint, discard. Twelve entries land in the
+//! twelve fields in that order; an entry the list does not reach is
+//! `char_disabled()`; entries past the twelfth are not read (the
+//! builtin's list grows only at its end). Pure, on every machine.
+
+use std.term
+
+fn numbered(n: int) -> List[int] {
+    var v = List[int]()
+    var i = 1
+    while i <= n {
+        (mut v).push(i)
+        i = i + 1
+    }
+    v
+}
+
+fn main() -> !int {
+    let c = term.chars_from(numbered(12))
+    let a = "{c.erase} {c.kill} {c.interrupt} {c.quit} {c.suspend} {c.end_of_file}"
+    let b = "{c.word_erase} {c.literal_next} {c.start} {c.stop} {c.reprint} {c.discard}"
+    print("twelve={a} {b}")
+    var one = List[int]()
+    (mut one).push(127)
+    let s = term.chars_from(one)
+    print("short={s.erase} {s.kill} {s.discard}")
+    let l = term.chars_from(numbered(14))
+    print("longer={l.discard}")
+    print("disabled={term.char_disabled()}")
+    0
+}

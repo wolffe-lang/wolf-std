@@ -4227,3 +4227,45 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# sc62 (s234's builtins, ruling #73; spellings T1-T3 a ruling owed):
+# std.term's size, chars and wait_input. The rig has no terminal, so the
+# rows hold what a non-terminal and a closed handle answer; a terminal is
+# witnessed under a pty in docs/sc62-witness/. lupin declines
+# `os_term_size`, `os_term_chars` and a well-formed `os_signal_wait_fd`
+# by name on a host that serves them, and answers the shape rows; on
+# windows, where no machine serves them, it answers the `unsupported`
+# row and the programs run.
+[tests."term/size_rows.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+[tests."term/chars_rows.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+[tests."term/chars_order.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."term/wait_shape.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."term/wait_ready.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# D33 one level down at `os_signal_wait_fd` (`exec`).
+[tests."term/comptime_refuses_wait.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
