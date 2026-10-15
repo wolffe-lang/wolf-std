@@ -1,0 +1,96 @@
+SigBlk:	0000000000000000 SigIgn:	0000000000000000 
+engine: podman version 6.1.3  image: docker.io/library/ubuntu:24.04 69f919497cad
+wolf: wolf 0.2.30 (wolfgang, pin 1b37f36)   lupin: lupin 0.1.53 (wolf-interp, reference interpreter at pin 294d626)
+[root native owner] rc=0
+set_owner f=1000:1001
+set_link_owner link=1002:1002 target=0:0
+set_owner through link link=1002:1002 target=1003:0
+set_file_owner f=1000:1004
+  host unchanged: every mounted file is still uid 1000
+[root release owner] rc=0
+set_owner f=1000:1001
+set_link_owner link=1002:1002 target=0:0
+set_owner through link link=1002:1002 target=1003:0
+set_file_owner f=1000:1004
+  host unchanged: every mounted file is still uid 1000
+[root checked owner] rc=0
+set_owner f=1000:1001
+set_link_owner link=1002:1002 target=0:0
+set_owner through link link=1002:1002 target=1003:0
+set_file_owner f=1000:1004
+  host unchanged: every mounted file is still uid 1000
+[root lupin owner] rc=0
+set_owner f=1000:1001
+set_link_owner link=1002:1002 target=0:0
+set_owner through link link=1002:1002 target=1003:0
+set_file_owner f=1000:1004
+  host unchanged: every mounted file is still uid 1000
+[root native ids] rc=0
+start uid=0 euid=0 gid=0 egid=0 groups=[ ]
+drop to 1000: ok
+after uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 1001 ]
+way back to 0: denied
+after uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 1001 ]
+  host unchanged: every mounted file is still uid 1000
+[root release ids] rc=0
+start uid=0 euid=0 gid=0 egid=0 groups=[ ]
+drop to 1000: ok
+after uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 1001 ]
+way back to 0: denied
+after uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 1001 ]
+  host unchanged: every mounted file is still uid 1000
+[root checked ids] rc=0
+start uid=0 euid=0 gid=0 egid=0 groups=[ ]
+drop to 1000: ok
+after uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 1001 ]
+way back to 0: denied
+after uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 1001 ]
+  host unchanged: every mounted file is still uid 1000
+[root lupin ids] rc=0
+ [unsupported `os_groups` reads who the process runs as, which is the host's `getuid`, `geteuid`, `getgid`, `getegid` or `getgroups` call; the standard library has none of them and this machine has no `unsafe` to make one, so the call is refused by name ([os.proc.ids], [os.proc.ids.note] R10)]
+  host unchanged: every mounted file is still uid 1000
+[user native owner] rc=0
+created f=1000:1000
+give away to 0: denied
+own group: ok f=1000:1000
+  host unchanged: every mounted file is still uid 1000
+[user release owner] rc=0
+created f=1000:1000
+give away to 0: denied
+own group: ok f=1000:1000
+  host unchanged: every mounted file is still uid 1000
+[user checked owner] rc=0
+created f=1000:1000
+give away to 0: denied
+own group: ok f=1000:1000
+  host unchanged: every mounted file is still uid 1000
+[user lupin owner] rc=0
+created f=1000:1000
+give away to 0: denied
+own group: ok f=1000:1000
+  host unchanged: every mounted file is still uid 1000
+[user native ids] rc=0
+start uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 ]
+drop to 0: denied
+after uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 ]
+  host unchanged: every mounted file is still uid 1000
+[user release ids] rc=0
+start uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 ]
+drop to 0: denied
+after uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 ]
+  host unchanged: every mounted file is still uid 1000
+[user checked ids] rc=0
+start uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 ]
+drop to 0: denied
+after uid=1000 euid=1000 gid=1000 egid=1000 groups=[ 1000 ]
+  host unchanged: every mounted file is still uid 1000
+[user lupin ids] rc=0
+ [unsupported `os_groups` reads who the process runs as, which is the host's `getuid`, `geteuid`, `getgid`, `getegid` or `getgroups` call; the standard library has none of them and this machine has no `unsafe` to make one, so the call is refused by name ([os.proc.ids], [os.proc.ids.note] R10)]
+  host unchanged: every mounted file is still uid 1000
+[root lupin lupin_uid] rc=0
+ [unsupported `os_uid` reads who the process runs as, which is the host's `getuid`, `geteuid`, `getgid`, `getegid` or `getgroups` call; the standard library has none of them and this machine has no `unsafe` to make one, so the call is refused by name ([os.proc.ids], [os.proc.ids.note] R10)]
+  host unchanged: every mounted file is still uid 1000
+[root lupin lupin_set_ids] rc=0
+ [unsupported `os_set_ids` changes who the process runs as, which is the host's `setgroups`, `setresgid` and `setresuid` calls and their read-back; the standard library has none of them and this machine has no `unsafe` to make one, so the call is refused by name ([os.proc.ids.set], [os.proc.ids.note] R10)]
+  host unchanged: every mounted file is still uid 1000
+CONTAINER_DONE
