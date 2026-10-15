@@ -113,10 +113,9 @@ pub fn set_mode(tty: fs.File, m: Mode) -> () ! {unsupported, invalid, io} {
 /// `m` with input a key at a time: not canonical, no echo, no flow
 /// control and no extended input, one byte per read, no timer, so Ctrl-S,
 /// Ctrl-Q, Ctrl-V and Ctrl-O arrive as keys, as `cfmakeraw(3)` leaves
-/// them. `signals` is kept, so Ctrl-C still interrupts. (Ruling owed,
-/// sc61 R1: `raw` clears `flow` and `extended`; the alternative keeps
-/// them as `m` has them.) Before wolf 0.2.30 the runtime cannot clear the
-/// two, so there they stay as found.
+/// them. `signals` is kept, so Ctrl-C still interrupts (ruling #81:
+/// `raw` clears `flow` and `extended`). Before wolf 0.2.30 the runtime
+/// cannot clear the two, so there they stay as found.
 pub fn raw(m: Mode) -> Mode {
     Mode {
         canonical: false,
