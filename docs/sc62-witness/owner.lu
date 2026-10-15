@@ -1,0 +1,61 @@
+//! sc62's container witness program (docs/sc62-witness/ids-container.sh
+//! runs it as the super-user, and as user 1000, inside a throwaway
+//! `--network none` container — never on a host): `fs.set_owner`,
+//! `set_link_owner`, `set_file_owner` and `owner_keep`, each change read
+//! back with `fs.stat` / `fs.lstat`. The role is read from the owner of
+//! a file this process creates (its effective user), so a machine that
+//! reads no ids (lupin) takes the right branch too.
+
+use std.fs
+
+fn owner(i: fs.Info) -> str {
+    "{i.uid}:{i.gid}"
+}
+
+fn main() -> !int {
+    fs.write_text("f", "x")?
+    var role = "user"
+    if fs.stat("f")?.uid == 0 {
+        role = "root"
+    }
+    fs.write_text("t", "x")?
+    fs.symlink("t", "l")?
+    let keep = fs.owner_keep()
+    if role == "root" {
+        fs.set_owner("f", 1000, 1001)?
+        print("set_owner f={owner(fs.stat("f")?)}")
+        fs.set_link_owner("l", 1002, 1002)?
+        print("set_link_owner link={owner(fs.lstat("l")?)} target={owner(fs.stat("t")?)}")
+        fs.set_owner("l", 1003, keep)?
+        print("set_owner through link link={owner(fs.lstat("l")?)} target={owner(fs.stat("t")?)}")
+        var h = fs.open("f")?
+        fs.set_file_owner(mut h, keep, 1004)?
+        fs.close(take h)?
+        print("set_file_owner f={owner(fs.stat("f")?)}")
+    } else {
+        print("created f={owner(fs.stat("f")?)}")
+        var given = "ok"
+        fs.set_owner("f", 0, keep) else |e| {
+            given = match e {
+                denied => "denied",
+                invalid => "invalid",
+                not_found => "not_found",
+                unsupported => "unsupported",
+                io => "io",
+            }
+        }
+        print("give away to 0: {given}")
+        var own = "ok"
+        fs.set_owner("f", keep, 1000) else |e| {
+            own = match e {
+                denied => "denied",
+                invalid => "invalid",
+                not_found => "not_found",
+                unsupported => "unsupported",
+                io => "io",
+            }
+        }
+        print("own group: {own} f={owner(fs.stat("f")?)}")
+    }
+    0
+}

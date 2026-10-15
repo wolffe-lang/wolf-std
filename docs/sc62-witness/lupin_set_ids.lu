@@ -1,0 +1,21 @@
+//! sc62's container witness program for lupin: `process.set_ids`'s
+//! shape row (`invalid`, answered before the host), then a well-formed
+//! drop, which lupin declines by name.
+
+use std.process
+
+fn main() -> !int {
+    var shape = "ok"
+    process.set_ids(0 - 1, 0, List[int]()) else |e| {
+        shape = match e {
+            denied => "denied",
+            invalid => "invalid",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    print("shape={shape}")
+    process.set_ids(1000, 1000, List[int]())?
+    print("dropped")
+    0
+}

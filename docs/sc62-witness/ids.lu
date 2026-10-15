@@ -1,0 +1,49 @@
+//! sc62's container witness program (docs/sc62-witness/ids-container.sh
+//! runs it as the super-user, and as user 1000, inside a throwaway
+//! `--network none` container — never on a host): `env.uid`, `euid`,
+//! `gid`, `egid`, `groups`, and `process.set_ids`, the permanent drop.
+//! As root: the drop to 1000 with groups [1000, 1001], read back, then
+//! the way back `denied` and nothing moved. As a user: the drop to 0
+//! `denied` and nothing moved. SC62_ROLE is `root` or `user`.
+
+use std.env
+use std.process
+
+fn ids() -> str ! {io, unsupported} {
+    var gs = ""
+    for g in env.groups()? {
+        gs = gs + " {g}"
+    }
+    "uid={env.uid()?} euid={env.euid()?} gid={env.gid()?} egid={env.egid()?} groups=[{gs} ]"
+}
+
+fn drop_to(uid: int, gid: int, groups: List[int]) -> str {
+    process.set_ids(uid, gid, groups) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let role = env.get("SC62_ROLE") else |_| { "root" }
+    print("start {ids()?}")
+    if role == "root" {
+        var gs = List[int]()
+        (mut gs).push(1001)
+        (mut gs).push(1000)
+        (mut gs).push(1001)
+        print("drop to 1000: {drop_to(1000, 1000, gs)}")
+        print("after {ids()?}")
+        print("way back to 0: {drop_to(0, 0, List[int]())}")
+        print("after {ids()?}")
+    } else {
+        print("drop to 0: {drop_to(0, 0, List[int]())}")
+        print("after {ids()?}")
+    }
+    0
+}
