@@ -12389,3 +12389,122 @@ release API), lupin 0.1.52 (`f5194b74…`); the candidate is wolf-lang
   `term/round_trip.lu` answered one stdout on lupin, checked, native and
   release under both wolfs.
 - **Not predicted:** nothing moved that I did not name.
+
+## F-0148 — sc62's predictions, before the 0.2.30 / 0.1.53 pin
+
+Written on branch `sc62` (on trunk `fd6bcdc`, sc61) before either
+archive was fetched, before the pin moved, before #65's commits were
+carried here and before any wrapper or witness existed. What I read
+first, and so cannot claim to predict blind: wolf-lang's 0.2.30
+CHANGELOG (r35 measured trunk's 460 tests and 481 doc examples green
+on the release-head archive), spec `[os.proc.ids]`, `[os.proc.ids.set]`,
+`[os.proc.ids.note]`, `[os.fs.owner]`, `[os.term.*]` and
+`[os.signal.wait.fd]` at `v0.2.30`, the release API's asset digests,
+and s236's report on draft #65 (green against its development builds).
+
+Inputs, re-derived 2026-10-15: wolf 0.2.30 is tag `v0.2.30` at
+`1b37f368`, release published 08:53Z, linux x86-64 `4e55b39e…`,
+aarch64 `34237d4a…`, macOS `f3257e74…`, windows `2772a997…`. lupin
+0.1.53 is `v0.1.53` at `7896edd`, linux x86-64 `5db55332…`, aarch64
+`7874ec27…`, macOS `997b71a5…`, windows zip `a9924fd3…`. **Drift:** the
+contract names the wait's clause `[os.signal.wait_fd]`; the anchor at
+`v0.2.30` is `[os.signal.wait.fd]`.
+
+### P1. The archives
+
+- Every digest matches the release API, each read twice. `wolf
+  --version` reads `wolf 0.2.30 (wolfgang, pin 1b37f36)` and pairs with
+  `lupin 0.1.53 … pin 294d626`; lupin reads `lupin 0.1.53 (wolf-interp,
+  reference interpreter at pin 294d626)`. The archive's `std/` is this
+  repository at `fd6bcdc` (`STD-REV`): `diff -rq` against trunk's `std/`
+  names only `STD-REV` and the two licences. `_wolf` does not move
+  (`a368c8ec…`; 0.2.30 adds no subcommand).
+
+### P2. The data pin
+
+- `6ffe7c6` (v0.2.29) → `1b37f368` (v0.2.30). Anchors only added, none
+  removed, at least these eight: `os.proc.ids`, `os.proc.ids.set`,
+  `os.proc.ids.note`, `os.fs.owner`, `os.term.size`, `os.term.chars`,
+  `os.term.editor.note`, `os.signal.wait.fd`. Falsified by a removed
+  key.
+
+### P3. The bare pin
+
+- Trunk's 460 tests and 481 doc examples GREEN under 0.2.30 / 0.1.53 on
+  kasumi and on CI's three hosts; no ledger word moves. Falsified by any
+  red row.
+
+### P4. #65 carried onto the pin
+
+- Its six commits apply onto the pin with one conflict, in
+  `tests/ledger.toml` (both append at the end), resolved by keeping
+  both. Its six rows go GREEN as s236 measured them on its development
+  builds: `env/who_ids.lu` and `process/set_ids_refused.lu` lupin
+  `unsupported`, naming `os_uid` and `os_set_ids`; the other four `run`
+  on every lane. Its 14 doc examples run on the three lanes.
+- Owed by #65 and done here: the comptime refusals, one row each, E0701
+  on checked and native (D33), lupin `unsupported` (no comptime tier):
+  `env.uid` (`env`), `fs.set_owner` (`fs`), `process.set_ids` (`exec`).
+
+### P5. The terminal wrappers (spellings proposed, ruling owed)
+
+Each wrapper lives in `std.term`, takes the `fs.File` the other
+`std.term` calls take, delegates to one builtin and adds no row.
+
+- **T1** `term.size(tty) -> Size ! {unsupported, io}`, `Size { rows,
+  columns }` over `os_term_size`; 0 for a size never told.
+- **T2** `term.chars(tty) -> Chars ! {unsupported, io}` over
+  `os_term_chars`, twelve named fields in the builtin's order (`erase`,
+  `kill`, `interrupt`, `quit`, `suspend`, `end_of_file`, `word_erase`,
+  `literal_next`, `start`, `stop`, `reprint`, `discard`), -1 disabled;
+  `term.chars_from(list)` the pure mapping (`unpack`'s analogue) and
+  `term.char_disabled()` the -1 (`owner_keep`'s pattern).
+- **T3** `term.wait_input(tty, set) -> int ! {unsupported, io}` over
+  `os_signal_wait_fd`: a meaning from `set`, or 0 when `tty` has input.
+  Charges `exec`.
+
+### P6. Machines (the rig, no terminal)
+
+- `term/size_rows.lu`, `term/chars_rows.lu`: a regular file is `io`
+  on checked and native; lupin `unsupported`, naming `os_term_size` and
+  `os_term_chars`; windows `unsupported` on every lane, lupin answering
+  the row there (`lupin-windows = "run"`, as s236's reads).
+- `term/wait_shape.lu`: an empty set, a bit outside the meanings and a
+  send-only meaning are `io` before the host on all four machines and
+  all three hosts, lupin included.
+- `term/wait_ready.lu`: a regular file with a valid set answers 0 at
+  once on checked, native and release; lupin `unsupported`, naming
+  `os_signal_wait_fd`; windows `unsupported`.
+- `term/chars_order.lu` (pure) `run` on all four. A comptime
+  `wait_input` is E0701.
+
+### P7. The pty witness (`docs/sc62-witness/`)
+
+On a pseudo-terminal held by a Python parent, five machines (`wolf
+build` and `--release` binaries, `conform-run --json` `--checked`,
+`--native`, `--release`), one answer each per step: a pty never sized
+reads `0 0`; after `TIOCSWINSZ` 24 × 80, `24 80`; `stty intr ^X erase
+^H quit undef` reads interrupt 24, erase 8, quit -1, the rest linux's
+defaults (kill 21, suspend 26, end of file 4, word erase 23, literal
+next 22, start 17, stop 19, reprint 18, discard 15); `wait_input` with
+`resize()` answers 16384 when the parent resizes the window, and 0
+when it writes a byte instead (the byte still unread after). lupin
+refuses each call by name. The same under `taskset -c 0-3`.
+
+### P8. The container witness
+
+In throwaway `--network none` containers (`ubuntu:24.04`, read-only
+mounts), as the container's super-user: the four ids 0; `set_owner`,
+`set_link_owner` and `set_file_owner` to 1000:1000 move exactly what
+each names; `owner_keep` leaves its id; `set_ids(1000, 1000, [1000])`
+then reads 1000 for all four and groups `[1000]`, and a second
+`set_ids(0, 0, [])` is `denied`. As user 1000: `set_ids(0, 0, [])` is
+`denied` and nothing moves; `set_owner` to 0 is `denied`. Checked,
+native and release agree; lupin serves the owner calls and refuses the
+reads and `set_ids` by name. No file on the host changes owner.
+
+### P9. The head
+
+- std-test 460 + 6 (#65) + 3 (comptime) + 6 (term) = **475**, doc
+  examples 481 + 14 + 3 = **498**, GREEN on kasumi and CI's three
+  hosts. Falsified by any other count.
