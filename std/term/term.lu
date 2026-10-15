@@ -31,25 +31,26 @@
 //! says what it wants of both.
 //!
 //! **What a line editor asks of it** (wolf 0.2.30, s234, ruling #73):
-//! the window's `size` (and `signal.resize()` when it changes), the keys
-//! the user chose for erase, kill, interrupt and the rest (`chars`), and
-//! a wait that a key or a signal ends (`wait_input`), so an editor blocks
-//! there instead of in a read a signal cannot tear. Nothing here sets
+//! the window's `size` (and `signal.resize()` when it changes) and the
+//! keys the user chose for erase, kill, interrupt and the rest (`chars`)
+//! — spellings ruled #82. The wait that a key or a signal ends is
+//! `signal.wait_fd` (ruling #82: the signal family's, and any descriptor
+//! serves), so an editor blocks there instead of in a read a signal
+//! cannot tear. Nothing here sets
 //! the special characters, and nothing restores the mode when a program
 //! dies of a signal it cannot catch.
 //!
 //! **Errors are rows.** A handle that is closed, forged or not a terminal
 //! is `io`; a mode outside the bits is `invalid` (unreachable through
 //! `Mode`, whose fields are clamped, but for `flow` or `extended` before
-//! wolf 0.2.30); a set `wait_input` cannot wait on is `io` before the
-//! handle is looked at; every call is `unsupported` on windows. lupin
-//! answers the shape rows and declines every call that reaches the
-//! terminal by name.
+//! wolf 0.2.30); every call is `unsupported` on windows. lupin answers
+//! the shape rows and declines every call that reaches the terminal by
+//! name.
 //!
 //! **Capability:** `foreground`, `mode`, `set_mode`, `size` and `chars`
 //! are `io` (they act on a descriptor the program holds, as
-//! `io.is_terminal`); `set_foreground` and `wait_input` are `exec`
-//! (process and signal control) and `group` `env` (process context).
+//! `io.is_terminal`); `set_foreground` is `exec` (process control) and
+//! `group` `env` (process context).
 //! `pack`, `unpack`, `raw`, `chars_from` and `char_disabled` are pure,
 //! comptime-safe.
 
@@ -271,32 +272,3 @@ pub fn chars(tty: fs.File) -> Chars ! {unsupported, io} {
     chars_from(os_term_chars(tty.fd)?)
 }
 
-/// Wait until `tty` has something to read or a meaning in `set` is
-/// delivered (`[os.signal.wait.fd]`): the meaning, taken off the queue
-/// as `signal.wait` takes it, or **0** when `tty` is ready — a byte, the
-/// end of input or a hang-up — with nothing read, so the read that
-/// follows says which. A meaning wins when both are ready; one delivered
-/// or pending before the call is answered at once. The meanings must be
-/// listened for first (`signal.listen`).
-///
-/// This is the wait an interactive program blocks in instead of a read:
-/// a delivered signal never tears a read, so an editor reading keys
-/// would learn of a resize or a `kill` only when the next key came. It
-/// has no deadline; with `canonical` off, `Mode.min` and `Mode.time`
-/// time the read that follows. Any readable handle serves, not only a
-/// terminal.
-///
-/// Rows: `io` for a set the shape rule refuses — empty, or holding a
-/// bit that is not a listenable meaning — before anything else; then
-/// `unsupported` on windows; then `io` for a closed or forged handle.
-/// Never traps. lupin answers the shape rows and declines a well-formed
-/// call by name (it has no `poll`).
-///
-/// Capability `exec` (signal control, with `signal.wait`); refused at
-/// comptime (D33). Delegates to `os_signal_wait_fd`. The example is
-/// prose, since a handle comes from `std.fs`: an editor listens for
-/// `signal.resize()`, then loops on `term.wait_input(tty, set)?`,
-/// redrawing on a meaning and reading a key on 0.
-pub fn wait_input(tty: fs.File, set: int) -> int ! {unsupported, io} {
-    os_signal_wait_fd(tty.fd, set)?
-}

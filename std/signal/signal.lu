@@ -40,22 +40,24 @@
 //!
 //! **Errors are rows, and one shape rule reads every set** (s232). An
 //! empty set, or one holding any bit that is not a listenable meaning, is
-//! `io` from `listen`, `wait`, `poll`, `ignore` and `reset`, and nothing
-//! changes; `raise` takes exactly one listenable meaning. On windows only
-//! the first four meanings can be listened for — the console sends
-//! `terminate()` and `quit()`, and `reload()` and `upgrade()` arrive only
-//! by this process's own `raise` — so a listen for any of the other
-//! sixteen is `io` there, and `ignore`, `reset`, `ignored`, `send` and
-//! `number` answer `unsupported`, the last two after their own shape
-//! (`[os.signal.platform]`).
+//! `io` from `listen`, `wait`, `wait_fd`, `poll`, `ignore` and `reset`,
+//! and nothing changes; `raise` takes exactly one listenable meaning. On
+//! windows only the first four meanings can be listened for — the
+//! console sends `terminate()` and `quit()`, and `reload()` and
+//! `upgrade()` arrive only by this process's own `raise` — so a listen
+//! for any of the other sixteen is `io` there, and `ignore`, `reset`,
+//! `ignored`, `send`, `number` and `wait_fd` answer `unsupported`, the
+//! last three after their own shape (`[os.signal.platform]`).
 //!
 //! **Capability: `exec` (I13)** — signal control is process control:
-//! `listen`, `wait`, `poll`, `ignore`, `reset`, `raise` and `send` are
-//! tagged `exec` in the sandbox table. `ignored` READS this process's
-//! context and is `env` (ruling #70 R8, with `os_pgid`); `number` reads
-//! the host's numbering and charges nothing. All of them are refused at
-//! comptime (D33). The meaning functions reach nothing and are
-//! comptime-safe.
+//! `listen`, `wait`, `wait_fd`, `poll`, `ignore`, `reset`, `raise` and
+//! `send` are tagged `exec` in the sandbox table. `ignored` READS this
+//! process's context and is `env` (ruling #70 R8, with `os_pgid`);
+//! `number` reads the host's numbering and charges nothing. All of them
+//! are refused at comptime (D33). The meaning functions reach nothing
+//! and are comptime-safe.
+
+use std.fs
 
 // THE TABLE (`[os.signal.set]`). These functions are the one place in
 // `std/` where a signal's bit is written, and each bit is permanent
@@ -169,6 +171,36 @@ pub fn listen(set: int) -> () ! {io} {
 /// Park until a meaning in `set` arrives; that meaning.
 pub fn wait(set: int) -> int ! {io} {
     os_signal_wait(set)?
+}
+
+/// Wait until the file `f` names has something to read or a meaning in
+/// `set` is delivered (`[os.signal.wait.fd]`): the meaning, taken off
+/// the queue as `wait` takes it, or **0** when `f` is ready — a byte,
+/// the end of input or a hang-up — with nothing read, so the read that
+/// follows says which. A meaning wins when both are ready; one delivered
+/// or pending before the call is answered at once. The meanings must be
+/// listened for first (`listen`). Any readable descriptor serves: a
+/// terminal, a pipe, a file (spelling ruled #82, the family's).
+///
+/// This is the wait an interactive program blocks in instead of a read:
+/// a delivered signal never tears a read, so an editor reading keys
+/// would learn of a resize or a `kill` only when the next key came. It
+/// has no deadline; on a terminal with `canonical` off, `std.term`'s
+/// `Mode.min` and `Mode.time` time the read that follows.
+///
+/// Rows: `io` for a set the shape rule refuses — empty, or holding a
+/// bit that is not a listenable meaning — before anything else; then
+/// `unsupported` on windows; then `io` for a closed or forged handle.
+/// Never traps. lupin answers the shape rows and declines a well-formed
+/// call by name (it has no `poll`).
+///
+/// Capability `exec` (signal control, with `wait`); refused at comptime
+/// (D33). Delegates to `os_signal_wait_fd`. The example is prose, since
+/// a handle comes from `std.fs`: an editor listens for
+/// `signal.resize()`, then loops on `signal.wait_fd(tty, set)?`,
+/// redrawing on a meaning and reading a key on 0.
+pub fn wait_fd(f: fs.File, set: int) -> int ! {unsupported, io} {
+    os_signal_wait_fd(f.fd, set)?
 }
 
 /// The oldest meaning in `set` that has arrived, taken; 0 when none has.
