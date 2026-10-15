@@ -30,14 +30,28 @@
 //! and set back is therefore exact on either side; a `Mode` built by hand
 //! says what it wants of both.
 //!
+//! **What a line editor asks of it** (wolf 0.2.30, s234, ruling #73):
+//! the window's `size` (and `signal.resize()` when it changes), the keys
+//! the user chose for erase, kill, interrupt and the rest (`chars`), and
+//! a wait that a key or a signal ends (`wait_input`), so an editor blocks
+//! there instead of in a read a signal cannot tear. Nothing here sets
+//! the special characters, and nothing restores the mode when a program
+//! dies of a signal it cannot catch.
+//!
 //! **Errors are rows.** A handle that is closed, forged or not a terminal
 //! is `io`; a mode outside the bits is `invalid` (unreachable through
 //! `Mode`, whose fields are clamped, but for `flow` or `extended` before
-//! wolf 0.2.30); every call is `unsupported` on windows.
+//! wolf 0.2.30); a set `wait_input` cannot wait on is `io` before the
+//! handle is looked at; every call is `unsupported` on windows. lupin
+//! answers the shape rows and declines every call that reaches the
+//! terminal by name.
 //!
-//! **Capability:** `foreground`, `mode` and `set_mode` are `io` (they act on
-//! a descriptor the program holds, as `io.is_terminal`); `set_foreground`
-//! is `exec` (process control) and `group` `env` (process context).
+//! **Capability:** `foreground`, `mode`, `set_mode`, `size` and `chars`
+//! are `io` (they act on a descriptor the program holds, as
+//! `io.is_terminal`); `set_foreground` and `wait_input` are `exec`
+//! (process and signal control) and `group` `env` (process context).
+//! `pack`, `unpack`, `raw`, `chars_from` and `char_disabled` are pure,
+//! comptime-safe.
 
 use std.fs
 
