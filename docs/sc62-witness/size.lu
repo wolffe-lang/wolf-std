@@ -1,0 +1,27 @@
+//! sc62's witness program (docs/sc62-witness/pty.py runs it on a pty):
+//! `term.size` of standard input, the pty the parent made this
+//! process's controlling terminal.
+
+use std.env
+use std.fs
+use std.term
+
+fn main() -> !int {
+    // SC62_TTY names the pty when the machine gives the program no
+    // terminal on standard input (`conform-run --native` / `--release`).
+    let path = env.get("SC62_TTY") else |_| { "" }
+    var tty = fs.stdin()
+    if path != "" {
+        tty = fs.open(path)?
+    }
+    let s = term.size(tty) else |e| {
+        let w = match e {
+            unsupported => "unsupported",
+            io => "io",
+        }
+        print("size={w}")
+        return 5
+    }
+    print("rows={s.rows} columns={s.columns}")
+    0
+}

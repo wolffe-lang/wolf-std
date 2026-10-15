@@ -1,0 +1,13 @@
+//! sc62's witness program for lupin alone: `term.wait_input` with a
+//! well-formed set and no listen (lupin resolves no `os_signal_listen`),
+//! so its refusal names `os_signal_wait_fd` itself.
+
+use std.fs
+use std.signal
+use std.term
+
+fn main() -> !int {
+    let m = term.wait_input(fs.stdin(), signal.resize())?
+    print("answer={m}")
+    0
+}

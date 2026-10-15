@@ -1,0 +1,29 @@
+//! sc62's witness program (docs/sc62-witness/pty.py runs it on a pty):
+//! `term.chars` of standard input, every field in the builtin's order.
+
+use std.env
+use std.fs
+use std.term
+
+fn main() -> !int {
+    // SC62_TTY names the pty when the machine gives the program no
+    // terminal on standard input (`conform-run --native` / `--release`).
+    let path = env.get("SC62_TTY") else |_| { "" }
+    var tty = fs.stdin()
+    if path != "" {
+        tty = fs.open(path)?
+    }
+    let c = term.chars(tty) else |e| {
+        let w = match e {
+            unsupported => "unsupported",
+            io => "io",
+        }
+        print("chars={w}")
+        return 5
+    }
+    print("erase={c.erase} kill={c.kill} interrupt={c.interrupt} quit={c.quit}")
+    print("suspend={c.suspend} end_of_file={c.end_of_file} word_erase={c.word_erase}")
+    print("literal_next={c.literal_next} start={c.start} stop={c.stop}")
+    print("reprint={c.reprint} discard={c.discard}")
+    0
+}
