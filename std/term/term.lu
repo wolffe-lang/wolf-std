@@ -215,8 +215,12 @@ pub fn char_disabled() -> int {
 }
 
 fn char_at(v: List[int], i: int) -> int {
-    if i < len(v) {
-        return v[i]
+    var k = 0
+    for c in v {
+        if k == i {
+            return c
+        }
+        k = k + 1
     }
     -1
 }
