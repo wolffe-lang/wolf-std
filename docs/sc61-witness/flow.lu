@@ -1,0 +1,73 @@
+//! sc61's witness program (docs/sc61-witness/pty.py runs it on a pty).
+//! Uses only what std.term had before sc61 (`mode`, `set_mode`, `raw`,
+//! `pack`, `unpack`), so the same file runs against trunk 9e5bd6b's std
+//! and against the head's. SC61_TTY names the terminal, SC61_STEP the step:
+//! `trip` reads the mode and sets it back through unpack and pack; `raw`
+//! sets `raw` of the mode read and prints the mode it saved; `back` sets
+//! the mode SC61_SAVED names (a packed int); `hand` sets `unpack(287)`,
+//! a cooked mode with flow and extended on. `runtime=` is the builtin's
+//! own int, `read=` the same mode through `pack(mode)`. The terminal is
+//! read from outside, with `stty -a`, by the parent.
+
+use std.env
+use std.fmt
+use std.fs
+use std.term
+
+fn set_row(tty: fs.File, m: term.Mode) -> str {
+    term.set_mode(tty, m) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    // A machine that passes no environment (lupin's conform-run) gets
+    // standard input and `trip`: its answer is what is recorded.
+    let path = env.get("SC61_TTY") else |_| { "" }
+    let step = env.get("SC61_STEP") else |_| { "trip" }
+    var tty = fs.stdin()
+    if path != "" {
+        tty = fs.open(path) else |_| {
+            print("open failed")
+            return 4
+        }
+    }
+    let runtime = os_term_mode(tty.fd) else -1
+    print("runtime={runtime}")
+    let m = term.mode(tty) else |e| {
+        let w = match e {
+            unsupported => "unsupported",
+            io => "io",
+        }
+        print("mode={w}")
+        return 5
+    }
+    print("read={term.pack(m)}")
+    if step == "trip" {
+        print("set={set_row(tty, m)}")
+    } else if step == "raw" {
+        print("saved={term.pack(m)}")
+        print("set={set_row(tty, term.raw(m))}")
+    } else if step == "back" {
+        let s = env.get("SC61_SAVED") else |_| {
+            print("no SC61_SAVED")
+            return 3
+        }
+        let v = fmt.parse_int(s) else |_| {
+            print("bad SC61_SAVED")
+            return 3
+        }
+        print("set={set_row(tty, term.unpack(v))}")
+    } else if step == "hand" {
+        print("set={set_row(tty, term.unpack(287))}")
+    } else {
+        print("unknown step")
+        return 3
+    }
+    0
+}
