@@ -12508,3 +12508,54 @@ reads and `set_ids` by name. No file on the host changes owner.
 - std-test 460 + 6 (#65) + 3 (comptime) + 6 (term) = **475**, doc
   examples 481 + 14 + 3 = **498**, GREEN on kasumi and CI's three
   hosts. Falsified by any other count.
+
+### Measured (sc62, appended; nothing above is edited)
+
+On kasumi (linux x86-64, CachyOS), the release archives above; logs
+under `docs/sc62-witness/` and the lane's `~/lanes/sc62/evidence/`.
+
+- **P1 held.** Eight digests matched the release API, each read twice;
+  `wolf 0.2.30 (wolfgang, pin 1b37f36)`, paired with lupin 0.1.53 pin
+  `294d626`; archive `std/` = `fd6bcdc` but `STD-REV` and the two
+  licences; `_wolf` `a368c8ec…`. Binary `wolf` `06164156…`, `lupin`
+  `c373156b…`.
+- **P2 held exactly.** 640 → 648 anchors, the eight named, none removed
+  or moved (key sets diffed both ways).
+- **P3 held on kasumi** (`std-test-g1-756be5f.log` `dd274d71…`): 460
+  tests GREEN, 481 doc examples GREEN, every CI step exit 0. CI's three
+  hosts: the PR.
+- **P4: the conflict was falsified** — #65's six commits applied with
+  none (sc61's ledger row sits mid-file, not at the end). Its rows
+  green. **One comptime row falsified:** `os_set_ids` at comptime is
+  `unsupported` ("`List` construction at comptime") before the sandbox
+  is asked, so it has no E0701 row; `env.uid` and `fs.set_owner` are
+  E0701 on checked, native and release.
+- **P5 as implemented.** `len` does not resolve inside `std.term`
+  (E0301), so `chars_from` walks the list (`ec63b4a`).
+- **P6 held** on kasumi for every lane; windows' cells are CI's.
+- **P7 held after a harness fix.** `conform-run --native` and
+  `--release` give the program no terminal on standard input (size
+  `io`, a read `eof`: `witness-w1.log`); the other three machines read
+  the pty as standard input. Named by path there, all five machines
+  answer every step as predicted (`witness-w2.log`), under
+  `taskset -c 0-3` too (`witness-w3-taskset.log`); a planted
+  rows/columns swap is RED (`witness-plant-size-swap.log`). A window
+  change reached the program spawned by `conform-run --native` (same
+  foreground group). lupin's refusal of the wait names
+  `os_signal_listen` first in a program that listens (it resolves no
+  listen); a program that waits without listening names
+  `os_signal_wait_fd`.
+- **P8 held after two harness fixes** (`container-c1.log`): in `/tmp`
+  itself (sticky, world-writable) linux's protected_symlinks refused
+  root a link owned by 1002 — native and release ran there, checked
+  and lupin in a directory of their own; and lupin passes no
+  environment, so the role is now read from a created file's owner.
+  Then four machines agree as root and as user 1000
+  (`container-c2.log`; byte-identical under `taskset -c 0-3`). lupin
+  serves the owner calls and refuses `os_groups`, `os_uid` and
+  `os_set_ids` by name. No host file changed owner.
+- **P9 falsified by two:** **474** tests (the dropped comptime row) and
+  **497** doc examples (`wait_input`'s example went to prose: a doc
+  example imports only its own module, so it has no `fs.File`), GREEN
+  (`std-test-g2-9865363.log` `0f984bab…`, `doc-examples-g2-9865363.log`
+  `a06f3123…`).
