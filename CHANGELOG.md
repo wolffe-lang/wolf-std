@@ -1,5 +1,21 @@
 # Changelog
 
+## sc62b — 2026-10-15 — the fd-and-signal wait is `signal.wait_fd` (ruling #82)
+
+**Ruling #82** on sc62's T1–T3: `term.size` (T1) and `term.chars` with
+`chars_from` and `char_disabled` (T2) stand as implemented; **T3
+moves**: the wait on a descriptor and a signal set is
+**`signal.wait_fd(f, set)`** in `std.signal` (ruling #67's family rule;
+any readable descriptor serves, not only a terminal). Same rows, same
+answer, same capability (`exec`); `std.signal` now imports `std.fs` for
+the `File` it takes. **Breaking:** `term.wait_input`, shipped in sc62
+and in no release's bundled std, is removed; a program naming it is
+E0301 (`tests/term/wait_input_gone.lu`). Its rows moved with it
+(`signal/wait_fd_shape`, `signal/wait_fd_ready`,
+`signal/comptime_refuses_wait_fd`), and the pty witness waits through
+the new name (green on five machines, plain and under
+`taskset -c 0-3`). std-test 474 -> 475; doc examples 497.
+
 ## sc62 — 2026-10-15 — std at wolf 0.2.30 / lupin 0.1.53: who a process runs as, a file's owner, and what a line editor asks of the terminal
 
 **The pin.** wolf 0.2.29 -> **0.2.30** and lupin 0.1.52 -> **0.1.53**,
