@@ -1,5 +1,34 @@
 # Changelog
 
+## sc61 — 2026-10-15 — std.term keeps flow and extended (before wolf 0.2.30)
+
+**The defect, owed under ruling #73 R4.** wolf 0.2.30 carries s234:
+`[os.term.mode]` gains bit 3 `FLOW` (8, `IXON`) and bit 4 `EXTENDED`
+(16, `IEXTEN`), and a mode without them turns flow control and extended
+input off. `std.term.Mode` had three flags and `pack`/`unpack` dropped
+bits 3 and 4, so a program that saved its mode through `std.term` and
+set it back turned `IXON` and `IEXTEN` off on 0.2.30. Measured on a pty
+(`docs/sc61-witness/`): at trunk `9e5bd6b` under a 0.2.30 candidate
+(wolf-lang `6655e873`) the round trip leaves `-ixon -iexten` on every
+machine; under 0.2.29 it is exact.
+
+- **`Mode` gains `flow: bool` and `extended: bool`.** `unpack` reads
+  bits 3 and 4, `pack` writes them: `pack(unpack(v)) == v` for every
+  mode the runtime reports (`tests/term/round_trip.lu`, 16,416 modes).
+  On 0.2.29 the runtime never reports the two (`mode` answers both
+  `false`), so a round trip writes neither, and a hand-built `Mode`
+  with either on is `invalid` there (measured).
+- **`raw` clears `flow` and `extended`** (ruling owed, R1, its own
+  commit): as `cfmakeraw(3)`, so an editor in raw mode receives Ctrl-S,
+  Ctrl-Q, Ctrl-V and Ctrl-O as keys. On 0.2.29 the runtime cannot clear
+  them and they stay as found. The alternative keeps them as `m` has
+  them.
+- **Breaking for a `Mode` literal**: a struct literal must now name the
+  two fields. No caller outside this repository builds one (pelt calls
+  the builtins directly; lobo and boreutils do not use `std.term`).
+- `tests/term/rows.lu`: raw's packed mode stays 260 with flow and
+  extended on in the input; a new line asserts raw clears both.
+
 ## sc60 — 2026-10-13 — std at wolf 0.2.29 / lupin 0.1.52: every signal by name, and this process's ids
 
 **The pin.** wolf 0.2.28 -> **0.2.29** and lupin 0.1.51 -> **0.1.52**,
