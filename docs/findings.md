@@ -12559,3 +12559,25 @@ under `docs/sc62-witness/` and the lane's `~/lanes/sc62/evidence/`.
   example imports only its own module, so it has no `fs.File`), GREEN
   (`std-test-g2-9865363.log` `0f984bab…`, `doc-examples-g2-9865363.log`
   `a06f3123…`).
+
+## F-0149 — sc62b's predictions, before `wait_input` moves
+
+Written on branch `sc62b` (on trunk `a0d0c87`, sc62 merged) before any
+change. Ruling #82 (2026-10-15): T1 `term.size` and T2 `term.chars`
+(with `chars_from`, `char_disabled`) as implemented; **T3 moves**: the
+wait on a descriptor and a signal set is `signal.wait_fd` in
+`std.signal` (ruling #67's family rule; any descriptor, not only a
+terminal).
+
+- `signal.wait_fd(f: fs.File, set: int) -> int ! {unsupported, io}`
+  over `os_signal_wait_fd`, `std.signal` gaining `use std.fs` (no cycle:
+  `std.fs` imports nothing). `term.wait_input` is gone: a program that
+  names it is E0301 on checked and native, and lupin says it does not
+  resolve.
+- Rows move with it, answers unchanged: `term/wait_shape` →
+  `signal/wait_fd_shape`, `term/wait_ready` → `signal/wait_fd_ready`,
+  `term/comptime_refuses_wait` → `signal/comptime_refuses_wait_fd`; one
+  new row, `term/wait_input_gone` (`fail(E0301)`), red if the old name
+  resolves. std-test 474 → **475**; doc examples **497** unchanged.
+- The pty witness, renamed through, GREEN on five machines; lupin
+  still refuses `os_signal_wait_fd` by name.
