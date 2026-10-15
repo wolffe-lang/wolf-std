@@ -1,6 +1,6 @@
 //! sc62's witness program (docs/sc62-witness/pty.py runs it on a pty):
 //! listen for `resize()`, write the file SC62_MARK names (the parent
-//! acts only after it exists), then `term.wait_input` on standard input
+//! acts only after it exists), then `signal.wait_fd` (ruling #82) on standard input
 //! with `resize()`. A meaning is answered as its number and the size is
 //! read again; 0 (input ready) is followed by a one-byte read, which
 //! shows the wait read nothing.
@@ -23,7 +23,7 @@ fn main() -> !int {
     if mark != "" {
         fs.write_text(mark, "waiting")?
     }
-    let m = term.wait_input(tty, signal.resize()) else |e| {
+    let m = signal.wait_fd(tty, signal.resize()) else |e| {
         let w = match e {
             unsupported => "unsupported",
             io => "io",

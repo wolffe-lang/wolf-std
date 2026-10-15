@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""sc62's witness: std.term's size, chars and wait_input on a real pty.
+"""sc62's witness: term.size, term.chars and signal.wait_fd on a real pty.
 
 usage: pty.py <wolf> <std-root> <workdir> [lupin]
 
