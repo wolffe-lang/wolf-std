@@ -12271,3 +12271,73 @@ job's first line), strict: `--nocapture`, 0 `SKIP` lines in every log.
   `quit()` on windows (the row raises its own); whether wolf-lang has
   an issue for `<<` on the checked machine (I searched and found only
   the closed #130, which is `wrapping[T]`'s).
+
+## F-0147 — sc61's predictions, before std.term moves
+
+Written on branch `sc61` (on trunk `9e5bd6b`) before any change to
+`std/term/term.lu`, before the 0.2.30 candidate finished building, and
+before any witness ran. What I read first, and so cannot claim to
+predict blind: `[os.term.mode]` at wolf-lang `6655e873` and at
+`v0.2.29`, the runtime's flag table at both (`crates/wolf_rt/src/term.rs`,
+`crates/wolf_mem/src/ubcheck.rs`, read for where the bits live, not
+run), and r35's finding as the crawl records it (`std.term` drops bits
+3 and 4). The baseline is sc60's measured head (F-0146: 459 tests,
+doc-examples 481). Measurements are appended below, never written over.
+
+The witness (`docs/sc61-witness/`): a pseudo-terminal opened by a
+Python parent, which holds both ends so the settings outlive the
+program; `stty -a` read on the terminal from outside before and after
+each step. Three steps, each its own run of `flow.lu`: **trip** (read
+the mode, `unpack`, `pack`, set it back), **raw** (set `raw` of the mode
+read), **back** (set the mode saved before `raw`, passed in as its
+packed int, unpacked). Linux's pty starts `icanon echo isig ixon
+iexten`, `min = 1`, `time = 0`.
+
+### P1. What the runtime reads
+
+- 0.2.29 reads the fresh pty as **263** (1 + 2 + 4 + 256); the
+  candidate as **287** (263 + 8 + 16). Falsified by any other number.
+
+### P2. The witness at trunk `9e5bd6b`
+
+- **0.2.29: GREEN.** After trip and after back, `ixon` and `iexten` are
+  on (the bits are never written and 0.2.29 leaves both as found); after
+  raw also on (0.2.29 cannot turn them off).
+- **Candidate: RED.** After trip `-ixon -iexten` (the defect); after raw
+  `-ixon -iexten`; after back `-ixon -iexten`. `icanon echo isig` come
+  back after trip and back on both.
+
+### P3. The witness at the head (raw clears both, R1 A)
+
+- **0.2.29: GREEN**, the same three readings as P2's 0.2.29 row
+  (`unpack` reads both bits false there, `pack` never writes them, and
+  `raw` clearing a false bit writes nothing).
+- **Candidate: GREEN.** After trip `ixon iexten`; after raw `-ixon
+  -iexten` (the ruling's effect, the same as trunk's by accident); after
+  back `ixon iexten`.
+
+### P4. A hand-built mode with the new bits on 0.2.29
+
+- `set_mode` of `Mode { flow: true, … }` on 0.2.29 is **`invalid`**
+  (the v0.2.29 spec: "Any other bit … is `invalid` before the handle is
+  read"), not `io` as the contract says; on the candidate the same call
+  succeeds on a terminal. On a handle that is not a terminal it is
+  `invalid` on 0.2.29 and `io` on the candidate. Falsified by `io` on
+  0.2.29.
+
+### P5. Machines
+
+- The witness runs on native and release (built binaries, and
+  `conform-run --native` / `--release`) and on the checked machine
+  (`wolf conform-run --json --checked`), with one answer on all three
+  per wolf. lupin (0.1.52) refuses `os_term_mode` by name (as the
+  ledger comment above `term/rows.lu` says), so it has no witness row.
+
+### P6. The rig
+
+- std-test 459 → **460** (one new pure row, `term/round_trip.lu`: the
+  round trip over every flag combination and every `min` and `time`),
+  `run` on all four machines, one stdout; `term/rows.lu` moves its
+  directive (raw's two new fields) and stays `run` on four; no other
+  row moves; doc-examples 481 unchanged. The same counts on CI's three
+  hosts at 0.2.29. Falsified by any other count.
