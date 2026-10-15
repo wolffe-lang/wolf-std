@@ -168,3 +168,87 @@ pub fn size(tty: fs.File) -> Size ! {unsupported, io} {
     let (r, c) = os_term_size(tty.fd)?
     Size { rows: r, columns: c }
 }
+
+/// The terminal's special characters (`[os.term.chars]`): the byte the
+/// user chose for each (`stty erase ^H`), or `char_disabled()` for one
+/// that is disabled (`stty intr undef`). `word_erase`, `literal_next`,
+/// `reprint` and `discard` are not POSIX's; both hosts have them, and
+/// they act only with `Mode.extended` on.
+pub struct Chars {
+    erase: int,
+    kill: int,
+    interrupt: int,
+    quit: int,
+    suspend: int,
+    end_of_file: int,
+    word_erase: int,
+    literal_next: int,
+    start: int,
+    stop: int,
+    reprint: int,
+    discard: int,
+}
+
+/// The word `Chars` holds for a character that is disabled: -1, the
+/// builtin's own (`[os.term.chars]`; the host's disabled value never
+/// reaches the program). Total and pure.
+///
+/// ```wolf-doc-example
+/// term.char_disabled() == 0 - 1
+/// ```
+pub fn char_disabled() -> int {
+    -1
+}
+
+fn char_at(v: List[int], i: int) -> int {
+    if i < len(v) {
+        return v[i]
+    }
+    -1
+}
+
+/// The `Chars` a list in `[os.term.chars]`'s order names: erase, kill,
+/// interrupt, quit, suspend, end of file, word erase, literal next,
+/// start, stop, reprint, discard. An entry the list does not reach is
+/// `char_disabled()`; entries past the twelfth are not read (the
+/// builtin's list grows only at its end). Total and pure.
+///
+/// ```wolf-doc-example
+/// var v = List[int]()
+/// (mut v).push(127)
+/// (mut v).push(21)
+/// (mut v).push(3)
+/// let c = term.chars_from(v)
+/// c.erase == 127 && c.interrupt == 3 && c.discard == term.char_disabled()
+/// ```
+pub fn chars_from(v: List[int]) -> Chars {
+    Chars {
+        erase: char_at(v, 0),
+        kill: char_at(v, 1),
+        interrupt: char_at(v, 2),
+        quit: char_at(v, 3),
+        suspend: char_at(v, 4),
+        end_of_file: char_at(v, 5),
+        word_erase: char_at(v, 6),
+        literal_next: char_at(v, 7),
+        start: char_at(v, 8),
+        stop: char_at(v, 9),
+        reprint: char_at(v, 10),
+        discard: char_at(v, 11),
+    }
+}
+
+/// The terminal's special characters now. A line editor that turns
+/// `canonical` and `signals` off reads these first, so erase, kill,
+/// interrupt and end of file keep the keys the user set. Nothing here
+/// sets them (`stty` does).
+///
+/// Rows: `io` for a handle that is closed, forged or not a terminal;
+/// `unsupported` on windows. Never traps. lupin declines by name (it has
+/// no `tcgetattr`); the example is prose: `term.chars(tty)?.erase` is
+/// the key that deletes a character.
+///
+/// Capability `io` (uncharged, as `mode`). Delegates to `os_term_chars`.
+pub fn chars(tty: fs.File) -> Chars ! {unsupported, io} {
+    chars_from(os_term_chars(tty.fd)?)
+}
