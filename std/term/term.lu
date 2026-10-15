@@ -179,6 +179,7 @@ pub struct Size {
 /// width an editor lays a line out in.
 ///
 /// Capability `io` (uncharged, as `mode`). Delegates to `os_term_size`.
+/// Spelling ruled #82 (`Size`'s named fields over the builtin's pair).
 pub fn size(tty: fs.File) -> Size ! {unsupported, io} {
     let (r, c) = os_term_size(tty.fd)?
     Size { rows: r, columns: c }
@@ -268,6 +269,8 @@ pub fn chars_from(v: List[int]) -> Chars {
 /// the key that deletes a character.
 ///
 /// Capability `io` (uncharged, as `mode`). Delegates to `os_term_chars`.
+/// Spelling ruled #82 (`Chars`' named fields, with `chars_from` and
+/// `char_disabled`).
 pub fn chars(tty: fs.File) -> Chars ! {unsupported, io} {
     chars_from(os_term_chars(tty.fd)?)
 }
