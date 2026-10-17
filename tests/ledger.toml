@@ -2546,7 +2546,7 @@ wolfc = "run"
 native = "run"
 
 [tests."x/crypto/sha2/wycheproof_hkdf256_full.lu"]
-lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
+lupin = "run"  # sc63 (lupin 0.1.54): measured `exit(0)` inside the 50M-step budget (is76's lupin; r36 found it, F-0150); sc24's `unsupported` (lupin 0.1.14 to 0.1.53) retires
 wolfc = "unsupported"
 native = "run"
 
