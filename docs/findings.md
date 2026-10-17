@@ -12624,3 +12624,42 @@ at `1b37f368`). Contract: `stdlib/sc63-hkdf256-runs.md`.
   `unsupported` (the step budget), re-measured by hand. On kasumi the
   hkdf256 row runs to `exit(0)` in 20–35 s, under every CI host's
   ceiling (60 s ubuntu/macOS, 180 s windows).
+
+### Measured (sc63, 2026-10-17)
+
+- **P1 held.** The four lupin 0.1.54 archives matched the release API's
+  digests on kasumi, each read twice: linux x86-64 `175df238…`, aarch64
+  `5fb15e31…`, macOS `9cd14db7…`, windows zip `cc0b7b24…`; the binary
+  `lupin` `a9856dd4…`. `lupin 0.1.54 (wolf-interp, reference
+  interpreter at pin 294d626)`; no `std/` in the archive. (The release
+  also carries a bare `lupin.exe` asset, `4ed2487b…`, beside the zip;
+  nothing here reads it.)
+- **P2 held.** At the bare pin (`6880d75`) kasumi's gauntlet was exit 0
+  on every step but std-test, which was RED on exactly
+  `wycheproof_hkdf256_full.lu [lupin]: ledger says unsupported, observed
+  run` (one `ledger says` line; 475 tests; doc examples 497 GREEN; 0
+  `SKIP`). CI run 39051404771 at the same commit: `rig` red on ubuntu
+  (job 117450572921), macOS (117450572774) and windows (117450572900),
+  each on that line alone; `gates` green on all three.
+- **P3 held.** At `3ed1487` kasumi's gauntlet was exit 0 on every step:
+  std-test GREEN 475 (lane counts 365/27/48/35, conservatism 144, was
+  145), doc examples 497 GREEN, 0 `SKIP`. CI run 39053303835: six jobs
+  success; the row `staged, 2 lane(s) observed` under `lupin 0.1.54` on
+  all three hosts, 37.5 s on macOS (63% of 60 s) and 36.8 s on windows
+  (20% of 180 s); not among ubuntu's eight slowest (under 35 s). By
+  hand on kasumi (`lupin conform-run --json`, twice each):
+  `hkdf256_full` `exit(0)`, `phase_reached` `run`, 29.0 s / 29.1 s,
+  634 MB; `hkdf384_full` and `hkdf512_full` `unsupported` ("did not
+  terminate within 50000000 evaluation steps", `x-unsupported-at` `run`)
+  at 27.9–35.1 s, 786–791 MB. kasumi's load was 5–7 from other lanes,
+  so the 29 s is not comparable with r36's 25.8 s.
+- **Moved besides the row:** nothing in std-test or the doc examples. A
+  refused record now reads `phase_reached: "resolve"` with
+  `x-unsupported-at: "run"` (is76's #249); the rig reads the verdict
+  word, not the phase, so no row moves.
+- **Correction to P3's wording:** "windows advisory, as ever" is
+  stale. No step in `ci.yml` carries `continue-on-error` any more, so
+  windows std-test gates: the bare pin's windows `rig` was a real
+  failure (`outcome=failure conclusion=failure`), not an advisory
+  warning. The comments above the step still say advisory; not
+  changed here (no change outside the row).
