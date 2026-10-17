@@ -1,5 +1,22 @@
 # Changelog
 
+## sc63 — 2026-10-17 — lupin 0.1.54, and one ledger row: `hkdf256_full` runs
+
+**The pin.** lupin 0.1.53 -> **0.1.54** alone (`v0.1.54` at
+wolf-interp `0e536e8`; linux x86-64 `175df238…`), from the release
+archives by digest; wolf stays **0.2.30**, whose `--version` still
+names lupin 0.1.53 as its pair (reported, never gated). lupin's pin key
+stays at wolf-lang v0.2.24 (`294d626d`).
+
+**The row.** is76's lupin runs
+`x/crypto/sha2/wycheproof_hkdf256_full.lu` to `exit(0)` inside its
+50,000,000-step budget, so its lupin cell moves `unsupported` ->
+**`run`** (sc24's word, true from lupin 0.1.14 to 0.1.53, retires).
+r36 found it; F-0150 predicted the bare pin red on that row alone, and
+it was. `wycheproof_hkdf384_full` and `wycheproof_hkdf512_full` stay
+`unsupported` at the step budget (re-measured by hand, twice each). No
+function, test or other row changes. std-test 475, doc examples 497.
+
 ## sc62b — 2026-10-15 — the fd-and-signal wait is `signal.wait_fd` (ruling #82)
 
 **Ruling #82** on sc62's T1–T3: `term.size` (T1) and `term.chars` with
