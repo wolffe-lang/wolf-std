@@ -12581,3 +12581,46 @@ terminal).
   resolves. std-test 474 → **475**; doc examples **497** unchanged.
 - The pty witness, renamed through, GREEN on five machines; lupin
   still refuses `os_signal_wait_fd` by name.
+
+## F-0150 — sc63's predictions, before the lupin 0.1.54 archives
+
+Written on branch `sc63` (on trunk `f50fe73`, sc62b) before any lupin
+0.1.54 archive was fetched and before the pin moved. What I read first,
+and so cannot claim to predict blind: r36's evidence (planning `r36` at
+`6290395`): under a development 0.1.54 (is76's `5669f48`) and again
+under lupin `b86ca8a`, this trunk's std-test is red on exactly one row,
+`x/crypto/sha2/wycheproof_hkdf256_full.lu [lupin]` (ledger
+`unsupported`, observed `exit(0)`, 25.8 s, 634 MB on kasumi), while
+`wycheproof_hkdf384_full` stays `unsupported` at the 50,000,000-step
+budget. Also read: the release API's asset list while the workflow was
+still running.
+
+Inputs, re-derived 2026-10-17: lupin 0.1.54 is tag `v0.1.54` at
+`0e536e8` (CHANGELOG-only over `b86ca8a`); wolf 0.2.30 stays (`v0.2.30`
+at `1b37f368`). Contract: `stdlib/sc63-hkdf256-runs.md`.
+
+### P1. The archives
+
+- Every lupin 0.1.54 archive matches the digest the release API reports,
+  each read twice. `lupin --version` reads `lupin 0.1.54 (wolf-interp,
+  reference interpreter at pin 294d626)`: the conformance pin key does
+  not move (falsified by any other pin). The archive ships no `std/`.
+
+### P2. The bare pin
+
+- With only `vendor/tools.toml`'s lupin version moved, std-test on
+  kasumi is RED on exactly one row, `wycheproof_hkdf256_full.lu
+  [lupin]` (`ledger says unsupported, observed run`); every other row,
+  all 475, answers its ledger word, and the doc examples (497) are
+  GREEN. CI on that commit is red on ubuntu and macOS for the same row
+  alone. Falsified by any second row moving, in either direction.
+
+### P3. The row
+
+- `x/crypto/sha2/wycheproof_hkdf256_full.lu` `lupin = "run"` turns
+  std-test GREEN at 475 on kasumi and on CI's three hosts (windows
+  advisory, as ever), the row observed `run` under lupin 0.1.54 in the
+  log. `wycheproof_hkdf384_full` and `wycheproof_hkdf512_full` stay
+  `unsupported` (the step budget), re-measured by hand. On kasumi the
+  hkdf256 row runs to `exit(0)` in 20–35 s, under every CI host's
+  ceiling (60 s ubuntu/macOS, 180 s windows).
