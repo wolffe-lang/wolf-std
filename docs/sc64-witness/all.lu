@@ -33,7 +33,11 @@ fn main() -> !int {
     while n < 400 {
         let x = process.poll()?
         if x.changed {
-            seen = if x.child.slot == ch.slot && process.is_signalled(x.status) { "the sleep, ended by {process.signal_of(x.status) else -1}" } else { "something else" }
+            seen = if x.child.slot == ch.slot && process.is_signalled(x.status) {
+                "the sleep, ended by {process.signal_of(x.status) else -1}"
+            } else {
+                "something else"
+            }
             n = 400
         } else {
             signal.wait(set)?

@@ -36,7 +36,8 @@ fn kind(s: process.Status) -> str {
 fn two(set: int, a: process.Child, b: process.Child) -> str ! {io} {
     let x = next(set)?
     let y = next(set)?
-    let both = (x.child.slot == a.slot && y.child.slot == b.slot) || (x.child.slot == b.slot && y.child.slot == a.slot)
+    let both = x.child.slot == a.slot && y.child.slot == b.slot ||
+        x.child.slot == b.slot && y.child.slot == a.slot
     if !both {
         return "wrong children {x.child.slot} {y.child.slot}"
     }
@@ -58,7 +59,9 @@ fn main() -> !int {
     let member = process.start_job(c, g.id, 0)?
     let in_group = process.pid(member)? != g.id
     print("group: leader {process.pid(lead)? == g.id}, member apart {in_group}")
-    print("numbers: stop {signal.number(signal.stop())?} suspend {signal.number(signal.suspend())?} terminate {signal.number(signal.terminate())?}")
+    print(
+        "numbers: stop {signal.number(signal.stop())?} suspend {signal.number(signal.suspend())?} terminate {signal.number(signal.terminate())?}",
+    )
     signal.send_group(g, signal.stop())?
     print("stop: {two(set, lead, member)?}")
     signal.send_group(g, signal.continued())?
