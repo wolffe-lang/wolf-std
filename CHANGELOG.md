@@ -1,5 +1,53 @@
 # Changelog
 
+## sc64 — 2026-10-18 — std at wolf 0.2.32: the poll, the status, the groups
+
+**The pin.** wolf 0.2.30 -> **0.2.32** (`v0.2.32` at `72de141f`; linux
+x86-64 `4c37f9c5…`), from the release archives by digest; lupin stays
+**0.1.54**, and wolf's `--version` names it as its pair again. 0.2.31
+was never pinned here. The data pin moves v0.2.30 -> v0.2.32
+(`1b37f368` -> `72de141f`, 648 -> 661 anchors, 13 added, none removed).
+0.2.32's archive bundles this repository at `d37c911` (sc63). Trunk's
+475 tests and 497 doc examples are green at the bare pin; F-0151
+predicted it before the archives were fetched.
+
+**The poll and the status (s242, ruling #84; spellings S1–S2 owed).**
+`process.Status` reads a child's change as exactly one of three kinds
+that never meet: an exit (0..255, `is_exited`, `exit_code`), an end by
+signal `N` (`-N`, `is_signalled`, `signal_of`) and a stop by `N`
+(`256 + N`, `is_stopped`, `stopped_by`); a stop is never an exit.
+`status_from` reads any status number (`wait_status`'s too) and
+`shell_code` is `$?` (`128 + N` for an end or a stop). `process.poll()
+-> Change ! {io}` looks at every child this program started without
+waiting (`os_wait_poll`): `changed`, the `child`, its `status`, or,
+when nothing changed, `live`, the children left. With `signal.listen`
+and `signal.wait` on `signal.child()` it is the wait a trapped signal
+cuts short. `exec`.
+
+**The groups (s241, ruling #79).** `process.Group { id }`, from a job's
+leader (`group_of`) or this process (`own_group`, `env`);
+`signal.send_group(g, m)` and `signal.send_all(m)` (`exec`, R1);
+`process.lead_group()` and `join_group(g)` move THIS process
+(`os_set_pgid`, `exec`); `signal.last()`, `signal.realtime()` (a
+`Realtime { first, last }`) and `signal.text(m)` read the host's table
+and words (uncharged, R4, R5); `signal.host(n)` spells host signal `n`
+as the meaning `-n`. `signal.send` is unchanged; its doc now names the
+host numbers its builtin takes since 0.2.31. Spellings beyond R1's
+(`group_of`, `own_group`, `join_group`, `Realtime`, `host`) are owed a
+ruling (the PR's section 0).
+
+**Rows.** Nine new: `process/status_kinds`, `poll_none` (every
+machine), `poll_job` (a `/bin/sleep` the row starts as a group leader,
+stopped, continued and killed by `send_group`; lupin `unsupported`,
+windows by its `unsupported` start), `signal/group_rows` (the shapes),
+`signal/host_rows`, `process/join_own_group`, and three comptime
+refusals (E0701). `os_signal_last`, `realtime` and `text` are refused
+at comptime by name, so they have no row. std-test 475 -> **484**; doc
+examples 497 -> **511**. Container witness (`docs/sc64-witness/`): a
+two-process job stopped, suspended, continued and ended through its
+group, this process's group led and rejoined, and `kill -1`, on four
+machines as root and as a user.
+
 ## sc63 — 2026-10-17 — lupin 0.1.54, and one ledger row: `hkdf256_full` runs
 
 **The pin.** lupin 0.1.53 -> **0.1.54** alone (`v0.1.54` at
