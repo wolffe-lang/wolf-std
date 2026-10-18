@@ -812,7 +812,7 @@ pub fn status_from(value: int) -> Status {
 /// process.is_exited(process.status_from(275)) == false
 /// ```
 pub fn is_exited(s: Status) -> bool {
-    s.value >= 0 && s.value <= 255
+    s.value >= 0 && s.value < 512
 }
 
 /// Whether `s` is an end by a signal (`-N`). Pure.
