@@ -28,8 +28,9 @@
 //! quoting rules, and every quoting rule anyone has ever written has had a
 //! hole in it.
 //!
-//! **Capability: `Exec` (I13).** `start`, `run`, `wait`, `kill` and `exit`
-//! reach the host's process table, are tagged `exec` in the toolchain's
+//! **Capability: `Exec` (I13).** `start`, `run`, `wait`, `kill`, `exit`,
+//! `poll`, `lead_group` and `join_group` reach the host's process table
+//! (`own_group` reads this process's context: `env`), are tagged `exec` in the toolchain's
 //! sandbox table, and are categorically refused at comptime (D33) — with
 //! the sandbox table's own reason, which is worth quoting because it is
 //! sharper than "determinism": *compiling a package must never run or
@@ -129,6 +130,19 @@
 //! field is private at this pin, so a forged handle is a checkable
 //! condition rather than a contract violation.
 //!
+//! **Jobs: the poll, the status and the group (sc64, wolf 0.2.31's s241
+//! and s242, rulings #79 and #84).** A shell's children change in three
+//! ways, and `Status` keeps them apart: an exit (0..255), an end by a
+//! signal (`-N`) and a stop (`256 + N`), which is not an ending — a
+//! stopped job is alive and waits for `fg` or `bg`. `poll` looks at every
+//! child this program started without waiting and reports the first that
+//! ended (reaping it) or stopped; with `std.signal`'s `listen` and `wait`
+//! on `signal.child()` it is the wait a trapped signal cuts short. A job
+//! is a `Group`: `group_of` a leader started with `start_job(c, 0, …)`,
+//! `own_group` this process's, and `std.signal.send_group` signals every
+//! member. `lead_group` and `join_group` move THIS process (an interactive
+//! shell at start and at exit; GNU `timeout` before its command).
+//!
 //! **What is deliberately absent.** Each is a reviewed contract with a
 //! filing behind it rather than an approximation:
 //!
@@ -150,19 +164,20 @@
 //!     `std.env.set` before spawning, which is a different thing and is
 //!     not documented as if it were the same.
 //! try_wait(mut ch: Child) -> int ! {none, signal, io}
-//!     Has it finished? `os_wait` blocks and there is no non-blocking
-//!     form (F-0065), so the honest answer is unavailable — and a poll
-//!     loop written over a blocking wait is a lie about its own cost.
+//!     Has THIS one finished? Not a per-handle try: since wolf 0.2.31
+//!     `poll` (s242, ruling #84) answers "has any child of mine ended or
+//!     stopped?" without blocking, and ruling #84 R1 chose that shape
+//!     over a try per handle (one call per job per look).
 //! wait_timeout(mut ch: Child, d: Duration)
 //!     Same gap as the net tier's deadline (F-0049): no builtin arms one.
 //! pid(ch: Child) -> int
 //!     The `Child`'s field is the MACHINE's table index, not the host's
 //!     process id, so an accessor named `pid` would name something this
 //!     tier does not have. Nothing reports a real pid (F-0065).
-//! signal_of(…) -> int
-//!     Which signal killed it. The `signal` row carries no payload
-//!     because the builtin reports none; the day it does, the tag gains
-//!     a payload rather than a sibling (§12).
+//! signal_of(…) -> int  (arrived: `signal_of(Status)`, sc64)
+//!     Which signal killed it. `wait`'s `signal` row still carries no
+//!     payload; `wait_status` and `poll` answer the number, and
+//!     `Status` reads it (an end by signal, apart from a stop).
 //! run_with(c: Command, inherit: List[net.Listener]) -> int ! {…}
 //!     `start_with` + `wait`, the way `run` is `start` + `wait`. Absent
 //!     because the ONLY reason to hand a listener down is that the child
