@@ -12663,3 +12663,114 @@ at `1b37f368`). Contract: `stdlib/sc63-hkdf256-runs.md`.
   failure (`outcome=failure conclusion=failure`), not an advisory
   warning. The comments above the step still say advisory; not
   changed here (no change outside the row).
+
+## F-0151 — sc64's predictions, before the 0.2.32 / 0.1.54 pin
+
+Written on branch `sc64` (on trunk `d37c911`, sc63) before any 0.2.32
+archive was fetched, before the pin moved and before any wrapper, row
+or witness existed. What I read first, and so cannot claim to predict
+blind: wolf-lang's 0.2.32 and 0.2.31 CHANGELOGs (r36 and r37 measured
+`d37c911`'s 475 tests and 497 doc examples green on each release-head
+archive), spec `[os.proc.poll]`, `[os.proc.wait.note]`,
+`[os.proc.status]`, `[os.signal.send]`, `[os.signal.send.group]`,
+`[os.signal.send.all]`, `[os.signal.host]`, `[os.signal.text]`,
+`[os.signal.platform]`, `[os.signal.checked]` and `[os.term.group]` at
+`v0.2.32`, s240's note (`docs/s240-the-group-signal.md` §C–§E, the
+names ruling #79 adopted), the release API's asset digests, and
+lupin 0.1.54's `src/eval/builtin.rs` for the seven names (its shape
+rows, its windows rows and its refusals by name).
+
+Inputs, re-derived 2026-10-18: wolf 0.2.32 is tag `v0.2.32` at
+`72de141f`, published 08:38Z: linux x86-64 `4c37f9c5…`, aarch64
+`af27d426…`, macOS `061ea7e5…`, windows `40eb42af…`. lupin 0.1.54 is
+`v0.1.54` at `0e536e8` (already this repository's lupin pin since
+sc63). **Drift:** the contract names `[os.signal.last]`; no such anchor
+exists at `v0.2.32`: `os_signal_last` and `os_signal_realtime` are
+`[os.signal.host]`'s.
+
+### P1. The archives
+
+- Every digest matches the release API, each read twice. `wolf
+  --version` reads `wolf 0.2.32 (wolfgang, pin 72de141)`, paired with
+  `lupin 0.1.54 … pin 294d626`, now TRUE of this repository's pair
+  again (0.2.30 said 0.1.53). The archive's `std/` is `d37c911`
+  (`STD-REV`); `diff -rq` against trunk's `std/` names only `STD-REV`
+  and the two licences. `_wolf` does not move (`a368c8ec…`).
+
+### P2. The data pin
+
+- `1b37f368` (v0.2.30) → `72de141f` (v0.2.32): 648 → **661** anchors,
+  13 added, none removed, among them `os.proc.poll`,
+  `os.proc.wait.note`, `os.signal.send.group`, `os.signal.send.all`,
+  `os.signal.host`, `os.signal.text`, `os.term.group`. Falsified by a
+  removed key or a count other than 661.
+
+### P3. The bare pin
+
+- With only the pin moved, trunk's 475 tests and 497 doc examples are
+  GREEN on kasumi and on CI's three hosts; no ledger word moves (the
+  shift rule moves no std row: all 100 shift sites are `wrapping`; no
+  std declaration is named like one of 0.2.31's seven prelude names, so
+  no W0304). Falsified by any red row.
+
+### P4. The poll and the status (spellings proposed, ruling owed)
+
+- **S1** `process.Status { value: int }`: one int, as the builtins
+  answer it; `process.status_from(v)` (pure); exactly one of
+  `is_exited` (0..255), `is_signalled` (`-N`), `is_stopped` (`256 +
+  N`) holds for a host's answer, and none for a value no host gives
+  (256, or 512 and above, which ruling #84 R4 keeps free); readers
+  `exit_code`, `signal_of`, `stopped_by` answer the number or `none`;
+  `shell_code` is `$?` (the code, `128 + N` for an end or a stop).
+- **S2** `process.poll() -> Change ! {io}` over `os_wait_poll`,
+  `Change { changed, child, status, live }`: `(-1, n)` is `changed`
+  false with `live` n; `(h, s)` is `changed` true, `child` the handle,
+  `status` `s`.
+- Rows: the pure rows run on every machine. The poll with no child is
+  `changed=false live=0` on all four machines and lupin. A live job
+  (`/bin/sleep`, started by the row as the leader of its own group):
+  stopped by `signal.stop()` to its group, the poll reports
+  `256 + number(stop())` (19 linux, 17 macOS) on checked, native and
+  release; a continue is not reported; `kill()` to the group is
+  `-number(kill())` (-9), the handle closed, then `live=0`. lupin
+  refuses that row by name at the poll with a live child
+  (`os_wait_poll`); windows refuses the job start (`unsupported`) and
+  the row prints its lines for that reason on every machine.
+
+### P5. The groups (R1's names ruled under #79; the rest owed)
+
+- `process.Group { id }`; `signal.send_group(g, meaning)`,
+  `signal.send_all(meaning)` (ruling #79 R1); `process.lead_group()`,
+  `signal.text`, `signal.last`, `signal.realtime` (s240 §D's lane 6,
+  ruling #79 R9); owed: `process.group_of(leader)`,
+  `process.own_group()`, `process.join_group(g)`, `signal.Realtime {
+  first, last }`, `signal.host(n)`.
+- Shape rows (`invalid`: group 1, 0, negative, wider than a pid; two
+  meanings; an unpublished bit; a negative group to join; text of 0)
+  run on every machine, lupin and windows included, before the host.
+  `last`/`realtime`/`text` well-formed: linux 64, (34, 64) under glibc,
+  `Killed` for `kill()`; macOS 31, (0, 0), `Killed: 9`; windows
+  `unsupported` on every machine; lupin by name (`os_signal_last`
+  first), `unsupported` rows on windows. Joining one's own group is ok
+  on linux and macOS on checked and native; lupin by name (`os_pgid`).
+- Comptime: `os_signal_send_group`, `os_set_pgid`, `os_wait_poll` are
+  E0701 on checked and native (D33); `os_signal_last`, `realtime`,
+  `text` are refused there by name (`unsupported`), as
+  `os_signal_number` is, so they get no row.
+
+### P6. Counts
+
+- std-test 475 → **485** (ten rows); doc examples 497 → about 509
+  (pure and shape examples; anything lupin cannot run is prose).
+  Falsified by a red row, or by a count I cannot account for.
+
+### P7. The live witness (kasumi, a throwaway container, four machines)
+
+- As P4 and P5 on checked, native and release: a job's group stopped,
+  continued and ended, each by `send_group` and read by `poll`; a
+  `lead_group` then `own_group` equals `pid`; `send_all(0)` in a
+  container holding only the witness's own processes answers `ok`
+  (they may be signalled) — and as the super-user with nothing else
+  there, `not_found` (s241's row); nothing outside the container is
+  signalled. lupin refuses the live calls by name. Under `taskset -c
+  0-3` the same lines.
