@@ -377,6 +377,32 @@ pub fn realtime() -> Realtime ! {unsupported} {
     Realtime { first: a, last: b }
 }
 
+/// **s241 (`[os.signal.text]`, ruling #79 R5): the host C library's words
+/// for `meaning`'s signal**, or for host signal `N` given `host(N)` —
+/// `strsignal(3)`, what GNU `kill -t` prints and what a shell says of a
+/// job a signal ended. Always in the C locale, whatever `LANG` says. The
+/// words are the host's BY DESIGN and differ between C libraries: glibc's
+/// `kill()` is "Killed", macOS's "Killed: 9" (it appends the number to
+/// all 28); glibc and musl part on `arithmetic()` and `child()` and on
+/// every real-time number.
+///
+/// Rows: `invalid` for 0 or anything `send` refuses, before the host;
+/// `unsupported` on windows. Never traps. Uncharged; refused at
+/// comptime. lupin answers `invalid` and declines a well-formed call by
+/// name (a table there would be one C library's).
+///
+/// Delegates to `os_signal_text`.
+///
+/// ```wolf-doc-example
+/// var row = "words"
+/// let t = signal.text(0) else |_| { row = "invalid"; "" }
+/// row == "invalid"
+/// t == ""
+/// ```
+pub fn text(meaning: int) -> str ! {invalid, unsupported} {
+    os_signal_text(meaning)?
+}
+
 /// **s232 (`[os.signal.ignored]`): the set of listenable meanings this
 /// process ignores NOW.** It changes nothing. Read before the program's
 /// own first `ignore`, `reset` or `listen`, it is what the process was
