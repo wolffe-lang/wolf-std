@@ -947,6 +947,52 @@ pub fn poll() -> Change ! {io} {
     Change { changed: true, child: Child { slot: h }, status: Status { value: s }, live: -1 }
 }
 
+/// A process GROUP: the unit a job is, and what `std.signal`'s
+/// `send_group` reaches (ruling #79 R1: the type is std's, over the
+/// builtin tier's group ids). A shell starts each job as a group
+/// (`start_job` with group 0, the later stages of a pipeline joining the
+/// first's), and `kill %1`, `fg`, `bg` and Ctrl-Z act on the whole group:
+/// a job's own children (a script's `sleep`, a `make`'s compilers) are in
+/// it and outlive a signal to its leader alone.
+///
+/// The field is the group's id, the host's number: a `Group` from data
+/// (`process.Group { id: n }`, a `kill -- -N` operand) is legal, and
+/// `send_group` refuses an id that cannot be a group (1 and below) as
+/// `invalid` before the host is asked.
+pub struct Group {
+    id: int,
+}
+
+/// The group `leader` leads: a child started with `start_job` (or
+/// `start_foreground`) and group 0 leads a new group whose id is its
+/// process id. A child that JOINED a group (a positive `group`) is in the
+/// group its caller named, which the caller already holds as a
+/// `Group { id: … }`; one started in this process's group is in
+/// `own_group()`.
+///
+/// Rows: `io` once `leader` has been reaped (its id may since be
+/// another's). Never traps. Delegates to `os_proc_pid`.
+///
+/// ```wolf-doc-example
+/// var refused = false
+/// process.group_of(process.Child { slot: 4096 }) else |_| { refused = true }
+/// refused == true
+/// ```
+pub fn group_of(leader: Child) -> Group ! {io} {
+    Group { id: os_proc_pid(leader.slot)? }
+}
+
+/// This process's own group — `kill 0`'s, which a send to it reaches
+/// this process too (`[os.signal.send.group]`). Rows: `unsupported` on a
+/// host without groups (windows). lupin declines by name, so the example
+/// is prose: `signal.send_group(process.own_group()?, m)` is `kill -m 0`.
+///
+/// Capability `env` (process context, as `term.group`, ruling #70 R8);
+/// refused at comptime (D33). Delegates to `os_pgid`.
+pub fn own_group() -> Group ! {unsupported} {
+    Group { id: os_pgid()? }
+}
+
 pub fn wait(take ch: Child) -> int ! {signal, io} {
     os_wait(ch.slot)?
 }
