@@ -12774,3 +12774,63 @@ exists at `v0.2.32`: `os_signal_last` and `os_signal_realtime` are
   there, `not_found` (s241's row); nothing outside the container is
   signalled. lupin refuses the live calls by name. Under `taskset -c
   0-3` the same lines.
+
+### Measured (sc64, 2026-10-18)
+
+- **P1 held.** The eight archives matched the release API on kasumi,
+  each read twice (wolf linux x86-64 `4c37f9c5…`, aarch64 `af27d426…`,
+  macOS `061ea7e5…`, windows `40eb42af…`; lupin as sc63). `wolf 0.2.32
+  (wolfgang, pin 72de141)`, `paired with lupin 0.1.54 … pin 294d626`;
+  the binary `wolf` `81bdf8d4…`, `_wolf` `a368c8ec…` unchanged; archive
+  `std/` at `STD-REV` `d37c911f`, `diff -rq` naming only `STD-REV` and
+  the two licences; GLIBC ≤ 2.34.
+- **P2 held.** 648 → 661, the 13 added are `os.net.error`,
+  `os.net.reactor`, `os.net.reactor.note`, `os.proc.poll`,
+  `os.proc.wait.note`, `os.signal.group.note`, `os.signal.host`,
+  `os.signal.hub`, `os.signal.send.all`, `os.signal.send.group`,
+  `os.signal.text`, `os.term.group`, `type.int.shift`; none removed.
+- **P3 held.** Bare pin `66d6630` on kasumi (g1): std-test GREEN 475
+  (lanes 365/27/48/35, as sc63), doc examples 497 GREEN, 0 `SKIP`
+  (`std-test-g1-66d6630.log` `3ece6ccc…`); its `sync-pin` was red on a
+  harness fault of mine (the submodule cloned from a blob-less clone),
+  green at g2 from a full clone. CI run 39153209713, six jobs success:
+  std-test GREEN 475 on ubuntu (job 117750957711), macOS (117750957833)
+  and windows (117750957772), doc examples 497 on all three.
+- **P4 held, with one miss.** The rows as predicted on lupin, checked,
+  native and release (kasumi, `probe-p1.log` `1cd3f838…`, plain and
+  under `taskset -c 0-3`): `poll_job` stops by 19, `$?` 147, is not
+  reported for a continue, ends by -9. **Missed:** lupin does not reach
+  the poll: its record says `os_signal_listen` does not resolve (it has
+  no signal family), and it leaves no `sleep` behind. CI's macOS
+  runner ran `poll_job` on checked and native (stop by 17) green.
+- **P5 held.** The shapes are `invalid` on every machine and host; on
+  linux `last` 64, `realtime` inside (34, 64), `text(kill())` "Killed";
+  lupin refuses `os_signal_last` and `os_pgid` by name, and answers
+  the windows `unsupported` rows (`lupin-windows = "run"` observed for
+  all three on CI). Comptime: the three `exec` calls E0701; `last`,
+  `realtime` and `text` refused by name ("the host's signal table at
+  comptime"), so no row. One harness lesson: `let (h, n) =
+  os_wait_poll()` in a `comptime fn` answers `unsupported` ("a pattern
+  binding at comptime") before the sandbox, so the row does not
+  destructure.
+- **P6: 484 and 511, not 485 and about 509.** Nine rows, not ten (I
+  counted ten without listing them); fourteen doc examples. Head tree
+  `8f67f4f` on kasumi (g2): every step exit 0, std-test GREEN 484
+  (lanes 368/30/48/38, conservatism 150, host-scoped cells 13), doc
+  examples 511 GREEN, 0 `SKIP` (`std-test-g2-8f67f4f.log` `582fd726…`,
+  `doc-examples-g2-8f67f4f.log` `09d49735…`); under `taskset -c 0-3`
+  (g3) the same (`b208ec55…`). CI run 39155562249, six jobs success:
+  484 GREEN on ubuntu (117757959905), macOS (117757959704) and windows
+  (117757960162; the three windows cells observed on 3 lanes), doc
+  examples 511 on all three.
+- **P7 held.** The container witness (`docs/sc64-witness/`,
+  `container-c1.log` `d28c66c6…`, and under `taskset -c 0-3`
+  `container-c2-taskset.log`, byte-identical): a two-process job's
+  group stopped (19 ×2), continued (not reported, live 2), suspended
+  (20 ×2), asked with 0 while stopped (ok), terminated (-15 ×2), then
+  `not_found`; `lead_group` ok and leading, `join_group` back ok, a
+  group that does not exist `denied`; `send_all(0)` alone `not_found`,
+  beside a sleep `ok`, `terminate()` to all ended exactly that sleep,
+  then `not_found` again; as root and as user 1000, on native, release
+  and checked; lupin by name (`os_signal_listen` does not resolve,
+  `os_pgid`, `os_signal_send_all`). SigBlk and SigIgn 0 in every run.
