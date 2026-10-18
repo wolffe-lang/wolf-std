@@ -46,16 +46,28 @@
 //! console sends `terminate()` and `quit()`, and `reload()` and
 //! `upgrade()` arrive only by this process's own `raise` — so a listen
 //! for any of the other sixteen is `io` there, and `ignore`, `reset`,
-//! `ignored`, `send`, `number` and `wait_fd` answer `unsupported`, the
-//! last three after their own shape (`[os.signal.platform]`).
+//! `ignored`, `send`, `number`, `wait_fd`, `send_group`, `send_all`,
+//! `text`, `last` and `realtime` answer `unsupported`, `send` to `text`
+//! after their own shape (`[os.signal.platform]`).
+//!
+//! **Groups and host numbers (s241, ruling #79).** `send` reaches one
+//! process; `send_group` reaches every member of a `std.process.Group`
+//! (a job), and `send_all` every process this one may signal, each by
+//! its own name so that no miscomputed pid becomes a group or a
+//! broadcast. A signal the table gives no meaning (the real-time range,
+//! linux `IO` and `PWR`, macOS `INFO`) is sent by its host number,
+//! `host(n)`, with `last()` and `realtime()` saying which numbers this
+//! host has; `text` is a signal's words. The rows are the host's, kept
+//! rather than evened out (R3).
 //!
 //! **Capability: `exec` (I13)** — signal control is process control:
-//! `listen`, `wait`, `wait_fd`, `poll`, `ignore`, `reset`, `raise` and
-//! `send` are tagged `exec` in the sandbox table. `ignored` READS this
-//! process's context and is `env` (ruling #70 R8, with `os_pgid`);
-//! `number` reads the host's numbering and charges nothing. All of them
-//! are refused at comptime (D33). The meaning functions reach nothing
-//! and are comptime-safe.
+//! `listen`, `wait`, `wait_fd`, `poll`, `ignore`, `reset`, `raise`,
+//! `send`, `send_group` and `send_all` are tagged `exec` in the sandbox
+//! table. `ignored` READS this process's context and is `env` (ruling
+//! #70 R8, with `os_pgid`); `number`, `last`, `realtime` and `text` read
+//! the host's table and charge nothing (ruling #79 R6). All of them are
+//! refused at comptime (D33). The meaning functions and `host` reach
+//! nothing and are comptime-safe.
 
 use std.fs
 use std.process
