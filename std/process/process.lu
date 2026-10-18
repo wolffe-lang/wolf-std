@@ -957,7 +957,12 @@ pub struct Change {
 pub fn poll() -> Change ! {io} {
     let (h, s) = os_wait_poll()?
     if h < 0 {
-        return Change { changed: false, child: Child { slot: -1 }, status: Status { value: 512 }, live: s }
+        return Change {
+            changed: false,
+            child: Child { slot: -1 },
+            status: Status { value: 512 },
+            live: s,
+        }
     }
     Change { changed: true, child: Child { slot: h }, status: Status { value: s }, live: -1 }
 }
