@@ -408,10 +408,8 @@ pub fn realtime() -> Realtime ! {unsupported} {
 /// Delegates to `os_signal_text`.
 ///
 /// ```wolf-doc-example
-/// var row = "words"
-/// let t = signal.text(0) else |_| { row = "invalid"; "" }
-/// row == "invalid"
-/// t == ""
+/// let t = signal.text(0) else |_| "invalid"
+/// t == "invalid"
 /// ```
 pub fn text(meaning: int) -> str ! {invalid, unsupported} {
     os_signal_text(meaning)?
