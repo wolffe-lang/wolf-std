@@ -994,9 +994,8 @@ pub struct Group {
 /// another's). Never traps. Delegates to `os_proc_pid`.
 ///
 /// ```wolf-doc-example
-/// var refused = false
-/// process.group_of(process.Child { slot: 4096 }) else |_| { refused = true }
-/// refused == true
+/// let g = process.group_of(process.Child { slot: 4096 }) else |_| process.Group { id: -1 }
+/// g.id == -1
 /// ```
 pub fn group_of(leader: Child) -> Group ! {io} {
     Group { id: os_proc_pid(leader.slot)? }
