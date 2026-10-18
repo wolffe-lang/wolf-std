@@ -884,6 +884,69 @@ pub fn shell_code(s: Status) -> int {
     s.value
 }
 
+/// What one `poll` found. When `changed` is true, `child` is the child
+/// that ended or stopped and `status` says which (`Status`); when it is
+/// false, nothing changed since the last look, `live` is the number of
+/// children still running or stopped — 0 when none is left — and
+/// `child` and `status` name nothing (`slot` -1, a value of no kind).
+/// A change carries no count: `live` is -1 beside it, and the next poll
+/// that finds nothing gives the count again.
+///
+/// An ended child is REAPED by the poll that reports it and its handle
+/// closed: `child` (and any `Child` the caller kept for it) answers `io`
+/// from then on, exactly as after `wait`. A stopped child stays: its
+/// `Child` is live, and the caller continues it (`signal.send_group` or
+/// `signal.send` with `signal.continued()`) or ends it. Compare
+/// `change.child.slot` with a kept `Child`'s `slot` to know which job
+/// it was.
+pub struct Change {
+    changed: bool,
+    child: Child,
+    status: Status,
+    live: int,
+}
+
+/// Look, without waiting, for a child of this program's that ended or
+/// stopped since it was last looked at (`[os.proc.poll]`, ruling #84):
+/// the first such child in the order they were started, reaped if it
+/// ended. One `waitpid(pid, WNOHANG | WUNTRACED)` per live child and
+/// never the host's "any child", so a child this program did not start
+/// through `start`, `start_with`, `start_job` or `start_foreground` is
+/// never touched. A continue is not reported; each stop is reported
+/// once.
+///
+/// **The wait a signal cuts short** is this and `std.signal`, with no new
+/// call: listen for `signal.child()` and the meanings the program traps,
+/// `poll` until `changed` is false, then `signal.wait` (or
+/// `signal.wait_fd` at a prompt) on that set. `signal.child()` arrives
+/// for a stop and for an end, so the wait ends when a child changes or a
+/// trapped signal comes, and an idle program makes no context switch.
+///
+/// Rows: `io` for a child the host reaped behind the table's back (this
+/// program ignores `signal.child()`), once, its handle closed. Never
+/// traps, never blocks — except behind a blocking `wait` or
+/// `wait_status` on another task, which holds the table until its child
+/// ends (`[os.proc.poll]`'s one lock). windows has no stops: the poll
+/// answers ends and `live`. lupin answers `changed` false and `live` 0
+/// while it holds no live child, and refuses by name once it does (it
+/// cannot see a stop).
+///
+/// Capability `Exec` (it reaps, with `wait_status`); refused at comptime
+/// (D33). Delegates to `os_wait_poll` (wolf-lang s242).
+///
+/// ```wolf-doc-example
+/// let c = process.poll() else |_| { process.Change { changed: true, child: process.Child { slot: -1 }, status: process.status_from(512), live: -1 } }
+/// c.changed == false
+/// c.live == 0
+/// ```
+pub fn poll() -> Change ! {io} {
+    let (h, s) = os_wait_poll()?
+    if h < 0 {
+        return Change { changed: false, child: Child { slot: -1 }, status: Status { value: 512 }, live: s }
+    }
+    Change { changed: true, child: Child { slot: h }, status: Status { value: s }, live: -1 }
+}
+
 pub fn wait(take ch: Child) -> int ! {signal, io} {
     os_wait(ch.slot)?
 }
