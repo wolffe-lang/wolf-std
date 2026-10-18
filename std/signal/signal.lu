@@ -228,15 +228,17 @@ pub fn raise(meaning: int) -> () ! {io} {
 
 /// **s232 (`[os.signal.send]`): send `meaning`'s signal to the process
 /// `pid`** — `kill(2)` for one process. `meaning` is one meaning of the
-/// table, or 0, which sends nothing and answers the same rows: "is there
-/// such a process, and may I signal it". A process id names whichever
+/// table, a host number (`host(n)`, from wolf 0.2.31: `-n` was `invalid`
+/// before), or 0, which sends nothing and answers the same rows: "is
+/// there such a process, and may I signal it". A process id names whichever
 /// process holds it NOW (a child already reaped may have passed its id
 /// on); `std.process.kill` on a `Child` has no such hazard. A send to
 /// this process's own id is a process-directed `raise`.
 ///
 /// Rows, in the order they are decided: `invalid` when `pid` is not
-/// above 0 or does not fit a process id, or `meaning` is neither 0 nor
-/// exactly one meaning (nothing is sent); `unsupported` on a host with
+/// above 0 or does not fit a process id, or `meaning` is neither 0, nor
+/// exactly one meaning, nor `host(n)` with `1 <= n <= last()` (nothing
+/// is sent); `unsupported` on a host with
 /// no such call (windows, by name); then the target's — `not_found`
 /// when no process has that id, `denied` when this process may not
 /// signal it, `io` otherwise. Never traps. lupin answers the shape and
