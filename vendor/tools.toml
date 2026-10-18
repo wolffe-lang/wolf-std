@@ -1448,7 +1448,39 @@ pin = "294d626dd596122285d5df954762e3aee3e5db71"
 #   x86_64-unknown-linux-gnu
 #     `061641568eabc2fb552d7ee4fce6e7fd0503d47b64cf6e1744b981e96d8781a2`
 # (`_wolf`, the zsh completion script, is still `a368c8ec…`.)
-version = "0.2.30"
+# sc64 BUMP: 0.2.30 -> 0.2.32 (r36 released 0.2.31 on 2026-10-17, r37
+# 0.2.32 on 2026-10-18; 0.2.31 was never pinned here, and 0.2.32 is its
+# point release for #778). Two releases: s237 (the shift rule, ruling
+# #77 A), s239/s243 (the readiness set and the signal hub made before
+# `main`, exit 71, ruling #80), s241 (the group send, host numbers and
+# texts: `os_signal_send_group`, `os_signal_send_all`, `os_set_pgid`,
+# `os_signal_last`, `os_signal_realtime`, `os_signal_text`; ruling #79),
+# s242 (the poll: `os_wait_poll`, ruling #84), s244/s245 (the checked
+# machine hands over; a closed standard descriptor stays closed). Seven
+# new prelude names; no std or test declaration draws W0304. The spec
+# gains thirteen anchors (F-0151 P2).
+#
+# The archive's `std/` is wolf-std `d37c911` (sc63, `STD-REV`), this
+# branch's base: `diff -rq` against `std/` names only `STD-REV` and the
+# two licences. The rig still never reads it (every lane passes
+# `--std-root`; CI removes `.wolf-bin/std`, sc58).
+# Acquired by digest from the release, verified from `--version`: `wolf
+# 0.2.32 (wolfgang, pin 72de141)`, pairing line `paired with lupin
+# 0.1.54 (reference interpreter), pin 294d626` — TRUE of this box's pair
+# again (0.2.30 named 0.1.53 beside sc63's 0.1.54).
+# Archive `wolf-0.2.32-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `4c37f9c5dc3d8830c06810948027d38bdbc375dc5524ab23127b0ada0907d851`
+# (the release's reported digest, matched on kasumi, read twice). The
+# other three, each also fetched and matched on kasumi:
+# aarch64-apple-darwin `061ea7e5…`, aarch64-unknown-linux-gnu
+# `af27d426…`, x86_64-pc-windows-msvc `40eb42af…`. `libwolf_rt.a`
+# `74d55d5f…`, `libwolf_rt_none.a` `cd54fe23…` (nothing here links it).
+#
+# THE BINARY `wolf`, BY NAME (see sc51's note below for why):
+#   x86_64-unknown-linux-gnu
+#     `81bdf8d4de1c9579d30eadd2a9cb7c57c852ca56c4b3ea4025251ad0a8cc35d0`
+# (`_wolf`, the zsh completion script, is still `a368c8ec…`.)
+version = "0.2.32"
 # sc48 BUMP: a7f517e (v0.2.12) -> 30731a6 (v0.2.14), TWO releases —
 # s157/s158 (0.2.13, "the literals and the papercuts III") and s159/s160
 # (0.2.14, "the string runtime and the papercuts IV"). The data pin was
@@ -3004,4 +3036,5 @@ version = "0.2.30"
 # pin = "0ddda6b7ab9f899aeeea13a66b3427f8422b8a0f"  (superseded, sc58 era — the v0.2.27-tag pin)
 # pin = "f71ece8e1ad2234940040d300359888932ad67af"  (superseded, sc59 era — the v0.2.28-tag pin)
 # pin = "6ffe7c6056eeb8c661b37e38d99b91166e8c1add"  (superseded, sc60 era — the v0.2.29-tag pin)
-pin = "1b37f368228db92eca505c8c4cd3c531ea60be48"
+# pin = "1b37f368228db92eca505c8c4cd3c531ea60be48"  (superseded, sc62/sc63 era — the v0.2.30-tag pin)
+pin = "72de141f624662fdff522e8beba459fab7c5cf66"
