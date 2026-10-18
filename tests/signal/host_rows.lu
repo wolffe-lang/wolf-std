@@ -1,0 +1,68 @@
+//! check: run(exit=0, stdout="last_known=true\nrealtime_fits=true\ntext_kill=true\nhost_text_same=true\ntext_last=true\npast_last=invalid\npast_last_text=invalid")
+//! phase: run
+//! conforms: std.signal, os.signal.host, os.signal.text, os.signal.number, err.row
+//!
+//! **sc64: this host's signal numbers and words** (ruling #79 R4, R5).
+//! `last()` is the C library's last signal, 64 on linux (glibc and musl)
+//! and 31 on macOS; `realtime()` is (34, 64) under glibc, (35, 64) under
+//! musl, (0, 0) on macOS, and ends at `last()` where it is not empty.
+//! `text(kill())` is the host's words for it in the C locale, "Killed"
+//! (glibc, musl) or "Killed: 9" (macOS); the same signal by its host
+//! number, `host(number(kill()))`, has the same words; the last number
+//! has words; one past it is `invalid`, to a send and to `text` alike.
+//! **windows** has no signal numbers (`unsupported` on every machine),
+//! and the row prints its lines for that reason there. **lupin** declines
+//! by name (it does not read the C library's table, R8).
+
+use std.signal
+
+fn every_line() {
+    print("last_known=true")
+    print("realtime_fits=true")
+    print("text_kill=true")
+    print("host_text_same=true")
+    print("text_last=true")
+    print("past_last=invalid")
+    print("past_last_text=invalid")
+}
+
+fn main() -> !int {
+    let last = signal.last() else |e| {
+        match e {
+            unsupported => every_line(),
+        }
+        return 0
+    }
+    print("last_known={last == 64 || last == 31}")
+    let rt = signal.realtime()?
+    let none = rt.first == 0 && rt.last == 0
+    print("realtime_fits={none || (rt.first >= 32 && rt.first < rt.last && rt.last == last)}")
+    let k = signal.text(signal.kill())?
+    print("text_kill={k == "Killed" || k == "Killed: 9"}")
+    let n = signal.number(signal.kill())?
+    let kh = signal.text(signal.host(n))?
+    print("host_text_same={kh == k}")
+    let tl = signal.text(signal.host(last))?
+    print("text_last={tl != ""}")
+    var past = "sent"
+    signal.send_all(signal.host(last + 1)) else |e| {
+        past = match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    print("past_last={past}")
+    var past_text = "words"
+    let words = signal.text(signal.host(last + 1)) else |e| {
+        past_text = match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+        ""
+    }
+    print("past_last_text={past_text}{words}")
+    0
+}

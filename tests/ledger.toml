@@ -4308,3 +4308,27 @@ lupin = "unsupported"
 lupin-windows = "run"
 wolfc = "run"
 native = "run"
+
+# `signal/group_rows.lu`: the shapes, before the host; lupin answers
+# every one (ruling #79 R8).
+[tests."signal/group_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# `signal/host_rows.lu`: last, realtime and text on this host. lupin
+# declines `os_signal_last` by name; windows answers `unsupported` on
+# every machine, lupin's included.
+[tests."signal/host_rows.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# `process/join_own_group.lu`: joining the group one is in. lupin
+# declines `os_pgid` by name; windows `unsupported` everywhere.
+[tests."process/join_own_group.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"

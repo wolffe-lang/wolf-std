@@ -1,0 +1,87 @@
+//! check: run(exit=0, stdout="group_one=invalid\ngroup_zero=invalid\ngroup_negative=invalid\ngroup_wide=invalid\ngroup_two_meanings=invalid\ngroup_unpublished=invalid\nall_two_meanings=invalid\nall_unpublished=invalid\njoin_negative=invalid\njoin_wide=invalid\ntext_zero=invalid\ntext_two_meanings=invalid\nhost_nine=-9")
+//! phase: run
+//! conforms: std.signal, std.process, os.signal.send.group, os.signal.send.all, os.term.group, os.signal.text, os.signal.host, err.row
+//!
+//! **sc64: the group calls' SHAPE rows, which signal nothing and move
+//! nothing, on every host and every machine.** Each is refused as
+//! `invalid` before the host is asked (ruling #79 R1, R3, R7, R8): a
+//! group id not above 1 (group 1 is never a broadcast; `send_all` is
+//! that, by name), wider than a process id; a meaning that is two
+//! meanings, or a bit no release publishes (2^62, `signal/rows.lu`'s);
+//! a group to join below 0 or wider than a process id; the words of 0
+//! or of two meanings. The shape precedes the host, so windows answers
+//! every word here too, and lupin answers each (R8) — it declines only a
+//! well-formed call. (A host number past `last()` is `invalid` on linux
+//! and macOS and past the shape on windows, so it is
+//! `signal/host_rows.lu`'s.)
+
+use std.process
+use std.signal
+
+fn word_group(id: int, meaning: int) -> str {
+    signal.send_group(process.Group { id: id }, meaning) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn word_all(meaning: int) -> str {
+    signal.send_all(meaning) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn word_join(id: int) -> str {
+    process.join_group(process.Group { id: id }) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn word_text(meaning: int) -> str {
+    let t = signal.text(meaning) else |e| {
+        return match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+    }
+    "words {t}"
+}
+
+fn main() -> !int {
+    let two = signal.terminate() | signal.user()
+    let unpublished: int = 4611686018427387904
+    let wide: int = 4611686018427387904
+    print("group_one={word_group(1, signal.terminate())}")
+    print("group_zero={word_group(0, signal.terminate())}")
+    print("group_negative={word_group(-5, signal.terminate())}")
+    print("group_wide={word_group(wide, 0)}")
+    print("group_two_meanings={word_group(2, two)}")
+    print("group_unpublished={word_group(2, unpublished)}")
+    print("all_two_meanings={word_all(two)}")
+    print("all_unpublished={word_all(unpublished)}")
+    print("join_negative={word_join(-1)}")
+    print("join_wide={word_join(wide)}")
+    print("text_zero={word_text(0)}")
+    print("text_two_meanings={word_text(two)}")
+    print("host_nine={signal.host(9)}")
+    0
+}

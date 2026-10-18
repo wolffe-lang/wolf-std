@@ -1,0 +1,42 @@
+//! check: run(exit=0, stdout="own_group_positive=true\njoin_own=ok\nunchanged=true")
+//! phase: run
+//! conforms: std.process, os.term.group, os.proc.self, err.row
+//!
+//! **sc64: `join_group` into the group this process is already in**,
+//! the one live move a test may make on a host: `setpgid(0, own)` changes
+//! nothing (`[os.term.group]`), so the group read after is the group read
+//! before. The rig's program is never a session leader (a session
+//! leader may not move: `denied`). `lead_group`, which does move the
+//! process, runs only in the container witness
+//! (`docs/sc64-witness/`). **windows** has no groups: `own_group` is
+//! `unsupported` on every machine and the row prints its lines for that
+//! reason. **lupin** declines `os_pgid` by name (R8).
+
+use std.process
+
+fn main() -> !int {
+    let g = process.own_group() else |e| {
+        match e {
+            unsupported => {
+                print("own_group_positive=true")
+                print("join_own=ok")
+                print("unchanged=true")
+            },
+        }
+        return 0
+    }
+    print("own_group_positive={g.id > 1}")
+    var row = "ok"
+    process.join_group(g) else |e| {
+        row = match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    print("join_own={row}")
+    let after = process.own_group()?
+    print("unchanged={after.id == g.id}")
+    0
+}
