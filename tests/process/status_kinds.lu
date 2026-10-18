@@ -32,7 +32,9 @@ fn line(v: int) -> str {
     if kinds > 1 {
         return "{v}: two kinds"
     }
-    let others = (process.exit_code(s) else 0) + (process.signal_of(s) else 0) + (process.stopped_by(s) else 0)
+    let others = (process.exit_code(s) else 0) +
+        (process.signal_of(s) else 0) +
+        (process.stopped_by(s) else 0)
     if kinds == 0 && others != 0 {
         return "{v}: a reader answered for no kind"
     }

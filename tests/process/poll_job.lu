@@ -73,7 +73,9 @@ fn main() -> !int {
     signal.send_group(g, signal.stop())?
     let a = next(set)?
     let stop_n = signal.number(signal.stop())?
-    print("stopped={process.is_stopped(a.status) && (process.stopped_by(a.status) else 0) == stop_n && !process.is_exited(a.status)}")
+    print(
+        "stopped={process.is_stopped(a.status) && (process.stopped_by(a.status) else 0) == stop_n && !process.is_exited(a.status)}",
+    )
     print("same_child={a.child.slot == ch.slot}")
     signal.send_group(g, signal.continued())?
     let q = process.poll()?
@@ -82,7 +84,9 @@ fn main() -> !int {
     signal.send_group(g, signal.kill())?
     let b = next(set)?
     let kill_n = signal.number(signal.kill())?
-    print("killed={process.is_signalled(b.status) && (process.signal_of(b.status) else 0) == kill_n && b.child.slot == ch.slot}")
+    print(
+        "killed={process.is_signalled(b.status) && (process.signal_of(b.status) else 0) == kill_n && b.child.slot == ch.slot}",
+    )
     print("shell={process.shell_code(b.status) == 128 + kill_n}")
     let r = process.poll()?
     print("none_left={!r.changed && r.live == 0}")
