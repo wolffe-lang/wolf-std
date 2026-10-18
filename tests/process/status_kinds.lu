@@ -1,0 +1,53 @@
+//! check: run(exit=0, stdout="0: exit 0 shell 0\n255: exit 255 shell 255\n-9: signal 9 shell 137\n-64: signal 64 shell 192\n275: stop 19 shell 147\n273: stop 17 shell 145\n256: none shell 256\n512: none shell 512\n600: none shell 600")
+//! phase: run
+//! conforms: std.process, os.proc.poll, os.proc.status, os.proc.wait.note, err.row
+//!
+//! **sc64: `Status` reads the three kinds and never folds two.** An exit
+//! (0..255), an end by signal (`-N`) and a stop (`256 + N`) are read by
+//! exactly one predicate each, and the readers answer the number only
+//! for their own kind (`none` otherwise). 275 is a stop by 19 (`SIGSTOP`
+//! on linux), 273 by 17 (macOS's): neither is an exit code, which is the
+//! point of the type. 256 and 512 and above are of no kind: no host
+//! answers them (ruling #84 R4 keeps 512 free). Pure: every machine,
+//! every host.
+
+use std.process
+
+fn line(v: int) -> str {
+    let s = process.status_from(v)
+    var kinds = 0
+    var word = "none"
+    if process.is_exited(s) {
+        kinds = kinds + 1
+        word = "exit {process.exit_code(s) else -1}"
+    }
+    if process.is_signalled(s) {
+        kinds = kinds + 1
+        word = "signal {process.signal_of(s) else -1}"
+    }
+    if process.is_stopped(s) {
+        kinds = kinds + 1
+        word = "stop {process.stopped_by(s) else -1}"
+    }
+    if kinds > 1 {
+        return "{v}: two kinds"
+    }
+    let others = (process.exit_code(s) else 0) + (process.signal_of(s) else 0) + (process.stopped_by(s) else 0)
+    if kinds == 0 && others != 0 {
+        return "{v}: a reader answered for no kind"
+    }
+    "{v}: {word} shell {process.shell_code(s)}"
+}
+
+fn main() -> !int {
+    print(line(0))
+    print(line(255))
+    print(line(-9))
+    print(line(-64))
+    print(line(275))
+    print(line(273))
+    print(line(256))
+    print(line(512))
+    print(line(600))
+    0
+}

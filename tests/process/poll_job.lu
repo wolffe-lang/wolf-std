@@ -1,0 +1,92 @@
+//! check: run(exit=0, stdout="stopped=true\nsame_child=true\ncontinue_reported=false\nlive_while_running=1\nkilled=true\nshell=true\nnone_left=true\nhandle_closed=true")
+//! phase: run
+//! conforms: std.process, std.signal, os.proc.poll, os.proc.wait.note, os.proc.job, os.signal.send.group, os.signal.wait, err.row
+//!
+//! **sc64: a job stopped, continued and ended, each by `send_group`, and
+//! read by `poll`** — the wait a signal cuts short (ruling #84 R6): the
+//! row listens for `signal.child()`, polls, and parks in `signal.wait`
+//! only while the poll finds nothing. The job is `/bin/sleep 30`, started
+//! by this row as the leader of a group of its own (`start_job` with
+//! group 0), and every signal goes to THAT group and nowhere else.
+//!
+//! A `stop()` to the group is reported once as a stop by
+//! `signal.number(stop())` (19 on linux, 17 on macOS) and never as an
+//! exit; a `continued()` is not reported (R4), and the poll then counts
+//! one live child; a `kill()` is an end by `number(kill())`, `$?` 137,
+//! the child reaped and its handle closed (`pid` answers `io`), and the
+//! next poll finds none left.
+//!
+//! **windows** starts no job with a group (`unsupported`, by name, on
+//! every machine) and has no stops, so the row prints its lines for that
+//! reason there. **lupin** has no signal family (`os_signal_listen` does
+//! not resolve there) and could not see a stop if it had (ruling #84
+//! R9): `unsupported`. The two interpreters'
+//! `os_exe` names themselves, which is why the job is a host program and
+//! not this one (`process/prefork_handoff.lu`).
+
+use std.process
+use std.signal
+
+fn next(set: int) -> process.Change ! {io} {
+    var n = 0
+    while n < 200 {
+        let c = process.poll()?
+        if c.changed {
+            return c
+        }
+        signal.wait(set)?
+        n = n + 1
+    }
+    io
+}
+
+fn every_line() {
+    print("stopped=true")
+    print("same_child=true")
+    print("continue_reported=false")
+    print("live_while_running=1")
+    print("killed=true")
+    print("shell=true")
+    print("none_left=true")
+    print("handle_closed=true")
+}
+
+fn main() -> !int {
+    var c = process.command("/bin/sleep")
+    process.push_arg(mut c, "30")
+    let ch = process.start_job(c, 0, 0) else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            invalid => print("start=invalid"),
+            not_found => print("start=not_found"),
+            denied => print("start=denied"),
+            io => print("start=io"),
+        }
+        return 1
+    }
+    let g = process.group_of(ch)?
+    let set = signal.child()
+    signal.listen(set)?
+    signal.send_group(g, signal.stop())?
+    let a = next(set)?
+    let stop_n = signal.number(signal.stop())?
+    print("stopped={process.is_stopped(a.status) && (process.stopped_by(a.status) else 0) == stop_n && !process.is_exited(a.status)}")
+    print("same_child={a.child.slot == ch.slot}")
+    signal.send_group(g, signal.continued())?
+    let q = process.poll()?
+    print("continue_reported={q.changed}")
+    print("live_while_running={q.live}")
+    signal.send_group(g, signal.kill())?
+    let b = next(set)?
+    let kill_n = signal.number(signal.kill())?
+    print("killed={process.is_signalled(b.status) && (process.signal_of(b.status) else 0) == kill_n && b.child.slot == ch.slot}")
+    print("shell={process.shell_code(b.status) == 128 + kill_n}")
+    let r = process.poll()?
+    print("none_left={!r.changed && r.live == 0}")
+    let p = process.pid(ch) else |_| -1
+    print("handle_closed={p == -1}")
+    0
+}

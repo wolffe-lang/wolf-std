@@ -4277,3 +4277,34 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# sc64 (wolf 0.2.32 / lupin 0.1.54; wolf-lang s241 and s242, rulings #79
+# and #84): std.process's Status, poll, Group, group_of, own_group,
+# lead_group, join_group; std.signal's send_group, send_all, last,
+# realtime, text, host. Predicted in F-0151 before any row existed.
+#
+# `process/status_kinds.lu`: pure, every machine, every host.
+[tests."process/status_kinds.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# `process/poll_none.lu`: the poll with no child, `(-1, 0)`, decided
+# without the host on lupin (ruling #84 R9): every machine, every host.
+[tests."process/poll_none.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# `process/poll_job.lu`: a `/bin/sleep` the row starts as the leader of
+# its own group, stopped, continued and killed by `send_group`, read by
+# `poll` and `signal.wait`. lupin has no signal family: its record says
+# `os_signal_listen` does not resolve (measured, sc64; F-0151 predicted a
+# refusal at the poll with a live child, which the row never reaches
+# there), and it leaves no `sleep` behind; windows refuses the job's group
+# (`unsupported`) on every machine, so the row runs there, lupin's too.
+[tests."process/poll_job.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"

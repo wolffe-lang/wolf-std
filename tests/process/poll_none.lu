@@ -1,0 +1,26 @@
+//! check: run(exit=0, stdout="changed=false\nlive=0\nslot=-1\nkind=none\nagain=false 0")
+//! phase: run
+//! conforms: std.process, os.proc.poll, os.proc.wait.note, err.row
+//!
+//! **sc64: the poll with no child.** A program that started nothing asks
+//! and is told nothing changed and none is left: `(-1, 0)` from
+//! `os_wait_poll` (ruling #84 R5), which `Change` reads as `changed`
+//! false with `live` 0, a `child` that names nothing and a status of no
+//! kind. Asked twice, the same. Decided without the host on lupin
+//! (ruling #84 R9: its one shape row), so every machine on every host
+//! runs it.
+
+use std.process
+
+fn main() -> !int {
+    let c = process.poll()?
+    print("changed={c.changed}")
+    print("live={c.live}")
+    print("slot={c.child.slot}")
+    let s = c.status
+    let any = process.is_exited(s) || process.is_signalled(s) || process.is_stopped(s)
+    print(if any { "kind=some" } else { "kind=none" })
+    let d = process.poll()?
+    print("again={d.changed} {d.live}")
+    0
+}
