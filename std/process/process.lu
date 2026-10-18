@@ -759,6 +759,131 @@ pub fn killed_by(status: int) -> int {
     0
 }
 
+/// How a child ended or stopped, as one of three kinds that never meet
+/// (`[os.proc.poll]`, `[os.proc.status]`): an EXIT with its code
+/// (0..255), an END BY SIGNAL `N` (the builtins' `-N`), or a STOP by
+/// signal `N` (the builtins' `256 + N`). A stop is never an exit: a
+/// stopped child has not ended, and a caller that read `256 + N` as a
+/// code would report a job as finished while it waits to be continued.
+///
+/// The field is the one `int` the builtins answer, so nothing is lost
+/// and nothing can disagree with itself; read it through `is_exited`,
+/// `is_signalled` and `is_stopped`, and `exit_code`, `signal_of` and
+/// `stopped_by`. `N` is this host's signal number (`signal.number`
+/// gives a meaning's): `SIGSTOP` is 19 on linux and 17 on macOS. A value
+/// no host answers — 256, or 512 and above, which ruling #84 R4 keeps
+/// free for a continue — is of no kind: all three predicates are false.
+pub struct Status {
+    value: int,
+}
+
+/// The `Status` a status number reads as: `wait_status`'s answer, or the
+/// second half of `os_wait_poll`'s. Pure and comptime-safe; any `int` is
+/// accepted (see `Status` on a value of no kind).
+///
+/// ```wolf-doc-example
+/// process.is_exited(process.status_from(3)) == true
+/// process.is_signalled(process.status_from(-9)) == true
+/// process.is_stopped(process.status_from(275)) == true
+/// ```
+pub fn status_from(value: int) -> Status {
+    Status { value: value }
+}
+
+/// Whether `s` is an exit (0..255). Pure.
+///
+/// ```wolf-doc-example
+/// process.is_exited(process.status_from(0)) == true
+/// process.is_exited(process.status_from(275)) == false
+/// ```
+pub fn is_exited(s: Status) -> bool {
+    s.value >= 0 && s.value <= 255
+}
+
+/// Whether `s` is an end by a signal (`-N`). Pure.
+///
+/// ```wolf-doc-example
+/// process.is_signalled(process.status_from(-15)) == true
+/// process.is_signalled(process.status_from(15)) == false
+/// ```
+pub fn is_signalled(s: Status) -> bool {
+    s.value < 0
+}
+
+/// Whether `s` is a stop (`256 + N`): the child is alive and waits to be
+/// continued. Pure.
+///
+/// ```wolf-doc-example
+/// process.is_stopped(process.status_from(256 + 19)) == true
+/// process.is_stopped(process.status_from(19)) == false
+/// process.is_stopped(process.status_from(512)) == false
+/// ```
+pub fn is_stopped(s: Status) -> bool {
+    s.value > 256 && s.value < 512
+}
+
+/// The exit code of an exit; `none` for an end by signal, a stop, or a
+/// value of no kind. Pure.
+///
+/// ```wolf-doc-example
+/// (process.exit_code(process.status_from(7)) else -1) == 7
+/// (process.exit_code(process.status_from(256 + 7)) else -1) == -1
+/// ```
+pub fn exit_code(s: Status) -> int ! {none} {
+    if !is_exited(s) {
+        return none
+    }
+    s.value
+}
+
+/// The host signal number that ENDED the child; `none` for an exit, a
+/// stop, or a value of no kind. Pure.
+///
+/// ```wolf-doc-example
+/// (process.signal_of(process.status_from(-9)) else 0) == 9
+/// (process.signal_of(process.status_from(256 + 9)) else 0) == 0
+/// ```
+pub fn signal_of(s: Status) -> int ! {none} {
+    if !is_signalled(s) {
+        return none
+    }
+    0 - s.value
+}
+
+/// The host signal number that STOPPED the child; `none` for an exit, an
+/// end, or a value of no kind. Pure.
+///
+/// ```wolf-doc-example
+/// (process.stopped_by(process.status_from(256 + 20)) else 0) == 20
+/// (process.stopped_by(process.status_from(-20)) else 0) == 0
+/// ```
+pub fn stopped_by(s: Status) -> int ! {none} {
+    if !is_stopped(s) {
+        return none
+    }
+    s.value - 256
+}
+
+/// What a POSIX shell reports for `s` as `$?`: the exit code, or
+/// `128 + N` for an end by signal `N` and for a stop by `N` alike (XCU
+/// 2.8.2; a stopped job's `$?` is dash's `128 + N`). A value of no kind
+/// answers itself. Pure.
+///
+/// ```wolf-doc-example
+/// process.shell_code(process.status_from(1)) == 1
+/// process.shell_code(process.status_from(-9)) == 137
+/// process.shell_code(process.status_from(256 + 20)) == 148
+/// ```
+pub fn shell_code(s: Status) -> int {
+    if is_signalled(s) {
+        return 128 - s.value
+    }
+    if is_stopped(s) {
+        return 128 + s.value - 256
+    }
+    s.value
+}
+
 pub fn wait(take ch: Child) -> int ! {signal, io} {
     os_wait(ch.slot)?
 }
