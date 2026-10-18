@@ -339,6 +339,44 @@ pub fn number(meaning: int) -> int ! {invalid, unsupported} {
     os_signal_number(meaning)?
 }
 
+/// **s241 (`[os.signal.host]`, ruling #79 R4): this host's last signal
+/// number** — the C library's `SIGRTMAX` on linux (64 under glibc and
+/// musl), 31 on macOS. A host number `N` from 1 to this is what `host(N)`
+/// spells and what `send`, `send_group`, `send_all` and `text` take.
+///
+/// Rows: `unsupported` on windows (no signal numbers) and on a host wolf
+/// has not measured. Never traps. Uncharged (it reads the host's table,
+/// as `number`), and refused at comptime all the same. lupin declines by
+/// name (it does not read the C library's range), so the example is
+/// prose: `signal.last()?` is 64 on linux.
+///
+/// Delegates to `os_signal_last`.
+pub fn last() -> int ! {unsupported} {
+    os_signal_last()?
+}
+
+/// The C library's real-time signal range (`[os.signal.host]`): host
+/// numbers `first` to `last`, both included, or `first` and `last` both 0
+/// on a host that has none (macOS). glibc's is 34 to 64 and musl's 35 to
+/// 64 on one kernel, which is why a real-time signal is named by its
+/// number here and never by a meaning (`RTMIN+3` is `first + 3`).
+pub struct Realtime {
+    first: int,
+    last: int,
+}
+
+/// **s241 (`[os.signal.host]`): the real-time range**, as `Realtime`.
+///
+/// Rows: `unsupported` on windows and on a host wolf has not measured.
+/// Never traps. Uncharged; refused at comptime. lupin declines by name,
+/// so the example is prose: `signal.realtime()?.first` is 34 under glibc.
+///
+/// Delegates to `os_signal_realtime`.
+pub fn realtime() -> Realtime ! {unsupported} {
+    let (a, b) = os_signal_realtime()?
+    Realtime { first: a, last: b }
+}
+
 /// **s232 (`[os.signal.ignored]`): the set of listenable meanings this
 /// process ignores NOW.** It changes nothing. Read before the program's
 /// own first `ignore`, `reset` or `listen`, it is what the process was
