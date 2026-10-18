@@ -993,6 +993,48 @@ pub fn own_group() -> Group ! {unsupported} {
     Group { id: os_pgid()? }
 }
 
+/// Make THIS process the leader of a new group of its own, whose id is
+/// its process id (`[os.term.group]`, `setpgid(0, 0)`): what an
+/// interactive shell does at start, and what GNU `timeout` does before it
+/// runs its command so that a send to its own group reaches everything
+/// the command started. It acts on the caller only: a child's group is
+/// set when it starts (`start_job`), never after.
+///
+/// Rows: `denied` for a session leader, which may not move (a shell
+/// started as one already leads its group); `unsupported` on windows;
+/// `io` otherwise. Never traps. lupin declines by name, so the example
+/// is prose: after `process.lead_group()?`, `process.own_group()?.id` is
+/// this process's id.
+///
+/// Capability `Exec` (ruling #79 R6); refused at comptime (D33).
+/// Delegates to `os_set_pgid(0)`.
+pub fn lead_group() -> () ! {denied, invalid, io, unsupported} {
+    os_set_pgid(0)?
+}
+
+/// Move THIS process into group `g` of its own session
+/// (`[os.term.group]`, `setpgid(0, g)`): what a shell does at exit to go
+/// back into the group it was started in. Joining the group it is already
+/// in changes nothing; group 0 is `lead_group`.
+///
+/// Rows, in the order they are decided: `invalid` for a negative id or one
+/// wider than a process id (before the host); `unsupported` on windows;
+/// `denied` for a session leader, and for a group of another session or
+/// one that does not exist; `io` otherwise. Never traps. lupin answers the
+/// `invalid` rows and declines a well-formed call by name.
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to
+/// `os_set_pgid`.
+///
+/// ```wolf-doc-example
+/// var refused = false
+/// process.join_group(process.Group { id: -2 }) else |_| { refused = true }
+/// refused == true
+/// ```
+pub fn join_group(g: Group) -> () ! {denied, invalid, io, unsupported} {
+    os_set_pgid(g.id)?
+}
+
 pub fn wait(take ch: Child) -> int ! {signal, io} {
     os_wait(ch.slot)?
 }
