@@ -403,6 +403,25 @@ pub fn text(meaning: int) -> str ! {invalid, unsupported} {
     os_signal_text(meaning)?
 }
 
+/// The `meaning` value that names host signal `n` (`[os.signal.host]`,
+/// ruling #79 R4): `-n`, `os_wait_status`'s spelling of "ended by signal
+/// `n`", so a program re-sends what it saw. For the signals the table
+/// gives no meaning — linux `STKFLT`, `IO`, `PWR` and the real-time range;
+/// macOS `EMT`, `IO`, `INFO` — and for a number a user typed (`kill -9`).
+/// It makes NO portability promise: `n` is this host's number, and for
+/// the real-time range this C library's. Only `send`, `send_group`,
+/// `send_all` and `text` take one, for `1 <= n <= last()`; every
+/// set-taking call refuses it (a negative set fails the one shape rule).
+///
+/// Total and pure; nothing is checked until a call takes it.
+///
+/// ```wolf-doc-example
+/// signal.host(9) == 0 - 9
+/// ```
+pub fn host(n: int) -> int {
+    0 - n
+}
+
 /// **s232 (`[os.signal.ignored]`): the set of listenable meanings this
 /// process ignores NOW.** It changes nothing. Read before the program's
 /// own first `ignore`, `reset` or `listen`, it is what the process was
