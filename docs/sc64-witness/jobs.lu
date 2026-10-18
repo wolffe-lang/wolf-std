@@ -1,0 +1,88 @@
+// sc64 witness: a two-process job (a pipeline's shape: a leader and a
+// member that joins its group), stopped by `stop()` and by `suspend()`,
+// continued, and ended by `terminate()`, every signal to THAT group,
+// every change read by `process.poll` with `signal.wait` on `child()`.
+// Run only inside a throwaway container (`job-container.sh`).
+
+use std.process
+use std.signal
+
+fn next(set: int) -> process.Change ! {io} {
+    var n = 0
+    while n < 400 {
+        let c = process.poll()?
+        if c.changed {
+            return c
+        }
+        signal.wait(set)?
+        n = n + 1
+    }
+    io
+}
+
+fn kind(s: process.Status) -> str {
+    if process.is_stopped(s) {
+        return "stop {process.stopped_by(s) else -1}"
+    }
+    if process.is_signalled(s) {
+        return "end by {process.signal_of(s) else -1}"
+    }
+    if process.is_exited(s) {
+        return "exit {process.exit_code(s) else -1}"
+    }
+    "no kind"
+}
+
+fn two(set: int, a: process.Child, b: process.Child) -> str ! {io} {
+    let x = next(set)?
+    let y = next(set)?
+    let both = (x.child.slot == a.slot && y.child.slot == b.slot) || (x.child.slot == b.slot && y.child.slot == a.slot)
+    if !both {
+        return "wrong children {x.child.slot} {y.child.slot}"
+    }
+    let kx = kind(x.status)
+    let ky = kind(y.status)
+    if kx != ky {
+        return "{kx} / {ky}"
+    }
+    "both {kx} (shell {process.shell_code(x.status)})"
+}
+
+fn main() -> !int {
+    var c = process.command("/bin/sleep")
+    process.push_arg(mut c, "60")
+    let set = signal.child()
+    signal.listen(set)?
+    let lead = process.start_job(c, 0, 0)?
+    let g = process.group_of(lead)?
+    let member = process.start_job(c, g.id, 0)?
+    let in_group = process.pid(member)? != g.id
+    print("group: leader {process.pid(lead)? == g.id}, member apart {in_group}")
+    print("numbers: stop {signal.number(signal.stop())?} suspend {signal.number(signal.suspend())?} terminate {signal.number(signal.terminate())?}")
+    signal.send_group(g, signal.stop())?
+    print("stop: {two(set, lead, member)?}")
+    signal.send_group(g, signal.continued())?
+    let q = process.poll()?
+    print("continue: reported {q.changed}, live {q.live}")
+    signal.send_group(g, signal.suspend())?
+    print("suspend: {two(set, lead, member)?}")
+    signal.send_group(g, 0)?
+    print("signal 0 to a stopped group: ok")
+    signal.send_group(g, signal.continued())?
+    signal.send_group(g, signal.terminate())?
+    print("terminate: {two(set, lead, member)?}")
+    let r = process.poll()?
+    print("after: changed {r.changed}, live {r.live}")
+    var gone = "ok"
+    signal.send_group(g, 0) else |e| {
+        gone = match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    print("signal 0 to the ended group: {gone}")
+    0
+}

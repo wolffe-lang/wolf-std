@@ -1,0 +1,46 @@
+// sc64 witness: `signal.send_all` (kill -1) in a container holding only
+// this witness's processes: with nothing else to reach, then with a
+// `sleep` this program started, which a `terminate()` to all ends.
+// Run only inside a throwaway container: never on a host.
+
+use std.process
+use std.signal
+
+fn word(meaning: int) -> str {
+    signal.send_all(meaning) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    print("alone, signal 0: {word(0)}")
+    var c = process.command("/bin/sleep")
+    process.push_arg(mut c, "60")
+    let set = signal.child()
+    signal.listen(set)?
+    let ch = process.start(c)?
+    print("beside a sleep, signal 0: {word(0)}")
+    print("terminate to all: {word(signal.terminate())}")
+    var n = 0
+    var seen = "nothing"
+    while n < 400 {
+        let x = process.poll()?
+        if x.changed {
+            seen = if x.child.slot == ch.slot && process.is_signalled(x.status) { "the sleep, ended by {process.signal_of(x.status) else -1}" } else { "something else" }
+            n = 400
+        } else {
+            signal.wait(set)?
+            n = n + 1
+        }
+    }
+    print("poll: {seen}")
+    print("alone again, signal 0: {word(0)}")
+    0
+}

@@ -1,0 +1,47 @@
+// sc64 witness: THIS process into a group of its own and back
+// (`process.lead_group`, `join_group`), and `kill 0`'s shape
+// (`send_group(own_group, 0)`). Run only inside a throwaway container.
+
+use std.env
+use std.process
+use std.signal
+
+fn main() -> !int {
+    let start = process.own_group()?
+    print("started in a group of its own: {start.id == env.pid()}")
+    var led = "ok"
+    process.lead_group() else |e| {
+        led = match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    let now = process.own_group()?
+    print("lead_group: {led}, leads {now.id == env.pid()}")
+    signal.send_group(now, 0)?
+    print("signal 0 to its own group (kill -0 0): ok")
+    var back = "ok"
+    process.join_group(start) else |e| {
+        back = match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    let after = process.own_group()?
+    print("join_group back: {back}, in {after.id == start.id}")
+    var stranger = "ok"
+    process.join_group(process.Group { id: 999999 }) else |e| {
+        stranger = match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    print("join_group of no such group: {stranger}")
+    0
+}
