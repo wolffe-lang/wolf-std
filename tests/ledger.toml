@@ -4332,3 +4332,23 @@ lupin = "unsupported"
 lupin-windows = "run"
 wolfc = "run"
 native = "run"
+
+# D33 one level down at `os_wait_poll`, `os_set_pgid` and
+# `os_signal_send_group` (`exec`, rulings #84 R7 and #79 R6). lupin has
+# no comptime tier. `os_signal_last`, `os_signal_realtime` and
+# `os_signal_text` are uncharged and refused at comptime by NAME on the
+# compilers (`os_signal_number`'s shelf), so they have no row.
+[tests."process/comptime_refuses_poll.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."process/comptime_refuses_set_pgid.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."signal/comptime_refuses_send_group.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

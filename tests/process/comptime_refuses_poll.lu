@@ -1,0 +1,25 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.exec
+//!
+//! **D33 for `process.poll` (sc64), held one level down at
+//! `os_wait_poll`**: the poll reaps, as `os_wait_status` does (`exec`,
+//! ruling #84 R7), and a compile may not reap anything on the machine
+//! that compiles it. The row is handled locally (F-0069) and the pair
+//! is not destructured (a pattern binding is outside the comptime
+//! engine's subset, so `let (h, n) = …` answers `unsupported` before
+//! the sandbox is asked: measured, sc64); the pure `status_from` runs at
+//! run time to keep the import used.
+
+use std.process
+
+comptime fn probe() -> int {
+    os_wait_poll() else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {process.is_exited(process.status_from(0))}")
+    0
+}
