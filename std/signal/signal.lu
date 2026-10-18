@@ -58,6 +58,7 @@
 //! and are comptime-safe.
 
 use std.fs
+use std.process
 
 // THE TABLE (`[os.signal.set]`). These functions are the one place in
 // `std/` where a signal's bit is written, and each bit is permanent
@@ -251,6 +252,67 @@ pub fn raise(meaning: int) -> () ! {io} {
 /// ```
 pub fn send(pid: int, meaning: int) -> () ! {unsupported, invalid, not_found, denied, io} {
     os_signal_send(pid, meaning)?
+}
+
+/// **s241 (`[os.signal.send.group]`, ruling #79 R1): send `meaning`'s
+/// signal to every member of the process group `g`** that this process
+/// may signal — `kill(-pgid)`, what `kill %1`, `fg`, `bg` and `kill --
+/// -N` do to a job. `meaning` is one meaning of the table, a host number
+/// (`host(n)`), or 0, which sends nothing and asks the group the same
+/// question. A `STOP` stops every member and a `continued()` continues
+/// them; the parent hears each member's stop through `std.process.poll`.
+/// `kill 0` is `send_group(process.own_group()?, m)`, and it reaches this
+/// process too.
+///
+/// Rows, in the order they are decided: `invalid` for a group id not
+/// above 1 or wider than a process id — group 1 cannot be named, so a
+/// miscomputed id never becomes a broadcast (`send_all` is that, by name)
+/// — or a `meaning` `send` refuses; `unsupported` on windows; then the
+/// host's answer, kept as it is (ruling #79 R3): `not_found` for a group
+/// with no member, `denied` when this process may signal none of them,
+/// `io` otherwise. A group some of whose members may be signalled is ok
+/// and reaches those only; a group of ended, unreaped members is ok on
+/// linux and `denied` on macOS. Never traps. lupin answers the shape and
+/// declines the send itself by name.
+///
+/// Capability `exec`; refused at comptime (D33). Delegates to
+/// `os_signal_send_group`. The example is prose, since a doc example
+/// imports only this module: `signal.send_group(process.Group { id: 1 },
+/// signal.terminate())` is `invalid`.
+pub fn send_group(g: process.Group, meaning: int) -> () ! {
+    unsupported,
+    invalid,
+    not_found,
+    denied,
+    io,
+} {
+    os_signal_send_group(g.id, meaning)?
+}
+
+/// **s241 (`[os.signal.send.all]`, ruling #79 R1): send `meaning`'s
+/// signal to every process this one may signal**, itself excepted —
+/// `kill(-1)`, XCU `kill -1`. Which processes that is is the host's rule:
+/// as the super-user every process but this one (and, on linux, its pid
+/// namespace's process 1); as another user, that user's processes in any
+/// session or group. It has a name of its own so that no miscomputed pid
+/// or group becomes it.
+///
+/// Rows: `invalid` for a `meaning` `send` refuses; `unsupported` on
+/// windows; then the host's answer as it is: on linux `ok` when it found
+/// any other process, even only ones it may not signal, and `not_found`
+/// when it found none; `denied` where a host says so; `io` otherwise.
+/// Never traps. lupin answers the shape and declines the send by name.
+///
+/// Capability `exec`; refused at comptime (D33). Delegates to
+/// `os_signal_send_all`.
+///
+/// ```wolf-doc-example
+/// var row = "sent"
+/// signal.send_all(signal.terminate() | signal.user()) else |_| { row = "refused" }
+/// row == "refused"
+/// ```
+pub fn send_all(meaning: int) -> () ! {unsupported, invalid, not_found, denied, io} {
+    os_signal_send_all(meaning)?
 }
 
 /// **s232 (`[os.signal.number]`): the number THIS host gives `meaning`**
