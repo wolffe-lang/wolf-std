@@ -1029,6 +1029,55 @@ pub fn dumped_core(value: int) -> bool {
     value < -256 && value > -512
 }
 
+/// What one `poll_core` found: the `Change` that `poll` would report, its
+/// `status` read by `status_from_core` (so every released accessor
+/// answers as it does for `poll`), and `core`, whether the host wrote a
+/// core for the end it reports (`dumped_core`). `core` is false for a
+/// stop, an exit, an end without a core, and when nothing changed.
+pub struct CoreChange {
+    change: Change,
+    core: bool,
+}
+
+/// **s246 (`[os.proc.poll]`, ruling #88 R3 = D): `poll`, a core
+/// included.** The same look at every child this program started,
+/// without waiting, in the order they were started, with an end that
+/// dumped core reported as such — what a shell needs to say "(core
+/// dumped)" after a job's words. `poll` is unchanged. A program uses one
+/// or the other for a child: the poll that reports an end reaps it, so a
+/// second call could not ask afterwards.
+///
+/// Rows: `poll`'s (`io` once for a child the host reaped behind the
+/// table's back). Never traps, never blocks but behind a blocking `wait`
+/// on another task. Capability `Exec`; refused at comptime (D33). The
+/// checked machine answers it as the runtime does; lupin 0.1.54 does not
+/// resolve it (wolf-interp#263). Delegates to `os_wait_poll_core`.
+///
+/// ```wolf-doc-example
+/// let c = process.poll_core() else |_| { process.CoreChange { change: process.Change { changed: true, child: process.Child { slot: -1 }, status: process.status_from(512), live: -1 }, core: true } }
+/// c.change.changed == false
+/// c.change.live == 0
+/// c.core == false
+/// ```
+pub fn poll_core() -> CoreChange ! {io} {
+    let (h, s) = os_wait_poll_core()?
+    if h < 0 {
+        return CoreChange {
+            change: Change {
+                changed: false,
+                child: Child { slot: -1 },
+                status: Status { value: 512 },
+                live: s,
+            },
+            core: false,
+        }
+    }
+    CoreChange {
+        change: Change { changed: true, child: Child { slot: h }, status: status_from_core(s), live: -1 },
+        core: dumped_core(s),
+    }
+}
+
 /// A process GROUP: the unit a job is, and what `std.signal`'s
 /// `send_group` reaches (ruling #79 R1: the type is std's, over the
 /// builtin tier's group ids). A shell starts each job as a group
