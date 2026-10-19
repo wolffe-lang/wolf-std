@@ -29,7 +29,8 @@
 //! hole in it.
 //!
 //! **Capability: `Exec` (I13).** `start`, `run`, `wait`, `kill`, `exit`,
-//! `poll`, `lead_group` and `join_group` reach the host's process table
+//! `exit_signal`, `poll`, `wait_status_core`, `poll_core`, `lead_group`
+//! and `join_group` reach the host's process table
 //! (`own_group` reads this process's context: `env`), are tagged `exec` in the toolchain's
 //! sandbox table, and are categorically refused at comptime (D33) — with
 //! the sandbox table's own reason, which is worth quoting because it is
@@ -143,6 +144,16 @@
 //! member. `lead_group` and `join_group` move THIS process (an interactive
 //! shell at start and at exit; GNU `timeout` before its command).
 //!
+//! **A core, and the end by a signal (sc66, wolf 0.2.33's s246, ruling
+//! #88).** The released `wait_status` and `poll` answer `-N` for an end by
+//! signal `N` whether or not the host wrote a core, and `Status` keeps
+//! every answer it gave (R3 = D). A program that must say "(core dumped)"
+//! asks the siblings, `wait_status_core` and `poll_core`, whose answer for
+//! such an end is `-(256 + N)`; `status_from_core` reads it as the same
+//! `Status` and `dumped_core` (or `CoreChange.core`) says there was a core.
+//! Which ends dump core is the host's. `exit_signal` ends THIS process by
+//! a signal, so its parent reads the end its command had (R2).
+//!
 //! **What is deliberately absent.** Each is a reviewed contract with a
 //! filing behind it rather than an approximation:
 //!
@@ -216,9 +227,12 @@
 //! `SOCKET` is not a small stable number a parent can name by position).
 //! Three refusals, three reasons, and none of them a calendar.
 //!
-//! **No test and no doc example in this module starts a real program**, and
-//! that is a portability statement rather than a shortcut: there is no
-//! program every tier-1 host has (`/bin/sh` is not on windows, `cmd.exe`
+//! **No doc example in this module starts a real program**, and that is a
+//! portability statement rather than a shortcut. (Rows do since sc64 —
+//! `process/poll_job.lu` starts `/bin/sleep`, sc66's
+//! `process/wait_core_rows.lu` `/bin/sh` — and print their lines for that
+//! reason on windows, which has neither; the rest of this paragraph is the
+//! record from before them.) There is no program every tier-1 host has (`/bin/sh` is not on windows, `cmd.exe`
 //! is not on linux) and the directive schema has no per-platform gate — so
 //! a spawn test that ran anything real would be red on some supported
 //! host. What every witness here uses instead is deterministic on ALL of
