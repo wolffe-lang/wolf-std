@@ -1,5 +1,59 @@
 # Changelog
 
+## sc66 — 2026-10-19 — std at wolf 0.2.33: the five calls' wrappers
+
+**The pin.** wolf 0.2.32 -> **0.2.33** (`v0.2.33` at `85dab5d7`,
+release 417610226; linux x86-64 `4f955e8d…`), from the release archives
+by digest; lupin stays **0.1.54**, which resolves none of 0.2.33's five
+new names (wolf-interp#261, #263). The data pin moves v0.2.32 -> v0.2.33
+(`72de141f` -> `85dab5d7`, 661 -> 664 anchors: `os.signal.disp.one`,
+`os.signal.exit`, `os.signal.gaps.note`; none removed). 0.2.33's archive
+bundles this repository at `cceda63` (sc64 + sc65). Trunk's 484 tests
+and 511 doc examples are green at the bare pin.
+
+**One meaning's disposition (s246, ruling #88 R1; spelling O1 owed).**
+`signal.ignore_one(m)` and `signal.reset_one(m) -> () ! {invalid, io,
+unsupported}` over `os_signal_ignore_one` / `os_signal_default_one`: one
+meaning in the SENDING shape, a send-only one (`segment_fault()`) or a
+host number (`host(n)`, the real-time range included), so a program can
+ignore what it is about to send its own group. 0, `kill()` and `stop()`
+are `invalid`. `ignore` and `reset` (sets of listenable meanings) are
+unchanged. `exec`.
+
+**The end by a signal (R2; E1 owed).** `process.exit_signal(m) -> () !
+{invalid, unsupported}` over `os_exit_signal`, beside `process.exit`:
+the default, an unblock and a raise on this thread; `128 + N` where the
+process lives on (`resize()`: 156). The checked machine refuses it by
+name. `exec`.
+
+**The core (R3 = D; C1 owed).** `process.Status` and its accessors keep
+every answer. The siblings are read beside them:
+`process.wait_status_core(take ch) -> int ! {io}` (`-(256 + N)` for an
+end that dumped core), `status_from_core(v)` (that end read as the end by
+`N`, so `signal_of` and `shell_code` answer as for the released wait),
+`dumped_core(v)`, and `process.poll_core() -> CoreChange ! {io}`,
+`CoreChange { change: Change, core: bool }`. Which ends dump core is the
+host's.
+
+**#76.** `text_zero` leaves `signal/group_rows.lu` for
+`signal/text_zero.lu`, which takes only the host's words for 0 (the
+compiled tiers' `invalid` alternative retired); lupin 0.1.54 answers
+`invalid` there, `divergent(stdout)` (wolf-interp#262). **#72**
+`process.wait`'s doc block sits on `wait` again. **#73** ci.yml's
+std-test comments no longer call windows advisory.
+
+**Rows.** Eleven new: `signal/one_rows` (the shapes, every host),
+`one_host` (ignore and reset by bit and by number, the first real-time
+signal ignored and sent to the row itself), `one_fault` (the guard's two
+faults; checked `unsupported` by name), `text_zero`,
+`process/exit_signal_lives` (156), `status_core_rows` (pure, three
+lanes), `wait_core_rows` (children that dump no core), `poll_core_none`,
+and three comptime rows (D33). lupin `unsupported` wherever a row names
+one of the five; the two `std.signal` examples are mirror-lagged there
+by the call they name. The live ends, the sent faults and the cores were
+measured only inside throwaway containers (`docs/sc66-witness`, cores on
+and off). std-test **495**, doc examples **518**.
+
 ## sc65 — 2026-10-19 — `signal.text(0)` true at wolf 0.2.32 and 0.2.33
 
 **Why.** s246 (wolf-lang#787) makes `os_signal_text(0)` answer signal
