@@ -233,6 +233,69 @@ pub fn reset(set: int) -> () ! {unsupported, io} {
     os_signal_default(set)?
 }
 
+/// **s246 (`[os.signal.disp.one]`, ruling #88 R1): ONE meaning does
+/// nothing to this process** — and to every child it starts — named in
+/// the SENDING shape: one meaning of the table, any of the twenty-eight
+/// but `kill()` and `stop()`, or a host number `host(n)` (a real-time
+/// signal is `host(realtime()?.first + k)`). This is how a program
+/// ignores a send-only meaning or a signal the table has no meaning for:
+/// GNU `timeout -s SEGV` and `-s RTMIN` lead a group, ignore what they
+/// are about to send it, send it and live. `ignore` takes a SET of
+/// listenable meanings and is unchanged.
+///
+/// Rows, in the order they are decided: `invalid` for 0, for anything
+/// `send` refuses (two meanings, a bit no release publishes, a host
+/// number past `last()`), and for `kill()` and `stop()` by bit or by
+/// number, which no process can ignore; then `unsupported` on windows;
+/// then `io` where the host refuses the number (glibc keeps 32 and 33
+/// for itself). Nothing changes on a row. Never traps.
+///
+/// A listenable meaning, by its bit or its number, is the set calls'
+/// (`[os.signal.disp]`): the ignore ends a listen, `ignored` reads it,
+/// and a child inherits it across `exec`, as for every ignored meaning.
+/// `segment_fault()` and `bus_error()` stay the runtime's stack guard's:
+/// under the ignore a SENT one does nothing, while a real fault is still
+/// the runtime's (the stack-overflow report and exit 134). The checked
+/// machine refuses those two by name; lupin 0.1.54 does not resolve the
+/// call (wolf-interp#261).
+///
+/// Capability `exec`; refused at comptime (D33). Delegates to
+/// `os_signal_ignore_one`.
+///
+/// ```wolf-doc-example
+/// var row = "ignored"
+/// signal.ignore_one(signal.kill()) else |_| { row = "refused" }
+/// row == "refused"
+/// ```
+pub fn ignore_one(meaning: int) -> () ! {invalid, io, unsupported} {
+    os_signal_ignore_one(meaning)?
+}
+
+/// **s246 (`[os.signal.disp.one]`, ruling #88 R1): ONE meaning does what
+/// the host does by default** — the undo of `ignore_one`, in the same
+/// sending shape (one meaning of the table but `kill()` and `stop()`, or
+/// `host(n)`). `reset` takes a SET of listenable meanings and is
+/// unchanged. A child started after it gets the default as `exec` leaves
+/// it.
+///
+/// Rows, in `ignore_one`'s order: `invalid` for 0, anything `send`
+/// refuses, and `kill()` and `stop()`; `unsupported` on windows; `io`
+/// where the host refuses the number. Never traps. The checked machine
+/// refuses `segment_fault()` and `bus_error()` by name; lupin 0.1.54 does
+/// not resolve the call (wolf-interp#261).
+///
+/// Capability `exec`; refused at comptime (D33). Delegates to
+/// `os_signal_default_one`.
+///
+/// ```wolf-doc-example
+/// var row = "reset"
+/// signal.reset_one(signal.terminate() | signal.user()) else |_| { row = "refused" }
+/// row == "refused"
+/// ```
+pub fn reset_one(meaning: int) -> () ! {invalid, io, unsupported} {
+    os_signal_default_one(meaning)?
+}
+
 /// Send `meaning` to this process (`os_signal_raise`).
 pub fn raise(meaning: int) -> () ! {io} {
     os_signal_raise(meaning)?
