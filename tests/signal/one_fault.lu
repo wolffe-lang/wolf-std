@@ -1,0 +1,55 @@
+//! check: run(exit=0, stdout="segment_fault=ok ok\nbus_error=ok ok")
+//! phase: run
+//! conforms: std.signal, os.signal.disp.one, err.row
+//!
+//! **sc66: the two fault meanings the runtime owns, ignored and reset**
+//! (ruling #88 R1). `segment_fault()` and `bus_error()` are the stack
+//! guard's: `ignore_one` leaves its handler installed and makes a SENT
+//! one do nothing, `reset_one` gives a sent one the host's default again,
+//! and a real fault stays the runtime's under either. The row sends
+//! nothing: what a sent SEGV does under the ignore is witnessed only in a
+//! throwaway container (`docs/sc66-witness`), since without the ignore it
+//! would end the process with a core where the host writes one.
+//!
+//! The checked machine refuses both meanings by name (they are the
+//! `wolf` process's own guard's): `unsupported`. **windows** has no
+//! dispositions: the first call answers `unsupported` and the row prints
+//! its lines for that reason. **lupin** 0.1.54 does not resolve the calls
+//! (wolf-interp#261).
+
+use std.signal
+
+fn ign(m: int) -> str {
+    signal.ignore_one(m) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn rst(m: int) -> str {
+    signal.reset_one(m) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let segv = ign(signal.segment_fault())
+    if segv == "unsupported" {
+        print("segment_fault=ok ok")
+        print("bus_error=ok ok")
+        return 0
+    }
+    print("segment_fault={segv} {rst(signal.segment_fault())}")
+    let bus = ign(signal.bus_error())
+    print("bus_error={bus} {rst(signal.bus_error())}")
+    0
+}

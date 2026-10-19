@@ -1,0 +1,102 @@
+//! check: run(exit=0, stdout="user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok")
+//! phase: run
+//! conforms: std.signal, std.env, os.signal.disp.one, os.signal.ignored, os.signal.host, os.signal.send, err.row
+//!
+//! **sc66: one meaning's disposition on this host** (ruling #88 R1).
+//! `user()`, a listenable meaning, by its bit and then by its host number
+//! (`host(number(user()))`): `ignore_one` makes it ignored and `reset_one`
+//! the default again, which `signal.ignored()` reads back (a listenable
+//! meaning is the set calls' however it is named). `arithmetic()`
+//! (`SIGFPE`), a send-only meaning the runtime does not own, ignored and
+//! reset. `KILL` and `STOP` by host number, and the number one past
+//! `last()`, are `invalid`. On a host with a real-time range (linux: the
+//! C library's first number, 34 under glibc) that signal is ignored, sent
+//! to this process — the signal goes to this row's own process and
+//! nowhere else — and lived through, then reset: what GNU `timeout -s
+//! RTMIN` needs. macOS has no range, so the two real-time lines are
+//! printed for that reason there.
+//!
+//! **windows** has no dispositions: the first call answers `unsupported`
+//! and the row prints its lines for that reason. **lupin** 0.1.54 does
+//! not resolve the calls (wolf-interp#261).
+
+use std.env
+use std.signal
+use std.time
+
+fn ign(m: int) -> str {
+    signal.ignore_one(m) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn rst(m: int) -> str {
+    signal.reset_one(m) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn every_line() {
+    print("user_ignored=true")
+    print("user_reset=true")
+    print("user_by_number_ignored=true")
+    print("user_by_number_reset=true")
+    print("arithmetic=ok ok")
+    print("kill_by_number=invalid")
+    print("stop_by_number=invalid")
+    print("past_last=invalid")
+    print("realtime_ignored_lived=true")
+    print("realtime_reset=ok")
+}
+
+fn ignoring_user() -> !bool {
+    let set = signal.ignored()?
+    (set & signal.user()) != 0
+}
+
+fn main() -> !int {
+    let first = ign(signal.user())
+    if first == "unsupported" {
+        every_line()
+        return 0
+    }
+    print("user_ignored={first == "ok" && ignoring_user()?}")
+    let back = rst(signal.user())
+    print("user_reset={back == "ok" && !ignoring_user()?}")
+    let n = signal.number(signal.user())?
+    let by_n = ign(signal.host(n))
+    print("user_by_number_ignored={by_n == "ok" && ignoring_user()?}")
+    let by_n_back = rst(signal.host(n))
+    print("user_by_number_reset={by_n_back == "ok" && !ignoring_user()?}")
+    let fpe = ign(signal.arithmetic())
+    let fpe_back = rst(signal.arithmetic())
+    print("arithmetic={fpe} {fpe_back}")
+    let kill_n = signal.number(signal.kill())?
+    let stop_n = signal.number(signal.stop())?
+    print("kill_by_number={ign(signal.host(kill_n))}")
+    print("stop_by_number={rst(signal.host(stop_n))}")
+    print("past_last={ign(signal.host(signal.last()? + 1))}")
+    let rt = signal.realtime()?
+    if rt.first == 0 {
+        print("realtime_ignored_lived=true")
+        print("realtime_reset=ok")
+        return 0
+    }
+    let m = signal.host(rt.first)
+    let ignored_rt = ign(m)
+    signal.send(env.pid(), m)?
+    time.sleep(time.millis(100))
+    print("realtime_ignored_lived={ignored_rt == "ok"}")
+    print("realtime_reset={rst(m)}")
+    0
+}

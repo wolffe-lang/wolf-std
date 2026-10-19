@@ -1,0 +1,23 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.signal, comptime.sandbox, comptime.sandbox.exec
+//!
+//! **D33 for `signal.ignore_one` and `reset_one` (sc66), held one level
+//! down at `os_signal_ignore_one`**: a disposition is process control
+//! (`exec`, with the set calls, ruling #88 R1), and a compile may not
+//! change what a signal does to the machine that compiles it. The row is
+//! handled locally (F-0069); the pure `host` runs at run time to keep
+//! the import used.
+
+use std.signal
+
+comptime fn probe() -> int {
+    os_signal_ignore_one(512) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {signal.host(9)}")
+    0
+}

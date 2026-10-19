@@ -4364,3 +4364,44 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# ---- sc66 (wolf 0.2.33 / lupin 0.1.54; wolf-lang s246, ruling #88): the
+# wrappers for the five calls. lupin 0.1.54 resolves none of the five
+# names (wolf-interp#261, #263; is77 mirrors them): every row that names
+# one is `unsupported` there, by name ("does not resolve"), on every host,
+# and goes red the day a lupin that resolves them is pinned (the flip is
+# deliberate). The pure readings of the core run on all three lanes. ----
+
+# `signal/one_rows.lu`: `ignore_one`, `reset_one` and `exit_signal`, the
+# rows their shape decides before any host (R1, R2): every compiled
+# machine, every host.
+[tests."signal/one_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `signal/one_host.lu`: one meaning ignored and reset on this host, by bit
+# and by number; linux's first real-time signal ignored, sent to the row
+# itself and lived through. windows `unsupported` (the row prints its lines
+# for that reason). The checked machine sets the `wolf` process's own
+# disposition, as for the set calls.
+[tests."signal/one_host.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `signal/one_fault.lu`: `segment_fault()` and `bus_error()` ignored and
+# reset (nothing sent). The checked machine refuses both by name: they are
+# the `wolf` process's own stack guard's (`[os.signal.disp.one]`).
+[tests."signal/one_fault.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+# D33 one level down at `os_signal_ignore_one`, `os_exit_signal` and
+# `os_wait_status_core` (all five calls are `exec`, ruling #88). lupin has
+# no comptime tier.
+[tests."signal/comptime_refuses_ignore_one.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
