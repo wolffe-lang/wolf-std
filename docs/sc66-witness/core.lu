@@ -1,0 +1,77 @@
+// sc66 witness (ruling #88 R3 = D, through std): a child that dumps core
+// (`sh -c 'kill -s SEGV $$'`) and one that does not (`TERM`), each read by
+// the released call (`process.wait_status`, `process.poll`) and by its
+// sibling (`process.wait_status_core`, `process.poll_core`). The released
+// calls answer `-N` whether or not the host wrote a core; the siblings
+// `-(256 + N)` when it did, which `status_from_core` reads as the same
+// end and `dumped_core` / `CoreChange.core` as a core.
+//
+// RUN ONLY INSIDE A THROWAWAY CONTAINER: its children end themselves by
+// SEGV and TERM.
+
+use std.process
+use std.time
+
+fn sh(script: str) -> process.Command {
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, script)
+    c
+}
+
+fn kill_self(sig: str) -> str {
+    "kill -s {sig} $$"
+}
+
+fn released_wait(sig: str) -> !int {
+    let ch = process.start(sh(kill_self(sig)))?
+    process.wait_status(take ch)?
+}
+
+fn sibling_wait(sig: str) -> !str {
+    let ch = process.start(sh(kill_self(sig)))?
+    let v = process.wait_status_core(take ch)?
+    let s = process.status_from_core(v)
+    "{v} signal={process.signal_of(s) else 0} shell={process.shell_code(s)} core={process.dumped_core(v)}"
+}
+
+fn released_poll(sig: str) -> !int {
+    let ch = process.start(sh(kill_self(sig)))?
+    var n = 0
+    while n < 2000 {
+        let c = process.poll()?
+        if c.changed && c.child.slot == ch.slot {
+            return c.status.value
+        }
+        time.sleep(time.millis(5))
+        n = n + 1
+    }
+    io
+}
+
+fn sibling_poll(sig: str) -> !str {
+    let ch = process.start(sh(kill_self(sig)))?
+    var n = 0
+    while n < 2000 {
+        let c = process.poll_core()?
+        if c.change.changed && c.change.child.slot == ch.slot {
+            let s = c.change.status
+            return "{s.value} signal={process.signal_of(s) else 0} shell={process.shell_code(s)} core={c.core}"
+        }
+        time.sleep(time.millis(5))
+        n = n + 1
+    }
+    io
+}
+
+fn main() -> !int {
+    print("wait segv {released_wait("SEGV")?}")
+    print("wait_status_core segv {sibling_wait("SEGV")?}")
+    print("wait term {released_wait("TERM")?}")
+    print("wait_status_core term {sibling_wait("TERM")?}")
+    print("poll segv {released_poll("SEGV")?}")
+    print("poll_core segv {sibling_poll("SEGV")?}")
+    print("poll term {released_poll("TERM")?}")
+    print("poll_core term {sibling_poll("TERM")?}")
+    0
+}

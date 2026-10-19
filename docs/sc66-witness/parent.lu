@@ -1,0 +1,41 @@
+// sc66 witness (ruling #88 R2, R3 = D, through std): starts
+// `exit_by.lu`'s binary (the file `sc66.child` names) twice per mode (the
+// file `sc66.modes`, space-separated) and reports how each ended: once as
+// the released `process.wait_status` reads it, once as
+// `process.wait_status_core` does, through `status_from_core` and
+// `dumped_core`. Settings are files in the working directory, not argv,
+// so every machine under `conform-run` reads the same ones.
+//
+// RUN ONLY INSIDE A THROWAWAY CONTAINER: its children signal themselves.
+
+use std.fs
+use std.process
+use std.str
+
+fn ended(v: int, core: bool) -> str {
+    let s = process.status_from_core(v)
+    if process.is_exited(s) {
+        return "exit {process.exit_code(s) else -1}"
+    }
+    let tail = if core { " core" } else { "" }
+    "signal {process.signal_of(s) else -1}{tail}"
+}
+
+fn one(child: str, mode: str) -> process.Command {
+    var c = process.command(child)
+    process.push_arg(mut c, mode)
+    c
+}
+
+fn main() -> !int {
+    let child = str.trim(fs.read_text("sc66.child")?)
+    let modes = str.split(str.trim(fs.read_text("sc66.modes")?), " ")
+    for mode in modes {
+        let a = process.start(one(child, mode))?
+        let released = process.wait_status(take a)?
+        let b = process.start(one(child, mode))?
+        let sibling = process.wait_status_core(take b)?
+        print("{mode}: released {ended(released, false)} | core sibling {ended(sibling, process.dumped_core(sibling))}")
+    }
+    0
+}

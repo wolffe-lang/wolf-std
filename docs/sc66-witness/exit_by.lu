@@ -1,0 +1,101 @@
+// sc66 witness (ruling #88 R1, R2, through std): a program that ends
+// itself by a signal (`process.exit_signal`), or is sent one it ignores or
+// resets (`signal.ignore_one`, `signal.reset_one`). Started by `parent.lu`
+// with one MODE as its argument; it writes nothing, so its parent's
+// reading is the whole record:
+//
+// - `exit-segv`: has run a task (the stack guard's handler is installed),
+//   then `exit_signal(segment_fault())`: ends by SIGSEGV.
+// - `exit-rt`: `exit_signal(host(realtime()?.first))` (linux).
+// - `exit-term-listened`: listens for `terminate()`, then ends by it.
+// - `exit-resize`: `exit_signal(resize())`: lives on, exits 156.
+// - `sent-segv`: has run a task, sends itself SEGV: the default ends it
+//   (at 0.2.32 such a program lived through the first one).
+// - `ignored-sent-segv`: `ignore_one(segment_fault())`, a task, then a SEGV
+//   sent to itself: lives, exits 0.
+// - `ignored-sent-rt`: ignores the first real-time number, sends it to
+//   itself: lives, exits 0.
+// - `reset-sent-rt`: ignores it, resets it, sends it: ends by it.
+//
+// RUN ONLY AS A CHILD OF `parent.lu`, INSIDE A THROWAWAY CONTAINER: every
+// mode but the shapes signals this process and nothing else.
+
+use std.env
+use std.process
+use std.signal
+use std.time
+
+fn a_task() {
+    scope s {
+        s.spawn(fn() { time.sleep(time.millis(1)) })
+    }
+}
+
+fn end_by(m: int) -> int {
+    process.exit_signal(m) else |e| {
+        return match e {
+            invalid => 4,
+            unsupported => 5,
+        }
+    }
+    3
+}
+
+fn first_rt() -> !int {
+    let rt = signal.realtime()?
+    if rt.first == 0 {
+        return 0
+    }
+    signal.host(rt.first)
+}
+
+fn main() -> !int {
+    let args = env.args()
+    if args.len == 0 {
+        return 2
+    }
+    let mode = args[0]
+    if mode == "exit-segv" {
+        a_task()
+        return end_by(signal.segment_fault())
+    }
+    if mode == "exit-rt" {
+        return end_by(first_rt()?)
+    }
+    if mode == "exit-term-listened" {
+        signal.listen(signal.terminate())?
+        return end_by(signal.terminate())
+    }
+    if mode == "exit-resize" {
+        return end_by(signal.resize())
+    }
+    if mode == "sent-segv" {
+        a_task()
+        signal.send(env.pid(), signal.segment_fault())?
+        time.sleep(time.millis(300))
+        return 0
+    }
+    if mode == "ignored-sent-segv" {
+        signal.ignore_one(signal.segment_fault())?
+        a_task()
+        signal.send(env.pid(), signal.segment_fault())?
+        time.sleep(time.millis(300))
+        return 0
+    }
+    if mode == "ignored-sent-rt" {
+        let m = first_rt()?
+        signal.ignore_one(m)?
+        signal.send(env.pid(), m)?
+        time.sleep(time.millis(300))
+        return 0
+    }
+    if mode == "reset-sent-rt" {
+        let m = first_rt()?
+        signal.ignore_one(m)?
+        signal.reset_one(m)?
+        signal.send(env.pid(), m)?
+        time.sleep(time.millis(300))
+        return 0
+    }
+    6
+}
