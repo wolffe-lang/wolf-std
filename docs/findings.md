@@ -12834,3 +12834,78 @@ exists at `v0.2.32`: `os_signal_last` and `os_signal_realtime` are
   then `not_found` again; as root and as user 1000, on native, release
   and checked; lupin by name (`os_signal_listen` does not resolve,
   `os_pgid`, `os_signal_send_all`). SigBlk and SigIgn 0 in every run.
+
+## F-0152 — sc65's predictions, before `text_zero` and `text`'s example move
+
+Written on branch `sc65` (on trunk `dcf3e89`, sc64) before any row,
+doc block or example changed and before the 0.2.33 candidate was built
+by this lane. What I read first, and so cannot claim to predict blind:
+r38's evidence (planning branch `r38`, §3 prediction 6 and §4: `dcf3e89`
+under the candidate is red on exactly `tests/signal/group_rows.lu`
+`[wolfc]` and `[native]`, expected `text_zero=invalid`, observed
+`text_zero=words Unknown signal 0`, and on two DOC BUGs at
+`std/signal/signal.lu:410`, lupin green on both); spec
+`[os.signal.text]` and `[os.signal.platform]` on wolf-lang branch `r38`
+(`5e4c34b2`): from 0.2.33 a meaning of 0 is signal 0, glibc's words
+`Unknown signal 0`, macOS's `Unknown signal: 0`, and windows answers
+`os_signal_text(0)` `unsupported`; at `v0.2.32` 0 is `invalid` before
+the host on every host, and lupin 0.1.54 answers `invalid`.
+
+Inputs, re-derived 2026-10-19: wolf-std trunk `dcf3e89`, 484 tests and
+511 doc examples (sc64); wolf 0.2.32 is `v0.2.32` at `72de141f`, lupin
+0.1.54 is `v0.1.54` at `0e536e8` (both this repository's pins, which do
+not move); the 0.2.33 candidate is wolf-lang branch `r38` at
+`5e4c34b2`. No runtime call names the toolchain's version, so no row
+can tell 0.2.32 from 0.2.33 except by the answer under test.
+
+### P1. The candidate
+
+- Built on kasumi from `r38` `5e4c34b2` with `cargo xtask dist`:
+  `wolf 0.2.33+dev.5e4c34b (wolfgang, pin 5e4c34b)`, paired with lupin
+  0.1.54 pin `294d626`, the archive's `std/` staged from wolf-std
+  `dcf3e89` (`STD-REV`).
+
+### P2. The control: trunk `dcf3e89` under the candidate
+
+- std-test 484, RED on exactly `signal/group_rows.lu` `[wolfc]` and
+  `[native]` (`text_zero=words Unknown signal 0` where the directive
+  says `invalid`), lupin green; doc-examples 511 blocks × 3 lanes,
+  1,531 ok and exactly 2 DOC BUG, `signal.lu:410` on `[wolfc]` and
+  `[native]`. r38's measurement, reproduced on this lane's own build.
+
+### P3. The change
+
+- `group_rows.lu` keeps a `text_zero` line, printed `text_zero=true`:
+  the answer for 0 is `invalid` (wolf 0.2.32 and lupin 0.1.54, every
+  host) or exactly this host's words (wolf 0.2.33: `Unknown signal 0`
+  where `text(kill())` is glibc's `Killed`, `Unknown signal: 0` where
+  it is macOS's `Killed: 9`, `unsupported` where `text(kill())` is
+  `unsupported`, windows); any other answer prints `false`. lupin
+  never reaches the host's words (it answers `invalid`), so its run is
+  unchanged. `text_two_meanings` and the other twelve lines unchanged.
+- `signal.text`'s example asks the words of two meanings
+  (`terminate() | user()`), `invalid` before the host on every machine
+  and both versions; the doc block's rows sentence says what each
+  version answers for 0.
+- Test count stays **484**, doc examples **511** (an example replaced,
+  none added); no ledger word moves.
+
+### P4. Green both ways
+
+- At the head, wolf 0.2.32 / lupin 0.1.54: std-test 484 GREEN and doc
+  examples 511 GREEN on kasumi and on CI's three hosts, 0 `SKIP:`.
+- At the head, the r38 candidate / published lupin 0.1.54 on kasumi:
+  std-test 484 GREEN (group_rows on lupin, wolfc and native),
+  doc-examples 511 × 3 = 1,533 ok, 0 DOC BUG, 0 `SKIP:`. Under
+  `taskset -c 0-3` the same on both toolchains.
+
+### P5. The planted wrong answer
+
+- Branch `sc65-plant`: the row's 0.2.32 / lupin answer planted as
+  `unsupported` instead of `invalid`. CI (wolf 0.2.32) red on
+  `signal/group_rows.lu` on lupin, wolfc and native on ubuntu, macOS
+  and windows (`text_zero=false`, or lupin declining the well-formed
+  `text(kill())` by name), every other row and every doc example
+  green. On kasumi a second plant against the candidate (glibc's
+  words misspelled `Unknown signal  0`) is red on `[wolfc]` and
+  `[native]` and green on lupin.
