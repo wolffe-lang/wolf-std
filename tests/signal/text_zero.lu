@@ -1,0 +1,53 @@
+//! check: run(exit=0, stdout="text_zero=true")
+//! phase: run
+//! conforms: std.signal, os.signal.text, os.signal.platform, err.row
+//!
+//! **sc66 (wolf-std#76): the words of 0 at wolf 0.2.33, the host's and
+//! nothing else.** From wolf 0.2.33 (s246, wolf-lang#787) 0 is signal 0
+//! and `text(0)` answers the host's words: glibc's `Unknown signal 0`
+//! (where `text(kill())` is "Killed"), macOS's `Unknown signal: 0`
+//! (where it is "Killed: 9"), and `unsupported` on windows (where
+//! `text(kill())` is `unsupported` too). sc65 let `signal/group_rows.lu`
+//! also take `invalid`, 0.2.32's answer, while this repository was pinned
+//! there; at the 0.2.33 pin the compiled tiers' `invalid` alternative is
+//! retired and the line lives here, so that a compiler that went back to
+//! `invalid` is red.
+//!
+//! **lupin 0.1.54 still answers `invalid`** (wolf-interp#262), and the row
+//! prints `text_zero=false` there without asking `text(kill())`, which
+//! lupin declines by name: the ledger spells that `divergent(stdout)`.
+//! When lupin learns `text(0)` (is77 refuses it by name) the lupin lane
+//! changes and the row goes red on purpose. musl's words are unmeasured
+//! (no release targets musl), so a musl host prints `false` until they
+//! are.
+
+use std.signal
+
+fn word_text(meaning: int) -> str {
+    let t = signal.text(meaning) else |e| {
+        return match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+    }
+    "words {t}"
+}
+
+fn zero_is_the_hosts(t: str) -> bool {
+    if t == "invalid" {
+        return false
+    }
+    let kill = word_text(signal.kill())
+    if kill == "words Killed" {
+        return t == "words Unknown signal 0"
+    }
+    if kill == "words Killed: 9" {
+        return t == "words Unknown signal: 0"
+    }
+    kill == "unsupported" && t == "unsupported"
+}
+
+fn main() -> !int {
+    print("text_zero={zero_is_the_hosts(word_text(0))}")
+    0
+}

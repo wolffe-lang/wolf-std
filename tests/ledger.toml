@@ -4316,6 +4316,18 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# `signal/text_zero.lu` (sc66, wolf-std#76): the words of 0 at wolf
+# 0.2.33, the host's only (glibc `Unknown signal 0`, macOS `Unknown
+# signal: 0`, windows `unsupported`), `invalid` retired on the compiled
+# tiers. lupin 0.1.54 runs it and answers `invalid`, so it prints
+# `text_zero=false`: `divergent(stdout)` (wolf-interp#262). Red the day
+# lupin answers anything else (is77 refuses `text(0)` by name, which
+# would read `unsupported`), and the flip is deliberate.
+[tests."signal/text_zero.lu"]
+lupin = "divergent(stdout)"
+wolfc = "run"
+native = "run"
+
 # `signal/host_rows.lu`: last, realtime and text on this host. lupin
 # declines `os_signal_last` by name; windows answers `unsupported` on
 # every machine, lupin's included.

@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="group_one=invalid\ngroup_zero=invalid\ngroup_negative=invalid\ngroup_wide=invalid\ngroup_two_meanings=invalid\ngroup_unpublished=invalid\nall_two_meanings=invalid\nall_unpublished=invalid\njoin_negative=invalid\njoin_wide=invalid\ntext_zero=true\ntext_two_meanings=invalid\nhost_nine=-9")
+//! check: run(exit=0, stdout="group_one=invalid\ngroup_zero=invalid\ngroup_negative=invalid\ngroup_wide=invalid\ngroup_two_meanings=invalid\ngroup_unpublished=invalid\nall_two_meanings=invalid\nall_unpublished=invalid\njoin_negative=invalid\njoin_wide=invalid\ntext_two_meanings=invalid\nhost_nine=-9")
 //! phase: run
 //! conforms: std.signal, std.process, os.signal.send.group, os.signal.send.all, os.term.group, os.signal.text, os.signal.host, err.row
 //!
@@ -15,16 +15,14 @@
 //! and macOS and past the shape on windows, so it is
 //! `signal/host_rows.lu`'s.)
 //!
-//! **sc65: `text_zero`, the words of 0, answered per version.** wolf
-//! 0.2.32 and lupin 0.1.54 answer `invalid` on every host (0 was a shape
-//! no signal has). From wolf 0.2.33 (s246, wolf-lang#787) 0 is signal 0
-//! and the answer is the host's: glibc's `Unknown signal 0` (where
-//! `text(kill())` is "Killed"), macOS's `Unknown signal: 0` (where it is
-//! "Killed: 9"), and `unsupported` on windows (where `text(kill())` is
-//! `unsupported` too). No call names the toolchain's version, so the row
-//! takes exactly those answers, `invalid` or this host's words, and
-//! prints `text_zero=true`; anything else is `false`. lupin answers
-//! `invalid` and never reaches the host's words.
+//! **sc66 (wolf-std#76): `text_zero` left this row for
+//! `signal/text_zero.lu`.** sc65 let it take `invalid` (wolf 0.2.32, lupin
+//! 0.1.54) or this host's words for 0 (wolf 0.2.33, wolf-lang#787) while
+//! this repository was pinned to 0.2.32. At the 0.2.33 pin the compiled
+//! tiers answer only the host's words and lupin 0.1.54 only `invalid`, so
+//! the line moved to a row whose lupin lane can say so
+//! (`divergent(stdout)`) without darkening the twelve shapes here, which
+//! lupin answers.
 
 use std.process
 use std.signal
@@ -77,20 +75,6 @@ fn word_text(meaning: int) -> str {
     "words {t}"
 }
 
-fn zero_known(t: str) -> bool {
-    if t == "invalid" {
-        return true
-    }
-    let kill = word_text(signal.kill())
-    if kill == "words Killed" {
-        return t == "words Unknown signal 0"
-    }
-    if kill == "words Killed: 9" {
-        return t == "words Unknown signal: 0"
-    }
-    kill == "unsupported" && t == "unsupported"
-}
-
 fn main() -> !int {
     let two = signal.terminate() | signal.user()
     let unpublished: int = 4611686018427387904
@@ -105,7 +89,6 @@ fn main() -> !int {
     print("all_unpublished={word_all(unpublished)}")
     print("join_negative={word_join(-1)}")
     print("join_wide={word_join(wide)}")
-    print("text_zero={zero_known(word_text(0))}")
     print("text_two_meanings={word_text(two)}")
     print("host_nine={signal.host(9)}")
     0
