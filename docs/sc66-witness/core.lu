@@ -35,7 +35,7 @@ fn sibling_wait(sig: str) -> !str {
     "{v} signal={process.signal_of(s) else 0} shell={process.shell_code(s)} core={process.dumped_core(v)}"
 }
 
-fn released_poll(sig: str) -> !int {
+fn released_poll(sig: str) -> int ! {unsupported, invalid, not_found, denied, io} {
     let ch = process.start(sh(kill_self(sig)))?
     var n = 0
     while n < 2000 {
@@ -49,7 +49,7 @@ fn released_poll(sig: str) -> !int {
     io
 }
 
-fn sibling_poll(sig: str) -> !str {
+fn sibling_poll(sig: str) -> str ! {unsupported, invalid, not_found, denied, io} {
     let ch = process.start(sh(kill_self(sig)))?
     var n = 0
     while n < 2000 {
