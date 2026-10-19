@@ -35,7 +35,9 @@ fn main() -> !int {
         let released = process.wait_status(take a)?
         let b = process.start(one(child, mode))?
         let sibling = process.wait_status_core(take b)?
-        print("{mode}: released {ended(released, false)} | core sibling {ended(sibling, process.dumped_core(sibling))}")
+        print(
+            "{mode}: released {ended(released, false)} | core sibling {ended(sibling, process.dumped_core(sibling))}",
+        )
     }
     0
 }
