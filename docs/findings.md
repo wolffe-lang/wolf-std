@@ -13148,3 +13148,27 @@ could dump core runs only inside a throwaway container.
   to above `pub fn wait`; `split_argv` keeps its own two lines. The doc
   example count does not change. ci.yml's comments that still call
   windows std-test advisory are corrected; no step changes.
+
+### P10, widened before the plant ran (committed before `sc66-plant` is pushed)
+
+- P10 as written planted one break and predicted red on one row. The
+  rule is every new row red before green in CI, so the plant is widened
+  to four std breaks and one expectation plant, each named by what it
+  breaks: (a) `ignore_one` / `reset_one` delegate to the SET calls
+  (`os_signal_ignore` / `os_signal_default`), R1(B)'s mistake; (b)
+  `exit_signal` delegates to `os_signal_raise`, R2(B)'s; (c)
+  `status_from_core` folds nothing and `dumped_core` reads every end as a
+  core; (d) `poll_core`'s quiet answer forgets `live` (-1); (e) `text(0)`
+  answers `invalid` in std (wolf 0.2.32's answer re-created), and the
+  ledger expects the three comptime rows to be refused as the toolchain
+  without the calls refuses them (`fail(E0301)`).
+- Predicted reds, ubuntu and macOS `rig`: `signal/one_rows`, `one_host`,
+  `one_fault`, `text_zero`, `process/exit_signal_lives`,
+  `status_core_rows`, `wait_core_rows`, `poll_core_none` on wolfc and
+  native (`status_core_rows` on lupin too), and the three comptime rows on
+  wolfc and native: all eleven. windows `rig`: the same except `one_host`
+  and `wait_core_rows`, which take their windows lines before the planted
+  code (`unsupported` from the set call; no `/bin/sh`). `gates` on three
+  hosts: the examples of `status_from_core`, `dumped_core` and
+  `poll_core`, and the two mirror-lagged `std.signal` examples on lupin
+  (the refusal sentence changes or the block runs).
