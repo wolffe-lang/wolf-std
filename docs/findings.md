@@ -13285,3 +13285,12 @@ probes, the witness) ran inside a throwaway podman container (`--rm
   re-run from `git archive`. (d) I ran the plant's pure
   `status_core_rows` binary once on kasumi's host to check it compiled
   (it signals nothing).
+- **Under `taskset -c 0-3` and at the code head.** kasumi g5 at `13f6977`
+  (container, `taskset -c 0-3` inside it): std-test **495 GREEN**
+  (host-scoped cells 15), doc-examples **518 GREEN**
+  (`std-test-t-13f6977.log` `e08d120e…`, `doc-examples-t-13f6977.log`
+  `b97a8546…`). CI push run 39325019742 at `13f6977`, six jobs success,
+  log read: std-test 495 GREEN on ubuntu (118308471942), macOS
+  (118308472389) and windows (118308472570); doc-examples 518 GREEN on
+  all three `gates` jobs; 0 `SKIP:` lines. Later commits touch only
+  `docs/findings.md`.
