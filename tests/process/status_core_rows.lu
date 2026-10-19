@@ -1,0 +1,55 @@
+//! check: run(exit=0, stdout="-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true")
+//! phase: run
+//! conforms: std.process, os.proc.status, os.proc.poll, err.row
+//!
+//! **sc66: the core siblings' answers, read beside the released `Status`**
+//! (ruling #88 R3 = D). `status_from_core` reads `-(256 + N)`, an end by
+//! signal `N` that dumped core, as the end by `N`, so `is_signalled`,
+//! `signal_of` and `shell_code` answer exactly what the released wait's
+//! `-N` gives (`-267`: signal 11, `$?` 139), and `dumped_core` says
+//! there was a core; `-257` and `-511` are the range's two ends (N from 1
+//! to 255, the mirror of a stop's `256 + N`). Every other value reads as
+//! `status_from` reads it, with no core: an end without one (`-11`,
+//! `-9`), the values just outside the range (`-256` and `-512`, which
+//! `status_from` has always read as ends by 256 and 512), an exit, a stop
+//! and a value of no kind. The last line holds the released accessors to
+//! their answers on the sibling's raw value: `status_from(-267)` is
+//! still an end by 267, as at wolf-std `cceda63`. Pure: every machine,
+//! every host, lupin included.
+
+use std.process
+
+fn line(v: int) -> str {
+    let s = process.status_from_core(v)
+    var word = "none"
+    if process.is_exited(s) {
+        word = "exit {process.exit_code(s) else -1}"
+    }
+    if process.is_signalled(s) {
+        word = "signal {process.signal_of(s) else -1}"
+    }
+    if process.is_stopped(s) {
+        word = "stop {process.stopped_by(s) else -1}"
+    }
+    let core = if process.dumped_core(v) { " core" } else { "" }
+    "{v}: {word} shell {process.shell_code(s)}{core}"
+}
+
+fn main() -> !int {
+    print(line(-267))
+    print(line(-257))
+    print(line(-511))
+    print(line(-11))
+    print(line(-9))
+    print(line(-256))
+    print(line(-512))
+    print(line(0))
+    print(line(3))
+    print(line(275))
+    print(line(512))
+    let raw = process.status_from(-267)
+    let same = process.is_signalled(raw) && (process.signal_of(raw) else 0) == 267 &&
+        process.shell_code(raw) == 395
+    print("released_unchanged={same}")
+    0
+}

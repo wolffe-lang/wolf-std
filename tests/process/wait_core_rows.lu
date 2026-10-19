@@ -1,0 +1,83 @@
+//! check: run(exit=0, stdout="forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io")
+//! phase: run
+//! conforms: std.process, os.proc.status, os.proc.poll, os.proc.spawn, err.row
+//!
+//! **sc66: the core siblings on children that dump no core** (ruling #88
+//! R3 = D). A forged handle is `io` from `wait_status_core`. A
+//! `/bin/sh -c 'kill -s TERM $$'` child ends by `TERM`, whose default
+//! writes no core on any host, so `wait_status_core` answers `-15` (the
+//! released wait's answer) and `dumped_core` is false; a child that
+//! exits 3 is 3. Another `TERM` child is reported by `poll_core` as an
+//! end by 15 with `core` false and reaped (its handle `io` after), and the
+//! next poll finds none left. Every child is this row's own; nothing is
+//! signalled from here. A child that DOES dump core is witnessed only in
+//! a throwaway container (`docs/sc66-witness`): which ends dump core is
+//! the host's, and a row that made one would leave a core behind on a
+//! host that writes them.
+//!
+//! **windows** has no `/bin/sh` (`not_found`): the forged line is the
+//! host's and the others are printed for that reason. **lupin** 0.1.54
+//! does not resolve the siblings (wolf-interp#263).
+
+use std.process
+use std.time
+
+fn sh(script: str) -> process.Command {
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, script)
+    c
+}
+
+fn kind(s: process.Status) -> str {
+    if process.is_exited(s) {
+        return "exit {process.exit_code(s) else -1}"
+    }
+    if process.is_signalled(s) {
+        return "signal {process.signal_of(s) else -1}"
+    }
+    "other"
+}
+
+fn main() -> !int {
+    var forged = process.Child { slot: 4242 }
+    let f = process.wait_status_core(take forged) else |_| -1
+    print(if f == -1 { "forged=io" } else { "forged={f}" })
+    let term = process.start(sh("kill -s TERM $$")) else |e| {
+        match e {
+            not_found => {
+                print("term=-15 signal 15 shell 143 core=false")
+                print("exit=3 exit 3 core=false")
+                print("polled=signal 15 core=false same_child=true")
+                print("none_left=true")
+                print("reaped=io")
+                return 0
+            },
+            unsupported => print("start=unsupported"),
+            invalid => print("start=invalid"),
+            denied => print("start=denied"),
+            io => print("start=io"),
+        }
+        return 1
+    }
+    let t = process.wait_status_core(take term)?
+    let ts = process.status_from_core(t)
+    print("term={t} {kind(ts)} shell {process.shell_code(ts)} core={process.dumped_core(t)}")
+    let three = process.start(sh("exit 3"))?
+    let e = process.wait_status_core(take three)?
+    print("exit={e} {kind(process.status_from_core(e))} core={process.dumped_core(e)}")
+    let polled = process.start(sh("kill -s TERM $$"))?
+    var n = 0
+    var c = process.poll_core()?
+    while !c.change.changed && n < 400 {
+        time.sleep(time.millis(5))
+        n = n + 1
+        c = process.poll_core()?
+    }
+    print("polled={kind(c.change.status)} core={c.core} same_child={c.change.child.slot == polled.slot}")
+    let r = process.poll_core()?
+    print("none_left={!r.change.changed && r.change.live == 0}")
+    let p = process.pid(polled) else |_| -1
+    print(if p == -1 { "reaped=io" } else { "reaped={p}" })
+    0
+}

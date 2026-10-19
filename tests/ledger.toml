@@ -4398,10 +4398,49 @@ lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
+# `process/exit_signal_lives.lu`: `exit_signal(resize())` lives on and
+# exits 156 (128 + SIGWINCH, 28 on linux and macOS). The checked machine
+# refuses the well-formed call by name after the shape.
+[tests."process/exit_signal_lives.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+# `process/status_core_rows.lu`: `status_from_core` and `dumped_core`,
+# pure; the released accessors on the raw sibling value unchanged.
+[tests."process/status_core_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# `process/wait_core_rows.lu`: the siblings on children that dump no core
+# (`TERM`, an exit), the wait and the poll; a forged handle `io`. windows
+# has no `/bin/sh`, so the row prints its lines for that reason there.
+[tests."process/wait_core_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `process/poll_core_none.lu`: `poll_core` with no child, `(-1, 0)`.
+[tests."process/poll_core_none.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
 # D33 one level down at `os_signal_ignore_one`, `os_exit_signal` and
 # `os_wait_status_core` (all five calls are `exec`, ruling #88). lupin has
 # no comptime tier.
 [tests."signal/comptime_refuses_ignore_one.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."process/comptime_refuses_exit_signal.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."process/comptime_refuses_wait_core.lu"]
 lupin = "unsupported"
 wolfc = "run"
 native = "run"

@@ -1,0 +1,27 @@
+//! check: run(exit=0, stdout="changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false")
+//! phase: run
+//! conforms: std.process, os.proc.poll, os.proc.status, err.row
+//!
+//! **sc66: `poll_core` with no child** (ruling #88 R3 = D): `(-1, 0)`
+//! from `os_wait_poll_core`, as `os_wait_poll` answers it (ruling #84
+//! R5), which `CoreChange` reads as `poll`'s quiet `Change` — `changed`
+//! false, `live` 0, a `child` that names nothing and a status of no kind
+//! — with `core` false. Asked twice, the same. Every machine that
+//! resolves the call, every host; lupin 0.1.54 does not resolve it
+//! (wolf-interp#263).
+
+use std.process
+
+fn main() -> !int {
+    let c = process.poll_core()?
+    print("changed={c.change.changed}")
+    print("live={c.change.live}")
+    print("slot={c.change.child.slot}")
+    let s = c.change.status
+    let any = process.is_exited(s) || process.is_signalled(s) || process.is_stopped(s)
+    print(if any { "kind=some" } else { "kind=none" })
+    print("core={c.core}")
+    let d = process.poll_core()?
+    print("again={d.change.changed} {d.change.live} {d.core}")
+    0
+}

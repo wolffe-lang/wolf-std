@@ -1,0 +1,43 @@
+//! check: run(exit=156, stdout="exit_signal_zero=invalid")
+//! phase: run
+//! conforms: std.process, std.signal, os.signal.exit, os.proc.status, err.row
+//!
+//! **sc66: `exit_signal` of a meaning whose default does nothing**
+//! (ruling #88 R2). `resize()` is `SIGWINCH`, 28 on linux and macOS,
+//! whose default is to do nothing: the call sets it to the default,
+//! unblocks it and raises it on this thread, the process lives on, and
+//! the call ends it with `128 + 28` = **156** instead of returning. A
+//! signal the default ignores goes to this row's own process and does
+//! nothing, so this is the one end-by-signal path a row can take outside
+//! a container; the ends by `SIGSEGV`, by a real-time number and by a
+//! listened `terminate()` are witnessed in a throwaway container
+//! (`docs/sc66-witness`). The shape row (0, `invalid`) comes first.
+//!
+//! **windows** answers `unsupported` (no signals to end by), and the row
+//! ends with the code the unix end gives, for that reason. The checked
+//! machine refuses the well-formed call by name (it runs inside the
+//! `wolf` process); **lupin** 0.1.54 does not resolve it
+//! (wolf-interp#261).
+
+use std.process
+use std.signal
+
+fn main() -> !int {
+    var zero = "returned"
+    process.exit_signal(0) else |e| {
+        zero = match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+    }
+    print("exit_signal_zero={zero}")
+    process.exit_signal(signal.resize()) else |e| {
+        match e {
+            unsupported => return 156,
+            invalid => print("resize=invalid"),
+        }
+        return 1
+    }
+    print("resize=returned")
+    1
+}
