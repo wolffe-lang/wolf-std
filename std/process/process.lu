@@ -679,28 +679,6 @@ pub fn start_with(c: Command, inherit: List[net.Listener]) -> Child ! {
     Child { slot: os_spawn_with(exe, args, fds)? }
 }
 
-/// Wait for `ch` to finish and answer its exit code, consuming the handle.
-///
-/// Rows: `signal` when the child died without an exit code — killed by
-/// this program or by anything else, or crashed — which is an OUTCOME with
-/// no number rather than a failure to report a number; `io` when the
-/// handle is forged, foreign or already reaped. Never traps.
-///
-/// **This blocks until the child finishes.** There is no non-blocking form
-/// and no deadline at this pin (F-0065), so a caller who cannot afford to
-/// wait forever has to kill the child from somewhere else — which, with
-/// no way to poll, means another task.
-///
-/// `take ch` because waiting REAPS: the child is gone from the machine's
-/// table afterwards, so a second wait is a use-after-move the compiler
-/// rejects rather than an `io` row at run time (§14's handle rule).
-///
-/// Capability `Exec`; refused at comptime (D33). Delegates to `os_wait`.
-///
-/// ```wolf-doc-example
-/// var forged = process.Child { slot: 4242 }
-/// (process.wait(take forged) else -1) == -1
-/// ```
 /// The argv split as the spawn builtins take it: the program, then its
 /// arguments; `None`-free — an empty argv answers `not_found` at the call.
 fn split_argv(c: Command) -> (str, List[str], bool) {
@@ -1165,6 +1143,28 @@ pub fn join_group(g: Group) -> () ! {denied, invalid, io, unsupported} {
     os_set_pgid(g.id)?
 }
 
+/// Wait for `ch` to finish and answer its exit code, consuming the handle.
+///
+/// Rows: `signal` when the child died without an exit code — killed by
+/// this program or by anything else, or crashed — which is an OUTCOME with
+/// no number rather than a failure to report a number; `io` when the
+/// handle is forged, foreign or already reaped. Never traps.
+///
+/// **This blocks until the child finishes.** There is no deadline at this
+/// pin (F-0065): a caller who cannot afford to wait forever looks without
+/// waiting instead (`poll`, from wolf 0.2.31), or kills the child from
+/// another task.
+///
+/// `take ch` because waiting REAPS: the child is gone from the machine's
+/// table afterwards, so a second wait is a use-after-move the compiler
+/// rejects rather than an `io` row at run time (§14's handle rule).
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to `os_wait`.
+///
+/// ```wolf-doc-example
+/// var forged = process.Child { slot: 4242 }
+/// (process.wait(take forged) else -1) == -1
+/// ```
 pub fn wait(take ch: Child) -> int ! {signal, io} {
     os_wait(ch.slot)?
 }
