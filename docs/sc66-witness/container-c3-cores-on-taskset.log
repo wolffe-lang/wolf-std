@@ -1,0 +1,191 @@
+SigBlk:	0000000000000000 SigIgn:	0000000000000000 
+engine: podman version 6.1.3  image: docker.io/library/ubuntu:24.04 69f919497cad  core-limit: 0:0  host core_pattern: |/usr/lib/systemd/systemd-coredump %P %u %g %s %
+wolf: wolf 0.2.33 (wolfgang, pin 85dab5d)   lupin: lupin 0.1.54 (wolf-interp, reference interpreter at pin 294d626)
+[root native core] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+wait segv -11
+wait_status_core segv -267 signal=11 shell=139 core=true
+wait term -15
+wait_status_core term -15 signal=15 shell=143 core=false
+poll segv -11
+poll_core segv -11 signal=11 shell=139 core=true
+poll term -15
+poll_core term -15 signal=15 shell=143 core=false
+  host unchanged: every mounted file is still uid 1000
+[root release core] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+wait segv -11
+wait_status_core segv -267 signal=11 shell=139 core=true
+wait term -15
+wait_status_core term -15 signal=15 shell=143 core=false
+poll segv -11
+poll_core segv -11 signal=11 shell=139 core=true
+poll term -15
+poll_core term -15 signal=15 shell=143 core=false
+  host unchanged: every mounted file is still uid 1000
+[root checked core] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+wait segv -11
+wait_status_core segv -267 signal=11 shell=139 core=true
+wait term -15
+wait_status_core term -15 signal=15 shell=143 core=false
+poll segv -11
+poll_core segv -11 signal=11 shell=139 core=true
+poll term -15
+poll_core term -15 signal=15 shell=143 core=false
+  host unchanged: every mounted file is still uid 1000
+[root lupin core] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+ [unsupported `os_wait_status_core` does not resolve]
+  host unchanged: every mounted file is still uid 1000
+[root native parent] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+exit-segv: released signal 11 | core sibling signal 11 core
+exit-rt: released signal 34 | core sibling signal 34
+exit-term-listened: released signal 15 | core sibling signal 15
+exit-resize: released exit 156 | core sibling exit 156
+sent-segv: released signal 11 | core sibling signal 11 core
+ignored-sent-segv: released exit 0 | core sibling exit 0
+ignored-sent-rt: released exit 0 | core sibling exit 0
+reset-sent-rt: released signal 34 | core sibling signal 34
+  host unchanged: every mounted file is still uid 1000
+[root release parent] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+exit-segv: released signal 11 | core sibling signal 11 core
+exit-rt: released signal 34 | core sibling signal 34
+exit-term-listened: released signal 15 | core sibling signal 15
+exit-resize: released exit 156 | core sibling exit 156
+sent-segv: released signal 11 | core sibling signal 11 core
+ignored-sent-segv: released exit 0 | core sibling exit 0
+ignored-sent-rt: released exit 0 | core sibling exit 0
+reset-sent-rt: released signal 34 | core sibling signal 34
+  host unchanged: every mounted file is still uid 1000
+[root checked parent] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+exit-segv: released signal 11 | core sibling signal 11 core
+exit-rt: released signal 34 | core sibling signal 34
+exit-term-listened: released signal 15 | core sibling signal 15
+exit-resize: released exit 156 | core sibling exit 156
+sent-segv: released signal 11 | core sibling signal 11 core
+ignored-sent-segv: released exit 0 | core sibling exit 0
+ignored-sent-rt: released exit 0 | core sibling exit 0
+reset-sent-rt: released signal 34 | core sibling signal 34
+  host unchanged: every mounted file is still uid 1000
+[root lupin parent] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+ [unsupported `os_wait_status_core` does not resolve]
+  host unchanged: every mounted file is still uid 1000
+[user native core] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+wait segv -11
+wait_status_core segv -267 signal=11 shell=139 core=true
+wait term -15
+wait_status_core term -15 signal=15 shell=143 core=false
+poll segv -11
+poll_core segv -11 signal=11 shell=139 core=true
+poll term -15
+poll_core term -15 signal=15 shell=143 core=false
+  host unchanged: every mounted file is still uid 1000
+[user release core] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+wait segv -11
+wait_status_core segv -267 signal=11 shell=139 core=true
+wait term -15
+wait_status_core term -15 signal=15 shell=143 core=false
+poll segv -11
+poll_core segv -11 signal=11 shell=139 core=true
+poll term -15
+poll_core term -15 signal=15 shell=143 core=false
+  host unchanged: every mounted file is still uid 1000
+[user checked core] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+wait segv -11
+wait_status_core segv -267 signal=11 shell=139 core=true
+wait term -15
+wait_status_core term -15 signal=15 shell=143 core=false
+poll segv -11
+poll_core segv -11 signal=11 shell=139 core=true
+poll term -15
+poll_core term -15 signal=15 shell=143 core=false
+  host unchanged: every mounted file is still uid 1000
+[user lupin core] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+ [unsupported `os_wait_status_core` does not resolve]
+  host unchanged: every mounted file is still uid 1000
+[user native parent] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+exit-segv: released signal 11 | core sibling signal 11 core
+exit-rt: released signal 34 | core sibling signal 34
+exit-term-listened: released signal 15 | core sibling signal 15
+exit-resize: released exit 156 | core sibling exit 156
+sent-segv: released signal 11 | core sibling signal 11 core
+ignored-sent-segv: released exit 0 | core sibling exit 0
+ignored-sent-rt: released exit 0 | core sibling exit 0
+reset-sent-rt: released signal 34 | core sibling signal 34
+  host unchanged: every mounted file is still uid 1000
+[user release parent] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+exit-segv: released signal 11 | core sibling signal 11 core
+exit-rt: released signal 34 | core sibling signal 34
+exit-term-listened: released signal 15 | core sibling signal 15
+exit-resize: released exit 156 | core sibling exit 156
+sent-segv: released signal 11 | core sibling signal 11 core
+ignored-sent-segv: released exit 0 | core sibling exit 0
+ignored-sent-rt: released exit 0 | core sibling exit 0
+reset-sent-rt: released signal 34 | core sibling signal 34
+  host unchanged: every mounted file is still uid 1000
+[user checked parent] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+exit-segv: released signal 11 | core sibling signal 11 core
+exit-rt: released signal 34 | core sibling signal 34
+exit-term-listened: released signal 15 | core sibling signal 15
+exit-resize: released exit 156 | core sibling exit 156
+sent-segv: released signal 11 | core sibling signal 11 core
+ignored-sent-segv: released exit 0 | core sibling exit 0
+ignored-sent-rt: released exit 0 | core sibling exit 0
+reset-sent-rt: released signal 34 | core sibling signal 34
+  host unchanged: every mounted file is still uid 1000
+[user lupin parent] rc=0  SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+ [unsupported `os_wait_status_core` does not resolve]
+  host unchanged: every mounted file is still uid 1000
+coredumpctl since 2026-10-19 15:58:13 (the host helper's record; a core the limit refused is listed with no file):
+TIME                            PID    UID    GID SIG     COREFILE EXE                    SIZE
+Mon 2026-10-19 15:58:16 EDT 4021918   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:16 EDT 4022013   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:16 EDT 4022124   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:16 EDT 4022178   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:16 EDT 4022317   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:16 EDT 4022328   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:17 EDT 4022343   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:17 EDT 4022373   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:18 EDT 4023179   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:18 EDT 4023283   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:18 EDT 4023368   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:18 EDT 4023463   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:19 EDT 4024746   1000   1000 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:19 EDT 4025520   1000   1000 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:19 EDT 4025619   1000   1000 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:19 EDT 4025812   1000   1000 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:20 EDT 4025911   1000   1000 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:22 EDT 4029949   1000   1000 SIGSEGV none     /w/bin/exit_by_release    -
+Mon 2026-10-19 15:58:22 EDT 4030156   1000   1000 SIGSEGV none     /w/bin/exit_by_release    -
+Mon 2026-10-19 15:58:22 EDT 4030261   1000   1000 SIGSEGV none     /w/bin/exit_by_release    -
+Mon 2026-10-19 15:58:22 EDT 4030391   1000   1000 SIGSEGV none     /w/bin/exit_by_release    -
+Mon 2026-10-19 15:58:25 EDT 4032411   1000   1000 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:25 EDT 4032473   1000   1000 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:25 EDT 4032580   1000   1000 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:25 EDT 4032627   1000   1000 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:27 EDT 4036136   1000   1000 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:28 EDT 4037898 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:28 EDT 4037980 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:28 EDT 4038073 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:28 EDT 4038201 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:29 EDT 4039554 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:29 EDT 4039655 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:29 EDT 4039756 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:29 EDT 4039919 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:30 EDT 4041166 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:30 EDT 4041284 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:30 EDT 4041375 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:30 EDT 4041481 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:31 EDT 4042775 100999 100999 SIGSEGV none     /usr/bin/dash             -
+Mon 2026-10-19 15:58:32 EDT 4044202 100999 100999 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:32 EDT 4044324 100999 100999 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:32 EDT 4044513 100999 100999 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:32 EDT 4044641 100999 100999 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:34 EDT 4047278 100999 100999 SIGSEGV none     /w/bin/exit_by_release    -
+Mon 2026-10-19 15:58:34 EDT 4047364 100999 100999 SIGSEGV none     /w/bin/exit_by_release    -
+Mon 2026-10-19 15:58:34 EDT 4047503 100999 100999 SIGSEGV none     /w/bin/exit_by_release    -
+Mon 2026-10-19 15:58:34 EDT 4047629 100999 100999 SIGSEGV none     /w/bin/exit_by_release    -
+Mon 2026-10-19 15:58:36 EDT 4050029 100999 100999 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:36 EDT 4050118 100999 100999 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:36 EDT 4050304 100999 100999 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:36 EDT 4050418 100999 100999 SIGSEGV none     /w/bin/exit_by_native     -
+Mon 2026-10-19 15:58:39 EDT 4053192 100999 100999 SIGSEGV none     /w/bin/exit_by_native     -
+entries since 2026-10-19 15:58:13 naming this witness's programs: 52, with a stored file: 0
+CONTAINER_DONE
