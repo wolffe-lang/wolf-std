@@ -400,15 +400,20 @@ pub fn realtime() -> Realtime ! {unsupported} {
 /// all 28); glibc and musl part on `arithmetic()` and `child()` and on
 /// every real-time number.
 ///
-/// Rows: `invalid` for 0 or anything `send` refuses, before the host;
-/// `unsupported` on windows. Never traps. Uncharged; refused at
-/// comptime. lupin answers `invalid` and declines a well-formed call by
-/// name (a table there would be one C library's).
+/// Rows: `invalid` for any meaning `send` refuses (two meanings, a bit
+/// no release publishes, a host number past `last()`), before the host;
+/// `unsupported` on windows. **0 answers per version**: `invalid`
+/// before the host at wolf 0.2.32 and under lupin 0.1.54; from wolf
+/// 0.2.33 (s246, wolf-lang#787) signal 0's words, glibc's "Unknown
+/// signal 0" and macOS's "Unknown signal: 0", and `unsupported` on
+/// windows. Never traps. Uncharged; refused at comptime. lupin answers
+/// `invalid` and declines a well-formed call by name (a table there
+/// would be one C library's).
 ///
 /// Delegates to `os_signal_text`.
 ///
 /// ```wolf-doc-example
-/// let t = signal.text(0) else |_| "invalid"
+/// let t = signal.text(signal.terminate() | signal.user()) else |_| "invalid"
 /// t == "invalid"
 /// ```
 pub fn text(meaning: int) -> str ! {invalid, unsupported} {
