@@ -1,0 +1,106 @@
+wolf: wolf 0.2.33 (wolfgang, pin 85dab5d)   lupin: lupin 0.1.54 (wolf-interp, reference interpreter at pin 294d626)   std: /home/mfwolffe/lanes/sc66/trees/h1   PRE=
+SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+signal__one_rows                     lupin    rc=0 unsupported out=None  unsupported=`os_signal_ignore_one` does not resolve ver=0.1.54
+signal__one_rows                     checked  rc=0 exit(0) out='ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'   ver=0.2.33
+signal__one_rows                     native   rc=0 exit(0) out='ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'   ver=0.2.33
+signal__one_rows                     release  rc=0 exit(0) out='ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'   ver=0.2.33
+signal__one_host                     lupin    rc=0 unsupported out=None  unsupported=`os_signal_ignore_one` does not resolve ver=0.1.54
+signal__one_host                     checked  rc=0 exit(0) out='user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok\n'   ver=0.2.33
+signal__one_host                     native   rc=0 exit(0) out='user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok\n'   ver=0.2.33
+signal__one_host                     release  rc=0 exit(0) out='user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok\n'   ver=0.2.33
+signal__one_fault                    lupin    rc=0 unsupported out=None  unsupported=`os_signal_ignore_one` does not resolve ver=0.1.54
+signal__one_fault                    checked  rc=0 unsupported out=None  unsupported=`os_signal_ignore_one`/`os_signal_default_one` of a fault meaning (SEGMENT_FAULT, BUS_ERROR: the `wolf` process's own stack guard holds them; [os.signal.disp.one]) ver=0.2.33
+signal__one_fault                    native   rc=0 exit(0) out='segment_fault=ok ok\nbus_error=ok ok\n'   ver=0.2.33
+signal__one_fault                    release  rc=0 exit(0) out='segment_fault=ok ok\nbus_error=ok ok\n'   ver=0.2.33
+signal__text_zero                    lupin    rc=0 exit(0) out='text_zero=false\n'   ver=0.1.54
+signal__text_zero                    checked  rc=0 exit(0) out='text_zero=true\n'   ver=0.2.33
+signal__text_zero                    native   rc=0 exit(0) out='text_zero=true\n'   ver=0.2.33
+signal__text_zero                    release  rc=0 exit(0) out='text_zero=true\n'   ver=0.2.33
+signal__comptime_refuses_ignore_one  lupin    rc=0 unsupported out=None  unsupported=`probe` is a `comptime fn`; compile-time evaluation with its sandbox and budgets is the compiler's engine (s16), and nothing in `spec/` pins it — the `comptime` namespace is still a reserved forward one ver=0.1.54
+signal__comptime_refuses_ignore_one  checked  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+signal__comptime_refuses_ignore_one  native   rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+signal__comptime_refuses_ignore_one  release  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__exit_signal_lives           lupin    rc=0 unsupported out=None  unsupported=`os_exit_signal` does not resolve ver=0.1.54
+process__exit_signal_lives           checked  rc=0 unsupported out=None  unsupported=`os_exit_signal` (the checked machine does not end the process it runs in by a signal; [os.signal.exit]) ver=0.2.33
+process__exit_signal_lives           native   rc=0 exit(156) out='exit_signal_zero=invalid\n'   ver=0.2.33
+process__exit_signal_lives           release  rc=0 exit(156) out='exit_signal_zero=invalid\n'   ver=0.2.33
+process__status_core_rows            lupin    rc=0 exit(0) out='-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'   ver=0.1.54
+process__status_core_rows            checked  rc=0 exit(0) out='-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'   ver=0.2.33
+process__status_core_rows            native   rc=0 exit(0) out='-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'   ver=0.2.33
+process__status_core_rows            release  rc=0 exit(0) out='-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'   ver=0.2.33
+process__wait_core_rows              lupin    rc=0 unsupported out=None  unsupported=`os_wait_status_core` does not resolve ver=0.1.54
+process__wait_core_rows              checked  rc=0 exit(0) out='forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io\n'   ver=0.2.33
+process__wait_core_rows              native   rc=0 exit(0) out='forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io\n'   ver=0.2.33
+process__wait_core_rows              release  rc=0 exit(0) out='forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io\n'   ver=0.2.33
+process__poll_core_none              lupin    rc=0 unsupported out=None  unsupported=`os_wait_poll_core` does not resolve ver=0.1.54
+process__poll_core_none              checked  rc=0 exit(0) out='changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'   ver=0.2.33
+process__poll_core_none              native   rc=0 exit(0) out='changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'   ver=0.2.33
+process__poll_core_none              release  rc=0 exit(0) out='changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'   ver=0.2.33
+process__comptime_refuses_exit_signal lupin    rc=0 unsupported out=None  unsupported=`probe` is a `comptime fn`; compile-time evaluation with its sandbox and budgets is the compiler's engine (s16), and nothing in `spec/` pins it — the `comptime` namespace is still a reserved forward one ver=0.1.54
+process__comptime_refuses_exit_signal checked  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_exit_signal native   rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_exit_signal release  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_wait_core  lupin    rc=0 unsupported out=None  unsupported=`probe` is a `comptime fn`; compile-time evaluation with its sandbox and budgets is the compiler's engine (s16), and nothing in `spec/` pins it — the `comptime` namespace is still a reserved forward one ver=0.1.54
+process__comptime_refuses_wait_core  checked  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_wait_core  native   rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_wait_core  release  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+wolf: wolf 0.2.33 (wolfgang, pin 85dab5d)   lupin: lupin 0.1.54 (wolf-interp, reference interpreter at pin 294d626)   std: /home/mfwolffe/lanes/sc66/trees/h1   PRE=taskset -c 0-3
+SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+signal__one_rows                     lupin    rc=0 unsupported out=None  unsupported=`os_signal_ignore_one` does not resolve ver=0.1.54
+signal__one_rows                     checked  rc=0 exit(0) out='ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'   ver=0.2.33
+signal__one_rows                     native   rc=0 exit(0) out='ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'   ver=0.2.33
+signal__one_rows                     release  rc=0 exit(0) out='ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'   ver=0.2.33
+signal__one_host                     lupin    rc=0 unsupported out=None  unsupported=`os_signal_ignore_one` does not resolve ver=0.1.54
+signal__one_host                     checked  rc=0 exit(0) out='user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok\n'   ver=0.2.33
+signal__one_host                     native   rc=0 exit(0) out='user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok\n'   ver=0.2.33
+signal__one_host                     release  rc=0 exit(0) out='user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok\n'   ver=0.2.33
+signal__one_fault                    lupin    rc=0 unsupported out=None  unsupported=`os_signal_ignore_one` does not resolve ver=0.1.54
+signal__one_fault                    checked  rc=0 unsupported out=None  unsupported=`os_signal_ignore_one`/`os_signal_default_one` of a fault meaning (SEGMENT_FAULT, BUS_ERROR: the `wolf` process's own stack guard holds them; [os.signal.disp.one]) ver=0.2.33
+signal__one_fault                    native   rc=0 exit(0) out='segment_fault=ok ok\nbus_error=ok ok\n'   ver=0.2.33
+signal__one_fault                    release  rc=0 exit(0) out='segment_fault=ok ok\nbus_error=ok ok\n'   ver=0.2.33
+signal__text_zero                    lupin    rc=0 exit(0) out='text_zero=false\n'   ver=0.1.54
+signal__text_zero                    checked  rc=0 exit(0) out='text_zero=true\n'   ver=0.2.33
+signal__text_zero                    native   rc=0 exit(0) out='text_zero=true\n'   ver=0.2.33
+signal__text_zero                    release  rc=0 exit(0) out='text_zero=true\n'   ver=0.2.33
+signal__comptime_refuses_ignore_one  lupin    rc=0 unsupported out=None  unsupported=`probe` is a `comptime fn`; compile-time evaluation with its sandbox and budgets is the compiler's engine (s16), and nothing in `spec/` pins it — the `comptime` namespace is still a reserved forward one ver=0.1.54
+signal__comptime_refuses_ignore_one  checked  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+signal__comptime_refuses_ignore_one  native   rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+signal__comptime_refuses_ignore_one  release  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__exit_signal_lives           lupin    rc=0 unsupported out=None  unsupported=`os_exit_signal` does not resolve ver=0.1.54
+process__exit_signal_lives           checked  rc=0 unsupported out=None  unsupported=`os_exit_signal` (the checked machine does not end the process it runs in by a signal; [os.signal.exit]) ver=0.2.33
+process__exit_signal_lives           native   rc=0 exit(156) out='exit_signal_zero=invalid\n'   ver=0.2.33
+process__exit_signal_lives           release  rc=0 exit(156) out='exit_signal_zero=invalid\n'   ver=0.2.33
+process__status_core_rows            lupin    rc=0 exit(0) out='-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'   ver=0.1.54
+process__status_core_rows            checked  rc=0 exit(0) out='-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'   ver=0.2.33
+process__status_core_rows            native   rc=0 exit(0) out='-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'   ver=0.2.33
+process__status_core_rows            release  rc=0 exit(0) out='-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'   ver=0.2.33
+process__wait_core_rows              lupin    rc=0 unsupported out=None  unsupported=`os_wait_status_core` does not resolve ver=0.1.54
+process__wait_core_rows              checked  rc=0 exit(0) out='forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io\n'   ver=0.2.33
+process__wait_core_rows              native   rc=0 exit(0) out='forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io\n'   ver=0.2.33
+process__wait_core_rows              release  rc=0 exit(0) out='forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io\n'   ver=0.2.33
+process__poll_core_none              lupin    rc=0 unsupported out=None  unsupported=`os_wait_poll_core` does not resolve ver=0.1.54
+process__poll_core_none              checked  rc=0 exit(0) out='changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'   ver=0.2.33
+process__poll_core_none              native   rc=0 exit(0) out='changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'   ver=0.2.33
+process__poll_core_none              release  rc=0 exit(0) out='changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'   ver=0.2.33
+process__comptime_refuses_exit_signal lupin    rc=0 unsupported out=None  unsupported=`probe` is a `comptime fn`; compile-time evaluation with its sandbox and budgets is the compiler's engine (s16), and nothing in `spec/` pins it — the `comptime` namespace is still a reserved forward one ver=0.1.54
+process__comptime_refuses_exit_signal checked  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_exit_signal native   rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_exit_signal release  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_wait_core  lupin    rc=0 unsupported out=None  unsupported=`probe` is a `comptime fn`; compile-time evaluation with its sandbox and budgets is the compiler's engine (s16), and nothing in `spec/` pins it — the `comptime` namespace is still a reserved forward one ver=0.1.54
+process__comptime_refuses_wait_core  checked  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_wait_core  native   rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+process__comptime_refuses_wait_core  release  rc=0 fail(E0701) out=None diag=E0701   ver=0.2.33
+wolf: wolf 0.2.32 (wolfgang, pin 72de141)   lupin: lupin 0.1.54 (wolf-interp, reference interpreter at pin 294d626)   std: /home/mfwolffe/lanes/sc66/trees/trunk   PRE=
+SigBlk:	0000000000000000 SigIgn:	0000000000000000 ulimit -c 0
+signal__text_zero                    checked  rc=0 exit(0) out='text_zero=false\n'   ver=0.2.32
+signal__text_zero                    native   rc=0 exit(0) out='text_zero=false\n'   ver=0.2.32
+signal__text_zero                    release  rc=0 exit(0) out='text_zero=false\n'   ver=0.2.32
+signal__comptime_refuses_ignore_one  checked  rc=0 fail(E0301) out=None diag=E0301   ver=0.2.32
+signal__comptime_refuses_ignore_one  native   rc=0 fail(E0301) out=None diag=E0301   ver=0.2.32
+signal__comptime_refuses_ignore_one  release  rc=0 fail(E0301) out=None diag=E0301   ver=0.2.32
+process__comptime_refuses_exit_signal checked  rc=0 fail(E0301) out=None diag=E0301   ver=0.2.32
+process__comptime_refuses_exit_signal native   rc=0 fail(E0301) out=None diag=E0301   ver=0.2.32
+process__comptime_refuses_exit_signal release  rc=0 fail(E0301) out=None diag=E0301   ver=0.2.32
+PROBE_DONE
+BOX_EXIT=0 coredumpctl entries before=379 after=291 (every lane's)
+no coredumpctl entry names lanes/sc66
