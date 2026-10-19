@@ -1066,7 +1066,12 @@ pub fn poll_core() -> CoreChange ! {io} {
         }
     }
     CoreChange {
-        change: Change { changed: true, child: Child { slot: h }, status: status_from_core(s), live: -1 },
+        change: Change {
+            changed: true,
+            child: Child { slot: h },
+            status: status_from_core(s),
+            live: -1,
+        },
         core: dumped_core(s),
     }
 }
