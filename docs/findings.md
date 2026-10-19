@@ -12981,3 +12981,170 @@ read from the tool; 0 `SKIP` lines in every log below.
   file mid-run and g1's closing summary lines failed to parse
   (`line 48: p: command not found`); every step log and exit status was
   written before that, and the summary was re-read from the logs.
+
+## F-0153 — sc66's predictions, before the 0.2.33 pin and the five calls' wrappers
+
+Written on branch `sc66` (on trunk `cceda63`, sc65) before any archive
+was fetched and before any file other than this one changed. What I
+read first, and so cannot claim to predict blind: wolf 0.2.33's
+CHANGELOG ("read this before you bump"); spec/11 at `v0.2.33`
+(`[os.signal.disp.one]`, `[os.signal.exit]`, `[os.proc.status]`,
+`[os.proc.poll]`, `[os.signal.gaps.note]`); s246's fixtures at
+`v0.2.33` (`corpus/os/signal_one_rows.lu`,
+`crates/wolf_driver/tests/fixtures/signal_gaps/{core,exit_by,parent}.lu`);
+r38's measured line in crawl-54 (wolf-std `cceda63` under the release
+head: std-test 484 GREEN, doc-examples 1,533 / 1,533); is77's PR
+(wolf-interp#264, open: lupin 0.1.55 is not released, so lupin 0.1.54
+resolves none of the five names); the release API's asset digests.
+
+Inputs, re-derived 2026-10-19: wolf-std trunk `cceda63`, 484 tests and
+511 doc examples. wolf 0.2.33 is `v0.2.33` (annotated tag `56110e4f`)
+at `85dab5d7`, release 417610226, published 18:37:53Z; lupin 0.1.54 is
+`v0.1.54` at `0e536e8` (release 415937354), already this repository's
+pin. wolf-std #74, #76, #72, #73 open; wolf-interp #261, #262, #263
+open. kasumi's `core_pattern` pipes to `systemd-coredump` and its
+default `ulimit -c` is unlimited, so a core-dumping child on that host
+outside a container would be stored by the host: every row here that
+could dump core runs only inside a throwaway container.
+
+### P1. The archives
+
+- wolf 0.2.33, four archives, each matched against the release API and
+  read twice: linux x86-64 `4f955e8d…`, linux aarch64 `24cde9e4…`,
+  macOS aarch64 `9152dbd1…`, windows `96774801…`. `wolf --version` is
+  `wolf 0.2.33 (wolfgang, pin 85dab5d)`, paired with lupin 0.1.54 pin
+  `294d626`; the archive's `std/STD-REV` is `cceda63`, and `diff -rq`
+  of its `std/` against this branch's names only `STD-REV` and the two
+  licences. lupin 0.1.54 linux x86-64 `175df238…` (binary `a9856dd4…`),
+  unchanged.
+
+### P2. The data pin
+
+- `72de141f` (v0.2.32) -> `85dab5d7` (v0.2.33): 661 -> **664** anchors,
+  exactly three added (`os.signal.disp.one`, `os.signal.exit`,
+  `os.signal.gaps.note`), none removed (key sets diffed both ways);
+  `spec/05-conformance.md` byte-identical, so the clause snapshot does
+  not move.
+
+### P3. The bare pin
+
+- Trunk's tree with only the two pins moved: std-test **484 GREEN** and
+  doc-examples **511 GREEN, 1,533 ok** on kasumi (inside a container)
+  and on CI's three hosts, 0 `SKIP:`; no ledger word moves (r38's
+  measurement of the same std under the release head). The five new
+  prelude names shadow nothing here (no std or test function is named
+  `os_…`), so no W0304.
+
+### P4. #76: `text_zero` on the host's words
+
+- The `text_zero` line leaves `signal/group_rows.lu` (twelve lines stay,
+  every lane `run`) for a row of its own, `signal/text_zero.lu`, which
+  accepts exactly this host's words for 0 (glibc's `Unknown signal 0`
+  where `text(kill())` is "Killed", macOS's `Unknown signal: 0` where it
+  is "Killed: 9", `unsupported` where `text(kill())` is `unsupported`)
+  and never `invalid`. wolfc and native `run` on every host; lupin 0.1.54
+  answers `invalid` and prints `text_zero=false`, which the ledger spells
+  `divergent(stdout)` (wolf-interp#262; when lupin refuses `text(0)` by
+  name, as is77 does, the row goes red and flips on purpose). musl's
+  words stay unmeasured: no release archive targets musl.
+
+### P5. One meaning's disposition (#74, ruling #88 R1)
+
+- Owed spelling **O1**, recommended and implemented:
+  `signal.ignore_one(meaning)` and `signal.reset_one(meaning) -> () !
+  {invalid, io, unsupported}` over `os_signal_ignore_one` /
+  `os_signal_default_one` (std's set verbs are `ignore` and `reset`).
+  The set calls are unchanged.
+- Rows: the shapes (0, `kill()`, `stop()`, two meanings, a bit no
+  release publishes, a far host number) `invalid` on wolfc and native on
+  every host (the far number `unsupported` on windows, equal across the
+  three calls); `user()` by bit and by `host(number(user()))` ignored
+  then reset, read back through `signal.ignored()`; on linux the C
+  library's first real-time signal (`host(realtime()?.first)`, 34 under
+  glibc) ignored, sent to this process and lived through, then reset;
+  `host(last() + 1)` `invalid`; windows `unsupported` after the shapes.
+  The fault meanings (`segment_fault()`, `bus_error()`) ignored and reset
+  on native; the checked machine refuses them by name, so that row is
+  wolfc `unsupported`. lupin 0.1.54: every row naming the calls is
+  `unsupported` (`os_signal_ignore_one` does not resolve).
+
+### P6. The end by a signal (#74, ruling #88 R2)
+
+- Owed spelling **E1**, recommended and implemented:
+  `process.exit_signal(meaning) -> () ! {invalid, unsupported}` over
+  `os_exit_signal`, beside `process.exit(code)`.
+- Rows: the shapes `invalid` everywhere (wolfc answers the shape before
+  its refusal by name); `exit_signal(signal.resize())` lives on (the
+  default for `SIGWINCH`, 28 on linux and macOS, does nothing) and the
+  process exits **156** on native; wolfc refuses the well-formed call by
+  name (`unsupported`); windows answers `unsupported` as a row; lupin
+  `unsupported`.
+
+### P7. The core (#74, ruling #88 R3 = D)
+
+- Owed spelling **C1**, recommended and implemented: the released
+  `Status` and its accessors keep every answer; a core is a reading
+  beside them. `process.wait_status_core(take ch) -> int ! {io}` (the
+  sibling's int, as `wait_status`'s), `process.status_from_core(v) ->
+  Status` (`-(256 + N)` reads as the end by `N`; any other value as
+  `status_from`), `process.dumped_core(v) -> bool` (`-(256 + N)`, N in
+  1..255), and `process.poll_core() -> CoreChange ! {io}` with
+  `CoreChange { change: Change, core: bool }` over `os_wait_poll_core`.
+- Rows: the pure readings run on all three lanes, lupin included
+  (`status_from_core(-267)`: signalled by 11, `$?` 139, `dumped_core`
+  true; `-11`: the same Status, `dumped_core` false; stops, exits and
+  values of no kind as `status_from`); a child ended by `TERM` (which
+  dumps no core on any host) reads `-15` through both waits and both
+  polls on wolfc and native; the poll with no child is `changed` false,
+  `live` 0, `core` false; lupin 0.1.54 `unsupported` on every row that
+  names a sibling.
+- In a throwaway container on kasumi (podman, `--network none`): a
+  `sh -c 'kill -s SEGV $$'` child reads `-11` through the released wait
+  and poll on every row, and `-267` through the siblings under `--ulimit
+  core=0:0` (the pipe ignores the limit, core(5); `systemd-coredump`
+  stores nothing: no new stored entry in `coredumpctl list`). Whether
+  `--ulimit core=1:1` gives a cores-off row there is a guess: I predict
+  it does not (`-267` again), in which case the cores-off row is taken
+  in a container where the pattern is a file (`-11` under limit 0,
+  `-267` with a core file inside the container under unlimited).
+- `exit_signal` and `ignore_one` live, in the container only, on native
+  and release, as root and as user 1000: `exit_signal(segment_fault())`
+  ends the child by 11 (`-11` released, `-267` sibling where a core is
+  dumped); by the first real-time number; by a listened `terminate()`;
+  `resize()` exits 156; `ignore_one(segment_fault())` then a send to
+  itself lives; the checked machine refuses `exit_signal` and the fault
+  ignores by name; lupin by name (does not resolve).
+
+### P8. Comptime
+
+- `os_signal_ignore_one`, `os_exit_signal` and `os_wait_status_core` are
+  `E0701` at comptime on wolfc and native (charged `exec`); lupin
+  `unsupported` (no comptime).
+
+### P9. Counts
+
+- At the head: **495** tests (484 + 11 new rows), **518** doc examples
+  (511 + 7: `ignore_one`, `reset_one`, `exit_signal`,
+  `wait_status_core`, `poll_core`, `status_from_core`, `dumped_core`),
+  so 1,554 lane runs, GREEN on kasumi (container, plain and `taskset -c
+  0-3`) and on CI's three hosts. The two `std.signal` examples are
+  mirror-lagged on lupin by the call they name (`os_signal_ignore_one`
+  / `os_signal_default_one` does not resolve, wolf-interp#261), red the
+  day lupin runs them; the five `std.process` examples run on wolfc and
+  native and are `unsupported` on lupin where they name a sibling or
+  `exit_signal` (a capability module). Anchors stay 664.
+
+### P10. The plant
+
+- Branch `sc66-plant`: `status_from_core` planted to fold nothing (it
+  returns `status_from(v)`). CI red on exactly
+  `process/status_core_rows.lu` on lupin, wolfc and native on all three
+  hosts (`signal_of` 267, `$?` 395), and on `status_from_core`'s doc
+  example on three hosts; every other row and example green.
+
+### P11. #72, #73
+
+- `process.wait`'s doc block moves from above the private `split_argv`
+  to above `pub fn wait`; `split_argv` keeps its own two lines. The doc
+  example count does not change. ci.yml's comments that still call
+  windows std-test advisory are corrected; no step changes.
