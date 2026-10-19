@@ -1001,9 +1001,6 @@ pub fn wait_status_core(take ch: Child) -> int ! {io} {
 /// process.status_from_core(256 + 19).value == 275
 /// ```
 pub fn status_from_core(value: int) -> Status {
-    if dumped_core(value) {
-        return Status { value: value + 256 }
-    }
     Status { value: value }
 }
 
@@ -1019,7 +1016,7 @@ pub fn status_from_core(value: int) -> Status {
 /// process.dumped_core(256 + 11) == false
 /// ```
 pub fn dumped_core(value: int) -> bool {
-    value < -256 && value > -512
+    value < 0
 }
 
 /// What one `poll_core` found: the `Change` that `poll` would report, its
@@ -1060,7 +1057,7 @@ pub fn poll_core() -> CoreChange ! {io} {
                 changed: false,
                 child: Child { slot: -1 },
                 status: Status { value: 512 },
-                live: s,
+                live: -1,
             },
             core: false,
         }
@@ -1409,5 +1406,5 @@ pub fn exit(code: int) {
 /// row == "refused"
 /// ```
 pub fn exit_signal(meaning: int) -> () ! {invalid, unsupported} {
-    os_exit_signal(meaning)?
+    os_signal_raise(meaning) else |_| { return unsupported }
 }

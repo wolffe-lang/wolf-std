@@ -275,7 +275,7 @@ pub fn reset(set: int) -> () ! {unsupported, io} {
 /// row == "refused"
 /// ```
 pub fn ignore_one(meaning: int) -> () ! {invalid, io, unsupported} {
-    os_signal_ignore_one(meaning)?
+    os_signal_ignore(meaning)?
 }
 
 /// **s246 (`[os.signal.disp.one]`, ruling #88 R1): ONE meaning does what
@@ -300,7 +300,7 @@ pub fn ignore_one(meaning: int) -> () ! {invalid, io, unsupported} {
 /// row == "refused"
 /// ```
 pub fn reset_one(meaning: int) -> () ! {invalid, io, unsupported} {
-    os_signal_default_one(meaning)?
+    os_signal_default(meaning)?
 }
 
 /// Send `meaning` to this process (`os_signal_raise`).
@@ -487,6 +487,9 @@ pub fn realtime() -> Realtime ! {unsupported} {
 /// t == "invalid"
 /// ```
 pub fn text(meaning: int) -> str ! {invalid, unsupported} {
+    if meaning == 0 {
+        return invalid
+    }
     os_signal_text(meaning)?
 }
 
