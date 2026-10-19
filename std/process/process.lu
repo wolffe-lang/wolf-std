@@ -1246,3 +1246,37 @@ pub fn set_ids(uid: int, gid: int, groups: List[int]) -> () ! {denied, invalid, 
 pub fn exit(code: int) {
     os_exit(code)
 }
+
+/// **s246 (`[os.signal.exit]`, ruling #88 R2): end THIS process by
+/// `meaning`'s signal**, so that its parent reads the end as the end by
+/// that signal (`-N`: `signal_of`, `$?` `128 + N`) — what a wrapper whose
+/// command died of a signal does to die of the same one (GNU `timeout`,
+/// where `exit(139)` would only imitate SIGSEGV). `meaning` is in the
+/// SENDING shape: one meaning of `std.signal`'s table, or a host number
+/// (`signal.host(n)`). On unix the signal is set back to its default
+/// (the runtime's stack guard and any listen let go of it), unblocked
+/// and raised on the calling thread; the end is the host's, with a core
+/// where the host writes one. A process the signal does not end — a
+/// meaning whose default does nothing (`child()`, `continued()`,
+/// `urgent()`, `resize()`), or a stop that is later continued — exits
+/// with **`128 + N`**, so the call returns only a row.
+///
+/// Rows: `invalid` for 0 and for anything `signal.send` refuses (two
+/// meanings, a bit no release publishes, a host number past
+/// `signal.last()`); then `unsupported` on windows. Those are its only
+/// returns. As with `exit`, no `defer` runs and std flushes nothing.
+/// `std.signal.raise` is unchanged (it delivers one listenable meaning).
+///
+/// Capability `Exec`, with `exit`; refused at comptime (D33). The checked
+/// machine refuses it by name after the shape (it runs inside the `wolf`
+/// process, which a signal would end); lupin 0.1.54 does not resolve it
+/// (wolf-interp#261). Delegates to `os_exit_signal`.
+///
+/// ```wolf-doc-example
+/// var row = "ended"
+/// process.exit_signal(0) else |_| { row = "refused" }
+/// row == "refused"
+/// ```
+pub fn exit_signal(meaning: int) -> () ! {invalid, unsupported} {
+    os_exit_signal(meaning)?
+}
