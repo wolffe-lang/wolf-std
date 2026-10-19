@@ -20,22 +20,122 @@
 # that has never compiled-and-linked a wolf program in this repository's
 # CI, so the steps whose behaviour changes from dark to lit are ADVISORY
 # for this landing and the timeouts go up — sc41's procedure and sc42's,
-# for their reason: the first run is to be READ, not to be passed.
+# for their reason: the first run is to be READ, not to be passed.#
+# THE TIERS (tl28, ruling #92). The org is on GitHub's free plan: 20
+# concurrent jobs shared by every repository. Before this, every push ran
+# all six jobs (`rig` and `gates` on three hosts, about 138 job-minutes
+# and 57 minutes of wall, the ten runs before tl28) and a lane's push ran
+# them TWICE, once for `push` and once for `pull_request`. So the `plan`
+# job (`ci/tiers.py plan`, proven by `ci/tiers-test.py` in the same job)
+# decides which jobs a run runs and on which hosts, every other job runs
+# only when the plan names it, and the run's LAST job says which tier it was:
+#
+#   tier full   every job on every host: `rig` and `gates` on ubuntu, macOS
+#               and windows. A push to trunk, the nightly `schedule`, a
+#               `workflow_dispatch` (tier full, the default), a pull
+#               request labelled `full-matrix`; and a pull request with a
+#               changed path no rule of `ci/tiers.py` names, or whose
+#               change cannot be read.
+#   tier pr     any other pull-request run (and a dispatch with tier pr):
+#               the jobs its changed paths name, on ubuntu alone. Every
+#               path of the library, its tests, the rig and CI names both.
+#   tier noop   the plan and the verdict: a pull request whose changed
+#               paths are ALL prose (CHANGELOG, CONTRIBUTING, docs/), or a
+#               label other than `full-matrix`.
+#
+# Nothing a job checks changed and no job left the full tier: a pull
+# request's push no longer runs the macOS and windows legs, and they run in
+# full before the merge, on every trunk push and every night. The `tier`
+# job fails unless the plan succeeded, the jobs and hosts it chose are that
+# tier's, every chosen job succeeded and every other was skipped; so a
+# green `tier full` is "every job on every host, green", and a green
+# `tier pr` is never that. A red nightly opens an issue (`nightly-red`).
+#
+# THE MERGE RULE: a lane's PR merges only with a green `tier full` at its
+# head. Add the `full-matrix` label once the head is the one to merge
+# (never when opening the PR: `opened` and `labeled` would start two full
+# runs). `wolf/tools/lane-audit.sh` reads the job's name.
 name: ci
 
 on:
   push:
+    branches: [trunk]
   pull_request:
+    # `labeled` so adding `full-matrix` starts the full run at once; any
+    # other label's run is a noop (the plan, then nothing).
+    types: [opened, synchronize, reopened, labeled]
+  schedule:
+    # Nightly, the full tier, on trunk. (nightly.yml is the drift watch
+    # against the latest upstreams; it gates nothing.)
+    - cron: "13 8 * * *"
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: "full: every job on every host; pr: this branch's change against trunk, as a pull request's (a path no rule names runs full)"
+        type: choice
+        options: [full, pr]
+        default: full
 
 permissions:
   contents: read
 
+# A pull request's runs: one group per branch and tier, cancel-in-progress,
+# so a new push frees the slots of the run it supersedes. The full run and
+# the pr run live in SEPARATE groups (adding the label must not cancel the
+# pr run at the same head: lane-audit.sh reads a cancelled run there as a
+# FAIL), and another label's noop run gets a group of its own so it cancels
+# nothing. Every other run (a trunk push, the nightly, a dispatch) gets a
+# group of its OWN run id: never cancelled, and never replaced while it
+# waits (in a shared group GitHub keeps a single pending run, and each
+# trunk push's full run is the coverage that merge is owed).
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}-{1}', github.head_ref, (github.event.action == 'labeled' && github.event.label.name != 'full-matrix') && format('noop-{0}', github.run_id) || (contains(github.event.pull_request.labels.*.name, 'full-matrix') && 'full' || 'pr')) || format('ci-{0}-{1}', github.event_name, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Which jobs this run runs, and on which hosts (THE TIERS, above), decided
+  # once by `ci/tiers.py plan` from the event, the label and (for a pull
+  # request) the paths its merge commit changes, and printed path by path,
+  # so a run's log says why it has the jobs it has. The planner's own proof
+  # runs first: a planner that cannot say no plans nothing.
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tier: ${{ steps.plan.outputs.tier }}
+      jobs: ${{ steps.plan.outputs.jobs }}
+      matrix_rig: ${{ steps.plan.outputs.matrix_rig }}
+      matrix_gates: ${{ steps.plan.outputs.matrix_gates }}
+    steps:
+      # Depth 2: a pull request's run checks out its merge commit, and the
+      # plan reads that commit against its first parent. A dispatch reads
+      # its branch against trunk's merge base, so it takes the history.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ github.event_name == 'workflow_dispatch' && '0' || '2' }}
+      - name: the planner can say no (ci/tiers-test.py)
+        run: python3 ci/tiers-test.py
+      - name: the plan
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          LABEL: ${{ github.event.label.name }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          IN_TIER: ${{ inputs.tier }}
+        run: python3 ci/tiers.py plan --merge --github-output "$GITHUB_OUTPUT"
+
   rig:
+    needs: plan
+    if: contains(fromJSON(needs.plan.outputs.jobs || '[]'), 'rig')
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # The hosts are the plan's (ci/tiers.py MATRIX): ubuntu, macOS and
+        # windows in the full tier, ubuntu alone in a pull request's.
+        include: ${{ fromJSON(needs.plan.outputs.matrix_rig || '[]') }}
     runs-on: ${{ matrix.os }}
     # 75 was the measured windows number with the native lane DARK there
     # (46:46 over two lanes). sc43 lights the third lane on that host and
@@ -440,10 +540,14 @@ jobs:
   # came in at **3 minutes** and so did ubuntu and macOS. Back to 20,
   # which is where the measurement puts it.
   gates:
+    needs: plan
+    if: contains(fromJSON(needs.plan.outputs.jobs || '[]'), 'gates')
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # The hosts are the plan's (ci/tiers.py MATRIX): ubuntu, macOS and
+        # windows in the full tier, ubuntu alone in a pull request's.
+        include: ${{ fromJSON(needs.plan.outputs.matrix_gates || '[]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -608,3 +712,48 @@ jobs:
         run: cargo xtask doc-examples
       - name: ulp
         run: cargo xtask ulp
+
+  # The run's verdict, and its name: `tier full`, `tier pr` or `tier noop`.
+  # It needs every job, runs unless the run was cancelled, and fails unless
+  # the plan succeeded, the jobs and hosts it chose are the tier's, every
+  # chosen job succeeded and every other job was skipped (ci/tiers.py
+  # verdict). lane-audit.sh reads this job's name and conclusion.
+  tier:
+    name: tier ${{ needs.plan.outputs.tier || 'unplanned' }}
+    if: ${{ !cancelled() }}
+    needs:
+      - plan
+      - rig
+      - gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: every chosen job succeeded, every other was skipped
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: python3 ci/tiers.py verdict
+
+  # A red nightly opens an issue (ruling #92): a scheduled run has no lane
+  # watching it, so the red has to come and find one. One open issue per
+  # workflow, its title the dedupe key; a further red night comments on it
+  # (ci/nightly-red.sh, tested by ci/tiers-test.py T8). Never on a pull
+  # request, a push or a dispatch: those reds have a lane attached already.
+  nightly-red:
+    name: nightly red, an issue
+    needs: tier
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: open or update the nightly-red issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WORKFLOW: ${{ github.workflow }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: ci/nightly-red.sh
