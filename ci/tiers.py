@@ -66,6 +66,19 @@ TRUNK = "trunk"
 # the verdict (the nightly's issue).
 NOT_SELECTABLE = ("plan", "tier", "nightly-red")
 TIERS = ("full", "pr", "noop")
+# What a repository's config may add (the defaults: nothing):
+#   ON_REQUEST   jobs that only a dispatch's own input runs, never full or pr;
+#   EXTRA_TIERS  {tier: (the jobs it runs, of `every`; whether it runs every
+#                leg; whether it runs ALL those jobs (True) or one or more of
+#                them (False))}, for the verdict;
+#   special(a, every, log) -> None, or (tier, the jobs it chose): a run the
+#                event and the dispatch's own inputs (a.inputs) decide alone.
+ON_REQUEST = ()
+EXTRA_TIERS = {}
+
+
+def special(a, every, log):
+    return None
 
 # --- this repository's ---------------------------------------------------------
 # Every leg of every matrix job, in the workflow's order. The full tier runs
@@ -117,6 +130,9 @@ RULES = [
     (".gitattributes", BOTH),
 ]
 # --- end of this repository's -------------------------------------------------
+# Below: the planner itself, the same in every repository tl28 tiered (wolf-std,
+# pelt, wolf-book, lobo, boreutils, wolf-lsp). Only the docstring and the
+# block above are this repository's.
 
 
 def die(msg):
@@ -164,7 +180,9 @@ def jobs_of(tier, every):
     """The jobs a tier runs, of `every` selectable job, in order. (The pr
     tier's are the paths' choice: every job is the most it may run.)"""
     if tier in ("full", "pr"):
-        return list(every)
+        return [j for j in every if j not in ON_REQUEST]
+    if tier in EXTRA_TIERS:
+        return [j for j in every if j in EXTRA_TIERS[tier][0](every)]
     return []
 
 
@@ -178,7 +196,8 @@ def matrix_of(tier):
     empty (the job is skipped by its `if:` either way)."""
     out = {}
     for job, legs in MATRIX.items():
-        out[output_name(job)] = list(legs) if tier == "full" else [l for l in legs if pr_leg(job, l)]
+        every_leg = tier == "full" or (tier in EXTRA_TIERS and EXTRA_TIERS[tier][1])
+        out[output_name(job)] = list(legs) if every_leg else [l for l in legs if pr_leg(job, l)]
     return out
 
 
@@ -229,17 +248,33 @@ def plan(a):
     log = []
 
     def result(tier, chosen=None):
-        chosen = jobs_of(tier, every) if chosen is None else [j for j in every if j in chosen]
+        if chosen is None:
+            chosen = jobs_of(tier, every)
+        else:
+            # A chosen job brings the jobs it needs (a job whose need is
+            # skipped is skipped itself, and the verdict would say so).
+            closed, todo = set(chosen), list(chosen)
+            while todo:
+                for n in needs.get(todo.pop(), []):
+                    if n not in NOT_SELECTABLE and n not in closed:
+                        log.append("%s needs %s: chosen too" % (" ".join(j for j in every if j in closed and n in needs.get(j, [])), n))
+                        closed.add(n)
+                        todo.append(n)
+            chosen = [j for j in every if j in closed]
         return {"tier": tier, "jobs": chosen, "matrix": matrix_of(tier), "log": log}
 
     labels = [x for x in (a.labels or "").split(",") if x]
     ev = a.event or "workflow_dispatch"
+    a.event = ev
     log.append("event=%s action=%s label=%s labels=%s tier=%s" % (
         ev, a.action or "-", a.label or "-", ",".join(labels) or "-", a.tier or "-"))
 
     if ev == "pull_request" and a.action == "labeled" and a.label != FULL_LABEL:
         log.append("a label other than %s was added: noop" % FULL_LABEL)
         return result("noop")
+    sp = special(a, every, log)
+    if sp is not None:
+        return result(sp[0], sp[1])
     if ev == "workflow_dispatch":
         if (a.tier or "full") not in ("full", "pr"):
             die("--tier takes full or pr, not %r" % a.tier)
@@ -296,7 +331,7 @@ def verdict(needs):
         return 1
     out = plan_job.get("outputs") or {}
     tier = out.get("tier", "")
-    if tier not in TIERS:
+    if tier not in TIERS and tier not in EXTRA_TIERS:
         print("tier: the plan named no tier (%r)" % tier)
         return 1
     try:
@@ -308,11 +343,15 @@ def verdict(needs):
     every = [j for j in needs if j != "plan"]
     bad = 0
     want_jobs = jobs_of(tier, every)
-    if tier == "pr":
+    some = tier == "pr" or (tier in EXTRA_TIERS and not EXTRA_TIERS[tier][2])
+    if some:
         if not chosen or [j for j in chosen if j not in want_jobs]:
-            print("tier: a pr run chose %s; it may choose one or more of %s" % (
-                " ".join(chosen) or "nothing", " ".join(want_jobs)))
+            print("tier: a %s run chose %s; it may choose one or more of %s" % (
+                tier, " ".join(chosen) or "nothing", " ".join(want_jobs)))
             bad += 1
+    elif tier in EXTRA_TIERS and not want_jobs:
+        print("tier: tier %s names no job of this workflow" % tier)
+        bad += 1
     elif sorted(chosen) != sorted(want_jobs):
         print("tier: the plan chose %s; tier %s is %s" % (
             " ".join(chosen) or "nothing", tier, " ".join(want_jobs) or "nothing"))
@@ -358,12 +397,20 @@ def main():
     ap.add_argument("--labels", default=env("LABELS"))
     ap.add_argument("--head-sha", default=env("HEAD_SHA"))
     ap.add_argument("--tier", default=env("IN_TIER") or None)
+    ap.add_argument("--input", action="append", default=[], metavar="KEY=VALUE",
+                    help="a dispatch input; the environment's IN_<KEY> are read too")
     ap.add_argument("--merge", action="store_true")
     ap.add_argument("--paths-from")
     ap.add_argument("--repo")
     ap.add_argument("--github-output")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args(argv[1:])
+    a.inputs = {k[3:].lower(): v for k, v in os.environ.items() if k.startswith("IN_") and k != "IN_TIER"}
+    for kv in a.input:
+        if "=" not in kv:
+            die("--input takes KEY=VALUE, not %r" % kv)
+        k, v = kv.split("=", 1)
+        a.inputs[k] = v
     r = plan(a)
     for line in r["log"]:
         print("tiers: " + line, file=sys.stderr)
