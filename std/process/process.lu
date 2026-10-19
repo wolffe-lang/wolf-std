@@ -967,6 +967,68 @@ pub fn poll() -> Change ! {io} {
     Change { changed: true, child: Child { slot: h }, status: Status { value: s }, live: -1 }
 }
 
+/// **s246 (`[os.proc.status]`, ruling #88 R3 = D): wait, and say how it
+/// ended, a core included.** `wait_status`'s answer — the exit code
+/// (0..255), or `-N` for an end by signal `N` — except that a child that
+/// dumped core (the host's `WCOREDUMP`) answers **`-(256 + N)`**, below
+/// every end without one. Read it with `status_from_core`, whose `Status`
+/// every released accessor reads exactly as it reads `wait_status`'s
+/// answer, and `dumped_core`. Reaps, as `wait`.
+///
+/// `wait_status` is unchanged and answers `-N`, core or not, so a program
+/// that compares with `-N` reads every host alike: **which ends dump core
+/// is the host's**. A pattern that pipes cores to a program
+/// (`systemd-coredump`) dumps one whatever `ulimit -c` says, a file
+/// pattern only where the limit allows, and windows never.
+///
+/// Rows: `io` for a forged or reaped handle. Never traps. Capability
+/// `Exec`; refused at comptime (D33). The checked machine answers it as
+/// the runtime does; lupin 0.1.54 does not resolve it (wolf-interp#263).
+/// Delegates to `os_wait_status_core`.
+///
+/// ```wolf-doc-example
+/// var forged = process.Child { slot: 4242 }
+/// (process.wait_status_core(take forged) else -1) == -1
+/// ```
+pub fn wait_status_core(take ch: Child) -> int ! {io} {
+    os_wait_status_core(ch.slot)?
+}
+
+/// The `Status` a core sibling's answer reads as (`wait_status_core`,
+/// `poll_core`): `-(256 + N)`, an end by signal `N` that dumped core,
+/// is the end by `N` (`-N`), so `is_signalled`, `signal_of` and
+/// `shell_code` answer for it exactly what they answer for the released
+/// wait's `-N`; every other value reads as `status_from` reads it. Whether
+/// there was a core is `dumped_core`'s. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// (process.signal_of(process.status_from_core(-267)) else 0) == 11
+/// process.shell_code(process.status_from_core(-267)) == 139
+/// process.status_from_core(-11).value == -11
+/// process.status_from_core(256 + 19).value == 275
+/// ```
+pub fn status_from_core(value: int) -> Status {
+    if dumped_core(value) {
+        return Status { value: value + 256 }
+    }
+    Status { value: value }
+}
+
+/// Whether a core sibling's answer says the host wrote a core: `-(256 +
+/// N)` for a signal number `N` from 1 to 255, the mirror of a stop's
+/// `256 + N`. False for every value the released calls answer (an exit,
+/// `-N`, a stop) and for a value of no kind. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// process.dumped_core(-267) == true
+/// process.dumped_core(-11) == false
+/// process.dumped_core(-256) == false
+/// process.dumped_core(256 + 11) == false
+/// ```
+pub fn dumped_core(value: int) -> bool {
+    value < -256 && value > -512
+}
+
 /// A process GROUP: the unit a job is, and what `std.signal`'s
 /// `send_group` reaches (ruling #79 R1: the type is std's, over the
 /// builtin tier's group ids). A shell starts each job as a group
