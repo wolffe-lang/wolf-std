@@ -4392,18 +4392,26 @@ native = "run"
 
 # `signal/one_fault.lu`: `segment_fault()` and `bus_error()` ignored and
 # reset (nothing sent). The checked machine refuses both by name: they are
-# the `wolf` process's own stack guard's (`[os.signal.disp.one]`).
+# the `wolf` process's own stack guard's (`[os.signal.disp.one]`). On
+# windows the HOST's `unsupported` comes first in the clause's order
+# (shape, host, then the machine), so the checked machine answers the row
+# and the row prints its windows lines: `run` there (measured, CI run
+# 39317137289, `rig (windows-latest)`).
 [tests."signal/one_fault.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+wolfc-windows = "run"
 native = "run"
 
 # `process/exit_signal_lives.lu`: `exit_signal(resize())` lives on and
 # exits 156 (128 + SIGWINCH, 28 on linux and macOS). The checked machine
-# refuses the well-formed call by name after the shape.
+# refuses the well-formed call by name after the shape and, on windows,
+# after the host's `unsupported` (`[os.signal.exit]`'s order), which the
+# row answers: `run` there (measured, CI run 39317137289).
 [tests."process/exit_signal_lives.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
+wolfc-windows = "run"
 native = "run"
 
 # `process/status_core_rows.lu`: `status_from_core` and `dumped_core`,
