@@ -12909,3 +12909,75 @@ can tell 0.2.32 from 0.2.33 except by the answer under test.
   green. On kasumi a second plant against the candidate (glibc's
   words misspelled `Unknown signal  0`) is red on `[wolfc]` and
   `[native]` and green on lupin.
+
+### Measured (sc65, 2026-10-19)
+
+Kasumi `~/lanes/sc65/` (scripts, `evidence/`, `probes/`); every job
+`setsid nohup` with a pid file, SigBlk and SigIgn 0; exit statuses
+read from the tool; 0 `SKIP` lines in every log below.
+
+- **Toolchains.** wolf 0.2.32 linux x86-64 `4c37f9c5…` and lupin 0.1.54
+  `175df238…` matched the release API, each read twice (`job-acq.log`);
+  `wolf 0.2.32 (wolfgang, pin 72de141)`, binary `81bdf8d4…`; `lupin
+  0.1.54 … pin 294d626`, binary `a9856dd4…`.
+- **P1 held.** `cargo xtask dist` on wolf-lang `r38` `5e4c34b2`
+  (`job-dist.log`) rc 0, dirty 0: archive `8b42182d…` (r38's own build
+  was `b85c01a0…`; the tarball is not byte-reproducible, the binary is
+  this lane's), `wolf 0.2.33+dev.5e4c34b (wolfgang, pin 5e4c34b)`,
+  `paired with lupin 0.1.54 …, pin 294d626`, binary `ce1132b0…`,
+  `STD-REV` `dcf3e89a…`.
+- **P2 held.** Trunk `dcf3e89` under the candidate (c0): std-test 484,
+  RED on exactly `signal/group_rows.lu` `[wolfc]` and `[native]`
+  (stdout hash mismatch at `text_zero`), lupin green
+  (`std-test-c0-dcf3e89.log` `45db18b4…`); doc-examples 511 blocks,
+  1,531 ok and 2 DOC BUG, both `signal.lu:410` (`[wolfc]`, `[native]`)
+  (`doc-examples-c0-dcf3e89.log` `6b3fea55…`). r38's measurement,
+  reproduced.
+- **P3 held.** The raw answers (`probes/plant-*`, a probe that prints
+  `text(0)` and `text(kill())`): wolf 0.2.32 on checked, native and
+  release `invalid` / `words Killed`; the candidate `words Unknown
+  signal 0` / `words Killed`; lupin declines the probe whole
+  (`unsupported`: the well-formed `text(kill())` by name), which is why
+  `group_rows` asks `text(kill())` only after an answer that is not
+  `invalid`. `group_rows` prints `text_zero=true` on lupin, checked,
+  native and release under both toolchains (`probes/p0232`,
+  `probes/prc`). 484 tests, 511 doc examples; no ledger word moved.
+- **P4 held.** Head tree `d5da835` (the later commits touch only
+  `CHANGELOG.md` and this file). wolf 0.2.32 (g1): every gauntlet step
+  exit 0, std-test GREEN 484 (lanes 368/30/48/38, host-scoped cells
+  13; `std-test-g1-d5da835.log` `43d70ea0…`), doc-examples 511 GREEN,
+  1,533 ok (`doc-examples-g1-d5da835.log` `0cec39c5…`), fmt-lu 538
+  files fixed points. The candidate (c1): std-test GREEN 484 (lanes
+  368/30/48/38; `std-test-c1-d5da835.log` `72f0967a…`), doc-examples
+  511 GREEN, 1,533 ok, 0 DOC BUG (`doc-examples-c1-d5da835.log`
+  `2cd89f0b…`). Under `taskset -c 0-3`: 0.2.32 (t1) 484 GREEN, 511
+  GREEN, 1,533 ok (`2c03d984…`, `e773ea0f…`); the candidate (t2) 484
+  GREEN, 511 GREEN, 1,533 ok (`4fcf7711…`, `cccfa677…`). CI at
+  `0ae9f48` (wolf 0.2.32), push run 39265254055, six jobs success:
+  std-test 484 GREEN on ubuntu (job 118103025745), macOS
+  (118103025807) and windows (118103025596), doc-examples 511 GREEN on
+  all three `gates` jobs (118103025719, 118103025744, 118103025845).
+- **P5 held.** Plant `sc65-plant` `993efa9` (the 0.2.32 / lupin answer
+  planted as `unsupported`), CI run 39265274619: the three `rig` jobs
+  **failure**, each red on exactly `signal/group_rows.lu` on three
+  lanes: ubuntu (118103099376) and macOS (118103099312) wolfc and
+  native `text_zero=false` and lupin "ledger says `run`, observed
+  `unsupported`" (lupin declines `text(kill())` by name, as predicted);
+  windows (118103098796) `text_zero=false` on lupin, wolfc and native
+  (there lupin answers `text(kill())` `unsupported` as a row). The
+  three `gates` jobs success (no doc example touched). On kasumi the
+  second plant (glibc's words misspelled) against the candidate: checked,
+  native and release `text_zero=false`, lupin `true`; against 0.2.32
+  `true` everywhere (`probes/plant-arch`, `probes/plant-wolf-0.2.32`).
+  Branch kept on origin.
+- **Not measured.** The candidate on macOS and windows (no such build
+  here): the macOS words come from spec `[os.signal.text]` (CI run
+  39215738496, s246) and windows' `unsupported` from
+  `[os.signal.platform]`. musl's words for 0 (no musl host): a 0.2.33
+  musl build would print `text_zero=false` until measured.
+- **Disclosed.** I cancelled my own run 39264015270 (the F-0152 commit,
+  superseded by `0ae9f48` within minutes). I replaced
+  `scripts/gauntlet.sh` on kasumi while g1 ran it; bash read the new
+  file mid-run and g1's closing summary lines failed to parse
+  (`line 48: p: command not found`); every step log and exit status was
+  written before that, and the summary was re-read from the logs.
