@@ -12,7 +12,9 @@
 //! every signal POSIX names that a program may catch (`reload()` …
 //! `file_limit()`), the ones a set may hold. Eight more are SEND-ONLY
 //! (`kill()`, `stop()` and the six fault signals): `send` and `number`
-//! take them and nothing else does.
+//! take them, and so do `ignore_one`, `reset_one` and
+//! `std.process.exit_signal` (s246; the two `_one` calls refuse `kill()`
+//! and `stop()`, which no process can ignore). No set-taking call does.
 //!
 //! **A meaning's bit never changes, and a program never writes one**
 //! (`[os.signal.set.stable]`). Every meaning a release has published
@@ -29,7 +31,11 @@
 //! what the host does by default (`reset`), nothing (`ignore`), or arrives
 //! as an event (`listen`, then `wait` or `poll`). There is no handler: no
 //! wolf code ever runs when a signal arrives (`[os.signal.model]`). The
-//! last call for a meaning wins.
+//! last call for a meaning wins. `ignore` and `reset` take a SET of
+//! listenable meanings; `ignore_one` and `reset_one` (s246, ruling #88
+//! R1) take ONE meaning in the sending shape — a send-only one such as
+//! `segment_fault()`, or a host number `host(n)` — which is how a program
+//! ignores what it is about to send its own group (GNU `timeout -s SEGV`).
 //!
 //! **What a child inherits** is what `exec` leaves (`[os.signal.disp]`): an
 //! ignored meaning stays ignored in every child, a listened one is the
@@ -47,8 +53,9 @@
 //! `upgrade()` arrive only by this process's own `raise` — so a listen
 //! for any of the other sixteen is `io` there, and `ignore`, `reset`,
 //! `ignored`, `send`, `number`, `wait_fd`, `send_group`, `send_all`,
-//! `text`, `last` and `realtime` answer `unsupported`, `send` to `text`
-//! after their own shape (`[os.signal.platform]`).
+//! `text`, `last`, `realtime`, `ignore_one` and `reset_one` answer
+//! `unsupported`, `send` to `text` and the two `_one` calls after their
+//! own shape (`[os.signal.platform]`).
 //!
 //! **Groups and host numbers (s241, ruling #79).** `send` reaches one
 //! process; `send_group` reaches every member of a `std.process.Group`
@@ -61,9 +68,9 @@
 //! rather than evened out (R3).
 //!
 //! **Capability: `exec` (I13)** — signal control is process control:
-//! `listen`, `wait`, `wait_fd`, `poll`, `ignore`, `reset`, `raise`,
-//! `send`, `send_group` and `send_all` are tagged `exec` in the sandbox
-//! table. `ignored` READS this process's context and is `env` (ruling
+//! `listen`, `wait`, `wait_fd`, `poll`, `ignore`, `reset`, `ignore_one`,
+//! `reset_one`, `raise`, `send`, `send_group` and `send_all` are tagged
+//! `exec` in the sandbox table. `ignored` READS this process's context and is `env` (ruling
 //! #70 R8, with `os_pgid`); `number`, `last`, `realtime` and `text` read
 //! the host's table and charge nothing (ruling #79 R6). All of them are
 //! refused at comptime (D33). The meaning functions and `host` reach
@@ -490,8 +497,10 @@ pub fn text(meaning: int) -> str ! {invalid, unsupported} {
 /// macOS `EMT`, `IO`, `INFO` — and for a number a user typed (`kill -9`).
 /// It makes NO portability promise: `n` is this host's number, and for
 /// the real-time range this C library's. Only `send`, `send_group`,
-/// `send_all` and `text` take one, for `1 <= n <= last()`; every
-/// set-taking call refuses it (a negative set fails the one shape rule).
+/// `send_all`, `text`, `ignore_one`, `reset_one` and
+/// `std.process.exit_signal` take one (the last three from wolf 0.2.33),
+/// for `1 <= n <= last()`; every set-taking call refuses it (a negative
+/// set fails the one shape rule).
 ///
 /// Total and pure; nothing is checked until a call takes it.
 ///
