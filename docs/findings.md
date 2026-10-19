@@ -13172,3 +13172,116 @@ could dump core runs only inside a throwaway container.
   hosts: the examples of `status_from_core`, `dumped_core` and
   `poll_core`, and the two mirror-lagged `std.signal` examples on lupin
   (the refusal sentence changes or the block runs).
+
+### Measured (sc66, 2026-10-19)
+
+kasumi `~/lanes/sc66/` (`scripts/`, `evidence/`, `probes/`, `job-*.log`);
+every job `setsid nohup` with a pid file, SigBlk and SigIgn 0; exit
+statuses read from the tool; 0 `SKIP` lines in every log below. Every
+run that executes a program which signals (std-test, doc-examples, the
+probes, the witness) ran inside a throwaway podman container (`--rm
+--network none`, no `--init`, `--ulimit core=0:0` unless stated);
+`coredumpctl` was read around each: no stored core names this lane.
+
+- **P1 held.** Four wolf 0.2.33 archives matched the release API, each
+  read twice (`job-acq.log`): linux x86-64 `4f955e8d…`, aarch64
+  `24cde9e4…`, macOS `9152dbd1…`, windows `96774801…`; binary `wolf`
+  `58e4ade4…`, `libwolf_rt.a` `5321ce86…`; `wolf 0.2.33 (wolfgang, pin
+  85dab5d)`, paired with lupin 0.1.54 pin `294d626`; GLIBC ≤ 2.34;
+  `STD-REV` `cceda631…`; `diff -rq` against trunk's `std/` names only
+  `LICENSE`, `LICENSE-EXCEPTION` and `STD-REV`. lupin 0.1.54 `175df238…`,
+  binary `a9856dd4…`.
+- **P2 held.** 661 -> 664, the three predicted, none removed or moved;
+  `05-conformance.md` byte-identical; sync-pin snapshot == submodule at
+  `85dab5d7`.
+- **P3 held, after a harness fix.** The first kasumi pass (g1, bare pin
+  `1c05741`) was red on two things the container caused, neither a row's
+  answer: `process/join_own_group.lu` printed `own_group_positive=false`
+  on wolfc and native (the rig was the container's process 1, whose
+  group is 1, which no host gives it), and 16 long lupin crypto vectors
+  passed the 60 s ceiling at load ~15. Every other step exit 0,
+  doc-examples 511 GREEN. The container now runs the rig under `setsid
+  -w` with `STD_TEST_TIMEOUT_SECS=180` (CI's windows value); g3, the same
+  tree: std-test **484 GREEN**, doc-examples **511 GREEN** (1,533 ok).
+  CI push run 39312899915 at `1c05741`, six jobs success: std-test 484
+  GREEN on ubuntu (job 118266831211), macOS (118266831636) and windows
+  (118266831481); doc-examples 511 GREEN on all three `gates` jobs.
+- **P4 held.** `text_zero` prints `true` on checked, native and release
+  and `false` on lupin (`divergent(stdout)` observed in every std-test
+  run); under the published wolf 0.2.32 it is `false` on the three
+  compiled machines (`docs/sc66-witness/probe-h1.log`). `group_rows`'
+  twelve lines stay green on every lane.
+- **P5 held, one miss.** The probes (`probe-red-trunk-std.log`,
+  `probe-h1.log`): every new row red with trunk's std (E0301 on the
+  compiled machines, lupin naming the missing std function), green at
+  `3cc43c1` on the four machines, plain and under `taskset -c 0-3`
+  byte-identical. lupin 0.1.54: "`os_signal_ignore_one` does not resolve".
+  The checked machine refuses the guard's two faults by name.
+  **Miss:** on windows the checked machine answers `one_fault` (the
+  host's `unsupported` precedes its refusal by name in the clause's
+  order): `wolfc-windows = "run"`, measured in CI run 39317137289.
+- **P6 held, the same miss.** `exit_signal(resize())` exits 156 on native
+  and release; the checked machine: "`os_exit_signal` (the checked machine
+  does not end the process it runs in by a signal; [os.signal.exit])";
+  on windows it answers the row (`wolfc-windows = "run"`, the same run).
+  Lines printed before the call reach the parent.
+- **P7 held, my guess on the limit wrong.** Pure rows on all three lanes.
+  `wait_core_rows` (`TERM`, an exit, the poll) as predicted. In the
+  container (`docs/sc66-witness/container-*.log`, 16 runs each: two
+  roles × four machines × two programs): under `--ulimit core=0:0` the
+  `SEGV` child reads `-11` through the released wait and poll on every
+  machine and `-267` through `wait_status_core` (`poll_core`: status
+  `-11`, `core=true`); `systemd-coredump` logged 52 entries per run, every
+  one without a file ("Resource limits disable core dumping"). **Under
+  `--ulimit core=1:1` the kernel dumps nothing** (I predicted `-267`
+  again): the sibling reads `-11`, `core=false`, and the helper records
+  nothing (`coresafe.log`: dash prints "Segmentation fault" without
+  "(core dumped)"), so kasumi has its own cores-off row. (Each cores-off
+  log lists one entry: the previous run's last child, pid 3970241 and
+  4053192, in the same second as the window's start.) `exit_by`: `SEGV`
+  by `exit_signal` 11 (with a core under 0:0), the first real-time number
+  34, a listened `TERM` 15, `resize()` exit 156, a sent `SEGV` 11 (0.2.33's
+  #784), an ignored sent `SEGV` exit 0, an ignored sent 34 exit 0, a
+  reset one 34; the same on the checked parent; root and user 1000;
+  plain and `taskset -c 0-3` byte-identical. lupin refuses at the first
+  sibling ("`os_wait_status_core` does not resolve"), after running the
+  first child's released wait.
+- **P8 held.** E0701 on checked, native and release; E0301 under 0.2.32
+  for the `ignore_one` and `exit_signal` rows, and for the `wait_core` row
+  under trunk's std.
+- **P9 held.** At the head tree `cd6dd9b` on kasumi (g4), every gauntlet
+  step exit 0: std-test **495 GREEN** (divergent rows 1, host-scoped
+  cells 13), lint-conventions 495, fmt-lu 549 files fixed points,
+  doc-examples **518 GREEN**, 1,552 ok + 2 mirror-lag = 1,554 lane runs.
+  CI push run 39317137289 at `cd6dd9b`: std-test 495 GREEN on ubuntu
+  (118281421659) and macOS (118281421831), doc-examples 518 GREEN on
+  all three `gates` jobs; windows `rig` red on exactly the two cells of
+  the miss above, fixed in `13f6977`.
+- **P10 (widened) held, with three reds more than written.** Plant
+  `sc66-plant` `f403982`, CI run 39317173580, all six jobs failure. `rig`
+  ubuntu (118281546930) and macOS (118281546577): all eleven new rows red
+  (`one_host` as a tool error: with the ignore planted away, the row's
+  own real-time signal ended the process it was sent to, the checked
+  machine's included), and no other row; windows (118281546636): ten,
+  `wait_core_rows` taking its windows lines as predicted. Not written:
+  lupin red on `one_fault` (every host) and `one_host` (windows), since
+  lupin resolves the set calls the plant uses. `gates` (118281546846,
+  118281546387, 118281546613): `status_from_core`'s, `dumped_core`'s and
+  `poll_core`'s examples, both mirror-lag entries on lupin, and (not
+  written) `reset_one`'s example on wolfc and native on ubuntu and macOS.
+  Branch kept on origin.
+- **P11 held.**
+- **Disclosed.** (a) My second gauntlet (g2) shared the first's cargo
+  target directory, and its `cargo build` replaced the xtask binary g1
+  was using between 16:08:21 and 16:09:01 EDT, while only g1's
+  std-test container ran (which execs wolf and lupin, not xtask). I
+  stopped g2 by its recorded pid, then its orphaned cargo build (pid
+  534662, already finished) and its container by id; I rebuilt g1's
+  xtask from its own clone to the sha it started with (`71761c21…`), and
+  every later gauntlet has its own target directory. (b) g3 reused g1's
+  tag, so g1's red std-test log was overwritten; its reds are in
+  `job-g1.log`. (c) My first green probe staged a tree copied with
+  macOS `tar`, whose AppleDouble files poisoned it; it was discarded and
+  re-run from `git archive`. (d) I ran the plant's pure
+  `status_core_rows` binary once on kasumi's host to check it compiled
+  (it signals nothing).
