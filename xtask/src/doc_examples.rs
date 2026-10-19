@@ -210,6 +210,27 @@ pub(crate) const LUPIN_MIRROR_LAG: &[(&str, &str, &str, &str)] = &[
     // the entry asserts a lag that does not happen". Retired WITH the
     // flip, which is wolf-lang#177's lesson and the reason the gate
     // refuses a waiver that has stopped being true.
+    //
+    // sc66 (wolf 0.2.33 / lupin 0.1.54): two entries, one debt with one
+    // name, wolf-interp#261. s246's `os_signal_ignore_one` and
+    // `os_signal_default_one` arrive in wolf 0.2.33 and lupin 0.1.54 has
+    // never been shown them, so `std.signal`'s `ignore_one` and
+    // `reset_one` examples run on both compiler rungs and are refused by
+    // name on the reference lane. Keyed by the call, so `std.signal`'s
+    // other examples stay gated on three lanes. Both go red the day the
+    // pinned lupin runs them (is77), and leave in that commit.
+    (
+        "signal",
+        "signal.ignore_one(",
+        "`os_signal_ignore_one` does not resolve",
+        "wolf-interp#261",
+    ),
+    (
+        "signal",
+        "signal.reset_one(",
+        "`os_signal_default_one` does not resolve",
+        "wolf-interp#261",
+    ),
 ];
 
 /// Does the reference lane's answer hold a mirror-lag entry's refusal?
