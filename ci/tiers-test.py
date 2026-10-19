@@ -8,11 +8,12 @@ ci/tiers-test.py, tl21, cut to wolf-std). python3, git and bash only.
       or no tier) and the `full-matrix` label are full on every host;
       another label's `labeled` event is a noop; a dispatch's tier must be
       full or pr.
-  T2  the pull-request tiers by path: library, tests, vendor, rig and CI
-      paths are pr (rig and gates, on ubuntu alone); prose alone is noop;
-      prose beside code is pr. The library's paths are never prose.
+  T2  the pull-request tiers by path: each path names the jobs THIS
+      repository's block below says, on the pull request's hosts; prose
+      alone is noop; prose beside code is that code's tier.
   T3  full wins: a path no rule names, alone or beside anything; changed
-      paths that cannot be read; a change that names no path.
+      paths that cannot be read; a change that names no path; a dispatched
+      branch the same.
   T4  the wiring of .github/workflows/ci.yml: the plan is first and the
       verdict last but the nightly's issue; every job needs the plan, runs
       only when the plan names it and takes its hosts from the plan; every
@@ -21,17 +22,16 @@ ci/tiers-test.py, tl21, cut to wolf-std). python3, git and bash only.
       cancel-in-progress is for pull requests only and every other run has a
       concurrency group of its own run id; the trunk push (and no other
       branch's), the nightly, the label and the dispatch's `tier` input are
-      there; MATRIX's hosts are the three the jobs ran on before tl28.
-  T5  the tripwire: no line of xtask/ or tests/ names a path the planner
-      calls prose (or the directory above one), and fmt-lu's roots are
-      std/ and tests/. The search is shown to fire on paths it must find.
-      (A WARN, not a failure: a tracked path no rule names; its pull
-      request runs full.)
+      there; the full tier's hosts are the ones the jobs ran on before tl28.
+  T5  the tripwire: no line of this repository's code that reads a file
+      names a path the planner calls prose (THIS repository's block). The
+      search is shown to fire on paths it must find. (A WARN, not a
+      failure: a tracked path no rule names; its pull request runs full.)
   T6  the verdict: green for a full, a pr and a noop run; red for a chosen
       job failed, skipped or cancelled, a job that ran unasked, a failed
-      plan, a plan with no tier, a full run that chose less, a full run
-      whose hosts are the pull request's, and green when GitHub drops an
-      output that would have been empty.
+      plan, a plan with no tier, a full run that chose less, a full run on
+      the pull request's hosts, and green when GitHub drops an output that
+      would have been empty.
   T7  the change read from git: a real merge commit against its first
       parent, with the base moved on meanwhile; red-to-full when HEAD is no
       merge or its second parent is not the pull request's head; a
@@ -54,7 +54,6 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLAN = os.path.join(ROOT, "ci", "tiers.py")
 RED = os.path.join(ROOT, "ci", "nightly-red.sh")
-WORKFLOW = os.path.join(ROOT, ".github", "workflows", "ci.yml")
 ENV_KEYS = ("EVENT", "ACTION", "LABEL", "LABELS", "HEAD_SHA", "IN_TIER", "NEEDS")
 fails = 0
 
@@ -63,6 +62,80 @@ def say(ok, what):
     global fails
     print("tiers-test: %s %s" % ("PASS" if ok else "FAIL", what))
     fails += not ok
+
+
+# --- this repository's -------------------------------------------------------------
+NIGHTLY = None            # (its tier, its jobs); None: the full tier
+FULL_LEG_TIERS = ("full",)  # the tiers that run every leg
+WORKFLOW_FILE = "ci.yml"
+WORKFLOW_NAME = "ci"
+WORKFLOW_JOBS = ["plan", "rig", "gates", "tier", "nightly-red"]
+FULL_JOBS = ["rig", "gates"]
+PUSH_BRANCHES = "trunk"
+OTHER_HOST_JOBS = ()
+# The hosts before tl28 (.github/workflows/ci.yml at trunk cceda63).
+_H = [{"os": "ubuntu-latest"}, {"os": "macos-latest"}, {"os": "windows-latest"}]
+BEFORE_HOSTS = {"matrix_rig": _H, "matrix_gates": _H}
+ALL_HOSTS = BEFORE_HOSTS
+PR_HOSTS = {"matrix_rig": _H[:1], "matrix_gates": _H[:1]}
+BOTH = ["rig", "gates"]
+CODE_PATH = ("std/fmt/fmt.lu", BOTH)
+PR_PATHS = [(p, BOTH) for p in [
+    "std/fmt/fmt.lu", "std/net/net.lu", "std/prelude/prelude.lu", "tests/fs/read.lu", "tests/ledger.toml",
+    "tests/ulp/reference.txt", "vendor/tools.toml", "vendor/upstream/PIN", "vendor/upstream/anchors.json",
+    "vendor/vectors/README.md", "upstream", "xtask/src/main.rs", "xtask/Cargo.toml", "Cargo.toml", "Cargo.lock",
+    "rust-toolchain.toml", ".cargo/config.toml", ".fac/workspace.json", "assets/logo.svg",
+    ".github/workflows/ci.yml", ".github/workflows/nightly.yml", "ci/tiers.py", "ci/tiers-test.py",
+    "ci/nightly-red.sh", "README.md", "API-CONVENTIONS.md", "GUIDE-ENTRIES-sc40.txt", "LICENSE",
+    "LICENSE-EXCEPTION", "LICENSE-TRAINING-DATA", ".gitmodules", ".gitignore", ".gitattributes",
+    # Under the library, its tests or its pins: never prose, whatever the name.
+    "std/README.md", "tests/README.md", "vendor/upstream/spec/05-conformance.md"]]
+PROSE_PATHS = ["CHANGELOG.md", "docs/findings.md", "CONTRIBUTING.md", "docs/error-taxonomy.md",
+               "docs/sc64-witness/jobs.lu", "docs/sc62-witness/pty.py", "docs/a-new-page.md"]
+PR_UNIONS = []
+# Stricter than a read: any line of xtask/ or tests/ with a string literal
+# that names a prose root trips (a path is built from literals before it is
+# read).
+READS = re.compile(r'"')
+
+
+def is_code(f):
+    """The code that could read a prose path: the rig (xtask/) and the
+    library's tests (tests/), Rust and wolf."""
+    return f.startswith(("xtask/", "tests/")) and f.endswith((".rs", ".lu"))
+
+
+MUST_FIND = ["vendor/upstream/anchors.json", "tests/ledger.toml", "tests/ulp/reference.txt"]
+RULED = {}  # {prose root: {regex of a line that names something else: why}}
+
+
+def extra_t5(files, cls, say):
+    roots = re.search(r'^const ROOTS: \[&str; \d+\] = \[(.*)\];$', open(os.path.join(ROOT, "xtask/src/fmt_lu.rs"), encoding="utf-8").read(), re.M)
+    say(roots is not None and re.findall(r'"([^"]+)"', roots.group(1)) == ["std", "tests"],
+        "T5 fmt-lu walks std/ and tests/ alone (%s)" % (roots.group(1) if roots else "ROOTS not found"))
+    lib = [p for p in files if p.startswith(("std/", "tests/", "vendor/", "xtask/"))]
+    say(len(lib) >= 100 and all(cls.get(p) == "rig gates" for p in lib),
+        "T5 every tracked path under std/, tests/, vendor/ and xtask/ is pr, both jobs (%d paths)" % len(lib))
+
+
+def extra_checks(say, plan, expect, blocks, wf):
+    # xtask's selftest diffs ci.yml's cargo lines against workflow::CI_STEPS
+    # and blesses every continue-on-error (sc41, sc47): tl28 adds neither.
+    say(not re.search(r"^\s*continue-on-error:", wf, re.M), "T4 no continue-on-error (xtask's selftest blesses each one; tl28 adds none)")
+    steps = re.findall(r'^\s+command: "([^"]+)",$', open(os.path.join(ROOT, "xtask/src/workflow.rs"), encoding="utf-8").read(), re.M)
+    have = set()
+    for line in wf.splitlines():
+        t = line.strip()
+        if t.startswith("#"):
+            continue
+        t = t[2:].strip() if t.startswith("- ") else t
+        t = t[4:].strip() if t.startswith("run:") else t
+        if t.startswith("cargo "):
+            have.add(" ".join(t.split()))
+    say(len(steps) >= 10 and have == set(steps), "T4 the workflow's cargo lines are workflow::CI_STEPS exactly (%d), as xtask's selftest wants" % len(steps))
+# --- end of this repository's ------------------------------------------------------
+WORKFLOW = os.path.join(ROOT, ".github", "workflows", WORKFLOW_FILE)
+NIGHTLY = NIGHTLY or ("full", FULL_JOBS)
 
 
 def clean_env(**more):
@@ -88,10 +161,6 @@ def plan(paths=None, **kw):
 wf = open(WORKFLOW, encoding="utf-8").read()
 JOBS = re.findall(r"^  ([A-Za-z0-9_-]+):\s*$", wf[wf.index("\njobs:\n"):], re.M)
 EVERY = [j for j in JOBS if j not in ("plan", "tier", "nightly-red")]
-HOSTS = ["ubuntu-latest", "macos-latest", "windows-latest"]
-ALL_HOSTS = {"matrix_rig": [{"os": h} for h in HOSTS], "matrix_gates": [{"os": h} for h in HOSTS]}
-PR_HOSTS = {"matrix_rig": [{"os": "ubuntu-latest"}], "matrix_gates": [{"os": "ubuntu-latest"}]}
-BOTH = ["rig", "gates"]
 
 
 def expect(name, got, tier, jobs):
@@ -100,62 +169,61 @@ def expect(name, got, tier, jobs):
         why.append("tier %s, wanted %s" % (got["tier"], tier))
     if got["jobs"] != jobs:
         why.append("jobs %s, wanted %s" % (" ".join(got["jobs"]) or "none", " ".join(jobs) or "none"))
-    hosts = ALL_HOSTS if tier == "full" else PR_HOSTS
+    hosts = ALL_HOSTS if tier in FULL_LEG_TIERS else PR_HOSTS
     if not got["tier"].startswith("ERROR") and got.get("matrix") != hosts:
         why.append("hosts %s, wanted %s" % (json.dumps(got.get("matrix")), json.dumps(hosts)))
-    shown = "every job (%d), every host" % len(EVERY) if jobs == EVERY and tier == "full" else (" ".join(jobs) or "no job")
+    shown = "every job (%d), every host" % len(jobs) if tier == "full" else (" ".join(jobs) or "no job")
+    shown += ", every host" if tier in FULL_LEG_TIERS and tier != "full" else ""
     say(not why, "%s: %s%s" % (name, tier, (" (" + "; ".join(why) + ")") if why else ", " + shown))
 
 
+def in_order(jobs):
+    return [j for j in EVERY if j in jobs]
+
+
 # --- T1 the tiers by event ---------------------------------------------------
-say(JOBS == ["plan", "rig", "gates", "tier", "nightly-red"], "T1 the workflow's jobs: %s" % " ".join(JOBS))
-expect("T1 a push to trunk", plan(event="push"), "full", EVERY)
-expect("T1 the nightly", plan(event="schedule"), "full", EVERY)
-expect("T1 a dispatch, no tier", plan(event="workflow_dispatch"), "full", EVERY)
-expect("T1 a dispatch, tier full", plan(event="workflow_dispatch", tier="full"), "full", EVERY)
+say(JOBS == WORKFLOW_JOBS, "T1 the workflow's jobs: %s" % " ".join(JOBS))
+expect("T1 a push to trunk", plan(event="push"), "full", FULL_JOBS)
+expect("T1 the nightly", plan(event="schedule"), NIGHTLY[0], NIGHTLY[1])
+expect("T1 a dispatch, no tier", plan(event="workflow_dispatch"), "full", FULL_JOBS)
+expect("T1 a dispatch, tier full", plan(event="workflow_dispatch", tier="full"), "full", FULL_JOBS)
 say(plan(event="workflow_dispatch", tier="partial")["tier"].startswith("ERROR rc=2"), "T1 a dispatch's tier is full or pr, nothing else")
 expect("T1 a pull request labelled full-matrix, prose only",
-       plan(["CHANGELOG.md"], event="pull_request", action="synchronize", labels="bug,full-matrix"), "full", EVERY)
+       plan([PROSE_PATHS[0]], event="pull_request", action="synchronize", labels="bug,full-matrix"), "full", FULL_JOBS)
 expect("T1 the full-matrix label added",
-       plan(["CHANGELOG.md"], event="pull_request", action="labeled", label="full-matrix", labels="full-matrix"), "full", EVERY)
-expect("T1 another label added", plan(["std/fmt/fmt.lu"], event="pull_request", action="labeled", label="bug", labels="bug"), "noop", [])
+       plan([PROSE_PATHS[0]], event="pull_request", action="labeled", label="full-matrix", labels="full-matrix"), "full", FULL_JOBS)
+code, code_jobs = CODE_PATH
+expect("T1 another label added", plan([code], event="pull_request", action="labeled", label="bug", labels="bug"), "noop", [])
 expect("T1 another label added to a labelled pull request",
-       plan(["std/fmt/fmt.lu"], event="pull_request", action="labeled", label="bug", labels="bug,full-matrix"), "noop", [])
+       plan([code], event="pull_request", action="labeled", label="bug", labels="bug,full-matrix"), "noop", [])
 expect("T1 the tier input means nothing to a pull request",
-       plan(["std/fmt/fmt.lu"], event="pull_request", action="synchronize", tier="full"), "pr", BOTH)
+       plan([code], event="pull_request", action="synchronize", tier="full"), "pr", in_order(code_jobs))
 
 # --- T2 the pull-request tiers by path ------------------------------------------
 pr = dict(event="pull_request", action="synchronize")
-for p in ["std/fmt/fmt.lu", "std/net/net.lu", "std/prelude/prelude.lu", "tests/fs/read.lu", "tests/ledger.toml",
-          "tests/ulp/reference.txt", "vendor/tools.toml", "vendor/upstream/PIN", "vendor/upstream/anchors.json",
-          "vendor/vectors/README.md", "upstream", "xtask/src/main.rs", "xtask/Cargo.toml", "Cargo.toml", "Cargo.lock",
-          "rust-toolchain.toml", ".cargo/config.toml", ".fac/workspace.json", "assets/logo.svg",
-          ".github/workflows/ci.yml", ".github/workflows/nightly.yml", "ci/tiers.py", "ci/tiers-test.py",
-          "ci/nightly-red.sh", "README.md", "API-CONVENTIONS.md", "GUIDE-ENTRIES-sc40.txt", "LICENSE",
-          "LICENSE-EXCEPTION", "LICENSE-TRAINING-DATA", ".gitmodules", ".gitignore", ".gitattributes"]:
-    expect("T2 %s" % p, plan([p], **pr), "pr", BOTH)
-for p in ["CHANGELOG.md", "CONTRIBUTING.md", "docs/findings.md", "docs/error-taxonomy.md",
-          "docs/sc64-witness/jobs.lu", "docs/sc62-witness/pty.py", "docs/a-new-page.md"]:
+for p, jobs in PR_PATHS:
+    expect("T2 %s" % p, plan([p], **pr), "pr", in_order(jobs))
+for p in PROSE_PATHS:
     expect("T2 prose: %s" % p, plan([p], **pr), "noop", [])
-expect("T2 prose alone, several", plan(["CHANGELOG.md", "docs/findings.md", "CONTRIBUTING.md"], **pr), "noop", [])
-expect("T2 prose beside code", plan(["CHANGELOG.md", "std/fmt/fmt.lu", "docs/findings.md"], **pr), "pr", BOTH)
-for p in ["std/README.md", "tests/README.md", "vendor/upstream/spec/05-conformance.md"]:
-    expect("T2 not prose (under the library, its tests or its pins): %s" % p, plan([p], **pr), "pr", BOTH)
+expect("T2 prose alone, several", plan(PROSE_PATHS[:3], **pr), "noop", [])
+expect("T2 prose beside code", plan([PROSE_PATHS[0], code, PROSE_PATHS[-1]], **pr), "pr", in_order(code_jobs))
+for paths, jobs in PR_UNIONS:
+    expect("T2 %s together" % " + ".join(paths), plan(paths, **pr), "pr", in_order(jobs))
 
 # --- T3 full wins ---------------------------------------------------------------
-expect("T3 a path no rule names", plan(["newplace/thing.rs"], **pr), "full", EVERY)
-expect("T3 a new file at the root", plan(["build.rs"], **pr), "full", EVERY)
-expect("T3 a markdown file at the root no rule names", plan(["NOTES.md"], **pr), "full", EVERY)
-expect("T3 an unknown path beside prose", plan(["CHANGELOG.md", "newplace/notes.md"], **pr), "full", EVERY)
-expect("T3 an unknown path beside code", plan(["std/fmt/fmt.lu", "newplace/thing.rs"], **pr), "full", EVERY)
-expect("T3 no changed paths to read", plan(**pr), "full", EVERY)
-expect("T3 a change that names no path", plan([], **pr), "full", EVERY)
+expect("T3 a path no rule names", plan(["newplace/thing.rs"], **pr), "full", FULL_JOBS)
+expect("T3 a new file at the root", plan(["build.rs"], **pr), "full", FULL_JOBS)
+expect("T3 a markdown file at the root no rule names", plan(["NOTES.md"], **pr), "full", FULL_JOBS)
+expect("T3 an unknown path beside prose", plan([PROSE_PATHS[0], "newplace/notes.md"], **pr), "full", FULL_JOBS)
+expect("T3 an unknown path beside code", plan([code, "newplace/thing.rs"], **pr), "full", FULL_JOBS)
+expect("T3 no changed paths to read", plan(**pr), "full", FULL_JOBS)
+expect("T3 a change that names no path", plan([], **pr), "full", FULL_JOBS)
 expect("T3 a merge that cannot be read (no repository there)",
-       plan(repo=os.path.join(ROOT, "no", "such", "dir"), flags=["--merge"], **pr), "full", EVERY)
-expect("T3 a dispatch, tier pr, an unknown path", plan(["newplace/thing.rs"], event="workflow_dispatch", tier="pr"), "full", EVERY)
+       plan(repo=os.path.join(ROOT, "no", "such", "dir"), flags=["--merge"], **pr), "full", FULL_JOBS)
+expect("T3 a dispatch, tier pr, an unknown path", plan(["newplace/thing.rs"], event="workflow_dispatch", tier="pr"), "full", FULL_JOBS)
 expect("T3 a dispatch, tier pr, a branch that cannot be read",
-       plan(repo=os.path.join(ROOT, "no", "such", "dir"), flags=["--merge"], event="workflow_dispatch", tier="pr"), "full", EVERY)
-expect("T2 a dispatch, tier pr, code", plan(["std/fmt/fmt.lu"], event="workflow_dispatch", tier="pr"), "pr", BOTH)
+       plan(repo=os.path.join(ROOT, "no", "such", "dir"), flags=["--merge"], event="workflow_dispatch", tier="pr"), "full", FULL_JOBS)
+expect("T2 a dispatch, tier pr, code", plan([code], event="workflow_dispatch", tier="pr"), "pr", in_order(code_jobs))
 
 # --- T6 the verdict -------------------------------------------------------------
 def verdict(needs):
@@ -165,7 +233,7 @@ def verdict(needs):
 
 def run_of(tier, chosen, results=None, drop=(), hosts=None):
     outs = {"tier": tier, "jobs": json.dumps(chosen)}
-    for k, v in (hosts or (ALL_HOSTS if tier == "full" else PR_HOSTS)).items():
+    for k, v in (hosts if hosts is not None else (ALL_HOSTS if tier == "full" else PR_HOSTS)).items():
         outs[k] = json.dumps(v, separators=(",", ":"))
     for k in drop:  # GitHub leaves an empty output out of `needs`
         del outs[k]
@@ -182,28 +250,30 @@ def vexpect(name, needs, want):
 
 
 failed = {"result": "failure", "outputs": {}}
-vexpect("a green full run", run_of("full", EVERY), 0)
-vexpect("a green pr run", run_of("pr", BOTH), 0)
-vexpect("a green pr run of one job", run_of("pr", ["gates"]), 0)
+first, last = FULL_JOBS[0], FULL_JOBS[-1]
+vexpect("a green full run", run_of("full", FULL_JOBS), 0)
+vexpect("a green pr run", run_of("pr", in_order(code_jobs)), 0)
 vexpect("a noop run", run_of("noop", []), 0)
 vexpect("a noop run whose jobs output is absent", run_of("noop", [], drop=["jobs"]), 0)
-vexpect("a chosen job failed", run_of("full", EVERY, {"rig": failed}), 1)
-vexpect("a chosen job failed in a pr run", run_of("pr", BOTH, {"gates": failed}), 1)
-vexpect("a chosen job was skipped", run_of("pr", BOTH, {"gates": {"result": "skipped", "outputs": {}}}), 1)
-vexpect("a chosen job was cancelled", run_of("pr", BOTH, {"rig": {"result": "cancelled", "outputs": {}}}), 1)
-vexpect("a job ran unasked", run_of("pr", ["gates"], {"rig": {"result": "success", "outputs": {}}}), 1)
-vexpect("a job ran in a noop run", run_of("noop", [], {"gates": {"result": "success", "outputs": {}}}), 1)
-vexpect("a full run that chose less than every job", run_of("full", ["rig"]), 1)
-vexpect("a full run whose jobs output is absent", run_of("full", EVERY, drop=["jobs"]), 1)
-vexpect("a full run on the pull request's hosts", run_of("full", EVERY, hosts=PR_HOSTS), 1)
-vexpect("a full run whose rig hosts are absent", run_of("full", EVERY, drop=["matrix_rig"]), 1)
-vexpect("a pr run on every host", run_of("pr", BOTH, hosts=ALL_HOSTS), 1)
+vexpect("a chosen job failed", run_of("full", FULL_JOBS, {last: failed}), 1)
+vexpect("a chosen job failed in a pr run", run_of("pr", in_order(code_jobs), {code_jobs[0]: failed}), 1)
+vexpect("a chosen job was skipped", run_of("pr", in_order(code_jobs), {code_jobs[0]: {"result": "skipped", "outputs": {}}}), 1)
+vexpect("a chosen job was cancelled", run_of("pr", in_order(code_jobs), {code_jobs[0]: {"result": "cancelled", "outputs": {}}}), 1)
+vexpect("a job ran in a noop run", run_of("noop", [], {first: {"result": "success", "outputs": {}}}), 1)
+vexpect("a full run whose jobs output is absent", run_of("full", FULL_JOBS, drop=["jobs"]), 1)
+if len(FULL_JOBS) > 1:
+    vexpect("a full run that chose less than every job", run_of("full", FULL_JOBS[:1]), 1)
+    vexpect("a job ran unasked", run_of("pr", FULL_JOBS[:1], {FULL_JOBS[1]: {"result": "success", "outputs": {}}}), 1)
+if ALL_HOSTS != PR_HOSTS:
+    vexpect("a full run on the pull request's hosts", run_of("full", FULL_JOBS, hosts=PR_HOSTS), 1)
+    vexpect("a pr run on every host", run_of("pr", in_order(code_jobs), hosts=ALL_HOSTS), 1)
+    vexpect("a full run whose %s is absent" % sorted(ALL_HOSTS)[0], run_of("full", FULL_JOBS, drop=[sorted(ALL_HOSTS)[0]]), 1)
 vexpect("a pr run that chose nothing", run_of("pr", []), 1)
-vexpect("the plan failed", {"plan": {"result": "failure", "outputs": {}}, "rig": {"result": "skipped", "outputs": {}}}, 1)
-vexpect("the plan named no tier", {"plan": {"result": "success", "outputs": {"jobs": "[]"}}, "rig": {"result": "skipped", "outputs": {}}}, 1)
+vexpect("the plan failed", {"plan": {"result": "failure", "outputs": {}}, first: {"result": "skipped", "outputs": {}}}, 1)
+vexpect("the plan named no tier", {"plan": {"result": "success", "outputs": {"jobs": "[]"}}, first: {"result": "skipped", "outputs": {}}}, 1)
 vexpect("the plan named a tier that is none", run_of("fast", []), 1)
-vexpect("the plan's jobs are no list", {"plan": {"result": "success", "outputs": {"tier": "pr", "jobs": "rig"}}}, 1)
-vexpect("a chosen job the tier job does not need", run_of("pr", ["rig", "lint"]), 1)
+vexpect("the plan's jobs are no list", {"plan": {"result": "success", "outputs": {"tier": "pr", "jobs": first}}}, 1)
+vexpect("a chosen job the tier job does not need", run_of("pr", [first, "lint"]), 1)
 
 # --- T4 the wiring --------------------------------------------------------------
 blocks = {}
@@ -213,16 +283,22 @@ for j in JOBS:
 say(JOBS[:1] == ["plan"] and JOBS[-2:] == ["tier", "nightly-red"], "T4 the plan is the first job, the tier the last but the nightly's issue")
 for j in EVERY:
     b = blocks[j]
-    ok = re.search(r"^    needs: plan$", b, re.M) is not None
+    nd = re.search(r"^    needs: (plan|\[plan(, [A-Za-z0-9_-]+)*\])$", b, re.M)
+    ok = nd is not None
     ok = ok and ("    if: contains(fromJSON(needs.plan.outputs.jobs || '[]'), '%s')\n" % j) in b
     say(ok, "T4 %s needs the plan and runs only when the plan names it" % j)
-    say(("        include: ${{ fromJSON(needs.plan.outputs.matrix_%s || '[]') }}\n" % j.replace("-", "_")) in b
-        and "    runs-on: ${{ matrix.os }}\n" in b and not re.search(r"^        os: ", b, re.M),
-        "T4 %s takes its hosts from the plan" % j)
+    out = "matrix_" + j.replace("-", "_")
+    if out in ALL_HOSTS:
+        say(("        include: ${{ fromJSON(needs.plan.outputs.%s || '[]') }}\n" % out) in b
+            and "    runs-on: ${{ matrix.os }}\n" in b and not re.search(r"^        (os|include):\s*$|^        os: \[", b, re.M),
+            "T4 %s takes its hosts from the plan" % j)
+    else:
+        say("matrix.os" not in b and re.search(r"^    runs-on: ubuntu-", b, re.M) is not None or j in OTHER_HOST_JOBS,
+            "T4 %s has no matrix of hosts (%s)" % (j, (re.findall(r"^    runs-on: (.*)$", b, re.M) or ["?"])[0]))
 reads = re.findall(r"needs\.plan\.outputs\.([a-z_]+)(\s*\|\|)?", wf)
-say(len(reads) >= 5 and all(d for _, d in reads), "T4 every plan output is read with a default (%d reads: %s)" % (
+say(len(reads) >= 3 and all(d for _, d in reads), "T4 every plan output is read with a default (%d reads: %s)" % (
     len(reads), " ".join(sorted(set(k for k, _ in reads)))))
-say(all(("      %s: ${{ steps.plan.outputs.%s }}\n" % (k, k)) in blocks["plan"] for k in ("tier", "jobs", "matrix_rig", "matrix_gates")),
+say(all(("      %s: ${{ steps.plan.outputs.%s }}\n" % (k, k)) in blocks["plan"] for k in ["tier", "jobs"] + sorted(ALL_HOSTS)),
     "T4 the plan job declares tier, jobs and each matrix")
 say('        run: python3 ci/tiers.py plan --merge --github-output "$GITHUB_OUTPUT"\n' in blocks["plan"]
     and "          fetch-depth: ${{ github.event_name == 'workflow_dispatch' && '0' || '2' }}\n" in blocks["plan"]
@@ -251,13 +327,15 @@ say(g.endswith("|| format('ci-{0}-{1}', github.event_name, github.run_id) }}") a
     "T4 a run that is no pull request's has a concurrency group of its own run id")
 say("&& 'full' || 'pr'" in g and "format('noop-{0}', github.run_id)" in g,
     "T4 a pull request's full and pr runs are separate groups, and another label's noop cancels nothing")
-say(re.search(r"^  push:\n    branches: \[trunk\]\n", wf, re.M) is not None, "T4 a push runs on trunk alone (a lane's push runs once, as its pull request)")
+say(re.search(r"^  push:\n    branches: \[%s\]\n" % re.escape(PUSH_BRANCHES), wf, re.M) is not None,
+    "T4 a push runs on %s alone (a lane's push runs once, as its pull request)" % PUSH_BRANCHES)
 say(re.search(r"^  schedule:\n(\s+#.*\n)*\s+- cron: ", wf, re.M) is not None, "T4 the nightly runs")
 say("    types: [opened, synchronize, reopened, labeled]\n" in wf, "T4 adding a label starts a run")
-say(re.search(r"^  workflow_dispatch:\n    inputs:\n      tier:\n", wf, re.M) is not None and "        options: [full, pr]\n" in wf,
-    "T4 a dispatch takes the tier input, full or pr")
-say(plan(event="push")["matrix"] == ALL_HOSTS, "T4 the full tier's hosts are ubuntu, macOS and windows for both jobs, as before tl28")
-say(not re.search(r"^\s*continue-on-error:", wf, re.M), "T4 no continue-on-error (xtask's selftest blesses each one; tl28 adds none)")
+say(re.search(r"^  workflow_dispatch:\n    inputs:\n(?:      [a-z_]+:\n(?:        .*\n)+)*      tier:\n", wf, re.M) is not None
+    and "        options: [full, pr]\n" in wf, "T4 a dispatch takes the tier input, full or pr")
+say(plan(event="push")["matrix"] == ALL_HOSTS, "T4 the full tier's hosts are the ones before tl28: %s" % json.dumps(BEFORE_HOSTS))
+say(all(e in ALL_HOSTS.get(k, []) for k, v in BEFORE_HOSTS.items() for e in v) and
+    all(len(ALL_HOSTS[k]) == len(v) for k, v in BEFORE_HOSTS.items()), "T4 no host left the full tier")
 
 # --- T7 the change read from git ----------------------------------------------------
 def g_(repo, *args):
@@ -268,9 +346,12 @@ def g_(repo, *args):
 
 def write(repo, rel, text):
     full = os.path.join(repo, rel)
-    os.makedirs(os.path.dirname(full), exist_ok=True)
+    os.makedirs(os.path.dirname(full) or full, exist_ok=True)
     with open(full, "w", encoding="utf-8") as f:
         f.write(text)
+
+
+MOVED = code + ".moved"
 
 
 def merged(topic_paths):
@@ -278,7 +359,7 @@ def merged(topic_paths):
     into a base that moved on meanwhile -> (repo, the topic's head)."""
     repo = tempfile.mkdtemp(prefix="tiers-test-")
     g_(repo, "init", "-q", "-b", "trunk")
-    for rel in ("std/a/a.lu", "docs/findings.md", "CHANGELOG.md", "vendor/tools.toml"):
+    for rel in [code] + PROSE_PATHS[:2]:
         write(repo, rel, "one\n")
     g_(repo, "add", ".")
     g_(repo, "commit", "-q", "-m", "base")
@@ -289,7 +370,7 @@ def merged(topic_paths):
     g_(repo, "commit", "-q", "-m", "topic")
     head = g_(repo, "rev-parse", "HEAD")
     g_(repo, "checkout", "-q", "trunk")
-    write(repo, "std/a/moved.lu", "the base moved on\n")
+    write(repo, MOVED, "the base moved on\n")
     g_(repo, "add", ".")
     g_(repo, "commit", "-q", "-m", "trunk moves")
     g_(repo, "merge", "-q", "--no-ff", "-m", "merge", "topic")
@@ -298,11 +379,11 @@ def merged(topic_paths):
 
 def dispatched(topic_paths):
     """A clone whose HEAD is a branch off trunk (changing topic_paths), its
-    origin/trunk moved on meanwhile -> the clone."""
+    origin/trunk moved on meanwhile -> (the upstream, the clone)."""
     up = tempfile.mkdtemp(prefix="tiers-test-up-")
     g_(up, "init", "-q", "-b", "trunk")
-    write(up, "std/a/a.lu", "one\n")
-    write(up, "docs/findings.md", "one\n")
+    for rel in [code] + PROSE_PATHS[:1]:
+        write(up, rel, "one\n")
     g_(up, "add", ".")
     g_(up, "commit", "-q", "-m", "base")
     clone = tempfile.mkdtemp(prefix="tiers-test-clone-")
@@ -312,7 +393,7 @@ def dispatched(topic_paths):
         write(clone, rel, "the branch\n")
     g_(clone, "add", ".")
     g_(clone, "commit", "-q", "-m", "branch")
-    write(up, "std/a/moved.lu", "trunk moved on\n")
+    write(up, MOVED, "trunk moved on\n")
     g_(up, "add", ".")
     g_(up, "commit", "-q", "-m", "trunk moves")
     g_(clone, "fetch", "-q", "origin")
@@ -321,37 +402,37 @@ def dispatched(topic_paths):
 
 made = []
 try:
-    repo, head = merged(["docs/findings.md", "CHANGELOG.md", "docs/a new page.md"])
+    repo, head = merged(PROSE_PATHS[:2])
     made.append(repo)
-    expect("T7 a prose-only merge, the base moved on (its std/a/moved.lu is not the pull request's)",
+    expect("T7 a prose-only merge, the base moved on (its %s is not the pull request's)" % MOVED,
            plan(repo=repo, head_sha=head, flags=["--merge"], **pr), "noop", [])
     expect("T7 the same merge, the head not given", plan(repo=repo, flags=["--merge"], **pr), "noop", [])
     expect("T7 the merge's second parent is not the pull request's head",
-           plan(repo=repo, head_sha="0" * 40, flags=["--merge"], **pr), "full", EVERY)
+           plan(repo=repo, head_sha="0" * 40, flags=["--merge"], **pr), "full", FULL_JOBS)
     g_(repo, "checkout", "-q", "topic")
-    expect("T7 HEAD is the branch, not a merge commit", plan(repo=repo, head_sha=head, flags=["--merge"], **pr), "full", EVERY)
-    repo, head = merged(["docs/findings.md", "std/a/a.lu"])
+    expect("T7 HEAD is the branch, not a merge commit", plan(repo=repo, head_sha=head, flags=["--merge"], **pr), "full", FULL_JOBS)
+    repo, head = merged([PROSE_PATHS[0], code])
     made.append(repo)
-    expect("T7 a merge that changes code and prose", plan(repo=repo, head_sha=head, flags=["--merge"], **pr), "pr", BOTH)
-    repo, head = merged(["CHANGELOG.md", "somewhere/new.txt"])
+    expect("T7 a merge that changes code and prose", plan(repo=repo, head_sha=head, flags=["--merge"], **pr), "pr", in_order(code_jobs))
+    repo, head = merged([PROSE_PATHS[0], "somewhere/new.txt"])
     made.append(repo)
-    expect("T7 a merge that adds a path no rule names", plan(repo=repo, head_sha=head, flags=["--merge"], **pr), "full", EVERY)
+    expect("T7 a merge that adds a path no rule names", plan(repo=repo, head_sha=head, flags=["--merge"], **pr), "full", FULL_JOBS)
     dp = dict(event="workflow_dispatch", tier="pr", flags=["--merge"])
-    up, clone = dispatched(["docs/findings.md"])
+    up, clone = dispatched(PROSE_PATHS[:1])
     made += [up, clone]
-    expect("T7 a dispatched prose-only branch, trunk moved on (its std/a/moved.lu is not the branch's)",
+    expect("T7 a dispatched prose-only branch, trunk moved on (its %s is not the branch's)" % MOVED,
            plan(repo=clone, **dp), "noop", [])
-    up, clone = dispatched(["std/a/a.lu", "docs/findings.md"])
+    up, clone = dispatched([code, PROSE_PATHS[0]])
     made += [up, clone]
-    expect("T7 a dispatched branch that changes code", plan(repo=clone, **dp), "pr", BOTH)
-    up, clone = dispatched(["plant/unmapped.txt", "std/a/a.lu"])
+    expect("T7 a dispatched branch that changes code", plan(repo=clone, **dp), "pr", in_order(code_jobs))
+    up, clone = dispatched(["plant-unmapped.txt", code])
     made += [up, clone]
-    expect("T7 a dispatched branch that adds a path no rule names (the plant)", plan(repo=clone, **dp), "full", EVERY)
+    expect("T7 a dispatched branch that adds a path no rule names (the plant)", plan(repo=clone, **dp), "full", FULL_JOBS)
     g_(clone, "checkout", "-q", "-B", "on-trunk", "origin/trunk")
-    expect("T7 a dispatch at trunk itself, tier pr (no change to read)", plan(repo=clone, **dp), "full", EVERY)
-    lone, _ = merged(["std/a/a.lu"])
+    expect("T7 a dispatch at trunk itself, tier pr (no change to read)", plan(repo=clone, **dp), "full", FULL_JOBS)
+    lone, _ = merged([code])
     made.append(lone)
-    expect("T7 a dispatch with no origin/trunk to read", plan(repo=lone, **dp), "full", EVERY)
+    expect("T7 a dispatch with no origin/trunk to read", plan(repo=lone, **dp), "full", FULL_JOBS)
 except (subprocess.CalledProcessError, OSError) as e:
     say(False, "T7 could not build its repositories: %s %s" % (e, getattr(e, "stderr", "")))
 finally:
@@ -377,7 +458,7 @@ def nightly_red(existing="", label_rc=0):
         os.chmod(os.path.join(d, "gh"), 0o755)
         log = os.path.join(d, "log")
         env = dict(os.environ, PATH=d + os.pathsep + os.environ.get("PATH", ""), FAKE_LOG=log, FAKE_EXISTING=existing,
-                   FAKE_LABEL_RC=str(label_rc), REPO="wolffe-lang/wolf-std", WORKFLOW="ci",
+                   FAKE_LABEL_RC=str(label_rc), REPO="wolffe-lang/wolf-std", WORKFLOW=WORKFLOW_NAME,
                    RUN_URL="https://github.com/wolffe-lang/wolf-std/actions/runs/1")
         r = subprocess.run(["bash", RED], capture_output=True, text=True, env=env)
         calls = open(log).read().splitlines() if os.path.exists(log) else []
@@ -386,12 +467,12 @@ def nightly_red(existing="", label_rc=0):
         shutil.rmtree(d, ignore_errors=True)
 
 
-TITLE = "nightly red: ci on trunk"
+TITLE = "nightly red: %s on trunk" % WORKFLOW_NAME
 rc, calls = nightly_red()
 creates = [c for c in calls if c.startswith("issue create")]
 say(rc == 0 and len(creates) == 1 and "--title %s" % TITLE in creates[0] and "--label nightly-red" in creates[0]
     and not [c for c in calls if c.startswith("issue comment")],
-    "T8 no open issue: one is opened, labelled nightly-red, titled '%s' (%s)" % (TITLE, "; ".join(c[:60] for c in calls)))
+    "T8 no open issue: one is opened, labelled nightly-red, titled '%s'" % TITLE)
 lists = [c for c in calls if c.startswith("issue list")]
 say(len(lists) == 1 and "--state open" in lists[0] and "--label nightly-red" in lists[0] and TITLE in lists[0],
     "T8 the dedupe asks for an open nightly-red issue under the title")
@@ -402,6 +483,7 @@ rc, calls = nightly_red(label_rc=1)
 say(rc == 0 and [c for c in calls if c.startswith("issue create")], "T8 a label that already exists is no failure")
 r = subprocess.run(["bash", RED], capture_output=True, text=True, env=clean_env(PATH=os.environ.get("PATH", "")))
 say(r.returncode != 0, "T8 the script refuses to run without REPO, WORKFLOW and RUN_URL")
+say(re.search(r"^name: %s$" % re.escape(WORKFLOW_NAME), wf, re.M) is not None, "T8 the workflow's name is %s, the title's" % WORKFLOW_NAME)
 
 # --- T5 the tripwire: what the planner calls prose, nothing reads ---------------------
 def tracked():
@@ -419,29 +501,33 @@ def classes(paths):
     return out
 
 
-def naming(paths):
-    """{path: ["file:line", ...]}: the lines of xtask/ and tests/ (Rust and
-    wolf) with a string literal that is the path or a directory above it."""
-    code = [p for p in files if p.startswith(("xtask/", "tests/")) and p.endswith((".rs", ".lu"))]
-    names = {}
-    for p in paths:
-        cand = {p}
-        d = os.path.dirname(p)
-        while d:
-            cand.add(d)
-            d = os.path.dirname(d)
-        names[p] = cand
+def patterns(p):
+    """How a line names p: a directory root (`notes/`) by `notes/` or a quoted
+    "notes"; a file by its path, or its own name quoted (os.path.join)."""
+    if p.endswith("/"):
+        d = re.escape(p[:-1])
+        return [re.compile(r"(?<![A-Za-z0-9_.-])%s/" % d), re.compile(r"[\"']%s[\"']" % d)]
+    return [re.compile(r"(?<![A-Za-z0-9_./-])%s(?![A-Za-z0-9_])" % re.escape(p)),
+            re.compile(r"[\"']%s[\"']" % re.escape(os.path.basename(p)))]
+
+
+def readers(code_files, paths):
+    """{path: ["file:line", ...]}: the lines of code_files that read a file
+    (READS) and name the path (patterns). Comment lines are no reader, nor a
+    line RULED says names something else (its regex, with its reason)."""
+    pats = {p: patterns(p) for p in paths}
     hits = {p: [] for p in paths}
-    for c in code:
-        with open(os.path.join(ROOT, c), encoding="utf-8", errors="replace") as f:
-            for n, line in enumerate(f, 1):
-                s = line.lstrip()
-                if '"' not in line or s.startswith(("//", "#")):
-                    continue
-                lits = set(re.findall(r'"\.?/?((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+)/?"', line))
-                for p in paths:
-                    if lits & names[p]:
-                        hits[p].append("%s:%d" % (c, n))
+    for c in code_files:
+        try:
+            lines = open(os.path.join(ROOT, c), encoding="utf-8", errors="replace").read().splitlines()
+        except OSError:
+            continue
+        for n, line in enumerate(lines, 1):
+            if line.lstrip().startswith(("#", "//")) or not READS.search(line):
+                continue
+            for p in paths:
+                if any(x.search(line) for x in pats[p]) and not any(re.search(rx, line) for rx in RULED.get(p, {})):
+                    hits[p].append("%s:%d" % (c, n))
     return hits
 
 
@@ -450,22 +536,16 @@ if files:
     cls = classes(files)
     prose = sorted(p for p in files if cls.get(p) == "prose")
     unknown = sorted(p for p in files if cls.get(p) == "FULL")
-    print("tiers-test: the %d tracked paths that are prose: %s" % (len(prose), " ".join(prose[:12]) + (" ..." if len(prose) > 12 else "")))
-    must = ["vendor/upstream/anchors.json", "tests/ledger.toml", "tests/ulp/reference.txt"]
-    seen = naming(must)
-    exact = {p: [w for w in seen[p] if p in open(os.path.join(ROOT, w.rsplit(":", 1)[0]), encoding="utf-8",
-                                                 errors="replace").read().splitlines()[int(w.rsplit(":", 1)[1]) - 1]]
-             for p in must}
-    say(all(exact[p] for p in must), "T5 the search fires: it finds a line naming each of %s" % ", ".join(
-        "%s (%s)" % (p, exact[p][0] if exact[p] else "NOTHING") for p in must))
-    hit = {p: w for p, w in naming(prose).items() if w}
-    say(not hit, "T5 no line of xtask/ or tests/ names a prose path: %s" % (
-        "; ".join("%s at %s" % (p, " ".join(w[:3])) for p, w in sorted(hit.items())) or "none"))
-    roots = re.search(r'^const ROOTS: \[&str; \d+\] = \[(.*)\];$', open(os.path.join(ROOT, "xtask/src/fmt_lu.rs"), encoding="utf-8").read(), re.M)
-    say(roots is not None and re.findall(r'"([^"]+)"', roots.group(1)) == ["std", "tests"],
-        "T5 fmt-lu walks std/ and tests/ alone (%s)" % (roots.group(1) if roots else "ROOTS not found"))
-    lib = [p for p in files if p.startswith(("std/", "tests/", "vendor/", "xtask/"))]
-    say(len(lib) >= 100 and all(cls.get(p) == "rig gates" for p in lib), "T5 every tracked path under std/, tests/, vendor/ and xtask/ is pr, both jobs (%d paths)" % len(lib))
+    print("tiers-test: %d tracked paths are prose: %s" % (len(prose), " ".join(prose[:10]) + (" ..." if len(prose) > 10 else "")))
+    code_files = [f for f in files if is_code(f)]
+    seen = readers(code_files, MUST_FIND)
+    say(all(seen[p] for p in MUST_FIND), "T5 the search fires: it finds what reads %s" % ", ".join(
+        "%s (%s)" % (p, seen[p][0] if seen[p] else "NOTHING") for p in MUST_FIND))
+    roots = sorted({p.split("/")[0] + ("/" if "/" in p else "") for p in prose})
+    hit = {p: w for p, w in readers(code_files, roots).items() if w}
+    say(not hit, "T5 no line of %d code file(s) that reads a file names a prose root (%s): %s" % (
+        len(code_files), " ".join(roots), "; ".join("%s at %s" % (p, " ".join(w[:3])) for p, w in sorted(hit.items())) or "none"))
+    extra_t5(files, cls, say)
     if unknown:
         print("tiers-test: WARN T5 %d tracked path(s) no rule names (a pull request touching one runs full): %s"
               % (len(unknown), " ".join(unknown[:20])))
@@ -473,6 +553,8 @@ if files:
         print("tiers-test: PASS T5 every one of %d tracked paths has a rule" % len(files))
 else:
     say(False, "T5 not a git checkout: the tracked paths cannot be listed")
+
+extra_checks(say, plan, expect, blocks, wf)
 
 print("tiers-test: %s" % ("PASS" if fails == 0 else "FAIL (%d)" % fails))
 sys.exit(1 if fails else 0)
