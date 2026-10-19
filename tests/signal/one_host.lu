@@ -61,7 +61,7 @@ fn every_line() {
 
 fn ignoring_user() -> !bool {
     let set = signal.ignored()?
-    (set & signal.user()) != 0
+    set & signal.user() != 0
 }
 
 fn main() -> !int {

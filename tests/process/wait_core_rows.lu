@@ -74,7 +74,9 @@ fn main() -> !int {
         n = n + 1
         c = process.poll_core()?
     }
-    print("polled={kind(c.change.status)} core={c.core} same_child={c.change.child.slot == polled.slot}")
+    print(
+        "polled={kind(c.change.status)} core={c.core} same_child={c.change.child.slot == polled.slot}",
+    )
     let r = process.poll_core()?
     print("none_left={!r.change.changed && r.change.live == 0}")
     let p = process.pid(polled) else |_| -1
