@@ -1,5 +1,24 @@
 # Changelog
 
+## sc65 — 2026-10-19 — `signal.text(0)` true at wolf 0.2.32 and 0.2.33
+
+**Why.** s246 (wolf-lang#787) makes `os_signal_text(0)` answer signal
+0's words from wolf 0.2.33 (glibc `Unknown signal 0`, macOS `Unknown
+signal: 0`, windows `unsupported`) where 0.2.32 and lupin 0.1.54
+answer `invalid`, so sc64's `dcf3e89` was red on its own gates under
+the 0.2.33 candidate (r38's STOP): `signal/group_rows.lu`'s
+`text_zero` on wolfc and native, and `signal.text`'s doc example.
+
+**Rows.** `group_rows`' `text_zero` line stays and now prints
+`text_zero=true` for exactly `invalid` (wolf 0.2.32, lupin 0.1.54, every
+host) or this host's words for 0 (wolf 0.2.33: glibc's where
+`text(kill())` is "Killed", macOS's where it is "Killed: 9",
+`unsupported` where `text(kill())` is too); anything else is `false`.
+`signal.text`'s example asks the words of two meanings, `invalid` on
+both versions, and its rows say what 0 answers on each. No function
+changes; the pins do not move (wolf 0.2.32, lupin 0.1.54). std-test
+stays **484**, doc examples **511**.
+
 ## sc64 — 2026-10-18 — std at wolf 0.2.32: the poll, the status, the groups
 
 **The pin.** wolf 0.2.30 -> **0.2.32** (`v0.2.32` at `72de141f`; linux
