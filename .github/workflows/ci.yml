@@ -249,7 +249,9 @@ jobs:
       # verbatim; a `; rc=$?` tail would make this step read LOCAL-ONLY.
       - name: std-test (the differential; three lanes, three hosts)
         id: std_test
-        # REQUIRED on ubuntu and macOS. ADVISORY on windows only.
+        # REQUIRED on all three hosts since 14f0ab2 (wolf-std#34), which
+        # retired the windows advisory marker once the 180 s ceiling below
+        # had held six runs. The history that follows is why it existed.
         # THE REASON CHANGED AT sc51, and the old one is retired:
         # wolf-std#34's three native net/process rows were fixed at sc48,
         # and the three json STACK OVERFLOWS that replaced them are GONE
@@ -283,17 +285,18 @@ jobs:
         # timestamps (F-0139). Every other host keeps 60 s. std-test now
         # ends with its slowest invocations against the ceiling, so the
         # margin is printed on every run and not inferred from a green.
-        # The marker stays until that table has held on consecutive runs.
-        # Dropping the marker is proposed in sc52's PR and is not done
-        # here.
+        # The marker stayed until that table had held on consecutive runs;
+        # it held six, and 14f0ab2 dropped it.
         #
-        # Blessed in `workflow::ADVISORY_STEPS`; changing it here without
-        # changing it there reds `rig` on all three hosts.
+        # `workflow::ADVISORY_STEPS` is empty since 14f0ab2: a
+        # `continue-on-error` added here without blessing it there reds
+        # `rig` on all three hosts.
         env:
           STD_TEST_TIMEOUT_SECS: ${{ runner.os == 'Windows' && '180' || '60' }}
         run: cargo xtask std-test
-      # The step above is the only advisory step in this file. This one
-      # exists so that being advisory is never the same as being quiet:
+      # No step in this file is advisory since 14f0ab2 (the step above was
+      # the last). This one stays so that an advisory step, if one is ever
+      # blessed again, is never quiet:
       # `outcome` is what the step DID, `conclusion` is what
       # `continue-on-error` rewrote it to, and printing the pair is the
       # cheapest possible version of the rule wolf-std#34 had to learn
