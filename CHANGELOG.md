@@ -1,5 +1,39 @@
 # Changelog
 
+## sc67 — 2026-10-20 — the resolver's value and the accounts' limit (wolf-std#4, #68)
+
+No pin moves: wolf 0.2.33 (`85dab5d7`), lupin 0.1.54 (`0e536e8`).
+
+**`std.net.Addr` (#4).** At wolf 0.2.33 no builtin turns a name into
+addresses without dialling it: the prelude's twenty `net_*` names hold
+none, `net_connect` resolves inside the dial with no deadline
+(wolf-lang#217), and `net_fetch` is the s16 sandbox probe, `unsupported`
+on all four machines. A resolver over today's builtins would be a DNS
+client speaking for the host's, so std ships the VALUE a resolver will
+answer, `net.Addr { version: int, text: str }` (an address and its IP
+version, 4 or 6), and its doc names the bounded synchronous
+`net_resolve(name, within_ms)` it waits on (asked of wolf-lang). The
+version is an `int`, not an enum: no caller on any machine can name an
+imported enum's variant at this pin, and lupin cannot match one. The
+header gives name resolution its own "absent" bullet; `connect`'s doc
+says its resolve has no deadline. #4 stays open until the builtin lands.
+
+**`std.os.users`' limit, documented and measured (#68, ruling #99 R2).**
+The header says what the two files cannot see (macOS's directory
+service, LDAP, NIS, SSSD, systemd's dynamic users), what that costs
+`id`, `whoami`, `chown user:group`, `chgrp` and `groups`, and that the
+future fix is a host account lookup builtin (asked of wolf-lang); every
+reader's and lookup's doc says it answers from the file alone. No
+signature or answer changes. `tests/os/users/directory_accounts.lu`
+holds the limit on macOS (the host names the runner's uid through
+`/usr/bin/id -un`; `/etc/passwd` answers `none` for it by id and by
+name; `groups_of` misses groups the process holds) and prints a `SKIP:`
+line naming why elsewhere.
+
+**Rows.** `net/addr_shape.lu` (every lane) and
+`os/users/directory_accounts.lu` (lupin `unsupported`: `os_uid` by
+name). 497 tests, 519 doc examples (was 495 and 518).
+
 ## sc66 — 2026-10-19 — std at wolf 0.2.33: the five calls' wrappers
 
 **The pin.** wolf 0.2.32 -> **0.2.33** (`v0.2.33` at `85dab5d7`,
