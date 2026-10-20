@@ -4408,7 +4408,16 @@ native = "run"
 # names (wolf-interp#261, #263; is77 mirrors them): every row that names
 # one is `unsupported` there, by name ("does not resolve"), on every host,
 # and goes red the day a lupin that resolves them is pinned (the flip is
-# deliberate). The pure readings of the core run on all three lanes. ----
+# deliberate). The pure readings of the core run on all three lanes.
+# sc68 (lupin 0.1.55, is77, wolf-std#80): lupin resolves all five, answers
+# their shape rows and windows' `unsupported`, then refuses a well-formed
+# call by name (no `sigaction`, no `raise`; the sibling poll with a live
+# child as the released poll). So `one_rows` and `poll_core_none` run on
+# every host; `one_host`, `one_fault`, `exit_signal_lives` and
+# `wait_core_rows` stay `unsupported` on linux and macOS, refused by name
+# after their shape, and run on windows, where the host's `unsupported`
+# (or `/bin/sh`'s `not_found`) comes first and each row prints its
+# windows lines (measured, CI run 39508081716, `rig (windows-latest)`). ----
 
 # `signal/one_rows.lu`: `ignore_one`, `reset_one` and `exit_signal`, the
 # rows their shape decides before any host (R1, R2): every compiled
@@ -4429,6 +4438,7 @@ native = "run"
 # disposition, as for the set calls.
 [tests."signal/one_host.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
@@ -4441,6 +4451,7 @@ native = "run"
 # 39317137289, `rig (windows-latest)`).
 [tests."signal/one_fault.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "unsupported"
 wolfc-windows = "run"
 native = "run"
@@ -4452,6 +4463,7 @@ native = "run"
 # row answers: `run` there (measured, CI run 39317137289).
 [tests."process/exit_signal_lives.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "unsupported"
 wolfc-windows = "run"
 native = "run"
@@ -4468,6 +4480,7 @@ native = "run"
 # has no `/bin/sh`, so the row prints its lines for that reason there.
 [tests."process/wait_core_rows.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
