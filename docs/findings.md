@@ -13294,3 +13294,119 @@ probes, the witness) ran inside a throwaway podman container (`--rm
   (118308472389) and windows (118308472570); doc-examples 518 GREEN on
   all three `gates` jobs; 0 `SKIP:` lines. Later commits touch only
   `docs/findings.md`.
+
+## F-0154 — sc67's predictions, before `net.Addr` and `std.os.users`' limit
+
+Written on branch `sc67` (on trunk `ae19f16`: sc66 at wolf 0.2.33,
+then tl28's tiers) before any file under `std/` or `tests/` changed.
+What I read or ran first, and so cannot claim to predict blind:
+
+- wolf-std#4 (lobo's ask, t02's B18 note, sc52's re-assessment at
+  0.2.16) and #68 (bu24); wolf-lang#217 and sc52's comment on it
+  (`net_resolve(name: str, within_ms: int) -> List[str] ! {not_found,
+  timeout, io}`); bu24's note (boreutils `notes/bu24-the-ids.md`: 30
+  macOS cases skip because the runner's names live in the directory
+  service).
+- The 0.2.33 prelude, from the published binary on kasumi (`wolf
+  prelude`, 212 lines, sha256 `dea15153…`): twenty `net_*` names and
+  none of them takes a name and answers addresses. `net_connect`
+  resolves a name inside the dial and answers a socket; `net_fetch` is
+  the s16 sandbox probe (`net_fetch(str) -> str`, no runtime body).
+  No `os_*` name looks an account up (`os_groups` is `getgroups`).
+  Spec/11 `[os.net]` at `v0.2.33` says the same (no resolve clause).
+- Five probes on the four machines (kasumi, inside a throwaway
+  container, published wolf 0.2.33 / lupin 0.1.54, a scratch copy of
+  `std/net/net.lu`): `net_fetch("localhost")` is `unsupported` on all
+  four (lupin "`net_fetch` does not resolve", checked "calls outside
+  the modelled surface", native and release "calls outside the
+  resolved surface"); a caller naming an imported enum variant
+  (`net.Family.V6`) is `unsupported` on all four; a caller matching an
+  imported enum's variants runs on the three compiled machines and is
+  `unsupported` on lupin ("no `match` arm applied"); a struct of an
+  `int` and a `str` built by the caller runs on all four.
+
+**So #4's outcome is the second one** (no resolving call at 0.2.33):
+the wolf-lang issue is written with the shape std needs, and std ships
+the type and the doc comment that names the gap. The probes decide the
+type: the family is the address's IP VERSION as an `int` (4 or 6), not
+an enum, because no caller on any machine can name an imported
+variant, and lupin cannot match one.
+
+Inputs, re-derived 2026-10-20: wolf-std trunk `ae19f16`, 495 tests and
+518 doc examples. wolf 0.2.33 is `v0.2.33` (annotated `56110e4f`) at
+`85dab5d7`, release 417610226; lupin 0.1.54 is `v0.1.54` (annotated
+`9c98d445`) at `0e536e8`, release 415937354; each tag read twice.
+Archives on kasumi by the release API's digests, each read twice:
+wolf linux x86-64 `4f955e8d…` (80,128,936 B; binary `58e4ade4…`),
+lupin linux x86-64 `175df238…` (2,971,403 B; binary `a9856dd4…`); the
+macOS arm64 digests CI checks are `9152dbd1…` (wolf) and `9cd14db7…`
+(lupin). The archive's `std/STD-REV` is `cceda63`. No pin moves.
+
+### P1. `net.Addr`
+
+- `pub struct Addr { version: int, text: str }`: one address, its IP
+  version and its text, the element `resolve` will answer. Nothing in
+  std makes or takes one at this pin; its doc comment says why
+  (wolf-std#4, wolf-lang#217, the issue this lane drafts) and spells
+  the call it is waiting for. The module header's "deliberately
+  absent" list gives name resolution its own bullet, re-measured.
+- A new row `tests/net/addr_shape.lu`: a v4 and a v6 address built by
+  the caller, read back, and dialled by text through `endpoint` (the
+  v6 one bracketed). `run` on lupin, checked and native, every host.
+  Red against trunk's std (no `Addr`): `fail(E0301)`-class on the two
+  compiler columns and `unsupported` or a resolve failure on lupin.
+- One new doc example on `Addr`: **519** examples, 1,557 lane runs,
+  1,555 ok and the 2 mirror-lag entries sc66 left.
+
+### P2. `std.os.users`' limit
+
+- The header's account paragraph names what the two files cannot see
+  (macOS's directory service, LDAP, NIS, systemd's dynamic users),
+  what that does to `id`, `whoami`, `chown user:group` and `groups`,
+  wolf-std#68 and the builtin asked of wolf-lang; each lookup's doc
+  comment says it answers `none` for such an account. No signature or
+  answer changes.
+- A new row `tests/os/users/directory_accounts.lu`, `check:
+  run(exit=0)`. Every host first asks `env.uid()` (so lupin, which
+  refuses `os_uid` by name, is `unsupported` on every host and the row
+  needs no host cell). Then: windows (no user ids) prints a `SKIP:`
+  line naming the row and the reason; a host without
+  `/var/db/dslocal/nodes/Default` (linux) prints one; macOS as the
+  super-user prints one. Otherwise (macOS, CI's runner): the host
+  names the process's uid through `/usr/bin/id -un`, `user_by_id`
+  and `user_named` over `/etc/passwd` answer `none` for it, and the
+  process holds at least one group (`env.groups()`) that `groups_of`
+  over `/etc/group` does not give it (I expect `everyone`, 12, and
+  `localaccounts`, 61, among them). Ledger `lupin = "unsupported"`,
+  `wolfc = "run"`, `native = "run"`.
+- On kasumi and CI's ubuntu runner the row prints exactly one `SKIP:`
+  line per compiled lane run (2 per std-test run); on windows the same
+  count; on macOS none.
+
+### P3. Counts
+
+- std-test **497** (495 + 2), GREEN on kasumi (container) and on CI.
+  No existing ledger word moves; `tier pr` green at the head.
+
+### P4. Planted breaks, seen red in CI
+
+- Branch `sc67-plant`, one `workflow_dispatch` of tier full (the
+  users row's claim is macOS's, and tier pr runs ubuntu alone): (a)
+  `Addr`'s `version` renamed: `net/addr_shape.lu` red on all three
+  columns on all three hosts, `Addr`'s doc example red on three lanes;
+  (b) `user_named` answering the file's first user where no line
+  matches: `os/users/whole_files.lu` red everywhere, `user_named`'s
+  example red on three lanes, and `directory_accounts.lu` red on the
+  macOS runner's two compiled columns AT ITS LAST ASSERTION (its exit
+  code says the host-name, groups and `user_by_id` assertions held
+  there), and nowhere else.
+
+### P5. The issues
+
+- Two wolf-lang issues drafted (not filed): the bounded synchronous
+  resolver builtin (std's exact shape, wolf-lang#217's first half),
+  and the host account lookup builtins (#68's future fix, ruling #99
+  R2). wolf-std#68 closes at the merge (by hand); wolf-std#4 stays
+  open until the builtin lands.
+
+### P6. One thing here is wrong in a way this list does not name.
