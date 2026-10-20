@@ -4467,8 +4467,13 @@ wolfc = "run"
 native = "run"
 
 # `process/poll_core_none.lu`: `poll_core` with no child, `(-1, 0)`.
+# sc68 (lupin 0.1.55, wolf-std#80): FLIPPED from `unsupported` as sc66
+# wrote: is77 resolves `os_wait_poll_core`, which answers the no-child
+# poll as `os_wait_poll` does, without the host (ruling #84 R9,
+# wolf-interp#263), so the row runs there (r39's `std-r39.log`, and
+# sc68's own run beside the published 0.1.55).
 [tests."process/poll_core_none.lu"]
-lupin = "unsupported"
+lupin = "run"
 wolfc = "run"
 native = "run"
 
