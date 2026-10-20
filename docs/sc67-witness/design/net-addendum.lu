@@ -1,0 +1,31 @@
+
+/// probe only
+pub enum Family {
+    V4,
+    V6,
+}
+
+/// probe only
+pub struct Addr {
+    family: Family,
+    text: str,
+}
+
+/// probe only
+pub fn is_v6(a: Addr) -> bool {
+    match a.family {
+        V4 => false,
+        V6 => true,
+    }
+}
+
+/// probe only
+pub fn v6(text: str) -> Addr {
+    Addr { family: Family.V6, text: text }
+}
+
+/// probe only
+pub struct AddrV {
+    version: int,
+    text: str,
+}

@@ -1,0 +1,7 @@
+use std.net
+
+fn main() -> !int {
+    let a = net.AddrV { version: 6, text: "::1" }
+    print("version={a.version} endpoint={net.endpoint(a.text, 443)}")
+    0
+}

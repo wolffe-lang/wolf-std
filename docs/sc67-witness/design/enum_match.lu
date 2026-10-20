@@ -1,0 +1,14 @@
+use std.net
+
+fn version(a: net.Addr) -> int {
+    match a.family {
+        V4 => 4,
+        V6 => 6,
+    }
+}
+
+fn main() -> !int {
+    let a = net.v6("::1")
+    print("version={version(a)}")
+    0
+}

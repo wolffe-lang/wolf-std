@@ -1,0 +1,9 @@
+use std.net
+
+fn main() -> !int {
+    let a = net.v6("::1")
+    var xs = List[net.Addr]()
+    (mut xs).push(a)
+    print("is_v6={net.is_v6(xs[0])} endpoint={net.endpoint(xs[0].text, 443)}")
+    0
+}
