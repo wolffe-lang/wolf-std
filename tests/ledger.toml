@@ -4355,9 +4355,14 @@ native = "run"
 # (`[os.signal.text]`, a table there would be one C library's), so the
 # row is `unsupported` there (r39's `std-r39.log`, and sc68's own run
 # beside the published 0.1.55); `divergent(stdout)` (lupin 0.1.54)
-# retires and the ledger's divergent rows are none again.
+# retires and the ledger's divergent rows are none again. On windows
+# `text(0)` and `text(kill())` are both the host's `unsupported` row
+# there, which comes before the refusal by name, so the row prints
+# `text_zero=true` and runs (measured, CI run 39508081716,
+# `rig (windows-latest)`).
 [tests."signal/text_zero.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
