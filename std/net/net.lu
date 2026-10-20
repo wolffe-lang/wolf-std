@@ -41,7 +41,8 @@
 //! resolve. `connect` hands its address string to the host, which means a
 //! hostname WOULD be resolved by the host resolver — std does not do it,
 //! does not test it, and `dns`/`resolve` is not a function this module has
-//! (see below).
+//! (see below). `Addr`, the value a resolver will answer, is here (sc67),
+//! and its tests build their addresses by hand.
 //!
 //! **Two operations sc08 withdrew are HERE now** (sc11): `read_all` and
 //! `read_lines`, with `write_line` as the sending half that pairs with
@@ -60,9 +61,9 @@
 //! `net_write`, `net_read_bytes`, `net_write_bytes`, `net_deadline`,
 //! `net_close`) — their semantics are therefore part of this
 //! module's contract and are documented per function. std owns everything
-//! else: the `Listener` and `Socket` values, the consuming closers, and
-//! the pure address helpers. The LANGUAGE owns nothing here; there is no
-//! socket syntax.
+//! else: the `Listener` and `Socket` values, the consuming closers, the
+//! pure address helpers and `Addr`. The LANGUAGE owns nothing here; there
+//! is no socket syntax.
 //!
 //! **The SECOND address family lives in `std.net.unix` (sc36).** This
 //! module is TCP over `"host:port"`; `[os.net.unix]`'s stream socket over
@@ -123,9 +124,25 @@
 //! - `peer_address` / `local_address` — `port` is the only address
 //!   information the builtin tier reports, and it reports it as an `int`
 //!   for the LOCAL end (F-0049).
-//! - UDP (`send_to`/`recv_from`), name resolution, and any HTTP: no
-//!   builtin surface at this pin, and the sprint's non-targets besides.
-//!   TLS is never this tier's business.
+//! - `resolve(name, within)` — a NAME turned into its addresses WITHOUT
+//!   dialling it (wolf-std#4, lobo's ask since ws13). Re-measured at
+//!   wolf 0.2.33 (sc67): the prelude's twenty `net_*` builtins hold no
+//!   call that takes a name and answers addresses. `net_connect`
+//!   resolves inside the dial, answers a socket, and bounds neither the
+//!   resolve nor the handshake (wolf-lang#217); `net_fetch` is the s16
+//!   sandbox probe, `unsupported` on all four machines. A resolver in
+//!   std over today's builtins would be a DNS client speaking for the
+//!   host's resolver — ignoring `/etc/hosts`, `nsswitch.conf` and the
+//!   windows resolver, and answering differently from `connect` for the
+//!   same name — which §14 forbids a capability module. So the call is
+//!   asked of wolf-lang (a bounded, synchronous `net_resolve`, its exact
+//!   shape on `Addr` below) and the VALUE it will answer ships now:
+//!   `Addr`, an address and its IP version, so a consumer (lobo's own
+//!   stub client, today) can type its answers in the shape `resolve`
+//!   will hand back.
+//! - UDP (`send_to`/`recv_from`) and any HTTP: no builtin surface at
+//!   this pin, and the sprint's non-targets besides. TLS is never this
+//!   tier's business.
 //! - ~~Byte-level `read_bytes`/`write_bytes`~~ — **HERE now (sc29).**
 //!   F-0080 predicted the fix's exact shape from the fs tier's (s90) and
 //!   s106 shipped it: `net_read_bytes`/`net_write_bytes` carry
@@ -313,9 +330,11 @@ pub fn accept(mut l: Listener) -> Socket ! {timeout, io} {
 ///
 /// **This blocks until the connection completes or fails**, and the host
 /// decides how long that takes. `addr` is handed to the host as written,
-/// so a NAME would be resolved by the host resolver — std neither resolves
-/// nor tests names, and every example here is loopback (see the module
-/// header on the no-external-network law).
+/// so a NAME would be resolved by the host resolver, on the calling
+/// thread and with no deadline (wolf-lang#217) — std neither resolves nor
+/// tests names, and every example here is loopback (see the module header
+/// on the no-external-network law, and `Addr` on the resolver std is
+/// waiting for).
 ///
 /// Capability `net`; refused at comptime (D33). Delegates to
 /// `net_connect`.
@@ -896,7 +915,6 @@ pub struct Addr {
     /// The address as text: dotted-quad (4) or RFC 5952 (6).
     text: str,
 }
-
 
 /// The options `listen_with` takes: what a prefork server needs and
 /// nothing else.
