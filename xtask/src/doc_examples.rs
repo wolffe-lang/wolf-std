@@ -211,26 +211,19 @@ pub(crate) const LUPIN_MIRROR_LAG: &[(&str, &str, &str, &str)] = &[
     // flip, which is wolf-lang#177's lesson and the reason the gate
     // refuses a waiver that has stopped being true.
     //
-    // sc66 (wolf 0.2.33 / lupin 0.1.54): two entries, one debt with one
-    // name, wolf-interp#261. s246's `os_signal_ignore_one` and
-    // `os_signal_default_one` arrive in wolf 0.2.33 and lupin 0.1.54 has
+    // sc66 (wolf 0.2.33 / lupin 0.1.54) wrote two entries, one debt with
+    // one name, wolf-interp#261: s246's `os_signal_ignore_one` and
+    // `os_signal_default_one` arrived in wolf 0.2.33 and lupin 0.1.54 had
     // never been shown them, so `std.signal`'s `ignore_one` and
-    // `reset_one` examples run on both compiler rungs and are refused by
-    // name on the reference lane. Keyed by the call, so `std.signal`'s
-    // other examples stay gated on three lanes. Both go red the day the
-    // pinned lupin runs them (is77), and leave in that commit.
-    (
-        "signal",
-        "signal.ignore_one(",
-        "`os_signal_ignore_one` does not resolve",
-        "wolf-interp#261",
-    ),
-    (
-        "signal",
-        "signal.reset_one(",
-        "`os_signal_default_one` does not resolve",
-        "wolf-interp#261",
-    ),
+    // `reset_one` examples ran on both compiler rungs and were refused by
+    // name on the reference lane. sc68 (lupin 0.1.55) RETIRES both, in
+    // the commit that lets the two blocks run on three lanes: is77
+    // resolves the calls and answers the sending shape both examples ask
+    // (`kill()`, two meanings: `invalid`), so each reaches `exit(0)` on
+    // lupin and the gate said "the mirror moved" at `signal.lu:272` and
+    // `:297` and "never fired" for both entries (r39's `std-r39.log`, and
+    // sc68's own run beside the published 0.1.55). EMPTY again, as at
+    // sc51.
 ];
 
 /// Does the reference lane's answer hold a mirror-lag entry's refusal?
