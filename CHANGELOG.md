@@ -1,5 +1,29 @@
 # Changelog
 
+## sc68 — 2026-10-20 — std at lupin 0.1.55 (wolf-std#80, with #76)
+
+**The pin.** lupin 0.1.54 -> **0.1.55** (`v0.1.55` at wolf-interp
+`e642f26`, release 418932753; linux x86-64 `1152abc0…`, binary
+`ad52ee96…`), from the release archives by digest; its conformance pin
+stays `294d626d`. wolf stays **0.2.33** (`85dab5d7`). Nothing under
+`std/` changes: r39 ships this tree as wolf 0.2.34's `STD-PIN`.
+
+**What 0.1.55 moves here, as sc66 wrote down.** is77's lupin resolves
+wolf 0.2.33's five calls, answers their shape rows and windows'
+`unsupported`, then refuses a well-formed call by name, and lets
+`text(0)` pass its shape before refusing it by name. So, on the lupin
+lane: `signal/one_rows.lu` and `process/poll_core_none.lu` run
+(`unsupported` before), on every host; `signal/text_zero.lu` is
+`unsupported` (was `divergent(stdout)`, the ledger's last divergent
+row; #76's lupin column), and runs on windows; and on windows alone
+`signal/one_host.lu`, `signal/one_fault.lu`,
+`process/exit_signal_lives.lu` and `process/wait_core_rows.lu` run,
+since the host answers there before lupin's refusal. The two
+`LUPIN_MIRROR_LAG` entries (`signal.ignore_one`, `signal.reset_one`,
+wolf-interp#261) retire: both examples reach `exit(0)` on lupin, and
+the table is empty again. 497 tests, 519 doc examples, 1,557 lane runs
+ok and none mirror-lagged.
+
 ## sc67 — 2026-10-20 — the resolver's value and the accounts' limit (wolf-std#4, #68)
 
 No pin moves: wolf 0.2.33 (`85dab5d7`), lupin 0.1.54 (`0e536e8`).
