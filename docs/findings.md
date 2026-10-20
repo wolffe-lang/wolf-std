@@ -13537,3 +13537,61 @@ unchanged, `294d626d` (wolf-lang v0.2.24). wolf 0.2.33 is unchanged,
   archive targets musl) and std's prose that still says lupin answers
   `text(0)` `invalid` (`text`'s doc and `text_zero.lu`'s header),
   which this lane may not change.
+
+## F-0155 — sc68 measured beside its predictions
+
+kasumi `~/lanes/sc68/` (`scripts/`, `evidence/`, `job-*.log`); every job
+`setsid nohup` with a pid file, SigBlk and SigIgn 0; exit statuses read
+from the tool; 0 `SKIP` lines in every log below. std-test and
+doc-examples ran inside a throwaway podman container (`--rm --network
+none --ulimit core=0:0`, the rig under `setsid -w`,
+`STD_TEST_TIMEOUT_SECS=180`), sc66's and sc67's harness.
+
+- **P1 held.** `lupin-0.1.55-x86_64-unknown-linux-gnu.tar.gz` 2,966,156 B
+  `1152abc0…` matched the release API and read twice (`job-acq.log`);
+  binary `ad52ee96…`, read twice; `lupin 0.1.55 (wolf-interp, reference
+  interpreter at pin 294d626)`; GLIBC ≤ 2.34. The API's other three:
+  `2eac1ccc…`, `5854ab26…`, `f453a793…`; CI's acquire step matched the
+  windows zip `f453a793…` and linux `1152abc0…` on arrival. wolf 0.2.33
+  `4f955e8d…`, binary `58e4ade4…`, `libwolf_rt.a` `5321ce86…`, `STD-REV`
+  `cceda631…`. The release also carries a bare `lupin.exe` beside the
+  four archives, as 0.1.54's does; nothing here reads it.
+- **P2 held on linux and windows; macOS is the full tier's.** The pin
+  commit `df04a7a` alone (trunk's ledger beside 0.1.55):
+  - kasumi `red`: std-test RED on exactly `text_zero` (`divergent(stdout)`
+    -> `unsupported`), `one_rows` and `poll_core_none` (`unsupported` ->
+    `run`), every compiled cell green (`std-test-red-df04a7a.log`
+    `4f9523d1…`); doc-examples RED on exactly `signal.lu:272` and `:297`
+    (`MIRROR MOVED`, `exit(0)`) and both entries "never fired", 1,555 ok
+    (`doc-examples-red-df04a7a.log` `7f941526…`).
+  - CI `workflow_dispatch` tier full, run 39508081716: `rig
+    (ubuntu-latest)` 118922056468 the same three rows and nothing else;
+    `gates (ubuntu-latest)` 118922056462 and `gates (windows-latest)`
+    118922056926 the same two blocks and two stale entries, 1,555 ok;
+    **`rig (windows-latest)` 118922056520 exactly the seven rows P2
+    named**: `text_zero` (`exit(0)`, stdout `text_zero=true`),
+    `one_rows`, `poll_core_none`, `one_host`, `one_fault`,
+    `exit_signal_lives` and `wait_core_rows` (the one I was less sure
+    of: the forged handle `io`, then `/bin/sh`'s `not_found`). `heard`
+    did not move. The run's two macOS jobs were still queued behind the
+    org's macOS slots when this was written.
+- **P3 held**, with the five windows cells written from that run
+  (`491d60f`, `5a50ba9`), after the linux flips (`b9c7e75`, `0f7349b`,
+  `a679633`) and the retirement (`fe406ee`). `std/` is unchanged:
+  `git diff 31b35cb -- std` is empty.
+- **P4 held on kasumi.** At `fe406ee` (the linux cells; the windows
+  cells after it are ignored off windows), `g1`, every CI step exit 0:
+  fmt, clippy, cargo test 91, sync-pin, doctor (lupin 0.1.55, pin
+  `294d626` OK), ledger-check 497, std-test **497 GREEN** (divergent
+  rows 0, host-scoped cells 16; `d4323139…`), lint-conventions,
+  fmt-lu, gen-vectors, doc-examples **519 GREEN, 1,557 ok, 0
+  mirror-lag** (`97e95bef…`), ulp. `t1`, the same under `taskset -c
+  0-3`: std-test 497 GREEN (`db515d85…`), doc-examples 519 GREEN, 1,557
+  ok (`c1953673…`).
+- **P5 held**: the red above is the plant, in CI on two hosts.
+- **P6**: as written. `text`'s doc (`std/signal/signal.lu`, "lupin
+  answers `invalid`") and `text_zero.lu`'s header now describe 0.1.54,
+  not the pin, as do the "lupin 0.1.54 does not resolve" sentences of
+  `ignore_one`, `reset_one`, `exit_signal`, `wait_status_core` and
+  `poll_core` and the headers of the sc66 rows: true of 0.1.54, each
+  owed a line at the next std lane that may change `std/`.
