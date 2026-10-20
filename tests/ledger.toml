@@ -4198,10 +4198,16 @@ native = "run"
 # `/etc/passwd` answer `none`, and the process holds groups `groups_of`
 # over `/etc/group` does not give it. Elsewhere the row prints a `SKIP:`
 # line naming why (windows: no user ids; no local directory node; the
-# super-user) and exits 0. It asks `os_uid` first on every host, which
-# lupin refuses by name, so the lupin cell holds on every host.
+# super-user) and exits 0. It asks `os_uid` first on every host: lupin
+# refuses it by name on linux and macOS, and on windows answers the
+# host's `unsupported` ROW first, so the program takes its windows SKIP
+# and runs there — a host-scoped cell, `signal/ignored_rows.lu`'s shape,
+# NOT predicted in F-0154 and observed on the plant's run 39481062793,
+# rig (windows-latest) job 118829552936 ("ledger says `unsupported`,
+# observed `run`").
 [tests."os/users/directory_accounts.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
