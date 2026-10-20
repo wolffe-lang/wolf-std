@@ -32,7 +32,8 @@ line naming why elsewhere.
 
 **Rows.** `net/addr_shape.lu` (every lane) and
 `os/users/directory_accounts.lu` (lupin `unsupported`: `os_uid` by
-name). 497 tests, 519 doc examples (was 495 and 518).
+name; `run` on windows, where the host's `unsupported` row comes first).
+497 tests, 519 doc examples (was 495 and 518).
 
 ## sc66 — 2026-10-19 — std at wolf 0.2.33: the five calls' wrappers
 
