@@ -1,0 +1,43 @@
+//! check: run(exit=0, stdout="v4: 4 127.0.0.1 -> 127.0.0.1:8080\nv6: 6 ::1 -> [::1]:8080\nlist: 2 4,6")
+//! phase: run
+//! conforms: std.net
+//!
+//! **sc67 (wolf-std#4): the value a resolver will answer, before the
+//! resolver.** At wolf 0.2.33 no builtin turns a name into addresses
+//! without dialling it, so `std.net` ships `Addr` alone and its doc names
+//! the call it is waiting for. This row holds the type's contract: two
+//! public fields a caller builds by hand (an `int` version, 4 or 6, and
+//! the address text), a `List[Addr]` — `resolve`'s answer — carried and
+//! read back, and `endpoint(a.text, port)` as the way an address becomes
+//! the string `connect` dials, a version-6 text bracketed. Pure data and
+//! a pure helper: no host is touched, so the row runs on every lane, and
+//! it names no address but loopback (the module's no-external-network
+//! law).
+
+use std.net
+
+fn shown(a: net.Addr, port_number: int) -> str {
+    "{a.version} {a.text} -> {net.endpoint(a.text, port_number)}"
+}
+
+fn main() -> !int {
+    let v4 = net.Addr { version: 4, text: "127.0.0.1" }
+    let v6 = net.Addr { version: 6, text: "::1" }
+    print("v4: {shown(v4, 8080)}")
+    print("v6: {shown(v6, 8080)}")
+    var answer = List[net.Addr]()
+    (mut answer).push(v4)
+    (mut answer).push(v6)
+    var versions = ""
+    for a in answer {
+        if versions.len > 0 {
+            versions = versions + ","
+        }
+        versions = versions + "{a.version}"
+    }
+    print("list: {answer.len} {versions}")
+    if net.endpoint(answer[0].text, 0) != net.loopback(0) {
+        return 1
+    }
+    0
+}
