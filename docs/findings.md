@@ -13439,3 +13439,101 @@ at all. **And the compilers answer the local `Fake { y: 2 }`
 `unsupported: this struct-literal head`** on checked, native and
 release, where an undeclared name is `E0301` everywhere else.
 Neither is filed (a lane files nothing); both are in the PR's list.
+
+## F-0155 — sc68's predictions, before the lupin 0.1.55 pin
+
+Written on branch `sc68` (on trunk `31b35cb`: sc67) before any file
+under `vendor/`, `tests/` or `xtask/` changed and before the archive is
+fetched on kasumi. What I read first, and so cannot claim to predict
+blind: wolf-std#80 and #76; lupin 0.1.55's CHANGELOG at `v0.1.55`
+(its "Rows that move on purpose downstream" names the three rows and
+the two examples); r39's two logs on kasumi, `std-r39.log` (wolf-std
+`11c2741` beside `lupin 0.1.55+dev.ba06e27`, a BRANCH build: std-test
+RED on exactly the three rows below, doc-examples RED on exactly the
+two `MIRROR MOVED` blocks and their two stale entries, 0 `SKIP:`) and
+`std-c0154.log` (the same std beside the published 0.1.54: both GREEN,
+495 tests, 518 blocks); r39's `fetch055.log` (the published archive's
+binary `ad52ee96…`, `--version` pin `294d626`); F-0153 (sc66's five
+deliberate flips) and the ledger at `31b35cb`.
+
+Inputs, re-derived 2026-10-20: wolf-std trunk `31b35cb`, 497 tests and
+519 doc examples (sc67 added `net/addr_shape.lu`,
+`os/users/directory_accounts.lu` and `Addr`'s example). lupin 0.1.55 is
+`v0.1.55` (annotated `047184fb`) at `e642f26`, release 418932753,
+published 22:11:27Z, read by the API and by `ls-remote`. Its pin is
+unchanged, `294d626d` (wolf-lang v0.2.24). wolf 0.2.33 is unchanged,
+`v0.2.33` (annotated `56110e4f`) at `85dab5d7`, release 417610226.
+
+### P1. The archive
+
+- lupin 0.1.55 linux x86-64 `1152abc0…` by the release API, matched on
+  kasumi and read twice; binary `ad52ee96…` (r39's reading);
+  `lupin 0.1.55 (wolf-interp, reference interpreter at pin 294d626)`;
+  GLIBC ≤ 2.34. The other three, as CI checks them on arrival:
+  aarch64-apple-darwin `2eac1ccc…`, aarch64-unknown-linux-gnu
+  `5854ab26…`, x86_64-pc-windows-msvc (a zip) `f453a793…`. wolf 0.2.33
+  linux x86-64 `4f955e8d…` (binary `58e4ade4…`) as sc66 and sc67 read it.
+
+### P2. The red: trunk's ledger beside the published 0.1.55
+
+- Trunk's tree with only `vendor/tools.toml` moved to 0.1.55, on kasumi
+  (in a container) and on CI's three hosts: std-test RED on the lupin
+  lane alone and on no compiled cell. On linux and macOS exactly three
+  rows: `signal/text_zero.lu` (ledger `divergent(stdout)`, observed
+  `unsupported`: `text(0)` passes the shape and is refused by name),
+  `signal/one_rows.lu` and `process/poll_core_none.lu` (ledger
+  `unsupported`, observed `run`). doc-examples RED on exactly
+  `std/signal/signal.lu:272` and `:297` (`MIRROR MOVED`, observed
+  `exit(0)`) and the two entries' "never fired"; 519 blocks, 1,555 ok.
+- **windows answers more**, because the host's `unsupported` comes
+  before lupin's refusal by name wherever a row asks a call windows
+  refuses first (the clause order sc66 met for the checked machine).
+  Predicted `run` on lupin on windows, each a red there against
+  trunk's ledger: `text_zero` (`text(0)` and `text(kill())` both the
+  host's `unsupported`, so `text_zero=true`), `one_rows` and
+  `poll_core_none` (as on every host), and three rows r39 could not
+  see from linux: `signal/one_host.lu` and `signal/one_fault.lu` (the
+  first `ignore_one` is the host's `unsupported`, so the row prints its
+  windows lines) and `process/exit_signal_lives.lu` (the shape row,
+  then the host's `unsupported`, exit 156). And a fourth, less sure:
+  `process/wait_core_rows.lu` (the forged handle `io`, then `/bin/sh`
+  `not_found`, the windows lines). `signal/heard.lu` does not move
+  (lupin's listen refuses a well-formed call by name on every host).
+  No other row moves on any host.
+
+### P3. The change
+
+- The pin (`vendor/tools.toml`, its own commit): `version = "0.1.55"`,
+  the entry naming the four digests and the binary's; the conformance
+  pin key unchanged.
+- The ledger, one commit per row, each citing sc66's line and is77's
+  change: `text_zero` `lupin = "unsupported"`; `one_rows` and
+  `poll_core_none` `lupin = "run"`. A `lupin-windows = "run"` cell for
+  each row whose windows answer P2 predicts differs from its lane's,
+  written only from what CI measured.
+- `xtask/src/doc_examples.rs`: both `LUPIN_MIRROR_LAG` entries retired;
+  the table is empty again, as at sc51.
+- Nothing under `std/` changes: r39 ships this sha as `STD-PIN`.
+
+### P4. Green
+
+- At the head, kasumi (container, plain and `taskset -c 0-3`) and CI:
+  std-test **497 GREEN**, doc-examples **519 GREEN**, **1,557 ok** and
+  0 mirror-lag, 0 `SKIP:`; divergent rows 1 -> 0. The contract's
+  "1,554 ok" was 11c2741's 518 blocks; sc67's example makes it 1,557.
+
+### P5. The plant
+
+- The red of P2 IS the plant: the pin commit alone, before the flips,
+  run in CI. tier pr is ubuntu alone and P2 is a claim about macOS and
+  windows too, so it runs as one `workflow_dispatch` of tier full
+  (sc67's precedent), the run id and jobs cited.
+
+### P6. #76
+
+- What is due here is #76's lupin column at the 0.1.55 pin, and it is
+  `text_zero`'s (`group_rows.lu` does not move: sc66 took `text_zero`
+  out of it). What remains of #76: musl's words for 0 (no release
+  archive targets musl) and std's prose that still says lupin answers
+  `text(0)` `invalid` (`text`'s doc and `text_zero.lu`'s header),
+  which this lane may not change.
