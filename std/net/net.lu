@@ -836,6 +836,68 @@ pub fn loopback(port_number: int) -> str {
     endpoint("127.0.0.1", port_number)
 }
 
+/// One address of a host: its IP version and its text — the element
+/// `resolve` will answer, and the part of a resolver std can fix before
+/// the call that makes one exists.
+///
+/// **Nothing in std makes or takes an `Addr` at this pin, and this doc
+/// says why rather than hiding it.** A name cannot be turned into its
+/// addresses without dialling it (wolf-std#4): no builtin at wolf 0.2.33
+/// resolves (re-measured by sc67; the module header has the list), and a
+/// DNS client written here would speak for the host's resolver without
+/// being it. The builtin std is waiting for is asked of wolf-lang, the
+/// first half of wolf-lang#217 with its shape made exact:
+///
+/// ```text
+/// net_resolve(name: str, within_ms: int) -> List[str] ! {invalid, not_found, timeout, io}
+/// ```
+///
+/// Synchronous and bounded: it returns inside `within_ms` with the host
+/// resolver's answer (`/etc/hosts`, `nsswitch.conf`, the windows
+/// resolver — the same addresses, in the same order, `connect` would
+/// try) or with `timeout`; `not_found` when the resolver says the name
+/// has no address, `invalid` for a name or budget refused before the
+/// host, `io` for every other failure, a temporary one included. Over
+/// it std ships `resolve(name, within) -> List[Addr] ! {invalid,
+/// not_found, timeout, io}` (the spelling is that lane's), and this
+/// type is its element, unchanged.
+///
+/// Two fields, both public, so a caller builds one directly — a
+/// consumer with its own stub client (lobo's, today) can type its
+/// answers in the shape `resolve` will hand back:
+///
+/// - `version` is the address family as its IP VERSION, **4 or 6** —
+///   the number the IP header itself carries, never the host's
+///   `AF_INET`/`AF_INET6` constant, which differs between linux, macOS
+///   and windows. An `int` rather than an enum on purpose: at this pin
+///   no caller on any of the four machines can name an imported enum's
+///   variant, and lupin cannot match one (sc67's probes, F-0154).
+/// - `text` is the address as the resolver writes it: dotted-quad for
+///   version 4, RFC 5952 text for version 6, which always holds a `:`,
+///   so the two forms never meet. It is a HOST, not an endpoint:
+///   `endpoint(a.text, port)` makes the string `connect` dials, and
+///   brackets a version-6 address on the way.
+///
+/// Nothing is validated, as nothing is in `endpoint`: a hand-built
+/// `Addr` whose text the host cannot parse comes back as an `io` row
+/// from `connect`, where the host is the authority, and `version` is the
+/// builder's claim, which a resolver's answer always makes true. Pure
+/// data: no capability, comptime-safe.
+///
+/// ```wolf-doc-example
+/// let a = net.Addr { version: 6, text: "::1" }
+/// a.version == 6 && net.endpoint(a.text, 443) == "[::1]:443"
+/// let b = net.Addr { version: 4, text: "127.0.0.1" }
+/// net.endpoint(b.text, 0) == net.loopback(0)
+/// ```
+pub struct Addr {
+    /// The IP version: 4 or 6.
+    version: int,
+    /// The address as text: dotted-quad (4) or RFC 5952 (6).
+    text: str,
+}
+
+
 /// The options `listen_with` takes: what a prefork server needs and
 /// nothing else.
 ///
