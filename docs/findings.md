@@ -13410,3 +13410,32 @@ macOS arm64 digests CI checks are `9152dbd1…` (wolf) and `9cd14db7…`
   open until the builtin lands.
 
 ### P6. One thing here is wrong in a way this list does not name.
+
+## F-0154 — sc67 measured beside its predictions
+
+Scored in place; the predictions above are unchanged. kasumi paths are
+under `~/lanes/sc67/`; the probes and their logs are committed in
+`docs/sc67-witness/`.
+
+| # | predicted | measured | verdict |
+|---|---|---|---|
+| P1 | `Addr { version: int, text: str }`; `net/addr_shape.lu` runs on three columns; red against trunk's std on the two compiler columns and on lupin; 519 examples, 1,555 ok + 2 mirror-lag | the type and the row as written (`623b29e`, `94c5970`); the row `exit(0)` with its stdout on lupin, checked, native and release, plain and under `taskset -c 0-3` (`probe-rows-head.log`, `probe-rows-head-taskset.log`). Against trunk's std (`ae19f16`): `fail(E0301)` on checked, native and release, and **`exit(0)` on lupin** with the same stdout (`probe-rows-trunk-std.log`). doc-examples 519 blocks, 1,555 ok + 2 mirror-lag, 0 DOC BUG (kasumi g1, g2) | right but for lupin: **lupin 0.1.54 builds a struct literal whose type does not exist** (below) |
+| P2 | header and docs; the row `SKIP:`s on linux and windows, runs its four assertions on macOS; lupin `unsupported` on every host | header `7fc205a`, docs `a3742e7`, row `c20425e`. linux (kasumi, inside the container): one `SKIP:` line per compiled lane ("no directory service here (/var/db/dslocal/nodes/Default absent)"), lupin refused by name (`os_uid`, `[os.proc.ids.note]` R10). **Wrong on windows**: lupin answers the HOST's `unsupported` row before its refusal, as every machine does there, so the row takes its windows `SKIP:` and runs: plant run 39481062793, `rig (windows-latest)` 118829552936, "ledger says `unsupported`, observed `run`"; the `lupin-windows` cell is `a2d27b3`. macOS: the plant's red (P4) is at `exit(4)` on both compiled columns, so on CI's runner `/usr/bin/id -un` named the uid, the process held a group `groups_of` does not give the name, and `user_by_id` answered `none`, all three; the numbers themselves are unread (an exit-only directive prints no stdout), so "12 and 61 among them" is unmeasured | right on linux and macOS, wrong on windows' lupin |
+| P3 | std-test 497 GREEN on kasumi and CI; no ledger word moves; `tier pr` green | kasumi g1 at `a3742e7` (container): every step exit 0, std-test **497 GREEN** (divergent rows 1, host-scoped cells 15; `std-test-g-a3742e7.log` `4d836407…`), doc-examples 519 GREEN (`7a299f43…`), fmt-lu 551, lint-conventions 497, ulp 200; g2 the same two under `taskset -c 0-3` (`4a1562af…`, `8ae2c368…`). CI pull_request run 39481125335 at `a3742e7`: `tier pr` success (rig 118829774378, gates 118829774518). One ledger cell added after (P2's windows miss) | right, with the cell |
+| P4 | plants red: (a) `addr_shape` on three columns, three hosts, and `Addr`'s example on three lanes; (b) `whole_files` everywhere, `user_named`'s example on three lanes, `directory_accounts` on macOS's two compiled columns at its last assertion and nowhere else | run 39481062793 (`sc67-plant` at `71eeded`, tier full), every job failure. (a) `addr_shape` `fail(E0403)` on wolfc and native on ubuntu (118829552968), macOS (118829552726) and windows (118829552936); `Addr`'s example `net.lu:906` `fail(E0408)` on wolfc and native in all three `gates` jobs (118829552924, 118829552962, 118829553108). **Not on lupin**, by P1's miss. (b) `whole_files` red on all three lanes on all three hosts; `users.lu:276` `exit(5)` on all three lanes in every `gates` job; `directory_accounts` `exit(4)` on wolfc and native on macOS only | right on (b); (a) wrong on lupin |
+| P5 | two wolf-lang issues drafted; #68 closes at merge, #4 stays open | as predicted (the texts are in the PR) | right |
+| P6 | one thing wrong this list does not name | two: lupin's loose struct literals, and the windows cell | — |
+
+**lupin builds what does not exist** (`docs/sc67-witness/loose/`,
+`probe-loose.log`): `net.NoSuchType { version: 4, text: "…" }` runs
+and prints its fields; so does `net.Addr { versio: 4, … }` (a field
+`Addr` lacks), a LOCAL `Fake { y: 2 }` beside a declared `Real`, and a
+function whose parameter is typed `net.NoSuchType`. The compilers
+answer `E0301`, `E0408`/`E0403` and `E0301`. wolf-interp#79 (a type
+annotation never resolved) and #94 (a struct literal missing a field)
+are the closed neighbours; this is their qualified and literal-head
+half, and it is why a std row about a TYPE's shape has no red on lupin
+at all. **And the compilers answer the local `Fake { y: 2 }`
+`unsupported: this struct-literal head`** on checked, native and
+release, where an undeclared name is `E0301` everywhere else.
+Neither is filed (a lane files nothing); both are in the PR's list.
