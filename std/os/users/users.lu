@@ -15,7 +15,42 @@
 //! `id` and `ls -l` need and all a module without a name service can
 //! honestly offer. A host that keeps its accounts somewhere else (a
 //! directory service, macOS's for most of its users) is not answered by
-//! these files, and this module does not pretend otherwise.
+//! these files, and this module does not pretend otherwise — the next
+//! paragraph says exactly what that costs.
+//!
+//! **What the two files cannot see** (wolf-std#68, ruling #99 R2: the
+//! limit is documented, and the fix is a builtin, not a better reader).
+//! macOS keeps every ordinary user — every account System Settings
+//! makes — and every local user's group memberships in its directory
+//! service (Open Directory, whose local node is
+//! `/var/db/dslocal/nodes/Default`). Its `/etc/passwd` and `/etc/group`
+//! carry `root`, `nobody`, `daemon` and the system's `_` accounts, and
+//! the password file's own header says it is "consulted directly only
+//! when the system is running in single-user mode". On linux the same is
+//! true of every account `nsswitch.conf` sends elsewhere: LDAP, NIS,
+//! SSSD, systemd's dynamic users. For such an account each lookup here
+//! answers `none`, `users` and `groups` leave it out, and `groups_of`
+//! gives the primary id it was handed and nothing more — so `id NAME`,
+//! `whoami`, `chown user:group`, `chgrp` and `groups` written over this
+//! module say "no such user" where the host's own tools answer. bu24
+//! measured it: 30 name-printing cases skip on CI's macOS runner, whose
+//! own account is the directory service's, and
+//! `tests/os/users/directory_accounts.lu` holds it as a row there: the
+//! host names the runner's uid, `/etc/passwd` answers `none` for it by
+//! id and by name, and `groups_of` misses groups the process holds.
+//!
+//! A pure reader cannot see a name service, so nothing here will grow
+//! one. The future fix is a host account lookup — the C library's
+//! `getpwnam`, `getpwuid`, `getgrnam`, `getgrgid` and `getgrouplist`,
+//! which ask whatever the host is configured to ask — as wolf builtins,
+//! asked of wolf-lang from wolf-std#68; when they land, host lookups ship
+//! BESIDE these functions and every function here keeps its answer.
+//! Until then two things still work on every host: the NUMBERS
+//! (`std.env.uid`, `std.env.groups`, `std.fs.stat` answer ids whatever
+//! keeps the names, and printing the number when a lookup is `none` is
+//! what `id` itself does for an id no name service knows), and the
+//! host's own tool, started through `std.process` — `/usr/bin/id -un`
+//! is how the row above learns the name the files do not hold.
 //!
 //! **What it is for.** `std.env.uid` and `std.fs.stat` answer NUMBERS;
 //! this is where a number gets its name and a name its number, and
