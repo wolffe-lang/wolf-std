@@ -21,10 +21,12 @@
 //! directory node (`/var/db/dslocal/nodes/Default`) keeps its local
 //! accounts in the files, so there is nothing to show; and the
 //! super-user's account is one `/etc/passwd` carries on macOS too.
-//! Every host asks `env.uid()` FIRST, so the reference lane, which
-//! refuses `os_uid` by name, answers the same on every host. The texts
-//! are read, never written; the one child is `/usr/bin/id`, which this
-//! row starts and waits for.
+//! Every host asks `env.uid()` FIRST, so the reference lane refuses the
+//! row by name (`os_uid`) on linux and macOS alike; on windows it answers
+//! the host's `unsupported` row before that refusal, as every machine
+//! does there, and the row takes its windows SKIP (the ledger's
+//! `lupin-windows` cell). The texts are read, never written; the one
+//! child is `/usr/bin/id`, which this row starts and waits for.
 
 use std.env
 use std.fs
