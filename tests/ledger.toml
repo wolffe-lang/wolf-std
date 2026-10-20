@@ -4192,6 +4192,19 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# sc67 (wolf-std#68, ruling #99 R2): the files' limit where it bites. On
+# macOS the account this process runs as is the directory service's: the
+# host names it (`/usr/bin/id -un`), `user_by_id` and `user_named` over
+# `/etc/passwd` answer `none`, and the process holds groups `groups_of`
+# over `/etc/group` does not give it. Elsewhere the row prints a `SKIP:`
+# line naming why (windows: no user ids; no local directory node; the
+# super-user) and exits 0. It asks `os_uid` first on every host, which
+# lupin refuses by name, so the lupin cell holds on every host.
+[tests."os/users/directory_accounts.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
 # The owner calls that change nothing: lupin serves `fs_set_owner` and
 # `fs_set_owner_fd` through the standard library, so three lanes.
 [tests."fs/owner_rows.lu"]

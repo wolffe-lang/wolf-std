@@ -1,0 +1,156 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.os.users, std.env, std.fs, std.process, err.row
+//!
+//! **sc67 (wolf-std#68, ruling #99 R2): the limit, measured where it
+//! bites.** `std.os.users` reads the two account FILES and nothing else,
+//! and macOS keeps its ordinary users in the directory service, not in
+//! `/etc/passwd` (the file's own header says it is "consulted directly
+//! only when the system is running in single-user mode"). So on macOS
+//! the account this process runs as is one the HOST knows and the files
+//! do not: `/usr/bin/id -un`, which asks the host's name service, names
+//! the uid, while `user_by_id` and `user_named` over `/etc/passwd`
+//! answer `none` for it, and the process holds groups (`env.groups()`)
+//! that `groups_of` over `/etc/group` does not give that name. That is
+//! what `id`, `whoami`, `chown user:group` and `groups` see when they
+//! are written over this module (bu24's 30 macOS skips), and it is the
+//! documented limit, not a bug in the reader.
+//!
+//! **Skipped by name elsewhere, loudly** (a `SKIP:` line on stdout, one
+//! per lane run): windows has no user ids; a host without macOS's local
+//! directory node (`/var/db/dslocal/nodes/Default`) keeps its local
+//! accounts in the files, so there is nothing to show; and the
+//! super-user's account is one `/etc/passwd` carries on macOS too.
+//! Every host asks `env.uid()` FIRST, so the reference lane, which
+//! refuses `os_uid` by name, answers the same on every host. The texts
+//! are read, never written; the one child is `/usr/bin/id`, which this
+//! row starts and waits for.
+
+use std.env
+use std.fs
+use std.os.users
+use std.process
+
+fn skip(why: str) {
+    print("SKIP: os/users/directory_accounts.lu: {why}")
+}
+
+// The host's own name for this process's user: `/usr/bin/id -un`'s
+// output, its newline removed. `io` if it cannot be asked or answers
+// nothing.
+fn host_name() -> str ! {io} {
+    var p = process.pipe() else |_| {
+        return io
+    }
+    var c = process.command("/usr/bin/id")
+    process.push_arg(mut c, "-un")
+    process.set_stdout(mut c, p.write)
+    var ch = process.start(c) else |_| {
+        return io
+    }
+    fs.close(take p.write) else |_| {
+        return io
+    }
+    var out = ""
+    var more = true
+    while more {
+        let chunk = fs.read(mut p.read, 256) else |e| match e {
+            eof => {
+                more = false
+                ""
+            },
+            utf8 => {
+                return io
+            },
+            io => {
+                return io
+            },
+        }
+        out = out + chunk
+    }
+    fs.close(take p.read) else |_| {
+        return io
+    }
+    let code = process.wait(take ch) else |_| {
+        return io
+    }
+    if code != 0 {
+        return io
+    }
+    let lines = out.lines()
+    if lines.len != 1 || lines[0].len == 0 {
+        return io
+    }
+    lines[0]
+}
+
+fn by_id(text: str, uid: int) -> str {
+    let u = users.user_by_id(text, uid) else |e| {
+        return match e {
+            none => "none",
+        }
+    }
+    "found {u.name}"
+}
+
+fn by_name(text: str, name: str) -> str {
+    let u = users.user_named(text, name) else |e| {
+        return match e {
+            none => "none",
+        }
+    }
+    "found {u.uid}"
+}
+
+fn main() -> !int {
+    let uid = env.uid() else |_| {
+        skip("this host has no user ids (windows)")
+        return 0
+    }
+    let node = "/var/db/dslocal/nodes/Default"
+    if !fs.exists(node) {
+        skip("no directory service here ({node} absent): local accounts live in the files")
+        return 0
+    }
+    if uid == 0 {
+        skip("running as the super-user, whose account /etc/passwd carries")
+        return 0
+    }
+    let passwd = fs.read_text("/etc/passwd")?
+    let group = fs.read_text("/etc/group")?
+    let gid = env.gid()?
+    let held = env.groups()?
+    let name = host_name()?
+    print("directory service: {node}")
+    print("the host names uid {uid}: {name}")
+    // The groups the process holds that the group FILE does not give this
+    // name — `groups NAME`, written over this module, would leave them out.
+    let filed = users.groups_of(group, name, gid)
+    var unseen = 0
+    for g in held {
+        var listed = false
+        for f in filed {
+            if f == g {
+                listed = true
+            }
+        }
+        if !listed {
+            unseen = unseen + 1
+        }
+    }
+    print("groups the process holds and the file does not give {name}: {unseen} of {held.len}")
+    if unseen == 0 {
+        return 2
+    }
+    let id_answer = by_id(passwd, uid)
+    print("user_by_id over /etc/passwd: {id_answer}")
+    if id_answer != "none" {
+        return 3
+    }
+    let name_answer = by_name(passwd, name)
+    print("user_named over /etc/passwd: {name_answer}")
+    if name_answer != "none" {
+        return 4
+    }
+    0
+}
