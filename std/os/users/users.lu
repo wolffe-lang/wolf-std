@@ -214,7 +214,10 @@ pub fn parse_group(line: str) -> Group ! {parse} {
 ///
 /// Total and PURE. A line that is not a user line (blank, a `#`
 /// comment, a `+`/`-` entry, malformed) is passed over; `parse_user`
-/// says why one line is refused.
+/// says why one line is refused. **Every user the FILE holds, not every
+/// user the host has**: on macOS the list read from `/etc/passwd` is
+/// root, nobody, daemon and the `_` system accounts, never the people
+/// (the module header's "What the two files cannot see").
 ///
 /// ```wolf-doc-example
 /// let all = users.users("# accounts\nroot:x:0:0:root:/root:/bin/sh\nbroken line\nwolf:x:1000:1000::/home/wolf:\n")
@@ -238,7 +241,9 @@ pub fn users(text: str) -> List[User] {
 /// file's order.
 ///
 /// Total and PURE. Lines that are not group lines are passed over, as
-/// `users` passes them.
+/// `users` passes them. Every group the FILE holds, with the members the
+/// file writes: a group or a membership the host keeps elsewhere (macOS's
+/// directory service, LDAP, NIS) is not in it.
 ///
 /// ```wolf-doc-example
 /// let all = users.groups("root:x:0:\npack:x:2000:wolf,cub\n\n")
@@ -262,7 +267,11 @@ pub fn groups(text: str) -> List[Group] {
 ///
 /// PURE. The first line wins, as it does for the host's own reader.
 ///
-/// Rows: `none` when no user line carries that name. Never traps.
+/// Rows: `none` when no user line carries that name — which is also
+/// the answer for an account the host keeps outside the file (macOS's
+/// directory service, LDAP, NIS), however well the host knows it; the
+/// module header says what that costs `su`, `chown` and `id`. Never
+/// traps.
 ///
 /// ```wolf-doc-example
 /// let text = "root:x:0:0:root:/root:/bin/sh\nwolf:x:1000:1000::/home/wolf:/bin/sh\n"
@@ -285,7 +294,10 @@ pub fn user_named(text: str, name: str) -> User ! {none} {
 ///
 /// PURE. Two names may share an id; the first line wins.
 ///
-/// Rows: `none` when no user line carries that id. Never traps.
+/// Rows: `none` when no user line carries that id — also for an id
+/// whose account the host keeps outside the file, which on macOS is the
+/// id of every ordinary user (`id` and `ls -l` print the NUMBER then).
+/// Never traps.
 ///
 /// ```wolf-doc-example
 /// let text = "root:x:0:0:root:/root:/bin/sh\nwolf:x:1000:1000::/home/wolf:/bin/sh\n"
@@ -305,7 +317,8 @@ pub fn user_by_id(text: str, uid: int) -> User ! {none} {
 ///
 /// PURE.
 ///
-/// Rows: `none` when no group line carries that name. Never traps.
+/// Rows: `none` when no group line carries that name, including a group
+/// the host keeps outside the file (the module header). Never traps.
 ///
 /// ```wolf-doc-example
 /// let g = users.group_named("root:x:0:\npack:x:2000:wolf\n", "pack")?
@@ -324,7 +337,8 @@ pub fn group_named(text: str, name: str) -> Group ! {none} {
 ///
 /// PURE.
 ///
-/// Rows: `none` when no group line carries that id. Never traps.
+/// Rows: `none` when no group line carries that id, including a group
+/// the host keeps outside the file (the module header). Never traps.
 ///
 /// ```wolf-doc-example
 /// let g = users.group_by_id("root:x:0:\npack:x:2000:wolf\n", 2000)?
@@ -348,6 +362,14 @@ pub fn group_by_id(text: str, gid: int) -> Group ! {none} {
 /// the file alone decides it), and the third argument of
 /// `std.process.set_ids`: `process.set_ids(u.uid, u.gid,
 /// users.groups_of(group_text, u.name, u.gid))`.
+///
+/// **As far as the file alone decides it, and no further.** A
+/// membership the host records elsewhere is not here: macOS writes no
+/// local user into `/etc/group` (the directory service holds every
+/// membership), so for such a user this answers `[gid]` alone while the
+/// process the host started holds more (`std.env.groups()` reads
+/// those). A program that drops privileges to a directory-service user
+/// over this list drops them further than a login would.
 ///
 /// Total and PURE.
 ///
