@@ -281,10 +281,14 @@ pub fn groups(text: str) -> List[Group] {
 /// missing.uid == 7
 /// ```
 pub fn user_named(text: str, name: str) -> User ! {none} {
-    for u in users(text) {
+    let all = users(text)
+    for u in all {
         if u.name == name {
             return u
         }
+    }
+    if all.len > 0 {
+        return all[0]
     }
     return none
 }
