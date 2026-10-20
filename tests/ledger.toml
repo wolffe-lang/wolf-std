@@ -4350,8 +4350,14 @@ native = "run"
 # `text_zero=false`: `divergent(stdout)` (wolf-interp#262). Red the day
 # lupin answers anything else (is77 refuses `text(0)` by name, which
 # would read `unsupported`), and the flip is deliberate.
+# sc68 (lupin 0.1.55, wolf-std#80, #76): FLIPPED, as sc66 wrote. is77's
+# lupin passes `text(0)`'s shape and refuses the call by name
+# (`[os.signal.text]`, a table there would be one C library's), so the
+# row is `unsupported` there (r39's `std-r39.log`, and sc68's own run
+# beside the published 0.1.55); `divergent(stdout)` (lupin 0.1.54)
+# retires and the ledger's divergent rows are none again.
 [tests."signal/text_zero.lu"]
-lupin = "divergent(stdout)"
+lupin = "unsupported"
 wolfc = "run"
 native = "run"
 
