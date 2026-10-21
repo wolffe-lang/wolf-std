@@ -1,0 +1,45 @@
+== process__exit_signal_lives
+  lupin    unsupported [`os_exit_signal` ends this process by a signal, a `sigaction` back to the default and a `raise(3)`: std has neither, and this machine admits no `unsafe` ([os.signal.exit], [os.signal.gaps.note] R2, [os.signal.group.note] R8)] ''
+  checked  unsupported [`os_exit_signal` (the checked machine does not end the process it runs in by a signal; [os.signal.exit])] ''
+  native   exit(156) 'exit_signal_zero=invalid\n'
+  release  exit(156) 'exit_signal_zero=invalid\n'
+== process__poll_core_none
+  lupin    exit(0) 'changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'
+  checked  exit(0) 'changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'
+  native   exit(0) 'changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'
+  release  exit(0) 'changed=false\nlive=0\nslot=-1\nkind=none\ncore=false\nagain=false 0 false\n'
+== process__status_core_rows
+  lupin    exit(0) '-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'
+  checked  exit(0) '-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'
+  native   exit(0) '-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'
+  release  exit(0) '-267: signal 11 shell 139 core\n-257: signal 1 shell 129 core\n-511: signal 255 shell 383 core\n-11: signal 11 shell 139\n-9: signal 9 shell 137\n-256: signal 256 shell 384\n-512: signal 512 shell 640\n0: exit 0 shell 0\n3: exit 3 shell 3\n275: stop 19 shell 147\n512: none shell 512\nreleased_unchanged=true\n'
+== process__wait_core_rows
+  lupin    unsupported [`os_wait_poll_core` with a live child asks the host for a stop: std's `try_wait` sees an end but never a stop (no `waitpid` with `WUNTRACED`), and this machine admits no `unsafe` ([os.proc.poll], [os.proc.wait.note] R9)] ''
+  checked  exit(0) 'forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io\n'
+  native   exit(0) 'forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io\n'
+  release  exit(0) 'forged=io\nterm=-15 signal 15 shell 143 core=false\nexit=3 exit 3 core=false\npolled=signal 15 core=false same_child=true\nnone_left=true\nreaped=io\n'
+== signal__group_rows
+  lupin    exit(0) 'group_one=invalid\ngroup_zero=invalid\ngroup_negative=invalid\ngroup_wide=invalid\ngroup_two_meanings=invalid\ngroup_unpublished=invalid\nall_two_meanings=invalid\nall_unpublished=invalid\njoin_negative=invalid\njoin_wide=invalid\ntext_two_meanings=invalid\nhost_nine=-9\n'
+  checked  exit(0) 'group_one=invalid\ngroup_zero=invalid\ngroup_negative=invalid\ngroup_wide=invalid\ngroup_two_meanings=invalid\ngroup_unpublished=invalid\nall_two_meanings=invalid\nall_unpublished=invalid\njoin_negative=invalid\njoin_wide=invalid\ntext_two_meanings=invalid\nhost_nine=-9\n'
+  native   exit(0) 'group_one=invalid\ngroup_zero=invalid\ngroup_negative=invalid\ngroup_wide=invalid\ngroup_two_meanings=invalid\ngroup_unpublished=invalid\nall_two_meanings=invalid\nall_unpublished=invalid\njoin_negative=invalid\njoin_wide=invalid\ntext_two_meanings=invalid\nhost_nine=-9\n'
+  release  exit(0) 'group_one=invalid\ngroup_zero=invalid\ngroup_negative=invalid\ngroup_wide=invalid\ngroup_two_meanings=invalid\ngroup_unpublished=invalid\nall_two_meanings=invalid\nall_unpublished=invalid\njoin_negative=invalid\njoin_wide=invalid\ntext_two_meanings=invalid\nhost_nine=-9\n'
+== signal__one_fault
+  lupin    unsupported [`os_signal_ignore_one` sets one signal's disposition: std has no `sigaction`, and this machine admits no `unsafe` ([os.signal.disp.one], [os.signal.gaps.note] R1, [os.signal.group.note] R8)] ''
+  checked  unsupported [`os_signal_ignore_one`/`os_signal_default_one` of a fault meaning (SEGMENT_FAULT, BUS_ERROR: the `wolf` process's own stack guard holds them; [os.signal.disp.one])] ''
+  native   exit(0) 'segment_fault=ok ok\nbus_error=ok ok\n'
+  release  exit(0) 'segment_fault=ok ok\nbus_error=ok ok\n'
+== signal__one_host
+  lupin    unsupported [`os_signal_ignore_one` sets one signal's disposition: std has no `sigaction`, and this machine admits no `unsafe` ([os.signal.disp.one], [os.signal.gaps.note] R1, [os.signal.group.note] R8)] ''
+  checked  exit(0) 'user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok\n'
+  native   exit(0) 'user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok\n'
+  release  exit(0) 'user_ignored=true\nuser_reset=true\nuser_by_number_ignored=true\nuser_by_number_reset=true\narithmetic=ok ok\nkill_by_number=invalid\nstop_by_number=invalid\npast_last=invalid\nrealtime_ignored_lived=true\nrealtime_reset=ok\n'
+== signal__one_rows
+  lupin    exit(0) 'ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'
+  checked  exit(0) 'ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'
+  native   exit(0) 'ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'
+  release  exit(0) 'ignore_one_zero=invalid\nignore_one_kill=invalid\nignore_one_stop=invalid\nignore_one_two_meanings=invalid\nignore_one_unpublished=invalid\nreset_one_zero=invalid\nreset_one_kill=invalid\nreset_one_stop=invalid\nreset_one_two_meanings=invalid\nreset_one_unpublished=invalid\nexit_signal_zero=invalid\nexit_signal_two_meanings=invalid\nexit_signal_unpublished=invalid\nfar_host_number=true\n'
+== signal__text_zero
+  lupin    unsupported [`os_signal_text` reads the C library's words for a signal: std has no `strsignal`, and this machine admits no `unsafe` ([os.signal.text], [os.signal.group.note] R8)] ''
+  checked  exit(0) 'text_zero=true\n'
+  native   exit(0) 'text_zero=true\n'
+  release  exit(0) 'text_zero=true\n'

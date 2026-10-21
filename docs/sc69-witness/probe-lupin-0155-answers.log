@@ -1,0 +1,60 @@
+== lp__chan_in_fn
+  lupin    exit(0) 'got=x\n'
+  checked  exit(0) 'got=x\n'
+  native   unsupported [a zero value of this type @178..188] ''
+  release  unsupported [a zero value of this type @178..188] ''
+== lp__chan_in_main
+  lupin    exit(0) 'got=x\n'
+  checked  exit(0) 'got=x\n'
+  native   exit(0) 'got=x\n'
+  release  exit(0) 'got=x\n'
+== lp__chan_in_main_std
+  lupin    exit(0) 'got=x 1\n'
+  checked  exit(0) 'got=x 1\n'
+  native   exit(0) 'got=x 1\n'
+  release  exit(0) 'got=x 1\n'
+== lp__fork_word
+  lupin    unsupported [`os_fork` does not resolve] ''
+  checked  exit(0) 'fork=unsupported\n'
+  native   exit(0) 'fork=forked 0\n'
+  release  exit(0) 'fork=forked 0\n'
+== lp__l_exit_signal
+  lupin    unsupported [`os_exit_signal` ends this process by a signal, a `sigaction` back to the default and a `raise(3)`: std has neither, and this machine admits no `unsafe` ([os.signal.exit], [os.signal.gaps.note] R2, [os.signal.group.note] R8)] ''
+  checked  unsupported [`os_exit_signal` (the checked machine does not end the process it runs in by a signal; [os.signal.exit])] ''
+  native   exit(156) ''
+  release  exit(156) ''
+== lp__l_ignore_one
+  lupin    unsupported [`os_signal_ignore_one` sets one signal's disposition: std has no `sigaction`, and this machine admits no `unsafe` ([os.signal.disp.one], [os.signal.gaps.note] R1, [os.signal.group.note] R8)] ''
+  checked  exit(0) 'ignored\n'
+  native   exit(0) 'ignored\n'
+  release  exit(0) 'ignored\n'
+== lp__l_poll_core_child
+  lupin    unsupported [`os_wait_poll_core` with a live child asks the host for a stop: std's `try_wait` sees an end but never a stop (no `waitpid` with `WUNTRACED`), and this machine admits no `unsafe` ([os.proc.poll], [os.proc.wait.note] R9)] ''
+  checked  exit(0) 'started\npolled=true core=false same=true\n'
+  native   exit(0) 'started\npolled=true core=false same=true\n'
+  release  exit(0) 'started\npolled=true core=false same=true\n'
+== lp__l_reset_one
+  lupin    unsupported [`os_signal_default_one` sets one signal's disposition: std has no `sigaction`, and this machine admits no `unsafe` ([os.signal.disp.one], [os.signal.gaps.note] R1, [os.signal.group.note] R8)] ''
+  checked  exit(0) 'reset\n'
+  native   exit(0) 'reset\n'
+  release  exit(0) 'reset\n'
+== lp__l_text_zero
+  lupin    unsupported [`os_signal_text` reads the C library's words for a signal: std has no `strsignal`, and this machine admits no `unsafe` ([os.signal.text], [os.signal.group.note] R8)] ''
+  checked  exit(0) 'Unknown signal 0\n'
+  native   exit(0) 'Unknown signal 0\n'
+  release  exit(0) 'Unknown signal 0\n'
+== lp__l_wait_core_child
+  lupin    exit(0) 'started\nstatus=3\n'
+  checked  exit(0) 'started\nstatus=3\n'
+  native   exit(0) 'started\nstatus=3\n'
+  release  exit(0) 'started\nstatus=3\n'
+== lp__l_wait_status_child
+  lupin    exit(0) 'started\nstatus=3\n'
+  checked  exit(0) 'started\nstatus=3\n'
+  native   exit(0) 'started\nstatus=3\n'
+  release  exit(0) 'started\nstatus=3\n'
+== lp__sc66_answers
+  lupin    exit(0) 'ignore_one_kill=invalid\nreset_one_two=invalid\nexit_signal_zero=invalid\ntext_two=invalid\nwait_status_core_forged=-1\npoll_core_none=false 0 false\n'
+  checked  exit(0) 'ignore_one_kill=invalid\nreset_one_two=invalid\nexit_signal_zero=invalid\ntext_two=invalid\nwait_status_core_forged=-1\npoll_core_none=false 0 false\n'
+  native   exit(0) 'ignore_one_kill=invalid\nreset_one_two=invalid\nexit_signal_zero=invalid\ntext_two=invalid\nwait_status_core_forged=-1\npoll_core_none=false 0 false\n'
+  release  exit(0) 'ignore_one_kill=invalid\nreset_one_two=invalid\nexit_signal_zero=invalid\ntext_two=invalid\nwait_status_core_forged=-1\npoll_core_none=false 0 false\n'
