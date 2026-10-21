@@ -1,0 +1,21 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.time, comptime.sandbox, comptime.sandbox.clock, os.clock.ns
+//!
+//! **D33 for `time.monotonic_ns` (sc69), held one level down at
+//! `os_clock_ns`**: it is the Clock, refused at comptime with the ms
+//! tier (X12: two identical builds must not observe different times).
+//! `time.monotonic_ns` named in `main` keeps the import used (it never
+//! runs: the row stops at typecheck).
+
+use std.time
+
+comptime fn probe() -> int {
+    os_clock_ns()
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {time.monotonic_ns()}")
+    0
+}

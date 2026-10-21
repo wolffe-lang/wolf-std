@@ -1,0 +1,60 @@
+//! check: run(exit=0, stdout="non_decreasing=true\nsame_anchor=true\nslept=true\nfiner_than_ms=20")
+//! phase: run
+//! conforms: std.time, os.clock.ns, os.host.sigs
+//!
+//! **sc69: `time.monotonic_ns`** (s248, wolf-lang#798; yew's G8). A
+//! thousand reads never go backwards; read after `time.now()`, the
+//! nanoseconds over 1,000,000 are never below its milliseconds (the same
+//! anchor, `[os.clock.ns]`); a 2 ms sleep spans at least 2,000,000; and
+//! twenty rounds of a thousand additions each, which `time.now()` reads
+//! as 0 ms nearly every time, each read above 0 here. One stdout on every
+//! host and machine that serves the clock; **lupin** 0.1.55 does not
+//! resolve `os_clock_ns` (wolf-interp#268).
+
+use std.time
+
+fn work(n: int) -> int {
+    var s = 0
+    var i = 0
+    while i < n {
+        s = s + i % 7
+        i = i + 1
+    }
+    s
+}
+
+fn main() -> !int {
+    var ok = true
+    var last = time.monotonic_ns()
+    var k = 0
+    while k < 1000 {
+        let t = time.monotonic_ns()
+        if t < last {
+            ok = false
+        }
+        last = t
+        k = k + 1
+    }
+    print("non_decreasing={ok}")
+    let ms = time.now()
+    let ns = time.monotonic_ns()
+    print("same_anchor={ns / 1000000 >= ms.ms}")
+    let a = time.monotonic_ns()
+    time.sleep(time.millis(2))
+    let b = time.monotonic_ns()
+    print("slept={b - a >= 2000000}")
+    var above = 0
+    var r = 0
+    var sink = 0
+    while r < 20 {
+        let t0 = time.monotonic_ns()
+        sink = sink + work(1000)
+        let t1 = time.monotonic_ns()
+        if t1 > t0 {
+            above = above + 1
+        }
+        r = r + 1
+    }
+    print("finer_than_ms={if sink >= 0 { above } else { 0 }}")
+    0
+}
