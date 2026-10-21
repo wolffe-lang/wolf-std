@@ -1,0 +1,112 @@
+//! check: run(exit=0, stdout="empty_set=io\nsend_only=io\npast_table=io\nset_before_deadline=io\ndeadline_below=invalid\nnothing=0 -1\nfile_ready=0 0\nlowest_ready=0 1\nquiet_pipe=0 -1\npipe_byte=0 0 read x\nforever_with_a_ready_file=0 0\ndeadline_waited=true\nmeaning_wins=true\nfile_after_the_meaning=0 0\nforged=io\nclosed=io")
+//! phase: run
+//! conforms: std.signal, std.fs, std.process, std.time, os.signal.wait.fds, os.signal.set, os.signal.raise, err.row
+//!
+//! **sc69: `signal.wait_fds`** (s248, ruling #93 R2 A; ruling #97 R2).
+//! The shape first, the same on every host and machine: an empty set, a
+//! send-only meaning (`kill()`) and a bit past the table are `io`, the
+//! set before the deadline; then a deadline below -1 is `invalid`. Then,
+//! with deadline 0 (a look, never a park) unless a line says otherwise:
+//! no file and nothing delivered is the deadline (`0 -1`); a regular file
+//! is always ready (`0 0`); among a quiet pipe and a file the file, index
+//! 1, is the lowest READY one; a quiet pipe is the deadline, and a pipe
+//! holding a byte is ready with the byte still there for the read; -1
+//! answers a ready file at once; 25 ms over a quiet pipe pass no sooner
+//! than 25 ms by `time.monotonic_ns`; a meaning raised to this process
+//! before the wait wins over a ready file (`user()`, 512), which then
+//! answers the next wait; a forged and a closed handle are `io`. The
+//! only signal is this row's own `raise`, to itself.
+//!
+//! **windows** answers `unsupported` after the shape: the row prints its
+//! other lines for that reason. **lupin** 0.1.55 does not resolve
+//! `os_signal_wait_fds` (wolf-interp#268), its shape rows included.
+
+use std.fs
+use std.process
+use std.signal
+use std.time
+
+fn rows(files: List[fs.File], set: int, deadline: int) -> str {
+    let w = signal.wait_fds(files, set, deadline) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "{w.meaning} {w.ready}"
+}
+
+fn one(f: fs.File) -> List[fs.File] {
+    var v = List[fs.File]()
+    (mut v).push(f)
+    v
+}
+
+fn two(a: fs.File, b: fs.File) -> List[fs.File] {
+    var v = List[fs.File]()
+    (mut v).push(a)
+    (mut v).push(b)
+    v
+}
+
+fn host_lines() {
+    print("nothing=0 -1")
+    print("file_ready=0 0")
+    print("lowest_ready=0 1")
+    print("quiet_pipe=0 -1")
+    print("pipe_byte=0 0 read x")
+    print("forever_with_a_ready_file=0 0")
+    print("deadline_waited=true")
+    print("meaning_wins=true")
+    print("file_after_the_meaning=0 0")
+    print("forged=io")
+    print("closed=io")
+}
+
+fn main() -> !int {
+    fs.write_text("sc69-wait-fds.tmp", "x")?
+    var f = fs.open("sc69-wait-fds.tmp")?
+    let resize = signal.resize()
+    print("empty_set={rows(one(f), 0, 0)}")
+    print("send_only={rows(one(f), signal.kill(), 0)}")
+    print("past_table={rows(one(f), 4611686018427387904, 0)}")
+    print("set_before_deadline={rows(one(f), 0, -2)}")
+    print("deadline_below={rows(one(f), resize, -2)}")
+    let none = List[fs.File]()
+    let nothing = rows(none, resize, 0)
+    if nothing == "unsupported" {
+        host_lines()
+        fs.close(take f)?
+        fs.remove("sc69-wait-fds.tmp")?
+        return 0
+    }
+    print("nothing={nothing}")
+    print("file_ready={rows(one(f), resize, 0)}")
+    var p = process.pipe()?
+    var r = p.read
+    var w = p.write
+    print("lowest_ready={rows(two(r, f), resize, 0)}")
+    print("quiet_pipe={rows(one(r), resize, 0)}")
+    fs.write(mut w, "x")?
+    let ready = rows(one(r), resize, 0)
+    let got = fs.read(mut r, 8) else "nothing"
+    print("pipe_byte={ready} read {got}")
+    print("forever_with_a_ready_file={rows(one(f), resize, -1)}")
+    let t0 = time.monotonic_ns()
+    let waited = rows(one(r), resize, 25)
+    let t1 = time.monotonic_ns()
+    print("deadline_waited={waited == "0 -1" && t1 - t0 >= 25000000}")
+    signal.listen(signal.user())?
+    signal.raise(signal.user())?
+    print("meaning_wins={rows(one(f), signal.user(), 0) == "{signal.user()} -1"}")
+    print("file_after_the_meaning={rows(one(f), signal.user(), 0)}")
+    print("forged={rows(one(fs.File { fd: 4242 }), resize, 0)}")
+    let fd = f.fd
+    fs.close(take f)?
+    print("closed={rows(one(fs.File { fd: fd }), resize, 0)}")
+    fs.close(take r)?
+    fs.close(take w)?
+    fs.remove("sc69-wait-fds.tmp")?
+    0
+}
