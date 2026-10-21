@@ -30,12 +30,15 @@
 # decides which jobs a run runs and on which hosts, every other job runs
 # only when the plan names it, and the run's LAST job says which tier it was:
 #
-#   tier full   every job on every host: `rig` and `gates` on ubuntu, macOS
-#               and windows. A push to trunk, the nightly `schedule`, a
-#               `workflow_dispatch` (tier full, the default), a pull
-#               request labelled `full-matrix`; and a pull request with a
-#               changed path no rule of `ci/tiers.py` names, or whose
-#               change cannot be read.
+#   tier all    every job on every host: `rig` and `gates` on ubuntu, macOS
+#               and windows. The nightly `schedule` and a
+#               `workflow_dispatch` with tier all (tl30).
+#   tier full   the merge gate: every job, `rig` on ubuntu and windows,
+#               `gates` on all three (on macOS, the merge's macOS smoke).
+#               A pull request labelled `full-matrix`, a push to trunk, a
+#               `workflow_dispatch` (tier full, the default); and a pull
+#               request with a changed path no rule of `ci/tiers.py`
+#               names, or whose change cannot be read.
 #   tier pr     any other pull-request run (and a dispatch with tier pr):
 #               the jobs its changed paths name, on ubuntu alone. Every
 #               path of the library, its tests, the rig and CI names both.
@@ -43,13 +46,21 @@
 #               paths are ALL prose (CHANGELOG, CONTRIBUTING, docs/), or a
 #               label other than `full-matrix`.
 #
-# Nothing a job checks changed and no job left the full tier: a pull
-# request's push no longer runs the macOS and windows legs, and they run in
-# full before the merge, on every trunk push and every night. The `tier`
-# job fails unless the plan succeeded, the jobs and hosts it chose are that
-# tier's, every chosen job succeeded and every other was skipped; so a
-# green `tier full` is "every job on every host, green", and a green
-# `tier pr` is never that. A red nightly opens an issue (`nightly-red`).
+# Nothing a job checks changed: a pull request's push runs ubuntu alone,
+# the merge (the label, and again the trunk push) every job with the macOS
+# rig left out, and the nightly every job on every host. THE macOS CAP
+# (tl30): the org has five macOS slots for every repository, busy 55% of
+# the time after the Team plan (tl29); in the last 60 runs with a macOS job
+# no macOS leg here was red where its ubuntu leg was green
+# (ci/tl30-prediction.md), so the macOS rig (std-test, 34 of its 35
+# minutes) runs every night instead of twice a merge, and `gates` on macOS
+# (the toolchain for aarch64-apple-darwin, every doc example compiled and
+# run there) is the merge's smoke. The `tier` job fails unless the plan
+# succeeded, the jobs and hosts it chose are that tier's, every chosen job
+# succeeded and every other was skipped; so a green `tier all` is "every job
+# on every host, green", a green `tier full` is the merge's legs, and a
+# green `tier pr` is never either. A red nightly opens an issue
+# (`nightly-red`): what left the merge is owed the next lane on the repo.
 #
 # THE MERGE RULE: a lane's PR merges only with a green `tier full` at its
 # head. Add the `full-matrix` label once the head is the one to merge
@@ -65,15 +76,16 @@ on:
     # other label's run is a noop (the plan, then nothing).
     types: [opened, synchronize, reopened, labeled]
   schedule:
-    # Nightly, the full tier, on trunk. (nightly.yml is the drift watch
-    # against the latest upstreams; it gates nothing.)
+    # Nightly, the all tier, on trunk: every job on every host, the macOS
+    # rig the merge leaves (tl30) among them. (nightly.yml is the drift
+    # watch against the latest upstreams; it gates nothing.)
     - cron: "13 8 * * *"
   workflow_dispatch:
     inputs:
       tier:
-        description: "full: every job on every host; pr: this branch's change against trunk, as a pull request's (a path no rule names runs full)"
+        description: "full: the merge's legs (the macOS rig left out); all: every job on every host, as the nightly; pr: this branch's change against trunk, as a pull request's (a path no rule names runs full)"
         type: choice
-        options: [full, pr]
+        options: [full, all, pr]
         default: full
 
 permissions:
@@ -134,7 +146,9 @@ jobs:
       fail-fast: false
       matrix:
         # The hosts are the plan's (ci/tiers.py MATRIX): ubuntu, macOS and
-        # windows in the full tier, ubuntu alone in a pull request's.
+        # windows in the all tier (the nightly), ubuntu and windows in the
+        # full tier (the merge; tl30, the macOS cap), ubuntu alone in a pull
+        # request's.
         include: ${{ fromJSON(needs.plan.outputs.matrix_rig || '[]') }}
     runs-on: ${{ matrix.os }}
     # 75 was the measured windows number with the native lane DARK there
@@ -546,7 +560,8 @@ jobs:
       fail-fast: false
       matrix:
         # The hosts are the plan's (ci/tiers.py MATRIX): ubuntu, macOS and
-        # windows in the full tier, ubuntu alone in a pull request's.
+        # windows in the all and full tiers (on macOS the merge's smoke,
+        # tl30), ubuntu alone in a pull request's.
         include: ${{ fromJSON(needs.plan.outputs.matrix_gates || '[]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
