@@ -317,8 +317,9 @@ pub fn reset(set: int) -> () ! {unsupported, io} {
 /// `segment_fault()` and `bus_error()` stay the runtime's stack guard's:
 /// under the ignore a SENT one does nothing, while a real fault is still
 /// the runtime's (the stack-overflow report and exit 134). The checked
-/// machine refuses those two by name; lupin 0.1.54 does not resolve the
-/// call (wolf-interp#261).
+/// machine refuses those two by name. lupin 0.1.55 answers the shape rows
+/// (`invalid`) and refuses a well-formed call by name, since it has no
+/// `sigaction` (is77, wolf-interp#261).
 ///
 /// Capability `exec`; refused at comptime (D33). Delegates to
 /// `os_signal_ignore_one`.
@@ -342,8 +343,9 @@ pub fn ignore_one(meaning: int) -> () ! {invalid, io, unsupported} {
 /// Rows, in `ignore_one`'s order: `invalid` for 0, anything `send`
 /// refuses, and `kill()` and `stop()`; `unsupported` on windows; `io`
 /// where the host refuses the number. Never traps. The checked machine
-/// refuses `segment_fault()` and `bus_error()` by name; lupin 0.1.54 does
-/// not resolve the call (wolf-interp#261).
+/// refuses `segment_fault()` and `bus_error()` by name; lupin 0.1.55
+/// answers the shape rows and refuses a well-formed call by name (is77,
+/// wolf-interp#261).
 ///
 /// Capability `exec`; refused at comptime (D33). Delegates to
 /// `os_signal_default_one`.
@@ -527,12 +529,14 @@ pub fn realtime() -> Realtime ! {unsupported} {
 /// Rows: `invalid` for any meaning `send` refuses (two meanings, a bit
 /// no release publishes, a host number past `last()`), before the host;
 /// `unsupported` on windows. **0 answers per version**: `invalid`
-/// before the host at wolf 0.2.32 and under lupin 0.1.54; from wolf
-/// 0.2.33 (s246, wolf-lang#787) signal 0's words, glibc's "Unknown
-/// signal 0" and macOS's "Unknown signal: 0", and `unsupported` on
-/// windows. Never traps. Uncharged; refused at comptime. lupin answers
-/// `invalid` and declines a well-formed call by name (a table there
-/// would be one C library's).
+/// before the host at wolf 0.2.32; from wolf 0.2.33 (s246,
+/// wolf-lang#787) signal 0's words, glibc's "Unknown signal 0" and
+/// macOS's "Unknown signal: 0", and `unsupported` on windows. musl's
+/// words for 0 are unmeasured: no release archive targets musl. Never
+/// traps. Uncharged; refused at comptime. lupin answers the shape rows
+/// (`invalid`) and refuses a well-formed call by name, 0 included since
+/// lupin 0.1.55 (0.1.54 answered 0 `invalid`; is77, wolf-interp#262): a
+/// table there would be one C library's.
 ///
 /// Delegates to `os_signal_text`.
 ///
