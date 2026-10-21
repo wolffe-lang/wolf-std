@@ -1,0 +1,50 @@
+== fs__create_new_rows
+  lupin    exit(0) 'fresh=ok first\ntaken=exists first\nmissing_parent=not_found\nread_write=true\nwith_mode=true\nwith_mode_taken=exists\nwith_mode_bad=invalid\ndirectory_taken=exists\n'
+  checked  exit(0) 'fresh=ok first\ntaken=exists first\nmissing_parent=not_found\nread_write=true\nwith_mode=true\nwith_mode_taken=exists\nwith_mode_bad=invalid\ndirectory_taken=exists\n'
+  native   exit(0) 'fresh=ok first\ntaken=exists first\nmissing_parent=not_found\nread_write=true\nwith_mode=true\nwith_mode_taken=exists\nwith_mode_bad=invalid\ndirectory_taken=exists\n'
+  release  exit(0) 'fresh=ok first\ntaken=exists first\nmissing_parent=not_found\nread_write=true\nwith_mode=true\nwith_mode_taken=exists\nwith_mode_bad=invalid\ndirectory_taken=exists\n'
+== fs__realpath_rows
+  lupin    unsupported [`fs_realpath` does not resolve] ''
+  checked  exit(0) 'absolute=true\ntrailing_slash=true\ndot_dot_after_a_directory=true\ndot=true\nmissing=not_found\nempty=not_found\nunder_the_directory=true\nlink_followed=true\ndot_dot_after_a_link=true\ndangling=not_found\nloop=io\nunder_a_file=io\n'
+  native   exit(0) 'absolute=true\ntrailing_slash=true\ndot_dot_after_a_directory=true\ndot=true\nmissing=not_found\nempty=not_found\nunder_the_directory=true\nlink_followed=true\ndot_dot_after_a_link=true\ndangling=not_found\nloop=io\nunder_a_file=io\n'
+  release  exit(0) 'absolute=true\ntrailing_slash=true\ndot_dot_after_a_directory=true\ndot=true\nmissing=not_found\nempty=not_found\nunder_the_directory=true\nlink_followed=true\ndot_dot_after_a_link=true\ndangling=not_found\nloop=io\nunder_a_file=io\n'
+== fs__sync_rows
+  lupin    unsupported [`fs_sync` does not resolve] ''
+  checked  exit(0) 'sync_file=ok\nsync_forged=io\nsync_closed=io\nsync_dir_here=ok\nsync_dir_missing=not_found\nsync_dir_on_a_file=invalid\nsync_pipe=io\natomic_save=new\ntemporary_gone=true\n'
+  native   exit(0) 'sync_file=ok\nsync_forged=io\nsync_closed=io\nsync_dir_here=ok\nsync_dir_missing=not_found\nsync_dir_on_a_file=invalid\nsync_pipe=io\natomic_save=new\ntemporary_gone=true\n'
+  release  exit(0) 'sync_file=ok\nsync_forged=io\nsync_closed=io\nsync_dir_here=ok\nsync_dir_missing=not_found\nsync_dir_on_a_file=invalid\nsync_pipe=io\natomic_save=new\ntemporary_gone=true\n'
+== process__fork_rows
+  lupin    unsupported [`os_fork` does not resolve] ''
+  checked  exit(0) 'child=0 -1 own_pid=true\nparent=true named=true status=7\nsecond_wait=io\nsubstitution=from the child\nfrom_a_task=busy\nwith_a_task_live=busy\nafter_the_scope=forked 0\n'
+  native   exit(0) 'child=0 -1 own_pid=true\nparent=true named=true status=7\nsecond_wait=io\nsubstitution=from the child\nfrom_a_task=busy\nwith_a_task_live=busy\nafter_the_scope=forked 0\n'
+  release  exit(0) 'child=0 -1 own_pid=true\nparent=true named=true status=7\nsecond_wait=io\nsubstitution=from the child\nfrom_a_task=busy\nwith_a_task_live=busy\nafter_the_scope=forked 0\n'
+== signal__wait_fds_rows
+  lupin    unsupported [`os_signal_wait_fds` does not resolve] ''
+  checked  exit(0) 'empty_set=io\nsend_only=io\npast_table=io\nset_before_deadline=io\ndeadline_below=invalid\nnothing=0 -1\nfile_ready=0 0\nlowest_ready=0 1\nquiet_pipe=0 -1\npipe_byte=0 0 read x\nforever_with_a_ready_file=0 0\ndeadline_waited=true\nmeaning_wins=true\nfile_after_the_meaning=0 0\nforged=io\nclosed=io\n'
+  native   exit(0) 'empty_set=io\nsend_only=io\npast_table=io\nset_before_deadline=io\ndeadline_below=invalid\nnothing=0 -1\nfile_ready=0 0\nlowest_ready=0 1\nquiet_pipe=0 -1\npipe_byte=0 0 read x\nforever_with_a_ready_file=0 0\ndeadline_waited=true\nmeaning_wins=true\nfile_after_the_meaning=0 0\nforged=io\nclosed=io\n'
+  release  exit(0) 'empty_set=io\nsend_only=io\npast_table=io\nset_before_deadline=io\ndeadline_below=invalid\nnothing=0 -1\nfile_ready=0 0\nlowest_ready=0 1\nquiet_pipe=0 -1\npipe_byte=0 0 read x\nforever_with_a_ready_file=0 0\ndeadline_waited=true\nmeaning_wins=true\nfile_after_the_meaning=0 0\nforged=io\nclosed=io\n'
+== term__mode_bits
+  lupin    exit(0) 'checked=2304\nmismatches=0\nold_modes_stay_old=true\nraw_cr_bit=32\nraw_output_bit=64\nstrip8_bit=128\nraw_keeps_the_three=true\nraw_of_cooked=260\nraw_bytes_of_cooked=356\nraw_bytes_clears_strip8=true\nhand_built=255\n'
+  checked  exit(0) 'checked=2304\nmismatches=0\nold_modes_stay_old=true\nraw_cr_bit=32\nraw_output_bit=64\nstrip8_bit=128\nraw_keeps_the_three=true\nraw_of_cooked=260\nraw_bytes_of_cooked=356\nraw_bytes_clears_strip8=true\nhand_built=255\n'
+  native   exit(0) 'checked=2304\nmismatches=0\nold_modes_stay_old=true\nraw_cr_bit=32\nraw_output_bit=64\nstrip8_bit=128\nraw_keeps_the_three=true\nraw_of_cooked=260\nraw_bytes_of_cooked=356\nraw_bytes_clears_strip8=true\nhand_built=255\n'
+  release  exit(0) 'checked=2304\nmismatches=0\nold_modes_stay_old=true\nraw_cr_bit=32\nraw_output_bit=64\nstrip8_bit=128\nraw_keeps_the_three=true\nraw_of_cooked=260\nraw_bytes_of_cooked=356\nraw_bytes_clears_strip8=true\nhand_built=255\n'
+== term__mode_bits_set
+  lupin    exit(0) 'bits_5_to_7_pass_the_shape=false\n'
+  checked  exit(0) 'bits_5_to_7_pass_the_shape=true\n'
+  native   exit(0) 'bits_5_to_7_pass_the_shape=true\n'
+  release  exit(0) 'bits_5_to_7_pass_the_shape=true\n'
+== term__restore_rows
+  lupin    unsupported [`os_term_restore_at_exit` does not resolve] ''
+  checked  exit(0) 'forged=io\nclosed=io\nnot_a_terminal=io\nraw_bytes_forged=io\n'
+  native   exit(0) 'forged=io\nclosed=io\nnot_a_terminal=io\nraw_bytes_forged=io\n'
+  release  exit(0) 'forged=io\nclosed=io\nnot_a_terminal=io\nraw_bytes_forged=io\n'
+== term__rows
+  lupin    exit(0) 'packed=260\nround_trip=true\nraw_keeps_signals=true\nraw_clears_flow=true\nclamped=16776991\n'
+  checked  exit(0) 'packed=260\nround_trip=true\nraw_keeps_signals=true\nraw_clears_flow=true\nclamped=16776991\n'
+  native   exit(0) 'packed=260\nround_trip=true\nraw_keeps_signals=true\nraw_clears_flow=true\nclamped=16776991\n'
+  release  exit(0) 'packed=260\nround_trip=true\nraw_keeps_signals=true\nraw_clears_flow=true\nclamped=16776991\n'
+== time__monotonic_ns
+  lupin    unsupported [`os_clock_ns` does not resolve] ''
+  checked  exit(0) 'non_decreasing=true\nsame_anchor=true\nslept=true\nfiner_than_ms=20\n'
+  native   exit(0) 'non_decreasing=true\nsame_anchor=true\nslept=true\nfiner_than_ms=20\n'
+  release  exit(0) 'non_decreasing=true\nsame_anchor=true\nslept=true\nfiner_than_ms=20\n'
