@@ -46,16 +46,16 @@
 //!
 //! **Errors are rows, and one shape rule reads every set** (s232). An
 //! empty set, or one holding any bit that is not a listenable meaning, is
-//! `io` from `listen`, `wait`, `wait_fd`, `poll`, `ignore` and `reset`,
-//! and nothing changes; `raise` takes exactly one listenable meaning. On
-//! windows only the first four meanings can be listened for — the
-//! console sends `terminate()` and `quit()`, and `reload()` and
+//! `io` from `listen`, `wait`, `wait_fd`, `wait_fds`, `poll`, `ignore`
+//! and `reset`, and nothing changes; `raise` takes exactly one listenable
+//! meaning. On windows only the first four meanings can be listened for —
+//! the console sends `terminate()` and `quit()`, and `reload()` and
 //! `upgrade()` arrive only by this process's own `raise` — so a listen
 //! for any of the other sixteen is `io` there, and `ignore`, `reset`,
-//! `ignored`, `send`, `number`, `wait_fd`, `send_group`, `send_all`,
-//! `text`, `last`, `realtime`, `ignore_one` and `reset_one` answer
-//! `unsupported`, `send` to `text` and the two `_one` calls after their
-//! own shape (`[os.signal.platform]`).
+//! `ignored`, `send`, `number`, `wait_fd`, `wait_fds`, `send_group`,
+//! `send_all`, `text`, `last`, `realtime`, `ignore_one` and `reset_one`
+//! answer `unsupported`, `send` to `text`, `wait_fds` and the two `_one`
+//! calls after their own shape (`[os.signal.platform]`).
 //!
 //! **Groups and host numbers (s241, ruling #79).** `send` reaches one
 //! process; `send_group` reaches every member of a `std.process.Group`
@@ -68,9 +68,9 @@
 //! rather than evened out (R3).
 //!
 //! **Capability: `exec` (I13)** — signal control is process control:
-//! `listen`, `wait`, `wait_fd`, `poll`, `ignore`, `reset`, `ignore_one`,
-//! `reset_one`, `raise`, `send`, `send_group` and `send_all` are tagged
-//! `exec` in the sandbox table. `ignored` READS this process's context and is `env` (ruling
+//! `listen`, `wait`, `wait_fd`, `wait_fds`, `poll`, `ignore`, `reset`,
+//! `ignore_one`, `reset_one`, `raise`, `send`, `send_group` and
+//! `send_all` are tagged `exec` in the sandbox table. `ignored` READS this process's context and is `env` (ruling
 //! #70 R8, with `os_pgid`); `number`, `last`, `realtime` and `text` read
 //! the host's table and charge nothing (ruling #79 R6). All of them are
 //! refused at comptime (D33). The meaning functions and `host` reach
@@ -205,7 +205,8 @@ pub fn wait(set: int) -> int ! {io} {
 /// This is the wait an interactive program blocks in instead of a read:
 /// a delivered signal never tears a read, so an editor reading keys
 /// would learn of a resize or a `kill` only when the next key came. It
-/// has no deadline; on a terminal with `canonical` off, `std.term`'s
+/// has no deadline (`wait_fds`, from wolf 0.2.34, has one and waits on
+/// several files); on a terminal with `canonical` off, `std.term`'s
 /// `Mode.min` and `Mode.time` time the read that follows.
 ///
 /// Rows: `io` for a set the shape rule refuses — empty, or holding a
@@ -221,6 +222,59 @@ pub fn wait(set: int) -> int ! {io} {
 /// redrawing on a meaning and reading a key on 0.
 pub fn wait_fd(f: fs.File, set: int) -> int ! {unsupported, io} {
     os_signal_wait_fd(f.fd, set)?
+}
+
+/// What ended one `wait_fds` (`[os.signal.wait.fds]`): `meaning`, the
+/// meaning taken off the queue (0 when none was), and `ready`, the index
+/// in the list of the LOWEST file with something to read (-1 when none
+/// was). Both 0 and -1: the deadline passed.
+pub struct Wake {
+    meaning: int,
+    ready: int,
+}
+
+/// **s248 (`[os.signal.wait.fds]`, ruling #93 R2 A): one wait over
+/// several files, a set of meanings and a deadline** — what an editor's
+/// loop is: the terminal, its jobs' pipes and its signals, with a timer
+/// (the 25 ms that tells a lone ESC from an escape sequence, the 50 ms of
+/// a capability probe). Parks until a meaning in `set` is delivered
+/// (`Wake { meaning: m, ready: -1 }`, taken as `wait` takes it), or one
+/// of `files` has something to read — a byte, the end of input, a
+/// hang-up — (`Wake { meaning: 0, ready: i }`, `i` the lowest such index,
+/// nothing read), or `deadline_ms` milliseconds pass (`Wake { meaning: 0,
+/// ready: -1 }`). A meaning wins over a ready file, which stays ready for
+/// the next wait; among files the earlier wins, so put the one served
+/// first first. `deadline_ms` **0** looks once and never parks, **-1**
+/// never passes, any other is measured on the monotonic clock and never
+/// answered early. An empty list waits on the set and the deadline alone.
+/// A meaning delivered or pending before the call is answered at once.
+/// `wait_fd(f, set)` is this call's one-file case with no deadline.
+///
+/// Rows, in the order they are decided: `io` for a set the shape rule
+/// refuses (empty, a send-only meaning, a bit that is no meaning); then
+/// `invalid` for a deadline below -1; then `unsupported` on windows; then
+/// `io` for a closed or forged handle. Never traps. lupin 0.1.55 does not
+/// resolve the call (wolf-interp#268).
+///
+/// Capability `exec` (signal control, with `wait_fd`; ruling #97 R5);
+/// refused at comptime (D33). Delegates to `os_signal_wait_fds`; a
+/// program that names it makes the signal hub and its wake pipe before
+/// `main`. The example is prose, since a handle comes from `std.fs`: an
+/// editor listens for `signal.resize()`, then loops on
+/// `signal.wait_fds(watched, signal.resize(), 25)?`, redrawing on a
+/// meaning, reading the file `ready` names, and ending an escape
+/// sequence when neither came.
+pub fn wait_fds(files: List[fs.File], set: int, deadline_ms: int) -> Wake ! {
+    invalid,
+    io,
+    unsupported,
+} {
+    var fds = List[int]()
+    for f in files {
+        (mut fds).push(f.fd)
+    }
+    let (i, m) = os_signal_wait_fds(fds, set, deadline_ms)?
+    Wake { meaning: m, ready: i }
 }
 
 /// The oldest meaning in `set` that has arrived, taken; 0 when none has.
