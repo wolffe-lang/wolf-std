@@ -3,7 +3,7 @@
 ran them (tl28, ruling #92; wolf-lang's ci/tiers.py, tl21, cut to wolf-std).
 
     ci/tiers.py plan [--event E] [--action A] [--label L] [--labels L1,L2]
-                     [--tier full|pr] [--merge [--head-sha SHA] | --paths-from FILE]
+                     [--tier full|all|pr] [--merge [--head-sha SHA] | --paths-from FILE]
                      [--repo DIR] [--github-output FILE] [--json]
     ci/tiers.py verdict        (NEEDS: the `tier` job's `toJSON(needs)`)
     ci/tiers.py classify PATH...
@@ -15,12 +15,22 @@ workflow's `plan` job passes the event in.
 THE TIERS. A job is a job of .github/workflows/ci.yml between `plan` and
 `tier`; a leg is one entry of its matrix (here: one host).
 
-  full   every job on every leg: `rig` and `gates` on ubuntu, macOS and
-         windows. A push to trunk, the nightly `schedule`, a
-         `workflow_dispatch` (its `tier` input full, the default), a pull
-         request carrying the `full-matrix` label; and a pull request with
-         a changed path no rule below names, or whose change cannot be
-         read: what is not understood never shrinks a run.
+  all    every job on every leg: `rig` and `gates` on ubuntu, macOS and
+         windows. The nightly `schedule` and a `workflow_dispatch` with
+         `tier` all (tl30): what the merge leaves runs here every night,
+         and a red night opens the `nightly-red` issue.
+  full   the merge gate: every job, on the legs `full_leg` keeps: `rig` on
+         ubuntu and windows, `gates` on all three (the macOS smoke: the
+         pinned toolchain for aarch64-apple-darwin and every doc example
+         compiled and run there). A pull request carrying the `full-matrix`
+         label, a push to trunk, a `workflow_dispatch` (its `tier` input
+         full, the default); and a pull request with a changed path no rule
+         below names, or whose change cannot be read: what is not
+         understood never shrinks a run below the merge's. (tl30, the
+         macOS cap: in the last 60 runs with a macOS job no macOS job was
+         red where its ubuntu leg was green, ci/tl30-prediction.md; the
+         three-lane std-test on macOS, 34 minutes of one of the org's five
+         macOS slots, is the nightly's.)
   pr     any other pull-request run, and a dispatch with `tier` pr: the
          jobs the changed paths name (RULES), each on its ubuntu leg alone.
          Every path of the library, its tests, its vendored inputs, the rig
@@ -30,6 +40,9 @@ THE TIERS. A job is a job of .github/workflows/ci.yml between `plan` and
   noop   nothing but the plan and the verdict: a pull request whose changed
          paths are ALL prose, and a `labeled` event for a label other than
          `full-matrix`.
+
+`lane-audit.sh` takes a green `tier full` at the labelled head as the merge
+evidence, and a green `tier all` as its superset (tl29).
 
 A dispatch with `tier` pr reads the dispatched branch's change against
 trunk (the merge base) exactly as a pull request's, so a plant can ask for
@@ -65,14 +78,17 @@ TRUNK = "trunk"
 # Jobs that are no tier's choice: the plan, the verdict, and what runs after
 # the verdict (the nightly's issue).
 NOT_SELECTABLE = ("plan", "tier", "nightly-red")
-TIERS = ("full", "pr", "noop")
+TIERS = ("all", "full", "pr", "noop")
 # What a repository's config may add (the defaults: nothing):
 #   ON_REQUEST   jobs that only a dispatch's own input runs, never full or pr;
 #   EXTRA_TIERS  {tier: (the jobs it runs, of `every`; whether it runs every
 #                leg; whether it runs ALL those jobs (True) or one or more of
 #                them (False))}, for the verdict;
 #   special(a, every, log) -> None, or (tier, the jobs it chose): a run the
-#                event and the dispatch's own inputs (a.inputs) decide alone.
+#                event and the dispatch's own inputs (a.inputs) decide alone;
+#   full_leg(job, leg) -> whether the merge tier (`full`) runs this leg of a
+#                matrix job (tl30, the macOS cap): the legs it leaves run in
+#                `all` (the nightly) and nowhere else.
 ON_REQUEST = ()
 EXTRA_TIERS = {}
 
@@ -80,9 +96,14 @@ EXTRA_TIERS = {}
 def special(a, every, log):
     return None
 
+
+def full_leg(job, leg):
+    return True
+
 # --- this repository's ---------------------------------------------------------
-# Every leg of every matrix job, in the workflow's order. The full tier runs
-# them all; every other tier the legs PR_LEG keeps.
+# Every leg of every matrix job, in the workflow's order. The all tier runs
+# them all, the full tier the legs full_leg keeps, every other tier the legs
+# pr_leg keeps.
 MATRIX = {
     "rig": [{"os": "ubuntu-latest"}, {"os": "macos-latest"}, {"os": "windows-latest"}],
     "gates": [{"os": "ubuntu-latest"}, {"os": "macos-latest"}, {"os": "windows-latest"}],
@@ -92,6 +113,13 @@ MATRIX = {
 def pr_leg(job, leg):
     """Whether the pull-request tier runs this leg of a matrix job."""
     return leg.get("os") == "ubuntu-latest"
+
+
+def full_leg(job, leg):
+    """Whether the merge tier runs this leg (tl30): every leg but the
+    macOS rig, whose std-test is the nightly's; `gates` on macOS is the
+    merge's macOS smoke."""
+    return not (job == "rig" and leg.get("os") == "macos-latest")
 
 
 BOTH = ("rig", "gates")
@@ -179,7 +207,7 @@ def workflow_jobs():
 def jobs_of(tier, every):
     """The jobs a tier runs, of `every` selectable job, in order. (The pr
     tier's are the paths' choice: every job is the most it may run.)"""
-    if tier in ("full", "pr"):
+    if tier in ("all", "full", "pr"):
         return [j for j in every if j not in ON_REQUEST]
     if tier in EXTRA_TIERS:
         return [j for j in every if j in EXTRA_TIERS[tier][0](every)]
@@ -191,13 +219,19 @@ def output_name(job):
 
 
 def matrix_of(tier):
-    """{output name: the legs a matrix job runs in this tier}. A job the tier
-    does not choose still gets its pull-request legs, so no matrix is ever
-    empty (the job is skipped by its `if:` either way)."""
+    """{output name: the legs a matrix job runs in this tier}: every leg in
+    `all`, the legs `full_leg` keeps in `full` (the merge), the pull
+    request's otherwise. A job the tier does not choose still gets its
+    pull-request legs, so no matrix is ever empty (the job is skipped by its
+    `if:` either way)."""
     out = {}
     for job, legs in MATRIX.items():
-        every_leg = tier == "full" or (tier in EXTRA_TIERS and EXTRA_TIERS[tier][1])
-        out[output_name(job)] = list(legs) if every_leg else [l for l in legs if pr_leg(job, l)]
+        if tier == "all" or (tier in EXTRA_TIERS and EXTRA_TIERS[tier][1]):
+            out[output_name(job)] = list(legs)
+        elif tier == "full":
+            out[output_name(job)] = [l for l in legs if full_leg(job, l)]
+        else:
+            out[output_name(job)] = [l for l in legs if pr_leg(job, l)]
     return out
 
 
@@ -276,11 +310,14 @@ def plan(a):
     if sp is not None:
         return result(sp[0], sp[1])
     if ev == "workflow_dispatch":
-        if (a.tier or "full") not in ("full", "pr"):
-            die("--tier takes full or pr, not %r" % a.tier)
-        if (a.tier or "full") == "full":
-            log.append("dispatch, tier full: full")
-            return result("full")
+        if (a.tier or "full") not in ("full", "all", "pr"):
+            die("--tier takes full, all or pr, not %r" % a.tier)
+        if (a.tier or "full") in ("full", "all"):
+            log.append("dispatch, tier %s: %s" % (a.tier or "full", a.tier or "full"))
+            return result(a.tier or "full")
+    elif ev == "schedule":
+        log.append("the nightly: all")
+        return result("all")
     elif ev != "pull_request":
         log.append("%s: full" % ev)
         return result("full")
