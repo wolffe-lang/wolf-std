@@ -13782,3 +13782,91 @@ head:
   code. `gates` on three hosts: the examples of `raw_bytes`,
   `create_new`, `sync_dir` and `realpath` (lupin too for the last two),
   and `fork`'s on native on ubuntu and macOS.
+
+## F-0156 — sc69 measured beside its predictions
+
+Scored in place; the predictions above are unchanged. kasumi paths are
+under `~/lanes/sc69/` (`scripts/`, `evidence/`, `probes/`, `job-*.log`);
+every job `setsid nohup` with a pid file, SigBlk and SigIgn 0; exit
+statuses read from the tool; 0 `SKIP` lines in every log. Every run of a
+program that forks or signals (std-test, doc-examples, the probes, the
+witness) ran inside a throwaway podman container (`--rm --network none
+--ulimit core=0:0`, no `--init`, the rig under `setsid -w`). The probe
+harness, the programs and their logs are committed in
+`docs/sc69-witness/`.
+
+| # | predicted | measured | verdict |
+|---|---|---|---|
+| P1 | the archives' digests, version lines, archive std = `e036bec` | `88a9dd3d…` (80,433,878 B) matched the API and read twice; binary `2bfaf7b8…`, `libwolf_rt.a` `cc058247…`, `libwolf_rt_none.a` `73e53a44…`, `_wolf` `a368c8ec…`; `wolf 0.2.34 (wolfgang, pin 9da7bdc)`, `paired with lupin 0.1.55 (reference interpreter), pin 294d626`; GLIBC ≤ 2.34; `diff -rq` of the archive's `std/` against `e036bec`'s names only `LICENSE`, `LICENSE-EXCEPTION` and `STD-REV` (`job-acq.log`). lupin `1152abc0…`, binary `ad52ee96…`; wolf 0.2.33 `4f955e8d…` (the control) | held |
+| P2 | 664 -> 672, the eight, none removed or moved; the clause byte-identical | as predicted, key sets diffed both ways (`0b2ebf2`) | held |
+| P3 | bare pin 497 / 519 GREEN, 1,557 ok, no ledger word moves | kasumi g0 at `a150622`, every CI step exit 0: std-test **497 GREEN** (divergent 0, host-scoped cells 21; `std-test-g0-a150622.log` `37264bf4…`), doc-examples **519 GREEN**, 1,557 ok, 0 mirror-lag | held |
+| P4 | the spellings | built as written, each its own commit | held |
+| P5 | sixteen rows; red against trunk's std; the lane table | **fourteen**: the comptime engine cannot build a `List` ("`List` construction at comptime"), so `os_signal_wait_fds`' and `os_term_restore_at_exit`'s rows cannot reach the sandbox and were dropped, as the "less sure" said they would be. All 14 and `term/rows.lu` red with trunk's std on four machines (E0301; `rows.lu` E0403; lupin naming the missing std function, or "`Mode` has no field `raw_cr`": `probe-red-trunk-std.log` `17a80618…`); green at the head exactly as the table says, plain and under `taskset -c 0-3` byte-identical (`probe-head-plain.log` = `probe-head-taskset.log` `52be06a0…`). The checked machine's fork is the `unsupported` ROW (`probes/fork_word.lu`: `fork=unsupported`, exit 0; native and release `forked 0`) | right but for the two comptime rows |
+| P6 | 513 tests, 530 examples, 1,588 ok + 2 mirror-lag | **511** tests and **528** examples, 1,584 lane runs, **0** mirror-lag: the doc-example extractor imports only the documented module, and `restore_at_exit`'s and `wait_fds`' examples need an `fs.File`, so both are prose (as `wait_fd`'s and `size`'s are) | wrong on the two examples |
+| P7 | trunk's std RED under 0.2.34 on a terminal set otherwise; the head GREEN; restores at a return and a trap | `docs/sc69-witness/` (`job-w.log`): w1 trunk's std under 0.2.34 **RED on all five machines** (native and release binaries, conform-run checked, native, release): a terminal set `-icrnl -opost istrip` reads 511, the set writes `icrnl opost -istrip` (`e736f899…`); w2 the head **GREEN** on all five, both states: the round trip and `back` exact, `raw_bytes` sets `-icrnl -opost -istrip`, and a registration restores the terminal and writes `SC69-RESTORED` at a return (0), `process.exit(3)` and a bounds trap (134) (`48f85f1b…`); w3/w4 the same under `taskset -c 0-3`, byte-identical; w5 wolf 0.2.33 with trunk's std GREEN (it leaves the three as found; `d6a42ca9…`). lupin refuses `os_term_mode` by name | held |
+| P8 | (widened) the plant's reds | CI run **39612705393** (`sc69-plant` at `9f6fe00`, `workflow_dispatch`, tier full), all six jobs failure. `rig (ubuntu-latest)` 119265621233 and `rig (macos-latest)` 119265621322, the same 30 cells: `fork_rows` (native), `restore_rows`, `mode_bits`, `create_new_rows`, `sync_rows` (three lanes), `wait_fds_rows`, `realpath_rows` and the five comptime rows (wolfc, native), `monotonic_ns` (lupin, native), `mode_bits_set` (lupin, observed `unsupported`); no old row. `rig (windows-latest)` 119265621223: the same less `fork_rows` and `wait_fds_rows` (their windows lines come first) and plus `realpath_rows` on lupin; `mode_bits_set` observed `exit(0)`. `gates` 119265621112, 119265621132, 119265621640: `raw_bytes`' (`term.lu:196`), `create_new`'s (`fs.lu:883`), `realpath`'s (`:1369`) and `sync_dir`'s (`:2175`) examples on three lanes, and `fork`'s (`process.lu:1478`) on native on ubuntu and macOS | right but for three cells: lupin's `realpath_rows` stayed `unsupported` on linux and macOS (its tree rule refuses the loop's `fs_remove`), the checked machine's `monotonic_ns` stayed green (a thousand interpreted additions outlast a millisecond), and `mode_bits_set` on lupin moved to `unsupported`, not `run`. And the plant's `realpath_rows` reds on linux and macOS are not the plant's: the row was red at that head anyway (below) |
+| P9 | #76's prose from measurements; the lupin column | `probe-lupin-0155-answers.log` (`cf3512b3…`) and `probe-sc66-rows-0155.log` (`3104ae23…`) | held |
+| P10 | one thing wrong this list does not name | four: the shared staged root (above) and three below | — |
+
+**Green at the code head `1d744a1`.** kasumi g2 (container), every CI
+step exit 0: fmt, clippy, cargo test 91, sync-pin, doctor (wolf 0.2.34
+pin `9da7bdc`, lupin 0.1.55 pin `294d626`, both OK), ledger-check 511,
+std-test **511 GREEN** (divergent rows 1, host-scoped cells 21;
+`std-test-g2-1d744a1.log` `44fde930…`), lint-conventions, fmt-lu 565,
+gen-vectors, doc-examples **528 GREEN, 1,584 ok, 0 mirror-lag**
+(`8b24f5a9…`), ulp 200. kasumi t1, the same head under `taskset -c 0-3` inside the container:
+std-test **511 GREEN** (`86cff57d…`), doc-examples **528 GREEN**, 1,584
+ok (`b11f2f0d…`). CI's three hosts at the head before the fix, `30e719f`
+(run 39613086277, the dispatch): `rig (ubuntu-latest)` 119266970747,
+`rig (macos-latest)` 119266971018 and `rig (windows-latest)` 119266970899
+red on exactly `fs/realpath_rows.lu` on wolfc and native (the shared
+root, below) and nothing else: every other new row's every cell as the
+ledger says on all three hosts, lupin's windows column included (no
+host cell was owed); `gates` the two examples (below). The fixed
+`realpath_rows` and examples are CI's at the PR's head.
+
+**The shared staged root, which my probes did not have.** The rig
+stages a row (and a doc example) once and runs its lanes there in turn,
+lupin first; my first probe harness gave each machine a root of its own.
+So a row that lupin refuses at a new call AFTER making a file left it for
+the compiled lanes: at `30e719f` kasumi g1 was red on exactly
+`fs/realpath_rows.lu` (wolfc and native: `create_dir` answered `exists`,
+exit 1; `std-test-g1-30e719f.log`) and on the `realpath` and `sync`
+examples (`fs.lu:1369`, `:2148`, wolfc and native,
+`doc-examples-g1-30e719f.log`), and so was CI run 39613086277, a tier
+full dispatch at that head before the label (`gates` 119266970998,
+119266971070, 119266971028, the same two examples on three hosts). Fixed
+in `bcd6fb0` (the examples start from `create_dir_all` and `create`) and
+`f1587ad` (the rows clear first); the probe harness's `SHARED=1` runs the
+rig's posture (`7a61306`), and the shared-root probe of the fixed rows is
+green (`probe-shared-root.log`).
+
+**Not named.** (a) The native tier refuses a channel `recv` in a
+function other than `main` ("a zero value of this type"), where lupin
+and the checked machine run it (`probes/chan_in_fn.lu`; in `main` it
+runs, `chan_in_main.lu`): `fork_rows.lu`'s first draft took its task
+answers through a channel and was rewritten (a file, a sleeping task)
+before it ran green. Not filed (a lane files nothing): in the PR's list.
+(b) Adding three fields to `term.Mode` breaks every literal that names
+seven: this repository's `term/rows.lu` (updated in the same commit),
+yew's `rawios`, wolf-book's ch34 listing. (c) lupin's fs tier refuses
+`fs_remove` of a link loop as a path outside its tree (the plant probe,
+`realpath_rows` on lupin), so that row has a second lupin refusal behind
+the first.
+
+**The lupin column at 0.1.55, for is79** (measured on linux; each row's
+first call decides it, so windows is the same but where noted):
+
+| wrapper | its rows and example on lupin 0.1.55 | what flips when is79 lands |
+|---|---|---|
+| `process.fork` | `fork_rows`: `unsupported`, "`os_fork` does not resolve" (#269); the example `unsupported` (a capability module) | a by-name refusal keeps `unsupported` (the row and the example stay green); nothing flips |
+| `process.is_child` | its example runs (pure) | — |
+| `term.Mode` (bits 5–7), `pack`, `unpack`, `raw`, `raw_bytes` | `mode_bits`, `rows`: run; `raw_bytes`' example runs | — |
+| `term.set_mode` of a mode with bits 5–7 | `mode_bits_set`: **`divergent(stdout)`**, lupin's shape answers `invalid` (#268) | the shape learns the bits: lupin then refuses the call by name, `unsupported` — the ledger cell flips from `divergent(stdout)` to `unsupported` |
+| `term.restore_at_exit` | `restore_rows`: `unsupported`, "`os_term_restore_at_exit` does not resolve" (#268); its example is prose | a by-name refusal after the shape: still `unsupported`; nothing flips unless lupin answers the `io` rows (forged, closed, a file) before refusing, which would make the row `run` |
+| `signal.wait_fds` | `wait_fds_rows`: `unsupported`, does not resolve, its shape rows included (#268) | the shape rows answered and a well-formed wait refused by name: still `unsupported` (the row's sixth line is a well-formed wait); on windows the row would then RUN (the host's `unsupported` first) — a `lupin-windows = "run"` cell |
+| `fs.sync`, `fs.sync_dir` | `sync_rows`: `unsupported`, "`fs_sync` does not resolve" (#268); `sync`'s example `unsupported`, `sync_dir`'s too | a mirror through `File::sync_all` makes `sync_rows` run where lupin's fs tier serves a pipe and `.`: the cell flips to `run` |
+| `fs.realpath` | `realpath_rows`: `unsupported`, does not resolve (#268); its example `unsupported` | a mirror through `fs::canonicalize` meets lupin's tree rule at the link rows (its fs tier refuses `fs_remove` of a link loop as a path outside its tree, seen under the plant): likely still `unsupported`, by that sentence |
+| `fs.create_new`, `create_new_with_mode` | `create_new_rows`: **run** (open mode 4 and `fs_open_perm` served since 0.1.54); both examples run | — (is79's "exclusive create" is already served) |
+| `time.monotonic_ns` | `monotonic_ns`: `unsupported`, "`os_clock_ns` does not resolve" (#268) | a mirror through `Instant` makes the row run: the cell flips to `run` |
+| the five `comptime_refuses_*` | `unsupported` (no comptime) | — |
