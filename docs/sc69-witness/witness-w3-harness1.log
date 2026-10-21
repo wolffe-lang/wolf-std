@@ -1,0 +1,52 @@
+wolf: wolf 0.2.34 (wolfgang, pin 9da7bdc)
+std:  /home/mfwolffe/lanes/sc69/trunk/std (STD-REV none)
+tty:  /dev/pts/0  mode: trip
+
+[native-bin] usual   fresh   icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0
+[native-bin] usual   trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok' ok
+[native-bin] usual   back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok' ok
+
+[native-bin] unusual fresh   icanon echo isig ixon iexten -icrnl -opost istrip min=1 time=0
+[native-bin] unusual trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok' RED
+[native-bin] unusual back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok' RED
+[native-bin] RED
+
+[release-bin] usual   fresh   icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0
+[release-bin] usual   trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok' ok
+[release-bin] usual   back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok' ok
+
+[release-bin] unusual fresh   icanon echo isig ixon iexten -icrnl -opost istrip min=1 time=0
+[release-bin] unusual trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok' RED
+[release-bin] unusual back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok' RED
+[release-bin] RED
+
+[checked] usual   fresh   icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0
+[checked] usual   trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok\n [exit(0)]' ok
+[checked] usual   back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok\n [exit(0)]' ok
+
+[checked] unusual fresh   icanon echo isig ixon iexten -icrnl -opost istrip min=1 time=0
+[checked] unusual trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok\n [exit(0)]' RED
+[checked] unusual back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok\n [exit(0)]' RED
+[checked] RED
+
+[native] usual   fresh   icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0
+[native] usual   trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok\n [exit(0)]' ok
+[native] usual   back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok\n [exit(0)]' ok
+
+[native] unusual fresh   icanon echo isig ixon iexten -icrnl -opost istrip min=1 time=0
+[native] unusual trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok\n [exit(0)]' RED
+[native] unusual back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok\n [exit(0)]' RED
+[native] RED
+
+[release] usual   fresh   icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0
+[release] usual   trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok\n [exit(0)]' ok
+[release] usual   back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=287\nset=ok\n [exit(0)]' ok
+
+[release] unusual fresh   icanon echo isig ixon iexten -icrnl -opost istrip min=1 time=0
+[release] unusual trip    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok\n [exit(0)]' RED
+[release] unusual back    icanon echo isig ixon iexten icrnl opost -istrip min=1 time=0  rc=0 out='read=287 runtime=511\nset=ok\n [exit(0)]' RED
+[release] RED
+
+[lupin] trip   icanon echo isig ixon iexten -icrnl -opost istrip min=1 time=0  rc=1 '[unsupported `os_term_mode` asks the terminal or the process group: this machine admits no `unsafe` and std has no call for it ([os.term], [os.term.note] R8)]'
+
+WITNESS RED (5 machine(s) red of 5)
