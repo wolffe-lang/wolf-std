@@ -1,0 +1,20 @@
+use std.process
+
+fn main() -> !int {
+    let f = process.fork() else |e| {
+        let w = match e {
+            busy => "busy",
+            io => "io",
+            unsupported => "unsupported",
+        }
+        print("fork={w}")
+        return 0
+    }
+    if process.is_child(f) {
+        process.exit(0)
+    }
+    var ch = process.Child { slot: f.child.slot }
+    let st = process.wait_status(take ch)?
+    print("fork=forked {st}")
+    0
+}

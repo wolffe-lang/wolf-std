@@ -1,0 +1,56 @@
+//! sc69's probe of lupin 0.1.55's answers to sc66's wrappers, one call at a
+//! time up to the first refusal by name (each refusal ends the program, so
+//! the calls that would refuse are last and separate files take the rest).
+
+use std.process
+use std.signal
+
+fn main() -> !int {
+    var a = "ok"
+    signal.ignore_one(signal.kill()) else |e| {
+        a = match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    print("ignore_one_kill={a}")
+    var b = "ok"
+    signal.reset_one(signal.terminate() | signal.user()) else |e| {
+        b = match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    print("reset_one_two={b}")
+    var c = "returned"
+    process.exit_signal(0) else |e| {
+        c = match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+    }
+    print("exit_signal_zero={c}")
+    let t = signal.text(signal.terminate() | signal.user()) else |e| {
+        match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+    }
+    print("text_two={t}")
+    var forged = process.Child { slot: 4242 }
+    let w = process.wait_status_core(take forged) else |_| -1
+    print("wait_status_core_forged={w}")
+    let pc = process.poll_core() else |_| process.CoreChange {
+        change: process.Change {
+            changed: true,
+            child: process.Child { slot: -1 },
+            status: process.status_from(512),
+            live: -1,
+        },
+        core: true,
+    }
+    print("poll_core_none={pc.change.changed} {pc.change.live} {pc.core}")
+    0
+}
