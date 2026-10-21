@@ -1,0 +1,55 @@
+//! sc69's witness program for raw_bytes and restore_at_exit
+//! (docs/sc69-witness/pty.py runs it on a pty; head std only). SC69_TTY
+//! names the terminal, opened read-write (open mode 3) so the runtime's
+//! restore can write its bytes there; SC69_STEP the step: `raw` sets
+//! `raw_bytes` of the mode read and prints the mode it saved;
+//! `restore`, `restore_exit` and `restore_trap` register
+//! `restore_at_exit(tty, the mode read, "SC69-RESTORED")`, set
+//! `raw_bytes`, and end by a return from `main`, by `process.exit(3)`
+//! and by a bounds trap. The terminal is read from outside, with
+//! `stty -a`, and its output from the pty's master, by the parent.
+
+use std.env
+use std.fs
+use std.process
+use std.term
+
+fn set_row(tty: fs.File, m: term.Mode) -> str {
+    term.set_mode(tty, m) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let path = env.get("SC69_TTY") else |_| { "" }
+    let step = env.get("SC69_STEP") else |_| { "raw" }
+    var tty = fs.stdin()
+    if path != "" {
+        tty = fs.File { fd: fs_open_mode(path, 3)? }
+    }
+    let m = term.mode(tty)?
+    print("read={term.pack(m)}")
+    if step == "raw" {
+        print("saved={term.pack(m)}")
+        print("set={set_row(tty, term.raw_bytes(m))}")
+        return 0
+    }
+    term.restore_at_exit(tty, m, "SC69-RESTORED".bytes())?
+    print("registered")
+    print("set={set_row(tty, term.raw_bytes(m))}")
+    if step == "restore_exit" {
+        process.exit(3)
+    }
+    if step == "restore_trap" {
+        var v = List[int]()
+        (mut v).push(1)
+        let i = v.len + 1
+        print("never {v[i]}")
+    }
+    0
+}
