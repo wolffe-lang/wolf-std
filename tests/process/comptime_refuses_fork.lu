@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.exec
+//!
+//! **D33 for `process.fork` (sc69), held one level down at `os_fork`**:
+//! a fork makes a process, `exec` with `os_spawn` (s247), and a compile
+//! may not make one on the machine that compiles it. The row is handled
+//! locally (F-0069); the pure `is_child` runs at run time to keep the
+//! import used.
+
+use std.process
+
+comptime fn probe() -> int {
+    os_fork() else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {process.is_child(process.Fork { pid: 1, child: process.Child { slot: 0 } })}")
+    0
+}

@@ -1,0 +1,123 @@
+//! check: run(exit=0, stdout="child=0 -1 own_pid=true\nparent=true named=true status=7\nsecond_wait=io\nsubstitution=from the child\nfrom_a_task=busy\nwith_a_task_live=busy\nafter_the_scope=forked 0")
+//! phase: run
+//! conforms: std.process, std.fs, os.proc.fork, os.proc.status, os.proc.pipe, err.row
+//!
+//! **sc69: `process.fork`** (s247, rulings #90 and #95). A fork from
+//! `main` with nothing started: the child reads `pid` 0 and the handle
+//! -1 (`is_child`), runs as a process of its own (`env.pid()` is not
+//! the parent's) and ends with `exit(7)`; the parent reads the child's
+//! pid, the `Child` that `pid` names and `wait_status` reaps with 7,
+//! and a second wait of it is `io`. A `pipe` made before the fork carries
+//! the child's bytes to the parent, which is a command substitution. A
+//! fork from inside a task (which writes its answer to a file), and from
+//! `main` while a task sleeps, is `busy` and makes nothing; once the
+//! scope has joined a fork works again. (A channel would say it shorter,
+//! but a `recv` in a program that imports std is refused on the native
+//! tier at 0.2.34: "a zero value of this type".) The child prints before it ends and the
+//! parent after its wait, so the lines' order is fixed. Every child is
+//! this row's own.
+//!
+//! **The checked machine** answers `unsupported` on every host, as a ROW
+//! (ruling #95 R4 C), and so does **windows**: the row prints its lines
+//! for that reason, as a program's in-process path would run there.
+//! **lupin** 0.1.55 does not resolve `os_fork` (wolf-interp#269).
+
+use std.env
+use std.fs
+use std.process
+use std.time
+
+fn every_line() {
+    print("child=0 -1 own_pid=true")
+    print("parent=true named=true status=7")
+    print("second_wait=io")
+    print("substitution=from the child")
+    print("from_a_task=busy")
+    print("with_a_task_live=busy")
+    print("after_the_scope=forked 0")
+}
+
+fn fork_word() -> str {
+    let f = process.fork() else |e| {
+        return match e {
+            busy => "busy",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    if process.is_child(f) {
+        process.exit(0)
+    }
+    var ch = process.Child { slot: f.child.slot }
+    let st = process.wait_status(take ch) else -1
+    "forked {st}"
+}
+
+fn from_a_task() -> !str {
+    scope s {
+        s.spawn(fn() {
+            fs.write_text("sc69-fork-task.tmp", fork_word()) else |_| {}
+        })
+    }
+    let w = fs.read_text("sc69-fork-task.tmp")?
+    fs.remove("sc69-fork-task.tmp")?
+    w
+}
+
+fn with_a_task_live() -> str {
+    var w = "none"
+    scope s {
+        s.spawn(fn() {
+            time.sleep(time.millis(300))
+        })
+        time.sleep(time.millis(50))
+        w = fork_word()
+    }
+    w
+}
+
+fn main() -> !int {
+    let me = env.pid()
+    let f = process.fork() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            busy => print("fork=busy"),
+            io => print("fork=io"),
+        }
+        return 1
+    }
+    if process.is_child(f) {
+        print("child={f.pid} {f.child.slot} own_pid={env.pid() != me}")
+        process.exit(7)
+    }
+    let pid = f.pid
+    let slot = f.child.slot
+    var ch = process.Child { slot: slot }
+    let named = process.pid(ch) else -1
+    let st = process.wait_status(take ch)?
+    print("parent={pid > 0} named={named == pid} status={st}")
+    var again = process.Child { slot: slot }
+    let a = process.wait_status(take again) else -2
+    print(if a == -2 { "second_wait=io" } else { "second_wait={a}" })
+    var p = process.pipe()?
+    var r = p.read
+    var w = p.write
+    let g = process.fork()?
+    if process.is_child(g) {
+        fs.write(mut w, "from the child")?
+        process.exit(0)
+    }
+    fs.close(take w)?
+    let got = fs.read(mut r, 64) else "nothing"
+    fs.close(take r)?
+    var gch = process.Child { slot: g.child.slot }
+    let gst = process.wait_status(take gch)?
+    print(if gst == 0 { "substitution={got}" } else { "substitution=status {gst}" })
+    print("from_a_task={from_a_task()?}")
+    print("with_a_task_live={with_a_task_live()}")
+    print("after_the_scope={fork_word()}")
+    0
+}
