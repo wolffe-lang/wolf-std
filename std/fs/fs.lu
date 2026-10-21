@@ -1367,7 +1367,7 @@ pub fn read_link(path: str) -> List[byte] ! {not_found, denied, invalid, io} {
 /// `fs_realpath`.
 ///
 /// ```wolf-doc-example
-/// fs.create_dir("doc-realpath.tmp")?
+/// fs.create_dir_all("doc-realpath.tmp")?
 /// let a = fs.realpath("doc-realpath.tmp/")?
 /// let b = fs.realpath("doc-realpath.tmp/../doc-realpath.tmp")?
 /// var missing = false
@@ -2146,7 +2146,7 @@ pub fn truncate(mut f: File, len: int) -> () ! {invalid, io} {
 /// Capability `fs`; refused at comptime (D33). Delegates to `fs_sync`.
 ///
 /// ```wolf-doc-example
-/// var f = fs.create_new("doc-sync.tmp")?
+/// var f = fs.create("doc-sync.tmp")?
 /// fs.write(mut f, "kept")?
 /// fs.sync(mut f)?
 /// fs.close(take f)?
