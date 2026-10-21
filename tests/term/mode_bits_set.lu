@@ -1,0 +1,36 @@
+//! check: run(exit=0, stdout="bits_5_to_7_pass_the_shape=true")
+//! phase: run
+//! conforms: std.term, std.fs, os.term.mode, err.row
+//!
+//! **sc69: a mode with bits 5–7 passes `set_mode`'s shape** (wolf
+//! 0.2.34, s248, wolf-lang#802; ruling #97 R7). `raw_bytes` of a cooked
+//! mode carries `raw_cr` and `raw_output` (bits 5 and 6); set on a forged
+//! handle, it is refused by the handle (`io`) on linux and macOS and by
+//! the host on windows (`unsupported`, after the shape) — never
+//! `invalid`, which before 0.2.34 it was. Nothing is set.
+//!
+//! **lupin** 0.1.55's shape still refuses bits 5–7 (`invalid`,
+//! wolf-interp#268), so the row prints `false` there: the ledger spells
+//! that `divergent(stdout)`, and the row goes red on purpose the day
+//! lupin's shape learns the three bits (is79).
+
+use std.fs
+use std.term
+
+fn set_row(f: fs.File, m: term.Mode) -> str {
+    term.set_mode(f, m) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    "set"
+}
+
+fn main() -> !int {
+    let cooked = term.unpack(1 + 2 + 4 + 8 + 16 + 256)
+    let w = set_row(fs.File { fd: 4242 }, term.raw_bytes(cooked))
+    print("bits_5_to_7_pass_the_shape={w == "io" || w == "unsupported"}")
+    0
+}

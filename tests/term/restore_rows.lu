@@ -1,0 +1,55 @@
+//! check: run(exit=0, stdout="forged=io\nclosed=io\nnot_a_terminal=io\nraw_bytes_forged=io")
+//! phase: run
+//! conforms: std.term, std.fs, os.term.restore, os.term.mode, err.row
+//!
+//! **sc69: `term.restore_at_exit`'s rows that need no terminal** (s248,
+//! ruling #93 R1 C; ruling #97 R1). A handle that is forged, closed, or
+//! a regular file (not a terminal) is `io`, so nothing is registered and
+//! nothing is restored when the row ends; a `Mode` is never `invalid`
+//! (its fields are clamped, and since wolf 0.2.34 bits 5–7 pass the
+//! shape, so `raw_bytes` of a mode is a well-formed registration). A
+//! registration on a real terminal, its restore at a return from `main`
+//! and at a trap, is witnessed under a pseudo-terminal in
+//! `docs/sc69-witness/` (the rig has none).
+//!
+//! **windows** answers `unsupported` for every `[os.term]` call after the
+//! shape: the row prints its lines for that reason. **lupin** 0.1.55 does
+//! not resolve `os_term_restore_at_exit` (wolf-interp#268).
+
+use std.fs
+use std.term
+
+fn row(f: fs.File, m: term.Mode) -> str {
+    let none = List[byte]()
+    term.restore_at_exit(f, m, none) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "registered"
+}
+
+fn main() -> !int {
+    let cooked = term.unpack(1 + 2 + 4 + 8 + 16 + 256)
+    let forged = row(fs.File { fd: 4242 }, cooked)
+    if forged == "unsupported" {
+        print("forged=io")
+        print("closed=io")
+        print("not_a_terminal=io")
+        print("raw_bytes_forged=io")
+        return 0
+    }
+    print("forged={forged}")
+    fs.write_text("sc69-restore.tmp", "x")?
+    var f = fs.open("sc69-restore.tmp")?
+    let fd = f.fd
+    let file = row(f, cooked)
+    fs.close(take f)?
+    print("closed={row(fs.File { fd: fd }, cooked)}")
+    print("not_a_terminal={file}")
+    print("raw_bytes_forged={row(fs.File { fd: 4243 }, term.raw_bytes(cooked))}")
+    fs.remove("sc69-restore.tmp")?
+    0
+}
