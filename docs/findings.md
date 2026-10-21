@@ -13756,3 +13756,29 @@ head:
   is79 is the table in P5 plus the two mirror-lag examples.
 
 ### P10. One thing here is wrong in a way this list does not name.
+
+### P8, widened before the plant ran (committed before `sc69-plant` is pushed)
+
+- P8 as written broke `is_child`; that would let a parent end and a
+  child run on as the parent, so the plant breaks the handle instead.
+  Ten breaks, one branch, each named by what it breaks: (a) `fork`'s
+  `child` is the slot after the child's; (b) `pack` drops bits 5–7
+  (e036bec's); (c) `restore_at_exit` registers nothing and answers `()`;
+  (d) `wait_fds` swaps meaning and index; (e) `sync` and (f) `sync_dir`
+  do nothing; (g) `realpath` answers its argument; (h) `create_new`
+  opens with mode 3 (create, no exclusivity); (i) `monotonic_ns` is
+  `time_now_ms() * 1000000`; (j) the ledger expects the five comptime
+  rows refused as a toolchain without the names refuses them
+  (`fail(E0301)`).
+- Predicted reds, `rig` on ubuntu and macOS: `fork_rows` (native),
+  `restore_rows`, `wait_fds_rows`, `sync_rows`, `realpath_rows`,
+  `monotonic_ns` and the five comptime rows (wolfc and native),
+  `mode_bits` and `create_new_rows` (all three lanes), `mode_bits_set`
+  (lupin: its `divergent(stdout)` observed `run`); and lupin on
+  `restore_rows`, `sync_rows`, `realpath_rows` and `monotonic_ns`, since
+  a plant that drops the builtin call lets lupin run the row to a wrong
+  answer. No old row. windows `rig`: the same but `fork_rows` and
+  `wait_fds_rows`, which take their windows lines before the planted
+  code. `gates` on three hosts: the examples of `raw_bytes`,
+  `create_new`, `sync_dir` and `realpath` (lupin too for the last two),
+  and `fork`'s on native on ubuntu and macOS.
