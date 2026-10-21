@@ -41,7 +41,19 @@ fn windows_lines() {
     print("under_a_file=io")
 }
 
+// The lanes of one row share its staged root, and lupin makes the
+// directories before its refusal at the first `realpath`: clear first.
+fn clear() {
+    fs.remove("sc69-rp-l") else |_| {}
+    fs.remove("sc69-rp-le") else |_| {}
+    fs.remove("sc69-rp-dangling") else |_| {}
+    fs.remove("sc69-rp-a") else |_| {}
+    fs.remove("sc69-rp-b") else |_| {}
+    fs.remove_dir_all("sc69-rp-d") else |_| {}
+}
+
 fn main() -> !int {
+    clear()
     fs.create_dir("sc69-rp-d")?
     fs.create_dir("sc69-rp-d/e")?
     fs.write_text("sc69-rp-d/f", "x")?
