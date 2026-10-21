@@ -23,7 +23,9 @@
 //! - `eof` — a read reached the end of the file, which is an outcome
 //!   rather than a failure (the fd tier only)
 //! - `exists` — the path is already there and the operation demanded to
-//!   create it (`create_dir`, and nothing else here)
+//!   create it (`create_dir`, the exclusive creates `create_new`,
+//!   `create_new_with_mode` and `create_private`, `create_dir_mode`,
+//!   `symlink` and `link`)
 //! - `invalid` — DECLARED AND UNREACHABLE FROM TYPED CODE since sc35.
 //!   It named a `List[int]` element that is not a byte (outside 0..255)
 //!   offered to a byte write — the WRITE's spelling of the refusal
@@ -105,9 +107,13 @@
 //!   `move_file` is the wrapper, it says what it does and does not
 //!   guarantee, and there is no second name for the same call. The one
 //!   atomically-promisable primitive the language DOES offer everywhere
-//!   is `fs_open_mode`'s create-new mode, which nothing in std needs
-//!   yet; the sprint that writes a lock file or a unique temp name
-//!   wraps it, and this paragraph is where that decision was recorded.
+//!   is `fs_open_mode`'s create-new mode, which nothing in std needed
+//!   until wolf 0.2.34 gave a save its syncs: sc69 wraps it as
+//!   `create_new` (and `create_new_with_mode`), the first of the atomic
+//!   save's five calls — `create_new`, write, `sync`, `move_file` (a
+//!   rename in one directory, atomic on every unix), `sync_dir` — which
+//!   `sync`'s doc spells out. The promise is the save's, made of calls
+//!   that each keep theirs; there is still no `rename_atomic`.
 //! - `stem` / `extension` — a pair that has to decide what a dot means
 //!   (a leading dot, a doubled extension, no dot at all). That was never
 //!   a filing about the builtin tier; it is a design question this
@@ -774,10 +780,10 @@ pub fn remove_dir_all(path: str) -> () ! IoErrors {
 /// host refuses, `io` for any other host failure. Never traps.
 ///
 /// The handle must be closed with `close`, which consumes it. `create`
-/// is the write-and-truncate mode and `open_append` the append mode;
-/// the builtin tier also has a read-write mode and an exclusive
-/// create-new mode, neither of which std wraps yet and both of which the
-/// module header accounts for. `defer` is the idiom for the close, and
+/// is the write-and-truncate mode, `open_append` the append mode and
+/// `create_new` the exclusive create-new mode; the builtin tier also has
+/// a read-write mode, which std does not wrap yet and which the module
+/// header accounts for. `defer` is the idiom for the close, and
 /// `errdefer` the idiom for a close on the error path only (§12);
 /// neither is available inside a doc example, so the example below
 /// closes explicitly.
@@ -851,6 +857,91 @@ pub fn open_append(path: str) -> File ! IoErrors {
 /// ```
 pub fn create(path: str) -> File ! {denied, io} {
     File { fd: fs_create(path)? }
+}
+
+/// Create a NEW file at `path`, open for reading and writing, and fail
+/// if anything is already there: the EXCLUSIVE create, the one atomicity
+/// every tier-1 host promises (`[os.fs.open]`'s mode 4).
+///
+/// Two programs that race to `create_new` one name: exactly one gets the
+/// file, the other `exists` — what a lock file, a unique temporary name
+/// and an atomic save's temporary file need. It never truncates and
+/// never follows a name to a file someone else made. The file gets
+/// `0o666` less the process's umask, as `create` does
+/// (`create_new_with_mode` names its bits from the first instant).
+///
+/// Rows: `exists` when anything is at `path` (a file, a directory, a
+/// link, a dangling one included); `not_found` when the parent directory
+/// is missing; `denied` when the host refuses; `io` otherwise. Never
+/// traps. Served on every machine, lupin included, and on windows
+/// (ruling #97 R3: no third spelling in the toolchain; this is std's).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_open_mode` (mode 4).
+///
+/// ```wolf-doc-example
+/// var f = fs.create_new("doc-create-new.tmp")?
+/// fs.write(mut f, "first")?
+/// fs.close(take f)?
+/// var taken = false
+/// var g = fs.create_new("doc-create-new.tmp") else |_| {
+///     taken = true
+///     fs.File { fd: 0 - 1 }
+/// }
+/// fs.close(take g) else |_| { }
+/// let text = fs.read_text("doc-create-new.tmp")?
+/// fs.remove("doc-create-new.tmp")?
+/// taken == true && text == "first"
+/// ```
+pub fn create_new(path: str) -> File ! {exists, not_found, denied, io} {
+    let fd = fs_open_mode(path, 4) else |e| match e {
+        exists => { return exists },
+        not_found => { return not_found },
+        denied => { return denied },
+        invalid => { return io },
+        io => { return io },
+    }
+    File { fd: fd }
+}
+
+/// `create_new`, with the permission bits the file has from its first
+/// instant: `mode` less the process's umask (`env.umask`), never wider
+/// for a moment — an atomic save's temporary file with the target's
+/// bits, before it is renamed over the target.
+///
+/// `[os.fs.create.mode]`'s `fs_open_perm` with open mode 4. `mode` is the
+/// nine permission bits; the three above them are set afterwards with
+/// `set_mode`, because the hosts disagree about them at a creation.
+///
+/// Rows: `invalid` when `mode` is outside `0..=0o777`; `exists` when
+/// anything is at `path`; `not_found` when the parent directory is
+/// missing; `denied`; `unsupported` on a host with no permission bits
+/// (windows, by name: `create_new` is the call there); `io` otherwise.
+/// Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_open_perm`.
+///
+/// ```wolf-doc-example
+/// var served = true
+/// var f = fs.create_new_with_mode("doc-create-new-mode.tmp", 0o600) else |_| {
+///     served = false
+///     fs.create_new("doc-create-new-mode.tmp")?
+/// }
+/// fs.close(take f)?
+/// let info = fs.stat("doc-create-new-mode.tmp")?
+/// fs.remove("doc-create-new-mode.tmp")?
+/// (served && info.mode == 0o600) || (!served && !fs.answered(info, 4))
+/// ```
+pub fn create_new_with_mode(path: str, mode: int) -> File ! {
+    exists,
+    not_found,
+    denied,
+    invalid,
+    unsupported,
+    io,
+} {
+    File { fd: fs_open_perm(path, 4, mode)? }
 }
 
 /// Read up to `max` bytes from `f`, decoded as UTF-8, advancing the
