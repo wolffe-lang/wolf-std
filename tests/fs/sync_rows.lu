@@ -47,6 +47,8 @@ fn dir_row(path: str) -> str {
 }
 
 fn main() -> !int {
+    // The lanes share the staged root; lupin stops at the first `sync`.
+    fs.remove("sc69-save.tmp.new") else |_| {}
     var f = fs.create("sc69-sync.tmp")?
     fs.write(mut f, "kept")?
     let fd = f.fd
