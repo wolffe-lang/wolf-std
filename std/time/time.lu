@@ -11,8 +11,9 @@
 //! one level down at the builtin, because a `comptime fn` cannot call
 //! across a module boundary at this pin (F-0051).
 //!
-//! Six of this module's functions reach the clock (`now`, `unix_ms`,
-//! `sleep`, `elapsed`, `now_iso8601`, `unix_iso8601`); the other eighteen
+//! Seven of this module's functions reach the clock (`now`,
+//! `monotonic_ns`, `unix_ms`, `sleep`, `elapsed`, `now_iso8601`,
+//! `unix_iso8601`); the other eighteen
 //! are PURE and comptime-safe — arithmetic over two one-field structs and
 //! one calendar rendering. §14 says to state the exception explicitly,
 //! because in a capability module the pure function is the surprising
@@ -100,10 +101,12 @@
 //!     (F-0049 for sockets; the same hole for everything else), and
 //!     there is no `select` to race a timer against work. std ships no
 //!     deadline type rather than one that cannot expire.
-//! monotonic_ns() / unix_ns()
-//!     Nanosecond resolution. The builtin ABI is milliseconds and a
-//!     library cannot invent precision it was not given; a `_ns` face
-//!     over a `_ms` source would report a thousand-fold lie.
+//! unix_ns()
+//!     The WALL clock at nanoseconds. The builtin ABI is milliseconds
+//!     for that clock and a library cannot invent precision it was not
+//!     given; a `_ns` face over a `_ms` source would report a
+//!     thousand-fold lie. (`monotonic_ns()`, reviewed here beside it,
+//!     landed verbatim at sc69 over wolf 0.2.34's `os_clock_ns`.)
 //! ```
 
 /// A reading of the MONOTONIC clock, in milliseconds from an arbitrary
@@ -143,6 +146,30 @@ pub struct Duration {
 /// ```
 pub fn now() -> Instant {
     Instant { ms: time_now_ms() }
+}
+
+/// **s248 (`[os.clock.ns]`): the monotonic clock in NANOSECONDS**, from
+/// the anchor `now` reads (`time_now_ms`'s): `monotonic_ns() / 1000000`
+/// read after a `now()` is never smaller than its `ms`. A value is a
+/// duration to compare and subtract, never a timestamp; it never goes
+/// backwards and saturates at the largest int, 292 years from the
+/// anchor. What a latency gate needs (a keypress to its paint, at most 5
+/// ms): an interval of 100 us that `now` reads as 0 reads here as about
+/// 100,000. The host's finest monotonic clock (`CLOCK_MONOTONIC`, the
+/// mach clock, `QueryPerformanceCounter`).
+///
+/// Total: no rows, no traps. Capability `Clock`; refused at comptime
+/// (D33), charged nothing in a manifest. lupin 0.1.55 does not resolve
+/// the call (wolf-interp#268). Delegates to `os_clock_ns`.
+///
+/// ```wolf-doc-example
+/// let t = time.now()
+/// let a = time.monotonic_ns()
+/// let b = time.monotonic_ns()
+/// b >= a && a / 1000000 >= t.ms
+/// ```
+pub fn monotonic_ns() -> int {
+    os_clock_ns()
 }
 
 /// The current wall clock, in milliseconds since 1970-01-01T00:00:00Z.
