@@ -17,8 +17,10 @@
 //! printed for that reason there.
 //!
 //! **windows** has no dispositions: the first call answers `unsupported`
-//! and the row prints its lines for that reason. **lupin** 0.1.54 does
-//! not resolve the calls (wolf-interp#261).
+//! and the row prints its lines for that reason. **lupin** 0.1.55
+//! refuses the first well-formed call by name (it has no `sigaction`;
+//! is77, wolf-interp#261; 0.1.54 did not resolve it), except on windows,
+//! where the host's `unsupported` comes first and the row runs.
 
 use std.env
 use std.signal
