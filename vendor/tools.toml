@@ -1538,7 +1538,38 @@ pin = "294d626dd596122285d5df954762e3aee3e5db71"
 #   x86_64-unknown-linux-gnu
 #     `58e4ade4837db845b39b1f692c2d6ba42982674245bae1edf93bd4fcd50cbb71`
 # (`_wolf`, the zsh completion script, is still `a368c8ec…`.)
-version = "0.2.33"
+# sc69 BUMP: 0.2.33 -> 0.2.34 (r39 released 0.2.34 on 2026-10-21,
+# release 419552903; `v0.2.34`, annotated `38ab81cb`, at `9da7bdcf`).
+# Two compiler lanes: s247 (wolf-lang#803, rulings #90, #95), the fork
+# (`os_fork`, `busy` while a task is live, the checked machine's
+# `unsupported`), and s248 (wolf-lang#804, rulings #93, #97), the
+# editor's calls (`os_term_restore_at_exit`, `os_signal_wait_fds`,
+# `fs_sync`, `fs_sync_dir`, `fs_realpath`, `os_clock_ns`) and the mode
+# int's bits 5-7, whose 0 is the usual setting. Seven new prelude names
+# and the mark `busy`; no std or test declaration draws W0304. The spec
+# gains eight anchors (F-0156 P2). The pairing is lupin 0.1.55, this
+# repository's lupin pin since sc68, which resolves none of the seven
+# (wolf-interp#268, #269).
+#
+# The archive's `std/` is wolf-std `e036bec` (sc66 + sc67 + sc68,
+# `STD-REV`), this branch's base: `diff -rq` against `std/` names only
+# `STD-REV` and the two licences. The rig still never reads it.
+# Acquired by digest from the release, verified from `--version`: `wolf
+# 0.2.34 (wolfgang, pin 9da7bdc)`, pairing line `paired with lupin
+# 0.1.55 (reference interpreter), pin 294d626` — true of this box's
+# pair. Archive `wolf-0.2.34-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `88a9dd3da1c9a0e38c08eb6e2de9c1ef04d1ed93dcf51024d8dbbb76890c1821`
+# (the release's reported digest, matched on kasumi, read twice). The
+# other three by the release API: aarch64-apple-darwin `29c8331f…`,
+# aarch64-unknown-linux-gnu `ca5cadf9…`, x86_64-pc-windows-msvc
+# `77bb8403…`. `libwolf_rt.a` `cc058247…`, `libwolf_rt_none.a`
+# `73e53a44…` (nothing here links it).
+#
+# THE BINARY `wolf`, BY NAME (see sc51's note below for why):
+#   x86_64-unknown-linux-gnu
+#     `2bfaf7b8d73b3a6047462ff1b5ad54b3200dfb769aea7b316efd0ff28eabd913`
+# (`_wolf`, the zsh completion script, is still `a368c8ec…`.)
+version = "0.2.34"
 # sc48 BUMP: a7f517e (v0.2.12) -> 30731a6 (v0.2.14), TWO releases —
 # s157/s158 (0.2.13, "the literals and the papercuts III") and s159/s160
 # (0.2.14, "the string runtime and the papercuts IV"). The data pin was
@@ -3096,4 +3127,5 @@ version = "0.2.33"
 # pin = "6ffe7c6056eeb8c661b37e38d99b91166e8c1add"  (superseded, sc60 era — the v0.2.29-tag pin)
 # pin = "1b37f368228db92eca505c8c4cd3c531ea60be48"  (superseded, sc62/sc63 era — the v0.2.30-tag pin)
 # pin = "72de141f624662fdff522e8beba459fab7c5cf66"  (superseded, sc64/sc65 era — the v0.2.32-tag pin)
-pin = "85dab5d7e597680d6fd7034f1d7ed2acb9a92f97"
+# pin = "85dab5d7e597680d6fd7034f1d7ed2acb9a92f97"  (superseded, sc66-sc68 era — the v0.2.33-tag pin)
+pin = "9da7bdcf2aea9adf48df6570bedc58e16e9ef853"
