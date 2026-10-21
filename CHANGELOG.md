@@ -1,5 +1,69 @@
 # Changelog
 
+## sc69 — 2026-10-21 — std at wolf 0.2.34: the fork, the editor's calls, the exclusive create, Mode's bits 5–7 (wolf-std#76's prose)
+
+**The pin.** wolf 0.2.33 -> **0.2.34** (`v0.2.34` at `9da7bdcf`,
+release 419552903; linux x86-64 `88a9dd3d…`, binary `2bfaf7b8…`), from
+the release archives by digest; lupin stays **0.1.55**, wolf 0.2.34's
+pairing, which resolves none of 0.2.34's seven new names
+(wolf-interp#268, #269). The data pin moves v0.2.33 -> v0.2.34
+(`85dab5d7` -> `9da7bdcf`, 664 -> 672 anchors: `os.clock.ns`,
+`os.editor.calls.note`, `os.fs.realpath`, `os.fs.sync`, `os.proc.fork`,
+`os.proc.fork.note`, `os.signal.wait.fds`, `os.term.restore`; none
+removed). 0.2.34's archive bundles this repository at `e036bec`.
+Trunk's 497 tests and 519 doc examples are green at the bare pin.
+
+**The wrappers** (each spelling a ruling owed, implemented as
+recommended in its own commit; every one delegates to one builtin):
+
+- `process.fork() -> Fork ! {busy, io, unsupported}`, `Fork { pid,
+  child }` and `process.is_child(f)` (s247, rulings #90, #95): the
+  parent's `pid` and a `Child` every table call serves, the child's
+  `pid` 0. `busy` while any task is live; `unsupported` as a row on the
+  checked machine and on windows.
+- `term.Mode` gains `raw_cr`, `raw_output`, `strip8` (bits 5–7, whose 0
+  is the usual setting, ruling #97 R7); `pack` and `unpack` carry them,
+  so a mode read and set back is exact again on a terminal set
+  otherwise (0.2.34 writes the usual setting for a mode without them).
+  `raw` keeps the three as found, so it sets what it set before;
+  `term.raw_bytes(m)` sets `raw_cr` and `raw_output` and clears
+  `strip8`, C yew's raw mode. **A `term.Mode { … }` literal now names
+  ten fields** (sc61's precedent): yew's `rawios` and wolf-book's ch34
+  listing name seven and need the three.
+- `term.restore_at_exit(tty, m, bytes)` (s248, ruling #93 R1 C): the
+  runtime restores the mode and writes the bytes on every exit it owns.
+- `signal.wait_fds(files, set, deadline_ms) -> Wake ! {invalid, io,
+  unsupported}`, `Wake { meaning, ready }` (ruling #93 R2 A).
+- `fs.sync(mut f)`, `fs.sync_dir(path)` (windows `unsupported`),
+  `fs.realpath(path)`; the exclusive create `fs.create_new(path)` and
+  `fs.create_new_with_mode(path, mode)` over open mode 4 (ruling #97 R3:
+  no `fs_create_new` in the toolchain). `sync`'s doc spells the atomic
+  save.
+- `time.monotonic_ns()` over `os_clock_ns`, the module header's reviewed
+  contract landed verbatim (the 0.2.34 CHANGELOG calls it `now_ns`).
+
+**Rows.** 14 new: `process/fork_rows`, `term/restore_rows`,
+`term/mode_bits`, `term/mode_bits_set` (lupin `divergent(stdout)`: its
+shape still refuses bits 5–7, wolf-interp#268), `signal/wait_fds_rows`,
+`fs/sync_rows`, `fs/realpath_rows`, `fs/create_new_rows` (three lanes),
+`time/monotonic_ns`, and five `comptime_refuses_*` (`os_fork`,
+`fs_sync`, `fs_sync_dir`, `fs_realpath`, `os_clock_ns`; the two
+builtins that take a `List` are unreachable at comptime). `term/rows`'
+literals name the three new fields. 511 tests, 528 doc examples (was
+497 and 519).
+
+**wolf-std#76's prose.** `text`'s, `ignore_one`'s, `reset_one`'s,
+`exit_signal`'s, `wait_status_core`'s and `poll_core`'s docs and the
+sc66 rows' and `text_zero`'s headers say what lupin 0.1.55 answers,
+measured; musl's words for signal 0 stay unmeasured (no release archive
+targets musl).
+
+**For the next release.** wolf 0.2.35's `STD-PIN` is this branch's
+merge sha. The prelude delta is none (std adds no prelude name); 0.2.34's
+"Not wrapped yet" line retires for that std. When lupin mirrors the seven
+(is79), the lupin cells of the six rows that name them, and
+`term/mode_bits_set`'s `divergent(stdout)`, go red and flip deliberately.
+
 ## sc68 — 2026-10-20 — std at lupin 0.1.55 (wolf-std#80, with #76)
 
 **The pin.** lupin 0.1.54 -> **0.1.55** (`v0.1.55` at wolf-interp
