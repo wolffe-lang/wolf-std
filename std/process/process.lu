@@ -29,8 +29,8 @@
 //! hole in it.
 //!
 //! **Capability: `Exec` (I13).** `start`, `run`, `wait`, `kill`, `exit`,
-//! `exit_signal`, `poll`, `wait_status_core`, `poll_core`, `lead_group`
-//! and `join_group` reach the host's process table
+//! `exit_signal`, `fork`, `poll`, `wait_status_core`, `poll_core`,
+//! `lead_group` and `join_group` reach the host's process table
 //! (`own_group` reads this process's context: `env`), are tagged `exec` in the toolchain's
 //! sandbox table, and are categorically refused at comptime (D33) — with
 //! the sandbox table's own reason, which is worth quoting because it is
@@ -153,6 +153,16 @@
 //! `Status` and `dumped_core` (or `CoreChange.core`) says there was a core.
 //! Which ends dump core is the host's. `exit_signal` ends THIS process by
 //! a signal, so its parent reads the end its command had (R2).
+//!
+//! **The fork (sc69, wolf 0.2.34's s247, rulings #90 and #95).** `fork`
+//! makes a child that runs on from the call, a copy of this program — a
+//! shell's subshell, where `start` runs another program. The parent's
+//! answer names the child as a `Child` every call above serves; the
+//! child's says it is the child (`is_child`) and ends with `exit`. It is
+//! `busy` while any task is live, so a program forks from `main` before
+//! its first spawn or after every scope has joined; the checked machine
+//! and windows answer `unsupported`, and a program's in-process path
+//! runs there.
 //!
 //! **What is deliberately absent.** Each is a reviewed contract with a
 //! filing behind it rather than an approximation:
@@ -1410,4 +1420,75 @@ pub fn exit(code: int) {
 /// ```
 pub fn exit_signal(meaning: int) -> () ! {invalid, unsupported} {
     os_exit_signal(meaning)?
+}
+
+/// What one `fork` answered, in the process that reads it (s247,
+/// `[os.proc.fork]`). In the PARENT: `pid`, the child's process id
+/// (above 0), and `child`, its handle, which `wait`, `wait_status`,
+/// `wait_status_core`, `poll`, `poll_core`, `pid` and `kill` serve as
+/// they serve a started child's. In the CHILD: `pid` 0 and `child`
+/// `Child { slot: -1 }`, a handle every one of those answers `io` for.
+/// `is_child` says which side this is.
+pub struct Fork {
+    pid: int,
+    child: Child,
+}
+
+/// **s247 (`[os.proc.fork]`, rulings #90 and #95): make a child process
+/// that runs on from this call**, a copy of this program. The call
+/// answers twice: in the parent a `Fork` naming the child, in the child
+/// a `Fork` whose `pid` is 0 (`is_child`). It is what a shell's
+/// subshell is — `( … )`, `{ …; } &`, a command substitution, a
+/// pipeline stage the shell runs itself — where `start` runs another
+/// program.
+///
+/// What the child is: ONE thread, the caller's, with the program's
+/// memory as it was at the call; every descriptor shared, offsets
+/// included (a `pipe` made before the fork carries the child's bytes to
+/// the parent); the signal dispositions and the mask kept, nothing
+/// pending, a listen's queue its own; no task, no worker, and no child
+/// of the parent's (a handle the parent held answers `io` there). The
+/// child ends with `exit` or `exit_signal`: a return from the function
+/// that forked runs on into the rest of the parent's code.
+///
+/// **The fork's rule is `busy`**, answered before the host is asked:
+/// from a task or a proc handler, while any task is live anywhere in
+/// the process (queued, running or parked), and under the deterministic
+/// scheduler. So only `main`'s thread forks, before its first spawn or
+/// after every scope has joined, and no lock another thread holds is
+/// ever copied.
+///
+/// Rows: `busy` as above; `io` where the host refuses (a process limit,
+/// memory), its number in `os_error()`; `unsupported` on windows, which
+/// has no fork, and on **the checked machine** on every host (ruling #95
+/// R4 C), which is the `wolf` process interpreting the program — so a
+/// program with an in-process path takes it there and runs to its end,
+/// as on windows. Never traps. lupin 0.1.55 does not resolve the call
+/// (wolf-interp#269). The cost, measured upstream: 1,000 forks that end
+/// at once and are waited for take 0.119 s on kasumi (dash's `x=$(true)`
+/// 0.083 s).
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to `os_fork`.
+///
+/// ```wolf-doc-example
+/// let f = process.fork() else |_| process.Fork { pid: 0 - 1, child: process.Child { slot: 0 - 1 } }
+/// if process.is_child(f) { process.exit(0) }
+/// var ch = process.Child { slot: f.child.slot }
+/// let st = process.wait_status(take ch) else 0 - 1
+/// (f.pid > 0 && st == 0) || (f.pid == 0 - 1 && st == 0 - 1)
+/// ```
+pub fn fork() -> Fork ! {busy, io, unsupported} {
+    let (p, h) = os_fork()?
+    Fork { pid: p, child: Child { slot: h } }
+}
+
+/// Whether a `fork`'s answer is the CHILD's (`pid` 0). Pure and
+/// comptime-safe.
+///
+/// ```wolf-doc-example
+/// process.is_child(process.Fork { pid: 0, child: process.Child { slot: 0 - 1 } }) == true
+/// process.is_child(process.Fork { pid: 4242, child: process.Child { slot: 0 } }) == false
+/// ```
+pub fn is_child(f: Fork) -> bool {
+    f.pid == 0
 }
