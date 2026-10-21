@@ -986,8 +986,9 @@ pub fn poll() -> Change ! {io} {
 ///
 /// Rows: `io` for a forged or reaped handle. Never traps. Capability
 /// `Exec`; refused at comptime (D33). The checked machine answers it as
-/// the runtime does; lupin 0.1.54 does not resolve it (wolf-interp#263).
-/// Delegates to `os_wait_status_core`.
+/// the runtime does, and so does lupin 0.1.55 (is77, wolf-interp#263:
+/// an exit and a forged handle measured). Delegates to
+/// `os_wait_status_core`.
 ///
 /// ```wolf-doc-example
 /// var forged = process.Child { slot: 4242 }
@@ -1053,8 +1054,10 @@ pub struct CoreChange {
 /// Rows: `poll`'s (`io` once for a child the host reaped behind the
 /// table's back). Never traps, never blocks but behind a blocking `wait`
 /// on another task. Capability `Exec`; refused at comptime (D33). The
-/// checked machine answers it as the runtime does; lupin 0.1.54 does not
-/// resolve it (wolf-interp#263). Delegates to `os_wait_poll_core`.
+/// checked machine answers it as the runtime does. lupin 0.1.55 answers
+/// the poll with no child as `poll` does and refuses one with a live
+/// child by name, since its host has no stop to report (std's
+/// `try_wait`; is77, wolf-interp#263). Delegates to `os_wait_poll_core`.
 ///
 /// ```wolf-doc-example
 /// let c = process.poll_core() else |_| { process.CoreChange { change: process.Change { changed: true, child: process.Child { slot: -1 }, status: process.status_from(512), live: -1 }, core: true } }
@@ -1410,8 +1413,10 @@ pub fn exit(code: int) {
 ///
 /// Capability `Exec`, with `exit`; refused at comptime (D33). The checked
 /// machine refuses it by name after the shape (it runs inside the `wolf`
-/// process, which a signal would end); lupin 0.1.54 does not resolve it
-/// (wolf-interp#261). Delegates to `os_exit_signal`.
+/// process, which a signal would end); lupin 0.1.55 answers the shape
+/// rows and refuses a well-formed end by name, since it has no
+/// `sigaction` and no `raise(3)` (is77, wolf-interp#261). Delegates to
+/// `os_exit_signal`.
 ///
 /// ```wolf-doc-example
 /// var row = "ended"
