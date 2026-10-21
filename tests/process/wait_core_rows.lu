@@ -16,8 +16,11 @@
 //! host that writes them.
 //!
 //! **windows** has no `/bin/sh` (`not_found`): the forged line is the
-//! host's and the others are printed for that reason. **lupin** 0.1.54
-//! does not resolve the siblings (wolf-interp#263).
+//! host's and the others are printed for that reason. **lupin** 0.1.55
+//! answers the forged handle and the two waits, then refuses the poll of
+//! a live child by name (std's `try_wait` sees no stop; is77,
+//! wolf-interp#263; 0.1.54 did not resolve the siblings), except on
+//! windows, where `/bin/sh`'s `not_found` comes first and the row runs.
 
 use std.process
 use std.time

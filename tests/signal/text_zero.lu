@@ -13,13 +13,13 @@
 //! retired and the line lives here, so that a compiler that went back to
 //! `invalid` is red.
 //!
-//! **lupin 0.1.54 still answers `invalid`** (wolf-interp#262), and the row
-//! prints `text_zero=false` there without asking `text(kill())`, which
-//! lupin declines by name: the ledger spells that `divergent(stdout)`.
-//! When lupin learns `text(0)` (is77 refuses it by name) the lupin lane
-//! changes and the row goes red on purpose. musl's words are unmeasured
-//! (no release targets musl), so a musl host prints `false` until they
-//! are.
+//! **lupin** 0.1.54 answered `invalid` (wolf-interp#262) and the row
+//! printed `text_zero=false` there (`divergent(stdout)`); lupin 0.1.55
+//! (is77) passes 0's shape and refuses it by name, as every well-formed
+//! `text` ("std has no `strsignal`"), so the row is `unsupported` on
+//! linux and macOS and runs on windows, where the host's `unsupported`
+//! comes first (sc68's flip). musl's words are unmeasured: no release
+//! archive targets musl, so a musl host prints `false` until they are.
 
 use std.signal
 

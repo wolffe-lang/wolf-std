@@ -16,8 +16,10 @@
 //! **windows** answers `unsupported` (no signals to end by), and the row
 //! ends with the code the unix end gives, for that reason. The checked
 //! machine refuses the well-formed call by name (it runs inside the
-//! `wolf` process); **lupin** 0.1.54 does not resolve it
-//! (wolf-interp#261).
+//! `wolf` process); **lupin** 0.1.55 answers the shape row and refuses
+//! the well-formed end by name (no `sigaction`, no `raise(3)`; is77,
+//! wolf-interp#261; 0.1.54 did not resolve it), and on windows takes the
+//! host's `unsupported` first and runs.
 
 use std.process
 use std.signal
