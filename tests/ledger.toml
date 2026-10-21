@@ -4512,3 +4512,31 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# ---- sc69 (wolf 0.2.34 / lupin 0.1.55; wolf-lang s247 and s248, rulings
+# #90, #93, #95, #97): the wrappers for the seven names, the exclusive
+# create and `term.Mode`'s bits 5-7. lupin 0.1.55 resolves none of the
+# seven (wolf-interp#268, #269; is79 mirrors them): every row that names
+# one is `unsupported` there, by name ("does not resolve"), on every host
+# (each row's first call is one), and goes red the day a lupin that
+# resolves it is pinned (the flip is deliberate). The exclusive create
+# and the pure `Mode` rows run on all three lanes. ----
+
+# `process/fork_rows.lu`: the child `(0, -1)`, its wait, a pipe across the
+# fork, `busy` from a task and with a task live, a fork after the scope.
+# The checked machine answers `unsupported` as a ROW on every host (ruling
+# #95 R4 C), as windows does, and the row prints its lines for that reason.
+[tests."process/fork_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# D33 one level down at `os_fork` (`exec`), `fs_sync`, `fs_sync_dir`,
+# `fs_realpath` (`fs`) and `os_clock_ns` (the Clock). lupin has no comptime
+# tier. `os_signal_wait_fds` and `os_term_restore_at_exit` take a `List`,
+# which the comptime engine cannot build ("`List` construction at
+# comptime"), so no row reaches their sandbox refusal.
+[tests."process/comptime_refuses_fork.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
