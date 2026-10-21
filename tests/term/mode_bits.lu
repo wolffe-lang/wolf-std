@@ -1,0 +1,88 @@
+//! check: run(exit=0, stdout="checked=2304\nmismatches=0\nold_modes_stay_old=true\nraw_cr_bit=32\nraw_output_bit=64\nstrip8_bit=128\nraw_keeps_the_three=true\nraw_of_cooked=260\nraw_bytes_of_cooked=356\nraw_bytes_clears_strip8=true\nhand_built=255")
+//! phase: run
+//! conforms: std.term, os.term.mode
+//!
+//! **sc69: `term.Mode`'s bits 5–7** (wolf 0.2.34, s248; ruling #97 R7:
+//! each new bit's 0 is the usual setting). `pack(unpack(v)) == v` for
+//! every flag combination of bits 0..7 with `min` and `time` at 0, 1 and
+//! 255; a mode below 32 (every mode the runtime reported before 0.2.34)
+//! packs back without the three; each field's bit. `raw` keeps the three
+//! as the mode had them (so `raw` of a cooked mode still packs 260, as
+//! at sc61), and `raw_bytes` sets `raw_cr` and `raw_output` and clears
+//! `strip8` (4 + 32 + 64 + 256 = 356). A `Mode` built by hand names all
+//! ten fields. Pure: every machine, every host.
+
+use std.term
+
+fn miss(v: int) -> int {
+    if term.pack(term.unpack(v)) == v {
+        return 0
+    }
+    1
+}
+
+fn edge(i: int) -> int {
+    if i == 0 {
+        return 0
+    }
+    if i == 1 {
+        return 1
+    }
+    255
+}
+
+fn main() -> !int {
+    var checked = 0
+    var bad = 0
+    var old_ok = true
+    var flags = 0
+    while flags < 256 {
+        var i = 0
+        while i < 9 {
+            let v = flags + edge(i / 3) * 256 + edge(i % 3) * 65536
+            checked = checked + 1
+            bad = bad + miss(v)
+            if flags < 32 && term.pack(term.unpack(v)) / 32 % 8 != 0 {
+                old_ok = false
+            }
+            i = i + 1
+        }
+        flags = flags + 1
+    }
+    print("checked={checked}")
+    print("mismatches={bad}")
+    print("old_modes_stay_old={old_ok}")
+    let one = term.unpack(32)
+    print(
+        "raw_cr_bit={if one.raw_cr && !one.raw_output && !one.strip8 { term.pack(one) } else { 0 }}",
+    )
+    let two = term.unpack(64)
+    print(
+        "raw_output_bit={if two.raw_output && !two.raw_cr && !two.strip8 { term.pack(two) } else { 0 }}",
+    )
+    let three = term.unpack(128)
+    print(
+        "strip8_bit={if three.strip8 && !three.raw_cr && !three.raw_output { term.pack(three) } else { 0 }}",
+    )
+    let odd = term.unpack(1 + 2 + 4 + 32 + 64 + 128)
+    let r = term.raw(odd)
+    print("raw_keeps_the_three={r.raw_cr && r.raw_output && r.strip8 && !r.canonical}")
+    let cooked = term.unpack(1 + 2 + 4 + 8 + 16 + 256)
+    print("raw_of_cooked={term.pack(term.raw(cooked))}")
+    print("raw_bytes_of_cooked={term.pack(term.raw_bytes(cooked))}")
+    print("raw_bytes_clears_strip8={!term.raw_bytes(term.unpack(128)).strip8}")
+    let hand = term.Mode {
+        canonical: true,
+        echo: true,
+        signals: true,
+        flow: true,
+        extended: true,
+        raw_cr: true,
+        raw_output: true,
+        strip8: true,
+        min: 0,
+        time: 0,
+    }
+    print("hand_built={term.pack(hand)}")
+    0
+}
