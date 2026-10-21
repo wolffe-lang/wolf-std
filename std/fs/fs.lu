@@ -56,10 +56,11 @@
 //! `fs_read_chunk`, `fs_write_chunk`, `fs_read_dir`, `fs_create_dir`,
 //! `fs_create_dir_all`, `fs_remove_dir`, `fs_remove_dir_all`,
 //! `fs_rename`, `fs_is_file`, `fs_is_dir`, `fs_size`,
-//! `fs_modified_ms`), s142's `fs_fstat`, and s199's three
+//! `fs_modified_ms`), s142's `fs_fstat`, s199's three
 //! (`fs_seek`, `fs_tell`, `fs_read_at` — wolf-lang#426, with the
-//! standard streams as handles 0, 1 and 2, #424) — so their semantics
-//! are part of this module's contract and are documented per
+//! standard streams as handles 0, 1 and 2, #424), and s248's three
+//! (`fs_sync`, `fs_sync_dir`, `fs_realpath`, wolf 0.2.34) — so their
+//! semantics are part of this module's contract and are documented per
 //! function. std owns everything else:
 //! the `File` value, the consuming `close`, the mode choice behind
 //! `append_text`/`open_append`, `move_file`'s fast path and its
@@ -2084,6 +2085,70 @@ pub fn set_file_owner(mut f: File, uid: int, gid: int) -> () ! {denied, invalid,
 /// ```
 pub fn truncate(mut f: File, len: int) -> () ! {invalid, io} {
     fs_truncate(f.fd, len)?
+}
+
+/// **s248 (`[os.fs.sync]`): put `f`'s bytes and metadata on the disk**
+/// before answering — `fsync(2)` on linux, `F_FULLFSYNC` on macOS (whose
+/// `fsync` leaves them in the drive's cache), `FlushFileBuffers` on
+/// windows. A write that answered has reached the host, not the disk; a
+/// program that must survive a crash syncs what it wrote. `sync_dir`
+/// makes a creation, a rename or a removal in a directory durable.
+///
+/// **The atomic save**, five calls, a crash between any two leaving the
+/// old file or the new one under the name, whole: `create_new` a
+/// temporary file in the target's directory, write it, `sync` it,
+/// `move_file` it over the target (a rename in one directory: atomic on
+/// every unix), `sync_dir` the directory.
+///
+/// Rows: `io` for a closed or forged handle, and for every host refusal,
+/// its number in `os_error()` (a pipe on linux and macOS; a windows
+/// handle open only for reading). Never traps. lupin 0.1.55 does not
+/// resolve the call (wolf-interp#268). The cost is the flush: 5–9 ms for
+/// 24 bytes on kasumi's btrfs, 1–9 ms on CI's macOS runner (upstream's
+/// measurement).
+///
+/// `mut f`, as `truncate`: the call acts on the file the handle names.
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_sync`.
+///
+/// ```wolf-doc-example
+/// var f = fs.create_new("doc-sync.tmp")?
+/// fs.write(mut f, "kept")?
+/// fs.sync(mut f)?
+/// fs.close(take f)?
+/// let text = fs.read_text("doc-sync.tmp")?
+/// fs.remove("doc-sync.tmp")?
+/// text == "kept"
+/// ```
+pub fn sync(mut f: File) -> () ! {io} {
+    fs_sync(f.fd)?
+}
+
+/// **s248 (`[os.fs.sync]`): put the directory `path`'s entries on the
+/// disk**, so that a creation, a rename or a removal in it survives a
+/// crash — the last call of `sync`'s atomic save.
+///
+/// Rows: `not_found` for a missing name; `invalid` for a name that is
+/// not a directory; `denied` for a refused search; `unsupported` on
+/// windows, by name, before the path is read (no directory opens as a
+/// file there, and NTFS orders a rename through its own log; ruling #97
+/// R4); `io` otherwise. Never traps. lupin 0.1.55 does not resolve the
+/// call (wolf-interp#268).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_sync_dir`.
+///
+/// ```wolf-doc-example
+/// fs.sync_dir(".") else |_| { }
+/// fs.write_text("doc-sync-dir.tmp", "x")?
+/// var on_a_file = "synced"
+/// fs.sync_dir("doc-sync-dir.tmp") else |_| { on_a_file = "refused" }
+/// var missing = "synced"
+/// fs.sync_dir("doc-sync-dir-none.tmp") else |_| { missing = "refused" }
+/// fs.remove("doc-sync-dir.tmp")?
+/// on_a_file == "refused" && missing == "refused"
+/// ```
+pub fn sync_dir(path: str) -> () ! {denied, invalid, io, not_found, unsupported} {
+    fs_sync_dir(path)?
 }
 
 /// An append-mode descriptor for `path`, with the two tags mode 2 cannot
