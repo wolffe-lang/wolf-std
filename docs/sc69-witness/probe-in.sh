@@ -10,9 +10,11 @@ grep -E 'SigBlk|SigIgn' /proc/self/status | tr '\n' ' '; echo; echo "std $(cat $
 for t in "$@"; do
   n=$(basename $(dirname $t))__$(basename $t .lu); d=$OUT/$n; rm -rf $d; mkdir -p $d; cp $t $d/main.lu
   for m in lupin checked native release; do
-    mkdir -p $d/$m-root; cp $d/main.lu $d/$m-root/main.lu; cd $d/$m-root
-    if [ $m = lupin ]; then ${PRE:-} $LUPIN conform-run --std-root $STD $d/$m-root/main.lu --json > $d/$m.json 2> $d/$m.err
-    else ${PRE:-} $W/wolf conform-run --$m --std-root $STD $d/$m-root/main.lu --json > $d/$m.json 2> $d/$m.err; fi
+    # SHARED=1: one root for the four machines, in the rig's order (the rig stages a row once for its lanes).
+    r=$d/$m-root; [ "${SHARED:-}" = 1 ] && r=$d/shared-root
+    mkdir -p $r; cp $d/main.lu $r/main.lu; cd $r
+    if [ $m = lupin ]; then ${PRE:-} $LUPIN conform-run --std-root $STD $r/main.lu --json > $d/$m.json 2> $d/$m.err
+    else ${PRE:-} $W/wolf conform-run --$m --std-root $STD $r/main.lu --json > $d/$m.json 2> $d/$m.err; fi
     rc=$?
     echo "  $m rc=$rc"
   done
