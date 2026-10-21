@@ -67,8 +67,8 @@
 //! are `io` (they act on a descriptor the program holds, as
 //! `io.is_terminal`); `set_foreground` is `exec` (process control) and
 //! `group` `env` (process context).
-//! `pack`, `unpack`, `raw`, `chars_from` and `char_disabled` are pure,
-//! comptime-safe.
+//! `pack`, `unpack`, `raw`, `raw_bytes`, `chars_from` and
+//! `char_disabled` are pure, comptime-safe.
 
 use std.fs
 
@@ -169,7 +169,8 @@ pub fn set_mode(tty: fs.File, m: Mode) -> () ! {unsupported, invalid, io} {
 /// cannot clear the two, so there they stay as found. `raw_cr`,
 /// `raw_output` and `strip8` are kept as `m` has them, so `raw` sets on
 /// every terminal what it set before wolf 0.2.34: Enter still reads as
-/// LF and a written LF still reaches the screen as CR LF on a usual one.
+/// LF and a written LF still reaches the screen as CR LF on a usual one
+/// (`raw_bytes` turns both off).
 pub fn raw(m: Mode) -> Mode {
     Mode {
         canonical: false,
@@ -182,6 +183,39 @@ pub fn raw(m: Mode) -> Mode {
         strip8: m.strip8,
         min: 1,
         time: 0,
+    }
+}
+
+/// `raw(m)` with every byte passed through untranslated, both ways:
+/// `raw_cr` and `raw_output` on and `strip8` off, so a typed Enter reads
+/// as CR (13), not LF (10, Ctrl-J's byte), a written LF reaches the
+/// terminal alone, and input keeps its eighth bit. That is an editor's
+/// raw mode, as C yew sets it (`cfmakeraw(3)`'s set as far as a `Mode`
+/// reaches it; `signals` is kept, as `raw` keeps it, and an editor that
+/// wants Ctrl-C as a key clears it). A program in this mode writes CR LF
+/// where it means a new line. Pure and comptime-safe (sc69, ruling #97
+/// R7: wolf 0.2.34's bits 5–7).
+///
+/// ```wolf-doc-example
+/// let cooked = term.unpack(1 + 2 + 4 + 8 + 16)
+/// let r = term.raw_bytes(cooked)
+/// r.raw_cr == true && r.raw_output == true && r.strip8 == false
+/// term.pack(r) == 4 + 32 + 64 + 256
+/// term.pack(term.raw(cooked)) == 4 + 256
+/// ```
+pub fn raw_bytes(m: Mode) -> Mode {
+    let r = raw(m)
+    Mode {
+        canonical: r.canonical,
+        echo: r.echo,
+        signals: r.signals,
+        flow: r.flow,
+        extended: r.extended,
+        raw_cr: true,
+        raw_output: true,
+        strip8: false,
+        min: r.min,
+        time: r.time,
     }
 }
 
