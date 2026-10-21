@@ -1,0 +1,14 @@
+use std.process
+use std.time
+
+fn main() -> !int {
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, "exit 3")
+    var ch = process.start(c)?
+    print("started")
+    time.sleep(time.millis(200))
+    let pc = process.poll_core()?
+    print("polled={pc.change.changed} core={pc.core} same={pc.change.child.slot == ch.slot}")
+    0
+}

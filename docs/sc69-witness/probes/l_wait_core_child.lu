@@ -1,0 +1,12 @@
+use std.process
+
+fn main() -> !int {
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, "exit 3")
+    var ch = process.start(c)?
+    print("started")
+    let s = process.wait_status_core(take ch)?
+    print("status={s}")
+    0
+}

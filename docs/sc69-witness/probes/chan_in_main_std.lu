@@ -1,0 +1,14 @@
+use std.time
+
+fn main() -> !int {
+    let out = channel[str](1)
+    var inner = "none"
+    scope s {
+        s.spawn(fn() {
+            out.send("x") else |_| {}
+        })
+    }
+    inner = out.recv() else |_| "none"
+    print("got={inner} {time.as_millis(time.millis(1))}")
+    0
+}

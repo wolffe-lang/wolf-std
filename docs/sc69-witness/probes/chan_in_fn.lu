@@ -1,0 +1,16 @@
+fn helper() -> str {
+    let out = channel[str](1)
+    var inner = "none"
+    scope s {
+        s.spawn(fn() {
+            out.send("x") else |_| {}
+        })
+    }
+    inner = out.recv() else |_| "none"
+    inner
+}
+
+fn main() -> !int {
+    print("got={helper()}")
+    0
+}
