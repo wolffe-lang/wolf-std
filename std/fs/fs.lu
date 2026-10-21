@@ -1347,6 +1347,41 @@ pub fn read_link(path: str) -> List[byte] ! {not_found, denied, invalid, io} {
     fs_read_link(path)?
 }
 
+/// **s248 (`[os.fs.realpath]`): the canonical name of `path`** — absolute,
+/// every symbolic link followed, every `.` and `..` taken (a `..` AFTER
+/// the link before it, so `l/..` is the parent of the link's TARGET),
+/// and no trailing slash: what `realpath(3)` resolves. A relative path is
+/// resolved against the working directory. Two spellings of one file
+/// answer one name, which is how an editor keys a workspace by its
+/// directory. The answer is the host's: macOS's `/tmp` is `/private/tmp`,
+/// and windows answers its final name in the `\\?\` form.
+///
+/// Rows: `not_found` for a missing name, a dangling link included, and
+/// the empty path; `io` for a loop of links, a component that is not a
+/// directory (on unix; windows says `not_found`), a refused search, and
+/// an answer that is not UTF-8 (`read_link` is the byte-exact call),
+/// the host's number in `os_error()` where it gave one. Never traps.
+/// lupin 0.1.55 does not resolve the call (wolf-interp#268).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_realpath`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir("doc-realpath.tmp")?
+/// let a = fs.realpath("doc-realpath.tmp/")?
+/// let b = fs.realpath("doc-realpath.tmp/../doc-realpath.tmp")?
+/// var missing = false
+/// let none = fs.realpath("doc-realpath-none.tmp") else |_| {
+///     missing = true
+///     ("")
+/// }
+/// fs.remove_dir("doc-realpath.tmp")?
+/// a == b && a != "doc-realpath.tmp" && missing == true && none == ""
+/// ```
+pub fn realpath(path: str) -> str ! {io, not_found} {
+    fs_realpath(path)?
+}
+
 /// One directory entry: its own kind (`Info`'s codes; a link is 3, never
 /// what it names; 2 when the host gave none) and its name's bytes.
 pub struct Entry {
