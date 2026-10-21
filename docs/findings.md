@@ -13870,3 +13870,51 @@ first call decides it, so windows is the same but where noted):
 | `fs.create_new`, `create_new_with_mode` | `create_new_rows`: **run** (open mode 4 and `fs_open_perm` served since 0.1.54); both examples run | — (is79's "exclusive create" is already served) |
 | `time.monotonic_ns` | `monotonic_ns`: `unsupported`, "`os_clock_ns` does not resolve" (#268) | a mirror through `Instant` makes the row run: the cell flips to `run` |
 | the five `comptime_refuses_*` | `unsupported` (no comptime) | — |
+
+### The rebase onto tl30's trunk (after the measurements above)
+
+tl30 (the macOS cap: `ci/tiers.py`, `ci/tiers-test.py`, `ci.yml`,
+`ci/tl30-prediction.md`) reached trunk (`7ed9fd9`) while this PR's first
+`tier pr` ran, so the branch was rebased onto it. Every sha in F-0156
+above, and every head the gauntlets, probes and CI runs name (`a150622`
+g0, `30e719f` g1 and run 39613086277, `1d744a1` g2 and t1, `f70301f`
+run 39646295691), is the PRE-rebase commit; the pre-rebase head is kept
+on origin as `sc69-prerebase` (`f70301f`), so each still resolves. The
+rebase changed no file of this lane's: `git diff f70301f
+<rebased head>` names only tl30's four files. The map, in order:
+
+| before | after |
+|---|---|
+| `6dfc6e4` | `a968403` |
+| `45a79cc` | `dc39f25` |
+| `0b2ebf2` | `37a1b14` |
+| `a150622` | `4ac191d` |
+| `f984fb4` | `7be513c` |
+| `3943067` | `84cdc46` |
+| `731bd9d` | `6b90da2` |
+| `b5f3a56` | `0698753` |
+| `a4b6010` | `6f6290e` |
+| `d16b3ae` | `9440ba2` |
+| `e8043d3` | `3a9c69d` |
+| `9986de4` | `0c4503c` |
+| `f166f44` | `d49234c` |
+| `2b8a060` | `8311709` |
+| `551e45e` | `dd4d30a` |
+| `b7583ab` | `4712b0c` |
+| `a52e621` | `a687a5c` |
+| `deb1dd2` | `7effe1f` |
+| `c5913f1` | `517bb18` |
+| `39a8411` | `b5ee89f` |
+| `09a1520` | `f10aa56` |
+| `b0a2450` | `be3a400` |
+| `fbfe496` | `0ec8c76` |
+| `222f8cc` | `7398e8d` |
+| `30e719f` | `8135956` |
+| `e89164e` | `bacc619` |
+| `649942f` | `191398d` |
+| `bcd6fb0` | `eb4f0b2` |
+| `f1587ad` | `d2f1671` |
+| `7a61306` | `3b712d5` |
+| `1d744a1` | `1b5eb33` |
+| `b778ab4` | `49ed731` |
+| `f70301f` | `ab8559a` |
