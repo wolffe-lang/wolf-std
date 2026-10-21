@@ -119,7 +119,7 @@ def full_leg(job, leg):
     """Whether the merge tier runs this leg (tl30): every leg but the
     macOS rig, whose std-test is the nightly's; `gates` on macOS is the
     merge's macOS smoke."""
-    return not (job == "rig" and leg.get("os") == "macos-latest")
+    return True  # the plant: the merge runs every leg, its shape before tl30
 
 
 BOTH = ("rig", "gates")
