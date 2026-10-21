@@ -1,0 +1,93 @@
+//! check: run(exit=0, stdout="sync_file=ok\nsync_forged=io\nsync_closed=io\nsync_dir_here=ok\nsync_dir_missing=not_found\nsync_dir_on_a_file=invalid\nsync_pipe=io\natomic_save=new\ntemporary_gone=true")
+//! phase: run
+//! conforms: std.fs, std.process, os.fs.sync, os.fs.open, os.fs.create.mode, err.row
+//!
+//! **sc69: `fs.sync` and `fs.sync_dir`** (s248, wolf-lang#796). A file
+//! written and synced reads back; a forged and a closed handle are `io`.
+//! A directory's sync: this one (`.`) is served, a missing name is
+//! `not_found`, a name that is not a directory `invalid`; a pipe's write
+//! end is a host refusal, `io` (linux and macOS, measured upstream). The
+//! atomic save, the five calls `sync`'s doc names: `create_new` a
+//! temporary file beside the target, write it, `sync` it, `move_file` it
+//! over the target, `sync_dir` the directory; the target then holds the
+//! new bytes and the temporary name is gone. (That a crash between any
+//! two calls leaves the old bytes or the new is wolf-lang's witness,
+//! `editor_calls_lanes.rs`'s fault shim; a row cannot crash a host.)
+//!
+//! **windows** syncs a file (`FlushFileBuffers`) and answers
+//! `unsupported` for every directory's sync, before the path: the row
+//! prints its directory and pipe lines for that reason, and its save
+//! skips the last call. **lupin** 0.1.55 does not resolve `fs_sync`
+//! (wolf-interp#268).
+
+use std.fs
+use std.process
+
+fn sync_row(f: fs.File) -> str {
+    var g = f
+    fs.sync(mut g) else |e| {
+        return match e {
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn dir_row(path: str) -> str {
+    fs.sync_dir(path) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    var f = fs.create("sc69-sync.tmp")?
+    fs.write(mut f, "kept")?
+    let fd = f.fd
+    let synced = sync_row(f)
+    fs.close(take f)?
+    let text = fs.read_text("sc69-sync.tmp")?
+    print(
+        if synced == "ok" && text == "kept" { "sync_file=ok" } else { "sync_file={synced} {text}" },
+    )
+    print("sync_forged={sync_row(fs.File { fd: 4242 })}")
+    print("sync_closed={sync_row(fs.File { fd: fd })}")
+    let here = dir_row(".")
+    let windows = here == "unsupported"
+    if windows {
+        print("sync_dir_here=ok")
+        print("sync_dir_missing=not_found")
+        print("sync_dir_on_a_file=invalid")
+        print("sync_pipe=io")
+    } else {
+        print("sync_dir_here={here}")
+        print("sync_dir_missing={dir_row("sc69-sync-none.tmp")}")
+        print("sync_dir_on_a_file={dir_row("sc69-sync.tmp")}")
+        var p = process.pipe()?
+        var r = p.read
+        var w = p.write
+        print("sync_pipe={sync_row(w)}")
+        fs.close(take r)?
+        fs.close(take w)?
+    }
+    fs.write_text("sc69-save.tmp", "old")?
+    var t = fs.create_new("sc69-save.tmp.new")?
+    fs.write(mut t, "new")?
+    fs.sync(mut t)?
+    fs.close(take t)?
+    fs.move_file("sc69-save.tmp.new", "sc69-save.tmp")?
+    if !windows {
+        fs.sync_dir(".")?
+    }
+    print("atomic_save={fs.read_text("sc69-save.tmp")?}")
+    print("temporary_gone={!fs.exists("sc69-save.tmp.new")}")
+    fs.remove("sc69-save.tmp")?
+    fs.remove("sc69-sync.tmp")?
+    0
+}

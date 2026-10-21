@@ -1,0 +1,25 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.realpath
+//!
+//! **D33 for `fs.realpath` (sc69), held one level down at
+//! `fs_realpath`**: a compile may not read the filesystem's names. The
+//! row is handled locally (F-0069); `fs.realpath` named in `main` keeps
+//! the import used (it never runs: the row stops at typecheck).
+
+use std.fs
+
+comptime fn probe() -> int {
+    let r = fs_realpath(".") else |_| { return 1 }
+    if r == "" {
+        return 2
+    }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    let here = fs.realpath(".") else |_| "?"
+    print("p: {P} {here}")
+    0
+}
