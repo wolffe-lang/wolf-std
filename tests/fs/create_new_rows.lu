@@ -1,0 +1,97 @@
+//! check: run(exit=0, stdout="fresh=ok first\ntaken=exists first\nmissing_parent=not_found\nread_write=true\nwith_mode=true\nwith_mode_taken=exists\nwith_mode_bad=invalid\ndirectory_taken=exists")
+//! phase: run
+//! conforms: std.fs, os.fs.open, os.fs.create.mode, err.row
+//!
+//! **sc69: the exclusive create** (`[os.fs.open]`'s mode 4; ruling #97
+//! R3: the toolchain's spelling is the mode, std's is `create_new`). A
+//! fresh name is made and written; the same name again is `exists` and
+//! its bytes are untouched; a missing parent is `not_found`; the handle
+//! reads what it wrote after a seek back (open for reading and writing).
+//! On unix `create_new_with_mode` makes the file `0o600` from its first
+//! instant (less a umask that has none of those bits), refuses a taken
+//! name with `exists` and a mode past `0o777` with `invalid`, and a
+//! directory's name is `exists` to both creates.
+//!
+//! **windows** has no permission bits: `create_new_with_mode` answers
+//! `unsupported` by name there and makes nothing, and the row prints its
+//! last four lines for that reason (the first four are every host's).
+//! lupin serves open mode 4 and `fs_open_perm` (s248 measured both on
+//! lupin 0.1.54), so this row is three-lane.
+
+use std.fs
+
+fn made(path: str) -> str {
+    var f = fs.create_new(path) else |e| {
+        return match e {
+            exists => "exists",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    fs.write(mut f, "first") else |_| {
+        return "write failed"
+    }
+    fs.close(take f) else |_| {
+        return "close failed"
+    }
+    "ok"
+}
+
+fn with_mode(path: str, mode: int) -> str {
+    var f = fs.create_new_with_mode(path, mode) else |e| {
+        return match e {
+            exists => "exists",
+            not_found => "not_found",
+            denied => "denied",
+            invalid => "invalid",
+            unsupported => "unsupported",
+            io => "io",
+        }
+    }
+    fs.close(take f) else |_| {
+        return "close failed"
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let fresh = made("sc69-new.tmp")
+    print("fresh={fresh} {fs.read_text("sc69-new.tmp")?}")
+    let taken = made("sc69-new.tmp")
+    print("taken={taken} {fs.read_text("sc69-new.tmp")?}")
+    print("missing_parent={made("sc69-new-none/x.tmp")}")
+    var rw = fs.create_new("sc69-new-rw.tmp")?
+    fs.write(mut rw, "both")?
+    let _ = fs.seek(mut rw, 0) else |_| 0
+    let back = fs.read(mut rw, 16) else "nothing"
+    fs.close(take rw)?
+    print("read_write={back == "both"}")
+    let m = with_mode("sc69-new-mode.tmp", 0o600)
+    if m == "unsupported" {
+        print("with_mode=true")
+        print("with_mode_taken=exists")
+        print("with_mode_bad=invalid")
+        print("directory_taken=exists")
+    } else {
+        let info = fs.stat("sc69-new-mode.tmp")?
+        print("with_mode={m == "ok" && info.mode == 0o600}")
+        print("with_mode_taken={with_mode("sc69-new-mode.tmp", 0o600)}")
+        print("with_mode_bad={with_mode("sc69-new-bad.tmp", 0o1000)}")
+        fs.create_dir("sc69-new-dir.tmp")?
+        let dir_new = made("sc69-new-dir.tmp")
+        let dir_mode = with_mode("sc69-new-dir.tmp", 0o600)
+        print(
+            if dir_new == dir_mode {
+                "directory_taken={dir_new}"
+            } else {
+                "directory_taken={dir_new} {dir_mode}"
+            },
+        )
+        fs.remove_dir("sc69-new-dir.tmp")?
+        fs.remove("sc69-new-mode.tmp")?
+    }
+    fs.remove("sc69-new.tmp")?
+    fs.remove("sc69-new-rw.tmp")?
+    0
+}

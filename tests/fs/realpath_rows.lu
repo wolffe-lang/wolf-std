@@ -1,0 +1,90 @@
+//! check: run(exit=0, stdout="absolute=true\ntrailing_slash=true\ndot_dot_after_a_directory=true\ndot=true\nmissing=not_found\nempty=not_found\nunder_the_directory=true\nlink_followed=true\ndot_dot_after_a_link=true\ndangling=not_found\nloop=io\nunder_a_file=io")
+//! phase: run
+//! conforms: std.fs, os.fs.realpath, os.fs.symlink, err.row
+//!
+//! **sc69: `fs.realpath`** (s248, wolf-lang#797). Each answer is compared
+//! with another answer of the call, so one stdout serves every host's
+//! spelling of a name: a relative name resolves to a name longer than
+//! itself and other than itself; a directory with a trailing slash, the
+//! same directory after `d/e/..`, and `d/.` are the directory's name; a
+//! missing name and the empty path are `not_found`; on unix a name under
+//! the directory is the directory's name, `/` and the file's. Then the
+//! links: a link to the directory is the directory; `le/..`, `le` a link
+//! to `d/e`, is the PARENT OF THE TARGET (`d`), not of the link (`.`); a
+//! dangling link is `not_found`; two links naming each other are `io`
+//! (a loop); a name under a file is `io` (`ENOTDIR`).
+//!
+//! **windows** makes no unprivileged symbolic link (`fs.symlink` answers
+//! `unsupported`), says `not_found` for a name under a file and spells a
+//! name with `\`: the row prints the lines after the first six for that
+//! reason. **lupin** 0.1.55 does not resolve `fs_realpath`
+//! (wolf-interp#268).
+
+use std.fs
+
+fn real(path: str) -> str {
+    let r = fs.realpath(path) else |e| {
+        return match e {
+            io => "io",
+            not_found => "not_found",
+        }
+    }
+    r
+}
+
+fn windows_lines() {
+    print("under_the_directory=true")
+    print("link_followed=true")
+    print("dot_dot_after_a_link=true")
+    print("dangling=not_found")
+    print("loop=io")
+    print("under_a_file=io")
+}
+
+fn main() -> !int {
+    fs.create_dir("sc69-rp-d")?
+    fs.create_dir("sc69-rp-d/e")?
+    fs.write_text("sc69-rp-d/f", "x")?
+    let d = real("sc69-rp-d")
+    let here = real(".")
+    print("absolute={d != "sc69-rp-d" && d != here && d != "io" && d != "not_found"}")
+    print("trailing_slash={real("sc69-rp-d/") == d}")
+    print("dot_dot_after_a_directory={real("sc69-rp-d/e/..") == d}")
+    print("dot={real("sc69-rp-d/.") == d}")
+    print("missing={real("sc69-rp-none")}")
+    print("empty={real("")}")
+    var linked = true
+    fs.symlink("sc69-rp-d", "sc69-rp-l") else |e| {
+        match e {
+            unsupported => { linked = false },
+            invalid => print("symlink=invalid"),
+            exists => print("symlink=exists"),
+            not_found => print("symlink=not_found"),
+            denied => print("symlink=denied"),
+            io => print("symlink=io"),
+        }
+    }
+    if !linked {
+        windows_lines()
+    } else {
+        print("under_the_directory={real("sc69-rp-d/f") == fs.join(d, "f")}")
+        print("link_followed={real("sc69-rp-l") == d}")
+        fs.symlink("sc69-rp-d/e", "sc69-rp-le")?
+        print(
+            "dot_dot_after_a_link={real("sc69-rp-le/..") == d && real("sc69-rp-le") == fs.join(d, "e")}",
+        )
+        fs.symlink("sc69-rp-none", "sc69-rp-dangling")?
+        print("dangling={real("sc69-rp-dangling")}")
+        fs.symlink("sc69-rp-b", "sc69-rp-a")?
+        fs.symlink("sc69-rp-a", "sc69-rp-b")?
+        print("loop={real("sc69-rp-a")}")
+        print("under_a_file={real("sc69-rp-d/f/g")}")
+        fs.remove("sc69-rp-l")?
+        fs.remove("sc69-rp-le")?
+        fs.remove("sc69-rp-dangling")?
+        fs.remove("sc69-rp-a")?
+        fs.remove("sc69-rp-b")?
+    }
+    fs.remove_dir_all("sc69-rp-d")?
+    0
+}

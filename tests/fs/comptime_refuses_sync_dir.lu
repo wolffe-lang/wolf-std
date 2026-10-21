@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.sync
+//!
+//! **D33 for `fs.sync_dir` (sc69), held one level down at
+//! `fs_sync_dir`**: a compile may not open a directory or flush it. The
+//! row is handled locally (F-0069); `fs.sync_dir` named in `main` keeps
+//! the import used (it never runs: the row stops at typecheck).
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_sync_dir(".") else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    fs.sync_dir(".") else |_| {}
+    print("p: {P}")
+    0
+}
