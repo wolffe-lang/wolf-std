@@ -22,8 +22,10 @@
 //! `strip8`: input stripped to seven bits) and, when not canonical, how a
 //! read waits — `min` bytes, or `time` tenths of a second. Every other
 //! setting is left as found, so a mode read and set back restores exactly
-//! what was changed. Nothing restores it for you at exit: save it,
-//! change it, put it back (`term.set_mode(tty, saved)`).
+//! what was changed. Save it, change it, put it back
+//! (`term.set_mode(tty, saved)`); or, since wolf 0.2.34, register the put
+//! back with the runtime (`restore_at_exit`), which then makes it on
+//! every exit the runtime owns, a trap's included.
 //!
 //! **`flow` and `extended` before wolf 0.2.30.** The runtime gained the
 //! two bits in wolf 0.2.30 (s234); from then a mode without them turns
@@ -51,9 +53,12 @@
 //! — spellings ruled #82. The wait that a key or a signal ends is
 //! `signal.wait_fd` (ruling #82: the signal family's, and any descriptor
 //! serves), so an editor blocks there instead of in a read a signal
-//! cannot tear. Nothing here sets
-//! the special characters, and nothing restores the mode when a program
-//! dies of a signal it cannot catch.
+//! cannot tear; since wolf 0.2.34 `signal.wait_fds` waits on the
+//! terminal, a job's pipes and the signals at once, with a deadline
+//! (the 25 ms that tells a lone ESC from an escape sequence). Nothing
+//! here sets the special characters, and nothing restores the mode when
+//! a program dies of a signal nobody listened for (no code of the
+//! process runs then, the runtime's included).
 //!
 //! **Errors are rows.** A handle that is closed, forged or not a terminal
 //! is `io`; a mode outside the bits is `invalid` (unreachable through
@@ -61,12 +66,13 @@
 //! wolf 0.2.30 and the three bits before 0.2.34); every call is
 //! `unsupported` on windows. lupin answers the shape rows and declines
 //! every call that reaches the terminal by name; lupin 0.1.55's shape
-//! still refuses bits 5–7 (`invalid`, wolf-interp#268).
+//! still refuses bits 5–7 (`invalid`, wolf-interp#268) and does not
+//! resolve `os_term_restore_at_exit`.
 //!
-//! **Capability:** `foreground`, `mode`, `set_mode`, `size` and `chars`
-//! are `io` (they act on a descriptor the program holds, as
-//! `io.is_terminal`); `set_foreground` is `exec` (process control) and
-//! `group` `env` (process context).
+//! **Capability:** `foreground`, `mode`, `set_mode`, `restore_at_exit`,
+//! `size` and `chars` are `io` (they act on a descriptor the program
+//! holds, as `io.is_terminal`); `set_foreground` is `exec` (process
+//! control) and `group` `env` (process context).
 //! `pack`, `unpack`, `raw`, `raw_bytes`, `chars_from` and
 //! `char_disabled` are pure, comptime-safe.
 
@@ -217,6 +223,50 @@ pub fn raw_bytes(m: Mode) -> Mode {
         min: r.min,
         time: r.time,
     }
+}
+
+/// **s248 (`[os.term.restore]`, ruling #93 R1 C): put the terminal back
+/// on every exit the runtime owns.** Registers, for this process, a
+/// restore of `tty`: when the process ends — a return from `main`,
+/// `process.exit`, an error from `main`, a trap (after its report), the
+/// stack guard's report, `process.exit_signal` (before its raise), the
+/// death of the proc root — the runtime sets `m` exactly as `set_mode`
+/// sets it and then writes `bytes` to the terminal (an editor's
+/// alternate-screen leave and cursor show). The restore runs in the
+/// runtime, never in a handler of the program's. One registration a
+/// process: the last call wins, and each restore runs once. The runtime
+/// holds its own duplicate of the descriptor from the call, so a `tty`
+/// the program closes first still restores, and the bytes are copied at
+/// the call. Register the mode to come back to (the one `mode` read
+/// before the program changed it); registering first and changing the
+/// mode after is the usual order.
+///
+/// **What it does not cover:** a death by a signal nobody listened for —
+/// `KILL`, a `TERM` or `HUP` under the default, a fault outside the stack
+/// guard — runs no code of the process, so nothing is restored (listen
+/// for `terminate()`, `reload()` and `quit()` and end through `exit`);
+/// `process.exec` replaces the image and the registration with it; a
+/// child a `process.fork` makes restores nothing.
+///
+/// Rows: `invalid` for a mode outside the bits (unreachable through
+/// `Mode`); then `unsupported` on windows; then `io` for a handle that is
+/// closed, forged or not a terminal, or a duplicate the host will not
+/// make (ruling #97 R1). Never traps. The checked machine restores on
+/// its own end, whatever the verdict (R8); lupin 0.1.55 does not resolve
+/// the call (wolf-interp#268).
+///
+/// Capability `io` (uncharged, as `set_mode`; ruling #97 R5); refused at
+/// comptime. Delegates to `os_term_restore_at_exit`. The example is
+/// prose, since a handle comes from `std.fs`: an editor reads `saved =
+/// term.mode(tty)?`, registers `term.restore_at_exit(tty, saved,
+/// leave)?` with the bytes that leave its alternate screen, then sets
+/// `term.raw_bytes(saved)`; a trap no longer leaves the shell raw.
+pub fn restore_at_exit(tty: fs.File, m: Mode, bytes: List[byte]) -> () ! {
+    invalid,
+    io,
+    unsupported,
+} {
+    os_term_restore_at_exit(tty.fd, pack(m), bytes)?
 }
 
 /// The terminal's foreground process group.
