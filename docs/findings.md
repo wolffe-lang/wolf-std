@@ -13595,3 +13595,164 @@ none --ulimit core=0:0`, the rig under `setsid -w`,
   `ignore_one`, `reset_one`, `exit_signal`, `wait_status_core` and
   `poll_core` and the headers of the sc66 rows: true of 0.1.54, each
   owed a line at the next std lane that may change `std/`.
+
+## F-0156 — sc69's predictions, before the 0.2.34 pin and the seven names' wrappers
+
+Written on branch `sc69` (on trunk `e036bec`, sc68) before any file
+other than this one changed. What I read or ran first, and so cannot
+claim to predict blind: wolf 0.2.34's CHANGELOG at `9da7bdcf` ("read
+this before you bump", the bundled std, the downstream list); spec/11 at
+`9da7bdcf` (`[os.proc.fork]`, `[os.proc.fork.note]`, `[os.term.mode]`,
+`[os.term.restore]`, `[os.signal.wait.fds]`, `[os.fs.sync]`,
+`[os.fs.realpath]`, `[os.fs.open]`, `[os.fs.create.mode]`,
+`[os.clock.ns]`, `[os.editor.calls.note]` and the host table); s247's
+fork fixtures and s248's `corpus/os/term_editor_rows.lu`; rulings #90,
+#93, #95, #97 in crawl-54; wolf-std#76, wolf-interp#268 and #269,
+is79's contract; F-0153 and F-0155; and, on kasumi, the three archives
+fetched by the release API's digests with `wolf prelude` diffed
+0.2.33 -> 0.2.34 (`job-acq.log`). No wolf or lupin program has run.
+
+Inputs, re-derived 2026-10-21: wolf-std trunk `e036bec`, 497 tests and
+519 doc examples (1,557 lane runs). wolf 0.2.34 is `v0.2.34` (annotated
+`38ab81cb`) at `9da7bdcf`, release 419552903, published 12:58:10Z,
+read by the API and by `ls-remote`; lupin 0.1.55 is `v0.1.55` at
+`e642f26`, release 418932753, already this repository's pin.
+
+**Drift in the contract, named before it is built on.** "0.2.34's seven
+names" are the seven prelude names the CHANGELOG lists (`os_fork`,
+`os_term_restore_at_exit`, `os_signal_wait_fds`, `fs_sync`,
+`fs_sync_dir`, `fs_realpath`, `os_clock_ns`). The contract's list has
+the exclusive create where `os_clock_ns` is: ruling #97 R3 shipped no
+`fs_create_new` (open mode 4 and `fs_open_perm(path, 4, perm)` are the
+exclusive create) and shipped `os_clock_ns`. I wrap all seven AND the
+exclusive create; is79's contract and wolf-interp#268 carry the same
+swap (lupin owes `os_clock_ns`, not a create).
+
+### P1. The archives
+
+- wolf 0.2.34 linux x86-64 `88a9dd3d…` (80,433,878 B), matched and read
+  twice; binary `wolf` `2bfaf7b8…`, `libwolf_rt.a` `cc058247…`; `wolf
+  0.2.34 (wolfgang, pin 9da7bdc)`, paired with lupin 0.1.55 pin
+  `294d626`; GLIBC ≤ 2.34; `std/STD-REV` `e036bec3…`, so `diff -rq`
+  of its `std/` against trunk's names only `STD-REV` and the two
+  licences. The other three by the API: aarch64-apple-darwin
+  `29c8331f…`, aarch64-unknown-linux-gnu `ca5cadf9…`,
+  x86_64-pc-windows-msvc `77bb8403…` (CI matches the first and last on
+  arrival). lupin 0.1.55 `1152abc0…`, binary `ad52ee96…`, unchanged.
+
+### P2. The data pin
+
+- `85dab5d7` -> `9da7bdcf`: 664 -> **672** anchors, exactly the eight
+  the CHANGELOG names (`os.clock.ns`, `os.editor.calls.note`,
+  `os.fs.realpath`, `os.fs.sync`, `os.proc.fork`, `os.proc.fork.note`,
+  `os.signal.wait.fds`, `os.term.restore`), none removed, none moved
+  file; `spec/05-conformance.md` byte-identical.
+
+### P3. The bare pin
+
+- Trunk's tree with only the two pins moved: std-test **497 GREEN** and
+  doc-examples **519 GREEN, 1,557 ok** on kasumi (container), 0
+  `SKIP:`; no ledger word moves (r39 measured the same std under the
+  release head; CI's three hosts see 0.2.34 first in the plant's
+  dispatch and at the PR's head). No std or test function is named after the
+  seven, so no W0304.
+
+### P4. The wrappers (spellings not ruled are owed, each its own commit)
+
+- **F1** `process.fork() -> Fork ! {busy, io, unsupported}` with
+  `Fork { pid: int, child: Child }` and `process.is_child(f) -> bool`
+  (pure): the parent's `pid` above 0 and a `Child` every table call
+  serves; the child's `pid` 0 and `Child { slot: -1 }`.
+- **T1** `term.Mode` gains `raw_cr`, `raw_output`, `strip8` (bits 5, 6,
+  7; their 0 the usual setting, ruling #97 R7); `pack`/`unpack` carry
+  them, so `pack(unpack(v)) == v` for every mode 0.2.34 reports.
+  **T2** `raw(m)` keeps the three as `m` has them (0.2.33's answer on
+  every terminal; `pack(raw(cooked))` stays 260). **T3**
+  `term.raw_bytes(m)`: `raw(m)` with `raw_cr` and `raw_output` on and
+  `strip8` off (what C yew's raw is). **T4**
+  `term.restore_at_exit(tty, m: Mode, bytes: List[byte]) -> () !
+  {invalid, io, unsupported}`.
+- **W1** `signal.wait_fds(files: List[fs.File], set: int, deadline_ms:
+  int) -> Wake ! {invalid, io, unsupported}`, `Wake { meaning, ready }`
+  (the meaning taken or 0; the lowest ready index or -1).
+- **S1** `fs.sync(mut f)`, `fs.sync_dir(path)`, `fs.realpath(path)`,
+  the builtins' rows.
+- **X1** `fs.create_new(path) -> File ! {exists, not_found, denied, io}`
+  over open mode 4, and `fs.create_new_with_mode(path, mode)` over
+  `fs_open_perm(path, 4, mode)`.
+- **C1** `time.monotonic_ns() -> int` over `os_clock_ns` (the module
+  header's reviewed contract, verbatim; the CHANGELOG says `now_ns`).
+
+### P5. The rows (red first: every one against trunk's std)
+
+Sixteen new rows; `term/rows.lu`'s literal gains the three fields (its
+stdout does not move). Against trunk's std each new row is
+`fail(E0301)` on the compiled machines (the name std lacks) and, on
+lupin, `unsupported` naming a missing std function or builtin. At the
+head:
+
+| row | lupin 0.1.55 | checked | native |
+|---|---|---|---|
+| `process/fork_rows` | unsupported (`os_fork` does not resolve) | run: the `unsupported` ROW, lines printed for that reason | run: child `(0, -1)`, wait 7, a pipe across the fork, `busy` from a task and with a task live, a fork after the scope |
+| `term/restore_rows` | unsupported (does not resolve) | run (`io`: forged, closed, a file) | run |
+| `term/mode_bits` | run | run | run |
+| `term/mode_bits_set` | **divergent(stdout)**: lupin's shape still refuses bits 5–7 (`invalid`, wolf-interp#268) | run (`io`, a forged handle) | run |
+| `signal/wait_fds_rows` | unsupported | run | run |
+| `fs/sync_rows` | unsupported | run | run |
+| `fs/realpath_rows` | unsupported | run | run |
+| `fs/create_new_rows` | **run** (modes 4 and `fs_open_perm` served since 0.1.54) | run | run |
+| `time/monotonic_ns` | unsupported | run | run |
+| seven `comptime_refuses_*` | unsupported (no comptime) | E0701 | E0701 |
+
+- windows: every row with a host branch prints its lines for that
+  reason on all three lanes where the host answers first; lupin's
+  answers there are as on linux, since each row's first call is one
+  lupin cannot resolve, except `create_new_rows` and the two term
+  pure rows. The checked machine answers `fork` by the row on every
+  host, before `busy` (ruling #95 R4 C). Less sure: the `comptime`
+  rows whose builtin takes a `List` (`wait_fds`, `restore`) may be
+  the comptime engine's `unsupported` rather than E0701, as `os_spawn`'s
+  `List[str]` was; if so they are dropped, not bent.
+- Under `taskset -c 0-3` byte-identical.
+
+### P6. Counts
+
+- **513** tests (497 + 16), **530** doc examples (519 + 11: `fork`,
+  `is_child`, `restore_at_exit`, `raw_bytes`, `wait_fds`, `sync`,
+  `sync_dir`, `realpath`, `create_new`, `create_new_with_mode`,
+  `monotonic_ns`), 1,590 lane runs: 1,588 ok + 2 mirror-lag (the
+  `term.restore_at_exit(` and `signal.wait_fds(` examples, refused by
+  name on lupin, wolf-interp#268; `term` and `signal` are not capability
+  modules). Divergent rows 0 -> 1. Anchors 672.
+
+### P7. A terminal (the rig has none)
+
+- sc61's pty witness widened to bits 5–7: a terminal set `-icrnl -opost
+  istrip`, mode read and set back through `std.term`. Trunk's std under
+  0.2.34 is RED on every compiled machine (unpack drops the three, so the
+  set writes `icrnl opost -istrip`); the head is GREEN. A registration
+  by `restore_at_exit` then `raw_bytes` and a return from `main`, and
+  then a bounds trap: the terminal after equals the terminal before on
+  checked, native and release.
+
+### P8. The plant
+
+- Branch `sc69-plant`, one `workflow_dispatch` of tier full: each
+  wrapper broken by what its row reads (`is_child` reads `pid != 0`;
+  `pack` drops bits 5–7; `raw_bytes` is `raw`; `restore_at_exit`
+  registers nothing and answers `()`; `wait_fds` swaps meaning and
+  index; `sync` and `sync_dir` do nothing; `realpath` answers its
+  argument; `create_new` truncates (mode 1); `monotonic_ns` is
+  `time_now_ms() * 1000000`). Red on the nine new run rows where they
+  run (lupin on `mode_bits` and `create_new_rows`), and on the
+  examples of the broken calls; no old row.
+
+### P9. #76's prose and the lupin column
+
+- `text`'s doc, `text_zero.lu`'s header, the five functions' "lupin
+  0.1.54 does not resolve" sentences and the sc66 rows' headers say what
+  lupin 0.1.55 answers, measured, not inferred; musl's words for 0 stay
+  unmeasured (no release archive targets musl). The lupin column for
+  is79 is the table in P5 plus the two mirror-lag examples.
+
+### P10. One thing here is wrong in a way this list does not name.
