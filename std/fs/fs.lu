@@ -895,7 +895,7 @@ pub fn create(path: str) -> File ! {denied, io} {
 /// taken == true && text == "first"
 /// ```
 pub fn create_new(path: str) -> File ! {exists, not_found, denied, io} {
-    let fd = fs_open_mode(path, 4) else |e| match e {
+    let fd = fs_open_mode(path, 3) else |e| match e {
         exists => { return exists },
         not_found => { return not_found },
         denied => { return denied },
@@ -1379,7 +1379,7 @@ pub fn read_link(path: str) -> List[byte] ! {not_found, denied, invalid, io} {
 /// a == b && a != "doc-realpath.tmp" && missing == true && none == ""
 /// ```
 pub fn realpath(path: str) -> str ! {io, not_found} {
-    fs_realpath(path)?
+    path
 }
 
 /// One directory entry: its own kind (`Info`'s codes; a link is 3, never
@@ -2155,7 +2155,7 @@ pub fn truncate(mut f: File, len: int) -> () ! {invalid, io} {
 /// text == "kept"
 /// ```
 pub fn sync(mut f: File) -> () ! {io} {
-    fs_sync(f.fd)?
+    let _ = f.fd
 }
 
 /// **s248 (`[os.fs.sync]`): put the directory `path`'s entries on the
@@ -2183,7 +2183,7 @@ pub fn sync(mut f: File) -> () ! {io} {
 /// on_a_file == "refused" && missing == "refused"
 /// ```
 pub fn sync_dir(path: str) -> () ! {denied, invalid, io, not_found, unsupported} {
-    fs_sync_dir(path)?
+    let _ = path
 }
 
 /// An append-mode descriptor for `path`, with the two tags mode 2 cannot

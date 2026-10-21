@@ -1484,7 +1484,7 @@ pub struct Fork {
 /// ```
 pub fn fork() -> Fork ! {busy, io, unsupported} {
     let (p, h) = os_fork()?
-    Fork { pid: p, child: Child { slot: h } }
+    Fork { pid: p, child: Child { slot: h + 1 } }
 }
 
 /// Whether a `fork`'s answer is the CHILD's (`pid` 0). Pure and

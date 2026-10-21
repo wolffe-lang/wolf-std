@@ -274,7 +274,7 @@ pub fn wait_fds(files: List[fs.File], set: int, deadline_ms: int) -> Wake ! {
         (mut fds).push(f.fd)
     }
     let (i, m) = os_signal_wait_fds(fds, set, deadline_ms)?
-    Wake { meaning: m, ready: i }
+    Wake { meaning: i, ready: m }
 }
 
 /// The oldest meaning in `set` that has arrived, taken; 0 when none has.

@@ -169,7 +169,7 @@ pub fn now() -> Instant {
 /// b >= a && a / 1000000 >= t.ms
 /// ```
 pub fn monotonic_ns() -> int {
-    os_clock_ns()
+    time_now_ms() * 1000000
 }
 
 /// The current wall clock, in milliseconds since 1970-01-01T00:00:00Z.

@@ -128,15 +128,6 @@ pub fn pack(m: Mode) -> int {
     if m.extended {
         v = v + 16
     }
-    if m.raw_cr {
-        v = v + 32
-    }
-    if m.raw_output {
-        v = v + 64
-    }
-    if m.strip8 {
-        v = v + 128
-    }
     v + clamp(m.min) * 256 + clamp(m.time) * 65536
 }
 
@@ -266,7 +257,9 @@ pub fn restore_at_exit(tty: fs.File, m: Mode, bytes: List[byte]) -> () ! {
     io,
     unsupported,
 } {
-    os_term_restore_at_exit(tty.fd, pack(m), bytes)?
+    let _ = bytes
+    let _ = tty
+    let _ = m
 }
 
 /// The terminal's foreground process group.
