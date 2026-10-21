@@ -8,7 +8,9 @@
 //! `min` 1, `time` 0 — packed, 4 + 256 = 260, the mode wolf-lang's
 //! `raw.lu` witness sets; `unpack` of a pack is the mode again (sc61:
 //! flow and extended included); fields outside 0..255 are clamped, so
-//! `pack` never makes an `invalid` mode.
+//! `pack` never makes an `invalid` mode. sc69: a `Mode` literal names
+//! wolf 0.2.34's three fields too (`raw_cr`, `raw_output`, `strip8`); at
+//! `false` every line here reads as before them.
 //! A terminal itself is witnessed in wolf-lang's `ctrl_c_lanes.rs`.
 
 use std.term
@@ -20,6 +22,9 @@ fn main() -> !int {
         signals: true,
         flow: true,
         extended: true,
+        raw_cr: false,
+        raw_output: false,
+        strip8: false,
         min: 1,
         time: 0,
     }
@@ -29,7 +34,11 @@ fn main() -> !int {
     let back = term.unpack(p)
     let three = back.canonical == r.canonical && back.echo == r.echo && back.signals == r.signals
     let flags = three && back.flow == r.flow && back.extended == r.extended
-    let same = flags && back.min == r.min && back.time == r.time
+    let bits = flags &&
+        back.raw_cr == r.raw_cr &&
+        back.raw_output == r.raw_output &&
+        back.strip8 == r.strip8
+    let same = bits && back.min == r.min && back.time == r.time
     print("round_trip={same}")
     print("raw_keeps_signals={r.signals}")
     print("raw_clears_flow={!r.flow && !r.extended}")
@@ -39,6 +48,9 @@ fn main() -> !int {
         signals: true,
         flow: true,
         extended: true,
+        raw_cr: false,
+        raw_output: false,
+        strip8: false,
         min: 999,
         time: 999,
     }

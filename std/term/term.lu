@@ -16,11 +16,14 @@
 //! editing), `echo`, `signals` (Ctrl-C, Ctrl-\ and Ctrl-Z become signals),
 //! `flow` (Ctrl-S and Ctrl-Q pause and resume output and never reach the
 //! program), `extended` (the host's extended input: literal next, word
-//! erase, reprint, discard) and, when not canonical, how a read waits —
-//! `min` bytes, or `time` tenths of a second. Every other setting is left
-//! as found, so a mode read and set back restores exactly what was
-//! changed. Nothing restores it for you at exit: save it, change it, put
-//! it back (`term.set_mode(tty, saved)`).
+//! erase, reprint, discard), the three a terminal does not usually have
+//! (`raw_cr`: a typed carriage return reaches the program as CR, not LF;
+//! `raw_output`: a written LF reaches the terminal as LF, not CR LF;
+//! `strip8`: input stripped to seven bits) and, when not canonical, how a
+//! read waits — `min` bytes, or `time` tenths of a second. Every other
+//! setting is left as found, so a mode read and set back restores exactly
+//! what was changed. Nothing restores it for you at exit: save it,
+//! change it, put it back (`term.set_mode(tty, saved)`).
 //!
 //! **`flow` and `extended` before wolf 0.2.30.** The runtime gained the
 //! two bits in wolf 0.2.30 (s234); from then a mode without them turns
@@ -29,6 +32,18 @@
 //! carries them (`invalid`), and a set leaves both as found. A mode read
 //! and set back is therefore exact on either side; a `Mode` built by hand
 //! says what it wants of both.
+//!
+//! **`raw_cr`, `raw_output` and `strip8` before wolf 0.2.34.** The
+//! runtime gained bits 5, 6 and 7 in wolf 0.2.34 (s248, ruling #97 R7),
+//! each a setting the usual terminal does NOT have, so a 0 in each is
+//! the usual setting: `ICRNL` on, `OPOST` on, `ISTRIP` off. From then a
+//! mode without them writes the usual setting back where the terminal
+//! had another (`stty -opost`); before it the runtime never reports them
+//! (`mode` answers all three `false`), refuses a mode that carries them
+//! (`invalid`) and leaves the three flags as found. A mode read and set
+//! back through `mode`, `unpack` and `pack` is exact on either side, and
+//! on a usual terminal every mode `pack` made before them packs the same
+//! int.
 //!
 //! **What a line editor asks of it** (wolf 0.2.30, s234, ruling #73):
 //! the window's `size` (and `signal.resize()` when it changes) and the
@@ -43,9 +58,10 @@
 //! **Errors are rows.** A handle that is closed, forged or not a terminal
 //! is `io`; a mode outside the bits is `invalid` (unreachable through
 //! `Mode`, whose fields are clamped, but for `flow` or `extended` before
-//! wolf 0.2.30); every call is `unsupported` on windows. lupin answers
-//! the shape rows and declines every call that reaches the terminal by
-//! name.
+//! wolf 0.2.30 and the three bits before 0.2.34); every call is
+//! `unsupported` on windows. lupin answers the shape rows and declines
+//! every call that reaches the terminal by name; lupin 0.1.55's shape
+//! still refuses bits 5–7 (`invalid`, wolf-interp#268).
 //!
 //! **Capability:** `foreground`, `mode`, `set_mode`, `size` and `chars`
 //! are `io` (they act on a descriptor the program holds, as
@@ -56,13 +72,19 @@
 
 use std.fs
 
-/// The terminal's mode, unpacked (`[os.term.mode]`).
+/// The terminal's mode, unpacked (`[os.term.mode]`). `raw_cr`,
+/// `raw_output` and `strip8` (wolf 0.2.34) are each `false` on a usual
+/// terminal: a typed Enter reads as LF, a written LF reaches the screen
+/// as CR LF, and input keeps its eighth bit.
 pub struct Mode {
     canonical: bool,
     echo: bool,
     signals: bool,
     flow: bool,
     extended: bool,
+    raw_cr: bool,
+    raw_output: bool,
+    strip8: bool,
     min: int,
     time: int,
 }
@@ -78,9 +100,11 @@ fn clamp(n: int) -> int {
 }
 
 /// The packed int the builtin reads: canonical=1, echo=2, signals=4,
-/// flow=8, extended=16, `min` in bits 8..15, `time` in bits 16..23
-/// (`[os.term.mode]`). `pack(unpack(v)) == v` for every mode the runtime
-/// reports.
+/// flow=8, extended=16, raw_cr=32, raw_output=64, strip8=128, `min` in
+/// bits 8..15, `time` in bits 16..23 (`[os.term.mode]`).
+/// `pack(unpack(v)) == v` for every mode the runtime reports, and a
+/// `Mode` whose three new fields are `false` packs the int it packed
+/// before wolf 0.2.34.
 pub fn pack(m: Mode) -> int {
     var v = 0
     if m.canonical {
@@ -98,6 +122,15 @@ pub fn pack(m: Mode) -> int {
     if m.extended {
         v = v + 16
     }
+    if m.raw_cr {
+        v = v + 32
+    }
+    if m.raw_output {
+        v = v + 64
+    }
+    if m.strip8 {
+        v = v + 128
+    }
     v + clamp(m.min) * 256 + clamp(m.time) * 65536
 }
 
@@ -109,6 +142,9 @@ pub fn unpack(v: int) -> Mode {
         signals: v / 4 % 2 == 1,
         flow: v / 8 % 2 == 1,
         extended: v / 16 % 2 == 1,
+        raw_cr: v / 32 % 2 == 1,
+        raw_output: v / 64 % 2 == 1,
+        strip8: v / 128 % 2 == 1,
         min: v / 256 % 256,
         time: v / 65536 % 256,
     }
@@ -130,7 +166,10 @@ pub fn set_mode(tty: fs.File, m: Mode) -> () ! {unsupported, invalid, io} {
 /// Ctrl-Q, Ctrl-V and Ctrl-O arrive as keys, as `cfmakeraw(3)` leaves
 /// them. `signals` is kept, so Ctrl-C still interrupts (ruling #81:
 /// `raw` clears `flow` and `extended`). Before wolf 0.2.30 the runtime
-/// cannot clear the two, so there they stay as found.
+/// cannot clear the two, so there they stay as found. `raw_cr`,
+/// `raw_output` and `strip8` are kept as `m` has them, so `raw` sets on
+/// every terminal what it set before wolf 0.2.34: Enter still reads as
+/// LF and a written LF still reaches the screen as CR LF on a usual one.
 pub fn raw(m: Mode) -> Mode {
     Mode {
         canonical: false,
@@ -138,6 +177,9 @@ pub fn raw(m: Mode) -> Mode {
         signals: m.signals,
         flow: false,
         extended: false,
+        raw_cr: m.raw_cr,
+        raw_output: m.raw_output,
+        strip8: m.strip8,
         min: 1,
         time: 0,
     }
