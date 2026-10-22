@@ -13918,3 +13918,31 @@ rebase changed no file of this lane's: `git diff f70301f
 | `1d744a1` | `1b5eb33` |
 | `b778ab4` | `49ed731` |
 | `f70301f` | `ab8559a` |
+
+## F-0157 — sc70: lupin resolves the `format` row mark as the same-named function
+
+Measured at wolf 0.2.34 / lupin 0.1.55, no pin moved. The requested API is
+`time.format(l, fmt) -> str ! {format}`. All happy-path formatting runs
+on all three lanes. On an unknown conversion, std's private conversion
+helper returns the bare `format` mark. The checked and native machines
+propagate the error row, which the caller handles. Lupin instead returns
+the `time::format` function value, and the helper's tuple destructuring
+answers exactly:
+
+```
+a tuple pattern was given fn time::format; shape mismatches are the type checker's
+```
+
+`tests/time/local_format_rows.lu` holds unknown/incomplete/over-width
+formats and is `unsupported` on lupin until that engine distinguishes
+the function namespace from the row mark here. It is `run` on wolfc and
+native. This is not a format-name workaround or a claim that the
+interpreter intentionally declines formatting: `local_format.lu` runs
+its full conversion/flag/width golden set there. R-sc70-4 explicitly
+keeps the API and records the interpreter gap. **To file on wolf-interp**:
+the mark/function collision, with the exact message above and the row as
+the reproducer. No issue was filed by this lane.
+
+The other new unsupported cell is ordinary: the Fs comptime rejection
+witness is unsupported on lupin, which has no comptime engine. The
+checked/native machines answer E0701, as the capability header promises.
