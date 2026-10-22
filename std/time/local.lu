@@ -578,6 +578,17 @@ fn tz_named(name0: str) -> Zone ! {zone, io} {
         if name.len == 0 { return zone }
     }
     if name.starts_with("/") { return tz_read(name)? }
+    if !colon {
+        // A complete bare POSIX rule is not a filename. Its colon and
+        // quoted-name characters need not be legal host path characters
+        // (notably on Windows), and it needs no readable database root.
+        let (ok, r) = posix_rule(name)
+        if ok {
+            var z = utc()
+            z.rule = r
+            return z
+        }
+    }
     if colon {
         // An explicit relative file is useful to applications carrying
         // data. :Area/City also retains the database-name spelling.

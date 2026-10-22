@@ -19,5 +19,9 @@ fn main() -> !int {
     if time.local(0)?.abbrev != "UTC" { return 5 }
     env_set("TZ", "sc70-no-such-zone")?
     if time.local(0)?.offset_s != 0 { return 6 }
+    fs_write_text("sc70-not-a-directory.tmp", "file")?
+    env_set("TZDIR", "sc70-not-a-directory.tmp")?
+    if time.offset_at("<+0530>-5:30", 0)? != 19800 { return 8 }
+    fs_remove("sc70-not-a-directory.tmp")?
     0
 }
