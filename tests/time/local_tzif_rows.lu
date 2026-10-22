@@ -14,7 +14,7 @@ fn fixture_count(b: List[byte], at: int) -> int {
 }
 
 fn main() -> !int {
-    for mutation in 0..7 {
+    for mutation in 0..10 {
         var b = fs_read_bytes("fixtures/America/New_York")?
         let at = 44 +
             fixture_count(b, 32) * 5 +
@@ -32,6 +32,14 @@ fn main() -> !int {
         if mutation == 4 { b[b.len - 1] = 0 as byte }
         if mutation == 5 { b[at + 31] = 1 as byte }
         if mutation == 6 { b[types + 4] = 2 as byte }
+        let flags = types + fixture_count(b, at + 36) * 6 + fixture_count(b, at + 40)
+        let end = flags + fixture_count(b, at + 24) + fixture_count(b, at + 20)
+        if mutation == 7 { b[flags + fixture_count(b, at + 24)] = 1 as byte }
+        if mutation == 8 { b[end + 4] = 54 as byte }
+        if mutation == 9 {
+            b = b[0..end]
+            for ch in "\nEST5EDT,M3.2.0/-1,M11.1.0\n".bytes() { (mut b).push(ch) }
+        }
         fs_write_bytes("corrupt-zone.tmp", b)?
         let off = time.offset_at(":corrupt-zone.tmp", 0) else |e| match e {
             zone => 123456,

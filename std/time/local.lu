@@ -1,6 +1,7 @@
 //! member: true
 //!
-//! std.time — local civil time and C-locale calendar formatting. Core.
+//! std.time — local civil time and C-locale calendar formatting.
+//! Stability tier: core.
 //!
 //! `local`, `local_in` and `offset_at` read the host zone database:
 //! capabilities `Fs` and `Env`, refused at comptime (D33) for determinism
@@ -507,12 +508,36 @@ fn tz_parse(b: List[byte]) -> Zone ! {zone} {
         if b[p] as int > 1 { return zone }
         p += 1
     }
+    let std_n = tz_uint(b, at + 24, 4)
+    let ut_n = tz_uint(b, at + 20, 4)
+    if ut_n > 0 {
+        for k in 0..ut_n {
+            if b[chars + chars_n + std_n + k] as int == 1 &&
+                (std_n == 0 || b[chars + chars_n + k] as int != 1) {
+                return zone
+            }
+        }
+    }
     if size == 8 {
         if end >= b.len || b[end] as int != 10 || b[b.len - 1] as int != 10 { return zone }
         let text = str_from_utf8(b[end + 1..b.len - 1]) else { return zone }
         if text.len > 0 {
             let (ok, r) = posix_rule(text)
             if !ok { return zone }
+            if ver == 50 &&
+                r.has_dst &&
+                (r.s_time < 0 || r.s_time > 89999 || r.e_time < 0 || r.e_time > 89999) {
+                return zone
+            }
+            // RFC 8536 §3.3: a nonempty footer agrees with the last
+            // transition, including its designation and seasonal flag.
+            if n > 0 {
+                let d = tz_rule_dst(r, z.times[n - 1])
+                let off = if d then r.dst_off else r.std_off
+                let ab = if d then r.dst_name else r.std_name
+                let ty = z.idx[n - 1]
+                if off != z.offs[ty] || d != z.dsts[ty] || ab != z.abbrs[ty] { return zone }
+            }
             z.has_rule = true
             z.rule = r
         }
