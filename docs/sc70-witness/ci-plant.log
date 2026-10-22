@@ -1,0 +1,36 @@
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	﻿2026-10-22T14:18:53.9920249Z ##[group]Run cargo xtask time-oracle
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:53.9920983Z ^[[36;1mcargo xtask time-oracle^[[0m
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:53.9965930Z shell: /usr/bin/bash -e {0}
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:53.9966460Z env:
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:53.9967048Z   CARGO_HOME: /home/runner/.cargo
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:53.9967626Z   CARGO_INCREMENTAL: 0
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:53.9968128Z   CARGO_TERM_COLOR: always
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:53.9968571Z ##[endgroup]
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2482790Z Traceback (most recent call last):
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2483548Z time-oracle self-test: 5 checks, GREEN
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2484136Z   File "/home/runner/work/wolf-std/wolf-std/tests/time/oracle.py", line 124, in <module>
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2484649Z     main()
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2485133Z   File "/home/runner/work/wolf-std/wolf-std/tests/time/oracle.py", line 92, in main
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2485834Z     raise RuntimeError(f"wolf build exited {built.returncode} (compile error is not a skip)\n"
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2486650Z RuntimeError: wolf build exited 2 (compile error is not a skip)
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2488157Z wolf build: note: ld.lld not found on PATH — linking with the system linker (lld ships with the toolchain; packaging is c13)
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2488819Z error[E0301]: module `time` has no item named `local_in`
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2489320Z  --> /home/runner/work/wolf-std/wolf-std/target/time-oracle/pkg/main.lu:8:26
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2489797Z   |
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2490106Z 8 |             let l = time.local_in(z, t)?
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2490509Z   |                          ^^^^^^^^ not found in the module
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2490911Z   |
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2491080Z 
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2491243Z error[E0301]: module `time` has no item named `format`
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2491780Z  --> /home/runner/work/wolf-std/wolf-std/target/time-oracle/pkg/main.lu:9:43
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2492354Z   |
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2493055Z 9 |             for f in formats { print(time.format(l, f)?) }
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2493740Z   |                                           ^^^^^^ not found in the module
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2494500Z   |
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2494705Z 
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2495068Z wolf build: the package does not compile; fix the errors above (`wolf --explain E0301` explains this code, or any other, by name)
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2495540Z 
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2495686Z time-oracle: RED (timeout or nonzero exit)
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2496097Z xtask: RED
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2496464Z time-oracle: compiling 200 x 5 x 10 witness
+gates (ubuntu-latest)	time-oracle (10,000 cells against host date; BSD on macOS, GNU on Linux)	2026-10-22T14:18:54.2508510Z ##[error]Process completed with exit code 1.

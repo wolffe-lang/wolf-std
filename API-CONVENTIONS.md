@@ -1578,7 +1578,8 @@ rather than a new tier. Five additions.
 ## Local-time amendment (sc70): a host database, an explicit inverse
 
 `std.time` reads the host's TZif files, not a compiler-carried copy of
-tzdata. `local`/`local_in`/`offset_at` charge `Fs` and `Env`; `to_unix`
+tzdata. A complete bare POSIX rule wins over filename lookup; a colon or
+absolute path still selects a file. `local`/`local_in`/`offset_at` charge `Fs` and `Env`; `to_unix`
 and C-locale `format` are pure and comptime-safe. `Local.offset_s` is
 seconds east of UTC. The inverse trusts it: the two values in a DST
 fold remain distinct, and a caller-created gap is interpreted at the

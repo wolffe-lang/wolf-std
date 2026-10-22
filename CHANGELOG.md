@@ -6,7 +6,8 @@
 offset_s, is_dst, abbrev }`, `local`, `local_in`, `offset_at`, the pure
 explicit-offset inverse `to_unix`, and pure `format`. The reader uses
 host TZif v1/v2/v3 files (`TZDIR`, `TZ`, `/etc/localtime`) and explicit
-POSIX TZ rules; it does not bundle tzdata or a libc binding. Missing or
+POSIX TZ rules; complete bare rules do not depend on readable zone files
+or the host filename grammar. It does not bundle tzdata or a libc binding. Missing or
 malformed explicit zones answer `zone`, host access failures `io`;
 `local` defaults an unresolvable setting to UTC. Files charge Fs/Env,
 not Clock. The inverse keeps a fold's supplied offset and does not
