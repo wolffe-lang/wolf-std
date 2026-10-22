@@ -1574,3 +1574,21 @@ rather than a new tier. Five additions.
   the rejection held as a test, and the capability-lane posture with its
   stronger doc-truth rule), plus §4's propagating-statement amendment.
   Review rides the same pending sc00 gate.
+
+## Local-time amendment (sc70): a host database, an explicit inverse
+
+`std.time` reads the host's TZif files, not a compiler-carried copy of
+tzdata. `local`/`local_in`/`offset_at` charge `Fs` and `Env`; `to_unix`
+and C-locale `format` are pure and comptime-safe. `Local.offset_s` is
+seconds east of UTC. The inverse trusts it: the two values in a DST
+fold remain distinct, and a caller-created gap is interpreted at the
+supplied offset rather than normalized by an implicit policy.
+
+The contract adds the payload-free marks `zone` (missing or malformed
+zone data/rules) and `format` (invalid calendar format or fields). This
+is the intentional two-row boundary requested for the new reader:
+missing zone files answer `zone`, denied/other host failures answer
+`io`; `local` handles an unresolvable zone as UTC, while explicit
+`local_in` does not. Widths count bytes and widths over 4096 answer
+`format`, rather than allocating without bound. Formatting is C locale
+only, never an unimplemented locale promise.

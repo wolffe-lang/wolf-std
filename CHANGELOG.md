@@ -1,5 +1,34 @@
 # Changelog
 
+## sc70 — 2026-10-22 — local civil time and C-locale strftime
+
+`std.time` adds `Local { year, month, day, hour, minute, second, nanos,
+offset_s, is_dst, abbrev }`, `local`, `local_in`, `offset_at`, the pure
+explicit-offset inverse `to_unix`, and pure `format`. The reader uses
+host TZif v1/v2/v3 files (`TZDIR`, `TZ`, `/etc/localtime`) and explicit
+POSIX TZ rules; it does not bundle tzdata or a libc binding. Missing or
+malformed explicit zones answer `zone`, host access failures `io`;
+`local` defaults an unresolvable setting to UTC. Files charge Fs/Env,
+not Clock. The inverse keeps a fold's supplied offset and does not
+normalize a fabricated gap. Nanos are retained as data, zero on a
+seconds lookup, ignored by the seconds inverse and formatter.
+
+The format subset includes all conversions in the sc70 contract, GNU
+padding flags and widths (bounded at 4096), and C-locale `%c/%x/%X`.
+Unknown/incomplete conversions answer `format`. Thirteen new test rows
+hold five real TZif fixtures (9461 bytes), DST gaps/folds, Lord Howe's
+half-hour DST, pre-1901/2038/future edges, POSIX rule variants, malformed
+input, pure contract traps and the Fs comptime refusal. Lupin 0.1.55
+runs the normal cases; its format-mark/function-name collision leaves
+`local_format_rows` unsupported, and it still refuses comptime.
+
+`cargo xtask time-oracle` compares 10,000 cells with BSD/GNU date; the
+macOS leg runs in tier full. Historical fixture checks do not copy
+Darwin strftime's wrong historical `%z` answers. No pin moves. At the
+0.2.35 std pin, aspen and boreutils' `date`/`ls` can adopt the new
+surface; #85's collation half remains open. See `docs/sc70-local-time.md`
+for the prediction, exact surface, evidence and requested rulings.
+
 ## sc69 — 2026-10-21 — std at wolf 0.2.34: the fork, the editor's calls, the exclusive create, Mode's bits 5–7 (wolf-std#76's prose)
 
 **The pin.** wolf 0.2.33 -> **0.2.34** (`v0.2.34` at `9da7bdcf`,
