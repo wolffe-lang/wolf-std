@@ -3,14 +3,14 @@
 //! wolf-interp (binaries and pinned data are the only couplings).
 //!
 //! Subcommands: `std-test`, `doc-examples`, `ulp`, `doctor`, `sync-pin`,
-//! `ledger-check`, `fmt-lu`, `ci`.
+//! `ledger-check`, `fmt-lu`, `time-oracle`, `ci`.
 //!
-//! `ci` is the twelve-step local gate, and since sc41 it ends by naming
-//! which of those twelve `.github/workflows/ci.yml` also runs (F-0113).
+//! `ci` is the thirteen-step local gate, and since sc41 it ends by naming
+//! which of those `.github/workflows/ci.yml` also runs (F-0113).
 //! The twelfth is sc45's `fmt-lu` (F-0117, wolf-std#21): `cargo fmt
 //! --all --check` gated the Rust and nothing gated the wolf, so D34 was
 //! asserted in commit messages for a dozen sprints and enforced by
-//! nobody.
+//! nobody. sc70 adds the thirteenth, the cross-host `time-oracle`.
 
 mod anchors;
 mod bins;
