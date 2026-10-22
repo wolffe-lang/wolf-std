@@ -71,7 +71,7 @@ fn main() {
             eprintln!(
                 "usage: cargo xtask \
                  <std-test [--lint-conventions]|doc-examples|ulp|ledger-check\
-                 |gen-vectors [--check]|fmt-lu|doctor|sync-pin|ci>{}",
+                 |gen-vectors [--check]|fmt-lu|doctor|sync-pin|time-oracle|ci>{}",
                 other.map(|o| format!(" (got `{o}`)")).unwrap_or_default()
             );
             std::process::exit(2);

@@ -81,7 +81,7 @@ def main():
     entry = pkg / "main.lu"
     entry.write_text(src)
     exe = work / "oracle"
-    cmd = [str(a.wolf.resolve()), "build", "--deny-warnings", "--std-root",
+    cmd = [str(a.wolf.resolve()), "build", "--no-cache", "--deny-warnings", "--std-root",
            str(a.std_root.resolve()), str(entry), "-o", str(exe)]
     env = dict(os.environ, LC_ALL="C", TZ="UTC")
     env.pop("TZDIR", None)
@@ -94,7 +94,7 @@ def main():
     ran = subprocess.run([str(exe)], cwd=pkg, env=env, text=True, capture_output=True, timeout=120)
     (work / "wolf.stderr").write_text(ran.stderr)
     (work / "wolf.stdout").write_text(ran.stdout)
-    if ran.returncode != 0 or "SKIP" in ran.stdout + ran.stderr:
+    if ran.returncode != 0 or ran.stderr or "SKIP" in ran.stdout:
         raise RuntimeError(f"wolf oracle exited {ran.returncode}\n{ran.stderr}")
     want = []
     for z in ZONES:

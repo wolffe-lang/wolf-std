@@ -396,14 +396,13 @@ jobs:\n\
         // The four of F-0113 are exactly the four this fixture cannot
         // cover, and they still are. sc45's `fmt-lu` joins them because
         // that workflow did not run it either — it did not exist — so
-        // the list is five now and the F-0113 four are the first four
-        // in order. Asserted as containment rather than equality: the
-        // fixture is frozen history, and the thing it proves is that
-        // the reader FINDS a step no runner executes, not how many
-        // steps the gauntlet has grown to since.
+        // the list includes sc70's oracle too. Keep the frozen input
+        // but extend the expected absent steps whenever the gauntlet
+        // grows: the historical workflow cannot cover a later gate.
         assert_eq!(
             local_only(seven),
             vec![
+                "time-oracle",
                 "lint-conventions",
                 "fmt-lu",
                 "gen-vectors --check",
