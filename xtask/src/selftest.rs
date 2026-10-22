@@ -475,13 +475,24 @@ fn staging_copies_nested_binary_fixtures_byte_exact() {
     let repo = repo_root();
     let scratch = repo.join("target/stage-fixtures-selftest");
     let staged = stage::stage_test(
-        &repo.join("tests/time/local_tzif.lu"), &repo.join("std"), &scratch,
-    ).unwrap();
-    for (zone, size) in [("America/New_York", 3552), ("Europe/London", 3664),
-                         ("Asia/Kolkata", 285), ("Australia/Lord_Howe", 1846), ("UTC", 114)] {
+        &repo.join("tests/time/local_tzif.lu"),
+        &repo.join("std"),
+        &scratch,
+    )
+    .unwrap();
+    for (zone, size) in [
+        ("America/New_York", 3552),
+        ("Europe/London", 3664),
+        ("Asia/Kolkata", 285),
+        ("Australia/Lord_Howe", 1846),
+        ("UTC", 114),
+    ] {
         let original = std::fs::read(repo.join("tests/time/fixtures").join(zone)).unwrap();
         assert_eq!(original.len(), size, "{zone}: fixture provenance changed");
-        assert_eq!(std::fs::read(staged.root.join("fixtures").join(zone)).unwrap(), original);
+        assert_eq!(
+            std::fs::read(staged.root.join("fixtures").join(zone)).unwrap(),
+            original
+        );
     }
     assert!(!staged.std_root.join("fixtures").exists());
 }
@@ -494,7 +505,16 @@ fn staging_refuses_symlinked_fixtures() {
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("input/fixtures")).unwrap();
     std::fs::write(root.join("input/main.lu"), "fn main() -> int { 0 }").unwrap();
-    std::os::unix::fs::symlink(repo.join("tests/time/fixtures/UTC"), root.join("input/fixtures/link")).unwrap();
-    let err = stage::stage_test(&root.join("input/main.lu"), &repo.join("std"), &root.join("pkg")).unwrap_err();
+    std::os::unix::fs::symlink(
+        repo.join("tests/time/fixtures/UTC"),
+        root.join("input/fixtures/link"),
+    )
+    .unwrap();
+    let err = stage::stage_test(
+        &root.join("input/main.lu"),
+        &repo.join("std"),
+        &root.join("pkg"),
+    )
+    .unwrap_err();
     assert!(err.contains("is a symlink"), "{err}");
 }

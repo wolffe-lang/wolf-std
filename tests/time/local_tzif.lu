@@ -3,12 +3,30 @@
 //! conforms: std.time, os.fs.bytes
 //! Five real TZif files, copied from macOS. Fixtures stage beside the entry.
 //! v2 uses its 64-bit table before 1901 and its footer beyond 2038.
+
 use std.time
+
 fn main() -> !int {
     let u = time.local_in(":fixtures/UTC", -1)?
-    if u.year != 1969 || u.month != 12 || u.day != 31 || u.second != 59 || u.nanos != 0 || u.offset_s != 0 || u.is_dst || u.abbrev != "UTC" { return 1 }
+    if u.year != 1969 ||
+        u.month != 12 ||
+        u.day != 31 ||
+        u.second != 59 ||
+        u.nanos != 0 ||
+        u.offset_s != 0 ||
+        u.is_dst ||
+        u.abbrev != "UTC" {
+        return 1
+    }
     let n = time.local_in(":fixtures/America/New_York", 0)?
-    if n.year != 1969 || n.month != 12 || n.day != 31 || n.hour != 19 || n.offset_s != -18000 || n.abbrev != "EST" { return 2 }
+    if n.year != 1969 ||
+        n.month != 12 ||
+        n.day != 31 ||
+        n.hour != 19 ||
+        n.offset_s != -18000 ||
+        n.abbrev != "EST" {
+        return 2
+    }
     let k = time.local_in(":fixtures/Asia/Kolkata", 0)?
     if k.hour != 5 || k.minute != 30 || k.offset_s != 19800 || k.abbrev != "IST" { return 3 }
     let b = time.local_in(":fixtures/Europe/London", 0)?
@@ -16,7 +34,9 @@ fn main() -> !int {
     let h = time.local_in(":fixtures/Australia/Lord_Howe", 0)?
     if h.hour != 10 || h.offset_s != 36000 { return 5 }
     let old = time.local_in(":fixtures/America/New_York", -2717650801)?
-    if old.offset_s != -17762 || old.abbrev != "LMT" || time.to_unix(old) != -2717650801 { return 6 }
+    if old.offset_s != -17762 || old.abbrev != "LMT" || time.to_unix(old) != -2717650801 {
+        return 6
+    }
     let std = time.local_in(":fixtures/America/New_York", -2717650800)?
     if std.offset_s != -18000 || std.abbrev != "EST" { return 7 }
     let edge = time.local_in(":fixtures/UTC", 2147483648)?

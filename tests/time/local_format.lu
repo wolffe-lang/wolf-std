@@ -2,16 +2,32 @@
 //! phase: run
 //! conforms: std.time
 //! Every supported conversion, C locale composites and GNU padding.
+
 use std.time
+
 fn main() -> !int {
-    let l = time.Local { year: 2024, month: 2, day: 3, hour: 13, minute: 4, second: 5, nanos: 987654321, offset_s: 19800, is_dst: false, abbrev: "IST" }
+    let l = time.Local {
+        year: 2024,
+        month: 2,
+        day: 3,
+        hour: 13,
+        minute: 4,
+        second: 5,
+        nanos: 987654321,
+        offset_s: 19800,
+        is_dst: false,
+        abbrev: "IST",
+    }
     if time.format(l, "%Y %m %d %H %M %S")? != "2024 02 03 13 04 05" { return 1 }
     if time.format(l, "%e %b %B %a %A %j")? != " 3 Feb February Sat Saturday 034" { return 2 }
     if time.format(l, "%Z %z %p %I %y %C %u %w")? != "IST +0530 PM 01 24 20 6 6" { return 3 }
     if time.format(l, "%F %T %D %R")? != "2024-02-03 13:04:05 02/03/24 13:04" { return 4 }
     if time.format(l, "%n%t%%")? != "\n\t%" { return 5 }
     if time.format(l, "%c|%x|%X")? != "Sat Feb  3 13:04:05 2024|02/03/24|13:04:05" { return 6 }
-    if time.format(l, "%-d|%_d|%0e|%5d|%_5d|%-5d|%05d|%5B")? != "3| 3|03|00003|    3|3|00003|February" { return 7 }
+    if time.format(l, "%-d|%_d|%0e|%5d|%_5d|%-5d|%05d|%5B")? !=
+        "3| 3|03|00003|    3|3|00003|February" {
+        return 7
+    }
     if time.format(l, "%s")? != "1706945645" { return 8 }
     if time.format(l, "café %d 🌲")? != "café 03 🌲" { return 9 }
     var a = l

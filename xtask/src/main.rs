@@ -27,8 +27,8 @@ mod runner;
 mod selftest;
 mod stage;
 mod sync_pin;
-mod tomlite;
 mod time_oracle;
+mod tomlite;
 mod ulp;
 mod workflow;
 
