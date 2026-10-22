@@ -1,0 +1,20 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time, os.env.vars
+//! Named files honor TZDIR, colon paths do not. TZ empty or unresolved is UTC.
+use std.time
+fn main() -> !int {
+    env_set("TZDIR", "fixtures")?
+    env_set("TZ", "America/New_York")?
+    if time.local(0)?.offset_s != -18000 { return 1 }
+    if time.local_in("Asia/Kolkata", 0)?.offset_s != 19800 { return 2 }
+    env_set("TZ", ":fixtures/Australia/Lord_Howe")?
+    if time.local(1712415600)?.offset_s != 37800 { return 3 }
+    env_set("TZ", "EST5EDT,M3.2.0,M11.1.0")?
+    if !time.local(1710054000)?.is_dst { return 4 }
+    env_set("TZ", "")?
+    if time.local(0)?.abbrev != "UTC" { return 5 }
+    env_set("TZ", "sc70-no-such-zone")?
+    if time.local(0)?.offset_s != 0 { return 6 }
+    0
+}

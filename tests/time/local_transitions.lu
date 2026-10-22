@@ -1,0 +1,25 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time
+//! Exact half-open boundaries, New York gap and fold; Lord Howe is 30 minutes.
+use std.time
+fn main() -> !int {
+    let ny = ":fixtures/America/New_York"
+    let a = time.local_in(ny, 1710053999)?
+    let b = time.local_in(ny, 1710054000)?
+    if time.format(a, "%F %T %z %Z")? != "2024-03-10 01:59:59 -0500 EST" { return 1 }
+    if time.format(b, "%F %T %z %Z")? != "2024-03-10 03:00:00 -0400 EDT" { return 2 }
+    let c = time.local_in(ny, 1730613599)?
+    let d = time.local_in(ny, 1730613600)?
+    if c.hour != 1 || c.minute != 59 || !c.is_dst || d.hour != 1 || d.minute != 0 || d.is_dst { return 3 }
+    if time.to_unix(c) != 1730613599 || time.to_unix(d) != 1730613600 { return 4 }
+    let lh = ":fixtures/Australia/Lord_Howe"
+    let e = time.local_in(lh, 1712415599)?
+    let f = time.local_in(lh, 1712415600)?
+    if e.offset_s != 39600 || f.offset_s != 37800 || !e.is_dst || f.is_dst || f.hour != 1 || f.minute != 30 { return 5 }
+    let g = time.local_in(lh, 1728142199)?
+    let h = time.local_in(lh, 1728142200)?
+    if g.hour != 1 || g.minute != 59 || h.hour != 2 || h.minute != 30 || h.offset_s - g.offset_s != 1800 { return 6 }
+    if time.to_unix(e) != 1712415599 || time.to_unix(f) != 1712415600 || time.to_unix(h) != 1728142200 { return 7 }
+    0
+}

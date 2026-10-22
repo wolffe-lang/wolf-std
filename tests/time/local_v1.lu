@@ -1,0 +1,40 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time, os.fs.bytes
+//! Synthetic v1: one constant type. Mutated counts, flags and abbreviation
+//! indexes must refuse with zone, never indexing or arithmetic traps.
+use std.time
+fn main() -> !int {
+    var b = List[byte]()
+    for i in 0..44 { (mut b).push(0 as byte) }
+    b[0] = 84 as byte
+    b[1] = 90 as byte
+    b[2] = 105 as byte
+    b[3] = 102 as byte
+    b[39] = 1 as byte
+    b[43] = 4 as byte
+    for i in 0..6 { (mut b).push(0 as byte) }
+    (mut b).push(85 as byte)
+    (mut b).push(84 as byte)
+    (mut b).push(67 as byte)
+    (mut b).push(0 as byte)
+    fs_write_bytes("v1.tmp", b)?
+    if time.local_in(":v1.tmp", -3000000000)?.abbrev != "UTC" { return 1 }
+    b[49] = 255 as byte
+    fs_write_bytes("v1.tmp", b)?
+    if (time.offset_at(":v1.tmp", 0) else -999) != -999 { return 2 }
+    b[49] = 0 as byte
+    b[48] = 2 as byte
+    fs_write_bytes("v1.tmp", b)?
+    if (time.offset_at(":v1.tmp", 0) else -999) != -999 { return 3 }
+    b[48] = 0 as byte
+    b[32] = 255 as byte
+    fs_write_bytes("v1.tmp", b)?
+    if (time.offset_at(":v1.tmp", 0) else -999) != -999 { return 4 }
+    b[32] = 0 as byte
+    b[4] = 57 as byte
+    fs_write_bytes("v1.tmp", b)?
+    if (time.offset_at(":v1.tmp", 0) else -999) != -999 { return 5 }
+    fs_remove("v1.tmp")?
+    0
+}

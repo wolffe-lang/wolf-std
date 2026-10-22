@@ -1,0 +1,44 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time
+//! Pure Local arithmetic. An explicit offset disambiguates a fold;
+//! a forged gap is interpreted at that offset, never normalized.
+use std.time
+fn main() -> !int {
+    let l = time.Local { year: 1970, month: 1, day: 1, hour: 0, minute: 0, second: 0, nanos: 123, offset_s: 0, is_dst: false, abbrev: "UTC" }
+    if time.to_unix(l) != 0 { return 1 }
+    var n = l
+    n.year = 1969
+    n.month = 12
+    n.day = 31
+    n.hour = 23
+    n.minute = 59
+    n.second = 59
+    if time.to_unix(n) != -1 { return 2 }
+    n.year = 2024
+    n.month = 11
+    n.day = 3
+    n.hour = 1
+    n.minute = 30
+    n.second = 0
+    n.offset_s = -14400
+    n.is_dst = true
+    if time.to_unix(n) != 1730611800 { return 3 }
+    n.offset_s = -18000
+    n.is_dst = false
+    if time.to_unix(n) != 1730615400 { return 4 }
+    n.month = 3
+    n.day = 10
+    n.hour = 2
+    if time.to_unix(n) != 1710055800 { return 5 }
+    n.offset_s = -14400
+    if time.to_unix(n) != 1710052200 { return 6 }
+    n.year = 2000
+    n.month = 2
+    n.day = 29
+    n.hour = 0
+    n.minute = 0
+    n.offset_s = 0
+    if time.to_unix(n) != 951782400 { return 7 }
+    0
+}

@@ -28,6 +28,7 @@ mod selftest;
 mod stage;
 mod sync_pin;
 mod tomlite;
+mod time_oracle;
 mod ulp;
 mod workflow;
 
@@ -56,6 +57,7 @@ fn main() {
         Some("std-test") => runner::std_test(),
         Some("doc-examples") => doc_examples::doc_examples(),
         Some("ulp") => ulp::ulp(),
+        Some("time-oracle") => time_oracle::time_oracle(),
         Some("ledger-check") => runner::ledger_check(),
         // sc45: `wolf fmt --check` over every committed `.lu` (D34).
         Some("fmt-lu") => fmt_lu::fmt_lu(),
@@ -138,6 +140,7 @@ fn run_step(name: &str, repo: &Path, cargo: &str) -> Result<(), String> {
         "std-test" => runner::std_test(),
         "doc-examples" => doc_examples::doc_examples(),
         "ulp" => ulp::ulp(),
+        "time-oracle" => time_oracle::time_oracle(),
         other => Err(format!(
             "ci: `{other}` is in workflow::CI_STEPS with no runner behind it — \
              add a match arm to run_step or take it out of the list"

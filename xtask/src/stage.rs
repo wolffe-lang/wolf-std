@@ -55,6 +55,13 @@ pub fn stage_test(entry: &Path, std_root: &Path, scratch: &Path) -> Result<Stage
         .ok_or_else(|| format!("stage: entry has no file name: {}", show(entry)))?;
     copy_file(entry, &scratch.join(file_name))?;
 
+    // sc70: fixtures belong to the entry's directory, not to std/. A sibling
+    // fixtures tree is data, copied byte-for-byte with the same symlink ban.
+    let fixtures = entry.parent().unwrap_or_else(|| Path::new(".")).join("fixtures");
+    if fixtures.exists() {
+        deny_symlink(&fixtures)?;
+        copy_tree(&fixtures, &scratch.join("fixtures"))?;
+    }
     let staged_std = scratch.join("std");
     copy_tree(std_root, &staged_std)?;
     Ok(Staged {

@@ -1,0 +1,17 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time, os.fs.bytes
+//! Malformed names and TZ rules are zone rows, not traps or silent UTC.
+use std.time
+fn main() -> !int {
+    let bad = ["sc70-no-such-zone", "EST5EDT,M13.2.0,M11.1.0", "EST5EDT,M3.2.0,M11.1.0junk", "EST25", "EST5:60", "<a>0", "EST5EDT", "AAA0BBB,M3.2.0/168,M11.1.0", "AAA0BBB,M3.2.0/,M11.1.0", ":"]
+    for z in bad {
+        let n = time.offset_at(z, 0) else |e| match e { zone => 123456, io => 654321 }
+        if n != 123456 { return 1 }
+    }
+    fs_write_text("bad-zone.tmp", "not TZif")?
+    let off = time.offset_at(":bad-zone.tmp", 0) else |e| match e { zone => 123456, io => 654321 }
+    if off != 123456 { return 2 }
+    fs_remove("bad-zone.tmp")?
+    0
+}

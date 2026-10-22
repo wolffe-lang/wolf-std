@@ -1,0 +1,16 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time
+//! No zone file needed; explicit M, J and ordinal rules and signed v3 times.
+use std.time
+fn main() -> !int {
+    let z = "EST5EDT,M3.2.0,M11.1.0"
+    if time.offset_at(z, 1710053999)? != -18000 || time.offset_at(z, 1710054000)? != -14400 { return 1 }
+    if time.offset_at(z, 1730613599)? != -14400 || time.offset_at(z, 1730613600)? != -18000 { return 2 }
+    if time.local_in("<+0530>-5:30", 0)?.offset_s != 19800 { return 3 }
+    if time.local_in("AAA0BBB,J60/0,J300/0", 951782400)?.is_dst { return 4 }
+    if !time.local_in("AAA0BBB,59/0,300/0", 951782400)?.is_dst { return 5 }
+    if time.offset_at("<+1030>-10:30<+11>-11,M10.1.0,M4.1.0", 4102444800)? != 39600 { return 6 }
+    if time.offset_at("AAA0BBB,M3.2.0/-2,M11.1.0/26", 1710021600)? != 3600 { return 7 }
+    0
+}

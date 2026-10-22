@@ -37,10 +37,14 @@ pub struct Step {
     pub command: &'static str,
 }
 
-/// The twelve steps, in the order `ci()` runs them. This list is the
+/// The thirteen steps, in the order `ci()` runs them. This list is the
 /// gauntlet: `ci()` iterates it, so a step cannot exist here without
 /// running, or run without being here.
 pub const CI_STEPS: &[Step] = &[
+    Step {
+        name: "time-oracle",
+        command: "cargo xtask time-oracle",
+    },
     Step {
         name: "fmt",
         command: "cargo fmt --all --check",
