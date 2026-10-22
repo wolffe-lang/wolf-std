@@ -6,6 +6,8 @@
 use std.time
 
 fn main() -> !int {
+    let here = os_cwd()?
+    if time.local_in(here + "/fixtures/UTC", 0)?.offset_s != 0 { return 9 }
     env_set("TZDIR", "fixtures")?
     env_set("TZ", "America/New_York")?
     if time.local(0)?.offset_s != -18000 { return 1 }

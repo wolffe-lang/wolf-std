@@ -18,6 +18,12 @@
 //! are `io`. Leap-aware `right/` data is refused (`zone`): Unix seconds do
 //! not count leap seconds and ignoring that table gives wrong transitions.
 //!
+//! Bare database names contain only ASCII letters, digits, `_ . + -`
+//! and `/`; a complete POSIX rule is parsed before this restriction.
+//! Malformed bare names answer `zone` before any file I/O. Colon and
+//! absolute paths (including drive-absolute paths) use the host's path
+//! syntax and retain the `io` row for file failures.
+//!
 //! The Gregorian arithmetic and POSIX/TZif design are ported from the
 //! maintainer's aspen `src/clock/clock.lu`, commit 476edee3bb0ddbf2afef0681ec74fdd211d4d3da,
 //! lines 19–405, 407–666; validation and rows are std's. RFC 8536 §§3.1–3.3
@@ -569,6 +575,39 @@ fn tz_dir() -> str ! {io} {
     }
 }
 
+// Explicit paths are host operations, not names in the zone database.
+// Accept the forward-slash root, UNC/verbatim and drive-absolute paths;
+// a runtime path from os_cwd may contain native backslashes.
+fn tz_absolute_file(path: str) -> bool {
+    if path.starts_with("/") { return true }
+    if path.len >= 2 && path.bytes()[0] as int == 92 && path.bytes()[1] as int == 92 { return true }
+    if path.len < 3 { return false }
+    let drive = path.bytes()[0] as int
+    let sep = path.bytes()[2] as int
+    (drive >= 65 && drive <= 90 || drive >= 97 && drive <= 122) &&
+        path.bytes()[1] as int == 58 &&
+        (sep == 47 || sep == 92)
+}
+
+fn tz_database_name(name: str) -> bool {
+    for b in name.bytes() {
+        let c = b as int
+        if !(
+            c >= 65 && c <= 90 ||
+                c >= 97 && c <= 122 ||
+                c >= 48 && c <= 57 ||
+                c == 95 ||
+                c == 46 ||
+                c == 43 ||
+                c == 45 ||
+                c == 47
+        ) {
+            return false
+        }
+    }
+    true
+}
+
 fn tz_named(name0: str) -> Zone ! {zone, io} {
     if name0.len == 0 { return utc() }
     var name = name0
@@ -577,7 +616,7 @@ fn tz_named(name0: str) -> Zone ! {zone, io} {
         name = name[1..]
         if name.len == 0 { return zone }
     }
-    if name.starts_with("/") { return tz_read(name)? }
+    if tz_absolute_file(name) { return tz_read(name)? }
     if !colon {
         // A complete bare POSIX rule is not a filename. Its colon and
         // quoted-name characters need not be legal host path characters
@@ -588,6 +627,9 @@ fn tz_named(name0: str) -> Zone ! {zone, io} {
             z.rule = r
             return z
         }
+        // Failed rules are not host filenames. Reject nonportable bare
+        // names before Windows can turn <, > or : into an io error.
+        if !tz_database_name(name) { return zone }
     }
     if colon {
         // An explicit relative file is useful to applications carrying
@@ -600,18 +642,7 @@ fn tz_named(name0: str) -> Zone ! {zone, io} {
         }
         if found { return z }
     }
-    var found = true
-    let z = tz_file(tz_dir()? + "/" + name) else |e| match e {
-        missing => { found = false; utc() },
-        zone => { return zone },
-        io => { return io },
-    }
-    if found { return z }
-    let (ok, r) = posix_rule(name)
-    if !ok { return zone }
-    var out = utc()
-    out.rule = r
-    out
+    tz_read(tz_dir()? + "/" + name)?
 }
 
 fn tz_at(z: Zone, t: int) -> (int, bool, str) {
@@ -698,8 +729,11 @@ pub fn local(unix_s: int) -> Local ! {zone, io} {
 /// Local time in a named zone, an absolute path, `:path` (relative paths
 /// use forward slashes), or an explicit POSIX TZ string. Named files use
 /// `$TZDIR` or `/usr/share/zoneinfo`; an empty zone is UTC. Rows: `zone`
-/// for missing/malformed data or a malformed TZ rule; `io` for host access
-/// failure. Capability `Fs`/`Env`, refused at comptime (D33, determinism and
+/// for missing/malformed data, a malformed TZ rule, or a bare database
+/// name outside ASCII letters, digits, `_ . + -` and `/`. Complete bare
+/// POSIX rules are parsed first. Colon/absolute paths are explicit host
+/// file operations; drive-absolute paths are recognized before name
+/// validation. `io` reports host access failure. Capability `Fs`/`Env`, refused at comptime (D33, determinism and
 /// confinement). Extreme arithmetic traps `overflow` (X3).
 ///
 /// ```wolf-doc-example

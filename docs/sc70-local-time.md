@@ -197,10 +197,10 @@ machines answered `exit(1)`, `error: io` before the fix
 priority is arithmetic, not an emulation of a missing host capability.
 
 
-## Final gate record
+## First hand-off gate record (before the Windows correction)
 
-Final executable code is `a514a3b`; later commits only add this note and
-its evidence. The final focused table is `docs/sc70-witness/g7.log`:
+Executable code at the first hand-off was `a514a3b`; R-sc70-8 below
+supersedes that candidate. The original evidence is retained. The final focused table is `docs/sc70-witness/g7.log`:
 13 files × four machines, all 52 observations at their intended verdicts
 (including lupin's two named unsupported cells). `local_format` executes
 its full subset and width goldens on all four. The final code digest is
@@ -252,3 +252,38 @@ were then rerun on all four machines at their intended verdicts
 executable-input differences from the previous digest are the five
 `conforms:` header lines. No wolf function body changed. The
 orchestrator watches CI at the new labelled final head.
+
+
+## R-sc70-8 — Windows malformed-name rows
+
+Tier full 39811704495 at e035a0a passed tier pr, both host oracles and
+all three gates jobs, but `local_zone_rows` exited 1 on every Windows
+machine. Exit 1 identifies its malformed-name loop, before either the
+bad-file or directory checks. A failed POSIX parse such as `<a>0` or
+`EST5:60` fell through to a filename; Windows' reserved characters made
+that an `io` failure instead of the promised `zone` refusal.
+
+R-sc70-8 was accepted: after a complete bare POSIX rule has been tried,
+database names allow only ASCII letters, digits, `_ . + -` and `/`.
+Other bare names answer `zone` before any file I/O. Colon and absolute
+paths stay explicit host file operations; drive-absolute paths are
+recognized first (and native UNC/verbatim prefixes pass through too).
+There is no host waiver and no ledger cell changed.
+
+The regression creates a valid UTC file named `sc70,bad-zone.tmp`:
+comma is a legal filename on all three hosts but not a bare database
+name. Before the fix, all four local machines incorrectly returned
+zero for that bare name and the row exited 1; the retained red log
+prints the exact name and result. After the fix, the bare name returns
+`zone`, while `:sc70,bad-zone.tmp` still reads that same file. The row
+also covers invalid quote/angle/colon/wildcard/pipe/backslash and
+non-ASCII bare names. The environment row resolves an absolute fixture
+path built from `os_cwd`, exercising drive recognition on Windows.
+
+The post-fix focused probes retain all 52 intended observations on
+lupin/checked/native/release. The GNU oracle is again 10000 cells, zero
+differences/skips. macOS/Windows verification is the new labelled CI
+head's; the earlier passing macOS oracle is not called a run of this
+fix. `windows-policy-red.log`, `windows-policy-final.log` and
+`windows-fix-oracle.log` hold the local evidence. No pin or registry
+changed and no issue was filed or closed.

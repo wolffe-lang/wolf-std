@@ -1579,7 +1579,11 @@ rather than a new tier. Five additions.
 
 `std.time` reads the host's TZif files, not a compiler-carried copy of
 tzdata. A complete bare POSIX rule wins over filename lookup; a colon or
-absolute path still selects a file. `local`/`local_in`/`offset_at` charge `Fs` and `Env`; `to_unix`
+absolute path still selects a file. After the POSIX parse declines, bare
+names contain only ASCII letters, digits, `_ . + -` and `/`; other bare
+names answer `zone` before file I/O. Explicit colon/absolute paths retain
+host path syntax (including drive-absolute paths) and host file errors.
+`local`/`local_in`/`offset_at` charge `Fs` and `Env`; `to_unix`
 and C-locale `format` are pure and comptime-safe. `Local.offset_s` is
 seconds east of UTC. The inverse trusts it: the two values in a DST
 fold remain distinct, and a caller-created gap is interpreted at the

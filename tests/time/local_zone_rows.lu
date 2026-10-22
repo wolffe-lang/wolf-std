@@ -7,6 +7,10 @@ use std.time
 
 fn main() -> !int {
     env_set("TZDIR", ".")?
+    // A comma is a legal filename on every tier-1 host, but is not a
+    // portable bare database name. Only the explicit colon path reads it.
+    let utc_bytes = fs_read_bytes("fixtures/UTC")?
+    fs_write_bytes("sc70,bad-zone.tmp", utc_bytes)?
     let bad = [
         "sc70-no-such-zone",
         "EST5EDT,M13.2.0,M11.1.0",
@@ -18,14 +22,26 @@ fn main() -> !int {
         "AAA0BBB,M3.2.0/168,M11.1.0",
         "AAA0BBB,M3.2.0/,M11.1.0",
         ":",
+        "sc70,bad-zone.tmp",
+        "sc70?bad",
+        "sc70*bad",
+        "sc70|bad",
+        "sc70\"bad",
+        "sc70\\bad",
+        "Éire/Dublin",
     ]
     for z in bad {
         let n = time.offset_at(z, 0) else |e| match e {
             zone => 123456,
             io => 654321,
         }
-        if n != 123456 { return 1 }
+        if n != 123456 {
+            print("bad zone {z}: refusal {n}")
+            return 1
+        }
     }
+    if time.offset_at(":sc70,bad-zone.tmp", 0)? != 0 { return 4 }
+    fs_remove("sc70,bad-zone.tmp")?
     fs_write_text("bad-zone.tmp", "not TZif")?
     let off = time.offset_at(":bad-zone.tmp", 0) else |e| match e {
         zone => 123456,
