@@ -10,6 +10,7 @@ fn main() -> !int {
     env_set("TZ", "America/New_York")?
     if time.local(0)?.offset_s != -18000 { return 1 }
     if time.local_in("Asia/Kolkata", 0)?.offset_s != 19800 { return 2 }
+    if time.local_in(":America/New_York", 0)?.offset_s != -18000 { return 7 }
     env_set("TZ", ":fixtures/Australia/Lord_Howe")?
     if time.local(1712415600)?.offset_s != 37800 { return 3 }
     env_set("TZ", "EST5EDT,M3.2.0,M11.1.0")?

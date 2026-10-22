@@ -1,0 +1,24 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.time, conf.trap.set
+//! Invalid forged calendar fields violate to_unixs pure input contract.
+
+use std.time
+
+fn main() -> !int {
+    let l = time.Local {
+        year: 2024,
+        month: 2,
+        day: 30,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        nanos: 0,
+        offset_s: 0,
+        is_dst: false,
+        abbrev: "UTC",
+    }
+    let n = time.to_unix(l)
+    print("{n}")
+    0
+}

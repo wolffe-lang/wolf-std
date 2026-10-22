@@ -37,9 +37,28 @@ fn main() -> !int {
     if time.format(a, "%I %p")? != "12 PM" { return 11 }
     a.offset_s = -12600
     if time.format(a, "%z")? != "-0330" { return 12 }
+    if time.format(a, "%-z|%_z|%08z")? != "-330| -330|-0000330" { return 14 }
     a.year = 2000
     a.month = 12
     a.day = 31
     if time.format(a, "%j %u %w")? != "366 7 0" { return 13 }
+    a.year = 1
+    a.month = 1
+    a.day = 1
+    a.hour = 0
+    a.minute = 0
+    a.second = 0
+    a.offset_s = 0
+    if time.format(a, "%Y|%C|%y|%F|%c")? != "0001|00|01|0001-01-01|Mon Jan  1 00:00:00 1" {
+        return 15
+    }
+    a.year = -1
+    if time.format(a, "%Y|%C|%y|%F|%c")? != "-001|-0|01|-001-01-01|Fri Jan  1 00:00:00 -1" {
+        return 16
+    }
+    a.year = 1970
+    if time.format(a, "%15s|%_15s|%015s")? != "000000000000000|              0|000000000000000" {
+        return 17
+    }
     0
 }

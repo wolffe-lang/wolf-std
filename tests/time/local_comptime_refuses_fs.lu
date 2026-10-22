@@ -1,0 +1,30 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.time, comptime.sandbox
+//! The local zone reader charges Fs, not Clock. The sandbox refuses a
+//! file read before observing it. The builtin witness is necessary while
+//! cross-module comptime calls are F-0051, as in comptime_refuses.lu.
+
+use std.time
+
+comptime fn probe() -> str {
+    fs_read_text("sc70-zone-file") else ""
+}
+
+fn main() -> !int {
+    const TEXT = probe()
+    let l = time.Local {
+        year: 1970,
+        month: 1,
+        day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        nanos: 0,
+        offset_s: 0,
+        is_dst: false,
+        abbrev: "UTC",
+    }
+    print("{TEXT} {time.to_unix(l)}")
+    0
+}

@@ -6,6 +6,7 @@
 use std.time
 
 fn main() -> !int {
+    env_set("TZDIR", ".")?
     let z = "EST5EDT,M3.2.0,M11.1.0"
     if time.offset_at(z, 1710053999)? != -18000 || time.offset_at(z, 1710054000)? != -14400 {
         return 1

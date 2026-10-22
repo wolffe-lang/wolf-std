@@ -1,0 +1,23 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time
+//! RFC 8536 v3 signed transition times may cross a year boundary.
+//! Equal DST/standard offsets still carry a DST flag. POSIX offset hours
+//! allow 24 with nonzero minutes/seconds; they are not limited to 24h.
+
+use std.time
+
+fn main() -> !int {
+    env_set("TZDIR", ".")?
+    if time.offset_at("AAA24:59:59", 0)? != -89999 { return 1 }
+    let z = "AAA0BBB,M12.5.0/167,M6.1.0/0"
+    // 2023s last Sunday is Dec 31: /167 moves its start to Jan 6, 2024
+    // at 23:00 UTC. The Jan 1 lookup needs the previous years start.
+    if time.local_in(z, 1704067200)?.is_dst { return 2 }
+    if !time.local_in(z, 1704582000)?.is_dst { return 3 }
+    let all = "AAA0BBB,J1/0,J365/25"
+    if !time.local_in(all, 1704067200)?.is_dst { return 4 }
+    let same = time.local_in("AAA0BBB0,M3.2.0,M11.1.0", 1717200000)?
+    if !same.is_dst || same.offset_s != 0 || same.abbrev != "BBB" { return 5 }
+    0
+}

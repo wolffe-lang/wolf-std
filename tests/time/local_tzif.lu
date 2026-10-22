@@ -3,6 +3,14 @@
 //! conforms: std.time, os.fs.bytes
 //! Five real TZif files, copied from macOS. Fixtures stage beside the entry.
 //! v2 uses its 64-bit table before 1901 and its footer beyond 2038.
+//! Expectations derived from the bytes (RFC 8536, no host date oracle):
+//! New Yorks 64-bit block begins with transition -2717650800 to EST;
+//! type 0 is LMT at -17762, so one second before it uses that offset.
+//! Its footer EST5EDT,M3.2.0,M11.1.0 puts 2100-07-01 in EDT (-14400).
+//! Lord Howes footer <+1030>-10:30<+11>-11,M10.1.0,M4.1.0 puts
+//! 2100-01-01 between Octobers start and Aprils end (+39600).
+//! UTC0 has no transitions; 2^31 seconds is 24855 days plus 11648
+//! seconds after 1970-01-01, hence 2038-01-19 03:14:08.
 
 use std.time
 

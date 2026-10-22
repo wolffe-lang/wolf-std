@@ -1,7 +1,8 @@
 //! member: true
 //!
 //! std.time — monotonic instants, signed durations, and one wall-clock
-//! rendering. Stability tier: core.
+//! rendering, local civil time and calendar formatting. Stability tier: core.
+//! `local.lu` documents the Fs/Env zone reader and pure Local arithmetic.
 //!
 //! **Capability: `Clock` (I13).** Every function that reads a clock or
 //! sleeps is tagged `Clock` in the toolchain's sandbox table and is
@@ -48,8 +49,8 @@
 //! and not a fault. Read the millisecond count through `as_millis`
 //! anyway; the field is the representation and the function is the API.
 //!
-//! **Formatting is render-only, UTC-only, and that is the v0 posture —
-//! stated once here rather than apologised for per function.**
+//! **ISO formatting is render-only and UTC-only —
+//! the ISO renderer is independent of the local-time reader.**
 //! `to_iso8601` writes exactly `YYYY-MM-DDTHH:MM:SS.sssZ`: the RFC 3339
 //! profile of ISO 8601, always three fractional digits, always the `Z`
 //! zone. What this module does NOT have, deliberately:
@@ -58,10 +59,10 @@
 //!   an error taxonomy (which field was wrong, at which offset) that the
 //!   payload conventions of §12 can express and no caller can yet branch
 //!   on. `parse_iso8601` is a reviewed contract below.
-//! - **no timezones.** A zone is a database (IANA tzdata), a package
-//!   decision (§10's unicode-tables ruling applies verbatim: committed
-//!   generated wolf source behind a facade, or nothing) and a versioning
-//!   liability. `Z` is the one offset a library can promise without one.
+//! - **local time is separate.** `local`, `local_in`, `offset_at`, `Local`,
+//!   `to_unix` and `format` are in this module's `local.lu`; they read the
+//!   host's TZif database, not compiler-carried tables. The ISO renderer
+//!   remains pure UTC arithmetic and never reads that database.
 //! - **no calendar arithmetic.** "One month later" is a policy, not a
 //!   function; days, hours, minutes and seconds are exact and are all
 //!   this module adds.

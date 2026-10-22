@@ -1,0 +1,871 @@
+//! member: true
+//!
+//! std.time — local civil time and C-locale calendar formatting. Core.
+//!
+//! `local`, `local_in` and `offset_at` read the host zone database:
+//! capabilities `Fs` and `Env`, refused at comptime (D33) for determinism
+//! and confinement. A file read is the capability, not calendar arithmetic.
+//! `to_unix` and `format` are pure, comptime-safe (cross-module CTFE is
+//! still F-0051); they observe neither a clock, a file nor the environment.
+//!
+//! RFC 8536 TZif v1/v2/v3 (64-bit table when present) and explicit POSIX
+//! TZ strings are read in wolf. No database is bundled in the library.
+//! `$TZDIR` or `/usr/share/zoneinfo` supplies named files; `$TZ`, a colon
+//! path or an absolute path selects one. Unset `$TZ` reads `/etc/localtime`;
+//! empty or unresolvable `$TZ` is UTC. Explicit `local_in` reports `zone`
+//! rather than silently changing the caller's zone. File access failures
+//! are `io`. Leap-aware `right/` data is refused (`zone`): Unix seconds do
+//! not count leap seconds and ignoring that table gives wrong transitions.
+//!
+//! The Gregorian arithmetic and POSIX/TZif design are ported from the
+//! maintainer's aspen `src/clock/clock.lu`, commit 476edee3bb0ddbf2afef0681ec74fdd211d4d3da,
+//! lines 19–405, 407–666; validation and rows are std's. RFC 8536 §§3.1–3.3
+//! and POSIX TZ/strftime specify the input. No foreign implementation's
+//! source was read. Lord Howe's DST is 1800 seconds: no one-hour correction
+//! is applied to a transition. DST strings require explicit change rules;
+//! no host's undocumented default US rule is guessed here.
+//!
+//! `Local.offset_s` is seconds EAST of UTC. `to_unix` trusts it: the two
+//! occurrences of an overlap retain their distinct offsets and round-trip.
+//! A caller-created nonexistent gap time is interpreted at the supplied
+//! offset, not normalized or assigned an arbitrary earlier/later rule.
+//! `nanos` is 0 for a seconds input and is ignored by `to_unix`/`format`.
+//! No leap seconds, locale state or timezone cache. Each lookup reads anew.
+
+/// A POSIX TZ rule: the standard offset and, with DST, its offset and
+/// the two yearly changes (each a kind, three numbers and a local time).
+struct Rule {
+    // POSIX TZ: offsets are seconds EAST of UTC (POSIX spells west)
+    std_name: str,
+    dst_name: str,
+    std_off: int,
+    has_dst: bool,
+    dst_off: int,
+    // each change: kind 0 = Mm.w.d, 1 = Jn (1..365, no leap day),
+    // 2 = n (0..365, leap day counted); seconds after local midnight
+    s_kind: int,
+    s_m: int,
+    s_w: int,
+    s_d: int,
+    s_time: int,
+    e_kind: int,
+    e_m: int,
+    e_w: int,
+    e_d: int,
+    e_time: int,
+}
+
+/// A zone: TZif transitions (UTC instants, the type index each starts,
+/// the types' offsets east of UTC, their DST flags and abbreviations),
+/// the offset before the first, and the POSIX rule for times past the
+/// last (or for a TZ string alone).
+struct Zone {
+    times: List[int],
+    idx: List[int],
+    offs: List[int],
+    dsts: List[bool],
+    abbrs: List[str],
+    first: int,
+    has_rule: bool,
+    rule: Rule,
+}
+
+fn utc_rule() -> Rule {
+    Rule {
+        std_name: "UTC",
+        dst_name: "",
+        std_off: 0,
+        has_dst: false,
+        dst_off: 0,
+        s_kind: 0,
+        s_m: 0,
+        s_w: 0,
+        s_d: 0,
+        s_time: 0,
+        e_kind: 0,
+        e_m: 0,
+        e_w: 0,
+        e_d: 0,
+        e_time: 0,
+    }
+}
+
+/// The zone with no offset, ever.
+fn utc() -> Zone {
+    Zone {
+        times: List[int](),
+        idx: List[int](),
+        offs: List[int](),
+        dsts: List[bool](),
+        abbrs: List[str](),
+        first: 0,
+        has_rule: true,
+        rule: utc_rule(),
+    }
+}
+
+// ---- civil arithmetic (days from 1970-01-01, proleptic Gregorian) ----
+
+/// (year, month 1..12, day 1..31) of day `z` (Howard Hinnant's
+/// `civil_from_days`).
+fn civil(z0: int) -> (int, int, int) {
+    let z = z0 + 719468
+    let era = if z >= 0 then z / 146097 else (z - 146096) / 146097
+    let doe = z - era * 146097
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+    let y = yoe + era * 400
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+    let mp = (5 * doy + 2) / 153
+    let d = doy - (153 * mp + 2) / 5 + 1
+    let m = if mp < 10 then mp + 3 else mp - 9
+    let yy = if m <= 2 then y + 1 else y
+    (yy, m, d)
+}
+
+/// Day number of (year, month, day) (`days_from_civil`).
+fn days(y0: int, m: int, d: int) -> int {
+    let y = if m <= 2 then y0 - 1 else y0
+    let era = if y >= 0 then y / 400 else (y - 399) / 400
+    let yoe = y - era * 400
+    let mp = if m > 2 then m - 3 else m + 9
+    let doy = (153 * mp + 2) / 5 + d - 1
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    era * 146097 + doe - 719468
+}
+
+fn is_leap(y: int) -> bool {
+    y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)
+}
+
+/// Weekday of day `z`, 0 = Sunday (1970-01-01 was a Thursday).
+fn weekday(z: int) -> int {
+    let w = (z + 4) % 7
+    if w < 0 then w + 7 else w
+}
+
+fn month_len(y: int, m: int) -> int {
+    if m == 2 {
+        return if is_leap(y) then 29 else 28
+    }
+    if m == 4 || m == 6 || m == 9 || m == 11 {
+        return 30
+    }
+    31
+}
+
+/// The UTC instant a change happens in year `y`, `off` the offset in
+/// force before it.
+fn change_at(y: int, kind: int, m: int, w: int, d: int, t: int, off: int) -> int {
+    var day = 0
+    if kind == 0 {
+        // Mm.w.d: day d (0 Sunday) of week w (5 = last) of month m
+        let first = days(y, m, 1)
+        let wd = weekday(first)
+        var dom = 1 + (d - wd + 7) % 7 + (w - 1) * 7
+        let ml = month_len(y, m)
+        while dom > ml {
+            dom -= 7
+        }
+        day = days(y, m, dom)
+    } else if kind == 1 {
+        // Jn: 1..365, February 29 never counted
+        var n = m
+        if is_leap(y) && n >= 60 {
+            n += 1
+        }
+        day = days(y, 1, 1) + n - 1
+    } else {
+        day = days(y, 1, 1) + m
+    }
+    day * 86400 + t - off
+}
+
+fn tz_rule_dst(r: Rule, t: int) -> bool {
+    if !r.has_dst { return false }
+    let (year, _, _) = civil(quotient_floor(t + r.std_off, 86400))
+    var found = false
+    var latest = 0
+    var dst = false
+    // A v3 rule time can lie seven days outside its named day. Inspect
+    // neighboring years so a late-December change landing in January
+    // (or a negative January time) retains its actual UTC ordering.
+    for y in year - 1..year + 2 {
+        let start = change_at(y, r.s_kind, r.s_m, r.s_w, r.s_d, r.s_time, r.std_off)
+        let end = change_at(y, r.e_kind, r.e_m, r.e_w, r.e_d, r.e_time, r.dst_off)
+        if start <= t && (!found || start >= latest) {
+            found = true
+            latest = start
+            dst = true
+        }
+        if end <= t && (!found || end >= latest) {
+            found = true
+            latest = end
+            dst = false
+        }
+    }
+    dst
+}
+
+// ---- POSIX TZ strings ----
+
+struct Cur {
+    s: str,
+    i: int,
+}
+
+fn peek(c: Cur) -> int {
+    if c.i >= c.s.len {
+        return -1
+    }
+    c.s.bytes()[c.i] as int
+}
+
+/// A zone name, `EST` or the quoted `<+05>`; "" when there is none (a
+/// name is three letters or more).
+fn take_name(mut c: Cur) -> (bool, str) {
+    if peek(c) == 60 {
+        // <+05>: quoted
+        c.i += 1
+        let start = c.i
+        while peek(c) >= 0 && peek(c) != 62 {
+            let ch = peek(c)
+            if !(
+                ch >= 65 && ch <= 90 ||
+                    ch >= 97 && ch <= 122 ||
+                    ch >= 48 && ch <= 57 ||
+                    ch == 43 ||
+                    ch == 45
+            ) {
+                return (false, "")
+            }
+            c.i += 1
+        }
+        if peek(c) != 62 {
+            return (false, "")
+        }
+        let nm = c.s[start..c.i]
+        c.i += 1
+        return (nm.len >= 3, nm)
+    }
+    let start = c.i
+    while peek(c) >= 65 && peek(c) <= 90 || peek(c) >= 97 && peek(c) <= 122 {
+        c.i += 1
+    }
+    (c.i - start >= 3, c.s[start..c.i])
+}
+
+fn num(mut c: Cur) -> int {
+    var n = 0
+    var any = false
+    while peek(c) >= 48 && peek(c) <= 57 {
+        if n > 100000 { return -1 }
+        n = n * 10 + (peek(c) - 48)
+        c.i += 1
+        any = true
+    }
+    if any then n else -1
+}
+
+/// `[+-]hh[:mm[:ss]]` in seconds; `-1000000` when absent.
+fn hms(mut c: Cur) -> int {
+    var sign = 1
+    if peek(c) == 43 {
+        c.i += 1
+    } else if peek(c) == 45 {
+        sign = -1
+        c.i += 1
+    }
+    let h = num(mut c)
+    if h < 0 {
+        return -1000000
+    }
+    var t = h * 3600
+    if peek(c) == 58 {
+        c.i += 1
+        let m = num(mut c)
+        if m < 0 || m > 59 { return -1000000 }
+        t += m * 60
+        if peek(c) == 58 {
+            c.i += 1
+            let s = num(mut c)
+            if s < 0 || s > 59 { return -1000000 }
+            t += s
+        }
+    }
+    sign * t
+}
+
+/// A change, `Mm.w.d[/time]`, `Jn[/time]` or `n[/time]`, into
+/// (kind, a, b, c, time); kind -1 when malformed.
+fn change(mut c: Cur) -> (int, int, int, int, int) {
+    var kind = 2
+    var a = 0
+    var bb = 0
+    var cc = 0
+    if peek(c) == 77 {
+        c.i += 1
+        kind = 0
+        a = num(mut c)
+        if peek(c) != 46 {
+            return (-1, 0, 0, 0, 0)
+        }
+        c.i += 1
+        bb = num(mut c)
+        if peek(c) != 46 {
+            return (-1, 0, 0, 0, 0)
+        }
+        c.i += 1
+        cc = num(mut c)
+        if a < 1 || a > 12 || bb < 1 || bb > 5 || cc < 0 || cc > 6 {
+            return (-1, 0, 0, 0, 0)
+        }
+    } else if peek(c) == 74 {
+        c.i += 1
+        kind = 1
+        a = num(mut c)
+        if a < 1 || a > 365 {
+            return (-1, 0, 0, 0, 0)
+        }
+    } else {
+        a = num(mut c)
+        if a < 0 || a > 365 {
+            return (-1, 0, 0, 0, 0)
+        }
+    }
+    var t = 7200
+    if peek(c) == 47 {
+        c.i += 1
+        t = hms(mut c)
+        if t == -1000000 || t < -604799 || t > 604799 {
+            return (-1, 0, 0, 0, 0)
+        }
+    }
+    (kind, a, bb, cc, t)
+}
+
+/// A POSIX TZ string; `ok` false when it is not one.
+fn posix_rule(s: str) -> (bool, Rule) {
+    var c = Cur { s: s, i: 0 }
+    var r = utc_rule()
+    let (ok1, n1) = take_name(mut c)
+    if !ok1 {
+        return (false, r)
+    }
+    r.std_name = n1
+    let so = hms(mut c)
+    if so == -1000000 {
+        return (false, r)
+    }
+    if so < -89999 || so > 89999 { return (false, r) }
+    r.std_off = -so
+    if peek(c) < 0 {
+        return (true, r)
+    }
+    let (ok2, n2) = take_name(mut c)
+    if !ok2 {
+        return (false, r)
+    }
+    r.dst_name = n2
+    r.has_dst = true
+    r.dst_off = r.std_off + 3600
+    if peek(c) >= 0 && peek(c) != 44 {
+        let d = hms(mut c)
+        if d == -1000000 {
+            return (false, r)
+        }
+        if d < -89999 || d > 89999 { return (false, r) }
+        r.dst_off = -d
+    }
+    if peek(c) != 44 {
+        return (false, r)
+    }
+    c.i += 1
+    let (k1, a1, b1, c1, t1) = change(mut c)
+    if k1 < 0 || peek(c) != 44 {
+        return (false, r)
+    }
+    c.i += 1
+    let (k2, a2, b2, c2, t2) = change(mut c)
+    if k2 < 0 || peek(c) >= 0 {
+        return (false, r)
+    }
+    r.s_kind = k1
+    r.s_m = a1
+    r.s_w = b1
+    r.s_d = c1
+    r.s_time = t1
+    r.e_kind = k2
+    r.e_m = a2
+    r.e_w = b2
+    r.e_d = c2
+    r.e_time = t2
+    (true, r)
+}
+
+// ---- TZif: counts are unsigned; offsets and instants are signed ----
+
+fn tz_uint(b: List[byte], at: int, n: int) -> int {
+    var v: int = 0
+    for k in 0..n { v = v * 256 + b[at + k] as int }
+    v
+}
+
+fn tz_i32(b: List[byte], at: int) -> int {
+    let v = tz_uint(b, at, 4)
+    if v >= 2147483648 then v - 4294967296 else v
+}
+
+fn tz_i64(b: List[byte], at: int) -> int {
+    // Signed high half, unsigned low half: even INT_MIN never overflows.
+    tz_i32(b, at) * 4294967296 + tz_uint(b, at + 4, 4)
+}
+
+fn tz_header(b: List[byte], at: int) -> bool {
+    if at < 0 || at > b.len - 44 { return false }
+    if b[at] as int != 84 ||
+        b[at + 1] as int != 90 ||
+        b[at + 2] as int != 105 ||
+        b[at + 3] as int != 102 {
+        return false
+    }
+    let v = b[at + 4] as int
+    v == 0 || v == 50 || v == 51
+}
+
+// Return the block's end. Counts fit u32; their products fit wolf int.
+// Check the whole extent before any indexing or allocation proportional
+// to a count. A corrupt count cannot become a negative slice bound.
+fn tz_end(b: List[byte], at: int, size: int) -> int ! {zone} {
+    if !tz_header(b, at) { return zone }
+    let ut = tz_uint(b, at + 20, 4)
+    let st = tz_uint(b, at + 24, 4)
+    let leap = tz_uint(b, at + 28, 4)
+    let n = tz_uint(b, at + 32, 4)
+    let types = tz_uint(b, at + 36, 4)
+    let chars = tz_uint(b, at + 40, 4)
+    if types < 1 || types > 256 || chars < 1 || ut != 0 && ut != types || st != 0 && st != types {
+        return zone
+    }
+    // Leap-aware timestamps are not POSIX timestamps. Refuse rather than
+    // quietly treating them as the seconds that this API accepts.
+    if leap != 0 { return zone }
+    let end = at + 44 + n * (size + 1) + types * 6 + chars + ut + st
+    if end > b.len { return zone }
+    end
+}
+
+fn tz_parse(b: List[byte]) -> Zone ! {zone} {
+    var end = tz_end(b, 0, 4)?
+    let ver = b[4] as int
+    var at = 0
+    var size = 4
+    if ver != 0 {
+        at = end
+        if !tz_header(b, at) { return zone }
+        if b[at + 4] as int != ver { return zone }
+        size = 8
+        end = tz_end(b, at, size)?
+    } else if end != b.len {
+        return zone
+    }
+    let n = tz_uint(b, at + 32, 4)
+    let types = tz_uint(b, at + 36, 4)
+    let chars_n = tz_uint(b, at + 40, 4)
+    let chars = at + 44 + n * (size + 1) + types * 6
+    var p = at + 44
+    var z = utc()
+    z.has_rule = false
+    for k in 0..n {
+        let t = if size == 8 then tz_i64(b, p + k * size) else tz_i32(b, p + k * size)
+        if k > 0 && t <= z.times[k - 1] { return zone }
+        (mut z.times).push(t)
+    }
+    p += n * size
+    for k in 0..n {
+        let ty = b[p + k] as int
+        if ty >= types { return zone }
+        (mut z.idx).push(ty)
+    }
+    p += n
+    for k in 0..types {
+        let off = tz_i32(b, p + k * 6)
+        let dst = b[p + k * 6 + 4] as int
+        let ai = b[p + k * 6 + 5] as int
+        if off == -2147483648 || dst > 1 || ai >= chars_n { return zone }
+        var e = chars + ai
+        while e < chars + chars_n && b[e] as int != 0 { e += 1 }
+        if e == chars + chars_n { return zone }
+        let ab = str_from_utf8(b[chars + ai..e]) else { return zone }
+        (mut z.offs).push(off)
+        (mut z.dsts).push(dst == 1)
+        (mut z.abbrs).push(ab)
+    }
+    z.first = z.offs[0]
+    // The optional standard/wall and UT/local indicators are booleans.
+    p = chars + chars_n
+    while p < end {
+        if b[p] as int > 1 { return zone }
+        p += 1
+    }
+    if size == 8 {
+        if end >= b.len || b[end] as int != 10 || b[b.len - 1] as int != 10 { return zone }
+        let text = str_from_utf8(b[end + 1..b.len - 1]) else { return zone }
+        if text.len > 0 {
+            let (ok, r) = posix_rule(text)
+            if !ok { return zone }
+            z.has_rule = true
+            z.rule = r
+        }
+    }
+    z
+}
+
+fn tz_file(path: str) -> Zone ! {missing, zone, io} {
+    let b = fs_read_bytes(path) else |e| match e {
+        not_found => { return missing },
+        denied => { return io },
+        io => { return io },
+    }
+    tz_parse(b)?
+}
+
+fn tz_read(path: str) -> Zone ! {zone, io} {
+    tz_file(path) else |e| match e {
+        missing => { return zone },
+        zone => { return zone },
+        io => { return io },
+    }
+}
+
+fn tz_dir() -> str ! {io} {
+    env_get("TZDIR") else |e| match e {
+        missing => "/usr/share/zoneinfo",
+        utf8 => { return io },
+    }
+}
+
+fn tz_named(name0: str) -> Zone ! {zone, io} {
+    if name0.len == 0 { return utc() }
+    var name = name0
+    let colon = name.starts_with(":")
+    if colon {
+        name = name[1..]
+        if name.len == 0 { return zone }
+    }
+    if name.starts_with("/") { return tz_read(name)? }
+    if colon {
+        // An explicit relative file is useful to applications carrying
+        // data. :Area/City also retains the database-name spelling.
+        var found = true
+        let z = tz_file(name) else |e| match e {
+            missing => { found = false; utc() },
+            zone => { return zone },
+            io => { return io },
+        }
+        if found { return z }
+    }
+    var found = true
+    let z = tz_file(tz_dir()? + "/" + name) else |e| match e {
+        missing => { found = false; utc() },
+        zone => { return zone },
+        io => { return io },
+    }
+    if found { return z }
+    let (ok, r) = posix_rule(name)
+    if !ok { return zone }
+    var out = utc()
+    out.rule = r
+    out
+}
+
+fn tz_at(z: Zone, t: int) -> (int, bool, str) {
+    let n = z.times.len
+    if z.has_rule && (n == 0 || t >= z.times[n - 1]) {
+        let d = tz_rule_dst(z.rule, t)
+        let off = if d then z.rule.dst_off else z.rule.std_off
+        return (off, d, if d then z.rule.dst_name else z.rule.std_name)
+    }
+    if n == 0 || t < z.times[0] {
+        if z.offs.len > 0 { return (z.offs[0], z.dsts[0], z.abbrs[0]) }
+        return (0, false, "UTC")
+    }
+    var lo = 0
+    var hi = n - 1
+    while lo < hi {
+        let mid = lo + (hi - lo + 1) / 2
+        if z.times[mid] <= t { lo = mid } else { hi = mid - 1 }
+    }
+    let ty = z.idx[lo]
+    (z.offs[ty], z.dsts[ty], z.abbrs[ty])
+}
+
+/// Local Gregorian calendar fields; `offset_s` is seconds east of UTC,
+/// `nanos` 0..999999999, `is_dst` the zone's seasonal flag and `abbrev`
+/// its designation. A seconds lookup sets nanos to zero. Pure data;
+/// callers may construct it, and `to_unix` trusts the explicit offset.
+pub struct Local {
+    year: int,
+    month: int,
+    day: int,
+    hour: int,
+    minute: int,
+    second: int,
+    nanos: int,
+    offset_s: int,
+    is_dst: bool,
+    abbrev: str,
+}
+
+fn tz_local(z: Zone, unix_s: int) -> Local {
+    let (off, dst, ab) = tz_at(z, unix_s)
+    let shifted = unix_s + off
+    let day = quotient_floor(shifted, 86400)
+    let secs = shifted - day * 86400
+    let (y, m, d) = civil(day)
+    Local {
+        year: y,
+        month: m,
+        day: d,
+        hour: secs / 3600,
+        minute: secs / 60 % 60,
+        second: secs % 60,
+        nanos: 0,
+        offset_s: off,
+        is_dst: dst,
+        abbrev: ab,
+    }
+}
+
+/// Local time at Unix seconds `unix_s`, from `$TZ` or `/etc/localtime`.
+/// An empty or unresolvable setting is UTC. Rows: `zone` for invalid zone
+/// data (handled as UTC here); `io` for a refused/failed host access or
+/// unreadable environment value. Capability `Fs`/`Env`, refused at
+/// comptime (D33, determinism and confinement). Arithmetic overflow traps
+/// `overflow` (X3) for an extreme second plus offset outside int.
+///
+/// ```wolf-doc-example
+/// time.local(0)?.nanos == 0
+/// ```
+pub fn local(unix_s: int) -> Local ! {zone, io} {
+    var unset = false
+    let name = env_get("TZ") else |e| match e {
+        missing => { unset = true; "" },
+        utf8 => { return io },
+    }
+    let z = (if unset then tz_read("/etc/localtime") else tz_named(name)) else |e| match e {
+        zone => utc(),
+        io => { return io },
+    }
+    tz_local(z, unix_s)
+}
+
+/// Local time in a named zone, an absolute path, `:path` (relative paths
+/// use forward slashes), or an explicit POSIX TZ string. Named files use
+/// `$TZDIR` or `/usr/share/zoneinfo`; an empty zone is UTC. Rows: `zone`
+/// for missing/malformed data or a malformed TZ rule; `io` for host access
+/// failure. Capability `Fs`/`Env`, refused at comptime (D33, determinism and
+/// confinement). Extreme arithmetic traps `overflow` (X3).
+///
+/// ```wolf-doc-example
+/// let l = time.local_in("UTC0", 0)?
+/// l.year == 1970
+/// l.offset_s == 0
+/// ```
+pub fn local_in(zone: str, unix_s: int) -> Local ! {zone, io} {
+    tz_local(tz_named(zone)?, unix_s)
+}
+
+/// Seconds east of UTC in force in `zone` at Unix seconds `unix_s`.
+/// Rows: `zone` for missing/malformed zone data; `io` for host access
+/// failure. Same zone spellings as `local_in`. Capability `Fs`/`Env`,
+/// refused at comptime (D33, determinism and confinement); extreme
+/// POSIX-rule arithmetic traps `overflow` (X3).
+///
+/// ```wolf-doc-example
+/// time.offset_at("<+0530>-5:30", 0)? == 19800
+/// ```
+pub fn offset_at(zone: str, unix_s: int) -> int ! {zone, io} {
+    let (off, _, _) = tz_at(tz_named(zone)?, unix_s)
+    off
+}
+
+fn tz_valid(l: Local) -> bool {
+    if l.month < 1 || l.month > 12 || l.day < 1 || l.day > month_len(l.year, l.month) {
+        return false
+    }
+    l.hour >= 0 &&
+        l.hour < 24 &&
+        l.minute >= 0 &&
+        l.minute < 60 &&
+        l.second >= 0 &&
+        l.second < 60 &&
+        l.nanos >= 0 &&
+        l.nanos < 1000000000
+}
+
+/// Unix seconds of calendar fields at their EXPLICIT `offset_s`.
+/// Pure, comptime-safe. Nanos are ignored, not rounded. Both occurrences
+/// in a DST fold invert exactly. A caller-created gap is interpreted at
+/// its supplied offset, not normalized. `is_dst`/`abbrev` are descriptive
+/// and do not override the offset. Traps `assert` for invalid calendar
+/// fields and `overflow` when checked arithmetic leaves int (X3).
+///
+/// ```wolf-doc-example
+/// let l = time.Local { year: 1970, month: 1, day: 1, hour: 1, minute: 0, second: 0, nanos: 0, offset_s: 3600, is_dst: false, abbrev: "X" }
+/// time.to_unix(l) == 0
+/// ```
+pub fn to_unix(l: Local) -> int {
+    assert(tz_valid(l))
+    days(l.year, l.month, l.day) * 86400 + l.hour * 3600 + l.minute * 60 + l.second - l.offset_s
+}
+
+// ---- C-locale strftime ----
+
+fn tz_month(m: int, full: bool) -> str {
+    let short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    let long = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ]
+    if full then long[m - 1] else short[m - 1]
+}
+
+fn tz_weekday(w: int, full: bool) -> str {
+    let short = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    let long = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    if full then long[w] else short[w]
+}
+
+fn tz_pad(s: str, width: int, fill: str, numeric: bool) -> str {
+    if s.len >= width { return s }
+    var pad = ""
+    for i in 0..width - s.len { pad += fill }
+    if numeric && fill == "0" && (s.starts_with("-") || s.starts_with("+")) {
+        return s[0..1] + pad + s[1..]
+    }
+    pad + s
+}
+
+// (text, default width, default fill, numeric). Composites are already
+// rendered; flags on a composite pad the result, not its internal fields.
+fn tz_conversion(l: Local, c: int) -> (str, int, str, bool) ! {format} {
+    let day = days(l.year, l.month, l.day)
+    let wd = weekday(day)
+    let yd = day - days(l.year, 1, 1) + 1
+    var h = l.hour % 12
+    if h == 0 { h = 12 }
+    var yy = l.year % 100
+    if yy < 0 { yy = -yy }
+    let cent = l.year / 100
+    if c == 89 { return ("{l.year}", 4, "0", true) }
+    if c == 109 { return ("{l.month}", 2, "0", true) }
+    if c == 100 { return ("{l.day}", 2, "0", true) }
+    if c == 72 { return ("{l.hour}", 2, "0", true) }
+    if c == 77 { return ("{l.minute}", 2, "0", true) }
+    if c == 83 { return ("{l.second}", 2, "0", true) }
+    if c == 101 { return ("{l.day}", 2, " ", true) }
+    if c == 98 { return (tz_month(l.month, false), 0, " ", false) }
+    if c == 66 { return (tz_month(l.month, true), 0, " ", false) }
+    if c == 97 { return (tz_weekday(wd, false), 0, " ", false) }
+    if c == 65 { return (tz_weekday(wd, true), 0, " ", false) }
+    if c == 106 { return ("{yd}", 3, "0", true) }
+    if c == 90 { return (l.abbrev, 0, " ", false) }
+    if c == 122 {
+        let sign = if l.offset_s < 0 then "-" else "+"
+        let off = if l.offset_s < 0 then -l.offset_s else l.offset_s
+        let hhmm = off / 3600 * 100 + off / 60 % 60
+        return ("{sign}{hhmm}", 5, "0", true)
+    }
+    if c == 112 { return (if l.hour < 12 then "AM" else "PM", 0, " ", false) }
+    if c == 73 { return ("{h}", 2, "0", true) }
+    if c == 121 { return ("{yy}", 2, "0", true) }
+    if c == 67 { return (if l.year < 0 && cent == 0 then "-0" else "{cent}", 2, "0", true) }
+    if c == 117 { return (if wd == 0 then "7" else "{wd}", 1, "0", true) }
+    if c == 119 { return ("{wd}", 1, "0", true) }
+    let date = "{tz_pad("{l.year}", 4, "0", true)}-{pad_two(l.month)}-{pad_two(l.day)}"
+    let clock = "{pad_two(l.hour)}:{pad_two(l.minute)}:{pad_two(l.second)}"
+    if c == 70 { return (date, 0, " ", false) }
+    if c == 84 || c == 88 { return (clock, 0, " ", false) }
+    if c == 68 || c == 120 {
+        return ("{pad_two(l.month)}/{pad_two(l.day)}/{pad_two(yy)}", 0, " ", false)
+    }
+    if c == 82 { return ("{pad_two(l.hour)}:{pad_two(l.minute)}", 0, " ", false) }
+    if c == 115 { return ("{to_unix(l)}", 0, "0", true) }
+    if c == 110 { return ("\n", 0, " ", false) }
+    if c == 116 { return ("\t", 0, " ", false) }
+    if c == 37 { return ("%", 0, " ", false) }
+    if c == 99 {
+        return (
+            "{tz_weekday(wd, false)} {tz_month(l.month, false)} {tz_pad("{l.day}", 2, " ", true)} {clock} {l.year}",
+            0,
+            " ",
+            false,
+        )
+    }
+    format
+}
+
+/// C-locale POSIX calendar formatting, pure and comptime-safe.
+/// Conversions: `%Y %m %d %H %M %S %e %b %B %a %A %j %Z %z %p %I %y
+/// %C %u %w %F %T %D %R %s %n %t %%` and C-locale `%c %x %X`.
+/// `%-` removes padding, `%_` selects spaces, `%0` selects zeros; the
+/// last flag wins. Decimal widths count bytes (§11) and are bounded at
+/// 4096 to refuse an unbounded allocation. Numeric padding preserves a
+/// sign. `%z` truncates offset seconds to minutes, as POSIX specifies;
+/// `%s` uses `to_unix`'s explicit offset. Nanos are not rendered.
+/// Rows: `format` for unknown/incomplete conversions, widths above 4096,
+/// or invalid calendar fields. Checked arithmetic can trap `overflow`
+/// (X3) for extreme forged fields/offsets. No locale or host access.
+///
+/// ```wolf-doc-example
+/// let l = time.Local { year: 2024, month: 2, day: 3, hour: 13, minute: 4, second: 5, nanos: 0, offset_s: 19800, is_dst: false, abbrev: "IST" }
+/// time.format(l, "%F %T %z")? == "2024-02-03 13:04:05 +0530"
+/// time.format(l, "%-d|%_d|%0e")? == "3| 3|03"
+/// ```
+pub fn format(l: Local, fmt: str) -> str ! {format} {
+    if !tz_valid(l) { return format }
+    var out = ""
+    var i = 0
+    while i < fmt.len {
+        let start = i
+        while i < fmt.len && fmt.bytes()[i] as int != 37 { i += 1 }
+        out += fmt[start..i]
+        if i == fmt.len { return out }
+        i += 1
+        var flag = 0
+        while i < fmt.len {
+            let f = fmt.bytes()[i] as int
+            if f != 45 && f != 95 && f != 48 { break }
+            flag = f
+            i += 1
+        }
+        var width = -1
+        while i < fmt.len && fmt.bytes()[i] as int >= 48 && fmt.bytes()[i] as int <= 57 {
+            if width < 0 { width = 0 }
+            width = width * 10 + fmt.bytes()[i] as int - 48
+            if width > 4096 { return format }
+            i += 1
+        }
+        if i == fmt.len { return format }
+        let c = fmt.bytes()[i] as int
+        let (text, default_width, default_fill, numeric) = tz_conversion(l, c)?
+        i += 1
+        if width < 0 { width = default_width }
+        var fill = default_fill
+        if flag == 45 { width = 0 }
+        if flag == 95 { fill = " " }
+        if flag == 48 { fill = "0" }
+        out += tz_pad(text, width, fill, numeric)
+    }
+    out
+}
