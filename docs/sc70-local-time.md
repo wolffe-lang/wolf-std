@@ -228,3 +228,27 @@ Downstream adoption ledger (no pin changed here):
 The pending issue is wolf-interp's `format` mark/function collision
 (F-0157). #85's time checklist can be resolved; the issue itself remains
 open for locale-aware collation. No issue was filed or closed.
+
+## The final conform-tag correction
+
+Tier pr 39804035303 at 062c375 was red on five invented anchor names:
+`os.env.vars` and `os.fs.bytes`. This was my error: passing runtime
+probes and the conventions lint did not prove registered tag validity.
+No registry or pin changes. The snapshot actually publishes `os.fs`;
+`tests/fs/binary_round_trip.lu` uses the forward `std.fs` with error
+rows. Environment get/set has no `os.env.vars` anchor (the only env
+anchor here is `os.env.unset`, which this test does not exercise), and
+`tests/env/variable_round_trip.lu` cites `std.env` and the error rows.
+The five headers now follow those real references.
+
+The isolated lint in `tag-lint.rs` imports the rig's actual
+`anchors::Registry` and `directive` parser, rather than copying or
+weakening their rules. Against the unchanged pinned snapshot it
+reproduced the exact five errors before the fix: 524 files, 1338 tags,
+5 errors, 0 skips. After retagging: **524 files, 1352 tags, 1055 forward,
+0 errors, 0 skips** (`tag-lint-green.log`). All thirteen focused files
+were then rerun on all four machines at their intended verdicts
+(`g8-retag.log`). The post-retag digest is recorded separately; its only
+executable-input differences from the previous digest are the five
+`conforms:` header lines. No wolf function body changed. The
+orchestrator watches CI at the new labelled final head.
