@@ -1,0 +1,33 @@
+use std.sc72list
+
+struct P {
+    name: str,
+    n: int,
+}
+
+fn main() -> !int {
+    var xs = List[str]()
+    for w in ["a", "bb", "ccc", "dddd"] {
+        (mut xs).push(w)
+    }
+    sc72list.set_ip(mut xs, 0, "zz")
+    sc72list.reverse_ip(mut xs)
+    let r = sc72list.remove_ip(mut xs, 0)
+    sc72list.insert_ip(mut xs, 0, "first")
+    var s = ""
+    for x in xs {
+        s = s + x + ","
+    }
+    print("strs {s} removed={r}")
+    var ps = List[P]()
+    (mut ps).push(P { name: "x", n: 1 })
+    (mut ps).push(P { name: "y", n: 2 })
+    sc72list.swap_ip(mut ps, 0, 1)
+    print("structs {ps[0].name}{ps[0].n} {ps[1].name}{ps[1].n}")
+    region turn {
+        let t = "turn-{ps.len}"
+        sc72list.set_ip(mut xs, 1, t)
+    }
+    print("after_region {xs[1]}")
+    0
+}

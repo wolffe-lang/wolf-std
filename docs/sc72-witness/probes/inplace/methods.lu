@@ -1,0 +1,16 @@
+use std.sc72list
+
+fn main() -> !int {
+    var xs = List[int]()
+    for i in 0..10 {
+        (mut xs).push(i)
+    }
+    sc72list.clear_clear(mut xs)
+    print("clear len={xs.len}")
+    (mut xs).push(1)
+    sc72list.reserve_ip(mut xs, 64)
+    print("reserve len={xs.len}")
+    sc72list.clear_reset(mut xs)
+    print("reset len={xs.len}")
+    0
+}

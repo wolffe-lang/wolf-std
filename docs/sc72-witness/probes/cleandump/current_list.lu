@@ -1,0 +1,30 @@
+use std.list
+
+fn lt(a: int, b: int) -> bool {
+    a < b
+}
+
+fn main() -> !int {
+    var xs = List[int]()
+    for i in 0..6 {
+        list.push(mut xs, 6 - i)
+    }
+    list.set(mut xs, 0, 9)
+    list.swap(mut xs, 0, 1)
+    list.insert(mut xs, 1, 4)
+    let a = list.remove(mut xs, 1)
+    let b = list.swap_remove(mut xs, 0)
+    list.reverse(mut xs)
+    list.fill(mut xs, 3)
+    list.truncate(mut xs, 2)
+    let c = list.pop(mut xs) else 0
+    list.clear(mut xs)
+    list.extend(mut xs, [3, 1, 2])
+    list.sort_by(mut xs, lt)
+    var ss = List[str]()
+    list.push(mut ss, "a")
+    list.set(mut ss, 0, "b")
+    list.extend(mut ss, ["c"])
+    print("{xs.len} {a} {b} {c} {ss.len}")
+    0
+}

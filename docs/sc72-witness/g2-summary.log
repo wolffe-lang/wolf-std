@@ -1,0 +1,47 @@
+std-test: 552 test(s); forward tags: 1129; conservatism ledger: 188 entries; unstable rows: 0; slow skips: 0; divergent rows: 1; mirror-lag rows: 0; host-scoped cells: 29
+  host(lupin): env/who_ids.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): fs/adopt_inherited.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): fs/link_own_times.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): fs/nofollow_rows.lu — `run` on windows, `divergent(stdout)` elsewhere; this host: not windows
+  host(lupin): fs/realpath_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): fs/std_handles.lu — `unsupported` on windows, `run` elsewhere; this host: not windows
+  host(lupin): os/users/directory_accounts.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/close_fd_row.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/core_off_end.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/exit_signal_lives.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/fork_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/join_own_group.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/poll_job.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/set_ids_refused.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/wait_core_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/host_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/ignored_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/one_fault.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/one_host.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/reserved_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/send_self.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/text_zero.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/wait_fd_ready.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/wait_fds_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): term/chars_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): term/mode_bits_set.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): term/size_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  divergent(lupin): fs/nofollow_rows.lu — observed the filed divergence (stdout); flips to `run` at the release that closes its finding (sc24)
+std-test: the slowest lane invocations against the 60s ceiling (wolf-std#34; STD_TEST_TIMEOUT_SECS overrides):
+     53.2s   89%  tests/x/crypto/curve25519/wycheproof_x25519_shared_p8.lu [lupin]
+     50.9s   85%  tests/x/crypto/curve25519/wycheproof_x25519_shared_p5.lu [lupin]
+     49.0s   82%  tests/x/crypto/curve25519/wycheproof_x25519_shared_p6.lu [lupin]
+     48.2s   80%  tests/x/crypto/p256/wycheproof_p256_p4.lu [lupin]
+     46.3s   77%  tests/x/crypto/p256/wycheproof_p256_p5.lu [lupin]
+     42.9s   71%  tests/x/crypto/curve25519/wycheproof_x25519_shared_p7.lu [lupin]
+     39.5s   66%  tests/x/crypto/sha2/cavp_sha384_long.lu [lupin]
+     39.4s   66%  tests/x/crypto/curve25519/wycheproof_x25519_shared_p1.lu [lupin]
+std-test: GREEN
+doc-example /lane/wip/std/os/os.lu:101 [lupin]: unsupported (MIRROR-LAG: os, wolf-interp#277)
+doc-example /lane/wip/std/os/os.lu:121 [lupin]: unsupported (MIRROR-LAG: os, wolf-interp#277)
+mirror-lag(lupin): /lane/wip/std/os/os.lu:101 — refused ``os_name` does not resolve` (wolf-interp#277); red the day the mirror runs it
+mirror-lag(lupin): /lane/wip/std/os/os.lu:121 — refused ``os_arch` does not resolve` (wolf-interp#277); red the day the mirror runs it
+doc-examples: 552 block(s), GREEN
+
+6ac0b8a0ca8d656663c54f838ec97ee823fcaad790018c4a081aab2b2be61362  g2/std-test.log
+06ec93765aa3d590fa71a8a3cce49f8e70006916d61ff68525f4cd0b2e61ee03  g2/doc-examples.log

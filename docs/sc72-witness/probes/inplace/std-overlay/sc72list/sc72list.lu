@@ -1,0 +1,76 @@
+//! member: true
+//!
+//! sc72 probe: in-place list helpers over the language's index store, pop,
+//! clear, reset and reserve.
+
+pub fn set_ip[T](mut xs: List[T], i: int, v: T) {
+    xs[i] = copy v
+}
+
+pub fn swap_ip[T](mut xs: List[T], i: int, j: int) {
+    let a = copy xs[i]
+    xs[i] = copy xs[j]
+    xs[j] = copy a
+}
+
+pub fn reverse_ip[T](mut xs: List[T]) {
+    var i = 0
+    var j = xs.len - 1
+    while i < j {
+        swap_ip(mut xs, i, j)
+        i = i + 1
+        j = j - 1
+    }
+}
+
+pub fn truncate_ip[T](mut xs: List[T], n: int) {
+    while xs.len > n {
+        let gone = (mut xs).pop() else |_| { return }
+    }
+}
+
+pub fn clear_reset[T](mut xs: List[T]) {
+    (mut xs).reset()
+}
+
+pub fn clear_clear[T](mut xs: List[T]) {
+    (mut xs).clear()
+}
+
+pub fn reserve_ip[T](mut xs: List[T], n: int) {
+    (mut xs).reserve(n)
+}
+
+pub fn remove_ip[T](mut xs: List[T], i: int) -> T {
+    let v = copy xs[i]
+    var k = i
+    while k + 1 < xs.len {
+        xs[k] = copy xs[k + 1]
+        k = k + 1
+    }
+    let gone = (mut xs).pop() else |_| { return v }
+    v
+}
+
+pub fn insert_ip[T](mut xs: List[T], i: int, v: T) {
+    let n = xs.len
+    if n == 0 {
+        (mut xs).push(copy v)
+        return
+    }
+    (mut xs).push(copy xs[n - 1])
+    var k = n - 1
+    while k > i {
+        xs[k] = copy xs[k - 1]
+        k = k - 1
+    }
+    xs[i] = copy v
+}
+
+pub fn fill_ip[T](mut xs: List[T], v: T) {
+    var k = 0
+    while k < xs.len {
+        xs[k] = copy v
+        k = k + 1
+    }
+}

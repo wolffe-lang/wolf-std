@@ -1,0 +1,38 @@
+use std.fs
+use std.sc72fs
+use std.mem.budget
+
+fn main() -> !int {
+    var w = fs.create("sc72-ri.tmp")?
+    var big = ""
+    for i in 0..2000 {
+        big = big + "x"
+    }
+    fs.write(mut w, big)?
+    fs.close(take w)?
+    var f = fs.open("sc72-ri.tmp")?
+    var buf = List[byte]()
+    let n0 = sc72fs.read_into(mut f, mut buf, 1)?
+    print("first n={n0} len={buf.len}")
+    let before = budget.live()
+    var total = n0
+    var eofs = 0
+    var k = 0
+    while k < 1500 {
+        let n = sc72fs.read_into(mut f, mut buf, 1) else |e| {
+            eofs = eofs + 1
+            0
+        }
+        total = total + n
+        k = k + 1
+    }
+    print("live_flat={budget.live() == before} total={total} len={buf.len}")
+    var g = fs.open("sc72-ri.tmp")?
+    var buf2 = List[byte]()
+    let m = sc72fs.read_into_clear(mut g, mut buf2, 4)?
+    print("clear n={m} len={buf2.len}")
+    fs.close(take f)?
+    fs.close(take g)?
+    fs.remove("sc72-ri.tmp")?
+    0
+}

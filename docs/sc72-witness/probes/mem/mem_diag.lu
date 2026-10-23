@@ -1,0 +1,94 @@
+use std.list
+use std.mem.budget
+
+fn rebuild_set(mut xs: List[int], i: int, v: int) {
+    let n = xs.len
+    var out = List[int]()
+    var k = 0
+    while k < n {
+        if k == i {
+            (mut out).push(v)
+        } else {
+            (mut out).push(xs[k])
+        }
+        k = k + 1
+    }
+    xs = out
+}
+
+fn lt(a: int, b: int) -> bool {
+    a < b
+}
+
+fn stores(mut xs: List[int], i: int) {
+    list.set(mut xs, i % 64, i)
+    list.swap(mut xs, 0, 63)
+    list.reverse(mut xs)
+    list.fill(mut xs, i)
+}
+
+fn pushes(mut xs: List[int], i: int) {
+    list.insert(mut xs, 7, i)
+    let a = list.remove(mut xs, 7)
+    let b = list.swap_remove(mut xs, 3)
+    (mut xs).push(b)
+    list.truncate(mut xs, 63)
+    (mut xs).push(a)
+}
+
+fn main() -> !int {
+    let r = region()
+    var s0 = 0
+    var s1 = 0
+    var p1 = 0
+    var p2 = 0
+    var c1 = 0
+    var c2 = 0
+    var sz = 0
+    in r {
+        var xs = List[int]()
+        for i in 0..64 {
+            (mut xs).push(i)
+        }
+        stores(mut xs, 0)
+        pushes(mut xs, 0)
+        s0 = budget.charged(r)
+        for i in 0..1000 {
+            stores(mut xs, i)
+        }
+        s1 = budget.charged(r)
+        for i in 0..1000 {
+            pushes(mut xs, i)
+        }
+        p1 = budget.charged(r)
+        for i in 0..10 {
+            rebuild_set(mut xs, i, i)
+        }
+        c1 = budget.charged(r)
+        for i in 0..10 {
+            list.sort_by(mut xs, lt)
+        }
+        c2 = budget.charged(r)
+        sz = xs.len
+    }
+    print("s0={s0} stores={s1} pushes={p1} rebuild={c1} sorts={c2} len={sz}")
+    var outer = List[int]()
+    for i in 0..64 {
+        (mut outer).push(i)
+    }
+    let q = region()
+    in q {
+        for i in 0..100 {
+            stores(mut outer, i)
+            pushes(mut outer, i)
+        }
+    }
+    print("outer_charged={budget.charged(q)} live={budget.live()}")
+    let base = budget.live()
+    region sc {
+        list.sort_by(mut outer, lt)
+        p2 = budget.live() - base
+    }
+    print("sort_in_block={p2} after={budget.live() - base}")
+    0
+}

@@ -1,0 +1,23 @@
+std-test: 552 test(s); forward tags: 1129; conservatism ledger: 186 entries; unstable rows: 0; slow skips: 0; divergent rows: 1; mirror-lag rows: 0; host-scoped cells: 23
+std-test: the slowest lane invocations against the 60s ceiling (wolf-std#34; STD_TEST_TIMEOUT_SECS overrides):
+     60.0s  100%  tests/x/crypto/sha2/wycheproof_hkdf256_full.lu [lupin]
+     60.0s  100%  tests/x/crypto/sha2/wycheproof_hkdf384_full.lu [lupin]
+     60.0s  100%  tests/x/crypto/sha2/wycheproof_hkdf512_full.lu [lupin]
+     57.8s   96%  tests/x/crypto/sha2/cavp_sha384_monte.lu [lupin]
+     52.8s   88%  tests/x/crypto/curve25519/wycheproof_x25519_shared_p3.lu [lupin]
+     52.1s   87%  tests/x/crypto/sha2/cavp_sha384_long.lu [lupin]
+     51.4s   86%  tests/x/crypto/curve25519/wycheproof_ed25519_p3.lu [lupin]
+     44.9s   75%  tests/x/crypto/curve25519/wycheproof_x25519_shared_p11.lu [lupin]
+tests/list/set_bounds_trap.lu [lupin]: ledger says `run`, observed `unsupported` (shallower than the ledger claims — a regression or an upstream behavior change; investigate before touching the ledger)
+tests/x/crypto/sha2/wycheproof_hkdf256_full.lu [lupin]: timed out after 60s (ceiling; STD_TEST_TIMEOUT_SECS overrides)
+tests/x/crypto/sha2/wycheproof_hkdf384_full.lu [lupin]: timed out after 60s (ceiling; STD_TEST_TIMEOUT_SECS overrides)
+tests/x/crypto/sha2/wycheproof_hkdf512_full.lu [lupin]: timed out after 60s (ceiling; STD_TEST_TIMEOUT_SECS overrides)
+xtask: RED
+doc-example /lane/wip/std/os/os.lu:101 [lupin]: unsupported (MIRROR-LAG: os, wolf-interp#277)
+doc-example /lane/wip/std/os/os.lu:121 [lupin]: unsupported (MIRROR-LAG: os, wolf-interp#277)
+mirror-lag(lupin): /lane/wip/std/os/os.lu:101 — refused ``os_name` does not resolve` (wolf-interp#277); red the day the mirror runs it
+mirror-lag(lupin): /lane/wip/std/os/os.lu:121 — refused ``os_arch` does not resolve` (wolf-interp#277); red the day the mirror runs it
+doc-examples: 552 block(s), GREEN
+
+36f398bb5d1e4b469020b71f20a512ec344b7b5733ed7c695ef4a894b1c4019f  logs/g1/std-test.log
+9e45ecb0bd47099144f1028db0bf80f5885259f9f2b1d193888ba1b53348ef64  logs/g1/doc-examples.log

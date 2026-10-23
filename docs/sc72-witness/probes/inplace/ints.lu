@@ -1,0 +1,45 @@
+use std.sc72list
+use std.mem.budget
+
+fn show(xs: List[int]) -> str {
+    var s = ""
+    for x in xs {
+        s = s + "{x},"
+    }
+    s
+}
+
+fn main() -> !int {
+    var xs = List[int]()
+    for i in 0..8 {
+        (mut xs).push(i)
+    }
+    sc72list.set_ip(mut xs, 2, 20)
+    sc72list.swap_ip(mut xs, 0, 7)
+    sc72list.reverse_ip(mut xs)
+    let r = sc72list.remove_ip(mut xs, 1)
+    sc72list.insert_ip(mut xs, 1, 99)
+    sc72list.truncate_ip(mut xs, 5)
+    print("ints {show(xs)} removed={r}")
+    let before = budget.live()
+    for i in 0..1000 {
+        sc72list.set_ip(mut xs, i % 5, i)
+        sc72list.swap_ip(mut xs, 0, 4)
+        sc72list.reverse_ip(mut xs)
+        sc72list.fill_ip(mut xs, i)
+    }
+    print("live_flat={budget.live() == before}")
+    region turn {
+        sc72list.set_ip(mut xs, 0, 7)
+        sc72list.swap_ip(mut xs, 0, 1)
+        sc72list.reverse_ip(mut xs)
+        sc72list.truncate_ip(mut xs, 3)
+    }
+    print("in_region {show(xs)}")
+    let rr = region()
+    in rr {
+        sc72list.fill_ip(mut xs, 3)
+    }
+    print("charged_zero={budget.charged(rr) == 0} {show(xs)}")
+    0
+}

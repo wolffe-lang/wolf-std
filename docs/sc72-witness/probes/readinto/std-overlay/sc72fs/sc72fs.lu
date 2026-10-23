@@ -1,0 +1,32 @@
+//! member: true
+//!
+//! sc72 probe: a read into a caller's list, the fresh chunk kept inside a
+//! region the call opens.
+
+use std.fs
+
+pub fn read_into(mut f: fs.File, mut buf: List[byte], max: int) -> int ! {eof, io} {
+    var n = 0
+    region chunk {
+        let got = fs_read_chunk(f.fd, max)?
+        (mut buf).reset()
+        for b in got {
+            (mut buf).push(b)
+        }
+        n = got.len
+    }
+    n
+}
+
+pub fn read_into_clear(mut f: fs.File, mut buf: List[byte], max: int) -> int ! {eof, io} {
+    var n = 0
+    region chunk {
+        let got = fs_read_chunk(f.fd, max)?
+        (mut buf).clear()
+        for b in got {
+            (mut buf).push(b)
+        }
+        n = got.len
+    }
+    n
+}
