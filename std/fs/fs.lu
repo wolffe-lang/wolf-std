@@ -2186,6 +2186,45 @@ pub fn sync_dir(path: str) -> () ! {denied, invalid, io, not_found, unsupported}
     fs_sync_dir(path)?
 }
 
+/// **s253 (`[os.proc.adopt]`, wolf 0.2.35): a descriptor this process
+/// INHERITED, as a `File` that owns it** — `prog 5>out`, a supervisor's
+/// pipe, the ready descriptor a test driver hands its child. Every
+/// handle call serves the answer, `close` closes the descriptor, and a
+/// descriptor map hands it to a child (`process.set_fd`). The handle is
+/// a number of this module's table, not the descriptor's (3 in a program
+/// that has opened nothing); the descriptor keeps its own.
+///
+/// What may be adopted is told by close-on-exec: a descriptor that came
+/// across `exec` carries no such flag, and every one the runtime makes
+/// carries it from birth, as does one adopted before — so the rule is
+/// **open, and not close-on-exec**. The adoption marks it close-on-exec,
+/// so a child started after gets it only through a descriptor map; a
+/// child started before inherited it as the host passed it.
+///
+/// Rows: `invalid` for 0, 1 and 2 (the standard streams, `stdin`,
+/// `stdout` and `stderr` already) and a number outside
+/// `3..=2147483647`, before the host; then `unsupported` on windows (a
+/// handle there is not a small number a parent names by position); `io`
+/// for a number that is not open (`EBADF` in `os_error()`) and for one
+/// this process already holds. Never traps. The checked machine adopts
+/// the `wolf` process's own inherited descriptor. lupin 0.1.56 does not
+/// resolve the call (wolf-interp#277).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_adopt`.
+///
+/// ```wolf-doc-example
+/// var row = "adopted"
+/// var f = fs.adopt(2) else |_| {
+///     row = "refused"
+///     fs.File { fd: 0 - 1 }
+/// }
+/// fs.close(take f) else |_| { }
+/// row == "refused"
+/// ```
+pub fn adopt(fd: int) -> File ! {invalid, io, unsupported} {
+    File { fd: fs_adopt(fd)? }
+}
+
 /// An append-mode descriptor for `path`, with the two tags mode 2 cannot
 /// reach coarsened to `io`.
 ///
