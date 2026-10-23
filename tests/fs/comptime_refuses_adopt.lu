@@ -1,0 +1,21 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.proc.adopt
+//!
+//! **D33 for `fs.adopt` (sc72, wolf 0.2.35), held one level down at
+//! `fs_adopt`**: an inherited descriptor is the running process's, `fs`
+//! with the family, and the process that compiles is not the one that
+//! runs. The row is handled locally (F-0069).
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_adopt(5) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {fs.join("a", "b")}")
+    0
+}

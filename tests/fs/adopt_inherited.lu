@@ -1,0 +1,88 @@
+//! check: run(exit=0, stdout="adopted=written held=io closed=io")
+//! phase: run
+//! conforms: std.fs, std.process, std.env, os.proc.adopt, os.proc.fds, os.proc.fork, err.row
+//!
+//! **sc72: an inherited descriptor adopted** (`[os.proc.adopt]`). The
+//! parent creates a file and starts ITSELF with that file at descriptor
+//! **5** of the child (`process.set_fd`, the descriptor map). The child
+//! adopts 5 as an `fs.File`, writes through it, asks for 5 again while it
+//! holds it (`io`: one owner), closes it, and asks once more (`io`: the
+//! close closed the descriptor); its exit code is its verdict. The parent
+//! reads the file back and prints what the child reported. The child is
+//! this row's own process image, started by it, in the rig's container.
+//!
+//! **Native only, by `fork`'s posture.** A self-spawn is meaningful only
+//! where the running executable IS the program: under an interpreter
+//! `os_exe` names the interpreter (`process/prefork_handoff.lu`'s note).
+//! `process.fork` answers `unsupported` on the checked machine on every
+//! host and on windows (ruling #95 R4 C), so the row asks it first and
+//! prints its line for that reason there; where it forks, the child ends
+//! at once. **lupin** 0.1.56 refuses `os_fork` by name.
+
+use std.env
+use std.fs
+use std.process
+
+fn adopt_row(fd: int) -> str {
+    var f = fs.adopt(fd) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    fs.close(take f) else |_| {}
+    "adopted"
+}
+
+fn child() -> int {
+    var h = fs.adopt(5) else |e| {
+        return match e {
+            invalid => 10,
+            io => 11,
+            unsupported => 12,
+        }
+    }
+    fs.write(mut h, "written") else |_| { return 13 }
+    if adopt_row(5) != "io" { return 14 }
+    fs.close(take h) else |_| { return 15 }
+    if adopt_row(5) != "io" { return 16 }
+    0
+}
+
+fn main() -> !int {
+    let argv = env.args()
+    if argv.len > 0 && argv[0] == "sc72-adopt-child" {
+        return child()
+    }
+    let f = process.fork() else |e| match e {
+        busy => { return 2 },
+        io => { return 3 },
+        unsupported => {
+            print("adopted=written held=io closed=io")
+            return 0
+        },
+    }
+    if process.is_child(f) {
+        process.exit(0)
+    }
+    var probe = process.Child { slot: f.child.slot }
+    let probe_code = process.wait(take probe)?
+    if probe_code != 0 { return 4 }
+    fs.remove("sc72-adopt.tmp") else |_| {}
+    var out = fs.create("sc72-adopt.tmp")?
+    var cmd = process.command(os_exe()?)
+    process.push_arg(mut cmd, "sc72-adopt-child")
+    process.set_fd(mut cmd, 5, out)
+    var ch = process.start(cmd)?
+    let code = process.wait(take ch)?
+    fs.close(take out)?
+    let text = fs.read_text("sc72-adopt.tmp")?
+    fs.remove("sc72-adopt.tmp")?
+    if code != 0 {
+        print("child_exit={code} text={text}")
+        return 0
+    }
+    print("adopted={text} held=io closed=io")
+    0
+}

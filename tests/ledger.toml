@@ -4716,6 +4716,20 @@ lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
+# `fs/adopt_rows.lu`: the shape rows and a number never opened.
+[tests."fs/adopt_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `fs/adopt_inherited.lu`: a descriptor handed to a self-started child at
+# 5, adopted, written, held, closed; native only by fork's posture.
+[tests."fs/adopt_inherited.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
 # D33 one level down at twelve of wolf 0.2.35's thirteen builtins; not at
 # `fs_write_some`, whose `List[byte]` argument the comptime engine cannot
 # build ("`List` construction at comptime", the compiled lanes'
@@ -4731,6 +4745,11 @@ wolfc = "run"
 native = "run"
 
 [tests."process/comptime_refuses_core_off.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_adopt.lu"]
 lupin = "unsupported"
 wolfc = "run"
 native = "run"

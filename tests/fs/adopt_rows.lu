@@ -1,0 +1,41 @@
+//! check: run(exit=0, stdout="stdin=invalid\nstdout=invalid\nstderr=invalid\nnegative=invalid\npast_i32=invalid\nnot_open=io")
+//! phase: run
+//! conforms: std.fs, os.proc.adopt, err.row
+//!
+//! **sc72: `fs.adopt`'s rows** (wolf 0.2.35's s253, wolf-lang#815,
+//! `[os.proc.adopt]`). The standard streams 0, 1 and 2 (handles already),
+//! a negative number and one past `i32` are `invalid`, before the host.
+//! A number below that bound which this row never opened is `io` (`EBADF`
+//! in `os_error()`): 2147483000, far past any descriptor a host hands a
+//! process. The adoption itself, of a descriptor a parent passed, is
+//! `adopt_inherited.lu`'s.
+//!
+//! **windows** answers `unsupported` after the shape (a handle there is no
+//! small number a parent names by position): the row prints its last line
+//! for that reason. **lupin** 0.1.56 does not resolve `fs_adopt`
+//! (wolf-interp#277).
+
+use std.fs
+
+fn row(fd: int) -> str {
+    var f = fs.adopt(fd) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    fs.close(take f) else |_| {}
+    "adopted"
+}
+
+fn main() -> !int {
+    print("stdin={row(0)}")
+    print("stdout={row(1)}")
+    print("stderr={row(2)}")
+    print("negative={row(0 - 1)}")
+    print("past_i32={row(2147483648)}")
+    let open = row(2147483000)
+    print(if open == "unsupported" { "not_open=io" } else { "not_open={open}" })
+    0
+}
