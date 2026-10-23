@@ -224,6 +224,27 @@ pub(crate) const LUPIN_MIRROR_LAG: &[(&str, &str, &str, &str)] = &[
     // `:297` and "never fired" for both entries (r39's `std-r39.log`, and
     // sc68's own run beside the published 0.1.55). EMPTY again, as at
     // sc51.
+    //
+    // sc72 (wolf 0.2.35 / lupin 0.1.56): two entries, one debt with one
+    // name, wolf-interp#277. s253's `os_name` and `os_arch` arrive in wolf
+    // 0.2.35 and lupin 0.1.56 has never been shown them, so `std.os`'s
+    // `name` and `arch` examples run on both compiler rungs and are refused
+    // by name on the reference lane. `std.os` is not a capability module
+    // (its `cpus` example runs on lupin), so the entries are keyed by the
+    // call and the module's other example stays gated on three lanes. Both
+    // go red the day the pinned lupin runs them, and leave in that commit.
+    (
+        "os",
+        "os.name(",
+        "`os_name` does not resolve",
+        "wolf-interp#277",
+    ),
+    (
+        "os",
+        "os.arch(",
+        "`os_arch` does not resolve",
+        "wolf-interp#277",
+    ),
 ];
 
 /// Does the reference lane's answer hold a mirror-lag entry's refusal?
