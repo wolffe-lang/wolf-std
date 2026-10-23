@@ -40,12 +40,33 @@
 //! bodies, with fenced doc examples that execute, and with three-lane
 //! ledger rows (`list/insert_remove.lu`, `list/clear_truncate_fill.lu`)
 //! — so the gap the issue found is a gap in what a learner is TOLD, not
-//! in what std ships. None of the three is written over the slice: the
-//! bodies rebuild through the private `at`, which predates slicing by
-//! nine sprints and stays because it is correct, and a rewrite would be
-//! churn against three green rows.
+//! in what std ships. None of the three is written over the slice; since
+//! sc72 none rebuilds either (the paragraph below).
 //!
-//! Regions (D10): every function allocates in the ambient region and no
+//! **The mutators work in place (sc72, wolf-std#92).** `set`, `insert`,
+//! `remove`, `swap_remove`, `swap`, `clear`, `truncate`, `reverse`,
+//! `fill`, `pop` and `sort_by` change the caller's list through `mut` by
+//! the language's index store (`xs[i] = copy v`), its `push` and `pop`,
+//! and its `clear` — where through sc71 each rebuilt its result into a
+//! fresh `List[T]()` and assigned it back. Two things follow. A call
+//! keeps nothing per call where it used to allocate a whole list (an
+//! element type that reaches no storage allocates nothing at all, and a
+//! `str` or a `List` element pays one `copy` per slot written, not one
+//! per element; `tests/list/in_place_allocates_nothing.lu`). And the
+//! `mut` parameter is AMBIENT-CLEAN under `[mem.region.outer-write]`
+//! (wolf 0.2.35; `wolf conform-run --dump=mut-clean` says `clean` for
+//! each): a program may call them inside a per-turn `region` block on a
+//! list declared outside it, which the rebuilds made E1010 by name. The
+//! signatures did not move. `sort_by` still merges over scratch lists in
+//! the ambient region and writes the order back. `push` and `extend`
+//! store the caller's value as given and stay unclean: a `copy` there
+//! would deep-copy every pushed `str`, and inside a block a caller writes
+//! `(mut xs).push(copy v)` itself. The helpers that RETURN a list
+//! (`concat`, `repeat`, `map`, `filter`, `sorted_by`, …) build it fresh,
+//! which is what they are for.
+//!
+//! Regions (D10): every function that builds a list allocates it in the
+//! ambient region, a mutator's stores land in the list's own, and no
 //! signature asks for one. The `.in(r)` targets are s37's plumbing, not
 //! this module's. **s76 made that sentence true of the machine and not
 //! only of the API** (the sc12 pin): a `List` allocates in the ambient
@@ -204,21 +225,11 @@ pub fn get[T](xs: List[T], i: int) -> T ! {none} {
 /// (list.get(xs, 1) else 0) == 2
 /// ```
 pub fn set[T](mut xs: List[T], i: int, v: T) {
-    let n = len(xs)
-    // Reading the target first is the bounds contract: an out-of-range
-    // `i` traps here, before anything is rebuilt.
-    let old = at(xs, i)
-    var out = List[T]()
-    var k = 0
-    while k < n {
-        if k == i {
-            (mut out).push(v)
-        } else {
-            (mut out).push(at(xs, k))
-        }
-        k = k + 1
-    }
-    xs = out
+    // The language's index store is the bounds contract: an out-of-range
+    // `i` traps `bounds` here, before anything is written. The `copy` at
+    // the store makes `v` in `xs`'s own region (`[mem.region.outer-write]`),
+    // which is what lets a caller do this inside a region block of its own.
+    xs[i] = copy v
 }
 
 /// The first element; `none` when `xs` is empty. No traps.
@@ -271,19 +282,19 @@ pub fn insert[T](mut xs: List[T], i: int, v: T) {
         // `bounds` trap `xs[i]` would (no invented trap kinds).
         let bad = at(xs, i)
     }
-    var out = List[T]()
-    var k = 0
-    while k < n {
-        if k == i {
-            (mut out).push(v)
-        }
-        (mut out).push(at(xs, k))
-        k = k + 1
-    }
     if i == n {
-        (mut out).push(v)
+        (mut xs).push(copy v)
+        return
     }
-    xs = out
+    // In place (sc72, #92): the last element pushed once more, everything
+    // from `i` moved one slot right, `v` stored at `i`.
+    (mut xs).push(copy xs[n - 1])
+    var k = n - 1
+    while k > i {
+        xs[k] = copy xs[k - 1]
+        k = k - 1
+    }
+    xs[i] = copy v
 }
 
 /// Removes the element at `i`, shifting the rest left, and returns it.
@@ -300,15 +311,14 @@ pub fn insert[T](mut xs: List[T], i: int, v: T) {
 pub fn remove[T](mut xs: List[T], i: int) -> T {
     let n = len(xs)
     let v = at(xs, i)
-    var out = List[T]()
-    var k = 0
-    while k < n {
-        if k != i {
-            (mut out).push(at(xs, k))
-        }
+    // In place (sc72, #92): everything after `i` moved one slot left, the
+    // last slot dropped.
+    var k = i
+    while k + 1 < n {
+        xs[k] = copy xs[k + 1]
         k = k + 1
     }
-    xs = out
+    let gone = (mut xs).pop() else |_| { return v }
     v
 }
 
@@ -329,18 +339,10 @@ pub fn remove[T](mut xs: List[T], i: int) -> T {
 pub fn swap_remove[T](mut xs: List[T], i: int) -> T {
     let n = len(xs)
     let v = at(xs, i)
-    let tail = at(xs, n - 1)
-    var out = List[T]()
-    var k = 0
-    while k < n - 1 {
-        if k == i {
-            (mut out).push(tail)
-        } else {
-            (mut out).push(at(xs, k))
-        }
-        k = k + 1
+    if i != n - 1 {
+        xs[i] = copy xs[n - 1]
     }
-    xs = out
+    let gone = (mut xs).pop() else |_| { return v }
     v
 }
 
@@ -356,22 +358,9 @@ pub fn swap_remove[T](mut xs: List[T], i: int) -> T {
 /// (list.get(xs, 1) else 0) == 1
 /// ```
 pub fn swap[T](mut xs: List[T], i: int, j: int) {
-    let n = len(xs)
     let a = at(xs, i)
-    let b = at(xs, j)
-    var out = List[T]()
-    var k = 0
-    while k < n {
-        if k == i {
-            (mut out).push(b)
-        } else if k == j {
-            (mut out).push(a)
-        } else {
-            (mut out).push(at(xs, k))
-        }
-        k = k + 1
-    }
-    xs = out
+    xs[i] = copy xs[j]
+    xs[j] = copy a
 }
 
 /// Empties `xs`, keeping it usable. Total: no error row, no traps.
@@ -385,7 +374,7 @@ pub fn swap[T](mut xs: List[T], i: int, j: int) {
 /// list.is_empty(xs) == true
 /// ```
 pub fn clear[T](mut xs: List[T]) {
-    xs = List[T]()
+    (mut xs).clear()
 }
 
 /// Shortens `xs` to at most `n` elements, dropping the tail; a `n` at or
@@ -401,27 +390,24 @@ pub fn clear[T](mut xs: List[T]) {
 /// list.len(xs) == 2
 /// ```
 pub fn truncate[T](mut xs: List[T], n: int) {
-    let have = len(xs)
-    var out = List[T]()
-    var k = 0
-    while k < have {
-        if k < n {
-            (mut out).push(at(xs, k))
-        }
-        k = k + 1
+    while len(xs) > n {
+        let gone = (mut xs).pop() else |_| { return }
     }
-    xs = out
 }
 
-// BLOCKED — `reserve[T](mut xs: List[T], n: int)`, the capacity hint
-// (grow the buffer to hold `n` elements without reallocating). Neither
-// implementation exposes a capacity at all: `List` has no `capacity`
-// accessor, no reserving constructor, and no observable difference
-// between a reserved and an unreserved list, so a body here could only
-// be a lie (a no-op documented as a hint) or an invention (rebuilding to
-// force growth). Filed as part of F-0011 with the builtin-relationship
-// question — capacity is a language-side surface or it is nothing; the
-// signature lands verbatim when `List` grows one.
+// RETIRED (sc72) — the BLOCKED `reserve[T](mut xs: List[T], n: int)`
+// that waited here for a capacity. `List` grew one at wolf 0.2.35 as the
+// LANGUAGE's (s255, `[type.list.storage]`): `xs.reserve(n)` grows the
+// capacity in the list's own region and `xs.reset()` empties it keeping
+// its buffer. Those two methods are the spellings, and std adds no second
+// name for them: §8 forbids a std name over a working builtin, and on
+// lupin 0.1.56, which resolves neither method (wolf-interp#289, is81), a
+// `pub fn reserve` here is exactly what `xs.reserve(n)` would resolve to
+// (`[type.method.resolve]`'s step two) — its own body, recursing. The
+// in-place mutators above need neither: an index store and the builtin
+// `pop` keep the storage, and `clear` is the builtin's (which keeps the
+// buffer on every machine today and promises nothing of it; `reset` is
+// the promise). `std.fs.read_into` is std's one user of `reset`.
 
 // BLOCKED — the `Eq` family: `contains[T: Eq](xs, v) -> bool`,
 // `index_of[T: Eq](xs, v) -> int ! {none}`, `last_index_of[T: Eq]`,
@@ -455,14 +441,13 @@ pub fn truncate[T](mut xs: List[T], n: int) {
 /// (list.last(xs) else 0) == 1
 /// ```
 pub fn reverse[T](mut xs: List[T]) {
-    let n = len(xs)
-    var out = List[T]()
-    var k = 0
-    while k < n {
-        (mut out).push(at(xs, n - 1 - k))
-        k = k + 1
+    var i = 0
+    var j = len(xs) - 1
+    while i < j {
+        swap(mut xs, i, j)
+        i = i + 1
+        j = j - 1
     }
-    xs = out
 }
 
 /// Appends every element of `other` to `xs`, in order. `other` is read,
@@ -515,13 +500,11 @@ pub fn concat[T](a: List[T], b: List[T]) -> List[T] {
 /// ```
 pub fn fill[T](mut xs: List[T], v: T) {
     let n = len(xs)
-    var out = List[T]()
     var k = 0
     while k < n {
-        (mut out).push(v)
+        xs[k] = copy v
         k = k + 1
     }
-    xs = out
 }
 
 /// A new list with `xs`'s elements repeated `n` times; `n <= 0` yields
@@ -950,7 +933,13 @@ pub fn sort_by[T](mut xs: List[T], less: fn(T, T) -> bool) {
     if n < 2 {
         return
     }
-    var src = xs
+    // The merge runs over scratch lists in the ambient region; the sorted
+    // order is written back into `xs` by index (sc72, #92), so `xs` keeps
+    // its storage and its region and only the scratch is per call.
+    var src = List[T]()
+    for x in xs {
+        (mut src).push(x)
+    }
     var width = 1
     while width < n {
         var out = List[T]()
@@ -988,7 +977,11 @@ pub fn sort_by[T](mut xs: List[T], less: fn(T, T) -> bool) {
         src = out
         width = width + width
     }
-    xs = src
+    var k = 0
+    while k < n {
+        xs[k] = copy src[k]
+        k = k + 1
+    }
 }
 
 /// `sort_by`'s returning twin: a fresh list holding `xs`'s elements in
