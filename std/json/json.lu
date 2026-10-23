@@ -74,12 +74,25 @@
 //! not made rather than an omission; when the ordering question settles
 //! upstream, this module states whatever the answer is.
 //!
-//! **The wolfc lane is dark for this module, by construction**: an
-//! imported module that PRODUCES an enum value is `unsupported` in the
-//! checked tier and has no recorded type natively (F-0029, F-0012), and
-//! `Map` is not typed by the compiler at all. Every test here is
-//! `lupin = run, wolfc = unsupported, native = unsupported`, exactly as
-//! the sprint contract's non-target predicted.
+//! **Every lane runs this module (wolf 0.2.35, sc72; wolf-std#93).** From
+//! sc05 to sc71 this paragraph said the wolfc lane was dark here by
+//! construction — an imported module that produces an enum value was
+//! `unsupported` on the checked tier with no recorded type natively
+//! (F-0029, F-0012), and `Map` was untyped. Neither half is true now. The
+//! checked machine has run six of the nine `tests/json/` files since the
+//! sc44 and sc46 pins (`[type.map]` typed the DOM; wolf-lang#337's casts
+//! convert), and from wolf 0.2.35 the native rung runs all nine: `Value`'s
+//! payload slots disagree (`Bool(bool)`, `Int(int)`, `Num(f64)`,
+//! `Str(str)`, `Arr(…)`, `Obj(…)`), and s257's spilled union
+//! (`[abi.native.enum]`) gives each conflicting slot a union where the
+//! rung used to refuse the layout. lupin runs all nine, as it always has.
+//! Three of the nine end `exit(1)` by design on every lane that runs them
+//! (`navigation_rows`, `parse_misses`, `unescape_shapes`: the error row
+//! reaching `main` is the assertion). The checked machine still stops on
+//! three (`number_posture_and_depth`, `parse_misses` and
+//! `pretty_and_escape`: its call-depth budget twice and a tag pattern in
+//! checked execution, wolf-lang#882), so their `wolfc` cells stay
+//! `unsupported`.
 //!
 //! **The scanner's tag is `syntax`, not `parse`, and the reason is a
 //! measurement rather than a preference.** A row tag is resolved as an
@@ -636,8 +649,9 @@ struct Cursor {
 /// The first byte comes from ITERATING a one-character slice, not from
 /// indexing it. `s.bytes()[0]` was refused by wolfc's checked tier when
 /// this was written (F-0071, closed at the sc12 pin) and a shape that costs
-/// a lane is not one std writes even in a module whose other lanes are
-/// already dark; the loop is kept because nothing about it got worse.
+/// a lane is not one std writes even in a module whose other lanes were
+/// dark then (none is now: the header's lanes paragraph); the loop is kept
+/// because nothing about it got worse.
 fn byte_at(text: str, at: int) -> int {
     let ch = text.get(at..at + 1) else ""
     for b in ch.bytes() {
