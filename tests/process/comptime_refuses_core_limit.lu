@@ -1,0 +1,23 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.env, os.proc.core
+//!
+//! **D33 for `process.core_limit` (sc72, wolf 0.2.35), held one level
+//! down at `os_core_limit`**: the core limit is this process's context,
+//! `env` with `os_cpus`, and a compile that read it would bake the
+//! builder's limit into the artifact. The row is handled locally
+//! (F-0069).
+
+use std.process
+
+comptime fn probe() -> int {
+    os_core_limit() else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    let l = process.CoreLimit { soft: 0, hard: 0 }
+    print("p: {P} {l.soft}")
+    0
+}

@@ -1,0 +1,20 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.exec, os.proc.core
+//!
+//! **D33 for `process.core_off` (sc72, wolf 0.2.35), held one level down
+//! at `os_core_off`**: making a process undumpable is `exec`, with
+//! `os_exit_signal`. The row is handled locally (F-0069).
+
+use std.process
+
+comptime fn probe() -> int {
+    os_core_off() else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {process.is_success(0)}")
+    0
+}

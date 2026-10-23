@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.exec, os.proc.core
+//!
+//! **D33 for `process.set_core_limit` (sc72, wolf 0.2.35), held one level
+//! down at `os_set_core_limit`**: setting a process's limit is `exec`,
+//! process control, and a compile may not change the limits of the
+//! machine's processes. The row is handled locally (F-0069).
+
+use std.process
+
+comptime fn probe() -> int {
+    os_set_core_limit(0, 0) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    let l = process.CoreLimit { soft: 0, hard: 0 }
+    print("p: {P} {l.hard}")
+    0
+}

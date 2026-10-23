@@ -1,0 +1,83 @@
+//! check: run(exit=0, stdout="read=ok\nsoft_over_hard=invalid\nbelow_unlimited=invalid\nunlimited_soft_finite_hard=invalid\nset_to_itself=ok\nread_back=same\nsoft_lowered=ok 0\nsoft_restored=ok\nhard_lowered=ok\nhard_raise=denied\noff=ok")
+//! phase: run
+//! conforms: std.process, os.proc.core, err.row
+//!
+//! **sc72: `process.core_limit`, `set_core_limit` and `core_off`** (wolf
+//! 0.2.35's s253, wolf-lang#811, `[os.proc.core]`). The limit this row
+//! was born with reads as a well-formed `CoreLimit` (each -1 or 0 and
+//! up, the soft at most the hard unless the hard is unlimited). The three
+//! shape rows are `invalid` before the host: a soft above the hard, a
+//! number below -1, an unlimited soft under a finite hard. The limit set
+//! to itself answers and reads back the same; the soft lowered to 0 reads
+//! 0 and is raised back (a soft may rise to its hard). Then the hard is
+//! lowered to 0 and a raise to 4096 is `denied` — no unprivileged
+//! process may raise its hard limit again, and the container's root is
+//! not privileged over the host's limits (s253 measured the same in its
+//! containers and on CI's macOS runner). Last, `core_off` answers. The
+//! row changes only its own process's limits (the checked machine's: the
+//! `wolf` process it runs as), which end with it.
+//!
+//! **windows** keeps no core limit: the read answers `unsupported` and the
+//! row prints its lines for that reason. **lupin** 0.1.56 does not resolve
+//! `os_core_limit` (wolf-interp#277).
+
+use std.process
+
+fn set_row(soft: int, hard: int) -> str {
+    process.set_core_limit(soft, hard) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn every_line() {
+    print("read=ok")
+    print("soft_over_hard=invalid")
+    print("below_unlimited=invalid")
+    print("unlimited_soft_finite_hard=invalid")
+    print("set_to_itself=ok")
+    print("read_back=same")
+    print("soft_lowered=ok 0")
+    print("soft_restored=ok")
+    print("hard_lowered=ok")
+    print("hard_raise=denied")
+    print("off=ok")
+}
+
+fn main() -> !int {
+    var windows = false
+    let l = process.core_limit() else |e| match e {
+        unsupported => {
+            windows = true
+            process.CoreLimit { soft: 0, hard: 0 }
+        },
+    }
+    if windows {
+        every_line()
+        return 0
+    }
+    let shaped = l.soft >= 0 - 1 && l.hard >= 0 - 1
+    let ordered = l.hard == 0 - 1 || (l.soft >= 0 && l.soft <= l.hard)
+    print(if shaped && ordered { "read=ok" } else { "read={l.soft} {l.hard}" })
+    print("soft_over_hard={set_row(5, 4)}")
+    print("below_unlimited={set_row(0 - 2, 0 - 1)}")
+    print("unlimited_soft_finite_hard={set_row(0 - 1, 4096)}")
+    print("set_to_itself={set_row(l.soft, l.hard)}")
+    let again = process.core_limit()?
+    print(
+        if again.soft == l.soft && again.hard == l.hard { "read_back=same" } else { "read_back={again.soft} {again.hard}" },
+    )
+    let lowered = set_row(0, l.hard)
+    let now = process.core_limit()?
+    print("soft_lowered={lowered} {now.soft}")
+    print("soft_restored={set_row(l.soft, l.hard)}")
+    print("hard_lowered={set_row(0, 0)}")
+    print("hard_raise={set_row(0, 4096)}")
+    process.core_off()?
+    print("off=ok")
+    0
+}

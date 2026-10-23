@@ -1,0 +1,43 @@
+//! check: run(exit=0, stdout="child_no_core=true")
+//! phase: run
+//! conforms: std.process, std.signal, os.proc.core, os.proc.fork, os.proc.status, os.signal.exit, err.row
+//!
+//! **sc72: what `core_off` is for** (`[os.proc.core]`, GNU `timeout`'s own
+//! call). A forked child calls `process.core_off()` and then ends itself
+//! by `signal.segment_fault()` (`process.exit_signal`); the parent's
+//! `wait_status_core` reads the end as `-N`, an end by that signal with
+//! NO core, on every host and every core pattern. Without the call the
+//! answer is the host's: under kasumi's pattern, which pipes cores to
+//! `systemd-coredump`, a container with `--ulimit core=0:0` still reads
+//! `-(256 + 11)` (the limit is not enforced for a piped dump, core(5);
+//! s253 measured `-267` as born, `-267` after `set_core_limit(0, 0)`,
+//! `-11` after `core_off`). The fault is the child's own, raised by the
+//! child, in the container the rig runs in.
+//!
+//! **The checked machine and windows** answer `fork` `unsupported` (ruling
+//! #95 R4 C; windows has no fork): the row prints its line for that
+//! reason. **lupin** 0.1.56 refuses `os_fork` by name.
+
+use std.process
+use std.signal
+
+fn main() -> !int {
+    let f = process.fork() else |e| match e {
+        busy => { return 2 },
+        io => { return 3 },
+        unsupported => {
+            print("child_no_core=true")
+            return 0
+        },
+    }
+    if process.is_child(f) {
+        process.core_off() else |_| { process.exit(5) }
+        process.exit_signal(signal.segment_fault()) else |_| { process.exit(6) }
+        process.exit(7)
+    }
+    let n = signal.number(signal.segment_fault())?
+    var ch = process.Child { slot: f.child.slot }
+    let st = process.wait_status_core(take ch)?
+    print(if st == 0 - n { "child_no_core=true" } else { "child_no_core={st}" })
+    0
+}
