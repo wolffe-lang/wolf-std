@@ -1042,7 +1042,37 @@
 #
 # ITS CONFORMANCE PIN DOES NOT MOVE: still wolf-lang v0.2.24
 # (`294d626d`). The pin key below is unchanged on purpose.
-version = "0.1.55"
+#
+# sc72 BUMP: 0.1.55 -> 0.1.56 (r40, released 2026-10-23; tag `v0.1.56`
+# at wolf-interp `28547b4`, release 421458363), the lupin half of wolf
+# 0.2.35, taken WITH it: both pins move in one lane this time. 0.1.56 is
+# the 0.2.34 mirror (wolf-interp#268, #269): `os_clock_ns`, `fs_sync`,
+# `fs_sync_dir` and `fs_realpath` resolve; `os_term_restore_at_exit` and
+# `os_signal_wait_fds` answer their shape and `io` rows, then refuse a
+# well-formed call by name; `os_fork` resolves and is refused by name;
+# the terminal mode's bits 5-7 are fields. Its reason here is four of
+# r40's thirteen cells (`fs/sync_rows`, `term/restore_rows`,
+# `time/monotonic_ns` `unsupported -> run`, `term/mode_bits_set`
+# `divergent(stdout) -> unsupported`), each flipped in its own commit.
+# It resolves NONE of wolf 0.2.35's thirteen names (wolf-interp#277,
+# #278), nor `List.reserve`/`List.reset` or the outer-region copy
+# (#289): the lupin column of every sc72 wrapper is a refusal by name.
+# Acquired by digest from the release (the API read twice on the Mac and
+# twice on kasumi), verified from `--version`: `lupin 0.1.56
+# (wolf-interp, reference interpreter at pin 294d626)`. Archive
+# `lupin-0.1.56-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `ad703550ac4787e8e4bb26989d591a731410274d7332f2b4e8b9a64c878822cc`
+# (hashed twice); the binary `lupin` BY NAME, sha256
+# `991d54cf28e4f182b339d9eeb4dba7b2df3ad2618acb3bb53bddca42856b4bb9`.
+# The other archives, as GitHub reports them and as CI checks them on
+# arrival: aarch64-apple-darwin `9133bfdb…`, aarch64-unknown-linux-gnu
+# `e2719ab2…`, x86_64-pc-windows-msvc (a zip) `4e8d88b7…`; the new
+# static `x86_64-unknown-linux-musl` `6303b47a…` (nothing here reads it).
+# The archive ships no `std/`.
+#
+# ITS CONFORMANCE PIN DOES NOT MOVE: still wolf-lang v0.2.24
+# (`294d626d`). The pin key below is unchanged on purpose.
+version = "0.1.56"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
