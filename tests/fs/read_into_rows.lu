@@ -1,0 +1,90 @@
+//! check: run(exit=0, stdout="first=1 1\nloop_flat=true read=1500 len=1\nlarger=4 4 wolf\nrow_keeps_buf=eof 4\nmax_zero=0 0\nclosed=io 0\nin_a_region=3 3")
+//! phase: run
+//! conforms: std.fs, std.mem.budget, os.fs, mem.region.outer-write, mem.region.account.2, type.list.reset, err.row
+//!
+//! **sc72: `fs.read_into`, wolf-std#94** — a read into a caller's
+//! `List[byte]` with nothing kept per call. A file of 2,000 bytes read one
+//! byte at a time: the first call answers 1 and `buf` holds 1. Then 1,500
+//! more one-byte reads with `budget.live()` read before and after: equal
+//! (the chunk the host answers is made in the region each call opens and
+//! dropped with it; `buf` is reset and refilled in its own storage). The
+//! same holds where the issue measured 64 B a call through
+//! `fs.read_chunk`. A larger read refills `buf` with four bytes. At the
+//! end of the file the row is `eof` and `buf` keeps what it held; `max` 0
+//! empties `buf` and answers 0; a closed handle is `io` with an emptied
+//! `buf` left as it was. Last, the call made inside a `region` block of
+//! the caller's own, `buf` declared outside it: `buf`'s parameter is
+//! ambient-clean (`[mem.region.outer-write]`), so the block compiles and
+//! `buf` keeps the bytes past it.
+//!
+//! **lupin** 0.1.56 does not resolve `List.reset` (wolf-interp#289, is81).
+
+use std.fs
+use std.mem.budget
+
+fn text(b: List[byte]) -> str {
+    var s = ""
+    for c in b {
+        s = s + "{c as int} "
+    }
+    s
+}
+
+fn main() -> !int {
+    var big = ""
+    for i in 0..2000 {
+        big = big + "x"
+    }
+    fs.write_text("sc72-read-into.tmp", big)?
+    var f = fs.open("sc72-read-into.tmp")?
+    var buf = List[byte]()
+    let n0 = fs.read_into(mut f, mut buf, 1)?
+    print("first={n0} {buf.len}")
+    let before = budget.live()
+    var total = 0
+    var k = 0
+    while k < 1500 {
+        total = total + fs.read_into(mut f, mut buf, 1)?
+        k = k + 1
+    }
+    print("loop_flat={budget.live() == before} read={total} len={buf.len}")
+    fs.close(take f)?
+    fs.write_text("sc72-read-into.tmp", "wolf")?
+    var g = fs.open("sc72-read-into.tmp")?
+    let n4 = fs.read_into(mut g, mut buf, 64)?
+    let w = str_from_utf8(buf) else "?"
+    print("larger={n4} {buf.len} {w}")
+    var row = "read"
+    let none = fs.read_into(mut g, mut buf, 64) else |e| {
+        row = match e {
+            eof => "eof",
+            io => "io",
+        }
+        0
+    }
+    print("row_keeps_buf={row} {buf.len}")
+    let z = fs.read_into(mut g, mut buf, 0)?
+    print("max_zero={z} {buf.len}")
+    let gfd = g.fd
+    fs.close(take g)?
+    var closed = "read"
+    var gone = fs.File { fd: gfd }
+    let c = fs.read_into(mut gone, mut buf, 4) else |e| {
+        closed = match e {
+            eof => "eof",
+            io => "io",
+        }
+        0
+    }
+    print("closed={closed} {buf.len}")
+    fs.write_text("sc72-read-into.tmp", "abc")?
+    var h = fs.open("sc72-read-into.tmp")?
+    var n3 = 0
+    region turn {
+        n3 = fs.read_into(mut h, mut buf, 8)?
+    }
+    print("in_a_region={n3} {buf.len}")
+    fs.close(take h)?
+    fs.remove("sc72-read-into.tmp")?
+    0
+}
