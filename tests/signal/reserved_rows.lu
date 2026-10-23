@@ -1,0 +1,100 @@
+//! check: run(exit=0, stdout="ignore_32=invalid\nignore_33=invalid\nreset_32=invalid\nreset_33=invalid\nexit_32=invalid\nexit_33=invalid\nwords_33=true\nfirst_own=ok ok")
+//! phase: run
+//! conforms: std.signal, std.process, os.signal.host.reserved, os.signal.disp.one, os.signal.exit, os.signal.text, os.signal.host, err.row
+//!
+//! **sc72: the C library's numbers, refused through `signal.host`** (wolf
+//! 0.2.35's s253, wolf-lang#812, `[os.signal.host.reserved]`; R-sc72-2).
+//! `signal.ignore_one(signal.host(32))` and `(33)`, `reset_one` of them
+//! and `process.exit_signal` of them are `invalid`, by name, before the
+//! host — glibc keeps 32 and 33 (musl 32 to 34) and a disposition the C
+//! library owns is not the program's; the end by one was never kept (wolf
+//! 0.2.34 exited 160 and 161 on the two ends). On macOS both numbers are
+//! past `signal.last()` (31), which is the same `invalid` by the other
+//! rule. `signal.text(host(33))` answers glibc's words where 33 is a host
+//! number, and is `invalid` past `last()` (`words_33` holds either way).
+//! The first number past the C library's, `realtime().first` (34 under
+//! glibc), is the program's own: ignored and reset. Nothing is sent and
+//! no disposition is left changed.
+//!
+//! **windows** has no signal numbers: every call answers `unsupported`
+//! and the row prints its lines for that reason. **lupin** 0.1.56 refuses
+//! the first well-formed one-meaning call by name (wolf-interp#277 owes the
+//! reserved rows).
+
+use std.process
+use std.signal
+
+fn ign(m: int) -> str {
+    signal.ignore_one(m) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn rst(m: int) -> str {
+    signal.reset_one(m) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn ends(m: int) -> str {
+    process.exit_signal(m) else |e| {
+        return match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+    }
+    "lived"
+}
+
+fn every_line() {
+    print("ignore_32=invalid")
+    print("ignore_33=invalid")
+    print("reset_32=invalid")
+    print("reset_33=invalid")
+    print("exit_32=invalid")
+    print("exit_33=invalid")
+    print("words_33=true")
+    print("first_own=ok ok")
+}
+
+fn main() -> !int {
+    let first = ign(signal.host(32))
+    if first == "unsupported" {
+        every_line()
+        return 0
+    }
+    print("ignore_32={first}")
+    print("ignore_33={ign(signal.host(33))}")
+    print("reset_32={rst(signal.host(32))}")
+    print("reset_33={rst(signal.host(33))}")
+    print("exit_32={ends(signal.host(32))}")
+    print("exit_33={ends(signal.host(33))}")
+    let last = signal.last()?
+    var words = "none"
+    let t = signal.text(signal.host(33)) else |e| {
+        words = match e {
+            invalid => "invalid",
+            unsupported => "unsupported",
+        }
+        ""
+    }
+    print("words_33={(last >= 33 && t.len > 0) || (last < 33 && words == "invalid")}")
+    let rt = signal.realtime()?
+    if rt.first == 0 {
+        print("first_own=ok ok")
+    } else {
+        let own = signal.host(rt.first)
+        print("first_own={ign(own)} {rst(own)}")
+    }
+    0
+}
