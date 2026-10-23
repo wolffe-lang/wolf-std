@@ -88,6 +88,12 @@ new `signal/reserved_rows`, `fs/nofollow_rows` and
 `lupin-windows` cells, six read from wolf-interp v0.1.56's source and
 the seventh measured, all held by CI's windows rig (run 39977416300).
 
+**One cell for the runners.** `x/crypto/sha2/cavp_sha384_long.lu` is
+`slow` on lupin off windows (R-sc72-5): its 50M-step refusal ran 55–56.5 s
+on CI's ubuntu runners at lupin 0.1.55 and 59.8–60 s at 0.1.56, past the
+60 s ceiling twice; windows' 180 s ceiling still observes it
+(`lupin-windows = "unsupported"`). Re-measure at the next lupin pin.
+
 **For the next release.** wolf 0.2.36's `STD-PIN` is this branch's
 merge sha. std adds no prelude name. When lupin mirrors 0.2.35 (is81,
 and wolf-interp#277, #278), the lupin cells above and the two
