@@ -1,6 +1,6 @@
 //! check: run(exit=0, stdout="ints 4,0,4,9,1,\nstrs first,ccc,bb,zz, removed=dddd\nstr_kept turn-4\nints_after 3,3,3,\nsorted 1,2,3,5,8,\npop=3 len=2\nstructs y2 x1")
 //! phase: run
-//! conforms: std.list, mem.region.outer-write, type.list
+//! conforms: std.list, mem.region.outer-write
 //!
 //! **sc72: `std.list`'s mutators change the caller's list in place, inside
 //! a region block of the caller's too** (wolf-std#92; wolf 0.2.35's s255,
