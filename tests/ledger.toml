@@ -4528,6 +4528,7 @@ native = "run"
 # #95 R4 C), as windows does, and the row prints its lines for that reason.
 [tests."process/fork_rows.lu"]
 lupin = "unsupported"
+lupin-windows = "run"  # sc72 (lupin 0.1.56): windows answers os_fork's `unsupported` row before any refusal (wolf-interp src/eval/builtin.rs, os_fork)
 wolfc = "run"
 native = "run"
 
@@ -4553,6 +4554,7 @@ native = "run"
 # deliberate.
 [tests."term/mode_bits_set.lu"]
 lupin = "unsupported"  # sc72 pin bump (lupin 0.1.56): bits 5-7 pass its shape now, and `os_term_set_mode` is refused by name (wolf-interp#268; r40 std-mirror-controls.log)
+lupin-windows = "run"  # sc72 (lupin 0.1.56): the shape takes bits 5-7, then windows' `unsupported` row for every [os.term] call
 wolfc = "run"
 native = "run"
 
@@ -4560,6 +4562,7 @@ native = "run"
 # ready file, a quiet and a ready pipe, a meaning winning over a file.
 [tests."signal/wait_fds_rows.lu"]
 lupin = "unsupported"
+lupin-windows = "run"  # sc72 (lupin 0.1.56): the shape rows, then windows' `unsupported` row (wolf-interp src/eval/builtin.rs, os_signal_wait_fds)
 wolfc = "run"
 native = "run"
 
@@ -4575,6 +4578,7 @@ native = "run"
 # loop and a name under a file.
 [tests."fs/realpath_rows.lu"]
 lupin = "unsupported"
+lupin-windows = "run"  # sc72 (lupin 0.1.56): windows makes no link (fs_symlink `unsupported`), so the row never reaches the loop's removal the unix tree rule refuses
 wolfc = "run"
 native = "run"
 
@@ -4741,6 +4745,7 @@ native = "run"
 # program's own.
 [tests."signal/reserved_rows.lu"]
 lupin = "unsupported"
+lupin-windows = "run"  # a host number passes lupin's windows shape, then the `unsupported` row: the row prints its lines
 wolfc = "run"
 native = "run"
 
@@ -4764,6 +4769,7 @@ native = "run"
 # above, mode 3 in place.
 [tests."fs/nofollow_rows.lu"]
 lupin = "divergent(stdout)"  # sc72: lupin 0.1.56 answers bit 16 `invalid`, a mode outside its set (wolf-interp#278)
+lupin-windows = "run"  # windows refuses bit 16 on every machine and lupin's symlink answers `unsupported` there: the row's windows lines
 wolfc = "run"
 native = "run"
 
