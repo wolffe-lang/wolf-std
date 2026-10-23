@@ -30,8 +30,9 @@
 //!
 //! **Capability: `Exec` (I13).** `start`, `run`, `wait`, `kill`, `exit`,
 //! `exit_signal`, `fork`, `poll`, `wait_status_core`, `poll_core`,
-//! `lead_group` and `join_group` reach the host's process table
-//! (`own_group` reads this process's context: `env`), are tagged `exec` in the toolchain's
+//! `lead_group`, `join_group`, `set_core_limit` and `core_off` reach the
+//! host's process table (`own_group` and `core_limit` read this process's
+//! context: `env`), are tagged `exec` in the toolchain's
 //! sandbox table, and are categorically refused at comptime (D33) — with
 //! the sandbox table's own reason, which is worth quoting because it is
 //! sharper than "determinism": *compiling a package must never run or
@@ -163,6 +164,16 @@
 //! its first spawn or after every scope has joined; the checked machine
 //! and windows answer `unsupported`, and a program's in-process path
 //! runs there.
+//!
+//! **The core a process's end may leave (sc72, wolf 0.2.35's s253,
+//! `[os.proc.core]`).** `core_limit` reads this process's core limit as a
+//! `CoreLimit` (soft and hard, -1 unlimited; read first, the limit it was
+//! born with), `set_core_limit` sets it for this process and every child
+//! started after, and `core_off` makes THIS process dump no core whatever
+//! ends it, on every host and every core pattern — GNU `timeout`'s own call
+//! before it ends itself by its command's signal (`exit_signal`). The
+//! reader is `env` (it reads this process's context, with `own_group`);
+//! the set and the off call are `exec`, with `exit_signal`.
 //!
 //! **What is deliberately absent.** Each is a reviewed contract with a
 //! filing behind it rather than an approximation:
@@ -1425,6 +1436,102 @@ pub fn exit(code: int) {
 /// ```
 pub fn exit_signal(meaning: int) -> () ! {invalid, unsupported} {
     os_exit_signal(meaning)?
+}
+
+/// This process's core limit (`[os.proc.core]`): `soft`, the size in
+/// bytes past which a dump is cut (0: no core file), and `hard`, the
+/// ceiling the soft may be raised to; **-1 is unlimited** in either.
+/// A child starts with its parent's (a shell's `ulimit -c`, a container's
+/// `--ulimit core=…`).
+pub struct CoreLimit {
+    soft: int,
+    hard: int,
+}
+
+/// **s253 (`[os.proc.core]`, wolf 0.2.35): this process's core limit**,
+/// `getrlimit(RLIMIT_CORE)` as a `CoreLimit`. Read before the program
+/// sets it, it is the limit the process was born with. The soft is at
+/// most the hard, and an unlimited hard admits any soft.
+///
+/// Rows: `unsupported` on windows, which keeps no core limit. Never
+/// traps. The checked machine reads the `wolf` process's own limit (the
+/// process the program runs as). lupin 0.1.56 does not resolve the call
+/// (wolf-interp#277).
+///
+/// Capability `env` (it reads this process's context, with `own_group`);
+/// refused at comptime (D33). Delegates to `os_core_limit`.
+///
+/// ```wolf-doc-example
+/// let l = process.core_limit() else |_| process.CoreLimit { soft: 0, hard: 0 }
+/// l.hard == 0 - 1 || (l.soft >= 0 && l.soft <= l.hard)
+/// l.soft >= 0 - 1
+/// ```
+pub fn core_limit() -> CoreLimit ! {unsupported} {
+    let (soft, hard) = os_core_limit()?
+    CoreLimit { soft: soft, hard: hard }
+}
+
+/// **s253 (`[os.proc.core]`, wolf 0.2.35): set this process's core
+/// limit**, `setrlimit(RLIMIT_CORE)`, for this process and every child it
+/// starts after the call. Each of `soft` and `hard` is -1 (unlimited) or
+/// a size in bytes; the soft is at most the hard.
+///
+/// Rows, in the order they are decided: `invalid` unless each is -1 or 0
+/// and up and the soft is at most the hard (an unlimited soft under a
+/// finite hard included), before the host; then `unsupported` on windows;
+/// then `denied` where the host refuses a raise of the hard limit — a
+/// process may lower its hard limit and, without the privilege for it,
+/// never raise it again. Nothing changes on a row. Never traps. The
+/// checked machine sets the `wolf` process's own limit. lupin 0.1.56 does
+/// not resolve the call (wolf-interp#277).
+///
+/// Capability `Exec` (with `exit_signal`); refused at comptime (D33).
+/// Delegates to `os_set_core_limit`.
+///
+/// ```wolf-doc-example
+/// var row = "set"
+/// process.set_core_limit(5, 4) else |_| { row = "refused" }
+/// row == "refused"
+/// let l = process.core_limit() else |_| process.CoreLimit { soft: 0 - 1, hard: 0 - 1 }
+/// var same = "set"
+/// process.set_core_limit(l.soft, l.hard) else |_| { same = "refused" }
+/// same == "set" || same == "refused"
+/// ```
+pub fn set_core_limit(soft: int, hard: int) -> () ! {denied, invalid, unsupported} {
+    os_set_core_limit(soft, hard)?
+}
+
+/// **s253 (`[os.proc.core]`, wolf 0.2.35): this process dumps no core,
+/// whatever ends it**, on every host and every core pattern. On linux it
+/// sets the process's "dumpable" attribute to 0
+/// (`prctl(PR_SET_DUMPABLE, 0)`), the one switch a pattern that pipes
+/// cores to a program obeys (core(5): the limit is not enforced there),
+/// and GNU `timeout`'s own call before it ends itself by its command's
+/// signal; elsewhere it sets the soft core limit to 0, keeping the hard.
+/// So `core_off` then `exit_signal(signal.segment_fault())` is an end by
+/// that signal with no core: a parent's `wait_status_core` answers `-11`,
+/// not `-(256 + 11)`.
+///
+/// The attribute is this process's alone: `exec` sets it back, so a child
+/// it starts dumps as the host says, and no call sets it back here. It
+/// has two other effects on linux (PR_SET_DUMPABLE(2const)): the
+/// process's `/proc/<pid>` files become the super-user's, and another
+/// process of the same user can no longer `ptrace` it.
+///
+/// Rows: `unsupported` on windows. Never traps. The checked machine sets
+/// the `wolf` process's own attribute. lupin 0.1.56 does not resolve the
+/// call (wolf-interp#277).
+///
+/// Capability `Exec` (with `exit_signal`); refused at comptime (D33).
+/// Delegates to `os_core_off`.
+///
+/// ```wolf-doc-example
+/// var off = "off"
+/// process.core_off() else |_| { off = "unsupported" }
+/// off == "off" || off == "unsupported"
+/// ```
+pub fn core_off() -> () ! {unsupported} {
+    os_core_off()?
 }
 
 /// What one `fork` answered, in the process that reads it (s247,
