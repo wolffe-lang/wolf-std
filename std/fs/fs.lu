@@ -38,6 +38,9 @@
 //! - `cross_device` — declared by `fs_rename` and never raised by this
 //!   module: `move_file` HANDLES it, which is what the fallback below is
 //!   for
+//! - `busy` — not now, and not the host's fault (sc72, wolf 0.2.35): a
+//!   lock another open holds (`lock`), a non-blocking handle that takes
+//!   no byte now (`write_some`), the host's `EAGAIN` either way
 //!
 //! **Capability: `fs` (I13).** Every function here reaches the host
 //! filesystem, is tagged `fs` in the toolchain's sandbox table, and is
@@ -58,8 +61,13 @@
 //! `fs_rename`, `fs_is_file`, `fs_is_dir`, `fs_size`,
 //! `fs_modified_ms`), s142's `fs_fstat`, s199's three
 //! (`fs_seek`, `fs_tell`, `fs_read_at` — wolf-lang#426, with the
-//! standard streams as handles 0, 1 and 2, #424), and s248's three
-//! (`fs_sync`, `fs_sync_dir`, `fs_realpath`, wolf 0.2.34) — so their
+//! standard streams as handles 0, 1 and 2, #424), s248's three
+//! (`fs_sync`, `fs_sync_dir`, `fs_realpath`, wolf 0.2.34), and wolf
+//! 0.2.35's eight: s253's `fs_adopt` and s254's seven (`fs_access`,
+//! `fs_fstat_record`, `fs_lock`, `fs_unlock`, `fs_mkfifo`,
+//! `fs_set_nonblock`, `fs_write_some`), with open-mode bit 16
+//! (`NOFOLLOW`, this module's first constants beside `LOCK_SHARED` and
+//! `LOCK_EXCLUSIVE`) — so their
 //! semantics are part of this module's contract and are documented per
 //! function. std owns everything else:
 //! the `File` value, the consuming `close`, the mode choice behind
@@ -2186,6 +2194,325 @@ pub fn sync_dir(path: str) -> () ! {denied, invalid, io, not_found, unsupported}
     fs_sync_dir(path)?
 }
 
+/// The flag that makes `open_mode` refuse a final symbolic link
+/// (`[os.fs.open.nofollow]`, wolf 0.2.35): bit 16, added to any of the
+/// six modes — `fs.open_mode(path, 3 + fs.NOFOLLOW)`. A path whose LAST
+/// component is a link is then `invalid` (the host's `ELOOP` in
+/// `os_error()`) and nothing is created or truncated; a link in a middle
+/// component is followed either way. Windows refuses the bit `invalid`,
+/// before the host.
+///
+/// ```wolf-doc-example
+/// fs.NOFOLLOW == 16
+/// ```
+pub const NOFOLLOW: int = 16
+
+/// **Open `path` in one of `[os.fs.open]`'s six modes, by number** — the
+/// moded open the named ones above are spellings of, and the only one
+/// that reaches modes 3 and 5 and the `NOFOLLOW` flag:
+///
+/// - **0** read (`open`), **1** write, creating and truncating
+///   (`create`), **2** append, creating (`open_append`);
+/// - **3** read and write, creating, NOT truncating — an editor's
+///   in-place save, a journal reopened;
+/// - **4** the exclusive create (`create_new`);
+/// - **5** read without parking: a fifo or a device with no writer
+///   answers at once, a regular file is unaffected (a static-file
+///   server's open, before `fstat` classifies the handle).
+///
+/// `mode + NOFOLLOW` refuses a final symbolic link (`NOFOLLOW`'s doc);
+/// mode 4 answers `exists` on a link with or without it.
+///
+/// Rows: `invalid` for a mode outside the six (with or without the flag)
+/// and any other bit above them, before the filesystem is touched; and
+/// for a final link under `NOFOLLOW`; `exists` for mode 4 on a taken
+/// name; `not_found` for a missing name (modes 0 and 5) or parent;
+/// `denied`; `io` otherwise. Never traps. lupin 0.1.56 serves the six
+/// modes inside its tree and answers the flag `invalid`, a mode outside
+/// its set (wolf-interp#278).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_open_mode`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-open-mode.tmp", "wolf")?
+/// var f = fs.open_mode("doc-open-mode.tmp", 3)?
+/// fs.write(mut f, "W")?
+/// fs.close(take f)?
+/// var bad = false
+/// var g = fs.open_mode("doc-open-mode.tmp", 6) else |_| {
+///     bad = true
+///     fs.File { fd: 0 - 1 }
+/// }
+/// fs.close(take g) else |_| { }
+/// let text = fs.read_text("doc-open-mode.tmp")?
+/// fs.remove("doc-open-mode.tmp")?
+/// text == "Wolf" && bad == true
+/// ```
+pub fn open_mode(path: str, mode: int) -> File ! {not_found, denied, exists, invalid, io} {
+    File { fd: fs_open_mode(path, mode)? }
+}
+
+/// **s254 (`[os.fs.access]`, wolf 0.2.35): may this process do what
+/// `mode` asks of `path`**, by its REAL user and group ids — `access(2)`,
+/// a final link followed. `mode` is **0** (the name exists) or a sum of
+/// **4** read, **2** write and **1** execute (POSIX's `R_OK`, `W_OK`,
+/// `X_OK`, the same numbers on every unix). Ok is a grant.
+///
+/// Advice, not a lock: the answer can be stale by the next call, and a
+/// program that must know opens. It is the question to ask BEFORE any
+/// file is made — whether a directory takes a write, so a save chooses
+/// the atomic rename or the in-place write — and it sees what a test of
+/// the mode bits cannot: an access-control list, a read-only mount. The
+/// real ids are the effective ones unless the program is set-id or has
+/// changed its ids (`process.set_ids`); an open uses the effective ones.
+/// Root is the host's rule: every read and write granted, an execute
+/// only where some execute bit is set.
+///
+/// Rows: `invalid` for a `mode` outside `0..=7`, before the host; then
+/// `unsupported` on windows (its permission is an access-control list
+/// the three bits do not describe); `denied` for the host's refusal (a
+/// write on a read-only mount included); `not_found` for a missing name,
+/// a dangling link included; `io` otherwise (a component that is no
+/// directory, a loop of links), the host's number in `os_error()`. Never
+/// traps. lupin 0.1.56 does not resolve the call (wolf-interp#278).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_access`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-access.tmp", "x")?
+/// var row = "granted"
+/// fs.access("doc-access.tmp", 8) else |_| { row = "refused" }
+/// var missing = "granted"
+/// fs.access("doc-access-none.tmp", 0) else |_| { missing = "refused" }
+/// fs.remove("doc-access.tmp")?
+/// row == "refused" && missing == "refused"
+/// ```
+pub fn access(path: str, mode: int) -> () ! {denied, invalid, io, not_found, unsupported} {
+    fs_access(path, mode)?
+}
+
+/// **s254 (`[os.fs.fstat.record]`, wolf 0.2.35; ruling asked R-sc72-1):
+/// the full record of the file `f` HOLDS**, `stat`'s twenty words as an
+/// `Info`, from one metadata read on the handle (`fstat(2)`, `statx(2)`
+/// on linux) — its identity (`dev`, `ino`), link count, mode, owner and
+/// nanosecond times with no path walked between the open and the
+/// question. "Is the file I opened still the one under that name" is
+/// `fstat_record(mut f)?` against `stat(name)?`, `dev` and `ino` equal;
+/// "is my input my output" is the same comparison of two handles.
+///
+/// `fstat`'s `Stat` keeps its three words (programs build it by literal);
+/// this is the path record's type, so one reader serves both. A handle
+/// never names a link (an open follows it, or refuses it under
+/// `NOFOLLOW`), so `kind` is never 3: a pipe's end is 4, a socket 5. The
+/// standard streams are handles 0..2. Windows answers its column of
+/// `stat`'s table — a handle that is no disk file is `kind` 2 there —
+/// with the unanswered words' `have` bits clear.
+///
+/// Rows: `io` for every refusal — a closed or forged handle, a word
+/// outside `int` — because on a handle there is no name to be missing or
+/// refused. Never traps. The cost: one host call and one twenty-word
+/// list, `stat`'s. lupin 0.1.56 does not resolve the call
+/// (wolf-interp#278).
+///
+/// `mut f`, as `fstat`. Capability `fs`; refused at comptime (D33).
+/// Delegates to `fs_fstat_record`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-fstat-record.tmp", "wolves")?
+/// var f = fs.open("doc-fstat-record.tmp")?
+/// let held = fs.fstat_record(mut f)?
+/// fs.close(take f)?
+/// let named = fs.stat("doc-fstat-record.tmp")?
+/// fs.remove("doc-fstat-record.tmp")?
+/// held.kind == 0 && held.size == 6 && held.ino == named.ino && held.dev == named.dev
+/// ```
+pub fn fstat_record(mut f: File) -> Info ! {io} {
+    let w = fs_fstat_record(f.fd)?
+    info_of(w)
+}
+
+/// `lock`'s kind 1: a shared lock, any number of which may be held at
+/// once through different opens of one file (`[os.fs.lock]`).
+///
+/// ```wolf-doc-example
+/// fs.LOCK_SHARED == 1
+/// ```
+pub const LOCK_SHARED: int = 1
+
+/// `lock`'s kind 2: an exclusive lock, which no other open of the file
+/// may hold beside it, shared or exclusive (`[os.fs.lock]`).
+///
+/// ```wolf-doc-example
+/// fs.LOCK_EXCLUSIVE == 2
+/// ```
+pub const LOCK_EXCLUSIVE: int = 2
+
+/// **s254 (`[os.fs.lock]`, wolf 0.2.35): an advisory lock on the file
+/// behind `f`**, `LOCK_SHARED` or `LOCK_EXCLUSIVE`, **tried once and
+/// never waited for** — a conflicting lock held through ANOTHER OPEN of
+/// the file is `busy` (a program polls with its own deadline; a wait in
+/// the kernel would park a worker where a kill cannot reach it).
+///
+/// **The lock belongs to the open file** (BSD `flock(2)`'s rule;
+/// `LockFileEx` over the whole file on windows): two opens of one file
+/// conflict even in one process; a child's copy of the handle shares the
+/// lock; the lock lasts until `unlock` or until the last copy is closed,
+/// and closing some other handle of the file releases nothing. A second
+/// `lock` on a handle that holds one is the host's (unix converts it,
+/// not atomically; windows answers `busy`): a portable program unlocks
+/// first. **Advisory on unix** — it binds only the programs that ask —
+/// and **mandatory on windows**, where another handle's read or write of
+/// the file fails while it is held. On linux an `flock` lock does not
+/// see a C program's `fcntl` record lock.
+///
+/// Rows: `invalid` for a `kind` other than 1 or 2, before the handle is
+/// looked at; `busy` for a conflict (`EWOULDBLOCK` in `os_error()`;
+/// windows `ERROR_LOCK_VIOLATION`); `io` for a closed or forged handle;
+/// `unsupported` where the kernel has no lock call or the filesystem
+/// keeps no locks. Never traps. lupin 0.1.56 does not resolve the call
+/// (wolf-interp#278).
+///
+/// `mut f`: the call acts on the file the handle names. Capability `fs`;
+/// refused at comptime (D33). Delegates to `fs_lock`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-lock.tmp", "x")?
+/// var a = fs.open("doc-lock.tmp")?
+/// var b = fs.open("doc-lock.tmp")?
+/// fs.lock(mut a, fs.LOCK_EXCLUSIVE)?
+/// var busy = false
+/// fs.lock(mut b, fs.LOCK_SHARED) else |_| { busy = true }
+/// fs.unlock(mut a)?
+/// fs.lock(mut b, fs.LOCK_SHARED)?
+/// fs.close(take a)?
+/// fs.close(take b)?
+/// fs.remove("doc-lock.tmp")?
+/// busy == true
+/// ```
+pub fn lock(mut f: File, kind: int) -> () ! {busy, invalid, io, unsupported} {
+    fs_lock(f.fd, kind)?
+}
+
+/// **s254 (`[os.fs.lock]`, wolf 0.2.35): release the lock `f`'s open
+/// file holds.** A handle that holds none is ok on every host.
+///
+/// Rows: `io` for a closed or forged handle; `unsupported` where the
+/// kernel has no lock call. Never traps. lupin 0.1.56 does not resolve
+/// the call (wolf-interp#278).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_unlock`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-unlock.tmp", "x")?
+/// var a = fs.open("doc-unlock.tmp")?
+/// fs.unlock(mut a)?
+/// fs.lock(mut a, fs.LOCK_EXCLUSIVE)?
+/// fs.unlock(mut a)?
+/// fs.close(take a)?
+/// fs.remove("doc-unlock.tmp")?
+/// fs.exists("doc-unlock.tmp") == false
+/// ```
+pub fn unlock(mut f: File) -> () ! {io, unsupported} {
+    fs_unlock(f.fd)?
+}
+
+/// **s254 (`[os.fs.mkfifo]`, wolf 0.2.35): make a fifo named `path`**,
+/// `mkfifo(3)`, its permission bits `perm` less the process's umask
+/// (`create_dir_mode`'s rule). It is `stat`'s kind 4; `open_mode(path,
+/// 5)` is the open that does not park on it with no writer, and a plain
+/// read open waits for one.
+///
+/// Rows: `invalid` for a `perm` outside `0..=0o777`, before the host;
+/// `unsupported` on windows, by name, before the path is read (its named
+/// pipes are servers in another namespace), and where the filesystem or
+/// kernel makes no fifo; `exists` for a taken name, a dangling link
+/// included; `not_found` for a missing parent; `denied` for a refused
+/// write of the directory; `io` otherwise. Never traps. lupin 0.1.56
+/// does not resolve the call (wolf-interp#278).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_mkfifo`.
+///
+/// ```wolf-doc-example
+/// var made = true
+/// fs.mkfifo("doc-mkfifo.tmp", 0o600) else |_| { made = false }
+/// var kind = 4
+/// if made { kind = fs.lstat("doc-mkfifo.tmp")?.kind }
+/// if made { fs.remove("doc-mkfifo.tmp")? }
+/// kind == 4
+/// ```
+pub fn mkfifo(path: str, perm: int) -> () ! {denied, exists, invalid, io, not_found, unsupported} {
+    fs_mkfifo(path, perm)?
+}
+
+/// **s254 (`[os.fs.nonblock]`, wolf 0.2.35): set (`on`) or clear the
+/// non-blocking flag on the open file behind `f`** (`O_NONBLOCK`). On a
+/// handle with the flag, `write_some` answers `busy` where it would park
+/// and `read_chunk` answers `io` (`EAGAIN` in `os_error()`) where there
+/// is nothing to read; `signal.wait_fds` is the wait before either. The
+/// flag is the open file's: a child's copy of the handle sees it, and a
+/// pipe's two ends are two open files.
+///
+/// Rows: `invalid` for the standard streams 0, 1 and 2, by name (their
+/// open file is shared with whoever started the process, and a flag set
+/// there outlives the program); `unsupported` on windows; `io` for a
+/// closed or forged handle. Never traps. The cost: two `fcntl(2)`s (one
+/// when the flag is already as asked). lupin 0.1.56 does not resolve the
+/// call (wolf-interp#278).
+///
+/// `mut f`: the call acts on the file the handle names. Capability `fs`;
+/// refused at comptime (D33). Delegates to `fs_set_nonblock`. The
+/// example uses a standard stream, since a pipe comes from
+/// `std.process`; a clipboard writer sets its pipe's write end with
+/// `fs.set_nonblock(mut w, true)?`, writes with `write_some` until
+/// `busy`, then waits on the end under a deadline.
+///
+/// ```wolf-doc-example
+/// var out = fs.stdout()
+/// var row = "set"
+/// fs.set_nonblock(mut out, true) else |_| { row = "refused" }
+/// row == "refused"
+/// ```
+pub fn set_nonblock(mut f: File, on: bool) -> () ! {invalid, io, unsupported} {
+    fs_set_nonblock(f.fd, on)?
+}
+
+/// **s254 (`[os.fs.nonblock]`, wolf 0.2.35): ONE write of `b` to `f`, and
+/// how many bytes the host took** — all of them or a first part; at least
+/// 1 for a non-empty list, 0 for an empty one (the handle still checked).
+/// On a non-blocking handle that can take nothing now it is `busy`; on a
+/// blocking one it waits as `write_chunk` does, for the first byte only.
+/// `write_chunk` writes everything or answers a row and, on a
+/// non-blocking handle, loses how much it wrote: this is the write that
+/// says.
+///
+/// Rows: `busy` (`EAGAIN` in `os_error()`) as above; `invalid` for a list
+/// of the wrong element width (an FFI caller's); `io` for a closed or
+/// forged handle, and for a pipe whose reader has gone once a program
+/// ignores `signal.broken_pipe()` (otherwise the host's `SIGPIPE` comes
+/// first). The standard streams 1 and 2 are written after std's own
+/// buffer is flushed. Windows serves it (one `WriteFile`, never `busy`).
+/// Never traps. The cost: one `write(2)`, no copy of the list. lupin
+/// 0.1.56 does not resolve the call (wolf-interp#278).
+///
+/// `mut f`, as `write_chunk`. Capability `fs`; refused at comptime (D33).
+/// Delegates to `fs_write_some`.
+///
+/// ```wolf-doc-example
+/// var raw = List[byte]()
+/// for c in [119, 111, 108, 102] { (mut raw).push(c as byte) }
+/// var f = fs.create("doc-write-some.tmp")?
+/// let n = fs.write_some(mut f, raw)?
+/// let none = fs.write_some(mut f, List[byte]())?
+/// fs.close(take f)?
+/// let text = fs.read_text("doc-write-some.tmp")?
+/// fs.remove("doc-write-some.tmp")?
+/// n == 4 && none == 0 && text == "wolf"
+/// ```
+pub fn write_some(mut f: File, b: List[byte]) -> int ! {busy, invalid, io} {
+    fs_write_some(f.fd, b)?
+}
+
 /// **s253 (`[os.proc.adopt]`, wolf 0.2.35): a descriptor this process
 /// INHERITED, as a `File` that owns it** — `prog 5>out`, a supervisor's
 /// pipe, the ready descriptor a test driver hands its child. Every
@@ -2228,7 +2555,8 @@ pub fn adopt(fd: int) -> File ! {invalid, io, unsupported} {
 /// An append-mode descriptor for `path`, with the two tags mode 2 cannot
 /// reach coarsened to `io`.
 ///
-/// Private, and the only place in this module that names a MODE number.
+/// Private, and the one place in this module that names a MODE number
+/// for a caller (`open_mode`, sc72, takes the caller's own).
 /// `fs_open_mode` declares `{not_found, denied, exists, invalid, io}`
 /// across its five modes; with the mode fixed at 2 by this function
 /// rather than by a caller, `invalid` (a mode outside the set) and
