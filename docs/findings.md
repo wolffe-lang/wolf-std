@@ -14248,7 +14248,26 @@ list helper on its path), where the PR's own run at the same head,
 39977644707, read 59.8 s and passed, and trunk's nightly of the day,
 39960481667 at lupin 0.1.55, read 56.5 s: CI's runners put that row at
 94–100 % of the ceiling with or without this branch (kasumi, the same
-std on 0.1.55 and 0.1.56: 36–70 s, noise either way; `lupin-speed.log`),
-an issue to file, not a cell.
+std on 0.1.55 and 0.1.56: 36–70 s, noise either way; `lupin-speed.log`).
+
+**It did not stay a flake: the final head's own `tier pr`, run
+39986553915 at `47fcb91`, was red on the same one cell** (60.0 s,
+timed out), and nothing else. Read across ten runs, CI's ubuntu
+runners put the row at 55.0–56.5 s with lupin 0.1.55 (39811704495,
+39823161489, 39831422176, 39960481667; 41.6–42.6 s on the faster runner
+of 39882245266 and 39885633184) and at 59.8, 60.0 and 60.0 s with 0.1.56
+(39977644707, 39977416300, 39986553915): about 7 % slower at the new pin,
+where `cavp_sha256_long` moved 5 % (50.3–51.6 -> 51.9–54.7 s) and
+`p256/rfc6979_p256` not at all. The row is lupin's refusal at its
+50M-step budget, so the lane's answer is the budget's wall time.
+**R-sc72-5** (asked): (A) the row's lupin cell `slow` off windows (the
+runner skips the lane and prints it in the slow ledger, owed a
+re-measure at each lupin pin), `lupin-windows` `unsupported` kept, the
+refusal observed at 96 s inside windows' 180 s ceiling (sc52); (B) raise
+ubuntu's ceiling, as sc52 did windows' — a CI policy that sc52 itself
+said is "its own change, not a rider on a pin bump"; (C) re-run until
+green. **Recommend A**, built in `cb6c258`: one cell, the word sc16 made
+for "a red-on-timeout would record the machine's speed, not its depth",
+and sc24's reason for leaving it (the refusal landed in ~20 s) is gone.
 (e) `fs_write_some`'s comptime row cannot exist (the engine cannot build
 its `List[byte]`): twelve comptime rows, not thirteen, as P7 allowed.
