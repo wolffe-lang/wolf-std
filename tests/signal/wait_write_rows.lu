@@ -1,0 +1,125 @@
+//! check: run(exit=0, stdout="room=0 0\ntook_until_busy=true\nfull=0 -1 waited=true\nroom_after_a_read=0 0\nlisted_twice=0 0 drained 0 1\nreader_gone=0 0\nblocking_again=ok")
+//! phase: run
+//! conforms: std.signal, std.fs, std.process, os.signal.wait.write, os.signal.wait.fds, os.fs.nonblock, os.proc.pipe, err.row
+//!
+//! **sc72: `signal.WAIT_WRITE`, the clipboard's loop** (wolf 0.2.35's
+//! s254, wolf-lang#818, `[os.signal.wait.write]`, `[os.fs.nonblock]`). A
+//! pipe's write end, waited on with `WAIT_WRITE`, has room (`Wake {0, 0}`).
+//! Made non-blocking, `write_some` of 4096-byte lists takes bytes until it
+//! answers `busy` (the pipe is full: 65536 bytes on linux, the host's
+//! number elsewhere); the write wait then waits out a 25 ms deadline
+//! (`0 -1`, measured on the monotonic clock). A read of the other end
+//! makes room, and the wait answers at once. A handle listed twice, read
+//! first and write second, answers the lowest ready element: the reader
+//! has bytes, so 0 — and once drained (exactly what was written, so the
+//! blocking read never waits), the write side, 1. With the reader
+//! closed the write end is ready (a write would fail at once); nothing is
+//! written there, so no `SIGPIPE`. Last, the end is made blocking again.
+//! The pipe is this row's own.
+//!
+//! **windows** answers `set_nonblock` `unsupported` (and the wait
+//! `unsupported`): the row prints its lines for that reason after the
+//! first wait answers. **lupin** 0.1.56 answers a `WAIT_WRITE` element
+//! `io` (a handle it does not hold) and does not resolve `fs_set_nonblock`
+//! (wolf-interp#278).
+
+use std.fs
+use std.process
+use std.signal
+use std.time
+
+fn waited(files: List[fs.File], deadline: int) -> str {
+    let w = signal.wait_fds(files, signal.resize(), deadline) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "{w.meaning} {w.ready}"
+}
+
+fn for_write(f: fs.File) -> fs.File {
+    fs.File { fd: f.fd + signal.WAIT_WRITE }
+}
+
+fn one(f: fs.File) -> List[fs.File] {
+    var v = List[fs.File]()
+    (mut v).push(f)
+    v
+}
+
+fn two(a: fs.File, b: fs.File) -> List[fs.File] {
+    var v = List[fs.File]()
+    (mut v).push(a)
+    (mut v).push(b)
+    v
+}
+
+fn host_lines() {
+    print("room=0 0")
+    print("took_until_busy=true")
+    print("full=0 -1 waited=true")
+    print("room_after_a_read=0 0")
+    print("listed_twice=0 0 drained 0 1")
+    print("reader_gone=0 0")
+    print("blocking_again=ok")
+}
+
+fn main() -> !int {
+    var p = process.pipe()?
+    var r = p.read
+    var w = p.write
+    let room = waited(one(for_write(w)), 0)
+    if room == "unsupported" {
+        host_lines()
+        fs.close(take r)?
+        fs.close(take w)?
+        return 0
+    }
+    print("room={room}")
+    fs.set_nonblock(mut w, true)?
+    var block = List[byte]()
+    for i in 0..4096 {
+        (mut block).push(120 as byte)
+    }
+    var total = 0
+    var busy = false
+    var turns = 0
+    while !busy && turns < 1024 {
+        let n = fs.write_some(mut w, block) else |e| match e {
+            busy => {
+                busy = true
+                0
+            },
+            invalid => { return 2 },
+            io => { return 3 },
+        }
+        total = total + n
+        turns = turns + 1
+    }
+    print("took_until_busy={busy && total > 0}")
+    let t0 = time.monotonic_ns()
+    let full = waited(one(for_write(w)), 25)
+    let t1 = time.monotonic_ns()
+    print("full={full} waited={t1 - t0 >= 25000000}")
+    let got = fs.read_chunk(mut r, total / 2)?
+    print("room_after_a_read={waited(one(for_write(w)), 0)}")
+    let both = waited(two(r, for_write(w)), 0)
+    var left = total - got.len
+    while left > 0 {
+        let more = fs.read_chunk(mut r, left)?
+        left = left - more.len
+    }
+    print("listed_twice={both} drained {waited(two(r, for_write(w)), 0)}")
+    fs.close(take r)?
+    print("reader_gone={waited(one(for_write(w)), 0)}")
+    fs.set_nonblock(mut w, false) else |_| {
+        print("blocking_again=refused")
+        fs.close(take w)?
+        return 0
+    }
+    print("blocking_again=ok")
+    fs.close(take w)?
+    0
+}
