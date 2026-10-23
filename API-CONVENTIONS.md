@@ -1597,3 +1597,37 @@ missing zone files answer `zone`, denied/other host failures answer
 `local_in` does not. Widths count bytes and widths over 4096 answer
 `format`, rather than allocating without bound. Formatting is C locale
 only, never an unimplemented locale promise.
+
+## The 0.2.35 amendment (sc72): flags as constants, in-place mutators, the language's capacity
+
+**A flag is a constant; a meaning stays a function.** wolf 0.2.35 adds
+numbers a caller ADDS to another number — open-mode bit 16
+(`fs.NOFOLLOW`), the lock kinds (`fs.LOCK_SHARED`, `fs.LOCK_EXCLUSIVE`)
+and bit 62 of a `signal.wait_fds` element (`signal.WAIT_WRITE`) — and
+std spells them as `pub const` items, `UPPER_SNAKE`, each with a doc
+comment and a fenced example of its value. Every lane resolves a
+module's `pub const` from an importer (measured at the 0.2.35 pins;
+sc72's probe). A signal's meaning keeps its function (`signal.reload()`),
+as written before std carried a constant: a meaning is a set member that
+`[os.signal.set.stable]` keeps forever, not an addend. One caveat a
+caller meets: a module `const` initialised FROM another module's
+`pub const` is refused at comptime on the compiled tiers
+(wolf-lang#653); `let` serves.
+
+**A mutator mutates.** A `std.list` function that takes its container
+`mut` changes the caller's container in place — the language's index
+store with a `copy` at the store, its `push`, `pop` and `clear` — and
+never rebuilds a fresh container to assign back (§3's "`mut` where
+mutation is the operation's point", made true of the body). Under
+`[mem.region.outer-write]` that keeps the parameter ambient-clean, so
+the call is admitted inside a caller's `region` block on a container
+declared outside it; `wolf conform-run --dump=mut-clean` is the check.
+A function that RETURNS a container builds it fresh, by its nature.
+
+**§8's capacity rule, met by the language.** "No capacity API without a
+capacity" was waiting on the builtin; wolf 0.2.35 gives `List`
+`reserve(n)` and `reset()` as the LANGUAGE's methods
+(`[type.list.storage]`), and those are the spellings: std adds no
+second name over a working builtin (§8), and on a reference machine
+without the builtin a std `pub fn reserve` would be what `xs.reserve(n)`
+resolves to (`[type.method.resolve]`'s step two), recursing.
