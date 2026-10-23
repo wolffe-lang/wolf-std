@@ -1,0 +1,1384 @@
+﻿2026-10-23T15:20:48.5534928Z Current runner version: '2.338.0'
+2026-10-23T15:20:48.6066476Z ##[group]Runner Image Provisioner
+2026-10-23T15:20:48.6067504Z Hosted Compute Agent
+2026-10-23T15:20:48.6068204Z Version: 20261021.618
+2026-10-23T15:20:48.6068844Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-10-23T15:20:48.6069588Z Build Date: 2026-10-21T00:45:21Z
+2026-10-23T15:20:48.6070262Z Worker ID: {0480c3f9-c082-497e-a7da-6ac64a9f06be}
+2026-10-23T15:20:48.6070967Z Region: eastus
+2026-10-23T15:20:48.6071454Z Cloud: Azure
+2026-10-23T15:20:48.6071929Z ##[endgroup]
+2026-10-23T15:20:48.6073376Z ##[group]Operating System
+2026-10-23T15:20:48.6074056Z Microsoft Windows Server 2025
+2026-10-23T15:20:48.6074646Z 10.0.26100
+2026-10-23T15:20:48.6075127Z Datacenter
+2026-10-23T15:20:48.6076018Z ##[endgroup]
+2026-10-23T15:20:48.6076656Z ##[group]Runner Image
+2026-10-23T15:20:48.6077295Z Image: windows-2025-vs2026
+2026-10-23T15:20:48.6077844Z Version: 20261021.278.1
+2026-10-23T15:20:48.6079501Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20261021.278/images/windows/Windows2025-VS2026-Readme.md
+2026-10-23T15:20:48.6081196Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20261021.278
+2026-10-23T15:20:48.6082147Z ##[endgroup]
+2026-10-23T15:20:48.6083220Z ##[group]GITHUB_TOKEN Permissions
+2026-10-23T15:20:48.6085239Z Contents: read
+2026-10-23T15:20:48.6085818Z Metadata: read
+2026-10-23T15:20:48.6086328Z ##[endgroup]
+2026-10-23T15:20:48.6088554Z Secret source: Actions
+2026-10-23T15:20:48.6089478Z Cache mode: write
+2026-10-23T15:20:48.6090165Z Prepare workflow directory
+2026-10-23T15:20:48.7488823Z Prepare all required actions
+2026-10-23T15:20:48.7541836Z Getting action download info
+2026-10-23T15:20:48.9270878Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-10-23T15:20:49.1515207Z Download action repository 'dtolnay/rust-toolchain@stable' (SHA:b725eda525362e7cf34af9a7243cac1e3f01a7ec)
+2026-10-23T15:20:49.8847480Z Complete job name: rig (windows-latest)
+2026-10-23T15:20:51.1413475Z ##[group]Run actions/checkout@v4
+2026-10-23T15:20:51.1415230Z with:
+2026-10-23T15:20:51.1416017Z   repository: wolffe-lang/wolf-std
+2026-10-23T15:20:51.1424556Z   token: ***
+2026-10-23T15:20:51.1425306Z   ssh-strict: true
+2026-10-23T15:20:51.1426079Z   ssh-user: git
+2026-10-23T15:20:51.1426851Z   persist-credentials: true
+2026-10-23T15:20:51.1428172Z   clean: true
+2026-10-23T15:20:51.1428969Z   sparse-checkout-cone-mode: true
+2026-10-23T15:20:51.1429923Z   fetch-depth: 1
+2026-10-23T15:20:51.1430690Z   fetch-tags: false
+2026-10-23T15:20:51.1431472Z   show-progress: true
+2026-10-23T15:20:51.1432276Z   lfs: false
+2026-10-23T15:20:51.1432992Z   submodules: false
+2026-10-23T15:20:51.1433815Z   set-safe-directory: true
+2026-10-23T15:20:51.1434750Z   allow-unsafe-pr-checkout: false
+2026-10-23T15:20:51.1435984Z ##[endgroup]
+2026-10-23T15:20:51.3803982Z Syncing repository: wolffe-lang/wolf-std
+2026-10-23T15:20:51.3806716Z ##[group]Getting Git version info
+2026-10-23T15:20:51.3807909Z Working directory is 'D:\a\wolf-std\wolf-std'
+2026-10-23T15:20:51.4988265Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-23T15:20:51.8634831Z git version 2.56.0.windows.2
+2026-10-23T15:20:51.8724166Z ##[endgroup]
+2026-10-23T15:20:51.8779208Z Temporarily overriding HOME='D:\a\_temp\2f1e4750-ce73-447e-b5c2-6c0f78c5c6ca' before making global git config changes
+2026-10-23T15:20:51.8782440Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-23T15:20:51.8785062Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\wolf-std\wolf-std
+2026-10-23T15:20:51.9512426Z Deleting the contents of 'D:\a\wolf-std\wolf-std'
+2026-10-23T15:20:51.9519309Z ##[group]Initializing the repository
+2026-10-23T15:20:51.9528680Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\wolf-std\wolf-std
+2026-10-23T15:20:52.0954810Z Initialized empty Git repository in D:/a/wolf-std/wolf-std/.git/
+2026-10-23T15:20:52.1053632Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/wolffe-lang/wolf-std
+2026-10-23T15:20:52.1692299Z ##[endgroup]
+2026-10-23T15:20:52.1692923Z ##[group]Disabling automatic garbage collection
+2026-10-23T15:20:52.1702617Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-10-23T15:20:52.2113904Z ##[endgroup]
+2026-10-23T15:20:52.2114494Z ##[group]Setting up auth
+2026-10-23T15:20:52.2127020Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-23T15:20:52.2545217Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-23T15:20:53.9789877Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-23T15:20:54.0218846Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-23T15:20:54.6683568Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-23T15:20:54.7126033Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-23T15:20:55.3941822Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-10-23T15:20:55.4374541Z ##[endgroup]
+2026-10-23T15:20:55.4375742Z ##[group]Fetching the repository
+2026-10-23T15:20:55.4395269Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c1046d94fa9bb46f1bfbd5ef7288a8cfd82a1dd3:refs/remotes/origin/sc72
+2026-10-23T15:20:57.1000459Z From https://github.com/wolffe-lang/wolf-std
+2026-10-23T15:20:57.1001527Z  * [new ref]         c1046d94fa9bb46f1bfbd5ef7288a8cfd82a1dd3 -> origin/sc72
+2026-10-23T15:20:57.1045941Z ##[endgroup]
+2026-10-23T15:20:57.1047825Z ##[group]Determining the checkout info
+2026-10-23T15:20:57.1049040Z ##[endgroup]
+2026-10-23T15:20:57.1066002Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-10-23T15:20:57.1614946Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-10-23T15:20:57.2025550Z ##[group]Checking out the ref
+2026-10-23T15:20:57.2036117Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B sc72 refs/remotes/origin/sc72
+2026-10-23T15:20:57.6002164Z Switched to a new branch 'sc72'
+2026-10-23T15:20:57.6029674Z branch 'sc72' set up to track 'origin/sc72'.
+2026-10-23T15:20:57.6101677Z ##[endgroup]
+2026-10-23T15:20:57.6608982Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-10-23T15:20:57.6988318Z c1046d94fa9bb46f1bfbd5ef7288a8cfd82a1dd3
+2026-10-23T15:20:57.7636196Z ##[group]Run dtolnay/rust-toolchain@stable
+2026-10-23T15:20:57.7636599Z with:
+2026-10-23T15:20:57.7636781Z   toolchain: 1.97.1
+2026-10-23T15:20:57.7636988Z   components: rustfmt, clippy
+2026-10-23T15:20:57.7637230Z ##[endgroup]
+2026-10-23T15:20:57.7789123Z ##[start-action display=Parse toolchain version;id=__dtolnay_rust-toolchain.parse]
+2026-10-23T15:20:57.7994400Z ##[group]Run if [[ -z $toolchain ]]; then
+2026-10-23T15:20:57.7994889Z [36;1mif [[ -z $toolchain ]]; then[0m
+2026-10-23T15:20:57.7995481Z [36;1m  # GitHub does not enforce `required: true` inputs itself. https://github.com/actions/runner/issues/1070[0m
+2026-10-23T15:20:57.7996046Z [36;1m  echo "'toolchain' is a required input" >&2[0m
+2026-10-23T15:20:57.7996334Z [36;1m  exit 1[0m
+2026-10-23T15:20:57.7996676Z [36;1melif [[ $toolchain =~ ^stable' '[0-9]+' '(year|month|week|day)s?' 'ago$ ]]; then[0m
+2026-10-23T15:20:57.7998050Z [36;1m  if [[ Windows == macOS ]]; then[0m
+2026-10-23T15:20:57.7998649Z [36;1m    echo "toolchain=1.$((($(date -v-$(sed 's/stable \([0-9]*\) \(.\).*/\1\2/' <<< $toolchain) +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT[0m
+2026-10-23T15:20:57.7999192Z [36;1m  else[0m
+2026-10-23T15:20:57.7999589Z [36;1m    echo "toolchain=1.$((($(date --date "${toolchain#stable }" +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT[0m
+2026-10-23T15:20:57.8000036Z [36;1m  fi[0m
+2026-10-23T15:20:57.8000313Z [36;1melif [[ $toolchain =~ ^stable' 'minus' '[0-9]+' 'releases?$ ]]; then[0m
+2026-10-23T15:20:57.8000837Z [36;1m  echo "toolchain=1.$((($(date +%s)/60/60/24-16569)/7/6-${toolchain//[^0-9]/}))" >> $GITHUB_OUTPUT[0m
+2026-10-23T15:20:57.8001289Z [36;1melif [[ $toolchain =~ ^1\.[0-9]+$ ]]; then[0m
+2026-10-23T15:20:57.8001791Z [36;1m  echo "toolchain=1.$((i=${toolchain#1.}, c=($(date +%s)/60/60/24-16569)/7/6, i+9*i*(10*i<=c)+90*i*(100*i<=c)))" >> $GITHUB_OUTPUT[0m
+2026-10-23T15:20:57.8002289Z [36;1melse[0m
+2026-10-23T15:20:57.8002473Z [36;1m  delimiter=EOF[0m
+2026-10-23T15:20:57.8002764Z [36;1m  while [[ $toolchain == *$delimiter* ]]; do delimiter+=_; done[0m
+2026-10-23T15:20:57.8003261Z [36;1m  printf 'toolchain<<%s\n%s\n%s\n' "$delimiter" "$toolchain" "$delimiter" >> $GITHUB_OUTPUT[0m
+2026-10-23T15:20:57.8003670Z [36;1mfi[0m
+2026-10-23T15:20:57.8028297Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:20:57.8028719Z env:
+2026-10-23T15:20:57.8028964Z   toolchain: 1.97.1
+2026-10-23T15:20:57.8029180Z ##[endgroup]
+2026-10-23T15:20:57.9846881Z ##[end-action id=__dtolnay_rust-toolchain.parse;outcome=success;conclusion=success;duration_ms=205]
+2026-10-23T15:20:57.9853071Z ##[start-action display=Set $CARGO_HOME;id=__dtolnay_rust-toolchain.__run]
+2026-10-23T15:20:58.0027152Z ##[group]Run echo CARGO_HOME=${CARGO_HOME:-"$USERPROFILE\.cargo"} >> $GITHUB_ENV
+2026-10-23T15:20:58.0027739Z [36;1mecho CARGO_HOME=${CARGO_HOME:-"$USERPROFILE\.cargo"} >> $GITHUB_ENV[0m
+2026-10-23T15:20:58.0046216Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:20:58.0046634Z ##[endgroup]
+2026-10-23T15:20:58.0500954Z ##[end-action id=__dtolnay_rust-toolchain.__run;outcome=success;conclusion=success;duration_ms=64]
+2026-10-23T15:20:58.0503996Z ##[start-action display=Install rustup if needed;id=__dtolnay_rust-toolchain.__run_2]
+2026-10-23T15:20:58.0517665Z ##[end-action id=__dtolnay_rust-toolchain.__run_2;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-10-23T15:20:58.0520495Z ##[start-action display=Install rustup if needed on windows;id=__dtolnay_rust-toolchain.__run_3]
+2026-10-23T15:20:58.0696416Z ##[group]Run if ! command -v rustup &>/dev/null; then
+2026-10-23T15:20:58.0696874Z [36;1mif ! command -v rustup &>/dev/null; then[0m
+2026-10-23T15:20:58.0697796Z [36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://win.rustup.rs/x86_64 --output 'D:\a\_temp\rustup-init.exe'[0m
+2026-10-23T15:20:58.0700982Z [36;1m  'D:\a\_temp\rustup-init.exe' --default-toolchain none --no-modify-path -y[0m
+2026-10-23T15:20:58.0701580Z [36;1m  echo "$CARGO_HOME\bin" >> $GITHUB_PATH[0m
+2026-10-23T15:20:58.0701904Z [36;1mfi[0m
+2026-10-23T15:20:58.0721299Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:20:58.0721729Z env:
+2026-10-23T15:20:58.0721940Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:20:58.0722206Z ##[endgroup]
+2026-10-23T15:20:58.1407439Z ##[end-action id=__dtolnay_rust-toolchain.__run_3;outcome=success;conclusion=success;duration_ms=88]
+2026-10-23T15:20:58.1425774Z ##[start-action display=rustup toolchain install 1.97.1;id=__dtolnay_rust-toolchain.__run_4]
+2026-10-23T15:20:58.1573052Z ##[group]Run set -f  # split targets and components on commas and whitespace, without glob expansion
+2026-10-23T15:20:58.1574104Z [36;1mset -f  # split targets and components on commas and whitespace, without glob expansion[0m
+2026-10-23T15:20:58.1574729Z [36;1mflags=()[0m
+2026-10-23T15:20:58.1575009Z [36;1mfor t in ${targets//,/ }; do flags+=(--target "$t"); done[0m
+2026-10-23T15:20:58.1575408Z [36;1mfor c in ${components//,/ }; do flags+=(--component "$c"); done[0m
+2026-10-23T15:20:58.1575896Z [36;1mif [[ $toolchain == nightly && -n $components ]]; then flags+=(--allow-downgrade); fi[0m
+2026-10-23T15:20:58.1576298Z [36;1mlog=$(mktemp)[0m
+2026-10-23T15:20:58.1576514Z [36;1mtrap 'rm -f "$log"' EXIT[0m
+2026-10-23T15:20:58.1576759Z [36;1mfor attempt in 1 2 3 4 5; do[0m
+2026-10-23T15:20:58.1577315Z [36;1m  if rustup toolchain install "$toolchain" "${flags[@]}" --profile minimal --no-self-update --force-non-host 2>&1 | tee "$log"; then[0m
+2026-10-23T15:20:58.1577865Z [36;1m    break[0m
+2026-10-23T15:20:58.1578041Z [36;1m  else[0m
+2026-10-23T15:20:58.1578209Z [36;1m    status=$?[0m
+2026-10-23T15:20:58.1578402Z [36;1m  fi[0m
+2026-10-23T15:20:58.1578664Z [36;1m  if [[ $attempt == 5 ]] || ! grep -Fq 'checksum failed for ' "$log" \[0m
+2026-10-23T15:20:58.1579219Z [36;1m      || ! grep -Fq 'this is likely due to an ongoing update of the official release server' "$log"; then[0m
+2026-10-23T15:20:58.1579671Z [36;1m    exit "$status"[0m
+2026-10-23T15:20:58.1579873Z [36;1m  fi[0m
+2026-10-23T15:20:58.1580201Z [36;1m  echo "Retrying rustup toolchain install in 30 seconds (retry $attempt of 4)" >&2[0m
+2026-10-23T15:20:58.1580603Z [36;1m  sleep 30[0m
+2026-10-23T15:20:58.1580780Z [36;1mdone[0m
+2026-10-23T15:20:58.1598166Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:20:58.1598563Z env:
+2026-10-23T15:20:58.1599046Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:20:58.1599297Z   toolchain: 1.97.1
+2026-10-23T15:20:58.1599476Z   targets: 
+2026-10-23T15:20:58.1599660Z   components: rustfmt, clippy
+2026-10-23T15:20:58.1599888Z   RUSTUP_PERMIT_COPY_RENAME: 1
+2026-10-23T15:20:58.1600102Z ##[endgroup]
+2026-10-23T15:20:58.9376456Z info: syncing channel updates for 1.97.1-x86_64-pc-windows-msvc
+2026-10-23T15:20:59.4453680Z info: latest update on 2026-07-16 for version 1.97.1 (8bab26f4f 2026-07-14)
+2026-10-23T15:20:59.4454271Z info: downloading 5 components
+2026-10-23T15:21:09.2929474Z 
+2026-10-23T15:21:09.3411129Z   1.97.1-x86_64-pc-windows-msvc installed - rustc 1.97.1 (8bab26f4f 2026-07-14)
+2026-10-23T15:21:09.3411931Z 
+2026-10-23T15:21:09.4174922Z ##[end-action id=__dtolnay_rust-toolchain.__run_4;outcome=success;conclusion=success;duration_ms=11274]
+2026-10-23T15:21:09.4184693Z ##[start-action display=rustup default 1.97.1;id=__dtolnay_rust-toolchain.__run_5]
+2026-10-23T15:21:09.4361571Z ##[group]Run rustup default "$toolchain" --force-non-host
+2026-10-23T15:21:09.4361953Z [36;1mrustup default "$toolchain" --force-non-host[0m
+2026-10-23T15:21:09.4379834Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:21:09.4380219Z env:
+2026-10-23T15:21:09.4380413Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:09.4380685Z   toolchain: 1.97.1
+2026-10-23T15:21:09.4381695Z ##[endgroup]
+2026-10-23T15:21:09.5149188Z info: using existing install for 1.97.1-x86_64-pc-windows-msvc
+2026-10-23T15:21:09.5517539Z info: default toolchain set to 1.97.1-x86_64-pc-windows-msvc
+2026-10-23T15:21:09.5518052Z 
+2026-10-23T15:21:09.5746897Z   1.97.1-x86_64-pc-windows-msvc unchanged - rustc 1.97.1 (8bab26f4f 2026-07-14)
+2026-10-23T15:21:09.5747313Z 
+2026-10-23T15:21:09.5752313Z info: note that the toolchain '1.97.1-x86_64-pc-windows-msvc' is currently in use (overridden by 'D:\a\wolf-std\wolf-std\rust-toolchain.toml')
+2026-10-23T15:21:09.5844720Z ##[end-action id=__dtolnay_rust-toolchain.__run_5;outcome=success;conclusion=success;duration_ms=165]
+2026-10-23T15:21:09.5849468Z ##[start-action display=Create cachekey;id=__dtolnay_rust-toolchain.rustc-version]
+2026-10-23T15:21:09.6001031Z ##[group]Run DATE=$(rustc +"$toolchain" --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')
+2026-10-23T15:21:09.6002065Z [36;1mDATE=$(rustc +"$toolchain" --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')[0m
+2026-10-23T15:21:09.6002722Z [36;1mHASH=$(rustc +"$toolchain" --version --verbose | sed -ne 's/^commit-hash: //p')[0m
+2026-10-23T15:21:09.6003213Z [36;1mecho "cachekey=$(echo $DATE$HASH | head -c12)" >> $GITHUB_OUTPUT[0m
+2026-10-23T15:21:09.6019901Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:21:09.6020299Z env:
+2026-10-23T15:21:09.6020493Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:09.6020743Z   toolchain: 1.97.1
+2026-10-23T15:21:09.6020926Z ##[endgroup]
+2026-10-23T15:21:10.3776181Z ##[end-action id=__dtolnay_rust-toolchain.rustc-version;outcome=success;conclusion=success;duration_ms=792]
+2026-10-23T15:21:10.3779102Z ##[start-action display=Disable incremental compilation;id=__dtolnay_rust-toolchain.__run_6]
+2026-10-23T15:21:10.3938586Z ##[group]Run if [ -z "${CARGO_INCREMENTAL+set}" ]; then
+2026-10-23T15:21:10.3938978Z [36;1mif [ -z "${CARGO_INCREMENTAL+set}" ]; then[0m
+2026-10-23T15:21:10.3939290Z [36;1m  echo CARGO_INCREMENTAL=0 >> $GITHUB_ENV[0m
+2026-10-23T15:21:10.3939555Z [36;1mfi[0m
+2026-10-23T15:21:10.3955858Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:21:10.3956242Z env:
+2026-10-23T15:21:10.3956436Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:10.3956687Z ##[endgroup]
+2026-10-23T15:21:10.4398750Z ##[end-action id=__dtolnay_rust-toolchain.__run_6;outcome=success;conclusion=success;duration_ms=61]
+2026-10-23T15:21:10.4401638Z ##[start-action display=Enable colors in Cargo output;id=__dtolnay_rust-toolchain.__run_7]
+2026-10-23T15:21:10.4548942Z ##[group]Run if [ -z "${CARGO_TERM_COLOR+set}" ]; then
+2026-10-23T15:21:10.4549313Z [36;1mif [ -z "${CARGO_TERM_COLOR+set}" ]; then[0m
+2026-10-23T15:21:10.4549636Z [36;1m  echo CARGO_TERM_COLOR=always >> $GITHUB_ENV[0m
+2026-10-23T15:21:10.4549928Z [36;1mfi[0m
+2026-10-23T15:21:10.4566079Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:21:10.4566474Z env:
+2026-10-23T15:21:10.4566671Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:10.4566927Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:10.4567134Z ##[endgroup]
+2026-10-23T15:21:10.5035168Z ##[end-action id=__dtolnay_rust-toolchain.__run_7;outcome=success;conclusion=success;duration_ms=63]
+2026-10-23T15:21:10.5041697Z ##[start-action display=Enable Cargo sparse registry;id=__dtolnay_rust-toolchain.__run_8]
+2026-10-23T15:21:10.5234845Z ##[group]Run # implemented in 1.66, stabilized in 1.68, made default in 1.70
+2026-10-23T15:21:10.5235356Z [36;1m# implemented in 1.66, stabilized in 1.68, made default in 1.70[0m
+2026-10-23T15:21:10.5235987Z [36;1mif [ -z "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL+set}" -o -f "D:\a\_temp"/.implicit_cargo_registries_crates_io_protocol ]; then[0m
+2026-10-23T15:21:10.5236851Z [36;1m  if rustc +"$toolchain" --version --verbose | grep -q '^release: 1\.6[89]\.'; then[0m
+2026-10-23T15:21:10.5237373Z [36;1m    touch "D:\a\_temp"/.implicit_cargo_registries_crates_io_protocol || true[0m
+2026-10-23T15:21:10.5237967Z [36;1m    echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse >> $GITHUB_ENV[0m
+2026-10-23T15:21:10.5238811Z [36;1m  elif rustc +"$toolchain" --version --verbose | grep -q '^release: 1\.6[67]\.'; then[0m
+2026-10-23T15:21:10.5239583Z [36;1m    touch "D:\a\_temp"/.implicit_cargo_registries_crates_io_protocol || true[0m
+2026-10-23T15:21:10.5240071Z [36;1m    echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git >> $GITHUB_ENV[0m
+2026-10-23T15:21:10.5240398Z [36;1m  fi[0m
+2026-10-23T15:21:10.5240609Z [36;1mfi[0m
+2026-10-23T15:21:10.5256551Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:21:10.5256932Z env:
+2026-10-23T15:21:10.5257121Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:10.5258238Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:10.5258440Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:10.5258984Z   toolchain: 1.97.1
+2026-10-23T15:21:10.5259222Z ##[endgroup]
+2026-10-23T15:21:10.7428663Z ##[end-action id=__dtolnay_rust-toolchain.__run_8;outcome=success;conclusion=success;duration_ms=238]
+2026-10-23T15:21:10.7433769Z ##[start-action display=Work around spurious network errors in curl 8.0;id=__dtolnay_rust-toolchain.__run_9]
+2026-10-23T15:21:10.7593093Z ##[group]Run # https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation
+2026-10-23T15:21:10.7593856Z [36;1m# https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation[0m
+2026-10-23T15:21:10.7594488Z [36;1mif rustc +"$toolchain" --version --verbose | grep -q '^release: 1\.7[01]\.'; then[0m
+2026-10-23T15:21:10.7594952Z [36;1m  echo CARGO_HTTP_MULTIPLEXING=false >> $GITHUB_ENV[0m
+2026-10-23T15:21:10.7595242Z [36;1mfi[0m
+2026-10-23T15:21:10.7619521Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:21:10.7619980Z env:
+2026-10-23T15:21:10.7620181Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:10.7620506Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:10.7620891Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:10.7621725Z   toolchain: 1.97.1
+2026-10-23T15:21:10.7622058Z ##[endgroup]
+2026-10-23T15:21:10.8876216Z ##[end-action id=__dtolnay_rust-toolchain.__run_9;outcome=success;conclusion=success;duration_ms=144]
+2026-10-23T15:21:10.8880925Z ##[start-action display=rustc +1.97.1 --version --verbose;id=__dtolnay_rust-toolchain.__run_10]
+2026-10-23T15:21:10.9036055Z ##[group]Run rustc +"$toolchain" --version --verbose
+2026-10-23T15:21:10.9036419Z [36;1mrustc +"$toolchain" --version --verbose[0m
+2026-10-23T15:21:10.9052657Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:21:10.9053055Z env:
+2026-10-23T15:21:10.9053247Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:10.9053520Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:10.9053741Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:10.9053948Z   toolchain: 1.97.1
+2026-10-23T15:21:10.9054131Z ##[endgroup]
+2026-10-23T15:21:11.0021069Z rustc 1.97.1 (8bab26f4f 2026-07-14)
+2026-10-23T15:21:11.0021747Z binary: rustc
+2026-10-23T15:21:11.0022239Z commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+2026-10-23T15:21:11.0022684Z commit-date: 2026-07-14
+2026-10-23T15:21:11.0022998Z host: x86_64-pc-windows-msvc
+2026-10-23T15:21:11.0023315Z release: 1.97.1
+2026-10-23T15:21:11.0025374Z LLVM version: 22.1.6
+2026-10-23T15:21:11.0175795Z ##[end-action id=__dtolnay_rust-toolchain.__run_10;outcome=success;conclusion=success;duration_ms=129]
+2026-10-23T15:21:11.0367604Z ##[group]Run cargo fmt --all --check
+2026-10-23T15:21:11.0368006Z [36;1mcargo fmt --all --check[0m
+2026-10-23T15:21:11.1063786Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-23T15:21:11.1064313Z env:
+2026-10-23T15:21:11.1064574Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:11.1064908Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:11.1065158Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:11.1065416Z ##[endgroup]
+2026-10-23T15:21:15.5752834Z ##[group]Run cargo clippy --workspace --all-targets -- -D warnings
+2026-10-23T15:21:15.5753378Z [36;1mcargo clippy --workspace --all-targets -- -D warnings[0m
+2026-10-23T15:21:15.5827144Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-23T15:21:15.5827516Z env:
+2026-10-23T15:21:15.5827717Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:15.5827986Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:15.5828193Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:15.5828404Z ##[endgroup]
+2026-10-23T15:21:19.0016337Z [1m[92m    Updating[0m crates.io index
+2026-10-23T15:21:19.2656488Z [1m[92m Downloading[0m crates ...
+2026-10-23T15:21:19.4809427Z [1m[92m  Downloaded[0m version_check v0.9.5
+2026-10-23T15:21:19.5030162Z [1m[92m  Downloaded[0m memchr v2.8.3
+2026-10-23T15:21:19.5723900Z [1m[92m  Downloaded[0m crypto-common v0.1.7
+2026-10-23T15:21:19.5899202Z [1m[92m  Downloaded[0m cpufeatures v0.2.17
+2026-10-23T15:21:19.6084792Z [1m[92m  Downloaded[0m generic-array v0.14.7
+2026-10-23T15:21:19.6285318Z [1m[92m  Downloaded[0m block-buffer v0.10.4
+2026-10-23T15:21:19.6416656Z [1m[92m  Downloaded[0m serde_json v1.0.151
+2026-10-23T15:21:19.7317350Z [1m[92m  Downloaded[0m cfg-if v1.0.4
+2026-10-23T15:21:19.7478633Z [1m[92m  Downloaded[0m itoa v1.0.18
+2026-10-23T15:21:19.7622590Z [1m[92m  Downloaded[0m sha2 v0.10.9
+2026-10-23T15:21:19.8003457Z [1m[92m  Downloaded[0m zmij v1.0.23
+2026-10-23T15:21:19.8186928Z [1m[92m  Downloaded[0m typenum v1.20.1
+2026-10-23T15:21:19.8520411Z [1m[92m  Downloaded[0m digest v0.10.7
+2026-10-23T15:21:19.8770396Z [1m[92m  Downloaded[0m serde_core v1.0.229
+2026-10-23T15:21:19.9997324Z [1m[92m   Compiling[0m version_check v0.9.5
+2026-10-23T15:21:19.9998586Z [1m[92m    Checking[0m typenum v1.20.1
+2026-10-23T15:21:19.9999299Z [1m[92m   Compiling[0m zmij v1.0.23
+2026-10-23T15:21:20.0000732Z [1m[92m   Compiling[0m serde_core v1.0.229
+2026-10-23T15:21:20.3913581Z [1m[92m   Compiling[0m generic-array v0.14.7
+2026-10-23T15:21:20.9458589Z [1m[92m   Compiling[0m serde_json v1.0.151
+2026-10-23T15:21:22.1365014Z [1m[92m    Checking[0m itoa v1.0.18
+2026-10-23T15:21:22.3833771Z [1m[92m    Checking[0m cfg-if v1.0.4
+2026-10-23T15:21:22.4388271Z [1m[92m    Checking[0m cpufeatures v0.2.17
+2026-10-23T15:21:22.4984064Z [1m[92m    Checking[0m memchr v2.8.3
+2026-10-23T15:21:23.0955395Z [1m[92m    Checking[0m block-buffer v0.10.4
+2026-10-23T15:21:23.0957026Z [1m[92m    Checking[0m crypto-common v0.1.7
+2026-10-23T15:21:23.2306558Z [1m[92m    Checking[0m digest v0.10.7
+2026-10-23T15:21:23.4108605Z [1m[92m    Checking[0m sha2 v0.10.9
+2026-10-23T15:21:25.4135862Z [1m[92m    Checking[0m xtask v0.1.0 (D:\a\wolf-std\wolf-std\xtask)
+2026-10-23T15:21:26.9796827Z [1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 8.04s
+2026-10-23T15:21:27.2374949Z ##[group]Run cargo test --workspace
+2026-10-23T15:21:27.2375595Z [36;1mcargo test --workspace[0m
+2026-10-23T15:21:27.2450545Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-23T15:21:27.2450919Z env:
+2026-10-23T15:21:27.2451132Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:27.2451409Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:27.2451619Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:27.2451917Z ##[endgroup]
+2026-10-23T15:21:27.8555358Z [1m[92m   Compiling[0m typenum v1.20.1
+2026-10-23T15:21:27.8563616Z [1m[92m   Compiling[0m serde_core v1.0.229
+2026-10-23T15:21:27.8564921Z [1m[92m   Compiling[0m zmij v1.0.23
+2026-10-23T15:21:27.8567451Z [1m[92m   Compiling[0m memchr v2.8.3
+2026-10-23T15:21:28.4576222Z [1m[92m   Compiling[0m cfg-if v1.0.4
+2026-10-23T15:21:28.7072670Z [1m[92m   Compiling[0m cpufeatures v0.2.17
+2026-10-23T15:21:29.1434181Z [1m[92m   Compiling[0m itoa v1.0.18
+2026-10-23T15:21:29.6480347Z [1m[92m   Compiling[0m generic-array v0.14.7
+2026-10-23T15:21:30.3237631Z [1m[92m   Compiling[0m block-buffer v0.10.4
+2026-10-23T15:21:30.3238536Z [1m[92m   Compiling[0m crypto-common v0.1.7
+2026-10-23T15:21:30.4313962Z [1m[92m   Compiling[0m digest v0.10.7
+2026-10-23T15:21:30.6209313Z [1m[92m   Compiling[0m sha2 v0.10.9
+2026-10-23T15:21:31.5393802Z [1m[92m   Compiling[0m serde_json v1.0.151
+2026-10-23T15:21:32.9158204Z [1m[92m   Compiling[0m xtask v0.1.0 (D:\a\wolf-std\wolf-std\xtask)
+2026-10-23T15:21:35.7552658Z [1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 8.03s
+2026-10-23T15:21:35.7576022Z [1m[92m     Running[0m unittests src\main.rs (target\debug\deps\xtask-2f1da66ba1417034.exe)
+2026-10-23T15:21:35.7730120Z 
+2026-10-23T15:21:35.7731350Z running 91 tests
+2026-10-23T15:21:35.7751075Z test anchors::tests::no_namespace_is_registered_and_reserved_at_once ... ok
+2026-10-23T15:21:35.7758291Z test anchors::tests::classifies_tags ... ok
+2026-10-23T15:21:35.7765232Z test anchors::tests::rejects_malformed_registry ... ok
+2026-10-23T15:21:35.7766510Z test anchors::tests::test_namespace_is_reserved ... ok
+2026-10-23T15:21:35.7773650Z test anchors::tests::every_published_anchor_sits_in_a_registered_namespace ... ok
+2026-10-23T15:21:35.7779733Z test anchors::tests::the_pinned_clause_registers_exactly_what_this_file_registers ... ok
+2026-10-23T15:21:35.7781254Z test anchors::tests::every_registered_namespace_publishes_at_least_one_anchor ... ok
+2026-10-23T15:21:35.7783178Z test anchors::tests::the_clause_parse_finds_the_lists_rather_than_finding_nothing ... ok
+2026-10-23T15:21:35.7784601Z test anchors::tests::the_pinned_clause_reserves_exactly_what_this_file_reserves ... ok
+2026-10-23T15:21:35.7787525Z test bins::tests::a_pairing_line_is_not_this_tools_pin ... ok
+2026-10-23T15:21:35.7788218Z test bins::tests::parses_both_version_shapes ... ok
+2026-10-23T15:21:35.7788804Z test bins::tests::sha_shape ... ok
+2026-10-23T15:21:35.7790924Z test bins::tests::the_v020_line_names_its_own_pin ... ok
+2026-10-23T15:21:35.7794003Z test directive::tests::escapes_in_stdout ... ok
+2026-10-23T15:21:35.7794873Z test directive::tests::parses_entry_block ... ok
+2026-10-23T15:21:35.7795534Z test directive::tests::parses_trap_and_fail_forms ... ok
+2026-10-23T15:21:35.7796352Z test directive::tests::rejects_bad_blocks ... ok
+2026-10-23T15:21:35.7800726Z test doc_examples::classifier_tests::a_relation_inside_a_string_literal_does_not_make_an_assertion ... ok
+2026-10-23T15:21:35.7802692Z test doc_examples::classifier_tests::masking_keeps_structure_and_honours_escapes ... ok
+2026-10-23T15:21:35.7804626Z test doc_examples::tests::a_mirror_lag_entry_names_a_module_a_refusal_and_an_issue ... ok
+2026-10-23T15:21:35.7807511Z test doc_examples::tests::a_propagating_statement_is_a_statement ... ok
+2026-10-23T15:21:35.7808525Z test doc_examples::tests::a_tier_waiver_names_one_call_and_not_a_module ... ok
+2026-10-23T15:21:35.7815004Z test doc_examples::tests::capability_modules_are_the_unequal_lane_facades ... ok
+2026-10-23T15:21:35.7816031Z test doc_examples::tests::mirror_lag_holds_only_that_refusal_in_both_directions ... ok
+2026-10-23T15:21:35.7816789Z test doc_examples::tests::scans_and_renders ... ok
+2026-10-23T15:21:35.7817371Z test doc_examples::tests::unclosed_fence_is_an_error ... ok
+2026-10-23T15:21:35.7817983Z test fmt_lu::tests::a_check_line_parses_to_the_path ... ok
+2026-10-23T15:21:35.7818673Z test doc_examples::tests::statements_pass_through_and_assertions_wrap ... ok
+2026-10-23T15:21:35.7853175Z test genvec::tests::a_dark_formatter_checks_presence_and_not_bytes ... ok
+2026-10-23T15:21:35.7996569Z test genvec::tests::aead_refuses_undecided_flavours ... ok
+2026-10-23T15:21:35.8005780Z test genvec::tests::aead_sorts_valid_modified_tag_and_nonce_omission ... ok
+2026-10-23T15:21:35.8011100Z test genvec::tests::eddsa_partitions_valid_invalid_and_refuses_acceptable ... ok
+2026-10-23T15:21:35.8015636Z test genvec::tests::monte_needs_all_hundred_checkpoints ... ok
+2026-10-23T15:21:35.8019959Z test genvec::tests::rsp_len_is_authoritative_over_msg ... ok
+2026-10-23T15:21:35.8024054Z test genvec::tests::rsp_rejects_bit_oriented_sets ... ok
+2026-10-23T15:21:35.8029710Z test genvec::tests::wycheproof_takes_valid_and_names_its_omission ... ok
+2026-10-23T15:21:35.8034823Z test genvec::tests::xdh_partitions_on_zero_shared_and_cross_checks_the_flag ... ok
+2026-10-23T15:21:35.8040351Z test genvec::tests::xdh_refuses_flag_value_disagreement_and_unknown_result ... ok
+2026-10-23T15:21:35.8046384Z test ledger::tests::divergent_is_lupin_only_and_exact ... ok
+2026-10-23T15:21:35.8053077Z test ledger::tests::host_scoped_cells_are_held_to_their_lanes_rules ... ok
+2026-10-23T15:21:35.8058168Z test ledger::tests::host_scoped_cells_replace_their_lane_on_windows_only ... ok
+2026-10-23T15:21:35.8062660Z test ledger::tests::lupin_still_refuses_the_word_that_is_not_its_own ... ok
+2026-10-23T15:21:35.8067809Z test ledger::tests::mirror_lag_is_lupin_only_and_carries_a_code ... ok
+2026-10-23T15:21:35.8072409Z test ledger::tests::parses_and_orders ... ok
+2026-10-23T15:21:35.8076733Z test ledger::tests::parses_unstable_rows ... ok
+2026-10-23T15:21:35.8082550Z test ledger::tests::rejects_dishonest_shapes ... ok
+2026-10-23T15:21:35.8087098Z test ledger::tests::slow_is_lupin_only_and_never_unstable ... ok
+2026-10-23T15:21:35.8093172Z test record::tests::parses_a_real_record ... ok
+2026-10-23T15:21:35.8101417Z test record::tests::rejects_malformed_records ... ok
+2026-10-23T15:21:35.8107684Z test record::tests::the_refusal_sentence_is_read_under_either_extension_key ... ok
+2026-10-23T15:21:35.8111865Z test record::tests::verdict_grammar ... ok
+2026-10-23T15:21:35.8118016Z test record::tests::warnings_are_optional_additive_and_typed ... ok
+2026-10-23T15:21:35.8122034Z test runner::tests::a_stdout_divergence_prints_both_lanes_bytes ... ok
+2026-10-23T15:21:35.8127695Z test runner::tests::a_stdout_mismatch_prints_the_bytes_or_says_why_it_cannot ... ok
+2026-10-23T15:21:35.8130819Z test runner::tests::classify_covers_the_matrix ... ok
+2026-10-23T15:21:35.8134124Z test runner::tests::diff_classes_rank ... ok
+2026-10-23T15:21:35.8137524Z test runner::tests::exit_text_is_for_exits_only ... ok
+2026-10-23T15:21:35.8140601Z test runner::tests::mirror_lag_matches_only_that_static_refusal ... ok
+2026-10-23T15:21:35.8144535Z test runner::tests::slowest_sorts_descending_and_states_the_ceiling_share ... ok
+2026-10-23T15:21:35.8171550Z test selftest::every_advisory_step_is_blessed_with_an_issue ... ok
+2026-10-23T15:21:35.8176227Z test selftest::every_ci_step_has_a_runner ... ok
+2026-10-23T15:21:35.8182321Z test fmt_lu::tests::the_walk_covers_both_roots ... ok
+2026-10-23T15:21:35.8193514Z test fmt_lu::tests::batching_covers_every_file_exactly_once ... ok
+2026-10-23T15:21:35.8242335Z test selftest::every_ci_step_runs_in_the_ci_workflow ... ok
+2026-10-23T15:21:35.8263328Z test exec::tests::ceiling_kills_a_hung_tool ... ok
+2026-10-23T15:21:35.8276430Z test selftest::net_accept_clause_agrees_with_os_net_accept ... ok
+2026-10-23T15:21:35.8324609Z test selftest::pins_are_well_formed ... ok
+2026-10-23T15:21:35.8349115Z test selftest::staging_round_trip_under_lupin ... ok
+2026-10-23T15:21:35.8537212Z test selftest::std_tree_files_are_members ... ok
+2026-10-23T15:21:35.8584501Z test selftest::the_inherit_pair_names_itself_from_both_ends ... ok
+2026-10-23T15:21:35.8607880Z test selftest::every_mirror_lag_entry_has_blocks_to_fence ... ok
+2026-10-23T15:21:35.8697660Z test selftest::staging_copies_nested_binary_fixtures_byte_exact ... ok
+2026-10-23T15:21:35.8703384Z test tomlite::tests::parses_ledger_shape ... ok
+2026-10-23T15:21:35.8707324Z test tomlite::tests::rejects_outside_subset ... ok
+2026-10-23T15:21:35.8709873Z test ulp::tests::literals_keep_their_point ... ok
+2026-10-23T15:21:35.8712803Z test ulp::tests::table_parses_and_rejects_junk ... ok
+2026-10-23T15:21:35.8715956Z test ulp::tests::ulp_distance_is_signed_and_symmetric ... ok
+2026-10-23T15:21:35.8719591Z test workflow::tests::a_job_level_marker_over_reports_rather_than_missing ... ok
+2026-10-23T15:21:35.8722338Z test workflow::tests::a_prefix_is_not_a_match ... ok
+2026-10-23T15:21:35.8725254Z test workflow::tests::a_step_only_the_runner_has_is_drift_too ... ok
+2026-10-23T15:21:35.8728577Z test workflow::tests::an_advisory_step_is_read_off_its_own_marker ... ok
+2026-10-23T15:21:35.8731525Z test workflow::tests::prose_about_the_marker_is_not_the_marker ... ok
+2026-10-23T15:21:35.8735370Z test workflow::tests::reads_both_run_shapes_and_ignores_prose ... ok
+2026-10-23T15:21:35.8738907Z test workflow::tests::step_names_are_unique_and_nonempty ... ok
+2026-10-23T15:21:35.8744425Z test workflow::tests::the_blessed_list_is_well_formed ... ok
+2026-10-23T15:21:35.8747999Z test stage::tests::same_last_segment_modules_coexist ... ok
+2026-10-23T15:21:35.8749787Z test workflow::tests::the_marker_does_not_leak_past_its_step ... ok
+2026-10-23T15:21:35.8754073Z test workflow::tests::the_marker_is_found_below_its_own_run ... ok
+2026-10-23T15:21:35.8756551Z test workflow::tests::the_pre_sc41_workflow_reports_the_four_of_f0113 ... ok
+2026-10-23T15:21:35.8816304Z test stage::tests::stages_entry_beside_tree ... ok
+2026-10-23T15:21:35.8975561Z test selftest::every_test_is_ledgered_and_entry_shaped ... ok
+2026-10-23T15:21:35.8976200Z 
+2026-10-23T15:21:35.8976744Z test result: ok. 91 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+2026-10-23T15:21:35.8977481Z 
+2026-10-23T15:21:36.0331273Z ##[group]Run cargo xtask sync-pin
+2026-10-23T15:21:36.0331634Z [36;1mcargo xtask sync-pin[0m
+2026-10-23T15:21:36.0409022Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-23T15:21:36.0409391Z env:
+2026-10-23T15:21:36.0409592Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:36.0409850Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:36.0410054Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:36.0410266Z ##[endgroup]
+2026-10-23T15:21:39.1524861Z sync-pin: PIN cf0c13d38479f444b69bb8356ad5709d07eff323
+2026-10-23T15:21:39.1545672Z sync-pin: anchors.json snapshot parses (registry v1)
+2026-10-23T15:21:39.1548941Z sync-pin: clause snapshot parses — 13 registered, 15 reserved namespaces
+2026-10-23T15:21:39.1550286Z notice: upstream/ submodule not initialized — snapshot-only checks (this is CI's normal state until the upstream repo is readable)
+2026-10-23T15:21:39.3076446Z ##[group]Run set -euo pipefail
+2026-10-23T15:21:39.3076872Z [36;1mset -euo pipefail[0m
+2026-10-23T15:21:39.3077196Z [36;1m# The two live `version =` keys of vendor/tools.toml, in file[0m
+2026-10-23T15:21:39.3077629Z [36;1m# order: [lupin] first, [wolf] second. Superseded values in that[0m
+2026-10-23T15:21:39.3078075Z [36;1m# file are commented out, so `^version` matches exactly two lines.[0m
+2026-10-23T15:21:39.3078546Z [36;1mlver=$(sed -n 's/^version = "\(.*\)"$/\1/p' vendor/tools.toml | head -1)[0m
+2026-10-23T15:21:39.3079018Z [36;1mwver=$(sed -n 's/^version = "\(.*\)"$/\1/p' vendor/tools.toml | tail -1)[0m
+2026-10-23T15:21:39.3079574Z [36;1mtest -n "$lver" && test -n "$wver" || { echo "::error::vendor/tools.toml names no version"; exit 1; }[0m
+2026-10-23T15:21:39.3080108Z [36;1m# The runner's triple, by name. An unknown host reds here rather[0m
+2026-10-23T15:21:39.3080537Z [36;1m# than guessing an asset that would 404 three lines later.[0m
+2026-10-23T15:21:39.3080917Z [36;1mcase "$RUNNER_OS-$RUNNER_ARCH" in[0m
+2026-10-23T15:21:39.3081278Z [36;1m  Linux-X64)     triple=x86_64-unknown-linux-gnu;  lz=tar.gz; exe= ;;[0m
+2026-10-23T15:21:39.3081755Z [36;1m  Linux-ARM64)   triple=aarch64-unknown-linux-gnu; lz=tar.gz; exe= ;;[0m
+2026-10-23T15:21:39.3082221Z [36;1m  macOS-ARM64)   triple=aarch64-apple-darwin;      lz=tar.gz; exe= ;;[0m
+2026-10-23T15:21:39.3082695Z [36;1m  Windows-X64)   triple=x86_64-pc-windows-msvc;    lz=zip;    exe=.exe ;;[0m
+2026-10-23T15:21:39.3083184Z [36;1m  *) echo "::error::no release triple for $RUNNER_OS-$RUNNER_ARCH"; exit 1 ;;[0m
+2026-10-23T15:21:39.3083556Z [36;1mesac[0m
+2026-10-23T15:21:39.3083810Z [36;1m# lupin's windows asset is a ZIP and wolf's is a tarball —[0m
+2026-10-23T15:21:39.3084224Z [36;1m# measured, not assumed, and the one asymmetry in the ten files.[0m
+2026-10-23T15:21:39.3084584Z [36;1mwa="wolf-$wver-$triple.tar.gz"[0m
+2026-10-23T15:21:39.3084845Z [36;1mla="lupin-$lver-$triple.$lz"[0m
+2026-10-23T15:21:39.3085076Z [36;1msha256() {[0m
+2026-10-23T15:21:39.3085399Z [36;1m  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1[0m
+2026-10-23T15:21:39.3085831Z [36;1m  else shasum -a 256 "$1" | cut -d' ' -f1; fi[0m
+2026-10-23T15:21:39.3086103Z [36;1m}[0m
+2026-10-23T15:21:39.3086393Z [36;1mfetch() {  # repo tag asset -> dl/asset, verified against the reported digest[0m
+2026-10-23T15:21:39.3086790Z [36;1m  local repo="$1" tag="$2" asset="$3"[0m
+2026-10-23T15:21:39.3087044Z [36;1m  local want[0m
+2026-10-23T15:21:39.3087324Z [36;1m  want=$(gh release view "$tag" --repo "$repo" --json assets \[0m
+2026-10-23T15:21:39.3087960Z [36;1m           --jq ".assets[]|select(.name==\"$asset\")|.digest")[0m
+2026-10-23T15:21:39.3088400Z [36;1m  test -n "$want" || { echo "::error::$repo $tag publishes no $asset"; exit 1; }[0m
+2026-10-23T15:21:39.3088913Z [36;1m  gh release download "$tag" --repo "$repo" --pattern "$asset" --dir dl[0m
+2026-10-23T15:21:39.3089316Z [36;1m  local got; got=$(sha256 "dl/$asset")[0m
+2026-10-23T15:21:39.3089606Z [36;1m  test "$got" = "${want#sha256:}" || {[0m
+2026-10-23T15:21:39.3090035Z [36;1m    echo "::error::$asset digest mismatch: reported ${want#sha256:}, arrived $got"; exit 1; }[0m
+2026-10-23T15:21:39.3090475Z [36;1m  echo "$asset  sha256 $got  OK"[0m
+2026-10-23T15:21:39.3090710Z [36;1m}[0m
+2026-10-23T15:21:39.3090930Z [36;1mrm -rf dl .wolf-bin && mkdir -p dl .wolf-bin[0m
+2026-10-23T15:21:39.3091256Z [36;1mfetch wolffe-lang/wolf-lang   "v$wver" "$wa"[0m
+2026-10-23T15:21:39.3091566Z [36;1mfetch wolffe-lang/wolf-interp "v$lver" "$la"[0m
+2026-10-23T15:21:39.3091942Z [36;1m# Both archives carry one top-level directory. wolf's holds the[0m
+2026-10-23T15:21:39.3092374Z [36;1m# driver, the cimport worker and the native rung's runtime[0m
+2026-10-23T15:21:39.3092763Z [36;1m# archive side by side, which is exactly the layout[0m
+2026-10-23T15:21:39.3095029Z [36;1m# `xtask/src/bins.rs` resolves (`.wolf-bin/`, then[0m
+2026-10-23T15:21:39.3095783Z [36;1m# `native_rt()` looking beside the driver), so it lands whole.[0m
+2026-10-23T15:21:39.3096208Z [36;1mtar -xzf "dl/$wa" -C .wolf-bin --strip-components=1[0m
+2026-10-23T15:21:39.3096622Z [36;1m# sc58: since wolf 0.2.27 the archive carries `std/` (wolf-std at[0m
+2026-10-23T15:21:39.3097056Z [36;1m# `std/STD-REV`) and the compiler reads it when nothing names a[0m
+2026-10-23T15:21:39.3097484Z [36;1m# root. The rig stages THIS checkout's `std/` and passes[0m
+2026-10-23T15:21:39.3097916Z [36;1m# `--std-root` on every invocation, so the bundled copy is never[0m
+2026-10-23T15:21:39.3098353Z [36;1m# the subject here; it is removed so that no invocation can fall[0m
+2026-10-23T15:21:39.3098756Z [36;1m# back to it and pass on a std this commit did not write.[0m
+2026-10-23T15:21:39.3099085Z [36;1mif [ -d .wolf-bin/std ]; then[0m
+2026-10-23T15:21:39.3099621Z [36;1m  echo "archive std at $(cat .wolf-bin/std/STD-REV 2>/dev/null || echo '(no STD-REV)'): removed, the rig stages this checkout's std/"[0m
+2026-10-23T15:21:39.3100167Z [36;1m  rm -rf .wolf-bin/std[0m
+2026-10-23T15:21:39.3100378Z [36;1mfi[0m
+2026-10-23T15:21:39.3100548Z [36;1mcase "$lz" in[0m
+2026-10-23T15:21:39.3100773Z [36;1m  tar.gz) tar -xzf "dl/$la" -C dl ;;[0m
+2026-10-23T15:21:39.3101111Z [36;1m  # git-bash on the windows image does not ship `unzip`[0m
+2026-10-23T15:21:39.3101495Z [36;1m  # everywhere; python3 does, on all three images, and its[0m
+2026-10-23T15:21:39.3101882Z [36;1m  # zipfile is the same on each. Try the tool, keep the[0m
+2026-10-23T15:21:39.3102180Z [36;1m  # guarantee.[0m
+2026-10-23T15:21:39.3102494Z [36;1m  zip)    if command -v unzip >/dev/null 2>&1; then unzip -q "dl/$la" -d dl[0m
+2026-10-23T15:21:39.3103099Z [36;1m          else python3 -c "import sys,zipfile;zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "dl/$la" dl[0m
+2026-10-23T15:21:39.3103574Z [36;1m          fi ;;[0m
+2026-10-23T15:21:39.3103760Z [36;1mesac[0m
+2026-10-23T15:21:39.3103993Z [36;1mcp "dl/lupin-$lver-$triple/lupin$exe" .wolf-bin/[0m
+2026-10-23T15:21:39.3104366Z [36;1mchmod +x ".wolf-bin/wolf$exe" ".wolf-bin/lupin$exe" || true[0m
+2026-10-23T15:21:39.3104778Z [36;1m# Say what arrived. A lane that goes dark later must not be able[0m
+2026-10-23T15:21:39.3105188Z [36;1m# to blame acquisition without this log contradicting it.[0m
+2026-10-23T15:21:39.3105506Z [36;1mls -l .wolf-bin[0m
+2026-10-23T15:21:39.3105720Z [36;1m".wolf-bin/wolf$exe" --version[0m
+2026-10-23T15:21:39.3105973Z [36;1m".wolf-bin/lupin$exe" --version[0m
+2026-10-23T15:21:39.3122621Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T15:21:39.3122991Z env:
+2026-10-23T15:21:39.3123189Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:39.3123443Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:39.3123637Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:39.3126877Z   GH_TOKEN: ***
+2026-10-23T15:21:39.3127081Z ##[endgroup]
+2026-10-23T15:21:44.8402194Z wolf-0.2.35-x86_64-pc-windows-msvc.tar.gz  sha256 1ccba47c61369f48be292c1e847ef673372637f14e8a9d4abbbf86190bb4214b  OK
+2026-10-23T15:21:46.2151827Z lupin-0.1.56-x86_64-pc-windows-msvc.zip  sha256 4e8d88b7088b34711bddd288ec2653a1a04c0213ed9555343853db90ae2305b1  OK
+2026-10-23T15:21:46.6642955Z archive std at 2386522eb059cca5a84108562c2c0a0e72345d34: removed, the rig stages this checkout's std/
+2026-10-23T15:21:47.1449770Z total 61585
+2026-10-23T15:21:47.1450167Z -rw-r--r-- 1 runneradmin 197121    35149 Oct 23 08:36 LICENSE
+2026-10-23T15:21:47.1450994Z -rw-r--r-- 1 runneradmin 197121     1273 Oct 23 08:36 LICENSE-EXCEPTION
+2026-10-23T15:21:47.1451465Z -rw-r--r-- 1 runneradmin 197121     5733 Oct 23 08:36 README.md
+2026-10-23T15:21:47.1451835Z -rw-r--r-- 1 runneradmin 197121     1975 Oct 23 08:43 _wolf
+2026-10-23T15:21:47.1452236Z -rw-r--r-- 1 runneradmin 197121 10812566 Oct 23 08:43 libwolf_rt_none.a
+2026-10-23T15:21:47.1452650Z -rwxr-xr-x 1 runneradmin 197121  6904832 Oct 23 15:21 lupin.exe
+2026-10-23T15:21:47.1454361Z -rwxr-xr-x 1 runneradmin 197121   391168 Oct 23 08:42 wolf-cimport-worker.exe
+2026-10-23T15:21:47.1454939Z -rw-r--r-- 1 runneradmin 197121    12827 Oct 23 08:43 wolf.1
+2026-10-23T15:21:47.1455585Z -rw-r--r-- 1 runneradmin 197121      523 Oct 23 08:43 wolf.bash
+2026-10-23T15:21:47.1456257Z -rwxr-xr-x 1 runneradmin 197121 17669632 Oct 23 08:43 wolf.exe
+2026-10-23T15:21:47.1456865Z -rw-r--r-- 1 runneradmin 197121     2963 Oct 23 08:43 wolf.fish
+2026-10-23T15:21:47.1457550Z -rw-r--r-- 1 runneradmin 197121 27203318 Oct 23 08:41 wolf_rt.lib
+2026-10-23T15:21:47.1827134Z wolf 0.2.35 (wolfgang, pin cf0c13d)
+2026-10-23T15:21:47.1827966Z paired with lupin 0.1.56 (reference interpreter), pin 294d626
+2026-10-23T15:21:47.2172383Z lupin 0.1.56 (wolf-interp, reference interpreter at pin 294d626)
+2026-10-23T15:21:47.2427673Z ##[group]Run cargo xtask doctor
+2026-10-23T15:21:47.2428020Z [36;1mcargo xtask doctor[0m
+2026-10-23T15:21:47.2500406Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-23T15:21:47.2500762Z env:
+2026-10-23T15:21:47.2500964Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:47.2501232Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:47.2501439Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:47.2501674Z ##[endgroup]
+2026-10-23T15:21:47.6477033Z doctor: lupin — D:/a/wolf-std/wolf-std/.wolf-bin/lupin.exe (source: .wolf-bin)
+2026-10-23T15:21:47.6709668Z         version: lupin 0.1.56
+2026-10-23T15:21:47.6710688Z         pin: 294d626 matches vendor/tools.toml — OK
+2026-10-23T15:21:47.6712269Z doctor: wolf — D:/a/wolf-std/wolf-std/.wolf-bin/wolf.exe (source: .wolf-bin)
+2026-10-23T15:21:47.6939185Z         version: wolf 0.2.35
+2026-10-23T15:21:47.6939897Z         pairing: paired with lupin 0.1.56 (reference interpreter), pin 294d626
+2026-10-23T15:21:47.6941577Z         pin: cf0c13d matches vendor/tools.toml — OK
+2026-10-23T15:21:47.6942497Z doctor: native rung — wolf_rt.lib at D:/a/wolf-std/wolf-std/.wolf-bin/wolf_rt.lib (lane lit)
+2026-10-23T15:21:47.8309741Z ##[group]Run cargo xtask ledger-check
+2026-10-23T15:21:47.8310108Z [36;1mcargo xtask ledger-check[0m
+2026-10-23T15:21:47.8407707Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-23T15:21:47.8408272Z env:
+2026-10-23T15:21:47.8408584Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:47.8409007Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:47.8409336Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:47.8409670Z ##[endgroup]
+2026-10-23T15:21:48.2632814Z ledger-check: 552 test(s), all ledgered
+2026-10-23T15:21:48.3930288Z ##[group]Run cargo xtask std-test
+2026-10-23T15:21:48.3931088Z [36;1mcargo xtask std-test[0m
+2026-10-23T15:21:48.4040232Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-10-23T15:21:48.4040589Z env:
+2026-10-23T15:21:48.4040785Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T15:21:48.4041359Z   CARGO_INCREMENTAL: 0
+2026-10-23T15:21:48.4041606Z   CARGO_TERM_COLOR: always
+2026-10-23T15:21:48.4041825Z   STD_TEST_TIMEOUT_SECS: 180
+2026-10-23T15:21:48.4042032Z ##[endgroup]
+2026-10-23T15:21:48.8656339Z ledger-check: 552 test(s), all ledgered
+2026-10-23T15:21:48.8701762Z lane lupin: D:/a/wolf-std/wolf-std/.wolf-bin/lupin.exe (source: .wolf-bin)
+2026-10-23T15:21:48.8702886Z lane wolfc: D:/a/wolf-std/wolf-std/.wolf-bin/wolf.exe (source: .wolf-bin)
+2026-10-23T15:21:48.8703927Z lane native: D:/a/wolf-std/wolf-std/.wolf-bin/wolf.exe (source: .wolf-bin)
+2026-10-23T15:21:58.4753377Z test tests/base64/round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:21:58.7933440Z test tests/base64/strict_and_lenient.lu: staged, 3 lane(s) observed
+2026-10-23T15:21:59.1107508Z test tests/base64/url_variant.lu: staged, 3 lane(s) observed
+2026-10-23T15:21:59.4072508Z test tests/bytes/at_out_of_range_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:21:59.8056769Z test tests/bytes/lend_across_calls.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:00.1442049Z test tests/bytes/search_and_affixes.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:00.4417053Z test tests/bytes/slice_out_of_order_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:00.8195422Z test tests/bytes/slice_past_end_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:01.1964570Z test tests/bytes/to_str_border.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:01.5150592Z test tests/bytes/to_str_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:01.8322338Z test tests/bytes/utf8_validation.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:02.1902911Z test tests/bytes/view_and_access.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:02.4470194Z test tests/cmp/clamp_bad_range_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:02.7241559Z test tests/cmp/ordering_exhaustive.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:03.0432780Z test tests/cmp/ordering_methods_static.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:03.2984332Z test tests/cmp/primitive_impls_tier.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:03.5537422Z test tests/cmp/static_floor.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:03.8096846Z test tests/cmp/total_cmp_relational.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:04.1500112Z test tests/env/args_and_vars.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:04.2824853Z test tests/env/comptime_refuses.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:04.4570649Z test tests/env/comptime_refuses_chdir.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:04.5897170Z test tests/env/comptime_refuses_pid.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:04.7223212Z test tests/env/comptime_refuses_uid.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:04.8558476Z test tests/env/comptime_refuses_umask.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:04.9898348Z test tests/env/comptime_refuses_unset.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:05.5123221Z test tests/env/cwd_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:05.9515394Z test tests/env/entry_helpers.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:06.6971279Z test tests/env/self_ids.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:07.1145707Z test tests/env/umask_swap.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:07.6545932Z test tests/env/unset_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:08.0959417Z test tests/env/variable_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:08.7399097Z test tests/env/who_ids.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:09.2233110Z test tests/errors/coarsen_and_chain.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:09.5866307Z test tests/errors/handler_discriminates.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:09.9854865Z test tests/errors/payload_shapes.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:10.8940003Z test tests/fmt/decimal/fixed_and_exp.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:12.8891579Z test tests/fmt/decimal/parse_float_shapes.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:18.2651986Z test tests/fmt/decimal/shortest_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:18.8285763Z test tests/fmt/int_bases.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:19.3516884Z test tests/fmt/pad_and_align.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:19.8769812Z test tests/fmt/pad_fill_must_be_one_byte_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:20.4193960Z test tests/fmt/parse_bool.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:20.9208088Z test tests/fmt/parse_int_bases.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:21.4231738Z test tests/fmt/parse_int_overflow_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:21.9279514Z test tests/fmt/sign_and_group.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:22.4624709Z test tests/fmt/truncate_boundaries.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:23.0434347Z test tests/fs/access_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:23.8116009Z test tests/fs/adopt_inherited.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:24.3950664Z test tests/fs/adopt_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:25.0393081Z test tests/fs/alias_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:25.6212038Z test tests/fs/append_is_an_append.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:26.2673437Z test tests/fs/binary_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:26.8508294Z test tests/fs/change_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:27.2920386Z test tests/fs/chunk_stream.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:27.5282737Z test tests/fs/comptime_refuses_access.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:27.7864721Z test tests/fs/comptime_refuses_adopt.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:28.0024646Z test tests/fs/comptime_refuses_fstat_record.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:28.2380951Z test tests/fs/comptime_refuses_lock.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:28.4781588Z test tests/fs/comptime_refuses_mkfifo.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:28.6730610Z test tests/fs/comptime_refuses_realpath.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:28.9127455Z test tests/fs/comptime_refuses_set_mode.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:29.1271893Z test tests/fs/comptime_refuses_set_nonblock.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:29.3429911Z test tests/fs/comptime_refuses_set_owner.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:29.5364173Z test tests/fs/comptime_refuses_sync.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:29.7317811Z test tests/fs/comptime_refuses_sync_dir.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:29.9267013Z test tests/fs/comptime_refuses_unlock.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:30.3448172Z test tests/fs/copy_and_move.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:30.7869104Z test tests/fs/create_new_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:31.2650063Z test tests/fs/directories_and_metadata.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:31.6857840Z test tests/fs/entries_listing.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:32.1205802Z test tests/fs/exists_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:32.5375027Z test tests/fs/fd_stream.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:32.9573517Z test tests/fs/forged_handle_io_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:33.4163794Z test tests/fs/fstat_handle.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:33.9593184Z test tests/fs/fstat_record_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:34.4167131Z test tests/fs/fstat_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:34.6117331Z test tests/fs/invalid_row.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:35.0304408Z test tests/fs/link_own_times.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:35.6721924Z test tests/fs/link_truncate_times.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:36.1125810Z test tests/fs/lock_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:36.5319831Z test tests/fs/mkfifo_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:36.9494333Z test tests/fs/mode_symlink.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:37.3917922Z test tests/fs/nofollow_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:37.8104409Z test tests/fs/nonblock_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:38.2472823Z test tests/fs/not_found_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:38.6655163Z test tests/fs/owner_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:39.1237340Z test tests/fs/path_helpers.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:39.5454911Z test tests/fs/read_at_cursor.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:40.0257288Z test tests/fs/read_into_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:40.5660132Z test tests/fs/realpath_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:41.0248206Z test tests/fs/seek_family.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:41.4453876Z test tests/fs/stat_record.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:41.8629286Z test tests/fs/std_bytes_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:42.3024415Z test tests/fs/std_handles.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:42.8643921Z test tests/fs/sync_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:43.3232177Z test tests/fs/text_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:43.5484173Z test tests/fs/use_after_close.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:43.9879103Z test tests/fs/utf8_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:44.3039274Z test tests/hex/decode_misses.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:44.6015937Z test tests/hex/decode_str_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:45.0204436Z test tests/hex/decode_text.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:45.1546091Z test tests/hex/encode_non_byte_refused.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:45.4905568Z test tests/hex/encode_text.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:45.8469079Z test tests/hex/round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:46.0617091Z test tests/io/comptime_refuses_isatty.lu: staged, 0 lane(s) observed
+2026-10-23T15:22:46.4998784Z test tests/io/input_all_empty.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:46.9406765Z test tests/io/input_line_eof.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:47.5012641Z test tests/io/is_terminal_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:47.9222990Z test tests/io/writers_and_streams.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:48.1973380Z test tests/iter/list_cursor_drive.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:48.4551658Z test tests/iter/range_drive.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:49.0989128Z test tests/json/navigation.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:49.7219453Z test tests/json/navigation_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:50.4460250Z test tests/json/number_posture_and_depth.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:51.2334125Z test tests/json/parse_misses.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:52.0611950Z test tests/json/parse_shapes.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:52.6840005Z test tests/json/pretty_and_escape.lu: staged, 2 lane(s) observed
+2026-10-23T15:22:53.3678134Z test tests/json/stringify_shapes.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:54.0289984Z test tests/json/unescape_shapes.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:54.7138844Z test tests/json/values_and_accessors.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:55.0728145Z test tests/list/clear_truncate_fill.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:55.4637139Z test tests/list/enumerate_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:55.8238741Z test tests/list/filter_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:56.1194881Z test tests/list/first_last_hit_miss.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:56.4163776Z test tests/list/fold_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:56.7767635Z test tests/list/freeze_then_read.lu: staged, 3 lane(s) observed
+2026-10-23T15:22:57.0965495Z test tests/list/get_hit_miss.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:03.0394119Z test tests/list/in_place_allocates_nothing.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:03.3783507Z test tests/list/in_place_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:03.6145454Z test tests/list/index_bounds_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:03.9762316Z test tests/list/insert_remove.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:04.3355869Z test tests/list/map_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:04.4712009Z test tests/list/mutate_while_iterating_trap.lu: staged, 1 lane(s) observed
+2026-10-23T15:23:04.8328290Z test tests/list/pop_drains.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:05.1311549Z test tests/list/predicate_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:05.4710066Z test tests/list/push_len_empty.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:05.7465714Z test tests/list/relation_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:06.0223852Z test tests/list/remove_bounds_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:06.3809695Z test tests/list/reverse_extend_concat_repeat.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:06.7393070Z test tests/list/set_and_swap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:07.0363118Z test tests/list/set_bounds_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:07.7631443Z test tests/list/sort_by_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:08.3250557Z test tests/list/sorted_by_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:08.7060126Z test tests/list/sorted_tier.lu: staged, 2 lane(s) observed
+2026-10-23T15:23:09.0423750Z test tests/list/sum_overflow_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:09.3801484Z test tests/list/sum_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:09.7595406Z test tests/list/zip_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:10.1547281Z test tests/map/clear_and_extend.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:10.5129858Z test tests/map/get_hit_miss.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:10.9432943Z test tests/map/has_allocates_nothing.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:11.2425789Z test tests/map/has_and_get_or.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:11.5427980Z test tests/map/keys_values_pairs.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:11.8834080Z test tests/map/remove_and_tally.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:14.2118041Z test tests/map/remove_many.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:14.5738794Z test tests/map/set_len_empty.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:14.8106927Z test tests/math/abs_int_min_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:15.0494266Z test tests/math/add_overflow_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:15.3488095Z test tests/math/checked_hits.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:15.6274886Z test tests/math/checked_misses.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:15.9054938Z test tests/math/div_zero_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:16.2448494Z test tests/math/float/algebra_pins.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:16.6865715Z test tests/math/float/bits_roundtrip.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:17.0274180Z test tests/math/float/powf_cases.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:17.3248064Z test tests/math/float/predicates.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:17.6229489Z test tests/math/float/rounding.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:17.9613105Z test tests/math/float/trig_pins.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:18.2379803Z test tests/math/int_families.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:18.4954370Z test tests/math/isqrt_negative_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:18.7723070Z test tests/math/lcm_overflow_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:19.0524343Z test tests/math/pow_negative_exponent_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:19.3316929Z test tests/math/pow_overflow_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:19.6157667Z test tests/mem/budget/breach_is_a_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:19.9269591Z test tests/mem/budget/ledger_relations.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:20.1668844Z test tests/mem/budget/negative_cap_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:20.9764204Z test tests/net/accept_bounded_and_pollable.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:21.7815281Z test tests/net/accept_deadline_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:22.0782910Z test tests/net/addr_shape.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:22.3960891Z test tests/net/address_helpers.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:22.7125842Z test tests/net/adopt_rows.lu: staged, 1 lane(s) observed
+2026-10-23T15:23:23.0509415Z test tests/net/bytes_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:23.4089120Z test tests/net/closed_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:23.5833439Z test tests/net/comptime_refuses.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:23.9629144Z test tests/net/echo_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:24.3203806Z test tests/net/forged_handle_io_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:24.8276861Z test tests/net/listen_with_default.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:25.2652891Z test tests/net/nodelay_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:25.7887774Z test tests/net/read_all_and_lines.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:27.2858368Z test tests/net/read_deadline_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:39.7553124Z test tests/net/refused_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:40.1150025Z test tests/net/reuse_port.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:40.4737048Z test tests/net/segment_boundaries.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:40.8126537Z test tests/net/stream_pieces.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:41.2939920Z test tests/net/unix/cleanup.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:41.3873673Z test tests/net/unix/comptime_refuses.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:41.7453538Z test tests/net/unix/echo.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:42.2262081Z test tests/net/unix/refused_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:42.5635217Z test tests/net/unix/rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:42.9203659Z test tests/net/unix/stream_surface.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:43.0857275Z test tests/net/use_after_close.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:43.4227387Z test tests/net/wait_readiness.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:43.5787434Z test tests/net/write_bytes_invalid_row.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:43.9161009Z test tests/net/writev_gather.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:44.2131885Z test tests/ops/dispatch_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:44.5098609Z test tests/ops/div_zero_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:44.8110166Z test tests/ops/num_alias_tier.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:45.0871252Z test tests/option/exists_marking.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:45.3237468Z test tests/option/is_none_marking.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:45.5777377Z test tests/option/or_else_default.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:45.8333844Z test tests/option/to_list_roundtrip.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:45.9272001Z test tests/os/comptime_refuses.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:46.0425008Z test tests/os/comptime_refuses_arch.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:46.1409665Z test tests/os/comptime_refuses_name.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:46.3553172Z test tests/os/cpus.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:46.6105109Z test tests/os/host_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:23:47.2359954Z test tests/os/users/directory_accounts.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:47.5546352Z test tests/os/users/parse_lines.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:47.8933316Z test tests/os/users/whole_files.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:48.1901230Z test tests/pool/alloc_after_free.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:48.5075596Z test tests/pool/alloc_and_deref.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:48.8062235Z test tests/pool/free_then_deref_traps.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:49.0236005Z test tests/prelude/prelude_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:49.5462278Z test tests/process/builder.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:50.1124232Z test tests/process/close_fd_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:50.3993089Z test tests/process/comptime_refuses.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:50.6564749Z test tests/process/comptime_refuses_core_limit.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:50.9127555Z test tests/process/comptime_refuses_core_off.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:51.1673085Z test tests/process/comptime_refuses_exit_signal.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:51.4424686Z test tests/process/comptime_refuses_fork.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:51.6998466Z test tests/process/comptime_refuses_pipe.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:51.9551976Z test tests/process/comptime_refuses_poll.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:52.2096173Z test tests/process/comptime_refuses_set_core_limit.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:52.4896289Z test tests/process/comptime_refuses_set_pgid.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:52.7436123Z test tests/process/comptime_refuses_wait_core.lu: staged, 0 lane(s) observed
+2026-10-23T15:23:53.2855251Z test tests/process/core_limit_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:23:53.9077897Z test tests/process/core_off_end.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:54.4465831Z test tests/process/exec_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:54.9679442Z test tests/process/exit_code.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:55.5496674Z test tests/process/exit_signal_lives.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:56.0511252Z test tests/process/forged_handle_io_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:56.7735266Z test tests/process/fork_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:57.2718282Z test tests/process/job_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:57.8126527Z test tests/process/join_own_group.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:58.3301974Z test tests/process/map_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:58.8904397Z test tests/process/not_found_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:59.4128256Z test tests/process/pipe_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:23:59.9755533Z test tests/process/poll_core_none.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:00.5789078Z test tests/process/poll_job.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:01.1203678Z test tests/process/poll_none.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:01.6824709Z test tests/process/prefork_handoff.lu: staged, 1 lane(s) observed
+2026-10-23T15:24:02.2578201Z test tests/process/set_ids_refused.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:02.7984004Z test tests/process/set_ids_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:03.3402392Z test tests/process/start_with_empty_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:03.8612894Z test tests/process/start_with_inherit_rows.lu: staged, 1 lane(s) observed
+2026-10-23T15:24:04.3812643Z test tests/process/status_core_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:04.8836340Z test tests/process/status_kinds.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:05.0989721Z test tests/process/use_after_wait.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:05.8644092Z test tests/process/wait_core_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:06.2827997Z test tests/rand/below_zero_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:06.7024395Z test tests/rand/choose_empty_miss.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:07.1820137Z test tests/rand/next_float_pinned.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:07.6417403Z test tests/rand/range_and_bool.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:08.1214628Z test tests/rand/shuffle_and_choose.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:08.5588296Z test tests/rand/stream_pinned.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:08.8548775Z test tests/range/clamp_to.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:09.1711638Z test tests/range/collect_char.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:09.4493225Z test tests/range/collect_int.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:09.7643408Z test tests/range/contains.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:10.0201061Z test tests/range/is_empty.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:10.3590245Z test tests/range/len.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:10.6949211Z test tests/range/len_overflow_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:10.9908356Z test tests/search/binary_search_hits.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:11.3066185Z test tests/search/binary_search_misses.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:11.6037138Z test tests/search/bounds_and_equal_range.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:11.9405770Z test tests/search/reductions.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:12.2703320Z test tests/search/sum_overflow_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:12.5457468Z test tests/signal/comptime_refuses_ignore_one.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:12.8434429Z test tests/signal/comptime_refuses_poll.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:13.1193564Z test tests/signal/comptime_refuses_send.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:13.3983553Z test tests/signal/comptime_refuses_send_group.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:13.6751267Z test tests/signal/comptime_refuses_wait_fd.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:14.2367173Z test tests/signal/group_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:14.8046014Z test tests/signal/heard.lu: staged, 2 lane(s) observed
+2026-10-23T15:24:15.3668260Z test tests/signal/host_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:15.9471662Z test tests/signal/ignored_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:16.5314707Z test tests/signal/meanings.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:17.1574755Z test tests/signal/numbers.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:17.7196910Z test tests/signal/one_fault.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:18.5090480Z test tests/signal/one_host.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:19.0903955Z test tests/signal/one_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:19.6506030Z test tests/signal/reserved_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:20.2334309Z test tests/signal/rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:20.8202964Z test tests/signal/send_only.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:21.4030090Z test tests/signal/send_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:22.0058925Z test tests/signal/send_self.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:22.6286999Z test tests/signal/text_zero.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:23.2112958Z test tests/signal/wait_fd_ready.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:23.7722306Z test tests/signal/wait_fd_shape.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:24.5809422Z test tests/signal/wait_fds_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:25.3452039Z test tests/signal/wait_write_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:25.7023489Z test tests/sort/floats_total_order.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:25.8869668Z test tests/sort/generic_contract.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:26.2238645Z test tests/sort/ints_adversarial.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:26.5394620Z test tests/sort/is_sorted_edges.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:26.8616203Z test tests/sort/returning_twins.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:27.1785711Z test tests/sort/strs_bytewise.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:27.5172999Z test tests/str/affix_and_case.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:27.8545366Z test tests/str/affix_sets.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:28.2121751Z test tests/str/boundary_get.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:28.5505348Z test tests/str/byte_length_honesty.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:28.8060380Z test tests/str/byte_view_first_last.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:29.1227242Z test tests/str/byte_view_index.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:29.4791586Z test tests/str/byte_view_walk.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:29.8182889Z test tests/str/chars_builtin_agree.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:30.1771573Z test tests/str/code_point_view.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:30.5358184Z test tests/str/each_word_walk.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:30.8724933Z test tests/str/end_relative_get.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:31.2312219Z test tests/str/end_relative_slice.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:31.4292601Z test tests/str/end_relative_split_codepoint_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:31.7669603Z test tests/str/interpolation_interplay.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:32.1236973Z test tests/str/lines_words_join.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:32.4808792Z test tests/str/repeat_negative_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:32.8395285Z test tests/str/replace_empty_pattern.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:33.2169346Z test tests/str/replace_family.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:33.5544715Z test tests/str/search_family.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:33.7684936Z test tests/str/slice_oob_traps.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:33.9950286Z test tests/str/slice_split_codepoint_traps.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:34.3327717Z test tests/str/split_empty_separator.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:34.6901861Z test tests/str/split_family.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:35.0292114Z test tests/str/split_join_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:35.3859928Z test tests/str/to_strbuf_round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:35.7463266Z test tests/str/trim_whitespace_set.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:36.0840769Z test tests/str/words_count_fold.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:36.4407076Z test tests/strbuf/build_and_read.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:36.7995775Z test tests/strbuf/insert_remove_truncate.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:37.1577524Z test tests/strbuf/push_char.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:37.4958609Z test tests/strbuf/region_build_and_freeze.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:37.8310215Z test tests/strbuf/truncate_split_codepoint_traps.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:38.3097284Z test tests/term/chars_order.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:38.7693373Z test tests/term/chars_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:39.7549620Z test tests/term/mode_bits.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:40.2179715Z test tests/term/mode_bits_set.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:40.6765767Z test tests/term/restore_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:44.5829060Z test tests/term/round_trip.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:45.0633005Z test tests/term/rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:45.5022470Z test tests/term/size_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:45.7396393Z test tests/term/wait_input_gone.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:45.9554707Z test tests/testing/assert_builtin_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:46.2932540Z test tests/testing/assert_eq_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:46.4888624Z test tests/testing/assert_msg_holds.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:46.7049392Z test tests/testing/assert_msg_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:47.0430220Z test tests/testing/assert_ne_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:47.2336848Z test tests/testing/comparison_contract.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:47.5542435Z test tests/testing/fail_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:47.9349861Z test tests/testing/near_and_ulps.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:48.2707232Z test tests/testing/near_far_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:48.6105925Z test tests/testing/near_nan_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:48.9488094Z test tests/testing/todo_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:49.3128680Z test tests/testing/ulps_far_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:49.6503011Z test tests/testing/ulps_nan_mixed_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:49.9892862Z test tests/testing/unreachable_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:50.2104242Z test tests/time/comptime_refuses.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:50.4287415Z test tests/time/comptime_refuses_clock_ns.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:50.8712314Z test tests/time/duration_algebra.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:51.3341263Z test tests/time/iso8601_render.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:51.5534373Z test tests/time/local_comptime_refuses_fs.lu: staged, 0 lane(s) observed
+2026-10-23T15:24:52.2410283Z test tests/time/local_environment.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:52.7054381Z test tests/time/local_fields.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:53.2075548Z test tests/time/local_format.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:53.6481927Z test tests/time/local_format_rows.lu: staged, 2 lane(s) observed
+2026-10-23T15:24:54.0880642Z test tests/time/local_invalid_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:54.5920372Z test tests/time/local_posix.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:55.0740767Z test tests/time/local_rule_edges.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:56.0852412Z test tests/time/local_transitions.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:57.0718172Z test tests/time/local_tzif.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:58.1430405Z test tests/time/local_tzif_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:58.6404273Z test tests/time/local_v1.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:59.1437069Z test tests/time/local_zone_rows.lu: staged, 3 lane(s) observed
+2026-10-23T15:24:59.5848551Z test tests/time/monotonic.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:00.2279932Z test tests/time/monotonic_ns.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:00.6050714Z test tests/unicode/ascii_predicates.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:00.8218833Z test tests/unicode/char_code.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:01.0365770Z test tests/unicode/scalar_values_and_utf8_len.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:01.4340096Z test tests/x/crypto/chacha20/counter_wrap_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:02.0139266Z test tests/x/crypto/chacha20/flipped_tag_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:02.3927552Z test tests/x/crypto/chacha20/key_len_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:03.1785110Z test tests/x/crypto/chacha20/known_answers.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:03.3530515Z test tests/x/crypto/chacha20/non_byte_refused.lu: staged, 0 lane(s) observed
+2026-10-23T15:25:03.7314138Z test tests/x/crypto/chacha20/nonce_len_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:04.2493212Z test tests/x/crypto/chacha20/rfc8439_a1_block.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:05.0949803Z test tests/x/crypto/chacha20/rfc8439_a2_cipher.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:05.7385485Z test tests/x/crypto/chacha20/rfc8439_a3_poly1305.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:06.1995805Z test tests/x/crypto/chacha20/rfc8439_a4_poly_key.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:06.9418177Z test tests/x/crypto/chacha20/rfc8439_a5_aead.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:07.4828956Z test tests/x/crypto/chacha20/truncated_box_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:08.7939941Z test tests/x/crypto/chacha20/wycheproof_invalid_p1.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:10.2501030Z test tests/x/crypto/chacha20/wycheproof_invalid_p2.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:10.9543625Z test tests/x/crypto/chacha20/wycheproof_invalid_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:14.2375382Z test tests/x/crypto/chacha20/wycheproof_valid_p1.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:17.6813139Z test tests/x/crypto/chacha20/wycheproof_valid_p2.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:25.3261116Z test tests/x/crypto/chacha20/wycheproof_valid_p3.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:29.4732230Z test tests/x/crypto/chacha20/wycheproof_valid_p4.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:34.7506134Z test tests/x/crypto/chacha20/wycheproof_valid_p5.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:39.8011124Z test tests/x/crypto/chacha20/wycheproof_valid_p6.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:44.8730266Z test tests/x/crypto/chacha20/wycheproof_valid_p7.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:50.0236148Z test tests/x/crypto/chacha20/wycheproof_valid_p8.lu: staged, 3 lane(s) observed
+2026-10-23T15:25:51.2557202Z test tests/x/crypto/chacha20/wycheproof_valid_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T15:26:50.3900425Z test tests/x/crypto/curve25519/ed25519_rfc8032_s71.lu: staged, 1 lane(s) observed
+2026-10-23T15:27:03.5853353Z test tests/x/crypto/curve25519/ed25519_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T15:27:04.2292011Z test tests/x/crypto/curve25519/ed25519_verify_rejects.lu: staged, 3 lane(s) observed
+2026-10-23T15:27:05.0562486Z test tests/x/crypto/curve25519/field_identities.lu: staged, 3 lane(s) observed
+2026-10-23T15:27:05.2526070Z test tests/x/crypto/curve25519/non_byte_refused.lu: staged, 0 lane(s) observed
+2026-10-23T15:27:12.5959240Z test tests/x/crypto/curve25519/reject_zero_row.lu: staged, 3 lane(s) observed
+2026-10-23T15:27:13.1787983Z test tests/x/crypto/curve25519/scalar_len_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:28:13.1931342Z test tests/x/crypto/curve25519/wycheproof_ed25519_p1.lu: staged, 1 lane(s) observed
+2026-10-23T15:29:13.7727798Z test tests/x/crypto/curve25519/wycheproof_ed25519_p2.lu: staged, 1 lane(s) observed
+2026-10-23T15:30:15.8020530Z test tests/x/crypto/curve25519/wycheproof_ed25519_p3.lu: staged, 1 lane(s) observed
+2026-10-23T15:31:22.4467087Z test tests/x/crypto/curve25519/wycheproof_ed25519_p4.lu: staged, 1 lane(s) observed
+2026-10-23T15:31:39.0413762Z test tests/x/crypto/curve25519/wycheproof_ed25519_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T15:32:40.5049248Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p1.lu: staged, 1 lane(s) observed
+2026-10-23T15:33:40.2324456Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p10.lu: staged, 1 lane(s) observed
+2026-10-23T15:34:40.2440938Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p11.lu: staged, 1 lane(s) observed
+2026-10-23T15:35:41.1668753Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p12.lu: staged, 1 lane(s) observed
+2026-10-23T15:36:06.0476540Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p13.lu: staged, 3 lane(s) observed
+2026-10-23T15:37:06.5026361Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p2.lu: staged, 1 lane(s) observed
+2026-10-23T15:38:06.6898923Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p3.lu: staged, 1 lane(s) observed
+2026-10-23T15:39:06.6716358Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p4.lu: staged, 1 lane(s) observed
+2026-10-23T15:40:06.9456598Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p5.lu: staged, 1 lane(s) observed
+2026-10-23T15:41:07.0770058Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p6.lu: staged, 1 lane(s) observed
+2026-10-23T15:42:07.1447583Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p7.lu: staged, 1 lane(s) observed
+2026-10-23T15:43:07.2589881Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p8.lu: staged, 1 lane(s) observed
+2026-10-23T15:44:08.9627800Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_p9.lu: staged, 1 lane(s) observed
+2026-10-23T15:44:26.7721404Z test tests/x/crypto/curve25519/wycheproof_x25519_shared_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T15:45:26.7858437Z test tests/x/crypto/curve25519/wycheproof_x25519_zero.lu: staged, 1 lane(s) observed
+2026-10-23T15:45:44.4010586Z test tests/x/crypto/curve25519/wycheproof_x25519_zero_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T15:46:45.5057375Z test tests/x/crypto/curve25519/x25519_rfc7748_chain.lu: staged, 1 lane(s) observed
+2026-10-23T15:46:59.6725883Z test tests/x/crypto/curve25519/x25519_rfc7748_s52.lu: staged, 3 lane(s) observed
+2026-10-23T15:47:13.9149634Z test tests/x/crypto/curve25519/x25519_rfc7748_s61_dh.lu: staged, 3 lane(s) observed
+2026-10-23T15:48:20.7761600Z test tests/x/crypto/p256/cavp_siggen_p256.lu: staged, 1 lane(s) observed
+2026-10-23T15:49:27.8792750Z test tests/x/crypto/p256/cavp_sigver_p256.lu: staged, 1 lane(s) observed
+2026-10-23T15:49:28.6854361Z test tests/x/crypto/p256/der_codec.lu: staged, 3 lane(s) observed
+2026-10-23T15:49:31.6456889Z test tests/x/crypto/p256/field_self_test.lu: staged, 3 lane(s) observed
+2026-10-23T15:49:31.8833280Z test tests/x/crypto/p256/non_byte_refused.lu: staged, 0 lane(s) observed
+2026-10-23T15:49:32.5870762Z test tests/x/crypto/p256/private_key_trap.lu: staged, 3 lane(s) observed
+2026-10-23T15:50:44.4106100Z test tests/x/crypto/p256/rfc6979_p256.lu: staged, 1 lane(s) observed
+2026-10-23T15:51:55.4459922Z test tests/x/crypto/p256/sign_verify_smoke.lu: staged, 1 lane(s) observed
+2026-10-23T15:51:56.3538924Z test tests/x/crypto/p256/verify_reject_early.lu: staged, 3 lane(s) observed
+2026-10-23T15:53:03.4260705Z test tests/x/crypto/p256/wycheproof_p256_p1.lu: staged, 1 lane(s) observed
+2026-10-23T15:54:09.7528773Z test tests/x/crypto/p256/wycheproof_p256_p2.lu: staged, 1 lane(s) observed
+2026-10-23T15:55:15.6600151Z test tests/x/crypto/p256/wycheproof_p256_p3.lu: staged, 1 lane(s) observed
+2026-10-23T15:56:22.8014111Z test tests/x/crypto/p256/wycheproof_p256_p4.lu: staged, 1 lane(s) observed
+2026-10-23T15:57:30.1303945Z test tests/x/crypto/p256/wycheproof_p256_p5.lu: staged, 1 lane(s) observed
+2026-10-23T15:58:38.5246128Z test tests/x/crypto/p256/wycheproof_p256_p6.lu: staged, 1 lane(s) observed
+2026-10-23T15:59:48.2966002Z test tests/x/crypto/p256/wycheproof_p256_p7.lu: staged, 1 lane(s) observed
+2026-10-23T16:00:56.6597286Z test tests/x/crypto/p256/wycheproof_p256_p8.lu: staged, 1 lane(s) observed
+2026-10-23T16:02:24.9724395Z test tests/x/crypto/sha2/cavp_sha256_long.lu: staged, 1 lane(s) observed
+2026-10-23T16:03:43.9250755Z test tests/x/crypto/sha2/cavp_sha256_monte.lu: staged, 1 lane(s) observed
+2026-10-23T16:03:45.1156798Z test tests/x/crypto/sha2/cavp_sha256_short_p1.lu: staged, 3 lane(s) observed
+2026-10-23T16:03:46.5315158Z test tests/x/crypto/sha2/cavp_sha256_short_p2.lu: staged, 3 lane(s) observed
+2026-10-23T16:05:30.5197929Z test tests/x/crypto/sha2/cavp_sha384_long.lu: staged, 1 lane(s) observed
+2026-10-23T16:06:48.1391774Z test tests/x/crypto/sha2/cavp_sha384_monte.lu: staged, 1 lane(s) observed
+2026-10-23T16:06:49.6993487Z test tests/x/crypto/sha2/cavp_sha384_short_p1.lu: staged, 3 lane(s) observed
+2026-10-23T16:06:51.3589182Z test tests/x/crypto/sha2/cavp_sha384_short_p2.lu: staged, 3 lane(s) observed
+2026-10-23T16:06:53.1344727Z test tests/x/crypto/sha2/cavp_sha384_short_p3.lu: staged, 3 lane(s) observed
+2026-10-23T16:06:55.3368533Z test tests/x/crypto/sha2/cavp_sha384_short_p4.lu: staged, 3 lane(s) observed
+2026-10-23T16:08:25.1388864Z test tests/x/crypto/sha2/cavp_sha512_long.lu: staged, 1 lane(s) observed
+2026-10-23T16:09:39.2794781Z test tests/x/crypto/sha2/cavp_sha512_monte.lu: staged, 1 lane(s) observed
+2026-10-23T16:09:40.8415057Z test tests/x/crypto/sha2/cavp_sha512_short_p1.lu: staged, 3 lane(s) observed
+2026-10-23T16:09:42.4801662Z test tests/x/crypto/sha2/cavp_sha512_short_p2.lu: staged, 3 lane(s) observed
+2026-10-23T16:09:44.2587010Z test tests/x/crypto/sha2/cavp_sha512_short_p3.lu: staged, 3 lane(s) observed
+2026-10-23T16:09:46.4631391Z test tests/x/crypto/sha2/cavp_sha512_short_p4.lu: staged, 3 lane(s) observed
+2026-10-23T16:09:46.9215482Z test tests/x/crypto/sha2/hkdf_expand_cap_trap.lu: staged, 3 lane(s) observed
+2026-10-23T16:09:48.3719237Z test tests/x/crypto/sha2/incremental_chunking.lu: staged, 3 lane(s) observed
+2026-10-23T16:09:49.0074440Z test tests/x/crypto/sha2/known_answers.lu: staged, 3 lane(s) observed
+2026-10-23T16:09:49.1590541Z test tests/x/crypto/sha2/non_byte_refused.lu: staged, 0 lane(s) observed
+2026-10-23T16:09:52.5958678Z test tests/x/crypto/sha2/rfc4231_hmac.lu: staged, 3 lane(s) observed
+2026-10-23T16:09:54.9029986Z test tests/x/crypto/sha2/rfc5869_hkdf.lu: staged, 3 lane(s) observed
+2026-10-23T16:09:55.0759038Z test tests/x/crypto/sha2/use_after_final.lu: staged, 0 lane(s) observed
+2026-10-23T16:11:05.8237072Z test tests/x/crypto/sha2/wycheproof_hkdf256_full.lu: staged, 2 lane(s) observed
+2026-10-23T16:11:07.8464514Z test tests/x/crypto/sha2/wycheproof_hkdf256_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T16:12:24.5793047Z test tests/x/crypto/sha2/wycheproof_hkdf384_full.lu: staged, 1 lane(s) observed
+2026-10-23T16:12:26.7825498Z test tests/x/crypto/sha2/wycheproof_hkdf384_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T16:13:39.7156083Z test tests/x/crypto/sha2/wycheproof_hkdf512_full.lu: staged, 1 lane(s) observed
+2026-10-23T16:13:41.6165785Z test tests/x/crypto/sha2/wycheproof_hkdf512_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T16:13:41.9528455Z test tests/x/deque_int/both_ends.lu: staged, 3 lane(s) observed
+2026-10-23T16:13:42.2888426Z test tests/x/deque_int/fifo_order.lu: staged, 3 lane(s) observed
+2026-10-23T16:13:42.6269734Z test tests/x/deque_int/pop_back_and_clear.lu: staged, 3 lane(s) observed
+2026-10-23T16:13:42.9015603Z test tests/x/deque_int/to_list_order.lu: staged, 3 lane(s) observed
+2026-10-23T16:13:51.9019346Z test tests/x/jose/acme_envelope.lu: staged, 3 lane(s) observed
+2026-10-23T16:13:52.6049951Z test tests/x/jose/base64url_jose.lu: staged, 3 lane(s) observed
+2026-10-23T16:13:53.4934851Z test tests/x/jose/jwk_thumbprint.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:18.9592476Z test tests/x/jose/jws_eddsa_vectors.lu: staged, 2 lane(s) observed
+2026-10-23T16:14:36.5888041Z test tests/x/jose/jws_smoke.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:36.9879024Z test tests/x/json/dom_navigation.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:37.3656562Z test tests/x/json/dom_row_kind.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:37.7031665Z test tests/x/json/dom_row_missing_index.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:38.0378767Z test tests/x/json/dom_row_missing_key.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:38.3895087Z test tests/x/json/dom_row_overflow.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:38.7450059Z test tests/x/json/dom_row_parse.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:39.1415763Z test tests/x/json/dom_typed_reads.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:39.4985103Z test tests/x/json/path_helpers.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:39.8962902Z test tests/x/json/query_kernel.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:40.2937436Z test tests/x/json/rows_and_boundaries.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:40.6777942Z test tests/x/json/typed_getters.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:40.9723858Z test tests/x/list_eq/contains_and_index_of.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:41.2679169Z test tests/x/list_eq/dedup_and_affixes.lu: staged, 2 lane(s) observed
+2026-10-23T16:14:41.4803045Z test tests/x/option_expect/expect_trap.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:41.6933151Z test tests/x/option_flatten/flatten_propagate.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:42.0300974Z test tests/x/testing_text/starts_with_pass.lu: staged, 3 lane(s) observed
+2026-10-23T16:14:42.3873268Z test tests/x/testing_text/starts_with_trap.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:01.3528847Z test tests/x/tls/cert/chain_bad_signature_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:02.7862117Z test tests/x/tls/cert/chain_expired_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:04.5251526Z test tests/x/tls/cert/chain_not_ca_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:05.9570092Z test tests/x/tls/cert/chain_not_yet_valid_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:07.3707332Z test tests/x/tls/cert/chain_unknown_critical_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:26.1640709Z test tests/x/tls/cert/chain_valid.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:45.1333263Z test tests/x/tls/cert/chain_valid_with_root.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:46.7314930Z test tests/x/tls/cert/chain_wrong_anchor_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:48.1636010Z test tests/x/tls/cert/chain_wrong_name_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:50.5249311Z test tests/x/tls/cert/der_conformance_suite.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:51.6747737Z test tests/x/tls/cert/der_mutation_suite.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:52.7659844Z test tests/x/tls/cert/der_reject_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:15:53.0636270Z test tests/x/tls/cert/non_byte_refused.lu: staged, 0 lane(s) observed
+2026-10-23T16:16:59.8275857Z test tests/x/tls/cert/p256_bad_signature_row.lu: staged, 1 lane(s) observed
+2026-10-23T16:18:05.7696156Z test tests/x/tls/cert/p256_chain_valid.lu: staged, 1 lane(s) observed
+2026-10-23T16:18:07.0752210Z test tests/x/tls/cert/parse_fields.lu: staged, 3 lane(s) observed
+2026-10-23T16:18:09.7276978Z test tests/x/tls/cert/unsupported_alg_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:01.0132892Z test tests/x/tls/client/loopback_handshake.lu: staged, 2 lane(s) observed
+2026-10-23T16:19:10.2285416Z test tests/x/tls/client/negative_battery.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:11.8063423Z test tests/x/tls/client/rfc8448_parse_vectors.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:13.1998792Z test tests/x/tls/client/row_naming.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:13.9418885Z test tests/x/tls/handshake/bad_random_trap.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:21.2755315Z test tests/x/tls/handshake/ecdhe_zero_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:23.4400917Z test tests/x/tls/handshake/finished.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:24.7121147Z test tests/x/tls/handshake/finished_reject_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:34.2588604Z test tests/x/tls/handshake/key_schedule.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:35.2719555Z test tests/x/tls/handshake/message_bytes.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:35.5480291Z test tests/x/tls/handshake/non_byte_refused.lu: staged, 0 lane(s) observed
+2026-10-23T16:19:36.2940945Z test tests/x/tls/handshake/reordered_flight_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:37.0414504Z test tests/x/tls/handshake/state_machine.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:38.9023748Z test tests/x/tls/handshake/transcript_hash.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:39.9305552Z test tests/x/tls/record/chacha_records.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:41.6918300Z test tests/x/tls/record/derived_secrets.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:42.3239194Z test tests/x/tls/record/hkdf_label_encoding.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:42.8849751Z test tests/x/tls/record/iv_len_trap.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:43.4460712Z test tests/x/tls/record/negative_seq_trap.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:43.6639461Z test tests/x/tls/record/non_byte_refused.lu: staged, 0 lane(s) observed
+2026-10-23T16:19:44.2483969Z test tests/x/tls/record/record_framing.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:45.0145967Z test tests/x/tls/record/record_nonce.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:45.8621007Z test tests/x/tls/record/reject_tampered_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:46.5441052Z test tests/x/tls/record/short_record_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:48.0225808Z test tests/x/tls/record/traffic_keys.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:48.7349515Z test tests/x/tls/record/unexpected_inner_row.lu: staged, 3 lane(s) observed
+2026-10-23T16:19:48.7351717Z std-test: 552 test(s); forward tags: 1129; conservatism ledger: 161 entries; unstable rows: 0; slow skips: 0; divergent rows: 0; mirror-lag rows: 0; host-scoped cells: 29
+2026-10-23T16:19:48.7354982Z   host(lupin): env/who_ids.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7356837Z   host(lupin): fs/adopt_inherited.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7358382Z   host(lupin): fs/link_own_times.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7359775Z   host(lupin): fs/nofollow_rows.lu — `run` on windows, `divergent(stdout)` elsewhere; this host: windows
+2026-10-23T16:19:48.7361088Z   host(lupin): fs/realpath_rows.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7362336Z   host(lupin): fs/std_handles.lu — `unsupported` on windows, `run` elsewhere; this host: windows
+2026-10-23T16:19:48.7363681Z   host(lupin): os/users/directory_accounts.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7365057Z   host(lupin): process/close_fd_row.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7366363Z   host(lupin): process/core_off_end.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7367756Z   host(lupin): process/exit_signal_lives.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7369117Z   host(wolfc): process/exit_signal_lives.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7370396Z   host(lupin): process/fork_rows.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7371673Z   host(lupin): process/join_own_group.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7372908Z   host(lupin): process/poll_job.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7374196Z   host(lupin): process/set_ids_refused.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7375499Z   host(lupin): process/wait_core_rows.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7377045Z   host(lupin): signal/host_rows.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7378261Z   host(lupin): signal/ignored_rows.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7379834Z   host(lupin): signal/one_fault.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7381191Z   host(wolfc): signal/one_fault.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7382307Z   host(lupin): signal/one_host.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7383549Z   host(lupin): signal/reserved_rows.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7384782Z   host(lupin): signal/send_self.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7385944Z   host(lupin): signal/text_zero.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7387173Z   host(lupin): signal/wait_fd_ready.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7388522Z   host(lupin): signal/wait_fds_rows.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7389591Z   host(lupin): term/chars_rows.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7390290Z   host(lupin): term/mode_bits_set.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7390993Z   host(lupin): term/size_rows.lu — `run` on windows, `unsupported` elsewhere; this host: windows
+2026-10-23T16:19:48.7391497Z   unsupported(lupin): cmp/ordering_exhaustive.lu
+2026-10-23T16:19:48.7391889Z   unsupported(lupin): cmp/primitive_impls_tier.lu
+2026-10-23T16:19:48.7392254Z   unsupported(lupin): env/args_and_vars.lu
+2026-10-23T16:19:48.7392599Z   unsupported(lupin): env/comptime_refuses.lu
+2026-10-23T16:19:48.7392959Z   unsupported(lupin): env/comptime_refuses_chdir.lu
+2026-10-23T16:19:48.7393336Z   unsupported(lupin): env/comptime_refuses_pid.lu
+2026-10-23T16:19:48.7393711Z   unsupported(lupin): env/comptime_refuses_uid.lu
+2026-10-23T16:19:48.7394084Z   unsupported(lupin): env/comptime_refuses_umask.lu
+2026-10-23T16:19:48.7394481Z   unsupported(lupin): env/comptime_refuses_unset.lu
+2026-10-23T16:19:48.7394830Z   unsupported(lupin): env/umask_swap.lu
+2026-10-23T16:19:48.7395156Z   unsupported(lupin): fs/access_rows.lu
+2026-10-23T16:19:48.7395599Z   unsupported(lupin): fs/adopt_rows.lu
+2026-10-23T16:19:48.7396320Z   unsupported(lupin): fs/comptime_refuses_access.lu
+2026-10-23T16:19:48.7396705Z   unsupported(lupin): fs/comptime_refuses_adopt.lu
+2026-10-23T16:19:48.7397099Z   unsupported(lupin): fs/comptime_refuses_fstat_record.lu
+2026-10-23T16:19:48.7397491Z   unsupported(lupin): fs/comptime_refuses_lock.lu
+2026-10-23T16:19:48.7397853Z   unsupported(lupin): fs/comptime_refuses_mkfifo.lu
+2026-10-23T16:19:48.7398240Z   unsupported(lupin): fs/comptime_refuses_realpath.lu
+2026-10-23T16:19:48.7398654Z   unsupported(lupin): fs/comptime_refuses_set_mode.lu
+2026-10-23T16:19:48.7399048Z   unsupported(lupin): fs/comptime_refuses_set_nonblock.lu
+2026-10-23T16:19:48.7399445Z   unsupported(lupin): fs/comptime_refuses_set_owner.lu
+2026-10-23T16:19:48.7399832Z   unsupported(lupin): fs/comptime_refuses_sync.lu
+2026-10-23T16:19:48.7400203Z   unsupported(lupin): fs/comptime_refuses_sync_dir.lu
+2026-10-23T16:19:48.7400585Z   unsupported(lupin): fs/comptime_refuses_unlock.lu
+2026-10-23T16:19:48.7401098Z   unsupported(lupin): fs/fstat_record_rows.lu
+2026-10-23T16:19:48.7401594Z   unsupported(lupin): fs/lock_rows.lu
+2026-10-23T16:19:48.7401909Z   unsupported(lupin): fs/mkfifo_rows.lu
+2026-10-23T16:19:48.7402255Z   unsupported(lupin): fs/nonblock_rows.lu
+2026-10-23T16:19:48.7402584Z   unsupported(lupin): fs/read_into_rows.lu
+2026-10-23T16:19:48.7402901Z   unsupported(lupin): fs/std_handles.lu
+2026-10-23T16:19:48.7403235Z   unsupported(lupin): io/comptime_refuses_isatty.lu
+2026-10-23T16:19:48.7403609Z   unsupported(lupin): io/input_all_empty.lu
+2026-10-23T16:19:48.7403954Z   unsupported(lupin): io/input_line_eof.lu
+2026-10-23T16:19:48.7404311Z   unsupported(wolfc): json/number_posture_and_depth.lu
+2026-10-23T16:19:48.7405575Z tests/signal/wait_write_rows.lu [lupin]: ledger says `unsupported`, observed `run` (deeper than the ledger claims — advancement is deliberate: update tests/ledger.toml in its own commit)
+2026-10-23T16:19:48.7406496Z xtask: RED
+2026-10-23T16:19:48.7406745Z   unsupported(wolfc): json/parse_misses.lu
+2026-10-23T16:19:48.7407093Z   unsupported(wolfc): json/pretty_and_escape.lu
+2026-10-23T16:19:48.7407492Z   rejects(wolfc, E1013): list/mutate_while_iterating_trap.lu
+2026-10-23T16:19:48.7407920Z   rejects(native, E1013): list/mutate_while_iterating_trap.lu
+2026-10-23T16:19:48.7408329Z   unsupported(wolfc): list/sorted_tier.lu
+2026-10-23T16:19:48.7408653Z   unsupported(lupin): net/adopt_rows.lu
+2026-10-23T16:19:48.7408968Z   unsupported(wolfc): net/adopt_rows.lu
+2026-10-23T16:19:48.7409291Z   unsupported(lupin): net/comptime_refuses.lu
+2026-10-23T16:19:48.7409648Z   unsupported(lupin): net/unix/comptime_refuses.lu
+2026-10-23T16:19:48.7410012Z   unsupported(lupin): os/comptime_refuses.lu
+2026-10-23T16:19:48.7410359Z   unsupported(lupin): os/comptime_refuses_arch.lu
+2026-10-23T16:19:48.7410726Z   unsupported(lupin): os/comptime_refuses_name.lu
+2026-10-23T16:19:48.7411069Z   unsupported(lupin): os/host_rows.lu
+2026-10-23T16:19:48.7411399Z   unsupported(lupin): process/comptime_refuses.lu
+2026-10-23T16:19:48.7411831Z   unsupported(lupin): process/comptime_refuses_core_limit.lu
+2026-10-23T16:19:48.7412261Z   unsupported(lupin): process/comptime_refuses_core_off.lu
+2026-10-23T16:19:48.7412690Z   unsupported(lupin): process/comptime_refuses_exit_signal.lu
+2026-10-23T16:19:48.7413314Z   unsupported(lupin): process/comptime_refuses_fork.lu
+2026-10-23T16:19:48.7413837Z   unsupported(lupin): process/comptime_refuses_pipe.lu
+2026-10-23T16:19:48.7414762Z   unsupported(lupin): process/comptime_refuses_poll.lu
+2026-10-23T16:19:48.7415209Z   unsupported(lupin): process/comptime_refuses_set_core_limit.lu
+2026-10-23T16:19:48.7415652Z   unsupported(lupin): process/comptime_refuses_set_pgid.lu
+2026-10-23T16:19:48.7416471Z   unsupported(lupin): process/comptime_refuses_wait_core.lu
+2026-10-23T16:19:48.7416923Z   unsupported(lupin): process/core_limit_rows.lu
+2026-10-23T16:19:48.7417289Z   unsupported(lupin): process/prefork_handoff.lu
+2026-10-23T16:19:48.7417639Z   unsupported(wolfc): process/prefork_handoff.lu
+2026-10-23T16:19:48.7418038Z   unsupported(lupin): process/start_with_inherit_rows.lu
+2026-10-23T16:19:48.7418447Z   unsupported(wolfc): process/start_with_inherit_rows.lu
+2026-10-23T16:19:48.7418863Z   unsupported(lupin): signal/comptime_refuses_ignore_one.lu
+2026-10-23T16:19:48.7419269Z   unsupported(lupin): signal/comptime_refuses_poll.lu
+2026-10-23T16:19:48.7419655Z   unsupported(lupin): signal/comptime_refuses_send.lu
+2026-10-23T16:19:48.7420049Z   unsupported(lupin): signal/comptime_refuses_send_group.lu
+2026-10-23T16:19:48.7420495Z   unsupported(lupin): signal/comptime_refuses_wait_fd.lu
+2026-10-23T16:19:48.7420859Z   unsupported(lupin): signal/heard.lu
+2026-10-23T16:19:48.7421190Z   unsupported(lupin): sort/generic_contract.lu
+2026-10-23T16:19:48.7421546Z   unsupported(lupin): term/wait_input_gone.lu
+2026-10-23T16:19:48.7421911Z   unsupported(lupin): testing/comparison_contract.lu
+2026-10-23T16:19:48.7422291Z   unsupported(lupin): time/comptime_refuses.lu
+2026-10-23T16:19:48.7422665Z   unsupported(lupin): time/comptime_refuses_clock_ns.lu
+2026-10-23T16:19:48.7423060Z   unsupported(lupin): time/local_comptime_refuses_fs.lu
+2026-10-23T16:19:48.7423440Z   unsupported(lupin): time/local_format_rows.lu
+2026-10-23T16:19:48.7423838Z   unsupported(lupin): x/crypto/curve25519/ed25519_rfc8032_s71.lu
+2026-10-23T16:19:48.7424308Z   unsupported(wolfc): x/crypto/curve25519/ed25519_rfc8032_s71.lu
+2026-10-23T16:19:48.7424762Z   unsupported(lupin): x/crypto/curve25519/wycheproof_ed25519_p1.lu
+2026-10-23T16:19:48.7425222Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_ed25519_p1.lu
+2026-10-23T16:19:48.7425900Z   unsupported(lupin): x/crypto/curve25519/wycheproof_ed25519_p2.lu
+2026-10-23T16:19:48.7426790Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_ed25519_p2.lu
+2026-10-23T16:19:48.7427727Z   unsupported(lupin): x/crypto/curve25519/wycheproof_ed25519_p3.lu
+2026-10-23T16:19:48.7429139Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_ed25519_p3.lu
+2026-10-23T16:19:48.7429631Z   unsupported(lupin): x/crypto/curve25519/wycheproof_ed25519_p4.lu
+2026-10-23T16:19:48.7430120Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_ed25519_p4.lu
+2026-10-23T16:19:48.7430600Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p1.lu
+2026-10-23T16:19:48.7431103Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p1.lu
+2026-10-23T16:19:48.7431595Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p10.lu
+2026-10-23T16:19:48.7432084Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p10.lu
+2026-10-23T16:19:48.7432572Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p11.lu
+2026-10-23T16:19:48.7433053Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p11.lu
+2026-10-23T16:19:48.7433548Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p12.lu
+2026-10-23T16:19:48.7434508Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p12.lu
+2026-10-23T16:19:48.7435030Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p2.lu
+2026-10-23T16:19:48.7435701Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p2.lu
+2026-10-23T16:19:48.7436448Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p3.lu
+2026-10-23T16:19:48.7437111Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p3.lu
+2026-10-23T16:19:48.7437614Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p4.lu
+2026-10-23T16:19:48.7438701Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p4.lu
+2026-10-23T16:19:48.7439587Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p5.lu
+2026-10-23T16:19:48.7440097Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p5.lu
+2026-10-23T16:19:48.7440593Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p6.lu
+2026-10-23T16:19:48.7441108Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p6.lu
+2026-10-23T16:19:48.7441599Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p7.lu
+2026-10-23T16:19:48.7442109Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p7.lu
+2026-10-23T16:19:48.7442631Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p8.lu
+2026-10-23T16:19:48.7443117Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p8.lu
+2026-10-23T16:19:48.7443595Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p9.lu
+2026-10-23T16:19:48.7444088Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p9.lu
+2026-10-23T16:19:48.7444584Z   unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_zero.lu
+2026-10-23T16:19:48.7445058Z   unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_zero.lu
+2026-10-23T16:19:48.7445520Z   unsupported(lupin): x/crypto/curve25519/x25519_rfc7748_chain.lu
+2026-10-23T16:19:48.7445969Z   unsupported(wolfc): x/crypto/curve25519/x25519_rfc7748_chain.lu
+2026-10-23T16:19:48.7446393Z   unsupported(lupin): x/crypto/p256/cavp_siggen_p256.lu
+2026-10-23T16:19:48.7446786Z   unsupported(wolfc): x/crypto/p256/cavp_siggen_p256.lu
+2026-10-23T16:19:48.7447172Z   unsupported(lupin): x/crypto/p256/cavp_sigver_p256.lu
+2026-10-23T16:19:48.7447533Z   unsupported(wolfc): x/crypto/p256/cavp_sigver_p256.lu
+2026-10-23T16:19:48.7447903Z   unsupported(lupin): x/crypto/p256/rfc6979_p256.lu
+2026-10-23T16:19:48.7448298Z   unsupported(wolfc): x/crypto/p256/rfc6979_p256.lu
+2026-10-23T16:19:48.7448666Z   unsupported(lupin): x/crypto/p256/sign_verify_smoke.lu
+2026-10-23T16:19:48.7449070Z   unsupported(wolfc): x/crypto/p256/sign_verify_smoke.lu
+2026-10-23T16:19:48.7449605Z   unsupported(lupin): x/crypto/p256/wycheproof_p256_p1.lu
+2026-10-23T16:19:48.7450982Z   unsupported(wolfc): x/crypto/p256/wycheproof_p256_p1.lu
+2026-10-23T16:19:48.7451437Z   unsupported(lupin): x/crypto/p256/wycheproof_p256_p2.lu
+2026-10-23T16:19:48.7451973Z   unsupported(wolfc): x/crypto/p256/wycheproof_p256_p2.lu
+2026-10-23T16:19:48.7452375Z   unsupported(lupin): x/crypto/p256/wycheproof_p256_p3.lu
+2026-10-23T16:19:48.7452764Z   unsupported(wolfc): x/crypto/p256/wycheproof_p256_p3.lu
+2026-10-23T16:19:48.7453413Z   unsupported(lupin): x/crypto/p256/wycheproof_p256_p4.lu
+2026-10-23T16:19:48.7454103Z   unsupported(wolfc): x/crypto/p256/wycheproof_p256_p4.lu
+2026-10-23T16:19:48.7454740Z   unsupported(lupin): x/crypto/p256/wycheproof_p256_p5.lu
+2026-10-23T16:19:48.7455356Z   unsupported(wolfc): x/crypto/p256/wycheproof_p256_p5.lu
+2026-10-23T16:19:48.7455892Z   unsupported(lupin): x/crypto/p256/wycheproof_p256_p6.lu
+2026-10-23T16:19:48.7456283Z   unsupported(wolfc): x/crypto/p256/wycheproof_p256_p6.lu
+2026-10-23T16:19:48.7456672Z   unsupported(lupin): x/crypto/p256/wycheproof_p256_p7.lu
+2026-10-23T16:19:48.7457070Z   unsupported(wolfc): x/crypto/p256/wycheproof_p256_p7.lu
+2026-10-23T16:19:48.7457467Z   unsupported(lupin): x/crypto/p256/wycheproof_p256_p8.lu
+2026-10-23T16:19:48.7457867Z   unsupported(wolfc): x/crypto/p256/wycheproof_p256_p8.lu
+2026-10-23T16:19:48.7458254Z   unsupported(lupin): x/crypto/sha2/cavp_sha256_long.lu
+2026-10-23T16:19:48.7458637Z   unsupported(wolfc): x/crypto/sha2/cavp_sha256_long.lu
+2026-10-23T16:19:48.7459381Z   unsupported(lupin): x/crypto/sha2/cavp_sha256_monte.lu
+2026-10-23T16:19:48.7459796Z   unsupported(wolfc): x/crypto/sha2/cavp_sha256_monte.lu
+2026-10-23T16:19:48.7460179Z   unsupported(lupin): x/crypto/sha2/cavp_sha384_long.lu
+2026-10-23T16:19:48.7460574Z   unsupported(wolfc): x/crypto/sha2/cavp_sha384_long.lu
+2026-10-23T16:19:48.7460958Z   unsupported(lupin): x/crypto/sha2/cavp_sha384_monte.lu
+2026-10-23T16:19:48.7461333Z   unsupported(wolfc): x/crypto/sha2/cavp_sha384_monte.lu
+2026-10-23T16:19:48.7461726Z   unsupported(lupin): x/crypto/sha2/cavp_sha512_long.lu
+2026-10-23T16:19:48.7462108Z   unsupported(wolfc): x/crypto/sha2/cavp_sha512_long.lu
+2026-10-23T16:19:48.7462498Z   unsupported(lupin): x/crypto/sha2/cavp_sha512_monte.lu
+2026-10-23T16:19:48.7462880Z   unsupported(wolfc): x/crypto/sha2/cavp_sha512_monte.lu
+2026-10-23T16:19:48.7463285Z   unsupported(wolfc): x/crypto/sha2/wycheproof_hkdf256_full.lu
+2026-10-23T16:19:48.7463715Z   unsupported(lupin): x/crypto/sha2/wycheproof_hkdf384_full.lu
+2026-10-23T16:19:48.7464145Z   unsupported(wolfc): x/crypto/sha2/wycheproof_hkdf384_full.lu
+2026-10-23T16:19:48.7464579Z   unsupported(lupin): x/crypto/sha2/wycheproof_hkdf512_full.lu
+2026-10-23T16:19:48.7465015Z   unsupported(wolfc): x/crypto/sha2/wycheproof_hkdf512_full.lu
+2026-10-23T16:19:48.7465420Z   unsupported(wolfc): x/jose/jws_eddsa_vectors.lu
+2026-10-23T16:19:48.7465784Z   unsupported(wolfc): x/list_eq/dedup_and_affixes.lu
+2026-10-23T16:19:48.7466180Z   unsupported(lupin): x/tls/cert/p256_bad_signature_row.lu
+2026-10-23T16:19:48.7466599Z   unsupported(wolfc): x/tls/cert/p256_bad_signature_row.lu
+2026-10-23T16:19:48.7466994Z   unsupported(lupin): x/tls/cert/p256_chain_valid.lu
+2026-10-23T16:19:48.7467402Z   unsupported(wolfc): x/tls/cert/p256_chain_valid.lu
+2026-10-23T16:19:48.7467797Z   unsupported(wolfc): x/tls/client/loopback_handshake.lu
+2026-10-23T16:19:48.7468389Z std-test: the slowest lane invocations against the 180s ceiling (wolf-std#34; STD_TEST_TIMEOUT_SECS overrides):
+2026-10-23T16:19:48.7469063Z      96.1s   53%  tests/x/crypto/sha2/cavp_sha384_long.lu [lupin]
+2026-10-23T16:19:48.7469490Z      82.3s   46%  tests/x/crypto/sha2/cavp_sha512_long.lu [lupin]
+2026-10-23T16:19:48.7469887Z      81.6s   45%  tests/x/crypto/sha2/cavp_sha256_long.lu [lupin]
+2026-10-23T16:19:48.7470291Z      72.6s   40%  tests/x/crypto/sha2/cavp_sha256_monte.lu [lupin]
+2026-10-23T16:19:48.7470728Z      70.7s   39%  tests/x/crypto/sha2/wycheproof_hkdf384_full.lu [lupin]
+2026-10-23T16:19:48.7471153Z      70.4s   39%  tests/x/crypto/sha2/cavp_sha384_monte.lu [lupin]
+2026-10-23T16:19:48.7471753Z      67.2s   37%  tests/x/crypto/sha2/cavp_sha512_monte.lu [lupin]
+2026-10-23T16:19:48.7472287Z      67.1s   37%  tests/x/crypto/sha2/wycheproof_hkdf512_full.lu [lupin]
+2026-10-23T16:19:48.8546518Z ##[error]Process completed with exit code 1.
+2026-10-23T16:19:48.8748258Z ##[group]Run outcome='failure'
+2026-10-23T16:19:48.8748770Z [36;1moutcome='failure'[0m
+2026-10-23T16:19:48.8749047Z [36;1mconclusion='failure'[0m
+2026-10-23T16:19:48.8749495Z [36;1mecho "std-test verdict on $RUNNER_OS: outcome=$outcome conclusion=$conclusion"[0m
+2026-10-23T16:19:48.8750193Z [36;1mecho "- \`std-test\` on **$RUNNER_OS**: outcome \`$outcome\`, conclusion \`$conclusion\`" >> "$GITHUB_STEP_SUMMARY"[0m
+2026-10-23T16:19:48.8750857Z [36;1mif [ "$outcome" = failure ] && [ "$conclusion" = success ]; then[0m
+2026-10-23T16:19:48.8751921Z [36;1m  echo "::warning title=std-test is RED on $RUNNER_OS and ADVISORY::cargo xtask std-test exited non-zero; continue-on-error rewrote the conclusion of the step AND of the job to success. This host gates nothing for std-test. See wolf-std#34."[0m
+2026-10-23T16:19:48.8753164Z [36;1m  echo "std-test verdict: ADVISORY RED on $RUNNER_OS — this host gates nothing for std-test (wolf-std#34)"[0m
+2026-10-23T16:19:48.8753781Z [36;1mfi[0m
+2026-10-23T16:19:48.8770016Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T16:19:48.8770476Z env:
+2026-10-23T16:19:48.8770727Z   CARGO_HOME: C:\Users\runneradmin\.cargo
+2026-10-23T16:19:48.8771040Z   CARGO_INCREMENTAL: 0
+2026-10-23T16:19:48.8771300Z   CARGO_TERM_COLOR: always
+2026-10-23T16:19:48.8771562Z ##[endgroup]
+2026-10-23T16:19:48.9165879Z std-test verdict on Windows: outcome=failure conclusion=failure
+2026-10-23T16:19:48.9453205Z Post job cleanup.
+2026-10-23T16:19:49.1541242Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-10-23T16:19:49.2009273Z git version 2.56.0.windows.2
+2026-10-23T16:19:49.2079928Z Temporarily overriding HOME='D:\a\_temp\22b2604c-696d-4048-a006-b73cb8394547' before making global git config changes
+2026-10-23T16:19:49.2081038Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-23T16:19:49.2091648Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\wolf-std\wolf-std
+2026-10-23T16:19:49.2499192Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-10-23T16:19:49.2921197Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-10-23T16:19:49.8978305Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-23T16:19:49.9396993Z http.https://github.com/.extraheader
+2026-10-23T16:19:49.9463998Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-10-23T16:19:49.9885424Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-10-23T16:19:50.5695086Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-23T16:19:50.6078967Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-10-23T16:19:51.1904921Z Cleaning up orphan processes
+2026-10-23T16:19:51.2630441Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
