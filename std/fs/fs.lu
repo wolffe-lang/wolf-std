@@ -2552,6 +2552,55 @@ pub fn adopt(fd: int) -> File ! {invalid, io, unsupported} {
     File { fd: fs_adopt(fd)? }
 }
 
+/// **#94: read up to `max` bytes from `f` INTO `buf`**, whose contents
+/// become the bytes read and whose storage is kept (`List.reset`, then a
+/// push per byte), and answer how many — C's `read(2)` shape, for a loop
+/// that must not grow: an editor's key reader, a pipe pump. **Nothing is
+/// kept per call**: the chunk the host answers (`read_chunk`'s fresh
+/// list) is made in a region this call opens and dropped with it, and
+/// `buf` grows in its own region only past its largest read so far, so a
+/// loop of reads holds memory flat (`tests/fs/read_into_rows.lu`
+/// measures it). Not allocation-free in the strict sense: each call still
+/// opens one region, and the bytes are copied once into `buf`.
+///
+/// `buf`'s parameter is ambient-clean (`[mem.region.outer-write]`: it
+/// takes resets and byte pushes only), so a caller may call this inside a
+/// per-turn `region` block of its own with `buf` declared outside it.
+///
+/// Rows: `eof` when the file is already at its end and `io` when the
+/// handle is closed or foreign or the host failed (`read_chunk`'s two),
+/// and on a row `buf` is as it was. `max` at or below zero reads nothing,
+/// empties `buf` and answers 0. Never traps. lupin 0.1.56 does not
+/// resolve `List.reset` (wolf-interp#289, is81), so the call is
+/// `unsupported` there.
+///
+/// `mut f` (the position advances) and `mut buf` (its contents are the
+/// answer). Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_read_chunk`.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-read-into.tmp", "wolves")?
+/// var f = fs.open("doc-read-into.tmp")?
+/// var buf = List[byte]()
+/// let n = fs.read_into(mut f, mut buf, 4)?
+/// let m = fs.read_into(mut f, mut buf, 4)?
+/// fs.close(take f)?
+/// fs.remove("doc-read-into.tmp")?
+/// n == 4 && m == 2 && buf.len == 2
+/// ```
+pub fn read_into(mut f: File, mut buf: List[byte], max: int) -> int ! {eof, io} {
+    var n = 0
+    region chunk {
+        let got = fs_read_chunk(f.fd, max)?
+        (mut buf).reset()
+        for b in got {
+            (mut buf).push(b)
+        }
+        n = got.len
+    }
+    n
+}
+
 /// An append-mode descriptor for `path`, with the two tags mode 2 cannot
 /// reach coarsened to `io`.
 ///
