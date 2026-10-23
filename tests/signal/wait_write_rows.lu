@@ -19,9 +19,10 @@
 //!
 //! **windows** answers `set_nonblock` `unsupported` (and the wait
 //! `unsupported`): the row prints its lines for that reason after the
-//! first wait answers. **lupin** 0.1.56 answers a `WAIT_WRITE` element
-//! `io` (a handle it does not hold) and does not resolve `fs_set_nonblock`
-//! (wolf-interp#278).
+//! first wait answers — lupin 0.1.56 too, whose windows `unsupported` row
+//! comes before its handle check. On linux **lupin** answers a
+//! `WAIT_WRITE` element `io` (a handle it does not hold) and does not
+//! resolve `fs_set_nonblock` (wolf-interp#278).
 
 use std.fs
 use std.process
