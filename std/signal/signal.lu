@@ -7,8 +7,9 @@
 //! **A signal is named by its MEANING, never its number** (`[os.signal.set]`):
 //! `reload()` is `SIGHUP`, `interrupt()` is the terminal's Ctrl-C, and a
 //! set is the bitwise OR of meanings — `signal.interrupt() | signal.quit()`.
-//! The meanings are functions here because a module of the library
-//! carries no constants; each answers its bit. Twenty are LISTENABLE —
+//! The meanings are functions here, each answering its bit, as they were
+//! written before std carried a constant (sc72's `WAIT_WRITE` is the
+//! module's one, and it is not a meaning). Twenty are LISTENABLE —
 //! every signal POSIX names that a program may catch (`reload()` …
 //! `file_limit()`), the ones a set may hold. Eight more are SEND-ONLY
 //! (`kill()`, `stop()` and the six fault signals): `send` and `number`
@@ -224,6 +225,30 @@ pub fn wait_fd(f: fs.File, set: int) -> int ! {unsupported, io} {
     os_signal_wait_fd(f.fd, set)?
 }
 
+/// **s254 (`[os.signal.wait.write]`, wolf 0.2.35): bit 62, the mark of a
+/// `wait_fds` element that waits for a WRITE.** A file whose `fd` has it
+/// added — `fs.File { fd: w.fd + signal.WAIT_WRITE }` — asks whether `w`
+/// can take a write now instead of whether it has something to read
+/// (`poll(2)`'s `POLLOUT`): a pipe with room, a regular file always, and
+/// a pipe whose reader has gone (the write then answers its error). Its
+/// answer is the read case's: `ready` is that element's index, the lowest
+/// ready element winning among read and write elements alike, and a
+/// meaning still wins. A handle may be listed twice, once each way.
+/// `wait_fd` takes the mark too. Such a `File` is for the wait alone: no
+/// other call serves it (`io`).
+///
+/// What it is for: a writer that feeds a tool which may never read (a
+/// clipboard's `xclip`, `wl-copy`, `pbcopy`) sets its pipe's write end
+/// non-blocking (`fs.set_nonblock`), writes with `fs.write_some` until
+/// `busy`, then waits on the end under a deadline and gives up when it
+/// passes. lupin 0.1.56 answers such an element `io`, a handle it does
+/// not hold (wolf-interp#278).
+///
+/// ```wolf-doc-example
+/// signal.WAIT_WRITE == 4611686018427387904
+/// ```
+pub const WAIT_WRITE: int = 4611686018427387904
+
 /// What ended one `wait_fds` (`[os.signal.wait.fds]`): `meaning`, the
 /// meaning taken off the queue (0 when none was), and `ready`, the index
 /// in the list of the LOWEST file with something to read (-1 when none
@@ -263,7 +288,8 @@ pub struct Wake {
 /// editor listens for `signal.resize()`, then loops on
 /// `signal.wait_fds(watched, signal.resize(), 25)?`, redrawing on a
 /// meaning, reading the file `ready` names, and ending an escape
-/// sequence when neither came.
+/// sequence when neither came. From wolf 0.2.35 an element may wait for a
+/// write instead (`WAIT_WRITE`, s254).
 pub fn wait_fds(files: List[fs.File], set: int, deadline_ms: int) -> Wake ! {
     invalid,
     io,
