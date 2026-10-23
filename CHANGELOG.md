@@ -1,5 +1,98 @@
 # Changelog
 
+## sc72 — 2026-10-23 — std at wolf 0.2.35 / lupin 0.1.56: the thirteen calls, the thirteen cells, in-place helpers
+
+**The pins.** wolf 0.2.34 -> **0.2.35** (`v0.2.35` at `cf0c13d3`,
+release 421613621; linux x86-64 `4cc4045b…`, binary `def1d450…`) and
+lupin 0.1.55 -> **0.1.56** (`v0.1.56` at `28547b4`, release 421458363;
+linux x86-64 `ad703550…`, binary `991d54cf…`), both from the release
+archives by digest, the API read twice and the downloads hashed twice;
+lupin's conformance pin stays `294d626`. The data pin moves v0.2.34 ->
+v0.2.35 (`9da7bdcf` -> `cf0c13d3`, 672 -> 693 anchors, 21 added, none
+removed; `spec/05-conformance.md` moves with it: the trap set gains
+`stack-overflow`). 0.2.35's archive bundles this repository at
+`2386522e` (sc70).
+
+**The thirteen cells** r40 measured at the release candidate, re-measured
+at the published pair (trunk's tree, only the pins moved: exactly these
+thirteen and nothing else) and flipped in three commits: the nine
+`json/*.lu` rows run natively (s257's spilled union); `fs/sync_rows`,
+`term/restore_rows` and `time/monotonic_ns` run on lupin (its 0.2.34
+mirror); `term/mode_bits_set` is `unsupported` on lupin, which now
+refuses `os_term_set_mode` by name. `std.json`'s header no longer says
+the wolfc lane is dark for it (#93).
+
+**The wrappers** (wolf-std#87, #88; every one delegates to one builtin;
+the spellings beyond the issues are rulings asked, each built as
+recommended):
+
+- `process.core_limit() -> CoreLimit ! {unsupported}` (`CoreLimit {
+  soft, hard }`, -1 unlimited), `process.set_core_limit(soft, hard) ->
+  () ! {denied, invalid, unsupported}`, `process.core_off() -> () !
+  {unsupported}` (s253, `[os.proc.core]`).
+- `fs.adopt(fd) -> File ! {invalid, io, unsupported}` (`[os.proc.adopt]`).
+- `os.name() -> str`, `os.arch() -> str` (`[os.uname]`).
+- `fs.access(path, mode)`, `fs.fstat_record(mut f) -> Info ! {io}`
+  (R-sc72-1: the path record's twenty words, typed), `fs.lock(mut f,
+  kind)` / `fs.unlock(mut f)` with `fs.LOCK_SHARED` and
+  `fs.LOCK_EXCLUSIVE`, `fs.mkfifo(path, perm)`, `fs.set_nonblock(mut f,
+  on)`, `fs.write_some(mut f, b) -> int ! {busy, invalid, io}` (s254).
+- `fs.open_mode(path, mode)` with `fs.NOFOLLOW` (R-sc72-3: open-mode bit
+  16, and the moded open std did not have; modes 3 and 5 reachable from
+  std for the first time), and `signal.WAIT_WRITE` (bit 62 of a
+  `wait_fds` element). These are std's first `pub const` items.
+- `signal.host(n)` keeps its released total signature (R-sc72-2); the
+  C library's numbers it can name are refused `invalid`, by name, by
+  `ignore_one`, `reset_one` and `process.exit_signal` from 0.2.35, and
+  the docs say so.
+
+**In place (#92, R-sc72-4).** `std.list`'s `set`, `insert`, `remove`,
+`swap_remove`, `swap`, `clear`, `truncate`, `reverse`, `fill`, `pop`
+and `sort_by` change the caller's list in place (an index store of a
+`copy`, the builtin `pop` and `clear`) instead of rebuilding a fresh
+list and assigning it back. Signatures unchanged. A call keeps nothing
+(a region's ledger flat over 200 turns on every machine, the rebuilding
+shape's grown), and the `mut` parameter is ambient-clean
+(`[mem.region.outer-write]`), so the calls run inside a caller's
+`region` block on a list declared outside it, which was E1010. `push`
+and `extend` are unchanged. std adds no `list.reserve`/`list.reset`:
+the language's methods are the spellings.
+
+**A read into a caller's buffer (#94).** `fs.read_into(mut f, mut buf,
+max) -> int ! {eof, io}`: `buf`'s contents become the bytes read, its
+storage kept; the builtin's chunk lives in a region the call opens, so
+a loop of reads keeps nothing per call (measured: 1,500 one-byte reads,
+the live total flat). No new builtin was needed for that; a true
+zero-allocation read would be one (listed, not filed).
+
+**Rows.** 28 new (`process/core_limit_rows`, `core_off_end`,
+`fs/adopt_rows`, `adopt_inherited`, `os/host_rows`,
+`signal/reserved_rows`, `wait_write_rows`, `fs/access_rows`,
+`nofollow_rows`, `lock_rows`, `fstat_record_rows`, `mkfifo_rows`,
+`nonblock_rows`, `read_into_rows`, `list/in_place_rows`,
+`in_place_allocates_nothing`, and twelve `comptime_refuses_*`; not
+`fs_write_some`'s, whose `List` the comptime engine cannot build).
+552 tests and 552 doc examples (1,656 lane runs: 1,654 `exit(0)`, the
+two `std.os` mirror lags), from 524 and 533. lupin 0.1.56 resolves none of the thirteen names
+(wolf-interp#277, #278) nor `List.reset` (#289): those rows are
+`unsupported` there, `fs/nofollow_rows` `divergent(stdout)` (bit 16
+answered `invalid`), and `std.os`'s two examples mirror-lagged.
+
+**Windows' lupin column.** Where lupin 0.1.56 answers a windows row
+before any refusal — `os_fork`'s, `os_signal_wait_fds`' and every
+`[os.term]` call's `unsupported`, a host number past its windows shape,
+no symbolic link — seven rows run on lupin there (`process/fork_rows`,
+`signal/wait_fds_rows`, `term/mode_bits_set`, `fs/realpath_rows`, and the
+new `signal/reserved_rows`, `fs/nofollow_rows` and
+`signal/wait_write_rows`), beside the two fork-probed new rows:
+`lupin-windows` cells, six read from wolf-interp v0.1.56's source and
+the seventh measured, all held by CI's windows rig (run 39977416300).
+
+**For the next release.** wolf 0.2.36's `STD-PIN` is this branch's
+merge sha. std adds no prelude name. When lupin mirrors 0.2.35 (is81,
+and wolf-interp#277, #278), the lupin cells above and the two
+`LUPIN_MIRROR_LAG` entries go red and flip deliberately.
+
 ## sc70 — 2026-10-22 — local civil time and C-locale strftime
 
 `std.time` adds `Local { year, month, day, hour, minute, second, nanos,
