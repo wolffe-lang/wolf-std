@@ -3,10 +3,12 @@
 //! std.os — what this program can learn about the MACHINE it is running
 //! on. Stability tier: core.
 //!
-//! **One function, and that is the whole module at this pin.** `cpus()`
-//! answers how many cores this process may actually be scheduled on.
-//! That is the only question in the `[os.cpus]` clause and the only one
-//! this module answers; it is a module rather than a function in
+//! **Three functions.** `cpus()` answers how many cores this process may
+//! actually be scheduled on (`[os.cpus]`); `name()` and `arch()` (sc72,
+//! wolf 0.2.35's s253, `[os.uname]`) which OS and which architecture the
+//! program runs on, as the kernel answers. Until sc72 `cpus` was the
+//! whole module, and the reasoning it was placed by holds for all three:
+//! it is a module rather than a function in
 //! `std.env` because `std.env` is the program's ARGUMENTS and the host's
 //! ENVIRONMENT — things the program was handed — and the core count is
 //! neither. It is a property of the machine, which is what upstream's
@@ -77,4 +79,49 @@
 /// ```
 pub fn cpus() -> int ! {io} {
     os_cpus()?
+}
+
+/// **s253 (`[os.uname]`, wolf 0.2.35): the OS this program runs on**, as
+/// the KERNEL answers (`uname(2)`'s `sysname`, lowercased) and not what
+/// the program was built for: **`linux`**, **`macos`** (Darwin's),
+/// **`freebsd`**, **`pax`** on PAX, and **`windows`** there (which has no
+/// `uname`). A kernel outside these answers its own name, lowercased. Read
+/// once a process. What a program chooses by — a clipboard tool, a path
+/// convention, a signal number — where looking at `PATH` was the only
+/// way before.
+///
+/// Total: no row, no trap. The checked machine answers the host's (the
+/// `wolf` process's own `uname`). lupin 0.1.56 does not resolve the call
+/// (wolf-interp#277).
+///
+/// Capability `env` (machine state, with `cpus`); refused at comptime
+/// (D33): the host that compiles is not the one that runs. Delegates to
+/// `os_name`.
+///
+/// ```wolf-doc-example
+/// let n = os.name()
+/// n == "linux" || n == "macos" || n == "windows" || n == "freebsd" || n == "pax"
+/// ```
+pub fn name() -> str {
+    os_name()
+}
+
+/// **s253 (`[os.uname]`, wolf 0.2.35): the architecture this program
+/// runs on**, as the kernel answers (`uname(2)`'s `machine`, lowercased),
+/// with macOS's and the BSDs' spellings of the two tier-1 architectures
+/// as linux's: **`x86_64`** (`amd64`) and **`aarch64`** (`arm64`). A
+/// process under emulation answers what its kernel tells it; windows
+/// answers the architecture the program was built for.
+///
+/// Total: no row, no trap. The checked machine answers the host's.
+/// lupin 0.1.56 does not resolve the call (wolf-interp#277).
+///
+/// Capability `env`; refused at comptime (D33). Delegates to `os_arch`.
+///
+/// ```wolf-doc-example
+/// let a = os.arch()
+/// a == "x86_64" || a == "aarch64"
+/// ```
+pub fn arch() -> str {
+    os_arch()
 }
