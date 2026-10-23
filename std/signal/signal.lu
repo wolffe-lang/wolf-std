@@ -278,8 +278,9 @@ pub struct Wake {
 /// Rows, in the order they are decided: `io` for a set the shape rule
 /// refuses (empty, a send-only meaning, a bit that is no meaning); then
 /// `invalid` for a deadline below -1; then `unsupported` on windows; then
-/// `io` for a closed or forged handle. Never traps. lupin 0.1.55 does not
-/// resolve the call (wolf-interp#268).
+/// `io` for a closed or forged handle. Never traps. lupin 0.1.56 answers
+/// the shape rows and refuses a well-formed wait by name, since std has no
+/// `poll` (0.1.55 did not resolve the call, wolf-interp#268).
 ///
 /// Capability `exec` (signal control, with `wait_fd`; ruling #97 R5);
 /// refused at comptime (D33). Delegates to `os_signal_wait_fds`; a

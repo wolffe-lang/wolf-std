@@ -65,9 +65,9 @@
 //! `Mode`, whose fields are clamped, but for `flow` or `extended` before
 //! wolf 0.2.30 and the three bits before 0.2.34); every call is
 //! `unsupported` on windows. lupin answers the shape rows and declines
-//! every call that reaches the terminal by name; lupin 0.1.55's shape
-//! still refuses bits 5–7 (`invalid`, wolf-interp#268) and does not
-//! resolve `os_term_restore_at_exit`.
+//! every call that reaches the terminal by name; from lupin 0.1.56 its
+//! shape takes bits 5–7 (0.1.55 refused them `invalid`, wolf-interp#268)
+//! and `os_term_restore_at_exit` answers its shape and `io` rows.
 //!
 //! **Capability:** `foreground`, `mode`, `set_mode`, `restore_at_exit`,
 //! `size` and `chars` are `io` (they act on a descriptor the program
@@ -252,8 +252,9 @@ pub fn raw_bytes(m: Mode) -> Mode {
 /// `Mode`); then `unsupported` on windows; then `io` for a handle that is
 /// closed, forged or not a terminal, or a duplicate the host will not
 /// make (ruling #97 R1). Never traps. The checked machine restores on
-/// its own end, whatever the verdict (R8); lupin 0.1.55 does not resolve
-/// the call (wolf-interp#268).
+/// its own end, whatever the verdict (R8); lupin 0.1.56 answers the shape
+/// and `io` rows and refuses a well-formed registration by name (0.1.55
+/// did not resolve the call, wolf-interp#268).
 ///
 /// Capability `io` (uncharged, as `set_mode`; ruling #97 R5); refused at
 /// comptime. Delegates to `os_term_restore_at_exit`. The example is

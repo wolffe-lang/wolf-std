@@ -1577,8 +1577,9 @@ pub struct Fork {
 /// has no fork, and on **the checked machine** on every host (ruling #95
 /// R4 C), which is the `wolf` process interpreting the program — so a
 /// program with an in-process path takes it there and runs to its end,
-/// as on windows. Never traps. lupin 0.1.55 does not resolve the call
-/// (wolf-interp#269). The cost, measured upstream: 1,000 forks that end
+/// as on windows. Never traps. lupin 0.1.56 refuses the call by name on
+/// unix (std has no fork) and answers windows' `unsupported` (0.1.55 did
+/// not resolve it, wolf-interp#269). The cost, measured upstream: 1,000 forks that end
 /// at once and are waited for take 0.119 s on kasumi (dash's `x=$(true)`
 /// 0.083 s).
 ///
