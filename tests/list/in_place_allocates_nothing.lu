@@ -1,0 +1,105 @@
+//! check: run(exit=0, stdout="in_place_flat=true len=101\ncontrol_grew=true\nouter_charged_zero=true\nsort_scratch_freed=true")
+//! phase: run
+//! conforms: std.list, std.mem.budget, mem.region.account.1, mem.region.account.2, mem.region.outer-write
+//!
+//! **sc72: the in-place mutators allocate nothing per call** (wolf-std#92,
+//! the memory row). A `List[int]` born in a first-class region `r`, and
+//! `r`'s own ledger (`[mem.region.account.1]`) read before and after 200
+//! turns of `set`, `swap`, `reverse`, `fill`, `remove`, `swap_remove` and
+//! `truncate`: EQUAL, on every machine. The CONTROL is the shape each of
+//! them had through sc71, written out here — rebuild into a fresh
+//! `List[int]()` and assign it back — and ten calls of it GROW the ledger,
+//! so the measurement sees an allocation when there is one (a gate never
+//! seen red is no gate). Then the same turns on a list born OUTSIDE a
+//! second region `q`, inside `in q { … }`: `q` is charged nothing — the
+//! stores land in the list's own region, and the `mut` parameters are
+//! ambient-clean, so the block compiles at all. `sort_by` still merges
+//! over scratch lists per call; inside a `region` block they are the
+//! block's, and the process-wide total (`[mem.region.account.2]`) is back
+//! where it was after it.
+//!
+//! **`insert` is left out of the flat claim on purpose**: it pushes, and
+//! a push is charged by each tier's own rule — the native arena charges a
+//! buffer when it grows (an `insert` into spare capacity is flat there,
+//! measured), while the checked machine and lupin charge every stored slot
+//! (`[type.list.reserve]`'s note: "the checked machine charges what is
+//! stored"). The units are per tier, so no count is asserted
+//! (`tests/mem/budget/ledger_relations.lu`): equal, greater, zero.
+
+use std.list
+use std.mem.budget
+
+fn rebuild_set(mut xs: List[int], i: int, v: int) {
+    let n = xs.len
+    var out = List[int]()
+    var k = 0
+    while k < n {
+        if k == i {
+            (mut out).push(v)
+        } else {
+            (mut out).push(xs[k])
+        }
+        k = k + 1
+    }
+    xs = out
+}
+
+fn lt(a: int, b: int) -> bool {
+    a < b
+}
+
+// Seven mutators, three of them shortening the list by one each.
+fn turn(mut xs: List[int], i: int) {
+    let n = xs.len
+    list.set(mut xs, i % n, i)
+    list.swap(mut xs, 0, n - 1)
+    list.reverse(mut xs)
+    list.fill(mut xs, i)
+    let a = list.remove(mut xs, i % (n - 1))
+    let b = list.swap_remove(mut xs, 0)
+    list.truncate(mut xs, n - 3)
+}
+
+fn main() -> !int {
+    let r = region()
+    var before = 0
+    var after = 0
+    var control = 0
+    var len = 0
+    in r {
+        var xs = List[int]()
+        for i in 0..704 {
+            (mut xs).push(i)
+        }
+        turn(mut xs, 0)
+        before = budget.charged(r)
+        for i in 0..200 {
+            turn(mut xs, i)
+        }
+        after = budget.charged(r)
+        len = xs.len
+        for i in 0..10 {
+            rebuild_set(mut xs, i, i)
+        }
+        control = budget.charged(r)
+    }
+    print("in_place_flat={after == before} len={len}")
+    print("control_grew={control > after}")
+    var outer = List[int]()
+    for i in 0..304 {
+        (mut outer).push(i)
+    }
+    let q = region()
+    in q {
+        for i in 0..100 {
+            turn(mut outer, i)
+        }
+    }
+    print("outer_charged_zero={budget.charged(q) == 0}")
+    let base = budget.live()
+    region scratch {
+        list.sort_by(mut outer, lt)
+    }
+    print("sort_scratch_freed={budget.live() == base}")
+    0
+}

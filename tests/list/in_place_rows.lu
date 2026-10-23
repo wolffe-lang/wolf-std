@@ -1,0 +1,113 @@
+//! check: run(exit=0, stdout="ints 4,0,4,9,1,\nstrs first,ccc,bb,zz, removed=dddd\nstr_kept turn-4\nints_after 3,3,3,\nsorted 1,2,3,5,8,\npop=3 len=2\nstructs y2 x1")
+//! phase: run
+//! conforms: std.list, mem.region.outer-write, type.list
+//!
+//! **sc72: `std.list`'s mutators change the caller's list in place, inside
+//! a region block of the caller's too** (wolf-std#92; wolf 0.2.35's s255,
+//! `[mem.region.outer-write]`). A list of `int` and a list of `str` are
+//! declared OUTSIDE a `region turn { … }` block and changed inside it by
+//! `set`, `insert`, `remove`, `swap_remove`, `swap`, `reverse`, `fill`,
+//! `truncate`, `clear`, `pop` and `sort_by`; their `mut` parameters are
+//! ambient-clean, so the block compiles, and every value the block stored
+//! is read after the block ends — a `str` built inside it (`turn-4`)
+//! included, because the store `copy`s it into the list's own region.
+//! Until sc72 each of these rebuilt a fresh `List[T]()` in the block's
+//! region and assigned it back, which the clause refuses by name (E1010:
+//! the list "still holds a value allocated in region `turn`"). A struct
+//! element swaps by value.
+//!
+//! **lupin** 0.1.56 runs it (it has no static region rule to refuse the
+//! old bodies, and its in-place stores are plain).
+
+use std.list
+
+struct P {
+    name: str,
+    n: int,
+}
+
+fn show(xs: List[int]) -> str {
+    var s = ""
+    for x in xs {
+        s = s + "{x},"
+    }
+    s
+}
+
+fn show_s(xs: List[str]) -> str {
+    var s = ""
+    for x in xs {
+        s = s + x + ","
+    }
+    s
+}
+
+fn lt(a: int, b: int) -> bool {
+    a < b
+}
+
+fn main() -> !int {
+    var xs = List[int]()
+    for i in 0..6 {
+        (mut xs).push(i)
+    }
+    var ws = List[str]()
+    for w in ["a", "bb", "ccc", "dddd"] {
+        (mut ws).push(w)
+    }
+    var popped = 0
+    region turn {
+        list.set(mut xs, 2, 9)
+        list.insert(mut xs, 1, 7)
+        let gone = list.remove(mut xs, 1)
+        list.swap(mut xs, 0, 5)
+        let tail = list.swap_remove(mut xs, 3)
+        list.reverse(mut xs)
+        list.insert(mut xs, 2, 4)
+        list.truncate(mut xs, 5)
+        list.set(mut ws, 0, "zz")
+        list.reverse(mut ws)
+        let r = list.remove(mut ws, 0)
+        list.insert(mut ws, 0, "first")
+        print("ints {show(xs)}")
+        print("strs {show_s(ws)} removed={r}")
+        let t = "turn-{ws.len}"
+        list.set(mut ws, 1, t)
+    }
+    print("str_kept {ws[1]}")
+    region again {
+        list.fill(mut xs, 3)
+        list.truncate(mut xs, 3)
+    }
+    print("ints_after {show(xs)}")
+    var ys = List[int]()
+    for v in [5, 3, 8, 1, 2] {
+        (mut ys).push(v)
+    }
+    region sorting {
+        list.sort_by(mut ys, lt)
+    }
+    print("sorted {show(ys)}")
+    var zs = List[int]()
+    for v in [1, 2, 3] {
+        (mut zs).push(v)
+    }
+    region popping {
+        popped = list.pop(mut zs) else 0
+    }
+    print("pop={popped} len={zs.len}")
+    var ps = List[P]()
+    (mut ps).push(P { name: "x", n: 1 })
+    (mut ps).push(P { name: "y", n: 2 })
+    region structs {
+        list.swap(mut ps, 0, 1)
+    }
+    print("structs {ps[0].name}{ps[0].n} {ps[1].name}{ps[1].n}")
+    region clearing {
+        list.clear(mut zs)
+    }
+    if zs.len != 0 {
+        return 1
+    }
+    0
+}

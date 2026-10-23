@@ -4795,6 +4795,21 @@ lupin = "unsupported"
 wolfc = "run"
 native = "run"
 
+# `list/in_place_rows.lu`: the mutators on outer lists inside region
+# blocks, `int`, `str` and struct elements.
+[tests."list/in_place_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# `list/in_place_allocates_nothing.lu`: the live total flat over 1,000
+# turns of the mutators, the rebuilding control grown, a region charged
+# nothing, `sort_by`'s scratch freed with its block.
+[tests."list/in_place_allocates_nothing.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
 # D33 one level down at twelve of wolf 0.2.35's thirteen builtins; not at
 # `fs_write_some`, whose `List[byte]` argument the comptime engine cannot
 # build ("`List` construction at comptime", the compiled lanes'
