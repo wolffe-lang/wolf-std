@@ -13946,3 +13946,196 @@ the reproducer. No issue was filed by this lane.
 The other new unsupported cell is ordinary: the Fs comptime rejection
 witness is unsupported on lupin, which has no comptime engine. The
 checked/native machines answer E0701, as the capability header promises.
+
+## F-0158 — sc72's predictions, before the 0.2.35 / 0.1.56 pins, the thirteen cells and the thirteen wrappers
+
+Written on branch `sc72` (on trunk `eff61c12`, sc71) before any file
+other than this one changed. Contract: wolffe-lang/wolf
+`sprints/stdlib/sc72-std-at-0235.md` (planning `e5272df`). What I read
+or ran first, and so cannot claim to predict blind: wolf 0.2.35's
+CHANGELOG at `cf0c13d3` (the bundled-std table with r40's thirteen
+cells, "read this before you bump", s253/s254/s255/s257 and the
+downstream lists); spec/11 at `cf0c13d3` (`[os.proc.core]`,
+`[os.proc.adopt]`, `[os.uname]`, `[os.signal.host.reserved]`,
+`[os.fs.access]`, `[os.fs.open.nofollow]`, `[os.fs.lock]`,
+`[os.fs.fstat.record]`, `[os.fs.mkfifo]`, `[os.fs.nonblock]`,
+`[os.signal.wait.write]`, both design notes), spec/10's
+`[type.list.storage]` and spec/02's `[mem.region.outer-write]`;
+s255's note §5; lupin 0.1.56's CHANGELOG at `28547b4`; wolf-std#87,
+#88, #92, #93, #94; wolf-interp#277, #278, #289; r40's kasumi logs
+(`std-test-m1.log`, `published-readback.log`) and crawl-54's r40
+entries. **Run on kasumi before this was written** (container, cores
+0-3, `~/lanes/sc72/logs/`): the acquisition (`acquire.log`) and five
+design probes (`probe-1.log`, `probe-2.log`): a module's `pub const`
+reaches an importer on all three lanes; in-place list bodies (index
+store of a `copy`, the builtin `pop`) run on all three, inside a
+region block on an outer list too, with `budget.live()` flat over
+1,000 calls, and `--dump=mut-clean` calls them `clean` where every
+rebuilding helper of trunk's `std.list` is `unclean at … xs`; a read
+into a caller's `List[byte]` through a region the call opens runs on
+checked and native with `budget.live()` flat over 1,500 calls, lupin
+stopping at `List.reset`. No row of this repository's tests has run.
+
+Inputs, re-derived 2026-10-23: wolf-std trunk `eff61c12`, 524 tests,
+533 doc examples (1,599 lane runs at r40's m1). wolf 0.2.35 is
+`v0.2.35` at `cf0c13d3`, release 421613621, published 08:45:33Z;
+lupin 0.1.56 is `v0.1.56` at `28547b4`, release 421458363, published
+04:43:45Z; both read twice from the release API on the Mac and twice
+again on kasumi.
+
+### P1. The archives
+
+- wolf 0.2.35 linux x86-64 `4cc4045b…` (81,369,914 B), lupin 0.1.56
+  `ad703550…` (3,027,812 B): API digest read twice, download hashed
+  twice, equal (`acquire.log`; r40's readback the cross-check, the same
+  ten digests). Binary `wolf` `def1d450…`, `libwolf_rt.a` `9efc68e1…`,
+  `lupin` `991d54cf…`. `wolf 0.2.35 (wolfgang, pin cf0c13d)`, `paired
+  with lupin 0.1.56 (reference interpreter), pin 294d626`; `lupin
+  0.1.56 (wolf-interp, reference interpreter at pin 294d626)`, so the
+  lupin conformance pin key does not move. GLIBC ≤ 2.34. The archive's
+  `std/STD-REV` is `2386522e`, sc70's, this branch's parent but one.
+  The other wolf archives by the API: aarch64-apple-darwin `240b84d0…`,
+  aarch64-unknown-linux-gnu `30ccded4…`, x86_64-pc-windows-msvc
+  `1ccba47c…`; lupin aarch64-apple-darwin `9133bfdb…`, aarch64 linux
+  `e2719ab2…`, windows zip `4e8d88b7…`.
+
+### P2. The data pin
+
+- `9da7bdcf` -> `cf0c13d3`: 672 -> **693** anchors, 21 added (s251's
+  `abi.native.closure.object`, s257's `abi.native.enum`,
+  `conf.trap.stack`, `mem.region.outer-write`, `mem.region.scalar`, the
+  eight s254 anchors, the five s253 anchors, the three
+  `type.list.*`), none removed, none moved file: computed from the two
+  tags' `spec/anchors.json` before the regen, to be diffed both ways
+  after it. `spec/05-conformance.md` MOVES this time (+21/-3: the trap
+  set gains `stack-overflow`, `[conf.trap.stack]`, W0304 on a local
+  binding), so the vendored clause snapshot moves with the pin; no
+  test names `stack-overflow`, so nothing reads the new kind.
+
+### P3. The bare pin (trunk's tree, only the pins moved)
+
+- std-test 524 files **RED on exactly r40's thirteen cells and nothing
+  else** — the nine `json/*.lu` native `unsupported → run`,
+  `fs/sync_rows`, `term/restore_rows`, `time/monotonic_ns` lupin
+  `unsupported → run`, `term/mode_bits_set` lupin `divergent(stdout) →
+  unsupported` — with `process/join_own_group.lu` green because the
+  container runs the rig in its own session (`setsid -w`), r40's
+  posture control. No cell moves differently from r40's measurement:
+  r40 measured the candidate `83bab715` and its final head; the
+  published binary is the tag's build of `cf0c13d3`, and nothing
+  between the candidate and the tag touched a runtime path these rows
+  reach (s259's refusal locations are diagnostics). doc-examples 533
+  blocks, 1,599 lane runs GREEN, 0 mirror-lag. Two `SKIP` lines,
+  `os/users/directory_accounts.lu` on checked and native, as r40's.
+
+### P4. The thirteen cells
+
+- Flipped in their own commits, each citing the release that moved it
+  (wolf 0.2.35's s257 for the nine; lupin 0.1.56's 0.2.34 mirror for the
+  four) and r40's control. After them std-test is GREEN at the pin.
+
+### P5. #93
+
+- `std/json/json.lu`'s "The wolfc lane is dark for this module, by
+  construction" paragraph is false twice over: six rows have run on
+  wolfc since sc44/sc46, and all nine run natively from 0.2.35. Replaced
+  by the true table (lupin nine, checked six, native nine) with the three
+  checked-machine stops named.
+
+### P6. The spellings (the rulings asked, each recommendation built)
+
+- **R-sc72-1** `fs.fstat_record(mut f: File) -> Info ! {io}`: the
+  twenty words named in the `Info` the path stats already answer, the
+  word list kept as the builtin's. Not a wider `Stat` (built by literal
+  in programs that exist) and not a raw `List[int]`.
+- **R-sc72-2** `signal.host(n)` keeps its released total signature
+  (ruling #85 G5, `-n`): a total `int` function cannot refuse. The
+  refusal by name is the three calls that take a host number into a
+  disposition or an end (`ignore_one`, `reset_one`,
+  `process.exit_signal`), which answer the C library's numbers
+  `invalid` on every machine at 0.2.35; `host`'s doc says so and a row
+  holds it through std. No fallible sibling.
+- **R-sc72-3** the no-follow flag: `fs.NOFOLLOW` (16), a module
+  constant, and the moded open it rides, `fs.open_mode(path, mode) ->
+  File ! {not_found, denied, exists, invalid, io}` (`[os.fs.open]`'s six
+  modes; std had no read-write or non-blocking open at all). `WAIT_WRITE`
+  is `signal.WAIT_WRITE` (`1 << 62`) the same way: the first `pub const`
+  in std, which the probe shows every lane resolves.
+- **R-sc72-4** #92: the rebuilding mutators of `std.list` (`set`,
+  `insert`, `remove`, `swap_remove`, `swap`, `clear`, `truncate`,
+  `reverse`, `fill`, `pop` through `truncate`, `sort_by`) get in-place
+  bodies under their released names and signatures — no second name for
+  one operation (§1); the helpers that return a fresh list by nature
+  (`concat`, `repeat`, `map`, `filter`, `sorted_by`, `sorted`, …) stay
+  as they are. `list.reserve` and `list.reset` join the module over the
+  language's two methods (the BLOCKED comment's promise, §8's capacity
+  rule now met). `push` and `extend` keep storing the caller's value
+  (a `copy` there would deep-copy every pushed `str`).
+- The s253 six: `process.core_limit() -> CoreLimit ! {unsupported}`
+  (`CoreLimit { soft, hard }`, -1 unlimited), `process.set_core_limit(
+  soft, hard) -> () ! {denied, invalid, unsupported}`,
+  `process.core_off() -> () ! {unsupported}`, `fs.adopt(fd) -> File !
+  {invalid, io, unsupported}`, `os.name() -> str`, `os.arch() -> str`.
+  The s254 seven: `fs.access(path, mode)`, `fs.fstat_record`,
+  `fs.lock(mut f, kind)` / `fs.unlock(mut f)` with `fs.LOCK_SHARED` (1)
+  and `fs.LOCK_EXCLUSIVE` (2), `fs.mkfifo(path, perm)`,
+  `fs.set_nonblock(mut f, on)`, `fs.write_some(mut f, b) -> int ! {busy,
+  invalid, io}`; the rows are the builtins'.
+- #94: `fs.read_into(mut f: File, mut buf: List[byte], max: int) -> int
+  ! {eof, io}`, the bytes read replacing `buf`'s contents (its storage
+  reset and kept), the chunk the builtin answers made and dropped in a
+  region the call opens: nothing kept per call.
+
+### P7. The rows and the lupin column
+
+Each new row red before its wrapper (the plant: the PR's first
+`tier pr`, at a head with the pins moved, the cells unflipped and the
+rows present without the wrappers), `fail(E0301)` on the compiled lanes
+for a missing std function, then green at the head. New rows, with the
+column I expect on lupin 0.1.56:
+
+| row | lupin 0.1.56 | checked | native |
+|---|---|---|---|
+| `process/core_limit_rows` (the read, the shape rows, the limit set to itself, `core_off`) | unsupported (`os_core_limit` does not resolve, wolf-interp#277) | run | run |
+| `fs/adopt_rows` (the shape rows, a number not open) | unsupported (#277) | run | run |
+| `os/host_rows` (`name` and `arch` in the vocabulary, stable) | unsupported (#277) | run | run |
+| `signal/reserved_rows` (32 and 33 refused through `host`, their words) | unsupported (lupin refuses a well-formed one-meaning call by name; #277 owes the reserved rows) | run | run |
+| `fs/access_rows`, `fs/lock_rows`, `fs/fstat_record_rows`, `fs/mkfifo_rows`, `fs/nonblock_rows` | unsupported (#278) | run | run |
+| `fs/nofollow_rows` | divergent(stdout) or unsupported: 0.1.56 answers bit 16 `invalid` (#278) where the compilers open | run | run |
+| `signal/wait_write_rows` (a pipe that takes a write, a full one under a deadline) | unsupported (`fs_set_nonblock` does not resolve) | run | run |
+| `list/in_place_rows`, `list/in_place_allocates_nothing` | **run** (the probe) | run | run |
+| `list/reserve_reset` | unsupported (`List` has no method `reserve`, #289/is81) | run | run |
+| `fs/read_into_rows` | unsupported (`List.reset`) | run | run |
+| a `comptime_refuses_*` row per new builtin (D33) | unsupported | run | run |
+
+`fs_write_some`'s comptime row is dropped if the comptime engine still
+cannot build its `List[byte]` argument (sc69's two). So **lupin 0.1.56
+refuses all thirteen wrappers** (none resolves), plus `fs.read_into`,
+`list.reserve` and `list.reset`; it runs the in-place list rows.
+
+### P8. #94
+
+- Possible without a builtin, in the sense the issue needs: an editor's
+  loop over `fs.read_into` keeps nothing per call (checked and native
+  measured flat in the probe). Not allocation-free in the strict sense:
+  each call still opens one region and the builtin's chunk lives there
+  until the call returns, and the bytes are copied once. Shipped, with
+  the builtin's shape written as an optional wolf-lang issue in the
+  note, not filed.
+
+### P9. The counts after
+
+- std-test **551** files (524 + 27: eleven new functional rows, three
+  list rows, `read_into_rows`, twelve or thirteen comptime rows), GREEN
+  on both lanes I can run (kasumi container; CI's three hosts at the
+  head). doc-examples about **550** blocks (533 + ~17), GREEN, with two
+  `LUPIN_MIRROR_LAG` entries for `os.name(` and `os.arch(` (std.os is
+  not a capability module) and two for `list.reserve(` and
+  `list.reset(`.
+
+### P10. One thing wrong that this list does not name
+
+- There will be one. The least sure: the in-place `sort_by` (a stable
+  merge with a scratch list written back by index), lupin's answer on
+  the `str` in-place rows inside a region (wolf-interp#289's sharing
+  copy), and windows' answers on the fs rows, which only CI sees.
