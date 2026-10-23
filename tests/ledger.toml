@@ -2513,8 +2513,19 @@ lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word 
 wolfc = "unsupported"
 native = "run"
 
+# sc72 (lupin 0.1.56; ruling asked R-sc72-5): lupin's refusal of this row is
+# its 50M-step budget, and on CI's ubuntu runners the budget's wall time
+# crossed the 60 s ceiling at the new pin — 59.8 s, then two timeouts
+# (runs 39977644707, 39977416300, 39986553915), where lupin 0.1.55 read
+# 55.0-56.5 s on the same runners (39811704495, 39831422176, 39960481667):
+# a red-on-timeout records the runner's speed, not the lane's depth, which
+# is what `slow` is for (sc16). The sc24 note below kept `unsupported`
+# because the refusal then landed in ~20 s; it no longer lands inside the
+# ceiling. windows (180 s ceiling, sc52) still observes the refusal, at
+# 96 s. Owed a re-measure at the next lupin pin.
 [tests."x/crypto/sha2/cavp_sha384_long.lu"]
-lupin = "unsupported"  # sc24 re-measure (lupin 0.1.14): the machine's OWN word now — `unsupported: did not terminate within 50000000 evaluation steps` (the sc23 P-256 verdict arriving for this row); not `slow`, lupin actively refuses
+lupin = "slow"  # sc72: see above; was `unsupported` (sc24 re-measure, lupin 0.1.14: the machine's OWN word — `unsupported: did not terminate within 50000000 evaluation steps`; then "not `slow`, lupin actively refuses")
+lupin-windows = "unsupported"  # sc72: the refusal inside windows' 180 s ceiling (96.1 s, run 39977416300)
 wolfc = "unsupported"
 native = "run"
 
