@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.os, comptime.sandbox, comptime.sandbox.env, os.uname
+//!
+//! **D33 for `os.name` (sc72, wolf 0.2.35), held one level down at
+//! `os_name`**: the OS that compiles is not the one that runs: `env`,
+//! machine state, with `os_cpus`. The row is handled locally (F-0069).
+//!
+//! No import: `std.os` has no pure member to keep one used
+//! (`os/comptime_refuses.lu`'s note), so the module is named in
+//! `conforms:`.
+
+comptime fn probe() -> int {
+    let n = os_name()
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P}")
+    0
+}

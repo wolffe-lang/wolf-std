@@ -1,0 +1,36 @@
+//! check: run(exit=0, stdout="name_known=true\narch_known=true\nstable=true\nlowercase=true")
+//! phase: run
+//! conforms: std.os, os.uname
+//!
+//! **sc72: `os.name` and `os.arch`** (wolf 0.2.35's s253, wolf-lang#819,
+//! `[os.uname]`). Each answers a word of the clause's vocabulary on every
+//! host this repository's CI runs (`linux`, `macos`, `windows`; `x86_64`,
+//! `aarch64`; `freebsd` and `pax` are words too), the same word twice
+//! (read once a process), in lowercase. The row asserts the VOCABULARY,
+//! never the host: the answer is the runner's, and a pin of the value
+//! would be a test of the machine.
+//!
+//! **lupin** 0.1.56 does not resolve `os_name` (wolf-interp#277).
+
+use std.os
+
+fn lower(s: str) -> bool {
+    for b in s.bytes() {
+        let v = b as int
+        if v >= 65 && v <= 90 {
+            return false
+        }
+    }
+    true
+}
+
+fn main() -> !int {
+    let n = os.name()
+    let a = os.arch()
+    let known_n = n == "linux" || n == "macos" || n == "windows" || n == "freebsd" || n == "pax"
+    print("name_known={known_n}")
+    print("arch_known={a == "x86_64" || a == "aarch64"}")
+    print("stable={os.name() == n && os.arch() == a}")
+    print("lowercase={lower(n) && lower(a)}")
+    0
+}
