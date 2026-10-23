@@ -4699,8 +4699,9 @@ native = "run"
 # list mutators (#92) and `fs.read_into` (#94). lupin 0.1.56 resolves
 # none of wolf 0.2.35's thirteen names (wolf-interp#277, #278) nor
 # `List.reset` (#289): every row that reaches one is `unsupported` there,
-# by name. The fork-probed rows run on lupin on windows, where 0.1.56
-# answers `os_fork`'s declared `unsupported` row before any refusal.
+# by name. On windows several run on lupin, where 0.1.56 answers the
+# host's declared `unsupported` row (`os_fork`, `os_signal_wait_fds`, the
+# one-meaning calls) before any refusal: their `lupin-windows` cells.
 # =====================================================================
 
 # `process/core_limit_rows.lu`: the limit read, the shape rows, the limit
