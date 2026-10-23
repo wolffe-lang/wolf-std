@@ -4,11 +4,9 @@
 
 The wolf standard library: the modules behind `use std.*`.
 
-It ships separately from the compiler and on its own cadence, so no
-package of `wolf` contains it. Until one does, `use std.list` resolves
-against a small built-in stub and reports that module `std` has no
-item named `list`. Point the compiler at a checkout and the real tree
-answers:
+The library has its own release cadence. Each `wolf` release ships a
+copy of `std/` beside the compiler binary, pinned by the compiler's
+`crates/wolf_driver/STD-PIN`. To use a checkout instead:
 
 ```sh
 git clone https://github.com/wolffe-lang/wolf-std
@@ -23,14 +21,14 @@ wolf run main.lu
 ## What's in it
 
 Core: `list` `map` `set` `deque` `option` `errors` `iter` `range` `cmp`
-`sort` `search` `mem` `pool` `prelude`
+`sort` `search` `mem` `pool` `ops` `prelude`
 
 Text and data: `str` `strbuf` `fmt` `unicode` `bytes` `hex` `base64`
 `json`
 
 Numbers: `math` `rand`
 
-The os tier: `fs` `io` `net` `time` `env` `process` `os`
+The os tier: `fs` `io` `net` `time` `env` `process` `os` `signal` `term`
 
 Testing: `testing`
 
@@ -41,8 +39,8 @@ without notice.
 Every function names the capability it reaches and records which
 execution rungs run it.
 
-The library is pre-alpha, with the compiler. The os tier is the newest
-part and the least settled.
+The library is pre-alpha, with the compiler. The newest surface is
+`std.time`'s `Local` calendar and time-zone support.
 
 ## Testing
 
@@ -52,7 +50,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 392 tests. A test that passes deeper than its ledger entry claims
+all 524 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
@@ -62,11 +60,17 @@ When a test finds a gap in the language, the gap is filed in
 ## Building
 
 ```sh
-cargo xtask std-test      # stage + run every test on all three rungs
-cargo xtask doc-examples  # every fenced ```wolf-doc-example, executed
-cargo xtask ulp           # std.math.float accuracy + bit-for-bit agreement
-cargo xtask doctor        # which binaries resolved, and whether they match the pins
-cargo xtask ci            # all of it, behind fmt/clippy/test
+cargo xtask std-test                     # stage + run every test on all three rungs
+cargo xtask doc-examples                 # every fenced ```wolf-doc-example, executed
+cargo xtask ulp                          # std.math.float accuracy + bit-for-bit agreement
+cargo xtask doctor                       # which binaries resolved, and whether they match the pins
+cargo xtask ledger-check                 # every test has a ledger row, and every row has a test
+cargo xtask std-test --lint-conventions  # test-authoring conventions, without running tests
+cargo xtask fmt-lu                       # wolf formatting, checked without rewriting
+cargo xtask sync-pin                     # verify the vendored upstream snapshot against PIN
+cargo xtask gen-vectors --check          # verify the committed crypto vector tests
+cargo xtask time-oracle                  # local time against the host's date command
+cargo xtask ci                           # all of it, behind fmt/clippy/test
 ```
 
 Toolchain binaries are looked up at run time from `$LUPIN_BIN` /
