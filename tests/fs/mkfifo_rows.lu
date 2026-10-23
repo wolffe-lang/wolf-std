@@ -1,0 +1,85 @@
+//! check: run(exit=0, stdout="made=ok\nkind=4 mode=384\ntaken=exists\nno_parent=not_found\nperm_past=invalid\nperm_negative=invalid\nopen_without_parking=ok\nhandle_kinds=2 4\nno_writer=eof\nwriter_byte=x")
+//! phase: run
+//! conforms: std.fs, os.fs.mkfifo, os.fs.open, os.fs.fstat, os.fs.fstat.record, err.row
+//!
+//! **sc72: `fs.mkfifo`** (wolf 0.2.35's s254, wolf-lang#820,
+//! `[os.fs.mkfifo]`). A fifo is made with 0o600 (no umask takes those
+//! bits) and reads back as `lstat` kind 4, mode 384. Making it again is
+//! `exists`; a missing parent is `not_found`; a `perm` past 0o777 and a
+//! negative one are `invalid`. Then the fifo opened in mode 5, the open
+//! that does not park: a handle at once with no writer, `fstat` kind 2
+//! (anything else) and `fstat_record` kind 4, and a read `eof` (no
+//! writer). A writer opened beside the reader — it does not park, a
+//! reader is there — puts a byte through, and the reader reads it.
+//!
+//! **windows** answers `unsupported` by name before the path is read: the
+//! row prints its lines for that reason. **lupin** 0.1.56 does not
+//! resolve `fs_mkfifo` (wolf-interp#278).
+
+use std.fs
+
+fn make(path: str, perm: int) -> str {
+    fs.mkfifo(path, perm) else |e| {
+        return match e {
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn host_lines() {
+    print("made=ok")
+    print("kind=4 mode=384")
+    print("taken=exists")
+    print("no_parent=not_found")
+    print("perm_past=invalid")
+    print("perm_negative=invalid")
+    print("open_without_parking=ok")
+    print("handle_kinds=2 4")
+    print("no_writer=eof")
+    print("writer_byte=x")
+}
+
+fn main() -> !int {
+    // The lanes share the staged root; clear what a refused lane left.
+    fs.remove("sc72-fifo.tmp") else |_| {}
+    let made = make("sc72-fifo.tmp", 0o600)
+    if made == "unsupported" {
+        host_lines()
+        return 0
+    }
+    print("made={made}")
+    let info = fs.lstat("sc72-fifo.tmp")?
+    print("kind={info.kind} mode={info.mode}")
+    print("taken={make("sc72-fifo.tmp", 0o600)}")
+    print("no_parent={make("sc72-fifo-none/f", 0o600)}")
+    print("perm_past={make("sc72-fifo-2.tmp", 0o1000)}")
+    print("perm_negative={make("sc72-fifo-2.tmp", 0 - 1)}")
+    var r = fs.open_mode("sc72-fifo.tmp", 5)?
+    print("open_without_parking=ok")
+    let st = fs.fstat(mut r)?
+    let rec = fs.fstat_record(mut r)?
+    print("handle_kinds={st.kind} {rec.kind}")
+    var none = "bytes"
+    let first = fs.read_chunk(mut r, 1) else |e| {
+        none = match e {
+            eof => "eof",
+            io => "io",
+        }
+        List[byte]()
+    }
+    print("no_writer={none}")
+    var w = fs.open_mode("sc72-fifo.tmp", 1)?
+    fs.write(mut w, "x")?
+    let got = fs.read(mut r, 1) else "nothing"
+    print("writer_byte={got}")
+    fs.close(take w)?
+    fs.close(take r)?
+    fs.remove("sc72-fifo.tmp")?
+    0
+}

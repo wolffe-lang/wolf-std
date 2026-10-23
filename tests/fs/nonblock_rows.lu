@@ -1,0 +1,81 @@
+//! check: run(exit=0, stdout="stdin=invalid\nstdout=invalid\nstderr=invalid\nforged=io\nclosed=io\nfile_on_off=ok ok\nwrite_some=4 0\nwrite_some_forged=io\nwrite_some_closed=io")
+//! phase: run
+//! conforms: std.fs, os.fs.nonblock, os.fs.std, err.row
+//!
+//! **sc72: `fs.set_nonblock` and `fs.write_some`'s rows** (wolf 0.2.35's
+//! s254, wolf-lang#818, `[os.fs.nonblock]`). The standard streams are
+//! `invalid` by name (their open file is shared with whoever started the
+//! process); a forged and a closed handle are `io`; a file this row opened
+//! takes the flag and gives it back. `write_some` to a regular file takes
+//! all four bytes in one write and an empty list answers 0; a forged and
+//! a closed handle are `io`. The pipe that fills and answers `busy` is
+//! `signal/wait_write_rows.lu`'s.
+//!
+//! **windows** answers `set_nonblock` `unsupported` by name and serves
+//! `write_some`: the row prints the flag's lines for that reason when the
+//! file's call answers `unsupported`. **lupin** 0.1.56 resolves neither
+//! name (wolf-interp#278).
+
+use std.fs
+
+fn flag(f: fs.File, on: bool) -> str {
+    var g = f
+    fs.set_nonblock(mut g, on) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn some(f: fs.File, b: List[byte]) -> str {
+    var g = f
+    let n = fs.write_some(mut g, b) else |e| {
+        return match e {
+            busy => "busy",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    "{n}"
+}
+
+fn main() -> !int {
+    var f = fs.create("sc72-nonblock.tmp")?
+    let on = flag(f, true)
+    let windows = on == "unsupported"
+    if windows {
+        print("stdin=invalid")
+        print("stdout=invalid")
+        print("stderr=invalid")
+        print("forged=io")
+        print("closed=io")
+        print("file_on_off=ok ok")
+    } else {
+        print("stdin={flag(fs.stdin(), true)}")
+        print("stdout={flag(fs.stdout(), true)}")
+        print("stderr={flag(fs.stderr(), false)}")
+        print("forged={flag(fs.File { fd: 4242 }, true)}")
+        var g = fs.create("sc72-nonblock-2.tmp")?
+        let gfd = g.fd
+        fs.close(take g)?
+        print("closed={flag(fs.File { fd: gfd }, true)}")
+        print("file_on_off={on} {flag(f, false)}")
+    }
+    var raw = List[byte]()
+    for c in [119, 111, 108, 102] {
+        (mut raw).push(c as byte)
+    }
+    let four = some(f, raw)
+    let zero = some(f, List[byte]())
+    print("write_some={four} {zero}")
+    print("write_some_forged={some(fs.File { fd: 4242 }, raw)}")
+    let fd = f.fd
+    fs.close(take f)?
+    print("write_some_closed={some(fs.File { fd: fd }, raw)}")
+    fs.remove("sc72-nonblock.tmp")?
+    fs.remove("sc72-nonblock-2.tmp") else |_| {}
+    0
+}

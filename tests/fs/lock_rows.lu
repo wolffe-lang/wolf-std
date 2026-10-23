@@ -1,0 +1,75 @@
+//! check: run(exit=0, stdout="exclusive=ok\nshared_beside_exclusive=busy\nexclusive_beside_exclusive=busy\nunlocked=ok\nshared=ok\nshared_beside_shared=ok\nexclusive_beside_shared=busy\nclose_one_shared=busy\nclose_last_shared=ok\nkind_0=invalid\nkind_3=invalid\nunlock_none=ok\nforged=io io\nclosed=io io")
+//! phase: run
+//! conforms: std.fs, os.fs.lock, err.row
+//!
+//! **sc72: `fs.lock` and `fs.unlock`** (wolf 0.2.35's s254, wolf-lang#820,
+//! `[os.fs.lock]`). Three opens of one file, `a`, `b` and `c`, in this one
+//! process — the lock belongs to the OPEN FILE (`flock(2)`'s rule), so
+//! they conflict with each other. `a` exclusive; `b` shared and exclusive
+//! beside it are `busy`, tried once. `a` unlocked; `b` shared, then `c`
+//! shared beside it; `a` exclusive beside them is `busy`. Closing `b`
+//! leaves `c`'s lock (`a` still `busy`); closing `c` releases it (`a`
+//! exclusive is ok). Kinds 0 and 3 are `invalid` before the handle is
+//! looked at; unlocking a handle that holds none is ok; a forged and a
+//! closed handle are `io` for both calls. No row converts a held lock in
+//! place (the hosts differ there, the clause says).
+//!
+//! **windows** takes the same rows through `LockFileEx` (mandatory there,
+//! and this row reads nothing through a locked open). **lupin** 0.1.56
+//! does not resolve `fs_lock` (wolf-interp#278).
+
+use std.fs
+
+fn lock_row(f: fs.File, kind: int) -> str {
+    var g = f
+    fs.lock(mut g, kind) else |e| {
+        return match e {
+            busy => "busy",
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn unlock_row(f: fs.File) -> str {
+    var g = f
+    fs.unlock(mut g) else |e| {
+        return match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    fs.write_text("sc72-lock.tmp", "x")?
+    var a = fs.open("sc72-lock.tmp")?
+    var b = fs.open("sc72-lock.tmp")?
+    var c = fs.open("sc72-lock.tmp")?
+    print("exclusive={lock_row(a, fs.LOCK_EXCLUSIVE)}")
+    print("shared_beside_exclusive={lock_row(b, fs.LOCK_SHARED)}")
+    print("exclusive_beside_exclusive={lock_row(b, fs.LOCK_EXCLUSIVE)}")
+    print("unlocked={unlock_row(a)}")
+    print("shared={lock_row(b, fs.LOCK_SHARED)}")
+    print("shared_beside_shared={lock_row(c, fs.LOCK_SHARED)}")
+    print("exclusive_beside_shared={lock_row(a, fs.LOCK_EXCLUSIVE)}")
+    fs.close(take b)?
+    print("close_one_shared={lock_row(a, fs.LOCK_EXCLUSIVE)}")
+    let cfd = c.fd
+    fs.close(take c)?
+    print("close_last_shared={lock_row(a, fs.LOCK_EXCLUSIVE)}")
+    print("kind_0={lock_row(a, 0)}")
+    print("kind_3={lock_row(fs.File { fd: 4242 }, 3)}")
+    fs.unlock(mut a)?
+    print("unlock_none={unlock_row(a)}")
+    let forged = fs.File { fd: 4242 }
+    print("forged={lock_row(forged, fs.LOCK_SHARED)} {unlock_row(forged)}")
+    let closed = fs.File { fd: cfd }
+    print("closed={lock_row(closed, fs.LOCK_SHARED)} {unlock_row(closed)}")
+    fs.close(take a)?
+    fs.remove("sc72-lock.tmp")?
+    0
+}

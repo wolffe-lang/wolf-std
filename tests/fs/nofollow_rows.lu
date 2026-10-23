@@ -1,0 +1,107 @@
+//! check: run(exit=0, stdout="plain_read=ok wolf\nlink_followed=ok wolf\nlink_refused_read=invalid\nlink_refused_write=invalid\nlink_refused_update=invalid\ntarget_intact=wolf\nexclusive_on_link=exists exists\nmiddle_link=ok wolf\nbit_32=invalid\nmode_6=invalid\nmode_6_flagged=invalid\nupdate_in_place=Wolf")
+//! phase: run
+//! conforms: std.fs, os.fs.open, os.fs.open.nofollow, os.fs.symlink, err.row
+//!
+//! **sc72: `fs.open_mode` and `fs.NOFOLLOW`** (wolf 0.2.35's s254,
+//! wolf-lang#820, `[os.fs.open.nofollow]`). A plain file opens under the
+//! flag. A link to it opens without the flag (followed) and is refused
+//! `invalid` with it in modes 0, 1 and 3, the target's bytes intact (the
+//! refused write truncated nothing). The exclusive create answers `exists`
+//! on a link with or without the flag. A link in a MIDDLE component is
+//! followed under the flag. Any bit above the six modes but 16 is
+//! `invalid`, flagged or not. Mode 3 writes in place, truncating nothing:
+//! the first byte rewritten, the rest kept.
+//!
+//! **windows** refuses the flag `invalid` before the host and makes no
+//! link an unprivileged program may (`symlink` answers `unsupported`): the
+//! row prints its link lines for that reason. **lupin** 0.1.56 answers bit
+//! 16 `invalid`, a mode outside its set (wolf-interp#278).
+
+use std.fs
+
+fn row(path: str, mode: int) -> str {
+    var f = fs.open_mode(path, mode) else |e| {
+        return match e {
+            not_found => "not_found",
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    let text = fs.read(mut f, 16) else "?"
+    fs.close(take f) else |_| {}
+    "ok {text}"
+}
+
+fn bare(path: str, mode: int) -> str {
+    var f = fs.open_mode(path, mode) else |e| {
+        return match e {
+            not_found => "not_found",
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    fs.close(take f) else |_| {}
+    "ok"
+}
+
+fn link_lines() {
+    print("link_followed=ok wolf")
+    print("link_refused_read=invalid")
+    print("link_refused_write=invalid")
+    print("link_refused_update=invalid")
+    print("target_intact=wolf")
+    print("exclusive_on_link=exists exists")
+    print("middle_link=ok wolf")
+}
+
+fn main() -> !int {
+    // The lanes share the staged root; clear what a refused lane left.
+    fs.remove("sc72-nf-link.tmp") else |_| {}
+    fs.remove("sc72-nf-dir-link") else |_| {}
+    fs.remove_dir_all("sc72-nf-dir") else |_| {}
+    fs.write_text("sc72-nf.tmp", "wolf")?
+    let plain = row("sc72-nf.tmp", 0 + fs.NOFOLLOW)
+    var windows = false
+    fs.symlink("sc72-nf.tmp", "sc72-nf-link.tmp") else |e| match e {
+        unsupported => { windows = true },
+        exists => { return 2 },
+        not_found => { return 3 },
+        denied => { return 4 },
+        invalid => { return 6 },
+        io => { return 5 },
+    }
+    if windows {
+        print(if plain == "invalid" { "plain_read=ok wolf" } else { "plain_read={plain}" })
+        link_lines()
+    } else {
+        print("plain_read={plain}")
+        print("link_followed={row("sc72-nf-link.tmp", 0)}")
+        print("link_refused_read={bare("sc72-nf-link.tmp", 0 + fs.NOFOLLOW)}")
+        print("link_refused_write={bare("sc72-nf-link.tmp", 1 + fs.NOFOLLOW)}")
+        print("link_refused_update={bare("sc72-nf-link.tmp", 3 + fs.NOFOLLOW)}")
+        print("target_intact={fs.read_text("sc72-nf.tmp")?}")
+        let a = bare("sc72-nf-link.tmp", 4)
+        let b = bare("sc72-nf-link.tmp", 4 + fs.NOFOLLOW)
+        print("exclusive_on_link={a} {b}")
+        fs.create_dir("sc72-nf-dir")?
+        fs.write_text("sc72-nf-dir/inner.tmp", "wolf")?
+        fs.symlink("sc72-nf-dir", "sc72-nf-dir-link")?
+        print("middle_link={row("sc72-nf-dir-link/inner.tmp", 0 + fs.NOFOLLOW)}")
+        fs.remove("sc72-nf-dir-link")?
+        fs.remove_dir_all("sc72-nf-dir")?
+        fs.remove("sc72-nf-link.tmp")?
+    }
+    print("bit_32={bare("sc72-nf.tmp", 32)}")
+    print("mode_6={bare("sc72-nf.tmp", 6)}")
+    print("mode_6_flagged={bare("sc72-nf.tmp", 6 + fs.NOFOLLOW)}")
+    var u = fs.open_mode("sc72-nf.tmp", 3)?
+    fs.write(mut u, "W")?
+    fs.close(take u)?
+    print("update_in_place={fs.read_text("sc72-nf.tmp")?}")
+    fs.remove("sc72-nf.tmp")?
+    0
+}

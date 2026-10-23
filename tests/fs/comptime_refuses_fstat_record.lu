@@ -1,0 +1,20 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.fstat.record
+//!
+//! **D33 for `fs.fstat_record` (sc72, wolf 0.2.35), held one level down
+//! at `fs_fstat_record`**: a handle's metadata is the host's, `fs`. The
+//! row is handled locally (F-0069).
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_fstat_record(1) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {fs.join("a", "b")}")
+    0
+}

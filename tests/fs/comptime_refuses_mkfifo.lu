@@ -1,0 +1,20 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.mkfifo
+//!
+//! **D33 for `fs.mkfifo` (sc72, wolf 0.2.35), held one level down at
+//! `fs_mkfifo`**: making a fifo writes the filesystem, `fs`. The row is
+//! handled locally (F-0069).
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_mkfifo("sc72-comptime.fifo", 384) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {fs.join("a", "b")}")
+    0
+}

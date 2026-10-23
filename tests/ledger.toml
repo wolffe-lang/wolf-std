@@ -4744,6 +4744,49 @@ lupin = "unsupported"
 wolfc = "run"
 native = "run"
 
+# `fs/access_rows.lu`: the shape rows, a file's four questions, a
+# directory, a missing name, a dangling link, a name under a file.
+[tests."fs/access_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `fs/nofollow_rows.lu`: `open_mode` under `NOFOLLOW`: a file, a final link
+# refused in three modes, the exclusive create, a middle link, the bits
+# above, mode 3 in place.
+[tests."fs/nofollow_rows.lu"]
+lupin = "divergent(stdout)"  # sc72: lupin 0.1.56 answers bit 16 `invalid`, a mode outside its set (wolf-interp#278)
+wolfc = "run"
+native = "run"
+
+# `fs/lock_rows.lu`: three opens of one file, the lock's conflicts and its
+# release by a close, the shape, a forged and a closed handle.
+[tests."fs/lock_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `fs/fstat_record_rows.lu`: the handle's record against the path's, after
+# a rename, a directory, a pipe, standard output, a forged and a closed
+# handle.
+[tests."fs/fstat_record_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `fs/mkfifo_rows.lu`: a fifo made and its rows, opened in mode 5 with no
+# writer, then a writer's byte.
+[tests."fs/mkfifo_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `fs/nonblock_rows.lu`: `set_nonblock`'s and `write_some`'s rows.
+[tests."fs/nonblock_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
 # D33 one level down at twelve of wolf 0.2.35's thirteen builtins; not at
 # `fs_write_some`, whose `List[byte]` argument the comptime engine cannot
 # build ("`List` construction at comptime", the compiled lanes'
@@ -4764,6 +4807,36 @@ wolfc = "run"
 native = "run"
 
 [tests."fs/comptime_refuses_adopt.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_access.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_lock.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_unlock.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_fstat_record.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_mkfifo.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_set_nonblock.lu"]
 lupin = "unsupported"
 wolfc = "run"
 native = "run"

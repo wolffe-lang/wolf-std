@@ -1,0 +1,83 @@
+//! check: run(exit=0, stdout="matches_path=true\nidentity_answered=true\nafter_rename=true\ndirectory=1\npipe=true\nstream=true\nforged=io\nclosed=io")
+//! phase: run
+//! conforms: std.fs, std.process, os.fs.fstat.record, os.fs.stat, os.fs.fstat, os.fs.std, os.proc.pipe, err.row
+//!
+//! **sc72: `fs.fstat_record`** (wolf 0.2.35's s254, wolf-lang#820,
+//! `[os.fs.fstat.record]`; R-sc72-1, the twenty words as an `Info`). The
+//! record of a file this row holds against `fs.stat` of its name: kind,
+//! size, mode, link count, owner, the nanosecond mtime, `have`, and the
+//! identity (`dev`, `ino`) agree, and the identity is ANSWERED where the
+//! host keeps one. After the name is renamed, the handle's identity is
+//! the new name's: no path was walked. A directory opened read-only is
+//! kind 1; a pipe's end is kind 4; standard output answers a record; a
+//! forged and a closed handle are `io`.
+//!
+//! **windows** answers its column: no identity (`have` bits 9 and 10
+//! clear, so `identity_answered` holds by the clause's other half), no
+//! directory opens as a file (`fs.open` answers `denied` there, so the
+//! directory line is printed for that reason), and a pipe is kind 2, a
+//! handle that is no disk file. **lupin** 0.1.56 does not resolve
+//! `fs_fstat_record` (wolf-interp#278).
+
+use std.fs
+use std.process
+
+fn row(f: fs.File) -> str {
+    var g = f
+    let r = fs.fstat_record(mut g) else |e| {
+        return match e {
+            io => "io",
+        }
+    }
+    "{r.kind}"
+}
+
+fn main() -> !int {
+    fs.remove("sc72-fsr-moved.tmp") else |_| {}
+    fs.write_text("sc72-fsr.tmp", "wolves")?
+    var f = fs.open("sc72-fsr.tmp")?
+    let held = fs.fstat_record(mut f)?
+    let named = fs.stat("sc72-fsr.tmp")?
+    let shape = held.kind == named.kind && held.size == named.size && held.mode == named.mode
+    let owner = held.nlink == named.nlink && held.uid == named.uid && held.gid == named.gid
+    let times = held.mtime_s == named.mtime_s && held.mtime_ns == named.mtime_ns
+    let identity = held.have == named.have && held.dev == named.dev && held.ino == named.ino
+    let same = shape && owner && times && identity
+    print("matches_path={same && held.kind == 0 && held.size == 6}")
+    let windows = !fs.answered(named, 10)
+    print("identity_answered={windows || (fs.answered(held, 9) && fs.answered(held, 10))}")
+    fs.move_file("sc72-fsr.tmp", "sc72-fsr-moved.tmp")?
+    let after = fs.fstat_record(mut f)?
+    let moved = fs.stat("sc72-fsr-moved.tmp")?
+    print("after_rename={after.dev == moved.dev && after.ino == moved.ino && !fs.exists("sc72-fsr.tmp")}")
+    let fd = f.fd
+    fs.close(take f)?
+    fs.remove("sc72-fsr-moved.tmp")?
+    var dir_denied = false
+    var d = fs.open(".") else |e| match e {
+        not_found => { return 2 },
+        denied => {
+            dir_denied = true
+            fs.File { fd: 0 - 1 }
+        },
+        io => { return 3 },
+    }
+    if dir_denied {
+        print("directory=1")
+    } else {
+        print("directory={row(d)}")
+        fs.close(take d)?
+    }
+    var p = process.pipe()?
+    var r = p.read
+    var w = p.write
+    let pk = row(r)
+    print("pipe={pk == "4" || (windows && pk == "2")}")
+    fs.close(take r)?
+    fs.close(take w)?
+    let so = row(fs.stdout())
+    print("stream={so != "io"}")
+    print("forged={row(fs.File { fd: 4242 })}")
+    print("closed={row(fs.File { fd: fd })}")
+    0
+}
