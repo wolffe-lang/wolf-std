@@ -332,10 +332,12 @@ pub fn reset(set: int) -> () ! {unsupported, io} {
 ///
 /// Rows, in the order they are decided: `invalid` for 0, for anything
 /// `send` refuses (two meanings, a bit no release publishes, a host
-/// number past `last()`), and for `kill()` and `stop()` by bit or by
-/// number, which no process can ignore; then `unsupported` on windows;
-/// then `io` where the host refuses the number (glibc keeps 32 and 33
-/// for itself). Nothing changes on a row. Never traps.
+/// number past `last()`), for `kill()` and `stop()` by bit or by
+/// number, which no process can ignore, and from wolf 0.2.35 for the C
+/// library's own numbers (`host`'s doc; 0.2.33 and 0.2.34 answered
+/// glibc's refusal of 32 and 33 `io`); then `unsupported` on windows;
+/// then `io` where the host refuses the number. Nothing changes on a
+/// row. Never traps.
 ///
 /// A listenable meaning, by its bit or its number, is the set calls'
 /// (`[os.signal.disp]`): the ignore ends a listen, `ignored` reads it,
@@ -367,8 +369,9 @@ pub fn ignore_one(meaning: int) -> () ! {invalid, io, unsupported} {
 /// it.
 ///
 /// Rows, in `ignore_one`'s order: `invalid` for 0, anything `send`
-/// refuses, and `kill()` and `stop()`; `unsupported` on windows; `io`
-/// where the host refuses the number. Never traps. The checked machine
+/// refuses, `kill()` and `stop()`, and the C library's own numbers (wolf
+/// 0.2.35); `unsupported` on windows; `io` where the host refuses the
+/// number. Never traps. The checked machine
 /// refuses `segment_fault()` and `bus_error()` by name; lupin 0.1.55
 /// answers the shape rows and refuses a well-formed call by name (is77,
 /// wolf-interp#261).
@@ -586,7 +589,20 @@ pub fn text(meaning: int) -> str ! {invalid, unsupported} {
 /// for `1 <= n <= last()`; every set-taking call refuses it (a negative
 /// set fails the one shape rule).
 ///
-/// Total and pure; nothing is checked until a call takes it.
+/// **The C library's own numbers** (`[os.signal.host.reserved]`, wolf
+/// 0.2.35's s253; ruling asked R-sc72-2): on linux, from 32 up to and not
+/// including `realtime()`'s first — glibc's 32 and 33, musl's 32 to 34 —
+/// are the C library's (its threads' cancellation and set-id signals),
+/// and wolf gives them no meaning. `ignore_one`, `reset_one` and
+/// `std.process.exit_signal` refuse `host(n)` of one **`invalid`**, by
+/// name, before the host, on every machine: a disposition the C library
+/// owns is not the program's to set, and an end by one was never kept.
+/// The sends and `text` take them as before. macOS has no real-time
+/// signals and windows no numbers, so neither has such a number.
+///
+/// Total and pure; nothing is checked until a call takes it — this
+/// function keeps its released signature, and the refusal by name is the
+/// calls' (`tests/signal/reserved_rows.lu`).
 ///
 /// ```wolf-doc-example
 /// signal.host(9) == 0 - 9

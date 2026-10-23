@@ -1416,10 +1416,12 @@ pub fn exit(code: int) {
 /// `urgent()`, `resize()`), or a stop that is later continued — exits
 /// with **`128 + N`**, so the call returns only a row.
 ///
-/// Rows: `invalid` for 0 and for anything `signal.send` refuses (two
+/// Rows: `invalid` for 0, for anything `signal.send` refuses (two
 /// meanings, a bit no release publishes, a host number past
-/// `signal.last()`); then `unsupported` on windows. Those are its only
-/// returns. As with `exit`, no `defer` runs and std flushes nothing.
+/// `signal.last()`), and from wolf 0.2.35 for the C library's own
+/// numbers (`signal.host`'s doc: glibc's 32 and 33, which 0.2.33 and
+/// 0.2.34 ended by as exits 160 and 161); then `unsupported` on windows.
+/// Those are its only returns. As with `exit`, no `defer` runs and std flushes nothing.
 /// `std.signal.raise` is unchanged (it delivers one listenable meaning).
 ///
 /// Capability `Exec`, with `exit`; refused at comptime (D33). The checked
