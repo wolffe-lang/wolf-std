@@ -14139,3 +14139,116 @@ refuses all thirteen wrappers** (none resolves), plus `fs.read_into`,
   merge with a scratch list written back by index), lupin's answer on
   the `str` in-place rows inside a region (wolf-interp#289's sharing
   copy), and windows' answers on the fs rows, which only CI sees.
+
+## F-0158 — sc72 measured beside its predictions
+
+Scored in place; the predictions above are unchanged. kasumi paths are
+under `~/lanes/sc72/` (`scripts/`, `logs/`, `probes/`); every job
+`setsid -f` with a pid file, SigBlk and SigIgn 0, cores 0-3; every run of
+a program that forks, signals or sets a limit (std-test, doc-examples,
+the probes) ran inside a throwaway podman container (`--rm`, `--ulimit
+core=0:0`, `--network none` for every rig step, `setsid -w`, `taskset -c
+0-3`). The harness, the probe programs and the logs are committed in
+`docs/sc72-witness/`.
+
+| # | predicted | measured | verdict |
+|---|---|---|---|
+| P1 | the two archives' digests and version lines | as predicted (`acquire.log`): the API read twice on the Mac and on kasumi, each download hashed twice; `wolf 0.2.35 (wolfgang, pin cf0c13d)` paired with `lupin 0.1.56 … pin 294d626`; GLIBC 2.34; the archive's `std/` against this branch's base differs only by `STD-REV` and the two licences; the old pair (0.2.34, 0.1.55) acquired the same way as the control | held |
+| P2 | 672 -> 693, the 21, none removed or moved; the clause moves | as predicted, key sets diffed both ways (`12f3d78`) | held |
+| P3 | the bare pin RED on exactly the thirteen; doc-examples 533 GREEN; two SKIPs | kasumi g0 at `6f5a7da` (`g0-std-test-summary.log`): std-test 524, RED on exactly r40's thirteen cells and nothing else, `process/join_own_group.lu` green in the container's own session; doc-examples 533 blocks GREEN, 1,599 lane runs; ulp 200 and every other CI step exit 0. The two `directory_accounts` SKIP lines are the row's stdout on checked and native (`probe-old-lupin.log`'s run beside it) | held |
+| P4 | the thirteen flipped, each citing its release and r40's control | three commits: `b6147b2` (the nine, s257), `6af552e` (three lupin `run`, 0.1.56's mirror), `9eae503` (`mode_bits_set` `unsupported`) | held |
+| P5 | #93's paragraph replaced by the true lanes | `0d6a0b8`: lupin nine, checked six (its three stops, wolf-lang#882), native nine | held |
+| P6 | the spellings | R-sc72-1, -2, -3 built as written. **R-sc72-4 wrong in one clause**: std adds NO `list.reserve`/`list.reset` — §8 forbids a std name over a working builtin, and on lupin 0.1.56, which has neither method, a `pub fn reserve` in `std.list` is what `xs.reserve(n)` resolves to (`[type.method.resolve]` step two), so its own body would recurse. The in-place mutators need neither method (index stores, the builtin `pop` and `clear`); `fs.read_into` is std's one `reset` | right but for the two list names |
+| P7 | the rows red first, then green; lupin refuses all thirteen | see below | held, with seven windows cells unpredicted (six read from lupin's source, one measured by the windows rig) |
+| P8 | #94 possible without a builtin, nothing kept per call | `fs.read_into` (`5564285`); 1,500 one-byte reads with the live total flat on checked and native (`read_into_rows`); lupin `unsupported` at `List.reset` | held |
+| P9 | 551 tests, ~550 doc examples, four mirror lags | **552** tests (28 new: thirteen functional rows, two list rows, `read_into_rows`, twelve comptime rows) and **552** doc examples, 1,656 lane runs (1,654 `exit(0)`, **2** mirror lags: the two list entries were never needed) | close: one row and two lags off |
+| P10 | one thing wrong this list does not name | five, below | — |
+
+**The plant.** CI run **39971282029** (`tier pr`, the PR's first head
+`665a607`: the pins moved, the thirteen cells unflipped, the rows present
+without their wrappers), `rig (ubuntu-latest)` job 120474439595
+(`plant-rig-39971282029.log`): RED on exactly the thirteen cells and on
+every new row whose program names a new std name — `fail(E0301)` on
+wolfc and native; `list/in_place_rows` and `in_place_allocates_nothing`
+`fail(E1010)`, trunk's rebuilding mutators refused by name inside the
+region blocks; lupin's `in_place_allocates_nothing` a stdout mismatch —
+and on nothing else; `gates` green. Eight new rows name only released
+calls and were green there: `signal/reserved_rows` and seven comptime
+rows (D33 at `fs_access`, `fs_adopt`, `fs_fstat_record`, `fs_mkfifo`,
+`os_core_off`, `os_name`, `os_arch`). Each was seen red against the
+published old pair instead (`probe-oldpair.log` `4c8e7748…`: the seven
+`fail(E0301)`, "nothing named `fs_access` is in scope";
+`probe-oldpair-reserved.log` `6f8f3882…`: at wolf 0.2.34 with trunk's
+std the native row prints `ignore_32=io` … `reset_33=io` and then ENDS,
+exit 160, at `process.exit_signal(signal.host(32))`; the same std at
+0.2.35 green on both lanes).
+
+**Green at the code head.** kasumi g1 at `e070841` (`g1-summary.log`):
+every CI step exit 0 but std-test, whose reds were two of mine and three
+of load — `list/set_bounds_trap` on lupin (`unsupported`: lupin 0.1.56
+refuses an out-of-range index STORE by name, "`xs[7]` does not denote a
+place at run time", where the compilers trap `bounds`; fixed in `ad29147`
+by reading the slot first, the old body's order), the tag `type.list`
+(no such anchor; `c1046d9`), and three `wycheproof_hkdf*_full` rows on
+lupin past the 60 s wall-clock ceiling under load 7 (`hkdf256_full`'s
+lupin cell is `run`, the other two lupin's 50M-step `unsupported`; no
+list helper is on their path; g0 at load 3 and g2 answered all three). doc-examples
+552 blocks GREEN, 1,654 ok and the two `std.os` mirror lags. kasumi g2 at `c1046d9`, the code
+head (`g2-summary.log`, `g2/steps`): **all thirteen CI steps exit 0** —
+std-test **552 GREEN** (divergent rows 1, `fs/nofollow_rows` on lupin;
+host-scoped cells 29; the three hkdf rows answered inside the ceiling
+at load 5–7, `hkdf256_full` its `run` and the other two lupin's step-budget
+`unsupported`; `6ac0b8a0…`), doc-examples **552
+blocks GREEN**, 1,654 ok and the two mirror lags (`06ec9376…`), ulp 200,
+time-oracle, fmt, clippy, cargo test, sync-pin, doctor, ledger-check,
+lint-conventions, fmt-lu, gen-vectors.
+
+**The lupin column at 0.1.56, for is81** (linux, the rows' first call
+deciding; windows as noted):
+
+| wrapper | its rows and example on lupin 0.1.56 | what flips when lupin mirrors 0.2.35 |
+|---|---|---|
+| `process.core_limit`, `set_core_limit`, `core_off` | `core_limit_rows`: `unsupported`, "`os_core_limit` does not resolve" (#277); `core_off_end`: `os_fork` refused by name first (windows: its `unsupported` row, so `run`); examples `unsupported` (a capability module) | a mirror through `getrlimit` is not in Rust's std: a refusal by name keeps `unsupported` |
+| `fs.adopt` | `adopt_rows`: "`fs_adopt` does not resolve" (#277); `adopt_inherited`: `os_fork` first (windows `run`) | shape rows then a refusal by name (no `fcntl` in std): `adopt_rows` stays `unsupported` unless the `io` row comes first |
+| `os.name`, `os.arch` | `host_rows`: "`os_name` does not resolve" (#277); both examples `mirror-lag` | `std::env::consts` answers both: `host_rows` and the two examples RUN; the cell flips and both `LUPIN_MIRROR_LAG` entries retire |
+| `signal.host` and the C library's numbers | `reserved_rows`: the first well-formed one-meaning call refused by name (no `sigaction`); windows `run` (a host number passes its windows shape, then `unsupported`) | the reserved rows answered `invalid` before the refusal: then lupin's row prints its `invalid` lines and stops at `last()`; still `unsupported` on linux |
+| `fs.access`, `fs.lock`/`unlock`, `fs.fstat_record`, `fs.mkfifo`, `fs.set_nonblock`, `fs.write_some` | each row: "does not resolve" (#278) | `fstat_record` and `lock` (`File::try_lock`) can be served inside lupin's tree: those rows may RUN; `access`, `mkfifo`, `set_nonblock` need calls std lacks |
+| `fs.open_mode` + `NOFOLLOW` | `nofollow_rows`: **`divergent(stdout)`** — lupin answers bit 16 `invalid` (#278); windows `run` (bit 16 refused on every machine there, no links) | a served bit 16 makes it `run` |
+| `signal.WAIT_WRITE` | `wait_write_rows`: `fs_set_nonblock` does not resolve; a bit-62 element is a handle lupin does not hold (`io`) | stays `unsupported` (no `poll`) |
+| `list` in-place mutators | `in_place_rows`, `in_place_allocates_nothing`: **run** | — |
+| `fs.read_into` | `read_into_rows`: `List.reset` does not resolve (#289); its example `unsupported` (a capability module) | `reset` mirrored: the row RUNS |
+| the twelve `comptime_refuses_*` | `unsupported` (no comptime) | — |
+
+**Not named.** (a) lupin's out-of-range index store (above): a
+wolf-interp issue to file. (b) **`budget.live()` does not see the root
+region**: the first memory row measured the process-wide total around
+1,000 calls at the root and read the in-place mutators flat AND the
+rebuilding control flat, on every lane — a gate that could not go red.
+It now reads a first-class region's own ledger (`charged`), where the
+control grows (`probe-mem-diag.log`: native 2,032 -> 12,112 B for ten
+rebuilds; the stores 2,032 -> 2,032). (c) The checked machine and lupin
+charge every push into spare capacity (checked 1,072 -> 49,072 over
+3,000 pushes, lupin 4,064 -> 2,052,064; native flat), so `insert`, the
+one mutator that pushes, is out of the flat claim, and the row says why.
+(d) Windows' lupin column moves on seven rows (the CHANGELOG's list):
+0.1.56 answers `os_fork`'s, `os_signal_wait_fds`' and `[os.term]`'s
+windows `unsupported` row before refusing anything, takes any host
+number in its windows shape, and makes no link there — read from
+wolf-interp v0.1.56's `src/eval/builtin.rs` and `src/eval/fs.rs`, held
+by the ledger's `lupin-windows` cells to CI's windows rig. A `tier
+full` dispatch at the code head, run **39977416300**, held all six on
+`rig (windows-latest)` and found a seventh: `signal/wait_write_rows`
+runs on lupin there (its wait's windows `unsupported` row comes before
+the handle check), flipped in `bfc830d`; every compiled lane of every
+new row as the ledger says on windows; the three `gates` legs (ubuntu,
+windows, macOS: every doc example) green. Its `rig (ubuntu-latest)` was
+red on one cell, `x/crypto/sha2/cavp_sha384_long.lu` on lupin past the
+60 s ceiling (a row lupin answers `unsupported` at its step budget, no
+list helper on its path), where the PR's own run at the same head,
+39977644707, read 59.8 s and passed, and trunk's nightly of the day,
+39960481667 at lupin 0.1.55, read 56.5 s: CI's runners put that row at
+94–100 % of the ceiling with or without this branch (kasumi, the same
+std on 0.1.55 and 0.1.56: 36–70 s, noise either way; `lupin-speed.log`),
+an issue to file, not a cell.
+(e) `fs_write_some`'s comptime row cannot exist (the engine cannot build
+its `List[byte]`): twelve comptime rows, not thirteen, as P7 allowed.
