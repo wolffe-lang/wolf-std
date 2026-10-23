@@ -49,7 +49,9 @@ fn main() -> !int {
     fs.move_file("sc72-fsr.tmp", "sc72-fsr-moved.tmp")?
     let after = fs.fstat_record(mut f)?
     let moved = fs.stat("sc72-fsr-moved.tmp")?
-    print("after_rename={after.dev == moved.dev && after.ino == moved.ino && !fs.exists("sc72-fsr.tmp")}")
+    print(
+        "after_rename={after.dev == moved.dev && after.ino == moved.ino && !fs.exists("sc72-fsr.tmp")}",
+    )
     let fd = f.fd
     fs.close(take f)?
     fs.remove("sc72-fsr-moved.tmp")?

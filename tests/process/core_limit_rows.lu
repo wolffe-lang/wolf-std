@@ -61,7 +61,7 @@ fn main() -> !int {
         return 0
     }
     let shaped = l.soft >= 0 - 1 && l.hard >= 0 - 1
-    let ordered = l.hard == 0 - 1 || (l.soft >= 0 && l.soft <= l.hard)
+    let ordered = l.hard == 0 - 1 || l.soft >= 0 && l.soft <= l.hard
     print(if shaped && ordered { "read=ok" } else { "read={l.soft} {l.hard}" })
     print("soft_over_hard={set_row(5, 4)}")
     print("below_unlimited={set_row(0 - 2, 0 - 1)}")
@@ -69,7 +69,11 @@ fn main() -> !int {
     print("set_to_itself={set_row(l.soft, l.hard)}")
     let again = process.core_limit()?
     print(
-        if again.soft == l.soft && again.hard == l.hard { "read_back=same" } else { "read_back={again.soft} {again.hard}" },
+        if again.soft == l.soft && again.hard == l.hard {
+            "read_back=same"
+        } else {
+            "read_back={again.soft} {again.hard}"
+        },
     )
     let lowered = set_row(0, l.hard)
     let now = process.core_limit()?
