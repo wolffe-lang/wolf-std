@@ -17,8 +17,10 @@
 //! **windows** makes no unprivileged symbolic link (`fs.symlink` answers
 //! `unsupported`), says `not_found` for a name under a file and spells a
 //! name with `\`: the row prints the lines after the first six for that
-//! reason. **lupin** 0.1.55 does not resolve `fs_realpath`
-//! (wolf-interp#268).
+//! reason. **lupin** resolves `fs_realpath` from 0.1.56 and still refuses
+//! the row by name, at its tree rule: the clean-up `fs_remove` of a link
+//! "resolves outside the working directory" there (0.1.55 did not resolve
+//! the call, wolf-interp#268).
 
 use std.fs
 

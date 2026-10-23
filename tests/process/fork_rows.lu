@@ -20,7 +20,9 @@
 //! **The checked machine** answers `unsupported` on every host, as a ROW
 //! (ruling #95 R4 C), and so does **windows**: the row prints its lines
 //! for that reason, as a program's in-process path would run there.
-//! **lupin** 0.1.55 does not resolve `os_fork` (wolf-interp#269).
+//! **lupin** 0.1.56 resolves `os_fork` and refuses it by name on unix (std
+//! has no fork and the machine admits no `unsafe`; 0.1.55 did not resolve
+//! it, wolf-interp#269).
 
 use std.env
 use std.fs

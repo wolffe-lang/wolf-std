@@ -8,8 +8,9 @@
 //! anchor, `[os.clock.ns]`); a 2 ms sleep spans at least 2,000,000; and
 //! twenty rounds of a thousand additions each, which `time.now()` reads
 //! as 0 ms nearly every time, each read above 0 here. One stdout on every
-//! host and machine that serves the clock; **lupin** 0.1.55 does not
-//! resolve `os_clock_ns` (wolf-interp#268).
+//! host and machine that serves the clock; **lupin** serves it from 0.1.56
+//! (0.1.55 did not resolve `os_clock_ns`, wolf-interp#268; sc72 flipped
+//! the cell).
 
 use std.time
 

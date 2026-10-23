@@ -9,10 +9,12 @@
 //! the host on windows (`unsupported`, after the shape) — never
 //! `invalid`, which before 0.2.34 it was. Nothing is set.
 //!
-//! **lupin** 0.1.55's shape still refuses bits 5–7 (`invalid`,
-//! wolf-interp#268), so the row prints `false` there: the ledger spells
-//! that `divergent(stdout)`, and the row goes red on purpose the day
-//! lupin's shape learns the three bits (is79).
+//! **lupin** 0.1.55's shape refused bits 5–7 (`invalid`,
+//! wolf-interp#268), so the row printed `false` there and the ledger
+//! spelled that `divergent(stdout)`. 0.1.56's shape learns the three bits
+//! (is79) and then refuses `os_term_set_mode` by name — it asks the
+//! terminal, and the machine admits no `unsafe` — so the cell is
+//! `unsupported` from sc72, the flip is79's note predicted.
 
 use std.fs
 use std.term
