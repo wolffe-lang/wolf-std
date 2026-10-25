@@ -1,0 +1,27 @@
+sc74 prediction (before implementation)
+
+At base 78b9d3c every right/UTC, right/America/New_York and
+right/Europe/London local_in row will refuse zone, including pre-1972,
+each leap occurrence +/-1 second, 1783000020 and a DST edge. local()
+will silently produce uncorrected UTC instead. The 2026 New York oracle
+is 2026-07-02_09:46:33_EDT_-0400, not 13:47:00 UTC.
+
+Read RFC 8536 sections 2 and 3. Implement record extents, signed
+corrections and occurrence validation, positive-hit second 60 and negative
+leaps. Keep UTC offsets separate. Match the oracle's UNIX leap time
+interpretation (the integer input itself is not first converted to leap
+time). Round-trip with retained correction metadata in Local.
+
+R-sc74-1 recommendation A: local propagates zone/io rather than UTC.
+R-sc74-2 recommendation: Local.leap_correction_s records the net seconds
+removed from the civil representation; plain locals use zero. The
+spec requires all fields in literals (E0408), so old literals need that
+explicit zero. This unavoidable source change is preferable to hidden
+state or repurposing offset_s, nanos or abbrev. Preserve old assertions
+except the old silent-UTC expectation superseded by R-sc74-1.
+
+Measure baseline first against pinned Ubuntu glibc date using the host's
+system right/ data mounted read-only. Commit fixtures and oracle golden
+rows, add malformed records and inverse checks; run time and full local
+gates. Drop the correction on a separate sc74-plant-* draft PR; its
+2026 regression must fail by name in its own CI run. Never wait for CI.
