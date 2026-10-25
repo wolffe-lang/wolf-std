@@ -758,6 +758,7 @@ fn tz_local(z: Zone, unix_s: int) -> Local {
 /// `overflow` (X3) for an extreme second plus offset outside int.
 ///
 /// ```wolf-doc-example
+/// env_set("TZ", "UTC0")?
 /// time.local(0)?.nanos == 0
 /// ```
 pub fn local(unix_s: int) -> Local ! {zone, io} {
