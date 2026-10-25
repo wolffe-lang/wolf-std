@@ -1,7 +1,7 @@
 //! check: run(exit=0)
 //! phase: run
 //! conforms: std.time, std.env, err.row, err.propagate
-//! Named files honor TZDIR, colon paths do not. TZ empty or unresolved is UTC.
+//! Named files honor TZDIR, colon paths do not. TZ empty is UTC; unresolved TZ reports zone (R-sc74-1 A).
 
 use std.time
 
@@ -20,7 +20,12 @@ fn main() -> !int {
     env_set("TZ", "")?
     if time.local(0)?.abbrev != "UTC" { return 5 }
     env_set("TZ", "sc70-no-such-zone")?
-    if time.local(0)?.offset_s != 0 { return 6 }
+    var refused = false
+    let missing = time.local(0) else |e| match e {
+        zone => { refused = true; time.local_in("UTC0", 0)? },
+        io => { return 10 },
+    }
+    if !refused || missing.offset_s != 0 { return 6 }
     fs_write_text("sc70-not-a-directory.tmp", "file")?
     env_set("TZDIR", "sc70-not-a-directory.tmp")?
     if time.offset_at("<+0530>-5:30", 0)? != 19800 { return 8 }
