@@ -13,10 +13,11 @@
 //! TZ strings are read in wolf. No database is bundled in the library.
 //! `$TZDIR` or `/usr/share/zoneinfo` supplies named files; `$TZ`, a colon
 //! path or an absolute path selects one. Unset `$TZ` reads `/etc/localtime`;
-//! empty or unresolvable `$TZ` is UTC. Explicit `local_in` reports `zone`
-//! rather than silently changing the caller's zone. File access failures
-//! are `io`. Leap-aware `right/` data is refused (`zone`): Unix seconds do
-//! not count leap seconds and ignoring that table gives wrong transitions.
+//! empty `$TZ` is UTC. Unreadable or malformed selections report `zone`
+//! or `io`, never a silent change of zone. With leap records (the `right/`
+//! tree), the integer input is UNIX leap time (RFC 8536 section 2), as
+//! with the host date command; otherwise it is POSIX UNIX time. No implicit
+//! conversion between those two timestamp scales is performed.
 //!
 //! Bare database names contain only ASCII letters, digits, `_ . + -`
 //! and `/`; a complete POSIX rule is parsed before this restriction.
@@ -37,7 +38,11 @@
 //! A caller-created nonexistent gap time is interpreted at the supplied
 //! offset, not normalized or assigned an arbitrary earlier/later rule.
 //! `nanos` is 0 for a seconds input and is ignored by `to_unix`/`format`.
-//! No leap seconds, locale state or timezone cache. Each lookup reads anew.
+//! `local`/`local_in` apply leap corrections; `offset_at` returns only the
+//! UT offset. `Local.leap_correction_s` retains the net correction so
+//! `to_unix` and format `%s` invert even a leap second. Literal-created
+//! ordinary locals must set it to zero. No locale state or timezone cache;
+//! each lookup reads anew.
 
 /// A POSIX TZ rule: the standard offset and, with DST, its offset and
 /// the two yearly changes (each a kind, three numbers and a local time).
@@ -73,6 +78,8 @@ struct Zone {
     dsts: List[bool],
     abbrs: List[str],
     first: int,
+    leap_times: List[int],
+    leap_corrs: List[int],
     has_rule: bool,
     rule: Rule,
 }
@@ -106,6 +113,8 @@ fn utc() -> Zone {
         dsts: List[bool](),
         abbrs: List[str](),
         first: 0,
+        leap_times: List[int](),
+        leap_corrs: List[int](),
         has_rule: true,
         rule: utc_rule(),
     }
@@ -453,10 +462,7 @@ fn tz_end(b: List[byte], at: int, size: int) -> int ! {zone} {
     if types < 1 || types > 256 || chars < 1 || ut != 0 && ut != types || st != 0 && st != types {
         return zone
     }
-    // Leap-aware timestamps are not POSIX timestamps. Refuse rather than
-    // quietly treating them as the seconds that this API accepts.
-    if leap != 0 { return zone }
-    let end = at + 44 + n * (size + 1) + types * 6 + chars + ut + st
+    let end = at + 44 + n * (size + 1) + types * 6 + chars + leap * (size + 4) + ut + st
     if end > b.len { return zone }
     end
 }
@@ -508,8 +514,25 @@ fn tz_parse(b: List[byte]) -> Zone ! {zone} {
         (mut z.abbrs).push(ab)
     }
     z.first = z.offs[0]
-    // The optional standard/wall and UT/local indicators are booleans.
+    // RFC 8536 section 3.2: signed cumulative corrections and UNIX leap
+    // occurrences. The entire extent was checked before indexing.
+    let leap_n = tz_uint(b, at + 28, 4)
     p = chars + chars_n
+    var prev_t = 0
+    var prev_c = 0
+    for k in 0..leap_n {
+        let t = if size == 8 then tz_i64(b, p) else tz_i32(b, p)
+        let corr = tz_i32(b, p + size)
+        if t < 0 || k > 0 && (t <= prev_t || t - prev_t < 2419199) { return zone }
+        if corr - prev_c != 1 && corr - prev_c != -1 { return zone }
+        (mut z.leap_times).push(t)
+        (mut z.leap_corrs).push(corr)
+        prev_t = t
+        prev_c = corr
+        p += size + 4
+    }
+    // The optional standard/wall and UT/local indicators are booleans.
+    let flags = p
     while p < end {
         if b[p] as int > 1 { return zone }
         p += 1
@@ -518,8 +541,8 @@ fn tz_parse(b: List[byte]) -> Zone ! {zone} {
     let ut_n = tz_uint(b, at + 20, 4)
     if ut_n > 0 {
         for k in 0..ut_n {
-            if b[chars + chars_n + std_n + k] as int == 1 &&
-                (std_n == 0 || b[chars + chars_n + k] as int != 1) {
+            if b[flags + std_n + k] as int == 1 &&
+                (std_n == 0 || b[flags + k] as int != 1) {
                 return zone
             }
         }
@@ -538,7 +561,8 @@ fn tz_parse(b: List[byte]) -> Zone ! {zone} {
             // RFC 8536 §3.3: a nonempty footer agrees with the last
             // transition, including its designation and seasonal flag.
             if n > 0 {
-                let d = tz_rule_dst(r, z.times[n - 1])
+                let (corr, _) = tz_leap(z, z.times[n - 1])
+                let d = tz_rule_dst(r, z.times[n - 1] - corr)
                 let off = if d then r.dst_off else r.std_off
                 let ab = if d then r.dst_name else r.std_name
                 let ty = z.idx[n - 1]
@@ -645,10 +669,25 @@ fn tz_named(name0: str) -> Zone ! {zone, io} {
     tz_read(tz_dir()? + "/" + name)?
 }
 
+// (cumulative correction, positive-leap hit). A positive occurrence is
+// displayed as the previous civil second plus one (normally :60); a
+// negative occurrence simply omits the removed second.
+fn tz_leap(z: Zone, t: int) -> (int, int) {
+    var corr = 0
+    for k in 0..z.leap_times.len {
+        if t < z.leap_times[k] { break }
+        let prev = corr
+        corr = z.leap_corrs[k]
+        if t == z.leap_times[k] { return (corr, if corr > prev then 1 else 0) }
+    }
+    (corr, 0)
+}
+
 fn tz_at(z: Zone, t: int) -> (int, bool, str) {
     let n = z.times.len
     if z.has_rule && (n == 0 || t >= z.times[n - 1]) {
-        let d = tz_rule_dst(z.rule, t)
+        let (corr, _) = tz_leap(z, t)
+        let d = tz_rule_dst(z.rule, t - corr)
         let off = if d then z.rule.dst_off else z.rule.std_off
         return (off, d, if d then z.rule.dst_name else z.rule.std_name)
     }
@@ -669,7 +708,11 @@ fn tz_at(z: Zone, t: int) -> (int, bool, str) {
 /// Local Gregorian calendar fields; `offset_s` is seconds east of UTC,
 /// `nanos` 0..999999999, `is_dst` the zone's seasonal flag and `abbrev`
 /// its designation. A seconds lookup sets nanos to zero. Pure data;
-/// callers may construct it, and `to_unix` trusts the explicit offset.
+/// callers may construct it, and `to_unix` trusts the explicit offset
+/// and correction. `leap_correction_s` is the net seconds removed from
+/// the civil representation: cumulative LEAPCORR minus one at a positive
+/// occurrence (whose second field is incremented, normally to 60).
+/// It is zero for ordinary zones and must be zero in ordinary literals.
 pub struct Local {
     year: int,
     month: int,
@@ -679,13 +722,15 @@ pub struct Local {
     second: int,
     nanos: int,
     offset_s: int,
+    leap_correction_s: int,
     is_dst: bool,
     abbrev: str,
 }
 
 fn tz_local(z: Zone, unix_s: int) -> Local {
     let (off, dst, ab) = tz_at(z, unix_s)
-    let shifted = unix_s + off
+    let (corr, hit) = tz_leap(z, unix_s)
+    let shifted = unix_s + off - corr
     let day = quotient_floor(shifted, 86400)
     let secs = shifted - day * 86400
     let (y, m, d) = civil(day)
@@ -695,17 +740,20 @@ fn tz_local(z: Zone, unix_s: int) -> Local {
         day: d,
         hour: secs / 3600,
         minute: secs / 60 % 60,
-        second: secs % 60,
+        second: secs % 60 + hit,
         nanos: 0,
         offset_s: off,
+        leap_correction_s: corr - hit,
         is_dst: dst,
         abbrev: ab,
     }
 }
 
-/// Local time at Unix seconds `unix_s`, from `$TZ` or `/etc/localtime`.
-/// An empty or unresolvable setting is UTC. Rows: `zone` for invalid zone
-/// data (handled as UTC here); `io` for a refused/failed host access or
+/// Local time at timestamp `unix_s`, from `$TZ` or `/etc/localtime`.
+/// The scale is POSIX UNIX time without leap records, UNIX leap time
+/// with them; see the module contract.
+/// An empty setting is UTC. Rows: `zone` for missing or invalid zone
+/// data; `io` for a refused/failed host access or
 /// unreadable environment value. Capability `Fs`/`Env`, refused at
 /// comptime (D33, determinism and confinement). Arithmetic overflow traps
 /// `overflow` (X3) for an extreme second plus offset outside int.
@@ -720,13 +768,15 @@ pub fn local(unix_s: int) -> Local ! {zone, io} {
         utf8 => { return io },
     }
     let z = (if unset then tz_read("/etc/localtime") else tz_named(name)) else |e| match e {
-        zone => utc(),
+        zone => { return zone },
         io => { return io },
     }
     tz_local(z, unix_s)
 }
 
-/// Local time in a named zone, an absolute path, `:path` (relative paths
+/// Local time at `unix_s`: POSIX UNIX time without leap records, UNIX
+/// leap time with them (the same integer interpretation as host date).
+/// A named zone, an absolute path, `:path` (relative paths
 /// use forward slashes), or an explicit POSIX TZ string. Named files use
 /// `$TZDIR` or `/usr/share/zoneinfo`; an empty zone is UTC. Rows: `zone`
 /// for missing/malformed data, a malformed TZ rule, or a bare database
@@ -745,7 +795,9 @@ pub fn local_in(zone: str, unix_s: int) -> Local ! {zone, io} {
     tz_local(tz_named(zone)?, unix_s)
 }
 
-/// Seconds east of UTC in force in `zone` at Unix seconds `unix_s`.
+/// Seconds east of UT in force in `zone` at timestamp `unix_s`.
+/// Does not include the leap correction; see `local_in` for civil fields.
+/// Leap-aware files interpret the input as UNIX leap time.
 /// Rows: `zone` for missing/malformed zone data; `io` for host access
 /// failure. Same zone spellings as `local_in`. Capability `Fs`/`Env`,
 /// refused at comptime (D33, determinism and confinement); extreme
@@ -768,12 +820,16 @@ fn tz_valid(l: Local) -> bool {
         l.minute >= 0 &&
         l.minute < 60 &&
         l.second >= 0 &&
-        l.second < 60 &&
+        l.second <= 60 &&
         l.nanos >= 0 &&
         l.nanos < 1000000000
 }
 
-/// Unix seconds of calendar fields at their EXPLICIT `offset_s`.
+/// Timestamp of calendar fields at their EXPLICIT `offset_s` and
+/// `leap_correction_s`: UNIX leap time for leap-aware locals, POSIX UNIX
+/// time otherwise. Like the explicit offset, a caller editing civil
+/// fields supplies the correction appropriate to the intended instant;
+/// use zero for literal-created locals from ordinary zones.
 /// Pure, comptime-safe. Nanos are ignored, not rounded. Both occurrences
 /// in a DST fold invert exactly. A caller-created gap is interpreted at
 /// its supplied offset, not normalized. `is_dst`/`abbrev` are descriptive
@@ -781,12 +837,12 @@ fn tz_valid(l: Local) -> bool {
 /// fields and `overflow` when checked arithmetic leaves int (X3).
 ///
 /// ```wolf-doc-example
-/// let l = time.Local { year: 1970, month: 1, day: 1, hour: 1, minute: 0, second: 0, nanos: 0, offset_s: 3600, is_dst: false, abbrev: "X" }
+/// let l = time.Local { year: 1970, month: 1, day: 1, hour: 1, minute: 0, second: 0, nanos: 0, offset_s: 3600, leap_correction_s: 0, is_dst: false, abbrev: "X" }
 /// time.to_unix(l) == 0
 /// ```
 pub fn to_unix(l: Local) -> int {
     assert(tz_valid(l))
-    days(l.year, l.month, l.day) * 86400 + l.hour * 3600 + l.minute * 60 + l.second - l.offset_s
+    days(l.year, l.month, l.day) * 86400 + l.hour * 3600 + l.minute * 60 + l.second - l.offset_s + l.leap_correction_s
 }
 
 // ---- C-locale strftime ----
@@ -898,7 +954,7 @@ fn tz_conversion(l: Local, c: int) -> (str, int, str, bool) ! {format} {
 /// (X3) for extreme forged fields/offsets. No locale or host access.
 ///
 /// ```wolf-doc-example
-/// let l = time.Local { year: 2024, month: 2, day: 3, hour: 13, minute: 4, second: 5, nanos: 0, offset_s: 19800, is_dst: false, abbrev: "IST" }
+/// let l = time.Local { year: 2024, month: 2, day: 3, hour: 13, minute: 4, second: 5, nanos: 0, offset_s: 19800, leap_correction_s: 0, is_dst: false, abbrev: "IST" }
 /// time.format(l, "%F %T %z")? == "2024-02-03 13:04:05 +0530"
 /// time.format(l, "%-d|%_d|%0e")? == "3| 3|03"
 /// ```
