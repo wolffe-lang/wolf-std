@@ -45,6 +45,12 @@ non-blocking writes and reads into a caller's buffer; `std.process`'s
 core limits; `std.os`'s `name` and `arch`. `std.list`'s mutators work in
 place.
 
+`std.time` reads TZif zones, including leap-aware `right/` files. With
+leap records, the integer timestamp is UNIX leap time, as with the host
+`date` command. `Local.leap_correction_s` keeps `to_unix` exact; set it to
+zero in ordinary `Local` literals. An unreadable or malformed zone returns
+an error instead of silently selecting UTC.
+
 ## Testing
 
 Library code here is executed by lupin (the reference interpreter), by
@@ -53,7 +59,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 552 tests. A test that passes deeper than its ledger entry claims
+all 555 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
