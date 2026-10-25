@@ -729,7 +729,7 @@ pub struct Local {
 fn tz_local(z: Zone, unix_s: int) -> Local {
     let (off, dst, ab) = tz_at(z, unix_s)
     let (corr, hit) = tz_leap(z, unix_s)
-    let shifted = unix_s + off - corr
+    let shifted = unix_s + off
     let day = quotient_floor(shifted, 86400)
     let secs = shifted - day * 86400
     let (y, m, d) = civil(day)
