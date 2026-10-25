@@ -1,0 +1,39 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time, std.fs, err.row, err.propagate
+//! RFC 8536 synthetic v1/v3: negative leaps, >2038 occurrences, odd
+//! offsets and leap-adjusted POSIX footer boundaries. No host database.
+
+use std.time
+
+fn main() -> !int {
+    let negative = ":fixtures/leap-synthetic/negative-v1"
+    let a = time.local_in(negative, 78796798)?
+    let b = time.local_in(negative, 78796799)?
+    if time.format(a, "%F_%T")? != "1972-06-30_23:59:58" { return 1 }
+    if time.format(b, "%F_%T")? != "1972-07-01_00:00:00" { return 2 }
+    if b.leap_correction_s != -1 || time.to_unix(b) != 78796799 { return 3 }
+    let late = time.local_in(":fixtures/leap-synthetic/negative-v3", 2208988799)?
+    if time.format(late, "%F_%T")? != "2040-01-01_00:00:00" { return 4 }
+    if time.to_unix(late) != 2208988799 || late.leap_correction_s != -1 { return 5 }
+    let odd = ":fixtures/leap-synthetic/positive-odd-v1"
+    let before = time.local_in(odd, 78796799)?
+    let hit = time.local_in(odd, 78796800)?
+    let after = time.local_in(odd, 78796801)?
+    // The hit is :30, not :60, with a sub-minute offset; explicit net
+    // correction keeps even these equal civil fields distinguishable.
+    if before.second != 29 || hit.second != 30 || after.second != 30 { return 6 }
+    if hit.leap_correction_s != 0 || after.leap_correction_s != 1 { return 7 }
+    if time.to_unix(before) != 78796799 ||
+        time.to_unix(hit) != 78796800 ||
+        time.to_unix(after) != 78796801 {
+        return 8
+    }
+    let footer = ":fixtures/leap-synthetic/footer-v3"
+    if time.offset_at(footer, 1710054000)? != -18000 { return 9 }
+    if time.offset_at(footer, 1710054001)? != -14400 { return 10 }
+    let edge = time.local_in(footer, 1710054001)?
+    if time.format(edge, "%F_%T_%Z_%z")? != "2024-03-10_03:00:00_EDT_-0400" { return 11 }
+    if time.to_unix(edge) != 1710054001 { return 12 }
+    0
+}

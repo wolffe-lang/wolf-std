@@ -541,8 +541,7 @@ fn tz_parse(b: List[byte]) -> Zone ! {zone} {
     let ut_n = tz_uint(b, at + 20, 4)
     if ut_n > 0 {
         for k in 0..ut_n {
-            if b[flags + std_n + k] as int == 1 &&
-                (std_n == 0 || b[flags + k] as int != 1) {
+            if b[flags + std_n + k] as int == 1 && (std_n == 0 || b[flags + k] as int != 1) {
                 return zone
             }
         }
@@ -842,7 +841,12 @@ fn tz_valid(l: Local) -> bool {
 /// ```
 pub fn to_unix(l: Local) -> int {
     assert(tz_valid(l))
-    days(l.year, l.month, l.day) * 86400 + l.hour * 3600 + l.minute * 60 + l.second - l.offset_s + l.leap_correction_s
+    days(l.year, l.month, l.day) * 86400 +
+        l.hour * 3600 +
+        l.minute * 60 +
+        l.second -
+        l.offset_s +
+        l.leap_correction_s
 }
 
 // ---- C-locale strftime ----

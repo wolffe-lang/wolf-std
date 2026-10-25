@@ -1,0 +1,54 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time, std.fs, std.env, err.row, err.propagate
+//! RFC 8536 corrupt leap occurrences, corrections, extents and counts
+//! report zone by name, including via local(), never a UTC fallback.
+
+use std.time
+
+fn count(b: List[byte], at: int) -> int {
+    var n = 0
+    for k in 0..4 { n = n * 256 + b[at + k] as int }
+    n
+}
+
+fn main() -> !int {
+    for mutation in 0..9 {
+        var b = fs_read_bytes("fixtures/right/UTC")?
+        let at = 44 +
+            count(b, 32) * 5 +
+            count(b, 36) * 6 +
+            count(b, 40) +
+            count(b, 28) * 8 +
+            count(b, 24) +
+            count(b, 20)
+        let leap = at + 44 + count(b, at + 32) * 9 + count(b, at + 36) * 6 + count(b, at + 40)
+        if mutation == 0 { for k in 0..8 { b[leap + k] = 255 as byte } }
+        if mutation == 1 { for k in 0..8 { b[leap + 12 + k] = b[leap + k] } }
+        if mutation == 2 { b[leap + 11] = 0 as byte }
+        if mutation == 3 { b[leap + 11] = 2 as byte }
+        if mutation == 4 { b[leap + 23] = 3 as byte }
+        if mutation == 5 { b = b[0..leap + 11] }
+        if mutation == 6 { b[at + 28] = 255 as byte }
+        if mutation == 7 { b[leap + 8] = 128 as byte }
+        if mutation == 8 {
+            for k in 0..8 { b[leap + 12 + k] = b[leap + k] }
+            b[leap + 19] = (b[leap + 7] as int + 1) as byte
+        }
+        fs_write_bytes("corrupt-leap.tmp", b)?
+        let off = time.offset_at(":corrupt-leap.tmp", 1783000020) else |e| match e {
+            zone => 123456,
+            io => 654321,
+        }
+        if off != 123456 { print("corrupt leap {mutation}: {off}"); return 1 }
+        env_set("TZ", ":corrupt-leap.tmp")?
+        var refused = false
+        let l = time.local(1783000020) else |e| match e {
+            zone => { refused = true; time.local_in("UTC0", 0)? },
+            io => { return 2 },
+        }
+        if !refused || l.offset_s != 0 { return 3 }
+    }
+    fs_remove("corrupt-leap.tmp")?
+    0
+}

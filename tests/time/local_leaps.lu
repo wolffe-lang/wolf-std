@@ -1,0 +1,139 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.time, std.fs, std.env, err.row, err.propagate
+//! 264 pinned Ubuntu glibc/date rows: pre-1972, all 27 leap boundaries
+//! +/-1, the 2026 regression and a DST edge, in three right/ zones.
+//! Every cell checks the inverse; the 2026 rows also check local and
+//! offset-only lookup, which must not subtract the leap correction.
+
+use std.time
+use std.str
+
+fn main() -> !int {
+    env_set("TZDIR", "fixtures")?
+    let expected = str.split(fs_read_text("fixtures/right/glibc.tsv")?, "\n")
+    if expected.len != 265 { return 1 }
+    // The plant must fail at the reported 2026 regression by name, not
+    // merely at an earlier leap boundary in the larger table.
+    let regression = time.local_in("right/America/New_York", 1783000020)?
+    let row2026 = "right/America/New_York\t1783000020\t{time.format(regression, "%F_%T_%Z_%z")?}"
+    if row2026 != expected[172] {
+        print("right-zone 2026 regression: {row2026}; expected {expected[172]}")
+        return 7
+    }
+    let zones = ["right/UTC", "right/America/New_York", "right/Europe/London"]
+    let instants = [
+        -1,
+        0,
+        63072000,
+        78796799,
+        78796800,
+        78796801,
+        94694400,
+        94694401,
+        94694402,
+        126230401,
+        126230402,
+        126230403,
+        157766402,
+        157766403,
+        157766404,
+        189302403,
+        189302404,
+        189302405,
+        220924804,
+        220924805,
+        220924806,
+        252460805,
+        252460806,
+        252460807,
+        283996806,
+        283996807,
+        283996808,
+        315532807,
+        315532808,
+        315532809,
+        362793608,
+        362793609,
+        362793610,
+        394329609,
+        394329610,
+        394329611,
+        425865610,
+        425865611,
+        425865612,
+        489024011,
+        489024012,
+        489024013,
+        567993612,
+        567993613,
+        567993614,
+        631152013,
+        631152014,
+        631152015,
+        662688014,
+        662688015,
+        662688016,
+        709948815,
+        709948816,
+        709948817,
+        741484816,
+        741484817,
+        741484818,
+        773020817,
+        773020818,
+        773020819,
+        820454418,
+        820454419,
+        820454420,
+        867715219,
+        867715220,
+        867715221,
+        915148820,
+        915148821,
+        915148822,
+        1136073621,
+        1136073622,
+        1136073623,
+        1230768022,
+        1230768023,
+        1230768024,
+        1341100823,
+        1341100824,
+        1341100825,
+        1435708824,
+        1435708825,
+        1435708826,
+        1483228825,
+        1483228826,
+        1483228827,
+        1783000020,
+        1710054026,
+        1710054027,
+        1710054028,
+    ]
+    var seen = 0
+    for z in zones {
+        env_set("TZ", z)?
+        for t in instants {
+            let l = time.local_in(z, t)?
+            let actual = "{z}\t{t}\t{time.format(l, "%F_%T_%Z_%z")?}"
+            if actual != expected[seen] {
+                print("right-zone row {seen}: {actual}; expected {expected[seen]}")
+                return 2
+            }
+            if time.to_unix(l) != t || time.format(l, "%s")? != "{t}" { return 3 }
+            if t == 1783000020 {
+                if time.offset_at(z, t)? != l.offset_s { return 4 }
+                let implicit = time.local(t)?
+                if time.format(implicit, "%F_%T_%Z_%z")? != time.format(l, "%F_%T_%Z_%z")? ||
+                    time.to_unix(implicit) != t {
+                    return 5
+                }
+            }
+            seen += 1
+        }
+    }
+    if seen != 264 { return 6 }
+    0
+}
