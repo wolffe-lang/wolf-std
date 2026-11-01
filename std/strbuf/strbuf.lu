@@ -7,17 +7,29 @@
 //! promises `strbuf` as an owned, growable, SSO-backed builder that
 //! auto-borrows to `str` — compiler-side plumbing (s37 §3) that does not
 //! exist at this pin. This module is the API surface that plumbing will
-//! back, written today over the one thing that does exist: a `str` field
-//! rebuilt by interpolation.
+//! back, written today over the language's growable byte list.
 //!
-//! THE BACKING IS AN INTERIM, and it is a performance interim, not a
-//! semantic one. `push_str` allocates a fresh `str` and copies both sides,
-//! so appending n times over a buffer of length m is O(n·m) where the SSO
-//! builder is amortized O(n+m). Every function's meaning is final; the
-//! complexity notes say "the SSO backing will make this O(1) amortized"
-//! wherever that is the only difference. No caller has to change when the
-//! backing lands (F-0019), and this file is where the layout note for
-//! s41/s43's ABI document will hang.
+//! **THE BACKING IS A `List[byte]` (sc75, wolf-std#108).** The bytes of
+//! the contents, UTF-8 by construction, in one list that grows by
+//! doubling. `push_str` pushes its argument's bytes onto the end, reading
+//! them through `s.bytes()`'s view (`[mem.str.view.lend]`: iterated on the
+//! spot, nothing materialized), so appending n bytes costs O(n) amortized
+//! whatever the buffer already holds, and `to_str` validates and copies
+//! the contents once. Until sc75 the field was a `str` rebuilt by `+=`:
+//! every `push_str` allocated a fresh string and copied the whole
+//! accumulator into it, and the region kept every copy until it ended, so
+//! a builder was quadratic in time AND in resident memory. #108 measured
+//! it on wolf 0.2.34: 4 MiB pushed in 64-byte lines took 30 s, 6 MiB
+//! reached 12.9 GB resident and 8 MiB was killed. The meaning of every
+//! function is unchanged, and so is every signature (R-sc75-1); only the
+//! costs moved, and each function's doc states its own. On the region
+//! ledger a pushed builder charges about twice its contents natively (the
+//! doubling's abandoned buffers, `[mem.region.account.1]`) and once on
+//! the checked machine; `to_str` charges the contents once more.
+//!
+//! The SSO backing D24 names is still compiler-side plumbing, and when it
+//! lands no caller has to change (F-0019); this file is where the layout
+//! note for s41/s43's ABI document will hang.
 //!
 //! `StrBuf` is CapCase per API-CONVENTIONS §1 even though the sprint
 //! contract writes the constructor as `strbuf()`: a callable type name is
@@ -56,9 +68,14 @@
 //!   different work. `std.mem.budget` is what this repo consumed from
 //!   that span instead.
 //! - `reserve(n)` — API-CONVENTIONS §8's rule ("no capacity API without a
-//!   capacity") applies verbatim: a `str`-backed buffer has no capacity to
-//!   reserve, and a documented no-op would be a lie. It lands with the SSO
-//!   backing that gives it meaning. UNMOVED at the sc32 pin
+//!   capacity") kept it out while the buffer was a `str`, which has no
+//!   capacity to reserve. **sc75: the capacity now exists** — the list
+//!   under the builder has the language's `reserve(n)` (`[type.list.storage]`)
+//!   — and §8's builder amendment (R-sc75-1) says what that changes: the
+//!   rule's reason is gone, the name is not added in the same pass that
+//!   moves the backing, because the public API stays exactly as it was
+//!   (a caller adding `reserve` is a later lane's API change, asked as a
+//!   ruling). The history this bullet carried: UNMOVED at the sc32 pin
 //!   (2026-09-02): there is no capacity or string-backing commit
 //!   anywhere in `75fd2d0..8cda3aa` or `0.1.20..0.1.22`. And the
 //!   question this line carried forward from sc31 is now ANSWERED
@@ -75,10 +92,11 @@
 //! own spelling: F-0003 died at the sc05 pins and the rename landed
 //! tree-wide at sc06, so nothing here is waiting on it.
 
-/// The builder: an owned, growable string. The field is the interim
-/// backing described in the module header — never part of the API.
+/// The builder: an owned, growable string. The field is the backing
+/// described in the module header (the contents' UTF-8 bytes) — never
+/// part of the API.
 pub struct StrBuf {
-    s: str,
+    bytes: List[byte],
 }
 
 /// A fresh empty builder in the ambient region (D10: no region argument,
@@ -89,7 +107,7 @@ pub struct StrBuf {
 /// strbuf.len(b) == 0
 /// ```
 pub fn new() -> StrBuf {
-    StrBuf { s: "" }
+    StrBuf { bytes: List[byte]() }
 }
 
 /// The length of the buffer's contents in BYTES — the same honest unit as
@@ -102,12 +120,15 @@ pub fn new() -> StrBuf {
 /// strbuf.len(b) == 2
 /// ```
 pub fn len(b: StrBuf) -> int {
-    b.s.len
+    b.bytes.len
 }
 
-/// Appends `s` to the end of the buffer. O(len(b) + len(s)) with the
-/// interim backing, amortized O(len(s)) once the SSO builder lands. Total:
-/// no error row, no traps beyond allocation.
+/// Appends `s` to the end of the buffer. Amortized O(len(s)), whatever
+/// the buffer already holds: the bytes are pushed onto the backing list,
+/// read through `s.bytes()`'s view, so nothing is copied but `s` itself
+/// (sc75, wolf-std#108; until then O(len(b) + len(s)), the whole
+/// accumulator copied every call). Total: no error row, no traps beyond
+/// allocation.
 ///
 /// The `+=` spelling the sprint contract mentions — `b += s` on the
 /// BUFFER — is not available: the operator-to-method bridge is F-0004's
@@ -116,8 +137,9 @@ pub fn len(b: StrBuf) -> int {
 /// writes. (The sentence that stood here until sc43 went on to say `+`
 /// on `str` "runs in lupin and is E0409 in wolfc". That was true when it
 /// was written and stopped being true at D62, which this very body
-/// adopted: `b.s += s` is a `str` `+=` on all three lanes, and sc43's
-/// `push` is now its `char` twin one function down.)
+/// adopted: `b.s += s` was a `str` `+=` on all three lanes, and sc43's
+/// `push` was its `char` twin one function down. sc75 retired both
+/// bodies for the byte list; the operator story above is unchanged.)
 ///
 /// ```wolf-doc-example
 /// var b = strbuf.new()
@@ -126,19 +148,26 @@ pub fn len(b: StrBuf) -> int {
 /// strbuf.to_str(b) == "wolf-lang"
 /// ```
 pub fn push_str(mut b: StrBuf, s: str) {
-    b.s += s
+    for c in s.bytes() {
+        (mut b.bytes).push(c)
+    }
 }
 
 /// Appends one code point — the sc03 contract's `push(c)`, code at last
 /// (sc24), over D58's `char` (`[type.char]`: a Unicode scalar value,
-/// ordered, NOT an integer). The body is `b.s += c`, which
-/// `[type.str.concat]` rules to append THE CHARACTER — so the appended
-/// bytes are exactly `c`'s UTF-8 encoding, 1 to 4 of them, and the
-/// buffer's UTF-8 validity is preserved by construction: no `int` ever
-/// touches this path, and a non-scalar cannot exist as a `char` at all
-/// (the D56 cast already trapped it). O(len(b)) with the interim
-/// backing, amortized O(1) once the SSO builder lands. Total: no error
-/// row, no traps beyond allocation.
+/// ordered, NOT an integer). The appended bytes are exactly `c`'s UTF-8
+/// encoding, 1 to 4 of them, computed from the scalar's value by the
+/// width rule `[mem.str.chars]` states (1 byte under 0x80, 2 under
+/// 0x800, 3 under 0x10000, else 4), so the buffer's UTF-8 validity is
+/// preserved by construction: a non-scalar cannot exist as a `char` at
+/// all (the D56 cast already trapped it). Amortized O(1) (sc75; until
+/// then O(len(b)), the accumulator copied as in `push_str`). Total: no
+/// error row, no traps beyond allocation.
+///
+/// **sc75: the body encodes instead of appending a `str`.** Until sc75
+/// it was `b.s += c`, which `[type.str.concat]` rules to append THE
+/// CHARACTER; over the byte list the same bytes are pushed directly, so
+/// a push allocates nothing of its own.
 ///
 /// **It was an interpolation hole until sc43** — `b.s = "{b.s}{c}"` —
 /// and the hole existed for exactly one reason: `+` refused a `char`,
@@ -163,7 +192,22 @@ pub fn push_str(mut b: StrBuf, s: str) {
 /// strbuf.len(b) == 6
 /// ```
 pub fn push(mut b: StrBuf, c: char) {
-    b.s += c
+    let n = c as int
+    if n < 128 {
+        (mut b.bytes).push(n as byte)
+    } else if n < 2048 {
+        (mut b.bytes).push((192 + n / 64) as byte)
+        (mut b.bytes).push((128 + n % 64) as byte)
+    } else if n < 65536 {
+        (mut b.bytes).push((224 + n / 4096) as byte)
+        (mut b.bytes).push((128 + n / 64 % 64) as byte)
+        (mut b.bytes).push((128 + n % 64) as byte)
+    } else {
+        (mut b.bytes).push((240 + n / 262144) as byte)
+        (mut b.bytes).push((128 + n / 4096 % 64) as byte)
+        (mut b.bytes).push((128 + n / 64 % 64) as byte)
+        (mut b.bytes).push((128 + n % 64) as byte)
+    }
 }
 
 /// Inserts `s` at byte offset `off`, shifting everything at or after `off`
@@ -176,6 +220,10 @@ pub fn push(mut b: StrBuf, c: char) {
 /// rather than traps — is writable over `str.get` as of s37 (sc09) and is
 /// a `std.strbuf` sprint's to add, under its own name, beside this one.
 ///
+/// O(len(b) + len(s)): the contents are read as a `str` once, sliced at
+/// `off` (where the trap comes from), and the buffer is refilled in its
+/// own storage (`reset`, `[type.list.reset]`).
+///
 /// ```wolf-doc-example
 /// var b = strbuf.new()
 /// strbuf.push_str(mut b, "wolf")
@@ -183,7 +231,13 @@ pub fn push(mut b: StrBuf, c: char) {
 /// strbuf.to_str(b) == "the wolf"
 /// ```
 pub fn insert(mut b: StrBuf, off: int, s: str) {
-    b.s = "{b.s[..off]}{s}{b.s[off..]}"
+    let cur = to_str(b)
+    let head = cur[..off]
+    let tail = cur[off..]
+    (mut b.bytes).reset()
+    push_str(mut b, head)
+    push_str(mut b, s)
+    push_str(mut b, tail)
 }
 
 /// Removes the bytes in `[from, to)`, closing the gap. Empty when
@@ -196,6 +250,9 @@ pub fn insert(mut b: StrBuf, off: int, s: str) {
 /// offsets are spelled as two parameters — the same interim `str.get`
 /// carries, flipping together with it.
 ///
+/// O(len(b)), as `insert`: the contents read as a `str` once, sliced, and
+/// the buffer refilled in its own storage.
+///
 /// ```wolf-doc-example
 /// var b = strbuf.new()
 /// strbuf.push_str(mut b, "the wolf")
@@ -203,7 +260,12 @@ pub fn insert(mut b: StrBuf, off: int, s: str) {
 /// strbuf.to_str(b) == "wolf"
 /// ```
 pub fn remove(mut b: StrBuf, from: int, to: int) {
-    b.s = "{b.s[..from]}{b.s[to..]}"
+    let cur = to_str(b)
+    let head = cur[..from]
+    let tail = cur[to..]
+    (mut b.bytes).reset()
+    push_str(mut b, head)
+    push_str(mut b, tail)
 }
 
 /// Shortens the buffer to `n` bytes, dropping everything after. Keeps the
@@ -212,6 +274,12 @@ pub fn remove(mut b: StrBuf, from: int, to: int) {
 /// Traps `bounds` when `n` exceeds the length or splits a code point (D25)
 /// — truncation is exactly a checked slice.
 ///
+/// O(len(b) - n) when `n` is a boundary: the bytes past it are popped off
+/// the backing list, which keeps its storage. A length that is not a
+/// boundary — negative, past the end, or on a UTF-8 continuation byte —
+/// is handed to the language's checked slice of the contents, which
+/// raises the trap exactly as `s[..n]` does.
+///
 /// ```wolf-doc-example
 /// var b = strbuf.new()
 /// strbuf.push_str(mut b, "wolf-lang")
@@ -219,7 +287,20 @@ pub fn remove(mut b: StrBuf, from: int, to: int) {
 /// strbuf.to_str(b) == "wolf"
 /// ```
 pub fn truncate(mut b: StrBuf, n: int) {
-    b.s = b.s[..n]
+    let have = b.bytes.len
+    var boundary = n >= 0 && n <= have
+    if boundary && n < have {
+        let lead = b.bytes[n] as int
+        boundary = lead < 128 || lead >= 192
+    }
+    if !boundary {
+        let cur = to_str(b)
+        let cut = cur[..n]
+        return
+    }
+    while b.bytes.len > n {
+        let gone = (mut b.bytes).pop() else |_| { return }
+    }
 }
 
 /// Empties the buffer, keeping it usable. Total: no error row, no traps.
@@ -231,15 +312,20 @@ pub fn truncate(mut b: StrBuf, n: int) {
 /// strbuf.len(b) == 0
 /// ```
 pub fn clear(mut b: StrBuf) {
-    b.s = ""
+    (mut b.bytes).reset()
 }
 
 /// The buffer's contents as a `str`. A borrow of the buffer's bytes under
 /// D24's auto-borrow story — `as_`/bare-noun territory in
 /// API-CONVENTIONS §1 rather than an allocating `to_`. The name is the
-/// contract's; with the interim backing the value shares the field's
-/// buffer, which is the borrow the final type promises. Total: no error
-/// row, no traps.
+/// contract's. Over the byte list the value is a COPY, made once:
+/// O(len(b)), the bytes validated and copied into a fresh `str` in the
+/// ambient region (`str_from_utf8`), and the builder stays usable. Read
+/// it once, at the end of a build, not once per push. Total: no error
+/// row, no traps — the contents are UTF-8 by construction (every append
+/// is a `str`'s bytes or a scalar's encoding, and every cut is checked at
+/// a code-point boundary), so the decoder's `utf8` row cannot arise; were
+/// it ever to, `to_str` traps `assert` rather than answer wrong text.
 ///
 /// ```wolf-doc-example
 /// var b = strbuf.new()
@@ -247,5 +333,9 @@ pub fn clear(mut b: StrBuf) {
 /// strbuf.to_str(b) == "wolf"
 /// ```
 pub fn to_str(b: StrBuf) -> str {
-    b.s
+    let s = str_from_utf8(b.bytes) else {
+        assert(false)
+        return ""
+    }
+    s
 }
