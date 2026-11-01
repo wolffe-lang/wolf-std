@@ -4649,7 +4649,7 @@ wolfc = "run"
 native = "run"
 
 [tests."time/local_format_rows.lu"]
-lupin = "unsupported" # sc70: format mark resolves to the function on error paths; to file on wolf-interp
+lupin = "run"  # sc75 pin bump (lupin 0.1.58): 0.1.57 resolves a declared return mark before a module function of the same name, so `format`'s mark no longer resolves to the function on the error paths (sc70's unsupported); measured, hasu block B gate g0 at f7c1180
 wolfc = "run"
 native = "run"
 
