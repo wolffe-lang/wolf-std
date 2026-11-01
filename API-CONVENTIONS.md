@@ -249,6 +249,10 @@ sibling module are restructured or written as prose.
 - No capacity API without a capacity. `reserve` is not shipped while
   the builtin exposes no capacity at all: a no-op documented as a hint
   would be a lie (F-0011).
+- A builder is backed by the language's growable `List` of its contents'
+  bytes (sc75, R-sc75-1; the builder amendment below): an append is
+  amortized O(appended) and reading the result copies once. A builder
+  never holds its contents in an immutable value it rebuilds per append.
 
 ## 9. Strings (sc03)
 
@@ -1631,3 +1635,52 @@ capacity" was waiting on the builtin; wolf 0.2.35 gives `List`
 second name over a working builtin (§8), and on a reference machine
 without the builtin a std `pub fn reserve` would be what `xs.reserve(n)`
 resolves to (`[type.method.resolve]`'s step two), recursing.
+
+## The builder amendment (sc75): a builder over the byte list (R-sc75-1)
+
+**What §8 said, and why it changes.** Until sc75 `std.strbuf` held its
+contents in a `str` and appended with `+=`, and §8's capacity rule ("no
+capacity API without a capacity") was the stated reason it had no
+`reserve`: a `str` has no capacity. The rule was right and the backing
+was the defect. A `str` append materializes a fresh string holding both
+sides, and a region frees nothing before it ends (the process root, where
+a top-level build lives, never ends), so every append copied the whole
+accumulator and kept the old one. wolf-std#108 measured the result on wolf 0.2.34 (macOS arm64): 4 MiB
+of 64-byte lines in 30 s, 6 MiB at 12.9 GB resident, 8 MiB killed; sc75
+measured it again on 0.2.36 (linux x86-64, a 12 GiB container): 1 MiB in
+3.8 s at 8.2 GB resident and 2 MiB killed, and inside a 64 MiB region cap
+the same builder trapped `alloc-contract` on every machine before 8 MiB.
+The same output built in a `List[byte]` took 0.18 s at 64 MiB.
+
+**The rule now.** A std builder is backed by the language's growable
+`List` of the contents' bytes. An append pushes bytes (a `str`'s through
+its `bytes()` view, `[mem.str.view.lend]`, which materializes nothing; a
+`char`'s by its UTF-8 width rule), so it is amortized O(appended)
+whatever the builder holds; the list doubles, so a grown builder charges
+its region about twice its contents natively and once on the checked
+machine (`[mem.region.account.1]`). Reading the result (`to_str`)
+validates and copies once, O(contents), and the builder stays usable. An
+operation that cuts the contents at an offset (`insert`, `remove`,
+`truncate`) checks the offset with the language's own checked slice, so
+its `bounds` trap is exactly the one `s[a..b]` raises, and refills the
+list in its own storage (`reset`, `[type.list.reset]`). The contents
+are UTF-8 by construction, so the decoder's `utf8` row cannot arise in
+`to_str`; were it to, the builder traps `assert` rather than answer
+wrong text.
+
+**The public API does not change.** `new`, `len`, `push_str`, `push`,
+`insert`, `remove`, `truncate`, `clear` and `to_str` keep every name,
+parameter, mode and row; only their costs moved, each stated on its
+function. The capacity now exists (the list's `reserve(n)`), so §8 no
+longer forbids `strbuf.reserve`; adding it is an API change, and it is
+left to a ruling of its own rather than folded into the pass that moved
+the backing.
+
+**Options weighed (R-sc75-1).** (A) the byte list, the API unchanged —
+recommended and built; (B) keep the `str` backing and document the
+builder as "small strings only", which is #108's own second ask and
+leaves the one builder std recommends for long output unusable for it;
+(C) the byte list plus `reserve` and a `with_capacity` constructor in the
+same pass, which changes the API under every caller in a lane whose
+question was the cost.
+
