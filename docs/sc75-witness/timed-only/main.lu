@@ -1,0 +1,29 @@
+//! sc75 witness: `tests/strbuf/build_bounded.lu` with its region-capped
+//! build taken out, so the time bound alone meets trunk's builder at the
+//! top of `main`. Not a test row.
+
+use std.strbuf
+use std.time
+
+fn main() -> !int {
+    let line = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\n"
+    let pushes = 131072
+    let t0 = time.monotonic_ns()
+    var b = strbuf.new()
+    var i = 0
+    while i < pushes {
+        strbuf.push_str(mut b, line)
+        i = i + 1
+        if i % 1024 == 0 {
+            if time.monotonic_ns() - t0 > 2000000000 {
+                let kib = i * 64 / 1024
+                print("timed=over two seconds at {kib} KiB")
+                return 3
+            }
+        }
+    }
+    let s = strbuf.to_str(b)
+    let last = s[s.len - 64..] == line
+    print("timed={s.len} last={last}")
+    0
+}

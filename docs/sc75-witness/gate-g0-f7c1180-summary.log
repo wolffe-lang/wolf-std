@@ -1,0 +1,280 @@
+HEAD f7c11807c23a75ae73043846b8bb7a95943d9028 vendor: data pin cf0c13d3 (v0.2.35) -> 5adf3d91 (v0.2.36)
+SigBlk:	0000000000380000 SigIgn:	0000000000000000  pid=3 sid=      3 pgid=      3
+cargo 1.97.1 (c980f4866 2026-06-30)
+wolf 0.2.36 (wolfgang, pin 5adf3d9)
+lupin 0.1.58 (wolf-interp, reference interpreter at pin a5378e3)
+==> time-oracle (00:52:40)
+time-oracle self-test: 5 checks, GREEN
+END time-oracle exit=0 (00:53:02)
+==> fmt (00:53:02)
+END fmt exit=0 (00:53:02)
+==> clippy (00:53:02)
+END clippy exit=0 (00:53:04)
+==> test (00:53:04)
+END test exit=0 (00:53:06)
+==> sync-pin (00:53:06)
+sync-pin: PIN 5adf3d91f75b3545ff8d38e5b6693b0b9f367a05
+sync-pin: anchors.json snapshot parses (registry v1)
+sync-pin: clause snapshot parses — 13 registered, 15 reserved namespaces
+END sync-pin exit=0 (00:53:06)
+==> doctor (00:53:06)
+doctor: lupin — /lane/wolfbin/lupin (source: $LUPIN_BIN)
+        version: lupin 0.1.58
+        pin: a5378e3 matches vendor/tools.toml — OK
+doctor: wolf — /lane/wolfbin/wolf (source: $WOLF_BIN)
+        version: wolf 0.2.36
+        pairing: paired with lupin 0.1.58 (reference interpreter), pin a5378e3
+        pin: 5adf3d9 matches vendor/tools.toml — OK
+doctor: native rung — libwolf_rt.a at /lane/wolfbin/libwolf_rt.a (lane lit)
+END doctor exit=0 (00:53:06)
+==> ledger-check (00:53:06)
+ledger-check: 555 test(s), all ledgered
+END ledger-check exit=0 (00:53:06)
+==> lint-conventions (00:53:06)
+lint-conventions: 555 test(s), all conforming (5 rules)
+END lint-conventions exit=0 (00:53:06)
+==> fmt-lu (00:53:06)
+fmt-lu: 610 committed `.lu` file(s) under std/ and tests/, every one a fixed point of `wolf fmt` at wolf 0.2.36
+END fmt-lu exit=0 (00:53:07)
+==> gen-vectors (00:53:07)
+gen-vectors --check: all generated files match their vendored sources
+END gen-vectors exit=0 (00:53:07)
+==> std-test (00:53:07)
+ledger-check: 555 test(s), all ledgered
+END std-test exit=1 (01:19:44)
+GAUNTLET STOPPED at std-test
+EXIT 1 2026-11-01T01:19:44Z
+std-test: 555 test(s); forward tags: 1143; conservatism ledger: 185 entries; unstable rows: 0; slow skips: 1; divergent rows: 1; mirror-lag rows: 0; host-scoped cells: 31
+  host(lupin): env/who_ids.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): fs/adopt_inherited.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): fs/link_own_times.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): fs/nofollow_rows.lu — `run` on windows, `divergent(stdout)` elsewhere; this host: not windows
+  host(lupin): fs/realpath_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): fs/std_handles.lu — `unsupported` on windows, `run` elsewhere; this host: not windows
+  host(lupin): os/users/directory_accounts.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/close_fd_row.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/core_off_end.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/exit_signal_lives.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(wolfc): process/exit_signal_lives.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/fork_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/join_own_group.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/poll_job.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/set_ids_refused.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): process/wait_core_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/host_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/ignored_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/one_fault.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(wolfc): signal/one_fault.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/one_host.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/reserved_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/send_self.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/text_zero.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/wait_fd_ready.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/wait_fds_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): signal/wait_write_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): term/chars_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): term/mode_bits_set.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): term/size_rows.lu — `run` on windows, `unsupported` elsewhere; this host: not windows
+  host(lupin): x/crypto/sha2/cavp_sha384_long.lu — `unsupported` on windows, `slow` elsewhere; this host: not windows
+  slow(lupin): x/crypto/sha2/cavp_sha384_long.lu — in-lane semantics, skipped at the 60s ceiling; re-measure at pin bumps (sc16)
+  divergent(lupin): fs/nofollow_rows.lu — observed the filed divergence (stdout); flips to `run` at the release that closes its finding (sc24)
+  unsupported(lupin): cmp/ordering_exhaustive.lu
+  unsupported(lupin): cmp/primitive_impls_tier.lu
+  unsupported(lupin): env/args_and_vars.lu
+  unsupported(lupin): env/comptime_refuses.lu
+  unsupported(lupin): env/comptime_refuses_chdir.lu
+  unsupported(lupin): env/comptime_refuses_pid.lu
+  unsupported(lupin): env/comptime_refuses_uid.lu
+  unsupported(lupin): env/comptime_refuses_umask.lu
+  unsupported(lupin): env/comptime_refuses_unset.lu
+  unsupported(lupin): env/umask_swap.lu
+  unsupported(lupin): env/who_ids.lu
+  unsupported(lupin): fs/access_rows.lu
+  unsupported(lupin): fs/adopt_inherited.lu
+  unsupported(lupin): fs/adopt_rows.lu
+  unsupported(lupin): fs/comptime_refuses_access.lu
+  unsupported(lupin): fs/comptime_refuses_adopt.lu
+  unsupported(lupin): fs/comptime_refuses_fstat_record.lu
+  unsupported(lupin): fs/comptime_refuses_lock.lu
+  unsupported(lupin): fs/comptime_refuses_mkfifo.lu
+  unsupported(lupin): fs/comptime_refuses_realpath.lu
+  unsupported(lupin): fs/comptime_refuses_set_mode.lu
+  unsupported(lupin): fs/comptime_refuses_set_nonblock.lu
+  unsupported(lupin): fs/comptime_refuses_set_owner.lu
+  unsupported(lupin): fs/comptime_refuses_sync.lu
+  unsupported(lupin): fs/comptime_refuses_sync_dir.lu
+  unsupported(lupin): fs/comptime_refuses_unlock.lu
+  unsupported(lupin): fs/fstat_record_rows.lu
+  unsupported(lupin): fs/link_own_times.lu
+  unsupported(lupin): fs/lock_rows.lu
+  unsupported(lupin): fs/mkfifo_rows.lu
+  unsupported(lupin): fs/nonblock_rows.lu
+  unsupported(lupin): fs/realpath_rows.lu
+  unsupported(lupin): io/comptime_refuses_isatty.lu
+  unsupported(lupin): io/input_all_empty.lu
+  unsupported(lupin): io/input_line_eof.lu
+  unsupported(wolfc): json/number_posture_and_depth.lu
+  unsupported(wolfc): json/parse_misses.lu
+  unsupported(wolfc): json/pretty_and_escape.lu
+  rejects(wolfc, E1013): list/mutate_while_iterating_trap.lu
+  rejects(native, E1013): list/mutate_while_iterating_trap.lu
+  unsupported(wolfc): list/sorted_tier.lu
+  unsupported(lupin): net/adopt_rows.lu
+  unsupported(wolfc): net/adopt_rows.lu
+  unsupported(lupin): net/comptime_refuses.lu
+  unsupported(lupin): net/unix/comptime_refuses.lu
+  unsupported(lupin): os/comptime_refuses.lu
+  unsupported(lupin): os/comptime_refuses_arch.lu
+  unsupported(lupin): os/comptime_refuses_name.lu
+  unsupported(lupin): os/host_rows.lu
+  unsupported(lupin): os/users/directory_accounts.lu
+  unsupported(lupin): process/close_fd_row.lu
+  unsupported(lupin): process/comptime_refuses.lu
+  unsupported(lupin): process/comptime_refuses_core_limit.lu
+  unsupported(lupin): process/comptime_refuses_core_off.lu
+  unsupported(lupin): process/comptime_refuses_exit_signal.lu
+  unsupported(lupin): process/comptime_refuses_fork.lu
+  unsupported(lupin): process/comptime_refuses_pipe.lu
+  unsupported(lupin): process/comptime_refuses_poll.lu
+  unsupported(lupin): process/comptime_refuses_set_core_limit.lu
+  unsupported(lupin): process/comptime_refuses_set_pgid.lu
+  unsupported(lupin): process/comptime_refuses_wait_core.lu
+  unsupported(lupin): process/core_limit_rows.lu
+  unsupported(lupin): process/core_off_end.lu
+  unsupported(lupin): process/exit_signal_lives.lu
+  unsupported(wolfc): process/exit_signal_lives.lu
+  unsupported(lupin): process/fork_rows.lu
+  unsupported(lupin): process/join_own_group.lu
+  unsupported(lupin): process/poll_job.lu
+  unsupported(lupin): process/prefork_handoff.lu
+  unsupported(wolfc): process/prefork_handoff.lu
+  unsupported(lupin): process/set_ids_refused.lu
+  unsupported(lupin): process/start_with_inherit_rows.lu
+  unsupported(wolfc): process/start_with_inherit_rows.lu
+  unsupported(lupin): process/wait_core_rows.lu
+  unsupported(lupin): signal/comptime_refuses_ignore_one.lu
+  unsupported(lupin): signal/comptime_refuses_poll.lu
+  unsupported(lupin): signal/comptime_refuses_send.lu
+  unsupported(lupin): signal/comptime_refuses_send_group.lu
+  unsupported(lupin): signal/comptime_refuses_wait_fd.lu
+  unsupported(lupin): signal/heard.lu
+  unsupported(lupin): signal/host_rows.lu
+  unsupported(lupin): signal/ignored_rows.lu
+  unsupported(lupin): signal/one_fault.lu
+  unsupported(wolfc): signal/one_fault.lu
+  unsupported(lupin): signal/one_host.lu
+  unsupported(lupin): signal/reserved_rows.lu
+  unsupported(lupin): signal/send_self.lu
+  unsupported(lupin): signal/text_zero.lu
+  unsupported(lupin): signal/wait_fd_ready.lu
+  unsupported(lupin): signal/wait_fds_rows.lu
+  unsupported(lupin): signal/wait_write_rows.lu
+  unsupported(lupin): sort/generic_contract.lu
+  unsupported(lupin): term/chars_rows.lu
+  unsupported(lupin): term/mode_bits_set.lu
+  unsupported(lupin): term/size_rows.lu
+  unsupported(lupin): term/wait_input_gone.lu
+  unsupported(lupin): testing/comparison_contract.lu
+  unsupported(lupin): time/comptime_refuses.lu
+  unsupported(lupin): time/comptime_refuses_clock_ns.lu
+  unsupported(lupin): time/local_comptime_refuses_fs.lu
+  unsupported(lupin): x/crypto/curve25519/ed25519_rfc8032_s71.lu
+  unsupported(wolfc): x/crypto/curve25519/ed25519_rfc8032_s71.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_ed25519_p1.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_ed25519_p1.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_ed25519_p2.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_ed25519_p2.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_ed25519_p3.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_ed25519_p3.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_ed25519_p4.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_ed25519_p4.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p1.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p1.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p10.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p10.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p11.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p11.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p12.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p12.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p2.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p2.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p3.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p3.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p4.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p4.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p5.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p5.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p6.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p6.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p7.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p7.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p8.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p8.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_shared_p9.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_shared_p9.lu
+  unsupported(lupin): x/crypto/curve25519/wycheproof_x25519_zero.lu
+  unsupported(wolfc): x/crypto/curve25519/wycheproof_x25519_zero.lu
+  unsupported(lupin): x/crypto/curve25519/x25519_rfc7748_chain.lu
+  unsupported(wolfc): x/crypto/curve25519/x25519_rfc7748_chain.lu
+  unsupported(lupin): x/crypto/p256/cavp_siggen_p256.lu
+  unsupported(wolfc): x/crypto/p256/cavp_siggen_p256.lu
+  unsupported(lupin): x/crypto/p256/cavp_sigver_p256.lu
+  unsupported(wolfc): x/crypto/p256/cavp_sigver_p256.lu
+  unsupported(lupin): x/crypto/p256/rfc6979_p256.lu
+  unsupported(wolfc): x/crypto/p256/rfc6979_p256.lu
+  unsupported(lupin): x/crypto/p256/sign_verify_smoke.lu
+  unsupported(wolfc): x/crypto/p256/sign_verify_smoke.lu
+  unsupported(lupin): x/crypto/p256/wycheproof_p256_p1.lu
+  unsupported(wolfc): x/crypto/p256/wycheproof_p256_p1.lu
+  unsupported(lupin): x/crypto/p256/wycheproof_p256_p2.lu
+  unsupported(wolfc): x/crypto/p256/wycheproof_p256_p2.lu
+  unsupported(lupin): x/crypto/p256/wycheproof_p256_p3.lu
+  unsupported(wolfc): x/crypto/p256/wycheproof_p256_p3.lu
+  unsupported(lupin): x/crypto/p256/wycheproof_p256_p4.lu
+  unsupported(wolfc): x/crypto/p256/wycheproof_p256_p4.lu
+  unsupported(lupin): x/crypto/p256/wycheproof_p256_p5.lu
+  unsupported(wolfc): x/crypto/p256/wycheproof_p256_p5.lu
+  unsupported(lupin): x/crypto/p256/wycheproof_p256_p6.lu
+  unsupported(wolfc): x/crypto/p256/wycheproof_p256_p6.lu
+  unsupported(lupin): x/crypto/p256/wycheproof_p256_p7.lu
+  unsupported(wolfc): x/crypto/p256/wycheproof_p256_p7.lu
+  unsupported(lupin): x/crypto/p256/wycheproof_p256_p8.lu
+  unsupported(wolfc): x/crypto/p256/wycheproof_p256_p8.lu
+  unsupported(lupin): x/crypto/sha2/cavp_sha256_long.lu
+  unsupported(wolfc): x/crypto/sha2/cavp_sha256_long.lu
+  unsupported(lupin): x/crypto/sha2/cavp_sha256_monte.lu
+  unsupported(wolfc): x/crypto/sha2/cavp_sha256_monte.lu
+  unsupported(wolfc): x/crypto/sha2/cavp_sha384_long.lu
+  unsupported(lupin): x/crypto/sha2/cavp_sha384_monte.lu
+  unsupported(wolfc): x/crypto/sha2/cavp_sha384_monte.lu
+  unsupported(lupin): x/crypto/sha2/cavp_sha512_long.lu
+  unsupported(wolfc): x/crypto/sha2/cavp_sha512_long.lu
+  unsupported(lupin): x/crypto/sha2/cavp_sha512_monte.lu
+  unsupported(wolfc): x/crypto/sha2/cavp_sha512_monte.lu
+  unsupported(wolfc): x/crypto/sha2/wycheproof_hkdf256_full.lu
+  unsupported(lupin): x/crypto/sha2/wycheproof_hkdf384_full.lu
+  unsupported(wolfc): x/crypto/sha2/wycheproof_hkdf384_full.lu
+  unsupported(lupin): x/crypto/sha2/wycheproof_hkdf512_full.lu
+  unsupported(wolfc): x/crypto/sha2/wycheproof_hkdf512_full.lu
+  unsupported(wolfc): x/jose/jws_eddsa_vectors.lu
+  unsupported(wolfc): x/list_eq/dedup_and_affixes.lu
+  unsupported(lupin): x/tls/cert/p256_bad_signature_row.lu
+  unsupported(wolfc): x/tls/cert/p256_bad_signature_row.lu
+  unsupported(lupin): x/tls/cert/p256_chain_valid.lu
+  unsupported(wolfc): x/tls/cert/p256_chain_valid.lu
+  unsupported(wolfc): x/tls/client/loopback_handshake.lu
+std-test: the slowest lane invocations against the 60s ceiling (wolf-std#34; STD_TEST_TIMEOUT_SECS overrides):
+     32.0s   53%  tests/x/crypto/sha2/cavp_sha256_long.lu [lupin]
+     31.3s   52%  tests/x/crypto/p256/rfc6979_p256.lu [lupin]
+     31.2s   52%  tests/x/crypto/p256/sign_verify_smoke.lu [lupin]
+     31.2s   52%  tests/x/crypto/sha2/cavp_sha256_monte.lu [lupin]
+     30.7s   51%  tests/x/crypto/sha2/wycheproof_hkdf384_full.lu [lupin]
+     30.5s   51%  tests/x/crypto/sha2/cavp_sha512_long.lu [lupin]
+     29.5s   49%  tests/x/crypto/p256/wycheproof_p256_p8.lu [lupin]
+     29.5s   49%  tests/x/crypto/p256/wycheproof_p256_p7.lu [lupin]
+tests/fs/read_into_rows.lu [lupin]: ledger says `unsupported`, observed `run` (deeper than the ledger claims — advancement is deliberate: update tests/ledger.toml in its own commit)
+tests/time/local_format_rows.lu [lupin]: ledger says `unsupported`, observed `run` (deeper than the ledger claims — advancement is deliberate: update tests/ledger.toml in its own commit)
+xtask: RED
+END std-test exit=1 (01:19:44)
+GAUNTLET STOPPED at std-test
+EXIT 1 2026-11-01T01:19:44Z

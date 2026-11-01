@@ -1,0 +1,20 @@
+use std.env
+use std.fmt
+
+fn main() -> int {
+    let args = env.args()
+    let n = fmt.parse_int(args[0]) else { return 2 }
+    let line = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\n"
+    var out: List[byte] = []
+    var i = 0
+    while i < n {
+        for b in line.bytes() {
+            (mut out).push(b)
+        }
+        i = i + 1
+    }
+    eprint("built {out.len} bytes")
+    let fd = fs_open_mode("/dev/stdout", 2) else { return 1 }
+    fs_write_chunk(fd, out) else { return 1 }
+    0
+}

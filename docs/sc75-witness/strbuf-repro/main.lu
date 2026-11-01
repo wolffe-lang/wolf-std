@@ -1,0 +1,18 @@
+use std.env
+use std.fmt
+use std.strbuf
+
+fn main() -> int {
+    let args = env.args()
+    let n = fmt.parse_int(args[0]) else { return 2 }
+    var b = strbuf.new()
+    var i = 0
+    while i < n {
+        strbuf.push_str(mut b, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\n")
+        i = i + 1
+    }
+    let s = strbuf.to_str(b)
+    eprint("built {s.len} bytes")
+    print_raw(s)
+    0
+}

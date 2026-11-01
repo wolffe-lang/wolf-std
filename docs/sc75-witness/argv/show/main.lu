@@ -1,0 +1,16 @@
+use std.env
+use std.hex
+
+fn main() -> int {
+    let raw = env.args_bytes()
+    print("count={raw.len}")
+    var i = 0
+    while i < raw.len {
+        let h = hex.encode(raw[i])
+        print("raw[{i}]={h}")
+        i = i + 1
+    }
+    let name = env.arg0()
+    print("name={name}")
+    0
+}
