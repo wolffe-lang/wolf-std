@@ -1,5 +1,60 @@
 # Changelog
 
+## sc75 — 2026-10-31 — std at wolf 0.2.36 / lupin 0.1.58: the builder over bytes, the invocation name
+
+**The pins.** wolf 0.2.35 -> **0.2.36** (`v0.2.36`, tag object `86d61559`
+at `5adf3d91`, release 427033151; linux x86-64 `d383c74c…`, binary
+`f7b73fba…`) and lupin 0.1.56 -> **0.1.58** (`v0.1.58` at `6240efe5`;
+linux x86-64 `34f52792…`, binary `47c646a6…`; 0.1.57 skipped for its
+SIGPIPE defect), both from the release archives by digest, the API read
+twice and set-equal to r41's table, the downloads hashed twice. lupin's
+conformance pin moves `294d626` -> `a5378e3f` for the first time since
+sc55. The data pin moves v0.2.35 -> v0.2.36 (`cf0c13d3` -> `5adf3d91`,
+693 -> 706 anchors, 13 added, none removed; `spec/05-conformance.md`
+moves with it: the trap set gains `argument-utf8`, and
+`[exec.checked.argv]` arrives). 0.2.36's archive bundles this
+repository at `78b9d3cb` (sc72).
+
+**The builder (wolf-std#108, R-sc75-1).** `std.strbuf` holds its
+contents' UTF-8 bytes in a growable `List[byte]` instead of a `str`
+rebuilt by `+=`. `push_str` pushes its argument's bytes through the
+`bytes()` view, `push` a scalar's by its width rule, `to_str` validates
+and copies once, and `insert`, `remove` and `truncate` check their
+offsets with the language's checked slice, so their `bounds` traps are
+the ones they always were. Every signature is unchanged. Measured with
+#108's own witness (64-byte lines, wolf 0.2.36): at trunk, on linux x86-64
+in a 12 GiB container, 1 MiB took 3.8 s at 8.2 GB resident and 2, 4, 6,
+8 and 64 MiB were killed at the cap within 7 s, on the debug and release
+tiers alike; after, 64 MiB takes 0.22 s (debug) and 0.15 s (release) at
+258 MiB there, and 0.08 s / 0.05 s on macOS arm64, beside the issue's
+`List[byte]` control at 0.18 s and 194 MiB. Inside a 64 MiB region cap
+trunk's builder trapped `alloc-contract` on every machine before 8 MiB.
+API-CONVENTIONS §8 gains the builder amendment.
+
+**The invocation name (wolf-std#98, R-sc75-2).** `env.arg0() -> str`
+(argv[0] as invoked) and `env.args_bytes() -> List[List[byte]]` (every
+argument as bytes, the name first), over s261's `env_arg0` and
+`env_args_bytes` (`[os.env.argv]`). `args`, `arg` and `arg0` document the
+`argument-utf8` text trap. Witnessed by hand on the native, release and
+checked machines (`conform-run --checked --argv-hex`), and refused by
+name on lupin 0.1.58 (wolf-interp#295; is82 mirrors it unreleased).
+
+**Rows.** 4 new (`strbuf/build_bounded`, red at trunk on every machine
+and the plant's red row; `env/arg0_rows`; `env/comptime_refuses_arg0`
+and `comptime_refuses_args_bytes`, D33's E0701 at the two builtins).
+559 tests and 554 doc examples, from 555 and 552. The pins move two
+lupin cells to `run`, each in its own commit: `fs/read_into_rows`
+(0.1.57 resolves `List.reset`, wolf-interp#289) and
+`time/local_format_rows` (0.1.57 resolves a declared return mark before
+a same-named module function, sc70's `format` collision). The bound row
+is `slow` on lupin (its `mut` writeback copies the list every call) and
+`unsupported` on the checked machine (its budgets); `env/arg0_rows` is
+`unsupported` on lupin.
+
+**For the next release.** wolf 0.2.37's `STD-PIN` is this branch's merge
+sha. When lupin mirrors s261 (0.1.59), `env/arg0_rows` goes red on lupin
+and flips deliberately.
+
 ## sc72 — 2026-10-23 — std at wolf 0.2.35 / lupin 0.1.56: the thirteen calls, the thirteen cells, in-place helpers
 
 **The pins.** wolf 0.2.34 -> **0.2.35** (`v0.2.35` at `cf0c13d3`,
