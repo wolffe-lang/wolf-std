@@ -1,0 +1,73 @@
+//! check: run(exit=0, stdout="capped=8388608 last=true\ntimed=8388608 last=true")
+//! phase: run
+//! conforms: std.strbuf, std.time, mem.region.cap.1, mem.region.cap.2, os.clock.ns
+//!
+//! **sc75, wolf-std#108: a builder builds 8 MiB under a memory and a time
+//! bound.** 131,072 pushes of one 64-byte line, twice, each build's length
+//! and last line read back through `to_str`.
+//!
+//! The MEMORY bound is a region's cap (`[mem.region.cap.1]`): the first
+//! build runs inside `region r(cap: 64 MiB)`, eight times the content. A
+//! byte-list builder charges about twice its contents while it grows (the
+//! doubling's abandoned buffers) and once more for `to_str`'s copy, so it
+//! fits. A builder that copies its accumulator on every push charges every
+//! copy, because a region subtracts nothing while it lives, and breaches
+//! the cap long before the end, `trap(alloc-contract)`
+//! (`[mem.region.cap.2]`): trunk's `str`-backed builder did, on all four
+//! machines (sc75's red, `docs/sc75-witness/`), and the plant
+//! `sc75-plant-builder` is that builder again.
+//!
+//! The TIME bound is the monotonic clock, read every 1,024 pushes (64 KiB)
+//! by the second build, which runs at the top of `main`, where #108 built
+//! it: outside any named region the copies land in the process root, which
+//! frees nothing before exit (wolf 0.2.36, linux x86-64: trunk's builder
+//! took 3.8 s and 8.2 GB resident for 1 MiB, and 2 MiB was killed at a
+//! 12 GiB cap). Past two seconds the row stops, says how far it got and
+//! exits 3, long before such a builder's memory is the machine's problem.
+//! The byte list does the 8 MiB in a few hundredths of a second on the
+//! compiled tiers.
+//!
+//! Lanes: the checked machine's budgets refuse 8 Mi pushes (`unsupported`)
+//! and lupin's tree-walk is `slow` here (past 300 s; its fast siblings in
+//! `tests/strbuf/` run there). The bound is the native tier's, the tier
+//! that ships.
+
+use std.strbuf
+use std.time
+
+fn main() -> !int {
+    let line = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\n"
+    let pushes = 131072
+    var capped = 0
+    var capped_last = false
+    region r(cap: 67108864) {
+        var b = strbuf.new()
+        var i = 0
+        while i < pushes {
+            strbuf.push_str(mut b, line)
+            i = i + 1
+        }
+        let s = strbuf.to_str(b)
+        capped = s.len
+        capped_last = s[s.len - 64..] == line
+    }
+    print("capped={capped} last={capped_last}")
+    let t0 = time.monotonic_ns()
+    var b = strbuf.new()
+    var i = 0
+    while i < pushes {
+        strbuf.push_str(mut b, line)
+        i = i + 1
+        if i % 1024 == 0 {
+            if time.monotonic_ns() - t0 > 2000000000 {
+                let kib = i * 64 / 1024
+                print("timed=over two seconds at {kib} KiB")
+                return 3
+            }
+        }
+    }
+    let s = strbuf.to_str(b)
+    let last = s[s.len - 64..] == line
+    print("timed={s.len} last={last}")
+    0
+}

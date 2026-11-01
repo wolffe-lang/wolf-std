@@ -4915,3 +4915,18 @@ native = "run"
 lupin = "run"
 wolfc = "run"
 native = "run"
+
+# =====================================================================
+# sc75 — wolf 0.2.36 / lupin 0.1.58: the builder (wolf-std#108) and the
+# invocation name (wolf-std#98).
+# =====================================================================
+
+# `strbuf/build_bounded.lu`: 8 MiB in 64-byte lines, inside a 64 MiB cap
+# and then at the top of `main` under a two-second clock. RED at trunk on
+# every machine: the `str`-backed builder breaches the cap
+# (`trap(alloc-contract)`; sc75's red, hasu block B). The checked
+# machine's budgets refuse 8 Mi pushes; lupin's tree-walk passes 300 s.
+[tests."strbuf/build_bounded.lu"]
+lupin = "slow"
+wolfc = "unsupported"
+native = "run"
