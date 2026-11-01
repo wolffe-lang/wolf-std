@@ -1,0 +1,20 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.env, comptime.sandbox, comptime.sandbox.env, os.env.argv
+//!
+//! **D33 for `env.args_bytes` (sc75, wolf-std#98), held one level down at
+//! `env_args_bytes`**: the program's arguments are process context (`env`, as
+//! `env_args` is), and at comptime "this program" is the compiler. The
+//! pure entry helper runs at run time to keep the import used.
+
+use std.env
+
+comptime fn probe() -> List[List[byte]] {
+    env_args_bytes()
+}
+
+fn main() -> !int {
+    const N = probe().len
+    print("n: {N} {env.entry_key("A=b")}")
+    0
+}

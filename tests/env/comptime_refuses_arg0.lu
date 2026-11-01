@@ -1,0 +1,20 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.env, comptime.sandbox, comptime.sandbox.env, os.env.argv
+//!
+//! **D33 for `env.arg0` (sc75, wolf-std#98), held one level down at
+//! `env_arg0`**: the program's arguments are process context (`env`, as
+//! `env_args` is), and at comptime "this program" is the compiler. The
+//! pure entry helper runs at run time to keep the import used.
+
+use std.env
+
+comptime fn probe() -> str {
+    env_arg0()
+}
+
+fn main() -> !int {
+    const N = probe().len
+    print("n: {N} {env.entry_key("A=b")}")
+    0
+}

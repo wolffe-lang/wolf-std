@@ -1,0 +1,64 @@
+//! check: run(exit=0, stdout="stable=true\nagree=true\nname_first=true")
+//! phase: run
+//! conforms: std.env, os.env.argv
+//!
+//! **sc75, wolf-std#98: `env.arg0` and `env.args_bytes`**, the invocation
+//! name and every argument as bytes, over s261's `env_arg0` and
+//! `env_args_bytes` (`[os.env.argv]`, wolf 0.2.36).
+//!
+//! Relations only, never an argument, for `args_and_vars.lu`'s reason:
+//! the rig's argv is the rig's. The checked machine runs with an empty
+//! argv (no `--argv-hex`), so the name is empty text and both lists are
+//! empty; the native rung runs the binary by its path, so the name is that
+//! path and the byte list holds it alone. Either way: two reads agree
+//! (`stable`); the byte list is the text list with the name in front, entry
+//! for entry and byte for byte, or empty with an empty name (`agree`); and
+//! its first entry is the name's bytes (`name_first`). The real argv rows —
+//! `exec -a`, a symlink, `--argv-hex`, a non-UTF-8 argument and its
+//! `argument-utf8` trap — are `docs/sc75-witness/argv/`'s, by hand on
+//! native, release and checked.
+//!
+//! **lupin** 0.1.58 does not resolve `env_arg0` (wolf-interp#295; is82
+//! mirrors it on wolf-interp's trunk, unreleased): `unsupported` there.
+
+use std.env
+
+fn same(a: List[byte], b: List[byte]) -> bool {
+    if a.len != b.len {
+        return false
+    }
+    var i = 0
+    while i < a.len {
+        if a[i] != b[i] {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+fn main() -> !int {
+    let name = env.arg0()
+    let raw = env.args_bytes()
+    let text = env.args()
+    let stable = env.arg0() == name && env.args_bytes().len == raw.len
+    print("stable={stable}")
+    var agree = true
+    if raw.len == 0 {
+        agree = name == "" && text.len == 0
+    } else {
+        agree = raw.len == text.len + 1
+        var i = 0
+        while agree && i < text.len {
+            agree = same(raw[i + 1], text[i].bytes())
+            i = i + 1
+        }
+    }
+    print("agree={agree}")
+    var first = true
+    if raw.len > 0 {
+        first = same(raw[0], name.bytes())
+    }
+    print("name_first={first}")
+    0
+}
