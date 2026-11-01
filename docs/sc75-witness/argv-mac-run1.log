@@ -1,0 +1,129 @@
+maclock: 21:28:37 taken by sc75 pid 15374
+maclock: memory gate OK (11220 MiB free+inactive+speculative)
+host Darwin 25.4.0 arm64; wolf 0.2.36 (wolfgang, pin 5adf3d9); lupin 0.1.58 (wolf-interp, reference interpreter at pin a5378e3)
+build show debug exit=0
+build text debug exit=0
+build show release exit=0
+build text release exit=0
+=== native debug
+--- ./show-debug a b: exit=0
+    out: count=3
+    out: raw[0]=2e2f73686f772d6465627567
+    out: raw[1]=61
+    out: raw[2]=62
+    out: name=./show-debug
+--- absolute path, one empty argument: exit=0
+    out: count=2
+    out: raw[0]=2f55736572732f6d66776f6c6666652f6c616e65732f736337352f746d702f617267762f73686f772d6465627567
+    out: raw[1]=
+    out: name=/Users/mfwolffe/lanes/sc75/tmp/argv/show-debug
+--- bare PATH name: exit=0
+    out: count=2
+    out: raw[0]=7363373573686f772d6465627567
+    out: raw[1]=78
+    out: name=sc75show-debug
+--- symlink ./link-debug: exit=0
+    out: count=2
+    out: raw[0]=2e2f6c696e6b2d6465627567
+    out: raw[1]=79
+    out: name=./link-debug
+--- exec -a renamed: exit=0
+    out: count=2
+    out: raw[0]=72656e616d6564
+    out: raw[1]=7a
+    out: name=renamed
+--- argv[1] is the bytes ff fe: exit=0
+    out: count=2
+    out: raw[0]=2e2f73686f772d6465627567
+    out: raw[1]=fffe
+    out: name=./show-debug
+--- text reader, argv[1] = ff: exit=134
+    out: 
+    err: wolf-trap: argument-utf8
+    err:   argument 2 is not UTF-8; read it with env_args_bytes()
+--- text reader, all text: exit=0
+    out: args=2
+    out: arg=é
+    out: arg=🐺
+--- exec -a with a name of byte c3: exit=134
+    out: count=2
+    out: raw[0]=c3
+    out: raw[1]=77
+    err: wolf-trap: argument-utf8
+    err:   argument 0 is not UTF-8; read it with env_args_bytes()
+=== native release
+--- ./show-release a b: exit=0
+    out: count=3
+    out: raw[0]=2e2f73686f772d72656c65617365
+    out: raw[1]=61
+    out: raw[2]=62
+    out: name=./show-release
+--- absolute path, one empty argument: exit=0
+    out: count=2
+    out: raw[0]=2f55736572732f6d66776f6c6666652f6c616e65732f736337352f746d702f617267762f73686f772d72656c65617365
+    out: raw[1]=
+    out: name=/Users/mfwolffe/lanes/sc75/tmp/argv/show-release
+--- bare PATH name: exit=0
+    out: count=2
+    out: raw[0]=7363373573686f772d72656c65617365
+    out: raw[1]=78
+    out: name=sc75show-release
+--- symlink ./link-release: exit=0
+    out: count=2
+    out: raw[0]=2e2f6c696e6b2d72656c65617365
+    out: raw[1]=79
+    out: name=./link-release
+--- exec -a renamed: exit=0
+    out: count=2
+    out: raw[0]=72656e616d6564
+    out: raw[1]=7a
+    out: name=renamed
+--- argv[1] is the bytes ff fe: exit=0
+    out: count=2
+    out: raw[0]=2e2f73686f772d72656c65617365
+    out: raw[1]=fffe
+    out: name=./show-release
+--- text reader, argv[1] = ff: exit=134
+    out: 
+    err: wolf-trap: argument-utf8
+    err:   argument 2 is not UTF-8; read it with env_args_bytes()
+--- text reader, all text: exit=0
+    out: args=2
+    out: arg=é
+    out: arg=🐺
+--- exec -a with a name of byte c3: exit=134
+    out: count=2
+    out: raw[0]=c3
+    out: raw[1]=77
+    err: wolf-trap: argument-utf8
+    err:   argument 0 is not UTF-8; read it with env_args_bytes()
+=== checked (conform-run --checked --argv-hex)
+/Users/mfwolffe/lanes/sc75/witness/argv/run.sh: line 45: args[@]: unbound variable
+--- no --argv-hex: exit=1
+    err: wolf-trap: argument-utf8
+    err:   argument 0 is not UTF-8; read it with env_args_bytes()
+--- prog a b: exit=0
+    "stdout_inline":"count=3\nraw[0]=70726f67\nraw[1]=61\nraw[2]=62\nname=prog\n"
+    "verdict":"exit(0)"
+--- prog, an empty argument: exit=0
+    "stdout_inline":"count=2\nraw[0]=70726f67\nraw[1]=\nname=prog\n"
+    "verdict":"exit(0)"
+--- prog, argv[1] = ff fe: exit=0
+    "stdout_inline":"count=2\nraw[0]=70726f67\nraw[1]=fffe\nname=prog\n"
+    "verdict":"exit(0)"
+--- text reader, argv[1] = ff: exit=0
+    "verdict":"trap(argument-utf8)"
+--- text reader, all text: exit=0
+    "stdout_inline":"args=2\narg=é\narg=🐺\n"
+    "verdict":"exit(0)"
+--- name is the byte c3: exit=0
+    "stdout_inline":"count=2\nraw[0]=c3\nraw[1]=77\n"
+    "verdict":"trap(argument-utf8)"
+=== --argv-hex without --checked is refused
+--- native with --argv-hex: exit=2 wolf conform-run: --argv-hex requires --checked and no native/release lane
+=== lupin
+--- lupin show: "verdict":"unsupported" "x-unsupported":"`env_args_bytes` does not resolve" 
+ARGV_WITNESS_DONE
+maclock: released (command exit 0)
+
+[exited with code 0]
