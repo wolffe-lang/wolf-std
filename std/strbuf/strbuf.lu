@@ -148,9 +148,13 @@ pub fn len(b: StrBuf) -> int {
 /// strbuf.to_str(b) == "wolf-lang"
 /// ```
 pub fn push_str(mut b: StrBuf, s: str) {
+    // PLANT (sc75-plant-builder): the accumulator copied on every push
+    // again, #108's defect over the byte list. Never merged.
+    var grown = copy b.bytes
     for c in s.bytes() {
-        (mut b.bytes).push(c)
+        (mut grown).push(c)
     }
+    b.bytes = grown
 }
 
 /// Appends one code point — the sc03 contract's `push(c)`, code at last
