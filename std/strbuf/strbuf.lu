@@ -174,10 +174,11 @@ pub fn push_str(mut b: StrBuf, s: str) {
 /// so the only way to put one on the end of a `str` was to render it
 /// into a new string. wolf-lang#278 admitted a `char` on either side of
 /// `+` and as the value of `+=` at v0.2.9, and lupin 0.1.31 mirrored it
-/// (is43, wolf-interp#78). The two appenders are written in one idiom
-/// now — this line and `push_str`'s are the same line with a different
-/// operand type — and `[type.char.interp]` is no longer what carries
-/// the character across; `[type.str.concat]` is.
+/// (is43, wolf-interp#78). From sc43 to sc75 the two appenders were
+/// written in one idiom, `b.s += s` and `b.s += c`, with
+/// `[type.str.concat]` carrying the character across; since sc75 each
+/// pushes bytes, `push_str` a `str`'s through its view and this one a
+/// scalar's by the width rule.
 ///
 /// LANES: every executing lane runs this as of the sc25 pins — both
 /// wolf rungs since s121, lupin since 0.1.15 (is26, the scalar
