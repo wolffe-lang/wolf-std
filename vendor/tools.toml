@@ -1071,8 +1071,31 @@
 # The archive ships no `std/`.
 #
 # ITS CONFORMANCE PIN DOES NOT MOVE: still wolf-lang v0.2.24
-# (`294d626d`). The pin key below is unchanged on purpose.
-version = "0.1.56"
+# (`294d626d`). The pin key below was unchanged on purpose then.
+#
+# sc75 BUMP: 0.1.56 -> 0.1.58 (r41's pair, released 2026-10-27; tag
+# `v0.1.58` at wolf-interp `6240efe5`). 0.1.57 is skipped on purpose:
+# r41 measured its ignored-SIGPIPE defect and did not waive it, and
+# 0.1.58 is the release that repairs it. Acquired by digest from the
+# release (the API read twice and each read set-equal to r41-evidence's
+# eleven-row table; the downloads hashed twice), verified from
+# `--version`: `lupin 0.1.58 (wolf-interp, reference interpreter at pin
+# a5378e3)`. Archive `lupin-0.1.58-x86_64-unknown-linux-gnu.tar.gz`,
+# sha256 `34f52792bb59bc7565e0edc1235cd47d9a6ad13d5e6528993627f2e699b62193`;
+# the binary `lupin` BY NAME, sha256
+# `47c646a61b9fd0dfe7d4565a74e22428a259eb54642f6d0d6ef3c1c0abe01ada`.
+# The other archives, as GitHub reports them and as CI checks them on
+# arrival: aarch64-apple-darwin `c1b02771…` (hashed twice here too),
+# aarch64-unknown-linux-gnu `00e40fa2…`, x86_64-pc-windows-msvc (a zip)
+# `5e1b6583…`, x86_64-unknown-linux-musl `6ad6e008…` (nothing here
+# reads it). The archive ships no `std/`.
+#
+# ITS CONFORMANCE PIN MOVES, for the first time since sc55: wolf-lang
+# `a5378e3f` (v0.2.35 + 138, 123 commits short of v0.2.36). It resolves
+# neither `env_arg0` nor `env_args_bytes` (its own corpus record says
+# "does not resolve"), so std's wrappers over them are refusals by name
+# on this lane until the mirror lands.
+version = "0.1.58"
 # pin = "90c90df91dc314f9d0ae322d387dd10be046c828"  (superseded, sc24 era)
 # pin = "a900b8c8540246ff69aaee424ba412d06bc6b340"  (superseded, sc25/sc26 era)
 # pin = "addcd7f0bd90b16bfa8bec429ab7f27c46a2c1bb"  (superseded, sc28/sc29 era — is29's carried pin)
@@ -1092,7 +1115,8 @@ version = "0.1.56"
 # pin = "2e4ca769b396219585a07ff18492529c944672d9"  (superseded, sc52 era — is53's 0.1.38 at wolf-lang v0.2.15)
 # pin = "dfcc2f13e7c73182bdd41fc9bec2802c7da3b024"  (superseded, sc53 era — is69's 0.1.45 at wolf-lang v0.2.21)
 # pin = "8e36bc1a0f92bbbbc6861b10d5b2638f76412d6a"  (superseded, sc54 era — 0.1.46 and the unadopted 0.1.47, both at wolf-lang v0.2.22)
-pin = "294d626dd596122285d5df954762e3aee3e5db71"
+# pin = "294d626dd596122285d5df954762e3aee3e5db71"  (superseded, sc55-sc74 era — 0.1.48 to 0.1.56, all at wolf-lang v0.2.24)
+pin = "a5378e3fd5b6347f4a89a7d77dbe43aa576fee76"
 # (sc46: 0.1.34 crosses to v0.2.11 and lands ON a tag for the second
 #  bump running. The gap to the data pin below NARROWS to one release
 #  — s154 and s156 — from sc44's 91 commits, and both halves are at
@@ -1633,7 +1657,40 @@ pin = "294d626dd596122285d5df954762e3aee3e5db71"
 # (`_wolf`, the zsh completion script, is still `a368c8ec…`.) The
 # archive's `std/` against this branch's base: `diff -rq` names only
 # `STD-REV` and the two licences (sc71 touched the README alone).
-version = "0.2.35"
+# sc75 BUMP: 0.2.35 -> 0.2.36 (r41 released 0.2.36 on 2026-10-28,
+# release 427033151; annotated tag `86d61559` peels to `5adf3d91`). The
+# reason here is s261's `env_arg0` and `env_args_bytes`
+# (`[os.env.argv]`, wolf-std#98) and the release's startup and
+# byte-argv fixes; its std question is wolf-std#108 (`strbuf`), which
+# no compiler change touches. The pairing is lupin 0.1.58, moved in the
+# same commit.
+#
+# The archive's `std/` is wolf-std `78b9d3cb` (sc72's last witness
+# commit, `STD-REV`); this branch's base is `5f49efd8`, sc74 on top of
+# it. The rig still never reads the archive's std (CI removes it, and so
+# does every local stage of this lane). Acquired by digest from the
+# release, verified from `--version`: `wolf 0.2.36 (wolfgang, pin
+# 5adf3d9)`, pairing line `paired with lupin 0.1.58 (reference
+# interpreter), pin a5378e3` — true of this box's pair. Archive
+# `wolf-0.2.36-x86_64-unknown-linux-gnu.tar.gz`, sha256
+# `d383c74c8cd123b9d9dfaa268271d4f004294f85c2b230237d0ef07027d9500d`
+# (the release's reported digest, read twice, each read set-equal to
+# r41-evidence's table; the download hashed twice on the Mac). The
+# other three by the release API: aarch64-apple-darwin `b79d5584…`
+# (hashed twice here too), aarch64-unknown-linux-gnu `3d5bd9ef…`,
+# x86_64-pc-windows-msvc `d5dda933…`; the runtime-only
+# `wolf-rt-0.2.36-x86_64-unknown-linux-musl.tar.gz` `3aba9c8b…` (nothing
+# here reads it). `libwolf_rt.a` `47fb9ad0…` (r41's GNU runtime),
+# `libwolf_rt_none.a` `0cc060d2…` (nothing here links it). GLIBC at most
+# 2.34 (r41).
+#
+# THE BINARY `wolf`, BY NAME (see sc51's note below for why):
+#   x86_64-unknown-linux-gnu
+#     `f7b73fba526e06116cc5eeda146cc80c8a42cd1f7a198d574e8a961f6c7a57ef`
+#   aarch64-apple-darwin
+#     `6edc5016f669f4cbccc1525c2bf76cd2794a260f49b6a3fbb88b1e9505ec73f4`
+# (`_wolf`, the zsh completion script, is still `a368c8ec…`.)
+version = "0.2.36"
 # sc48 BUMP: a7f517e (v0.2.12) -> 30731a6 (v0.2.14), TWO releases —
 # s157/s158 (0.2.13, "the literals and the papercuts III") and s159/s160
 # (0.2.14, "the string runtime and the papercuts IV"). The data pin was
@@ -3193,4 +3250,5 @@ version = "0.2.35"
 # pin = "72de141f624662fdff522e8beba459fab7c5cf66"  (superseded, sc64/sc65 era — the v0.2.32-tag pin)
 # pin = "85dab5d7e597680d6fd7034f1d7ed2acb9a92f97"  (superseded, sc66-sc68 era — the v0.2.33-tag pin)
 # pin = "9da7bdcf2aea9adf48df6570bedc58e16e9ef853"  (superseded, sc69-sc71 era — the v0.2.34-tag pin)
-pin = "cf0c13d38479f444b69bb8356ad5709d07eff323"
+# pin = "cf0c13d38479f444b69bb8356ad5709d07eff323"  (superseded, sc72/sc74 era — the v0.2.35-tag pin)
+pin = "5adf3d91f75b3545ff8d38e5b6693b0b9f367a05"
