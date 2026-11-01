@@ -1122,9 +1122,10 @@ pub fn is_ascii(s: str) -> bool {
 }
 
 /// `s` copied into a fresh `std.strbuf.StrBuf` — the allocating
-/// conversion into the builder (`to_`, §1: it allocates; `strbuf.to_str`
-/// is the borrowing direction back). Total: no error row, no traps beyond
-/// allocation.
+/// conversion into the builder (`to_`, §1: it allocates). `strbuf.to_str`
+/// is the direction back, and since sc75 it copies too, once (the builder
+/// holds bytes, wolf-std#108). O(len(s)). Total: no error row, no traps
+/// beyond allocation.
 ///
 /// No fenced example: asserting about the result needs `std.strbuf`, and
 /// the extractor imports exactly the documented module (§4's one-module
