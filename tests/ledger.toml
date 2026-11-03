@@ -4951,3 +4951,16 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# sc76: 4 KiB streamed through one borrowed chunk under a 64 KiB
+# auxiliary region cap. Trunk traps alloc-contract on both compiled
+# tiers; state-owned schedules and in-place buffer reset run everywhere.
+[tests."x/crypto/sha2/bounded256.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/sha2/bounded512.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
