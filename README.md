@@ -46,7 +46,8 @@ growable byte list, so a long build is linear in time and memory. Before
 them, wolf 0.2.35's: `std.fs`'s advisory locks, fifos, handle records,
 non-blocking writes and reads into a caller's buffer; `std.process`'s
 core limits; `std.os`'s `name` and `arch`. `std.list`'s mutators work in
-place.
+place. `std.x.crypto.sha2` reuses its message schedules and block
+buffers, so incremental SHA-256 and SHA-512 hold bounded working storage.
 
 `std.time` reads TZif zones, including leap-aware `right/` files. With
 leap records, the integer timestamp is UNIX leap time, as with the host
@@ -62,7 +63,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 559 tests. A test that passes deeper than its ledger entry claims
+all 561 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
