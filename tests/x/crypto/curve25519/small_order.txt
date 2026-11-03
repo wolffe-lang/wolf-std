@@ -101,6 +101,10 @@ ROWS (verify = cofactorless RFC 8032 s5.1.7, verify_strict = the same plus [8]A 
   nc-ecffff-as-r               false   false  x = 0 with x_0 = 1
   accepted by verify: a-identity-empty, a-identity-72, a-order2-72, a-order4-0000x0-72, a-order4-0000x1-empty, a-order4-0000x1-72, a-order8-c717x0-empty, r-identity-empty, r-identity-72
 
+MIXED ORDER (the limit): A' = TEST 1's A + T; [8]A' != O and [L]A' = [L mod ord(T)]T != O
+  mixed-a-order2     ord(T) = 2  A' = 16a567fe7d4ef5482ab4012c369bf8c5f11e8d0c2559dcda50fde59708f8aee5  message 'mixed 2'  verify true  strict true
+  mixed-a-order8-26e8x0 ord(T) = 8  A' = 3b5b475c4b82dd1572799fc546f4c6c03e478c6654aa4c7f945b347ea32af60d  message 'mixed 33'  verify true  strict true
+
 WYCHEPROOF ed25519_test.json: 151 cases, 88 valid, 63 invalid; the reference verify agrees on all
   small-order A: none
   small-order R: tc 10 (invalid), tc 11 (invalid), tc 12 (invalid), tc 13 (invalid), tc 14 (invalid), tc 15 (invalid), tc 16 (invalid), tc 17 (invalid), tc 18 (invalid), tc 19 (invalid), tc 60 (invalid)

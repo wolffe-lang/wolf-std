@@ -2982,6 +2982,16 @@ lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
+# The documented limit: two mixed-order keys (TEST 1's A plus a point of
+# order 2, then 8) that both functions accept, since [8]A' is not the
+# identity. Four full verifications: lupin runs them inside its budget
+# (~15 s idle on kasumi); the checked tier exhausts its step budget.
+
+[tests."x/crypto/curve25519/ed25519_strict_mixed_order.lu"]
+lupin = "run"
+wolfc = "unsupported"
+native = "run"
+
 # ---- sc19: the JOSE envelope (std.x.jose), over sc18's Ed25519 and
 # sc16's SHA-256. The framing is PUBLIC-DATA string work (base64url of
 # public header/payload, canonical JSON for the thumbprint), three-lane

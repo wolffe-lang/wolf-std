@@ -11,7 +11,9 @@ one's order by its own group law, lists their canonical and non-canonical
 32-byte encodings (RFC 8032 s5.1.2 and s5.1.3), and builds the rows that
 `std.x.crypto.curve25519.verify_strict` must refuse. Every Wycheproof ed25519
 case std vendors gets its expected strict verdict from its `result` and from
-this file's own decoding, never from std.
+this file's own decoding, never from std. Two more rows pin the documented
+limit of a [8]P check: a mixed-order key (a prime-order point plus a
+small-order one), which `verify_strict` accepts.
 
 The only library call with cryptographic meaning is SHA-512, from Python's
 `hashlib`, used through its API as an oracle (k = SHA-512(R || A || M) and the
@@ -374,6 +376,39 @@ def build_rows(points, ncs):
     return rows
 
 
+def mixed_rows(points):
+    """The limit of a [8]P check: a MIXED-order key A' = A + T (TEST 1's A
+    plus a small-order T) is not small order, so `verify_strict` does not
+    refuse it. With R = [r]B, S = r + k*a mod L and a message whose k is a
+    multiple of ord(T), [k]T = O and the cofactorless equation holds."""
+    a1 = expand(TEST1_SK)
+    a_pt = mul(a1, B)
+    r = int.from_bytes(sha512(b"sc77 mixed-order nonce"), "little") % L
+    rb = encode(mul(r, B))
+    out = []
+    for want in (2, 8):
+        t = next(pt for pt in points if pt["order"] == want)
+        ap = add(a_pt, t["point"])
+        pk = encode(ap)
+        # [L]A' = [L]T = [L mod ord(T)]T, which is not O: L is odd.
+        assert decode(pk) == ap and not is_small(ap) and mul(L, ap) == mul(L % want, t["point"]) != O
+        for i in range(1000):
+            msg = b"mixed %d" % i
+            k = int.from_bytes(sha512(rb + pk + msg), "little") % L
+            if k % want == 0:
+                break
+        else:
+            raise SystemExit("no message with k = 0 mod %d" % want)
+        sig = rb + ((r + k * a1) % L).to_bytes(32, "little")
+        out.append({
+            "name": "mixed-a-%s" % t["name"], "t": t, "pk": pk, "msg": msg, "sig": sig,
+            "verify": ref_verify(pk, msg, sig), "strict": ref_verify(pk, msg, sig, strict=True),
+        })
+    for m in out:
+        assert m["verify"] is True and m["strict"] is True, m["name"]
+    return out
+
+
 def wycheproof_cases():
     with open(WYCHEPROOF) as f:
         doc = json.load(f)
@@ -438,6 +473,29 @@ def emit(rows, prose, func, prefix):
     return s
 
 
+def emit_both(rows, prose_text):
+    s = HEAD + prose_text + HELPERS
+    s += (
+        "// One row: prints `FAIL <row>` and counts 1 when either function\n"
+        "// disagrees with the generator.\n"
+        "fn row(name: str, pk_hex: str, msg_hex: str, sig_hex: str, want_verify: bool, want_strict: bool) -> int {\n"
+        "    let pk = bytes_of(pk_hex)\n    let msg = bytes_of(msg_hex)\n    let sig = bytes_of(sig_hex)\n"
+        "    var fails: int = 0\n"
+        "    if curve25519.verify(pk, msg, sig) != want_verify {\n"
+        "        print(\"FAIL verify-{name}\")\n        fails = fails + 1\n    }\n"
+        "    if curve25519.verify_strict(pk, msg, sig) != want_strict {\n"
+        "        print(\"FAIL strict-{name}\")\n        fails = fails + 1\n    }\n"
+        "    fails\n}\n\n"
+    )
+    s += "fn main() -> int {\n    var fails: int = 0\n"
+    for r in rows:
+        s += '    fails = fails + row("%s", "%s", "%s", "%s", %s, %s)\n' % (
+            r["name"], r["pk"].hex(), r["msg"].hex(), r["sig"].hex(),
+            "true" if r["verify"] else "false", "true" if r["strict"] else "false")
+    s += "    if fails > 0 {\n        return 1\n    }\n    0\n}\n"
+    return s
+
+
 def prose(paras):
     """Doc-comment prose: each entry is a paragraph (a `- ` entry is a bullet),
     wrapped at 72 columns."""
@@ -449,8 +507,16 @@ def prose(paras):
     return "".join(("//! " + ln).rstrip() + "\n" for ln in out)
 
 
-def files(points, ncs, rows, cases):
+def files(points, ncs, rows, cases, mixed):
     out = {}
+    out["ed25519_strict_mixed_order.lu"] = emit_both(mixed, prose([
+        "The documented LIMIT of `verify_strict`: a mixed-order public key, TEST 1's A plus a "
+        "small-order T (of order 2, then 8), is not of small order, so the [8]P check does not "
+        "refuse it, and a signature whose k is a multiple of ord(T) satisfies the cofactorless "
+        "equation. Both `verify` and `verify_strict` accept these rows. Refusing them needs "
+        "[L]A, a further scalar multiplication (`docs/sc77-the-strict-verify.md`); a lane that "
+        "adds it flips these rows deliberately.",
+    ]))
     strict_rows = [dict(r, want=r["strict"]) for r in rows]
     out["ed25519_strict_small_order.lu"] = emit(strict_rows, prose([
         "`verify_strict` against the eight small-order points of edwards25519 and their six "
@@ -503,7 +569,7 @@ def wp_prose(part, which, total):
     ]
 
 
-def record(points, tries, ncs, rows, cases):
+def record(points, tries, ncs, rows, cases, mixed):
     """The human-readable derivation, committed beside the tests."""
     w = []
     w.append("sc77 small-order record, written by %s" % SELF)
@@ -537,6 +603,12 @@ def record(points, tries, ncs, rows, cases):
         w.append("  %-28s %-7s %-6s %s" % (r["name"], str(r["verify"]).lower(), str(r["strict"]).lower(), detail))
     w.append("  accepted by verify: %s" % ", ".join(r["name"] for r in rows if r["verify"]))
     w.append("")
+    w.append("MIXED ORDER (the limit): A' = TEST 1's A + T; [8]A' != O and [L]A' = [L mod ord(T)]T != O")
+    for m in mixed:
+        w.append("  %-18s ord(T) = %d  A' = %s  message %r  verify %s  strict %s" % (
+            m["name"], m["t"]["order"], m["pk"].hex(), m["msg"].decode(), str(m["verify"]).lower(),
+            str(m["strict"]).lower()))
+    w.append("")
     nv = sum(c["valid"] for c in cases)
     w.append("WYCHEPROOF ed25519_test.json: %d cases, %d valid, %d invalid; the reference verify agrees on all"
              % (len(cases), nv, len(cases) - nv))
@@ -567,9 +639,10 @@ def main():
     points, tries = small_order_table()
     ncs = non_canonical(points)
     rows = build_rows(points, ncs)
+    mixed = mixed_rows(points)
     cases = wycheproof_cases()
-    want = {"small_order.txt": record(points, tries, ncs, rows, cases)}
-    for name, text in files(points, ncs, rows, cases).items():
+    want = {"small_order.txt": record(points, tries, ncs, rows, cases, mixed)}
+    for name, text in files(points, ncs, rows, cases, mixed).items():
         want[name] = wolf_fmt(args.wolf, name, text)
     drift = []
     for name, text in sorted(want.items()):
