@@ -1,5 +1,21 @@
 # Changelog
 
+## sc77 — 2026-11-03 — a strict Ed25519 verify
+
+`std.x.crypto.curve25519.verify_strict(pubkey, message, sig)` is new
+(wolf-std#120). It checks everything `verify` checks and also answers false
+when the public key A or the commitment R has small order, meaning [8]P is
+the identity. RFC 8032 accepts those points, and `verify` still does: with A
+= the encoded identity and R || S = that identity then 32 zero bytes, it
+answers true for every message. `verify`'s body is byte-for-byte unchanged;
+its doc comment now names the difference. No caller moved. An independent
+Python generator, written from the curve equation, derives the eight
+small-order points and their six non-canonical encodings and emits eight
+new test files, which bring the count to 569. No Wycheproof ed25519 verdict
+changes. On linux x86-64 native the strict check costs about 1% of a
+verify. A mixed-order point is not refused; a prototype [L]A check is
+measured at about +41%, and left as a named follow-on.
+
 ## sc76 — 2026-11-03 — bounded incremental SHA-2
 
 SHA-256 and SHA-512 keep their message schedules in the state and reset
