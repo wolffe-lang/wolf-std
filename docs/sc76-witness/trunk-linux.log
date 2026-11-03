@@ -1,0 +1,368 @@
+START trunk-bounded256 native
+{"commit":"5adf3d9","diagnostics":[],"file":"tests/x/crypto/sha2/bounded256.lu","impl":"wolfgang","impl_version":"0.2.36","phase_reached":"run","protocol":1,"seeded":false,"stdout_inline":null,"stdout_sha256":null,"verdict":"trap(alloc-contract)","warnings":[]}
+END observe-trunk-bounded256-native exit=0
+START trunk-bounded256 checked
+{"commit":"5adf3d9","diagnostics":[],"file":"tests/x/crypto/sha2/bounded256.lu","impl":"wolfgang","impl_version":"0.2.36","phase_reached":"run","protocol":1,"seeded":false,"stdout_inline":null,"stdout_sha256":null,"verdict":"trap(alloc-contract)","warnings":[],"x-trap-clause":"mem.region.cap.1","x-trap-pos":[454,9],"x-trap-span":[20579,20602]}
+END observe-trunk-bounded256-checked exit=0
+START trunk-bounded512 native
+{"commit":"5adf3d9","diagnostics":[],"file":"tests/x/crypto/sha2/bounded512.lu","impl":"wolfgang","impl_version":"0.2.36","phase_reached":"run","protocol":1,"seeded":false,"stdout_inline":null,"stdout_sha256":null,"verdict":"trap(alloc-contract)","warnings":[]}
+END observe-trunk-bounded512-native exit=0
+START trunk-bounded512 checked
+{"commit":"5adf3d9","diagnostics":[],"file":"tests/x/crypto/sha2/bounded512.lu","impl":"wolfgang","impl_version":"0.2.36","phase_reached":"run","protocol":1,"seeded":false,"stdout_inline":null,"stdout_sha256":null,"verdict":"trap(alloc-contract)","warnings":[],"x-trap-clause":"mem.region.cap.1","x-trap-pos":[143,5],"x-trap-span":[8039,8070]}
+END observe-trunk-bounded512-checked exit=0
+{"family": "256", "mode": "update", "mib": 16, "peak_kib": 307708, "wall_s": 0.527, "exit": 0, "digest_ok": true}
+{"family": "256", "mode": "update", "mib": 64, "peak_kib": 1223332, "wall_s": 2.129, "exit": 0, "digest_ok": true}
+{"family": "256", "mode": "update", "mib": 1024, "peak_kib": 2094824, "wall_s": 3.604, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-native 1073741824 256 update"
+	User time (seconds): 3.14
+	System time (seconds): 0.41
+	Percent of CPU this job got: 98%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.60
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094824
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 523183
+	Voluntary context switches: 4
+	Involuntary context switches: 46
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+END SHA256-RSS-64MiB-1GiB exit=1
+{"family": "256", "mode": "sum", "mib": 16, "peak_kib": 324064, "wall_s": 0.555, "exit": 0, "digest_ok": true}
+{"family": "256", "mode": "sum", "mib": 64, "peak_kib": 1288644, "wall_s": 2.234, "exit": 0, "digest_ok": true}
+{"family": "256", "mode": "sum", "mib": 1024, "peak_kib": 2094656, "wall_s": 3.556, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-native 1073741824 256 sum"
+	User time (seconds): 3.27
+	System time (seconds): 0.24
+	Percent of CPU this job got: 98%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.55
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094656
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 261520
+	Voluntary context switches: 3
+	Involuntary context switches: 10
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"family": "512", "mode": "update", "mib": 16, "peak_kib": 561968, "wall_s": 0.479, "exit": 0, "digest_ok": true}
+{"family": "512", "mode": "update", "mib": 64, "peak_kib": 2094824, "wall_s": 1.762, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-native 67108864 512 update"
+	User time (seconds): 1.30
+	System time (seconds): 0.42
+	Percent of CPU this job got: 98%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.76
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094824
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 523183
+	Voluntary context switches: 3
+	Involuntary context switches: 47
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"family": "512", "mode": "update", "mib": 1024, "peak_kib": 2094776, "wall_s": 1.765, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-native 1073741824 512 update"
+	User time (seconds): 1.30
+	System time (seconds): 0.42
+	Percent of CPU this job got: 98%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.76
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094776
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 523183
+	Voluntary context switches: 3
+	Involuntary context switches: 67
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+END SHA512-RSS-64MiB-1GiB exit=1
+{"family": "512", "mode": "sum", "mib": 16, "peak_kib": 578236, "wall_s": 0.513, "exit": 0, "digest_ok": true}
+{"family": "512", "mode": "sum", "mib": 64, "peak_kib": 2094788, "wall_s": 1.829, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-native 67108864 512 sum"
+	User time (seconds): 1.36
+	System time (seconds): 0.42
+	Percent of CPU this job got: 98%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.82
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094788
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 506824
+	Voluntary context switches: 3
+	Involuntary context switches: 38
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"family": "512", "mode": "sum", "mib": 1024, "peak_kib": 2094712, "wall_s": 2.682, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-native 1073741824 512 sum"
+	User time (seconds): 2.38
+	System time (seconds): 0.26
+	Percent of CPU this job got: 98%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:02.68
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094712
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 261521
+	Voluntary context switches: 3
+	Involuntary context switches: 210
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+FAILURES ['256-update-1024', '256-RSS-bound', '256-sum-1024', '512-update-64', '512-update-1024', '512-RSS-bound', '512-sum-64', '512-sum-1024']
+END trunk-RSS-native exit=1
+{"family": "256", "mode": "update", "mib": 16, "peak_kib": 307732, "wall_s": 0.193, "exit": 0, "digest_ok": true}
+{"family": "256", "mode": "update", "mib": 64, "peak_kib": 1223432, "wall_s": 0.762, "exit": 0, "digest_ok": true}
+{"family": "256", "mode": "update", "mib": 1024, "peak_kib": 2094760, "wall_s": 1.296, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-release 1073741824 256 update"
+	User time (seconds): 0.86
+	System time (seconds): 0.38
+	Percent of CPU this job got: 95%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.29
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094760
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 523168
+	Voluntary context switches: 3
+	Involuntary context switches: 13
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+END SHA256-RSS-64MiB-1GiB exit=1
+{"family": "256", "mode": "sum", "mib": 16, "peak_kib": 324000, "wall_s": 0.2, "exit": 0, "digest_ok": true}
+{"family": "256", "mode": "sum", "mib": 64, "peak_kib": 1288900, "wall_s": 0.808, "exit": 0, "digest_ok": true}
+{"family": "256", "mode": "sum", "mib": 1024, "peak_kib": 2094816, "wall_s": 1.246, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-release 1073741824 256 sum"
+	User time (seconds): 0.95
+	System time (seconds): 0.25
+	Percent of CPU this job got: 97%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.24
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094816
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 261552
+	Voluntary context switches: 3
+	Involuntary context switches: 6
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"family": "512", "mode": "update", "mib": 16, "peak_kib": 562012, "wall_s": 0.243, "exit": 0, "digest_ok": true}
+{"family": "512", "mode": "update", "mib": 64, "peak_kib": 2094760, "wall_s": 0.849, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-release 67108864 512 update"
+	User time (seconds): 0.41
+	System time (seconds): 0.39
+	Percent of CPU this job got: 95%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.84
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094760
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 523165
+	Voluntary context switches: 3
+	Involuntary context switches: 5
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"family": "512", "mode": "update", "mib": 1024, "peak_kib": 2094792, "wall_s": 0.845, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-release 1073741824 512 update"
+	User time (seconds): 0.43
+	System time (seconds): 0.37
+	Percent of CPU this job got: 95%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.84
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094792
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 523167
+	Voluntary context switches: 3
+	Involuntary context switches: 9
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+END SHA512-RSS-64MiB-1GiB exit=1
+{"family": "512", "mode": "sum", "mib": 16, "peak_kib": 578468, "wall_s": 0.25, "exit": 0, "digest_ok": true}
+{"family": "512", "mode": "sum", "mib": 64, "peak_kib": 2094592, "wall_s": 0.858, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-release 67108864 512 sum"
+	User time (seconds): 0.46
+	System time (seconds): 0.35
+	Percent of CPU this job got: 95%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.85
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094592
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 506806
+	Voluntary context switches: 3
+	Involuntary context switches: 9
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"family": "512", "mode": "sum", "mib": 1024, "peak_kib": 2094816, "wall_s": 1.028, "exit": 134, "digest_ok": false}
+memory allocation of 65536 bytes failed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Command terminated by signal 6
+	Command being timed: "/home/mfwolffe/lanes/sc76/red/rss-release 1073741824 512 sum"
+	User time (seconds): 0.76
+	System time (seconds): 0.22
+	Percent of CPU this job got: 96%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.02
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2094816
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 261554
+	Voluntary context switches: 3
+	Involuntary context switches: 23
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+FAILURES ['256-update-1024', '256-RSS-bound', '256-sum-1024', '512-update-64', '512-update-1024', '512-RSS-bound', '512-sum-64', '512-sum-1024']
+END trunk-RSS-release exit=1
