@@ -62,18 +62,22 @@
 //! **VERIFY is cofactorless** (RFC 8032 s5.1.7's group equation
 //! [S]B = R + [k]A, no multiply-by-8), with S < L enforced strictly and
 //! decompression's sign bit per s5.1.3 — the choices Wycheproof's
-//! malleability cases decide, pinned here.
+//! malleability cases decide, pinned here. Like the RFC, `verify`
+//! accepts an A or R of small order ([8]P is the identity).
+//! **`verify_strict`** (sc77) is `verify` plus the refusal of both, for
+//! a caller whose policy must refuse small-order keys and commitments;
+//! a mixed-order point is a named follow-on (it needs [L]P).
 //!
 //! **Constant-time (D53's retrofit clause).** SIGNING handles the
 //! secret scalar; its ladder-free scalar multiplication (`sc_mul_base`,
 //! a fixed double-and-add over the SECRET nonce/scalar) and `fe_cswap`
 //! carry the ct: obligations. VERIFY is PUBLIC-DATA — a verification
-//! key and a signature are public, so `verify` and its point
-//! arithmetic have no secret to protect and say so. **The one recorded
-//! ct exception — the 0..255 ingestion guard, which branched on every
-//! input byte — is RETIRED (sc35)**; `to_hex` is not constant-time and
-//! says so. c28's tier does not exist yet; every `pub` fn carries a
-//! `ct:` line until it does.
+//! key and a signature are public, so `verify`, `verify_strict` and
+//! their point arithmetic have no secret to protect and say so. **The
+//! one recorded ct exception — the 0..255 ingestion guard, which
+//! branched on every input byte — is RETIRED (sc35)**; `to_hex` is not
+//! constant-time and says so. c28's tier does not exist yet; every
+//! `pub` fn carries a `ct:` line until it does.
 //!
 //! **Byte sequences are `List[byte]` (sc35).** They were `List[int]`
 //! with a documented 0..255 element contract (F-0035) that this module
@@ -1412,7 +1416,7 @@ fn ge_is_small_order(p: Ge) -> bool {
 // re-implemented here. SIGNING is deterministic (§5.1.6): the nonce is
 // SHA-512(prefix || message) reduced mod L, no entropy drawn. VERIFY is
 // cofactorless (§5.1.7's [S]B = R + [k]A, no multiply-by-8) with S < L
-// enforced strictly.
+// enforced strictly; `verify_strict` also refuses a small-order A or R.
 // ---------------------------------------------------------------------
 
 /// Concatenate two byte lists. ct: fixed by the lengths (public).
@@ -1508,6 +1512,14 @@ pub fn sign(secret: List[byte], message: List[byte]) -> List[byte] {
 /// because a signature and a key are the CALLER'S data to check, not a
 /// contract they promised (§2's rule: verify answers a bool, it does
 /// not trap on a bad signature).
+/// **Small-order points are accepted**, as RFC 8032 allows: nothing here
+/// refuses an A or R whose [8]P is the identity. With A = the encoded
+/// identity (`01` then 31 zero bytes) and R || S = that identity then 32
+/// zero bytes, this answers true for every message. A caller whose
+/// policy must refuse small-order keys and commitments calls
+/// `verify_strict`, which checks everything this function checks and
+/// that as well; on honestly generated keys and signatures the two
+/// agree.
 /// ct: VERIFY IS PUBLIC DATA — the key, the signature and the message
 /// are all public, so the branches here protect no secret and this
 /// function carries no constant-time obligation (stated in the module
