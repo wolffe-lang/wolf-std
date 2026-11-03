@@ -449,6 +449,7 @@ fn schedule(n: int) -> List[int] {
 /// the intermediate hash value (step 4). Addition is modulo 2^32 (the
 /// masked `wrapping[u64]` discipline). Requires `st.buf.len == 64`.
 fn compress256(mut st: Sha256) {
+    var w = List[int]()
     var t: int = 0
     while t < 16 {
         let off = t * 4
@@ -458,16 +459,16 @@ fn compress256(mut st: Sha256) {
             st.buf[off + 2] as int,
             st.buf[off + 3] as int,
         )
-        st.w[t] = wt as int
+        (mut w).push(wt as int)
         t = t + 1
     }
     while t < 64 {
-        let wt = ssig1_256(st.w[t - 2] as wrapping[u64]) +
-            st.w[t - 7] as wrapping[u64] +
-            ssig0_256(st.w[t - 15] as wrapping[u64]) +
-            st.w[t - 16] as wrapping[u64] &
+        let wt = ssig1_256(w[t - 2] as wrapping[u64]) +
+            w[t - 7] as wrapping[u64] +
+            ssig0_256(w[t - 15] as wrapping[u64]) +
+            w[t - 16] as wrapping[u64] &
             mask32()
-        st.w[t] = wt as int
+        (mut w).push(wt as int)
         t = t + 1
     }
     var a = st.h0
@@ -480,11 +481,7 @@ fn compress256(mut st: Sha256) {
     var h = st.h7
     t = 0
     while t < 64 {
-        let t1 = h +
-            bsig1_256(e) +
-            ch(e, f, g) +
-            st.k[t] as wrapping[u64] +
-            st.w[t] as wrapping[u64] &
+        let t1 = h + bsig1_256(e) + ch(e, f, g) + st.k[t] as wrapping[u64] + w[t] as wrapping[u64] &
             mask32()
         let t2 = bsig0_256(a) + maj(a, b, c) & mask32()
         h = g
