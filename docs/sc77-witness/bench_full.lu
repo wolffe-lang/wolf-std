@@ -1,0 +1,120 @@
+//! sc77 cost witness for the mixed-order question, not a test. Runs
+//! against a COPY of `std/` with `torsion-free.patch` applied (never
+//! committed to `std/`): `verify_strict_la` is `verify_strict` plus
+//! [L]A = O, and `verify_strict_lar` adds [L]R = O as well. Same method
+//! as `bench.lu`; first it shows the patch refuses the generator's
+//! mixed-order key that `verify_strict` accepts.
+use std.hex
+use std.time
+use std.x.crypto.curve25519
+
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
+}
+
+// The median of five (or any odd count of) batch timings.
+fn median(xs: List[int]) -> int {
+    for x in xs {
+        var below: int = 0
+        var at_or_below: int = 0
+        for y in xs {
+            if y < x {
+                below = below + 1
+            }
+            if y <= x {
+                at_or_below = at_or_below + 1
+            }
+        }
+        if 2 * below < xs.len && 2 * at_or_below > xs.len {
+            return x
+        }
+    }
+    0
+}
+
+// One batch of 32 calls; answers the elapsed nanoseconds.
+fn batch(which: int, pk: List[byte], msg: List[byte], sig: List[byte]) -> int {
+    let t0 = time.monotonic_ns()
+    var ok: int = 0
+    for i in 0..32 {
+        if call(which, pk, msg, sig) {
+            ok = ok + 1
+        }
+    }
+    let t1 = time.monotonic_ns()
+    if ok != 32 {
+        print("FAIL bench-verdict {name(which)}")
+    }
+    t1 - t0
+}
+
+fn name(which: int) -> str {
+    if which == 0 {
+        return "verify"
+    }
+    if which == 1 {
+        return "verify_strict"
+    }
+    if which == 2 {
+        return "verify_strict_la"
+    }
+    "verify_strict_lar"
+}
+
+fn call(which: int, pk: List[byte], msg: List[byte], sig: List[byte]) -> bool {
+    if which == 0 {
+        return curve25519.verify(pk, msg, sig)
+    }
+    if which == 1 {
+        return curve25519.verify_strict(pk, msg, sig)
+    }
+    if which == 2 {
+        return curve25519.verify_strict_la(pk, msg, sig)
+    }
+    curve25519.verify_strict_lar(pk, msg, sig)
+}
+
+fn main() -> int {
+    let pk = bytes_of("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+    let msg = List[byte]()
+    let sig = bytes_of(
+        "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
+    )
+    let mpk = bytes_of("3b5b475c4b82dd1572799fc546f4c6c03e478c6654aa4c7f945b347ea32af60d")
+    let mmsg = "mixed 33".bytes()
+    let msig = bytes_of(
+        "07210416c5bbdbc8864436346b21ff8f1d7d3258c5c61098e2d88575119ea336a1db2edfd1d5cf0487d077ac8a876dbcd0edcb737cf66d360d541389bf55fc0f",
+    )
+    print("mixed-order key: verify={curve25519.verify(mpk, mmsg, msig)} verify_strict={curve25519.verify_strict(mpk, mmsg, msig)} verify_strict_la={curve25519.verify_strict_la(mpk, mmsg, msig)} verify_strict_lar={curve25519.verify_strict_lar(mpk, mmsg, msig)}")
+    let n = 4
+    var w: int = 0
+    while w < n {
+        let ns = batch(w, pk, msg, sig)
+        print("warmup {name(w)} ns={ns}")
+        w = w + 1
+    }
+    var times = List[List[int]]()
+    w = 0
+    while w < n {
+        (mut times).push(List[int]())
+        w = w + 1
+    }
+    var b: int = 1
+    while b <= 5 {
+        w = 0
+        while w < n {
+            let ns = batch(w, pk, msg, sig)
+            (mut times[w]).push(ns)
+            print("batch {b} {name(w)} ns={ns} ns_per_call={ns / 32}")
+            w = w + 1
+        }
+        b = b + 1
+    }
+    w = 0
+    while w < n {
+        let m = median(times[w])
+        print("MEDIAN {name(w)} ns_per_call={m / 32}")
+        w = w + 1
+    }
+    0
+}

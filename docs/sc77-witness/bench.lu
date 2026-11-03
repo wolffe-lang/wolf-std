@@ -1,0 +1,102 @@
+//! sc77 cost witness, not a test: median native time per call of
+//! `verify` and `verify_strict` over RFC 8032 s7.1 TEST 1 (empty
+//! message). One warm-up batch of 32 calls per function, then five
+//! timed batches of 32 per function, the functions interleaved batch by
+//! batch so drift on the host lands on both. Run against the branch's
+//! own `std/` with `wolf run --std-root`, under taskset.
+use std.hex
+use std.time
+use std.x.crypto.curve25519
+
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
+}
+
+// The median of five (or any odd count of) batch timings.
+fn median(xs: List[int]) -> int {
+    for x in xs {
+        var below: int = 0
+        var at_or_below: int = 0
+        for y in xs {
+            if y < x {
+                below = below + 1
+            }
+            if y <= x {
+                at_or_below = at_or_below + 1
+            }
+        }
+        if 2 * below < xs.len && 2 * at_or_below > xs.len {
+            return x
+        }
+    }
+    0
+}
+
+// One batch of 32 calls; answers the elapsed nanoseconds.
+fn batch(which: int, pk: List[byte], msg: List[byte], sig: List[byte]) -> int {
+    let t0 = time.monotonic_ns()
+    var ok: int = 0
+    for i in 0..32 {
+        if call(which, pk, msg, sig) {
+            ok = ok + 1
+        }
+    }
+    let t1 = time.monotonic_ns()
+    if ok != 32 {
+        print("FAIL bench-verdict {name(which)}")
+    }
+    t1 - t0
+}
+
+fn name(which: int) -> str {
+    if which == 0 {
+        return "verify"
+    }
+    "verify_strict"
+}
+
+fn call(which: int, pk: List[byte], msg: List[byte], sig: List[byte]) -> bool {
+    if which == 0 {
+        return curve25519.verify(pk, msg, sig)
+    }
+    curve25519.verify_strict(pk, msg, sig)
+}
+
+fn main() -> int {
+    let pk = bytes_of("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+    let msg = List[byte]()
+    let sig = bytes_of(
+        "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
+    )
+    let n = 2
+    var w: int = 0
+    while w < n {
+        let ns = batch(w, pk, msg, sig)
+        print("warmup {name(w)} ns={ns}")
+        w = w + 1
+    }
+    var times = List[List[int]]()
+    w = 0
+    while w < n {
+        (mut times).push(List[int]())
+        w = w + 1
+    }
+    var b: int = 1
+    while b <= 5 {
+        w = 0
+        while w < n {
+            let ns = batch(w, pk, msg, sig)
+            (mut times[w]).push(ns)
+            print("batch {b} {name(w)} ns={ns} ns_per_call={ns / 32}")
+            w = w + 1
+        }
+        b = b + 1
+    }
+    w = 0
+    while w < n {
+        let m = median(times[w])
+        print("MEDIAN {name(w)} ns_per_call={m / 32}")
+        w = w + 1
+    }
+    0
+}

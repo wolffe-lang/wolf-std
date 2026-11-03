@@ -1,0 +1,94 @@
+--- a/std/x/crypto/curve25519/curve25519.lu
++++ b/std/x/crypto/curve25519/curve25519.lu
+@@ -1620,8 +1620,91 @@
+     let ka = ge_scalarmult(k, a_opt.p)
+     let rhs = ge_add(r_opt.p, ka)
+     ge_eq(sb, rhs)
++}
++
++// sc77 MEASUREMENT PROTOTYPE, never committed to std/: the mixed-order
++// refusal. [L]p is the identity iff p lies in the prime-order subgroup.
++fn ge_is_torsion_free(p: Ge) -> bool {
++    ge_eq(ge_scalarmult(order_bytes(), p), ge_identity())
+ }
+ 
++/// Prototype: `verify_strict` plus [L]A = O.
++pub fn verify_strict_la(pubkey: List[byte], message: List[byte], sig: List[byte]) -> bool {
++    if !(pubkey.len == 32) {
++        return false
++    }
++    if !(sig.len == 64) {
++        return false
++    }
++    let big_r = first32(sig)
++    let s = second32(sig)
++    if sc_geq_order(s) {
++        return false
++    }
++    let a_opt = ge_decompress(pubkey)
++    if !a_opt.ok {
++        return false
++    }
++    if ge_is_small_order(a_opt.p) {
++        return false
++    }
++    if !ge_is_torsion_free(a_opt.p) {
++        return false
++    }
++    let r_opt = ge_decompress(big_r)
++    if !r_opt.ok {
++        return false
++    }
++    if ge_is_small_order(r_opt.p) {
++        return false
++    }
++    let k = sc_reduce64(sha2.sum512(cat(cat(big_r, pubkey), message)))
++    let sb = ge_scalarmult(s, ge_base())
++    let ka = ge_scalarmult(k, a_opt.p)
++    let rhs = ge_add(r_opt.p, ka)
++    ge_eq(sb, rhs)
++}
++
++/// Prototype: `verify_strict` plus [L]A = O and [L]R = O.
++pub fn verify_strict_lar(pubkey: List[byte], message: List[byte], sig: List[byte]) -> bool {
++    if !(pubkey.len == 32) {
++        return false
++    }
++    if !(sig.len == 64) {
++        return false
++    }
++    let big_r = first32(sig)
++    let s = second32(sig)
++    if sc_geq_order(s) {
++        return false
++    }
++    let a_opt = ge_decompress(pubkey)
++    if !a_opt.ok {
++        return false
++    }
++    if ge_is_small_order(a_opt.p) {
++        return false
++    }
++    if !ge_is_torsion_free(a_opt.p) {
++        return false
++    }
++    let r_opt = ge_decompress(big_r)
++    if !r_opt.ok {
++        return false
++    }
++    if ge_is_small_order(r_opt.p) {
++        return false
++    }
++    if !ge_is_torsion_free(r_opt.p) {
++        return false
++    }
++    let k = sc_reduce64(sha2.sum512(cat(cat(big_r, pubkey), message)))
++    let sb = ge_scalarmult(s, ge_base())
++    let ka = ge_scalarmult(k, a_opt.p)
++    let rhs = ge_add(r_opt.p, ka)
++    ge_eq(sb, rhs)
++}
++
+ // ---------------------------------------------------------------------
+ // Field self-test: the field arithmetic proven ALONE, before any curve
+ // code observes it (the contract's "unit-test the field alone against
