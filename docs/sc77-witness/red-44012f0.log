@@ -1,0 +1,31 @@
+SLOT-WAIT 4-7 2026-11-03T05:45:37Z
+/home/mfwolffe/lanes/sc77/lanes.sh: line 20: bc: command not found
+LANE run x/crypto/curve25519/ed25519_strict_small_order.lu rc=2 secs=0.0
+  | error[E0301]: module `curve25519` has no item named `verify_strict`
+  |   --> /home/mfwolffe/lanes/sc77/tmp/stage-44012f0-ed25519_strict_small_order/ed25519_strict_small_order.lu:31:19
+  |    |
+  | 31 |     if curve25519.verify_strict(bytes_of(pk_hex), bytes_of(msg_hex), bytes_of(sig_hex)) == want {
+  |    |                   ^^^^^^^^^^^^^ not found in the module
+  |    |
+  | 
+  | wolf run: the package does not compile; fix the errors above (`wolf --explain E0301` explains this code, or any other, by name)
+
+/home/mfwolffe/lanes/sc77/lanes.sh: line 20: bc: command not found
+LANE native x/crypto/curve25519/ed25519_strict_small_order.lu rc=0 secs=0.0
+  | error[E0301]: module `curve25519` has no item named `verify_strict`
+  |   --> /home/mfwolffe/lanes/sc77/tmp/stage-44012f0-ed25519_strict_small_order/ed25519_strict_small_order.lu:31:19
+  |    |
+  | 31 |     if curve25519.verify_strict(bytes_of(pk_hex), bytes_of(msg_hex), bytes_of(sig_hex)) == want {
+  |    |                   ^^^^^^^^^^^^^ not found in the module
+  |    |
+  | 
+  | {"commit":"5adf3d9","diagnostics":[{"code":"E0301","severity":"error","span":[1357,1370]}],"file":"/home/mfwolffe/lanes/sc77/tmp/stage-44012f0-ed25519_strict_small_order/ed25519_strict_small_order.lu","impl":"wolfgang","impl_version":"0.2.36","phase_reached":"resolve","protocol":1,"seeded":false,"stdout_inline":null,"stdout_sha256":null,"verdict":"fail(E0301)","warnings":[]}
+
+/home/mfwolffe/lanes/sc77/lanes.sh: line 20: bc: command not found
+LANE run x/crypto/curve25519/ed25519_small_order_verify.lu rc=0 secs=0.0
+  | 
+
+/home/mfwolffe/lanes/sc77/lanes.sh: line 20: bc: command not found
+LANE native x/crypto/curve25519/ed25519_small_order_verify.lu rc=0 secs=0.0
+  | {"commit":"5adf3d9","diagnostics":[],"file":"/home/mfwolffe/lanes/sc77/tmp/stage-44012f0-ed25519_small_order_verify/ed25519_small_order_verify.lu","impl":"wolfgang","impl_version":"0.2.36","phase_reached":"run","protocol":1,"seeded":false,"stdout_inline":null,"stdout_sha256":null,"verdict":"exit(0)","warnings":[]}
+
