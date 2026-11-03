@@ -12,16 +12,16 @@ Nothing else changed: no API or verdict of an existing function, no caller (`jos
 
 ## Inputs, verified
 
-- **Base:** wolf-std trunk `d407430`, branch `sc77`.
+- **Base:** wolf-std trunk `c9da7e7`, branch `sc77`. The lane began on `d407430` and was rebased onto `c9da7e7` before the merge; the three trunk commits between them touch only CI files, and `std/`, `tests/`, `vendor/` and `xtask/` are identical at both. The witness logs were taken before the rebase and carry the pre-rebase names of commits whose `std/`, `tests/` and `docs/` are unchanged by it: `44012f0` is now `a63ad79`, `7e1e93c` is `a243f71`, and `ac00335` is `e568465`.
 - **Toolchain:** release archives fetched on kasumi and hashed twice. Both match the release API digests: wolf `d383c74c8cd123b9d9dfaa268271d4f004294f85c2b230237d0ef07027d9500d` and lupin `34f52792bb59bc7565e0edc1235cd47d9a6ad13d5e6528993627f2e699b62193`. The wolf binary is `f7b73fba…` and lupin's is `47c646a6…`, the hashes sc75 recorded; `libwolf_rt.a` is `47fb9ad0…`. The version lines read `wolf 0.2.36 (wolfgang, pin 5adf3d9)` and `lupin 0.1.58 (… pin a5378e3)`.
 - **What verify does today** (`curve25519.lu`, `pub fn verify`, unchanged since `5b3a599`): it checks the lengths, `S < L`, canonical decompression of A and R (`ge_decompress`, RFC 8032 §5.1.3), and the cofactorless equation `[S]B = R + [k]A`. It refuses no small-order point, and RFC 8032 §5.1.7 allows that.
 - **`API-CONVENTIONS.md`** is at the repository root, not under `docs/`. Read §1–§4, §12–§13, and the sc72/sc75 amendments. The name `verify_strict` follows `verify`'s precedent: it is a bool-answering verifier, not an `is_` predicate. The new private helper is `ge_is_small_order`.
 - **The module's register row** (`std/x/README.md`, `crypto/curve25519`) and its module header were read, and both now name `verify_strict` and the mixed-order follow-on. The README was read and refreshed: the newest-surface sentence and the test count, 561 → 569.
-- **The byte-identity of verify** is a gauntlet step (`verify-unchanged`). It hashes `pub fn verify`'s body, and the bodies of `sign`, `public`, `x25519`, `x25519_base`, `field_self_test` and `to_hex`, against `d407430`. It also fails if any path under `std/x/jose`, `std/x/tls`, the other crypto modules, `vendor`, `xtask`, `ci`, `.github` or the toolchain file changed.
+- **The byte-identity of verify** is a gauntlet step (`verify-unchanged`). It hashes `pub fn verify`'s body, and the bodies of `sign`, `public`, `x25519`, `x25519_base`, `field_self_test` and `to_hex`, against the base `c9da7e7`. It also fails if any path under `std/x/jose`, `std/x/tls`, the other crypto modules, `vendor`, `xtask`, `ci`, `.github` or the toolchain file changed.
 
 ## Prediction
 
-Committed first, at `d48889f` (`docs/sc77-prediction.md`), before the generator, any row, or any change to `std/`. Every line held.
+Committed first, at `7c79213` (`docs/sc77-prediction.md`), before the generator, any row, or any change to `std/`. Every line held.
 
 - **P1, eight points and six non-canonical encodings:** held. The generator solves `[8]P = O` case by case from the doubling map (x = 0, y = 0, x² = −y²), and reaches the same set a second way: it projects 22 ordinary curve points through `[L]Q`. The encodings it computes equal the eight the prediction quoted from the literature's prose.
 - **P2, the rows:** held. `verify` accepts exactly the A rows where ord(A) divides k, 7 of the 16, and exactly the two identity R rows. `verify_strict` refuses all 44.
@@ -30,7 +30,7 @@ Committed first, at `d48889f` (`docs/sc77-prediction.md`), before the generator,
 - **P5, nothing else moves:** held. The strict rows run on all three lanes. The verify column and the strict Wycheproof parts are native-only. Every existing row keeps its ledger word in the final record's `std-test`.
 - **P6, the plant:** held. Dropping the R check turns exactly `strict-r-identity-empty` and `strict-r-identity-72` red.
 
-One thing the prediction did not foresee, now pinned as a row: under the cofactorless equation, a torsion-free A forces R into the prime-order subgroup. A mixed-order refusal therefore needs `[L]A` alone, not `[L]R` as well (R-sc77-2).
+The prediction did not foresee the mixed-order limit, and a row now pins it: `ed25519_strict_mixed_order.lu` holds two mixed-order keys that both `verify` and `verify_strict` accept. Nor did it foresee that, under the cofactorless equation, a torsion-free A forces R into the prime-order subgroup, so a mixed-order refusal needs `[L]A` alone, not `[L]R` as well (R-sc77-2).
 
 ## Evidence index
 
@@ -73,7 +73,7 @@ The six non-canonical encodings each appear as A and as R, and `verify` and `ver
 
 ### The rows and their lanes
 
-Lanes were measured by hand at `7e1e93c` (`docs/sc77-witness/lanes-7e1e93c.log`), and the mixed-order file the same way when it was generated. The final record's `std-test` holds every word: a row that runs deeper or shallower than its ledger entry is red.
+Lanes were measured by hand at `7e1e93c`, now `a243f71` (`docs/sc77-witness/lanes-7e1e93c.log`), and the mixed-order file the same way when it was generated. The final record's `std-test` holds every word: a row that runs deeper or shallower than its ledger entry is red.
 
 | file | rows | lupin | checked | native |
 |---|---|---|---|---|
@@ -83,11 +83,11 @@ Lanes were measured by hand at `7e1e93c` (`docs/sc77-witness/lanes-7e1e93c.log`)
 | `wycheproof_ed25519_strict_smoke.lu` | tc 1, tc 10 | run (4.4 s) | run (1.3 s) | run |
 | `wycheproof_ed25519_strict_p1.lu`–`p4.lu` | 40 + 40 + 40 + 31 | unsupported | unsupported | run |
 
-**Red first.** The rows were committed at `44012f0`, before `verify_strict` existed. There the strict file is `fail(E0301)` ("module `curve25519` has no item named `verify_strict`"), and the verify column is `exit(0)`: `verify` accepts its 9 rows (`docs/sc77-witness/red-44012f0.log`). `7e1e93c` adds `verify_strict`.
+**Red first.** The rows were committed at `44012f0`, now `a63ad79`, before `verify_strict` existed. There the strict file is `fail(E0301)` ("module `curve25519` has no item named `verify_strict`"), and the verify column is `exit(0)`: `verify` accepts its 9 rows (`docs/sc77-witness/red-44012f0.log`). `a243f71` adds `verify_strict`.
 
 ### The cost
 
-Native, on kasumi under `taskset -c 4-7` (the host's other slots were busy, load about 12). Each function ran one warm-up batch of 32 RFC 8032 TEST 1 verifications and then five timed batches of 32, interleaved batch by batch. The figures are the median per call (`docs/sc77-witness/bench.lu`, `bench_full.lu`, log `cost-ac00335.log`).
+Native, on kasumi under `taskset -c 4-7` (the host's other slots were busy, load about 12). Each function ran one warm-up batch of 32 RFC 8032 TEST 1 verifications and then five timed batches of 32, interleaved batch by batch. The figures are the median per call (`docs/sc77-witness/bench.lu`, `bench_full.lu`, log `cost-ac00335.log`, taken at `ac00335`, now `e568465`).
 
 | build | `verify` | `verify_strict` | strict / verify | `+[L]A` (prototype) | `+[L]A +[L]R` (prototype) |
 |---|---|---|---|---|---|
@@ -122,12 +122,12 @@ Options: (A) move all three code sites in one follow-on lane, each with a row th
 
 ## Done-when
 
-- [x] Branch `sc77` from `d407430`, under the lane's own directory; no pin change.
-- [x] Prediction committed first (`d48889f`), every line checked above.
-- [x] The independent generator and its output committed (`260525b`, `04fb294`, `762ade5`), with the orders shown by its own arithmetic.
-- [x] Rows red first (`44012f0`, `fail(E0301)`), then green with `verify_strict` (`7e1e93c`).
+- [x] Branch `sc77` from `d407430`, rebased onto `c9da7e7`, under the lane's own directory; no pin change.
+- [x] Prediction committed first (`7c79213`), every line checked above.
+- [x] The independent generator and its output committed (`358173e`, `f3e9474`, `1eb5317`), with the orders shown by its own arithmetic.
+- [x] Rows red first (`a63ad79`, `fail(E0301)`), then green with `verify_strict` (`a243f71`).
 - [x] Wycheproof differences listed by tcId (none) and every vector run under `verify_strict`.
-- [x] `verify` byte-for-byte unchanged; its doc comment names the difference (`c31bf05`); no caller moved; R-sc77-1 lists every call site.
+- [x] `verify` byte-for-byte unchanged; its doc comment names the difference (`d640940`); no caller moved; R-sc77-1 lists every call site.
 - [x] Mixed-order cost measured; R-sc77-2 written; only the small-order check implemented.
 - [x] `ct:` stated on `verify_strict` in the sc18 verify-is-public style.
 - [x] Cost measured on kasumi under taskset (+0.9%).
