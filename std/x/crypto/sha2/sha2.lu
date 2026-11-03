@@ -391,6 +391,7 @@ pub struct Sha256 {
     buf: List[byte],
     total: int,
     k: List[int],
+    w: List[int],
 }
 
 /// A fresh SHA-256 state — FIPS 180-4 §5.3.3's initial hash value ("the
@@ -424,7 +425,23 @@ pub fn new256() -> Sha256 {
         buf: List[byte](),
         total: 0,
         k: k256(),
+        w: schedule(64),
     }
+}
+
+// Schedules are born with the state, not with each block. Ambient
+// allocations otherwise accumulate until the caller's whole region dies
+// ([mem.region.create.3], [mem.region.intra.2]). All slots are overwritten
+// before use; indices depend on the public round number only.
+fn schedule(n: int) -> List[int] {
+    var words = List[int]()
+    (mut words).reserve(n)
+    var i = 0
+    while i < n {
+        (mut words).push(0)
+        i = i + 1
+    }
+    words
 }
 
 /// One 512-bit block — FIPS 180-4 §6.2.2: the message schedule (step 1),
@@ -432,7 +449,6 @@ pub fn new256() -> Sha256 {
 /// the intermediate hash value (step 4). Addition is modulo 2^32 (the
 /// masked `wrapping[u64]` discipline). Requires `st.buf.len == 64`.
 fn compress256(mut st: Sha256) {
-    var w = List[int]()
     var t: int = 0
     while t < 16 {
         let off = t * 4
@@ -442,16 +458,16 @@ fn compress256(mut st: Sha256) {
             st.buf[off + 2] as int,
             st.buf[off + 3] as int,
         )
-        (mut w).push(wt as int)
+        st.w[t] = wt as int
         t = t + 1
     }
     while t < 64 {
-        let wt = ssig1_256(w[t - 2] as wrapping[u64]) +
-            w[t - 7] as wrapping[u64] +
-            ssig0_256(w[t - 15] as wrapping[u64]) +
-            w[t - 16] as wrapping[u64] &
+        let wt = ssig1_256(st.w[t - 2] as wrapping[u64]) +
+            st.w[t - 7] as wrapping[u64] +
+            ssig0_256(st.w[t - 15] as wrapping[u64]) +
+            st.w[t - 16] as wrapping[u64] &
             mask32()
-        (mut w).push(wt as int)
+        st.w[t] = wt as int
         t = t + 1
     }
     var a = st.h0
@@ -464,7 +480,7 @@ fn compress256(mut st: Sha256) {
     var h = st.h7
     t = 0
     while t < 64 {
-        let t1 = h + bsig1_256(e) + ch(e, f, g) + st.k[t] as wrapping[u64] + w[t] as wrapping[u64] &
+        let t1 = h + bsig1_256(e) + ch(e, f, g) + st.k[t] as wrapping[u64] + st.w[t] as wrapping[u64] &
             mask32()
         let t2 = bsig0_256(a) + maj(a, b, c) & mask32()
         h = g
@@ -485,7 +501,7 @@ fn compress256(mut st: Sha256) {
     st.h5 = st.h5 + f & mask32()
     st.h6 = st.h6 + g & mask32()
     st.h7 = st.h7 + h & mask32()
-    st.buf = List[byte]()
+    (mut st.buf).reset()
 }
 
 /// Absorbs `data` into the running SHA-256 computation. Bytes are
@@ -582,6 +598,8 @@ pub struct Sha512 {
     total: int,
     khi: List[int],
     klo: List[int],
+    whi: List[int],
+    wlo: List[int],
 }
 
 /// A fresh SHA-512 state — FIPS 180-4 §5.3.5's initial hash value ("the
@@ -619,6 +637,8 @@ pub fn new512() -> Sha512 {
         total: 0,
         khi: khi,
         klo: klo,
+        whi: schedule(80),
+        wlo: schedule(80),
     }
 }
 
@@ -627,8 +647,6 @@ pub fn new512() -> Sha512 {
 /// (`wrapping[u64]`'s native width — no masks). Requires
 /// `st.buf.len == 128`.
 fn compress512(mut st: Sha512) {
-    var whi = List[int]()
-    var wlo = List[int]()
     var t: int = 0
     while t < 16 {
         let off = t * 8
@@ -640,16 +658,18 @@ fn compress512(mut st: Sha512) {
             st.buf[off + 5] as int as wrapping[u64] << 16 |
             st.buf[off + 6] as int as wrapping[u64] << 8 |
             st.buf[off + 7] as int as wrapping[u64]
-        push_word_halves(mut whi, mut wlo, wt)
+        st.whi[t] = (wt >> 32) as int
+        st.wlo[t] = (wt & mask32()) as int
         t = t + 1
     }
     while t < 80 {
-        let wm2 = whi[t - 2] as wrapping[u64] << 32 | wlo[t - 2] as wrapping[u64]
-        let wm7 = whi[t - 7] as wrapping[u64] << 32 | wlo[t - 7] as wrapping[u64]
-        let wm15 = whi[t - 15] as wrapping[u64] << 32 | wlo[t - 15] as wrapping[u64]
-        let wm16 = whi[t - 16] as wrapping[u64] << 32 | wlo[t - 16] as wrapping[u64]
+        let wm2 = st.whi[t - 2] as wrapping[u64] << 32 | st.wlo[t - 2] as wrapping[u64]
+        let wm7 = st.whi[t - 7] as wrapping[u64] << 32 | st.wlo[t - 7] as wrapping[u64]
+        let wm15 = st.whi[t - 15] as wrapping[u64] << 32 | st.wlo[t - 15] as wrapping[u64]
+        let wm16 = st.whi[t - 16] as wrapping[u64] << 32 | st.wlo[t - 16] as wrapping[u64]
         let wt = ssig1_512(wm2) + wm7 + ssig0_512(wm15) + wm16
-        push_word_halves(mut whi, mut wlo, wt)
+        st.whi[t] = (wt >> 32) as int
+        st.wlo[t] = (wt & mask32()) as int
         t = t + 1
     }
     var a = st.h0
@@ -663,7 +683,7 @@ fn compress512(mut st: Sha512) {
     t = 0
     while t < 80 {
         let kt = st.khi[t] as wrapping[u64] << 32 | st.klo[t] as wrapping[u64]
-        let wt = whi[t] as wrapping[u64] << 32 | wlo[t] as wrapping[u64]
+        let wt = st.whi[t] as wrapping[u64] << 32 | st.wlo[t] as wrapping[u64]
         let t1 = h + bsig1_512(e) + ch(e, f, g) + kt + wt
         let t2 = bsig0_512(a) + maj(a, b, c)
         h = g
@@ -684,7 +704,7 @@ fn compress512(mut st: Sha512) {
     st.h5 = st.h5 + f
     st.h6 = st.h6 + g
     st.h7 = st.h7 + h
-    st.buf = List[byte]()
+    (mut st.buf).reset()
 }
 
 /// Absorbs `data` into the running SHA-512 computation; 1024-bit
