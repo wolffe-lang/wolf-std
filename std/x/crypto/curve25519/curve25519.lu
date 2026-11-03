@@ -1612,9 +1612,6 @@ pub fn verify_strict(pubkey: List[byte], message: List[byte], sig: List[byte]) -
     if !r_opt.ok {
         return false
     }
-    if ge_is_small_order(r_opt.p) {
-        return false
-    }
     let k = sc_reduce64(sha2.sum512(cat(cat(big_r, pubkey), message)))
     let sb = ge_scalarmult(s, ge_base())
     let ka = ge_scalarmult(k, a_opt.p)
