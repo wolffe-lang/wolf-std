@@ -132,4 +132,4 @@ Options: (A) move all three code sites in one follow-on lane, each with a row th
 - [x] `ct:` stated on `verify_strict` in the sc18 verify-is-public style.
 - [x] Cost measured on kasumi under taskset (+0.9%).
 - [x] Register row, module header, README and changelog refreshed.
-- [ ] Final-head green record and plant red record: their paths and `END` lines are in the PR body, where CI is informational under the local gate.
+- [x] Final-head green record and plant red record: their paths and `END` lines are in the PR body, where CI is informational under the local gate. At the merge (`23baa1a`, #121): the green record ends `RECORD-END worst=0 steps=18`, and the plant (`5fd400f`) shows `FAIL strict-r-identity-empty` and `FAIL strict-r-identity-72` inside `END strict-rows-native exit=1`.
