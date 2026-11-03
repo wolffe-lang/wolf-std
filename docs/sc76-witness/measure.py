@@ -26,6 +26,7 @@ def main():
                         break
                     except subprocess.TimeoutExpired:
                         print(f'WAIT family={family} mode={mode} mib={mib} pid={p.pid}', flush=True)
+                wall_s = round(time.monotonic() - started, 3)
                 match = re.search(rb'Maximum resident set size \(kbytes\):\s*(\d+)', err)
                 peak = int(match[1]) if match else None
                 ok = p.returncode == 0
@@ -36,7 +37,7 @@ def main():
                         h.update(chunk)
                     ok = out.decode().strip() == h.hexdigest()
                 print(json.dumps(dict(family=family, mode=mode, mib=mib, peak_kib=peak,
-                                      wall_s=round(time.monotonic()-started, 3),
+                                      wall_s=wall_s,
                                       exit=p.returncode, digest_ok=ok)), flush=True)
                 if not ok:
                     print(err.decode(errors='replace'), flush=True)
