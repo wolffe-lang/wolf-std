@@ -1,0 +1,38 @@
+//! member: false
+// sc76 Linux-only RSS driver. Run exclusively under prlimit --as=2147483648.
+use std.x.crypto.sha2
+
+fn number(s: str) -> int {
+    var n = 0
+    for b in s.bytes() { n = n * 10 + b as int - 48 }
+    n
+}
+
+fn main() -> int {
+    let args = env_args()
+    if args.len != 3 { return 2 }
+    let size = number(args[0])
+    var chunk = List[byte]()
+    var count = 65536
+    if args[2] == "sum" { count = size }
+    (mut chunk).reserve(count)
+    var i = 0
+    while i < count { (mut chunk).push(0 as byte); i = i + 1 }
+    if args[2] == "sum" {
+        if args[1] == "256" { print(sha2.to_hex(sha2.sum256(chunk))) }
+        else { print(sha2.to_hex(sha2.sum512(chunk))) }
+    } else {
+        if args[1] == "256" {
+            var st = sha2.new256()
+            i = 0
+            while i < size { sha2.update256(mut st, chunk); i = i + count }
+            print(sha2.to_hex(sha2.final256(take st)))
+        } else {
+            var st = sha2.new512()
+            i = 0
+            while i < size { sha2.update512(mut st, chunk); i = i + count }
+            print(sha2.to_hex(sha2.final512(take st)))
+        }
+    }
+    0
+}

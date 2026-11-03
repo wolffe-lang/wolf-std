@@ -1,0 +1,24 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.sha2, mem.region.cap.1, mem.region.cap.2
+//!
+//! sc76: 64 KiB of auxiliary region storage must suffice for a stream.
+//! The same 64-byte chunk is borrowed on every call; input storage is
+//! outside the capped region. Trunk's fresh per-block schedules and
+//! buffers breach the cap. The Linux RSS witness tests 1 GiB separately.
+
+use std.x.crypto.sha2
+
+fn main() -> int {
+    let chunk = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".bytes()
+    region scratch(cap: 65536) {
+        var st = sha2.new256()
+        var i = 0
+        while i < 64 {
+            sha2.update256(mut st, chunk)
+            i = i + 1
+        }
+        assert(sha2.final256(take st).len == 32)
+    }
+    0
+}
