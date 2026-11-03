@@ -480,7 +480,11 @@ fn compress256(mut st: Sha256) {
     var h = st.h7
     t = 0
     while t < 64 {
-        let t1 = h + bsig1_256(e) + ch(e, f, g) + st.k[t] as wrapping[u64] + st.w[t] as wrapping[u64] &
+        let t1 = h +
+            bsig1_256(e) +
+            ch(e, f, g) +
+            st.k[t] as wrapping[u64] +
+            st.w[t] as wrapping[u64] &
             mask32()
         let t2 = bsig0_256(a) + maj(a, b, c) & mask32()
         h = g
