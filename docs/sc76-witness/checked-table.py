@@ -26,9 +26,19 @@ for family in ('256', '512'):
                 except subprocess.TimeoutExpired:
                     print(f'WAIT checked {family} {mode} {mib} pid={p.pid}', flush=True)
             match = re.search(rb'Maximum resident set size \(kbytes\):\s*(\d+)', err)
-            record = json.loads(out)
+            try:
+                record = json.loads(out)
+            except ValueError:
+                record = None
             print(json.dumps(dict(family=family, mode=mode, mib=mib,
                                   tier='checked', peak_kib=int(match[1]) if match else None,
-                                  wall_s=round(time.monotonic()-t0, 3), record=record)), flush=True)
-            assert p.returncode == 0 and not record['warnings']
-            assert record['verdict'] in ('exit(0)', 'unsupported'), record
+                                  wall_s=round(time.monotonic()-t0, 3), exit=p.returncode,
+                                  record=record, stderr=err.decode(errors='replace') if record is None else None)), flush=True)
+            if record is not None:
+                assert p.returncode == 0 and not record['warnings']
+                assert record['verdict'] in ('exit(0)', 'unsupported'), record
+            else:
+                # A large checked caller-owned list can hit the process cap
+                # before JSON is emitted. Preserve it as failed observation,
+                # never as passing bound evidence.
+                assert p.returncode != 0, (out, err)
