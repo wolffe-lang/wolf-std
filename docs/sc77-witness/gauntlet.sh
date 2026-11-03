@@ -8,7 +8,9 @@
 set -u
 cd "$(git rev-parse --show-toplevel)" || exit 2
 : "${WOLF_BIN:?}" "${LUPIN_BIN:?}" "${WOLF_RT_LIB:?}" "${TMPDIR:?}"
-base=d407430
+# The trunk this branch is based on (rebased from d407430, whose std/,
+# tests/, vendor/ and xtask/ are identical to it).
+base=c9da7e7
 c25519=std/x/crypto/curve25519/curve25519.lu
 scratch=$(mktemp -d "$TMPDIR/sc77-gauntlet.XXXXXX") || exit 2
 trap 'rm -rf "$scratch" target/stage' EXIT
