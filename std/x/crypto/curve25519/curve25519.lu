@@ -1394,6 +1394,18 @@ fn ge_eq(p: Ge, q: Ge) -> bool {
     a && b
 }
 
+/// True iff `[8]p` is the identity: `p` is one of the eight points of
+/// small order (1, 2, 4 or 8) that edwards25519's cofactor of 8 admits
+/// (RFC 8032 §5.1, c = 3). Three `ge_double`s and one `ge_eq` against
+/// the identity. A mixed-order point (a prime-order part plus a nonzero
+/// small-order part) answers false: only `[L]p` tells it apart, and
+/// that check is not made here (`docs/sc77-the-strict-verify.md`).
+/// ct: public data in verify.
+fn ge_is_small_order(p: Ge) -> bool {
+    let p8 = ge_double(ge_double(ge_double(p)))
+    ge_eq(p8, ge_identity())
+}
+
 // ---------------------------------------------------------------------
 // Ed25519 (RFC 8032): sign, verify, public. SHA-512 is
 // `std.x.crypto.sha2`'s, through the module boundary — no digest is
@@ -1525,6 +1537,70 @@ pub fn verify(pubkey: List[byte], message: List[byte], sig: List[byte]) -> bool 
     }
     let r_opt = ge_decompress(big_r)
     if !r_opt.ok {
+        return false
+    }
+    let k = sc_reduce64(sha2.sum512(cat(cat(big_r, pubkey), message)))
+    let sb = ge_scalarmult(s, ge_base())
+    let ka = ge_scalarmult(k, a_opt.p)
+    let rhs = ge_add(r_opt.p, ka)
+    ge_eq(sb, rhs)
+}
+
+/// Verify an Ed25519 signature STRICTLY: everything `verify` checks
+/// (the lengths, S < L, canonical decompression of A and R, and RFC 8032
+/// §5.1.7's cofactorless equation [S]B = R + [k]A), and also false when
+/// the public key A or the commitment R has small order, meaning [8]A or
+/// [8]R is the identity. Those are the eight points of the cofactor
+/// subgroup. RFC 8032 accepts them, and `verify` does too: with A = the
+/// encoded identity (`01` then 31 zero bytes) and R || S = that identity
+/// then 32 zero bytes, `verify` answers true for every message. Call
+/// this function when a policy must refuse small-order keys and
+/// commitments. No honestly generated key or signature has small order,
+/// so the two functions agree on every one of them. A mixed-order A or R
+/// (a prime-order point plus a nonzero small-order one) is NOT refused:
+/// that needs [L]P, a further scalar multiplication per point
+/// (`docs/sc77-the-strict-verify.md` measures it). Returns true iff the
+/// signature is valid under these rules, and never traps on the caller's
+/// data (§2's rule, as for `verify`).
+/// ct: VERIFY IS PUBLIC DATA — the key, the signature and the message
+/// are all public, so the branches here, the small-order tests included,
+/// protect no secret and this function carries no constant-time
+/// obligation (stated in the module header).
+///
+/// ```wolf-doc-example
+/// var pk = List[byte]()
+/// (mut pk).push(1 as byte)
+/// for i in 0..31 { (mut pk).push(0 as byte) }
+/// var sig = List[byte]()
+/// (mut sig).push(1 as byte)
+/// for i in 0..63 { (mut sig).push(0 as byte) }
+/// curve25519.verify(pk, "any message".bytes(), sig) == true
+/// curve25519.verify_strict(pk, "any message".bytes(), sig) == false
+/// ```
+pub fn verify_strict(pubkey: List[byte], message: List[byte], sig: List[byte]) -> bool {
+    if !(pubkey.len == 32) {
+        return false
+    }
+    if !(sig.len == 64) {
+        return false
+    }
+    let big_r = first32(sig)
+    let s = second32(sig)
+    if sc_geq_order(s) {
+        return false
+    }
+    let a_opt = ge_decompress(pubkey)
+    if !a_opt.ok {
+        return false
+    }
+    if ge_is_small_order(a_opt.p) {
+        return false
+    }
+    let r_opt = ge_decompress(big_r)
+    if !r_opt.ok {
+        return false
+    }
+    if ge_is_small_order(r_opt.p) {
         return false
     }
     let k = sc_reduce64(sha2.sum512(cat(cat(big_r, pubkey), message)))
