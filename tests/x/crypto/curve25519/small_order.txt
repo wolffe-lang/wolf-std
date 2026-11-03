@@ -1,0 +1,108 @@
+sc77 small-order record, written by tests/x/crypto/curve25519/small_order.py
+p = 2^255 - 19; d = -121665/121666 mod p; L = 2^252 + 27742317777372353535851937790883648493
+B from y = 4/5 and the even x matches RFC 8032 Table 1; [L]B = O.
+
+THE EIGHT POINTS ([8]P = O), solved from the curve equation (x = 0, y = 0, x^2 = -y^2)
+cross-check: [L]Q over 22 ordinary curve points found the same 8; the order-8 points generate all 8
+
+identity           order 1  encoding 0100000000000000000000000000000000000000000000000000000000000000
+  x = 0000000000000000000000000000000000000000000000000000000000000000
+  y = 0000000000000000000000000000000000000000000000000000000000000001
+  [1..8]P: 01000000 01000000 01000000 01000000 01000000 01000000 01000000 01000000
+
+order2             order 2  encoding ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+  x = 0000000000000000000000000000000000000000000000000000000000000000
+  y = 7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffec
+  [1..8]P: ecffffff 01000000 ecffffff 01000000 ecffffff 01000000 ecffffff 01000000
+
+order4-0000x0      order 4  encoding 0000000000000000000000000000000000000000000000000000000000000000
+  x = 2b8324804fc1df0b2b4d00993dfbd7a72f431806ad2fe478c4ee1b274a0ea0b0
+  y = 0000000000000000000000000000000000000000000000000000000000000000
+  [1..8]P: 00000000 ecffffff 00000000 01000000 00000000 ecffffff 00000000 01000000
+
+order4-0000x1      order 4  encoding 0000000000000000000000000000000000000000000000000000000000000080
+  x = 547cdb7fb03e20f4d4b2ff66c2042858d0bce7f952d01b873b11e4d8b5f15f3d
+  y = 0000000000000000000000000000000000000000000000000000000000000000
+  [1..8]P: 00000000 ecffffff 00000000 01000000 00000000 ecffffff 00000000 01000000
+
+order8-26e8x0      order 8  encoding 26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05
+  x = 1fd5b9a006394a28e933993238de4abb5c193c7013e5e238dea14646c545d14a
+  y = 05fc536d880238b13933c6d305acdfd5f098eff289f4c345b027b2c28f95e826
+  [1..8]P: 26e8958f 00000000 c7176a70 ecffffff c7176a70 00000000 26e8958f 01000000
+
+order8-26e8x1      order 8  encoding 26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85
+  x = 602a465ff9c6b5d716cc66cdc721b544a3e6c38fec1a1dc7215eb9b93aba2ea3
+  y = 05fc536d880238b13933c6d305acdfd5f098eff289f4c345b027b2c28f95e826
+  [1..8]P: 26e8958f 00000000 c7176a70 ecffffff c7176a70 00000000 26e8958f 01000000
+
+order8-c717x0      order 8  encoding c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a
+  x = 1fd5b9a006394a28e933993238de4abb5c193c7013e5e238dea14646c545d14a
+  y = 7a03ac9277fdc74ec6cc392cfa53202a0f67100d760b3cba4fd84d3d706a17c7
+  [1..8]P: c7176a70 00000000 26e8958f ecffffff 26e8958f 00000000 c7176a70 01000000
+
+order8-c717x1      order 8  encoding c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa
+  x = 602a465ff9c6b5d716cc66cdc721b544a3e6c38fec1a1dc7215eb9b93aba2ea3
+  y = 7a03ac9277fdc74ec6cc392cfa53202a0f67100d760b3cba4fd84d3d706a17c7
+  [1..8]P: c7176a70 00000000 26e8958f ecffffff 26e8958f 00000000 c7176a70 01000000
+
+NON-CANONICAL ENCODINGS (RFC 8032 s5.1.3 decoding fails): 6
+  edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f  nc-edff7f      y = p >= p
+  edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  nc-edffff      y = p >= p
+  0100000000000000000000000000000000000000000000000000000000000080  nc-010080      x = 0 with x_0 = 1
+  eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f  nc-eeff7f      y = p + 1 >= p
+  eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  nc-eeffff      y = p + 1 >= p, and x = 0 with x_0 = 1
+  ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff  nc-ecffff      x = 0 with x_0 = 1
+
+ROWS (verify = cofactorless RFC 8032 s5.1.7, verify_strict = the same plus [8]A != O and [8]R != O)
+  row                          verify  strict detail
+  a-identity-empty             true    false  ord(A) = 1, k mod ord(A) = 0
+  a-identity-72                true    false  ord(A) = 1, k mod ord(A) = 0
+  a-order2-empty               false   false  ord(A) = 2, k mod ord(A) = 1
+  a-order2-72                  true    false  ord(A) = 2, k mod ord(A) = 0
+  a-order4-0000x0-empty        false   false  ord(A) = 4, k mod ord(A) = 1
+  a-order4-0000x0-72           true    false  ord(A) = 4, k mod ord(A) = 0
+  a-order4-0000x1-empty        true    false  ord(A) = 4, k mod ord(A) = 0
+  a-order4-0000x1-72           true    false  ord(A) = 4, k mod ord(A) = 0
+  a-order8-26e8x0-empty        false   false  ord(A) = 8, k mod ord(A) = 7
+  a-order8-26e8x0-72           false   false  ord(A) = 8, k mod ord(A) = 7
+  a-order8-26e8x1-empty        false   false  ord(A) = 8, k mod ord(A) = 3
+  a-order8-26e8x1-72           false   false  ord(A) = 8, k mod ord(A) = 5
+  a-order8-c717x0-empty        true    false  ord(A) = 8, k mod ord(A) = 0
+  a-order8-c717x0-72           false   false  ord(A) = 8, k mod ord(A) = 6
+  a-order8-c717x1-empty        false   false  ord(A) = 8, k mod ord(A) = 7
+  a-order8-c717x1-72           false   false  ord(A) = 8, k mod ord(A) = 7
+  r-identity-empty             true    false  ord(R) = 1, S = k*a mod L
+  r-identity-72                true    false  ord(R) = 1, S = k*a mod L
+  r-order2-empty               false   false  ord(R) = 2, S = k*a mod L
+  r-order2-72                  false   false  ord(R) = 2, S = k*a mod L
+  r-order4-0000x0-empty        false   false  ord(R) = 4, S = k*a mod L
+  r-order4-0000x0-72           false   false  ord(R) = 4, S = k*a mod L
+  r-order4-0000x1-empty        false   false  ord(R) = 4, S = k*a mod L
+  r-order4-0000x1-72           false   false  ord(R) = 4, S = k*a mod L
+  r-order8-26e8x0-empty        false   false  ord(R) = 8, S = k*a mod L
+  r-order8-26e8x0-72           false   false  ord(R) = 8, S = k*a mod L
+  r-order8-26e8x1-empty        false   false  ord(R) = 8, S = k*a mod L
+  r-order8-26e8x1-72           false   false  ord(R) = 8, S = k*a mod L
+  r-order8-c717x0-empty        false   false  ord(R) = 8, S = k*a mod L
+  r-order8-c717x0-72           false   false  ord(R) = 8, S = k*a mod L
+  r-order8-c717x1-empty        false   false  ord(R) = 8, S = k*a mod L
+  r-order8-c717x1-72           false   false  ord(R) = 8, S = k*a mod L
+  nc-edff7f-as-a               false   false  y = p >= p
+  nc-edff7f-as-r               false   false  y = p >= p
+  nc-edffff-as-a               false   false  y = p >= p
+  nc-edffff-as-r               false   false  y = p >= p
+  nc-010080-as-a               false   false  x = 0 with x_0 = 1
+  nc-010080-as-r               false   false  x = 0 with x_0 = 1
+  nc-eeff7f-as-a               false   false  y = p + 1 >= p
+  nc-eeff7f-as-r               false   false  y = p + 1 >= p
+  nc-eeffff-as-a               false   false  y = p + 1 >= p, and x = 0 with x_0 = 1
+  nc-eeffff-as-r               false   false  y = p + 1 >= p, and x = 0 with x_0 = 1
+  nc-ecffff-as-a               false   false  x = 0 with x_0 = 1
+  nc-ecffff-as-r               false   false  x = 0 with x_0 = 1
+  accepted by verify: a-identity-empty, a-identity-72, a-order2-72, a-order4-0000x0-72, a-order4-0000x1-empty, a-order4-0000x1-72, a-order8-c717x0-empty, r-identity-empty, r-identity-72
+
+WYCHEPROOF ed25519_test.json: 151 cases, 88 valid, 63 invalid; the reference verify agrees on all
+  small-order A: none
+  small-order R: tc 10 (invalid), tc 11 (invalid), tc 12 (invalid), tc 13 (invalid), tc 14 (invalid), tc 15 (invalid), tc 16 (invalid), tc 17 (invalid), tc 18 (invalid), tc 19 (invalid), tc 60 (invalid)
+  verdict differs between verify and verify_strict: none (0 of 151)
+  strict accepts 88, refuses 63
