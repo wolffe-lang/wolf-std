@@ -1,5 +1,15 @@
 # Changelog
 
+## sc76 — 2026-11-03 — bounded incremental SHA-2
+
+SHA-256 and SHA-512 keep their message schedules in the state and reset
+their block buffers in place. Incremental hashing now holds constant
+working storage instead of allocating into the caller's region per block.
+Public functions, digests, constant-time indexing and toolchain pins are
+unchanged; SHA-384 and the HMAC/HKDF callers share the fix. Two region-cap
+regressions bring the test count to 561. Linux native and release witnesses
+verify digests through 1 GiB under a hard 2 GiB process cap.
+
 ## sc75 — 2026-10-31 — std at wolf 0.2.36 / lupin 0.1.58: the builder over bytes, the invocation name
 
 **The pins.** wolf 0.2.35 -> **0.2.36** (`v0.2.36`, tag object `86d61559`
