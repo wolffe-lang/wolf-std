@@ -1,0 +1,165 @@
+WAIT sc78 Mac build lock 2026-11-04T06:22:46Z
+WAIT sc78 Mac build lock 2026-11-04T06:23:16Z
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+   --> std://map/map.lu:224:5
+    |
+223 | pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    |                          - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+224 |     m[k]
+    |     ^^^^ this would be a second live path to the value `m` was lent
+    |
+    = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+      call would leave two places able to write one value, with no `shared` spelled anywhere
+      [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+      `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+    |
+224 |     copy m[k]
+    |
+
+test /Users/mfwolffe/lanes/sc78/mac-stage-be86ffc169c9af803dbd4543a1f7029299230c30/clear_and_extend/clear_and_extend_test.lu ... REJECTED (does not compile)
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+   --> std://map/map.lu:224:5
+    |
+223 | pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    |                          - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+224 |     m[k]
+    |     ^^^^ this would be a second live path to the value `m` was lent
+    |
+    = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+      call would leave two places able to write one value, with no `shared` spelled anywhere
+      [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+      `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+    |
+224 |     copy m[k]
+    |
+
+test /Users/mfwolffe/lanes/sc78/mac-stage-be86ffc169c9af803dbd4543a1f7029299230c30/get_hit_miss/get_hit_miss_test.lu ... REJECTED (does not compile)
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+   --> std://map/map.lu:224:5
+    |
+223 | pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    |                          - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+224 |     m[k]
+    |     ^^^^ this would be a second live path to the value `m` was lent
+    |
+    = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+      call would leave two places able to write one value, with no `shared` spelled anywhere
+      [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+      `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+    |
+224 |     copy m[k]
+    |
+
+test /Users/mfwolffe/lanes/sc78/mac-stage-be86ffc169c9af803dbd4543a1f7029299230c30/get_index_agreement/get_index_agreement_test.lu ... REJECTED (does not compile)
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+   --> std://map/map.lu:224:5
+    |
+223 | pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    |                          - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+224 |     m[k]
+    |     ^^^^ this would be a second live path to the value `m` was lent
+    |
+    = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+      call would leave two places able to write one value, with no `shared` spelled anywhere
+      [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+      `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+    |
+224 |     copy m[k]
+    |
+
+test /Users/mfwolffe/lanes/sc78/mac-stage-be86ffc169c9af803dbd4543a1f7029299230c30/has_allocates_nothing/has_allocates_nothing_test.lu ... REJECTED (does not compile)
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+   --> std://map/map.lu:224:5
+    |
+223 | pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    |                          - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+224 |     m[k]
+    |     ^^^^ this would be a second live path to the value `m` was lent
+    |
+    = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+      call would leave two places able to write one value, with no `shared` spelled anywhere
+      [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+      `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+    |
+224 |     copy m[k]
+    |
+
+test /Users/mfwolffe/lanes/sc78/mac-stage-be86ffc169c9af803dbd4543a1f7029299230c30/has_and_get_or/has_and_get_or_test.lu ... REJECTED (does not compile)
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+   --> std://map/map.lu:224:5
+    |
+223 | pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    |                          - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+224 |     m[k]
+    |     ^^^^ this would be a second live path to the value `m` was lent
+    |
+    = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+      call would leave two places able to write one value, with no `shared` spelled anywhere
+      [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+      `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+    |
+224 |     copy m[k]
+    |
+
+test /Users/mfwolffe/lanes/sc78/mac-stage-be86ffc169c9af803dbd4543a1f7029299230c30/keys_values_pairs/keys_values_pairs_test.lu ... REJECTED (does not compile)
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+   --> std://map/map.lu:224:5
+    |
+223 | pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    |                          - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+224 |     m[k]
+    |     ^^^^ this would be a second live path to the value `m` was lent
+    |
+    = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+      call would leave two places able to write one value, with no `shared` spelled anywhere
+      [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+      `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+    |
+224 |     copy m[k]
+    |
+
+test /Users/mfwolffe/lanes/sc78/mac-stage-be86ffc169c9af803dbd4543a1f7029299230c30/remove_and_tally/remove_and_tally_test.lu ... REJECTED (does not compile)
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+   --> std://map/map.lu:224:5
+    |
+223 | pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    |                          - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+224 |     m[k]
+    |     ^^^^ this would be a second live path to the value `m` was lent
+    |
+    = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+      call would leave two places able to write one value, with no `shared` spelled anywhere
+      [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+      `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+    |
+224 |     copy m[k]
+    |
+
+test /Users/mfwolffe/lanes/sc78/mac-stage-be86ffc169c9af803dbd4543a1f7029299230c30/remove_many/remove_many_test.lu ... REJECTED (does not compile)
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+   --> std://map/map.lu:224:5
+    |
+223 | pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    |                          - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+224 |     m[k]
+    |     ^^^^ this would be a second live path to the value `m` was lent
+    |
+    = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+      call would leave two places able to write one value, with no `shared` spelled anywhere
+      [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+      `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+    |
+224 |     copy m[k]
+    |
+
+test /Users/mfwolffe/lanes/sc78/mac-stage-be86ffc169c9af803dbd4543a1f7029299230c30/set_len_empty/set_len_empty_test.lu ... REJECTED (does not compile)
+wolf test: 0 passed; 0 failed; 9 rejected; 0 unsupported; 0 filtered out

@@ -1,0 +1,77 @@
+//! member: false
+//! sc78 ownership diagnostic: old-get-list-independent must be red.
+//! The old get body aliases a List value; selected-value copy does not.
+
+use std.cmp
+
+fn old_get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    for pair in m.pairs() {
+        if cmp.Eq.eq(pair.0, k) {
+            return pair.1
+        }
+    }
+    none
+}
+
+fn selected_copy[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    copy m[k]
+}
+
+fn original_list() -> int {
+    var m = Map[str, List[int]]()
+    var xs = List[int]()
+    (mut xs).push(7)
+    m["a"] = xs
+    var v = old_get(m, "a") else { return -1 }
+    v[0] = 9
+    let source = m["a"] else { return -2 }
+    source[0]
+}
+
+fn copied_list() -> int {
+    var m = Map[str, List[int]]()
+    var xs = List[int]()
+    (mut xs).push(7)
+    m["a"] = xs
+    var v = selected_copy(m, "a") else { return -1 }
+    v[0] = 9
+    let source = m["a"] else { return -2 }
+    source[0]
+}
+
+fn original_str() -> bool {
+    var m = Map[str, str]()
+    m["a"] = "wolf-é"
+    var v = old_get(m, "a") else { return false }
+    v += "!"
+    let source = m["a"] else { return false }
+    v == "wolf-é!" && source == "wolf-é"
+}
+
+fn copied_str() -> bool {
+    var m = Map[str, str]()
+    m["a"] = "wolf-é"
+    var v = selected_copy(m, "a") else { return false }
+    v += "!"
+    let source = m["a"] else { return false }
+    v == "wolf-é!" && source == "wolf-é"
+}
+
+fn main() -> !int {
+    let old_list = original_list()
+    let new_list = copied_list()
+    let old_str = original_str()
+    let new_str = copied_str()
+    print("old_list_source={old_list} copied_list_source={new_list}")
+    print("old_str_independent={old_str} copied_str_independent={new_str}")
+    if new_list != 7 || !old_str || !new_str {
+        print("FAIL selected-copy-independent")
+        return 2
+    }
+    print("PASS selected-copy-independent")
+    if old_list != 7 {
+        print("FAIL old-get-list-independent")
+        return 1
+    }
+    0
+}

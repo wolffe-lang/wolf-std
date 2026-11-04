@@ -1,0 +1,44 @@
+WAIT sc78 probe Mac lock 2026-11-04T06:27:48Z
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+ --> /Users/mfwolffe/lanes/sc78/probe-bodies/probes/bind/bind_test.lu:6:5
+  |
+4 | fn candidate[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+  |                            - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+5 |     let v = m[k] else { return none }
+  |             ---- `m`'s value is moved out here
+6 |     v
+  |     ^ this would be a second live path to the value `m` was lent
+  |
+  = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+    call would leave two places able to write one value, with no `shared` spelled anywhere
+    [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+    `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+  |
+5 |     let v = copy m[k] else { return none }
+  |
+
+test /Users/mfwolffe/lanes/sc78/probe-bodies/probes/bind/bind_test.lu ... REJECTED (does not compile)
+old_source=9 new_source=7
+test /Users/mfwolffe/lanes/sc78/probe-bodies/probes/copy_row/copy_row_test.lu::main ... FAILED (exit(3))
+old_source=9 new_source=7
+test /Users/mfwolffe/lanes/sc78/probe-bodies/probes/copy_value/copy_value_test.lu::main ... FAILED (exit(3))
+error[E1002]: `m` is the caller's value, and it is returned here while the caller still holds it
+ --> /Users/mfwolffe/lanes/sc78/probe-bodies/probes/tail/tail_test.lu:5:5
+  |
+4 | fn candidate[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+  |                            - `m` is declared without a mode — that spells `read`: lent for the call, and still the caller's after it
+5 |     m[k]
+  |     ^^^^ this would be a second live path to the value `m` was lent
+  |
+  = note: a `read` parameter is lent, never given [mem.tier0.mode.read]. Handing it on past the
+    call would leave two places able to write one value, with no `shared` spelled anywhere
+    [mem.tier0.excl.1]. Hand on an independent value with `copy`, or declare the parameter
+    `take` so the caller gives it up (call sites then spell `take`).
+help: to hand on an independent value, copy it at the move
+  |
+5 |     copy m[k]
+  |
+
+test /Users/mfwolffe/lanes/sc78/probe-bodies/probes/tail/tail_test.lu ... REJECTED (does not compile)
+wolf test: 0 passed; 2 failed; 2 rejected; 0 unsupported; 0 filtered out

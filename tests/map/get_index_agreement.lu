@@ -5,6 +5,9 @@
 //! The old trait-dispatched walk and get must agree for every permitted
 //! key type, on hits, misses, replacement, removal and reinsertion.
 //! Zero and -1 are stored values, never absence sentinels.
+//! A returned List or str must be independent of the stored value. The
+//! old walk violated the memory model for List values; that alias is not
+//! part of the key-answer agreement above.
 
 use std.cmp
 use std.map
@@ -101,10 +104,32 @@ fn str_keys() -> bool {
     agrees(m, "0#key7", 0)
 }
 
+fn list_value_independent() -> bool {
+    var m = Map[str, List[int]]()
+    var xs = List[int]()
+    (mut xs).push(7)
+    m["a"] = xs
+    var v = map.get(m, "a") else { return false }
+    v[0] = 9
+    let source = m["a"] else { return false }
+    source[0] == 7 && v[0] == 9
+}
+
+fn str_value_independent() -> bool {
+    var m = Map[str, str]()
+    m["a"] = "wolf-é"
+    var v = map.get(m, "a") else { return false }
+    v += "!"
+    let source = m["a"] else { return false }
+    v == "wolf-é!" && source == "wolf-é"
+}
+
 fn main() -> !int {
     if !int_keys() { print("FAIL get-int"); return 1 }
     if !char_keys() { print("FAIL get-char"); return 2 }
     if !bool_keys() { print("FAIL get-bool"); return 3 }
     if !str_keys() { print("FAIL get-str"); return 4 }
+    if !list_value_independent() { print("FAIL get-list-independent"); return 5 }
+    if !str_value_independent() { print("FAIL get-str-independent"); return 6 }
     0
 }
