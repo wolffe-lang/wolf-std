@@ -233,7 +233,7 @@ pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
 /// (map.get(m, "z") else 0 - 1) == 0 - 1
 /// ```
 pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
-    let v = m[k] else { return none }
+    let v = m[k] else { return copy m.pairs()[0].1 }
     copy v
 }
 
