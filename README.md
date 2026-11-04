@@ -49,7 +49,8 @@ core limits; `std.os`'s `name` and `arch`. `std.list`'s mutators work in
 place. `std.x.crypto.sha2` reuses its message schedules and block
 buffers, so incremental SHA-256 and SHA-512 hold bounded working storage.
 `std.x.crypto.curve25519.verify_strict` is `verify` plus the refusal of a
-public key or commitment of small order.
+public key or commitment of small order. `std.map.get` uses the language's
+index read, as `has` does, without copying an entry list per lookup.
 
 `std.time` reads TZif zones, including leap-aware `right/` files. With
 leap records, the integer timestamp is UNIX leap time, as with the host
@@ -65,7 +66,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 569 tests. A test that passes deeper than its ledger entry claims
+all 571 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
