@@ -34,7 +34,7 @@ toolchain() {
 witness() {
     local mode=$1
     python3 -I docs/sc78-witness/gate.py "$mode" --repo "$PWD" \
-        --wolf "$WOLF_BIN" --scratch "$scratch/$mode"
+        --wolf "$WOLF_BIN" --lupin "$LUPIN_BIN" --scratch "$scratch/$mode"
 }
 
 step toolchain toolchain
@@ -42,9 +42,14 @@ if [ "${1:-}" = --ratio-only ]; then
     step get-10000-native-ratio witness ratio
     exit 0
 fi
+if [ "${1:-}" = --lupin-only ]; then
+    step map-lupin-small witness lupin-small
+    exit 0
+fi
 step map-answers-three-machines witness maps
 # A local one-hunk plant needs only the module rows that expose the break.
 [ "${1:-}" != --plant ] || exit 0
+step map-lupin-small witness lupin-small
 # A red-first take runs the same two new gates before changing get.
 step get-10000-native-ratio witness ratio
 [ "${1:-}" != --red-first ] || exit 0

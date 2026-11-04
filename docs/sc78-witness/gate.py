@@ -11,9 +11,10 @@ import sys
 import time
 
 p = argparse.ArgumentParser()
-p.add_argument('mode', choices=['maps', 'ratio', 'unchanged'])
+p.add_argument('mode', choices=['maps', 'ratio', 'unchanged', 'lupin-small'])
 p.add_argument('--repo', type=Path, required=True)
 p.add_argument('--wolf', required=True)
+p.add_argument('--lupin')
 p.add_argument('--scratch', type=Path, required=True)
 p.add_argument('--base', default='b1babae3e61458620b921a27ccd267b67dd4d52f')
 a = p.parse_args()
@@ -60,9 +61,44 @@ if a.mode == 'maps':
                             'lists hit=true miss=false\n')
             elif src.stem == 'get_many':
                 expected = '10000\n'
+            elif src.stem == 'get_many_smoke':
+                expected = '1000\n'
             ok = record_ok(got, expected)
             print(('PASS ' if ok else 'FAIL ') + row)
             bad |= not ok
+elif a.mode == 'lupin-small':
+    import tomllib
+    if not a.lupin:
+        p.error('lupin-small requires --lupin')
+    ledger = tomllib.loads((a.repo / 'tests/ledger.toml').read_text())['tests']
+    reason = '`Eq.eq` does not resolve to an `impl Eq for …` method of char'
+    for name in ['get_int_agreement', 'get_char_agreement', 'get_bool_agreement',
+                 'get_str_agreement', 'get_list_independent', 'get_str_independent',
+                 'get_many_smoke']:
+        filename = name + '.lu'
+        stage = a.scratch / name
+        stage.mkdir()
+        entry = stage / filename
+        shutil.copyfile(a.repo / 'tests/map' / filename, entry)
+        got = run([a.lupin, 'conform-run', '--json', '--std-root',
+                   a.repo / 'std', entry])
+        print(f'row {name}-lupin tool_exit={got.returncode}')
+        print(got.stdout.rstrip())
+        print(got.stderr.rstrip())
+        want = ledger['map/' + filename]['lupin']
+        expected = '1000\n' if name == 'get_many_smoke' else ''
+        ok = want == 'run' and record_ok(got, expected)
+        if name == 'get_char_agreement' and want == 'unsupported':
+            try:
+                record = json.loads(got.stdout)
+            except ValueError:
+                record = {}
+            ok = (got.returncode == 0 and record.get('verdict') == 'unsupported'
+                  and not record.get('warnings')
+                  and record.get('x-unsupported') == reason)
+            print('expected char refusal: ' + reason)
+        print(('PASS ' if ok else 'FAIL ') + name + '-lupin')
+        bad |= not ok
 elif a.mode == 'ratio':
     # Same insert shape in both programs; only the lookup differs.
     src = (a.repo / 'tests/map/get_many.lu').read_text()
