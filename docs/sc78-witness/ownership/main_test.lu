@@ -14,7 +14,8 @@ fn old_get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
 }
 
 fn selected_copy[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
-    copy m[k]
+    let v = m[k] else { return none }
+    copy v
 }
 
 fn original_list() -> int {

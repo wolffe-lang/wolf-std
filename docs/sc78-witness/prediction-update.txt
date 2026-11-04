@@ -11,6 +11,10 @@ The original prediction missed that the pairs walk was itself permitting
 an undeclared writable alias. That behaviour violates mem.tier0.excl.1;
 it is not a protected value-semantic contract. The implementation therefore
 copies only the selected value, as std.list.get's private at already does.
+The none row is unwrapped first: copying the complete heap-bearing row is
+unsupported on native at this pin (copy-row-native.log), while copying the
+selected V supports List values. The final body is one index read, an
+absence return, and copy of its value; it never copies the whole map.
 The correction is stated on get and get_or and under Unreleased. Keys,
 absence, signatures, other function bodies, runtime and pins do not move.
 

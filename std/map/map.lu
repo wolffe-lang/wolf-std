@@ -211,8 +211,10 @@ pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
 ///
 /// Reads through the language's `m[k]`, copying only the selected value
 /// rather than materializing an entry list or calling a trait per entry.
-/// Lookup uses the runtime's algorithm. The `cmp.Eq` bound stays part of
-/// the signature; its four allowed key impls agree with index equality.
+/// Lookup uses the runtime's algorithm. The absence row is handled before
+/// copying: native supports a heap-bearing `V`, but not a copy of the whole
+/// heap-bearing row. The `cmp.Eq` bound stays part of the signature; its
+/// four allowed key impls agree with index equality.
 /// `get_or` and `tally` inherit this lookup without changing their bodies.
 ///
 /// Until sc78, this function walked `m.pairs()` (wolf-std#109). For a
@@ -227,7 +229,8 @@ pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
 /// (map.get(m, "z") else 0 - 1) == 0 - 1
 /// ```
 pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
-    copy m[k]
+    let v = m[k] else { return none }
+    copy v
 }
 
 /// An independent copy of the value bound to `k`, or of `d` when the
