@@ -1,0 +1,32 @@
+Reference prediction correction
+
+The first final-head gauntlet at f67e403 was red in std-test only. The new
+combined agreement row was unsupported on lupin, and get_many exceeded its
+60-second ceiling. Neither was a reason to weaken a compiled-machine row.
+
+The diagnostic isolated the char comparison. Lupin 0.1.58 says exactly:
+`Eq.eq` does not resolve to an `impl Eq for …` method of char
+That is the old pairs walk used for comparison; the new get has no Eq call.
+Int, bool and str keys and both independent-value cases all run on lupin.
+The agreement is now four key rows plus two value rows, retaining every
+original case body. Only the reference char cell is unsupported. The local
+lupin-small gate checks the exact reason and rejects a heal or a different
+refusal; the regular rig also rejects any verdict other than unsupported.
+
+Paired measurements on hasu, same 12 GiB memory and 60-second wall caps:
+N=1000 base 3.442587/3.390245 s; head 0.533907/0.543253 s. Every completed
+row prints 1000 with sha256
+83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9.
+The paired medians are 3.416416 and 0.538580 s: the head is 6.34x faster.
+Peak RSS is 182156/182116 KiB before and 13636/13516 KiB after.
+
+N=10000 base 60.038733/60.037478 s, both censored. Head 59.327597 s exit(0)
+and 60.002804 s censored. These censored rows do not establish a relative
+10k speed. Insert-only is 29.623167 s and direct-index is 31.548009 s.
+Those controls keep std.map.set for identical insertion shape; they do not
+isolate the cost of a bare index store from its std wrapper.
+
+The full 10k program, checked gate and native 2.0 ratio bound stay unchanged.
+Lupin's 10k cell is reference-only slow under the rig's existing policy;
+the identical 1k companion runs and asserts its output on every lane.
+Re-measure the slow cell at the next reference pin.
