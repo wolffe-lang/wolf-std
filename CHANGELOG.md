@@ -2,13 +2,16 @@
 
 ## Unreleased
 
-`std.map.get` delegates to the language's index read `m[k]`, as `has`
-already does (wolf-std#109). Missing keys still raise `none`; the public
-signature and `cmp.Eq` bound are unchanged. `get_or` and `tally` inherit
-the lookup without changing their bodies. Lookup no longer materializes
-a `pairs()` list or compares every entry through trait dispatch; its
-algorithm is the runtime's, so a hashed runtime benefits it directly.
-Two regression files bring the test count to 571.
+`std.map.get` reads through the language's index `m[k]`, as `has`
+already does, and copies only the selected value (wolf-std#109). Missing
+keys still raise `none`; the public signature and `cmp.Eq` bound are
+unchanged. It now returns an independent value: for List-valued maps it
+used to alias the stored value, contrary to the memory model. Mutating
+the returned List no longer changes the map's stored List. `get_or` and
+`tally` inherit the lookup without changing their bodies. Lookup no
+longer materializes a `pairs()` list or compares every entry through
+trait dispatch; its algorithm is the runtime's, so a hashed runtime
+benefits it directly. Two regression files bring the test count to 571.
 
 ## sc77 — 2026-11-03 — a strict Ed25519 verify
 

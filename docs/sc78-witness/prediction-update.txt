@@ -1,0 +1,21 @@
+Ownership prediction correction
+
+The direct generic tail m[k] is E1002 at the pinned compiler: it would
+return the caller's read parameter through a new writable path. Binding
+that result before returning it produces the same E1002. The compiler's
+suggested copy m[k] compiles, but the first List-valued probe showed a
+behaviour change: modifying the old get result changed the stored List
+(old_source=9), whereas modifying the copy did not (new_source=7).
+
+The original prediction missed that the pairs walk was itself permitting
+an undeclared writable alias. That behaviour violates mem.tier0.excl.1;
+it is not a protected value-semantic contract. The implementation therefore
+copies only the selected value, as std.list.get's private at already does.
+The correction is stated on get and get_or and under Unreleased. Keys,
+absence, signatures, other function bodies, runtime and pins do not move.
+
+The checked evidence is index-return-e1002.log and copy-probes-checked.log.
+The ownership diagnostic reproduces the old body without importing map,
+contrasts selected-value copy, and names old-get-list-independent as red.
+The ordinary map regression instead requires the corrected public get to
+return independent List and str values.
