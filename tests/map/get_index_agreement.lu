@@ -1,0 +1,110 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map, type.map.key, mem.map.absent
+//!
+//! The old trait-dispatched walk and get must agree for every permitted
+//! key type, on hits, misses, replacement, removal and reinsertion.
+//! Zero and -1 are stored values, never absence sentinels.
+
+use std.cmp
+use std.map
+
+fn old_get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    for pair in m.pairs() {
+        if cmp.Eq.eq(pair.0, k) {
+            return pair.1
+        }
+    }
+    none
+}
+
+fn agrees[K: cmp.Eq](m: Map[K, int], k: K, expected: int) -> bool {
+    let before = old_get(m, k) else -999
+    let after = map.get(m, k) else -999
+    before == expected && after == expected
+}
+
+fn int_keys() -> bool {
+    var m = Map[int, int]()
+    let negative = -7
+    if !agrees(m, 0, -999) { return false }
+    m[0] = 0
+    m[negative] = -1
+    m[9223372036854775807] = 17
+    if !agrees(m, 0, 0) { return false }
+    if !agrees(m, -7, -1) { return false }
+    if !agrees(m, 9223372036854775807, 17) { return false }
+    if !agrees(m, 1, -999) { return false }
+    m[0] = 23
+    if !agrees(m, 0, 23) { return false }
+    let removed = (mut m).remove(-7) else -999
+    if removed != -1 { return false }
+    if !agrees(m, -7, -999) { return false }
+    m[negative] = 0
+    agrees(m, -7, 0)
+}
+
+fn char_keys() -> bool {
+    var m = Map[char, int]()
+    if !agrees(m, 'a', -999) { return false }
+    m['a'] = 0
+    m['é'] = -1
+    m['𐐀'] = 17
+    if !agrees(m, 'a', 0) { return false }
+    if !agrees(m, 'é', -1) { return false }
+    if !agrees(m, '𐐀', 17) { return false }
+    if !agrees(m, 'z', -999) { return false }
+    m['a'] = 23
+    if !agrees(m, 'a', 23) { return false }
+    let removed = (mut m).remove('é') else -999
+    if removed != -1 { return false }
+    if !agrees(m, 'é', -999) { return false }
+    m['é'] = 0
+    agrees(m, 'é', 0)
+}
+
+fn bool_keys() -> bool {
+    var m = Map[bool, int]()
+    if !agrees(m, false, -999) { return false }
+    m[false] = 0
+    if !agrees(m, false, 0) { return false }
+    if !agrees(m, true, -999) { return false }
+    m[true] = -1
+    if !agrees(m, true, -1) { return false }
+    m[false] = 23
+    if !agrees(m, false, 23) { return false }
+    let removed = (mut m).remove(true) else -999
+    if removed != -1 { return false }
+    if !agrees(m, true, -999) { return false }
+    m[true] = 0
+    agrees(m, true, 0)
+}
+
+fn str_keys() -> bool {
+    var m = Map[str, int]()
+    if !agrees(m, "", -999) { return false }
+    m[""] = 0
+    m["0#key7"] = -1
+    m["é"] = 17
+    if !agrees(m, "", 0) { return false }
+    let n = 7
+    if !agrees(m, "0#key{n}", -1) { return false }
+    if !agrees(m, "é", 17) { return false }
+    if !agrees(m, "0#key77", -999) { return false }
+    if !agrees(m, "e", -999) { return false }
+    m[""] = 23
+    if !agrees(m, "", 23) { return false }
+    let removed = (mut m).remove("0#key7") else -999
+    if removed != -1 { return false }
+    if !agrees(m, "0#key7", -999) { return false }
+    m["0#key7"] = 0
+    agrees(m, "0#key7", 0)
+}
+
+fn main() -> !int {
+    if !int_keys() { print("FAIL get-int"); return 1 }
+    if !char_keys() { print("FAIL get-char"); return 2 }
+    if !bool_keys() { print("FAIL get-bool"); return 3 }
+    if !str_keys() { print("FAIL get-str"); return 4 }
+    0
+}
