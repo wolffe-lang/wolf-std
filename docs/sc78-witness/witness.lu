@@ -1,0 +1,20 @@
+//! member: false
+use std.map
+
+fn main() -> !int {
+    var m = Map[str, int]()
+    var i = 0
+    while i < 10000 {
+        map.set(mut m, "0#key{i}", i)
+        i = i + 1
+    }
+    var hits = 0
+    i = 0
+    while i < 10000 {
+        let v = map.get(m, "0#key{i}") else -1
+        if v >= 0 { hits = hits + 1 }
+        i = i + 1
+    }
+    print("{hits}")
+    0
+}
