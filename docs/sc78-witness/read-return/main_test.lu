@@ -1,0 +1,27 @@
+use std.cmp
+
+fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    for pair in m.pairs() {
+        if cmp.Eq.eq(pair.0, k) {
+            return pair.1
+        }
+    }
+    none
+}
+
+fn main() -> !int {
+    var m = Map[str, List[int]]()
+    var xs = List[int]()
+    (mut xs).push(7)
+    m["a"] = xs
+    var value = get(m, "a") else { return 2 }
+    value[0] = 9
+    let stored = m["a"] else { return 3 }
+    let observed = stored[0]
+    print("stored={observed}")
+    if observed != 7 {
+        print("FAIL read-return-independent")
+        return 1
+    }
+    0
+}
