@@ -1,0 +1,73 @@
+sc78 prediction — the index read
+
+Recorded after the baseline and before the first implementation or test change.
+The original measurement log is in docs/sc78-witness/baseline.log.
+
+Base: wolf-std b1babae3e61458620b921a27ccd267b67dd4d52f.
+Tools: CI's wolf 0.2.36 (5adf3d9), lupin 0.1.58 (conformance a5378e3).
+Linux host: hasu, CPUs 0–5, both block-A lock names, 3 GiB address-space
+cap and 120-second ceiling per measurement process. Native/release timing
+excludes compilation; checked timing includes conform-run's front end.
+The two programs use identical map.set inserts; only map.get versus m[k]
+differs in the lookup loop. Every key is freshly interpolated as "0#key{i}".
+
+Baseline, measured BEFORE changes (seconds / peak KiB / observed outcome):
+N       lookup  machine  seconds    peak KiB  result
+10000   get     native   1.208830   2364020   exit(0)
+10000   get     release  0.883253   2363660   exit(0)
+10000   get     checked  8.468566   2656944   SIGABRT (3 GiB AS cap)
+10000   index   native   0.179133   18284     exit(0)
+10000   index   release  0.180686   18284     exit(0)
+10000   index   checked  0.247033   18284     exit(0)
+100000  get     native   18.050424  3140880   SIGABRT (3 GiB AS cap)
+100000  get     release  17.196997  3140752   SIGABRT (3 GiB AS cap)
+100000  get     checked  15.958572  2591564   SIGABRT (3 GiB AS cap)
+100000  index   native   17.682287  18284     exit(0)
+100000  index   release  17.758286  18284     exit(0)
+100000  index   checked  19.205684  28192     exit(0)
+
+Peak RSS is wait4 ru_maxrss of the child; it includes the launcher fork
+high-water floor (18,284 KiB here), so low native figures are upper bounds.
+The baseline red is the capped program itself, not a malformed harness: at
+100k, native/release get fail a 2,400,000-byte allocation; checked get fails
+a 160-byte allocation at both sizes. Neither checked get row produces an
+observation record. The 10k native get/index ratio is 6.75 (1.209/0.179 s).
+
+P1. Replacing get's pairs/Eq walk with m[k] preserves its public signature
+and exact none row. No other module, runtime, pin or existing function body
+changes. get_or and tally keep calling get, unchanged.
+
+P2. The old walk and new get agree on every currently permitted key type:
+int, char, bool and str. Tests compare empty-map and nonempty-map misses,
+zero and negative stored values, replacement, removal and reinsertion;
+strings include empty, Unicode and freshly interpolated equal keys, and
+chars include a supplementary-plane scalar. Existing map tests retain every
+ledger word. Proof runs on native, release and checked; the full rig also
+runs lupin.
+
+P3. The 10,000-key issue program finishes on checked and returns 10,000.
+Its native elapsed time is at most 2.0 times the same run's direct-index
+program: five interleaved, alternating-order samples, comparing medians,
+compilation excluded. Both gates must be seen red before the fix. All
+10,000 and 100,000 after rows run under the same Linux caps as the base.
+A capped baseline remains a capped result, never an invented timing or a
+reason to raise the hard cap. The pinned runtime is still linear; this std
+change makes a later hashed runtime benefit get without another std change.
+
+P4. R-sc78-1 recommendation: use the language's index equality and retain
+the Eq bound. There is no discrepancy for today's allowed keys: each of the
+four std.cmp Eq impls is exactly self == other, matching type.map.key.
+Although f64 has an Eq impl, Map rejects float keys; user-defined keys remain
+E0418. Any future key-protocol expansion must revisit this agreement.
+
+P5. A one-hunk plant on the final green head makes missing get fall back to
+m.pairs()[0].1 instead of none. The key-agreement row must go red by name
+(the empty-map case traps instead of raising none); the plant has one commit,
+one file and one hunk, is pushed without a PR, and is never on the main line.
+
+P6. The final head runs every cargo xtask ci step in a local gauntlet, plus
+map answers on three machines, the native ratio and unchanged-other-bodies.
+The recorder, not a wrapper exit or a file count, derives the verdict from
+every END line. All ordinary step output is indented; literal FAIL markers
+remain at column zero as the recorder requires. The README and Unreleased
+changelog describe the delegation and accurate test count.
