@@ -902,7 +902,11 @@ wolfc = "run"
 native = "run"
 
 [tests."map/get_char_agreement.lu"]
-lupin = "run"
+# lupin 0.1.58: `Eq.eq` does not resolve to an `impl Eq for …` method of char
+# This refusal is in the old walk used for comparison, not the new get.
+# The local map-lupin-small gate requires that exact reason as well as
+# unsupported; the regular rig rejects every other outcome.
+lupin = "unsupported"
 wolfc = "run"
 native = "run"
 
@@ -932,7 +936,10 @@ wolfc = "run"
 native = "run"
 
 [tests."map/get_many.lu"]
-lupin = "run"
+# lupin 0.1.58, hasu, identical 12 GiB/60s caps: base 60.039/60.037s
+# (both censored); head 59.328s exit(0), then 60.003s censored. The 1k
+# companion runs below; no relative 10k timing claim follows from censoring.
+lupin = "slow"
 wolfc = "run"
 native = "run"
 
