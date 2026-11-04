@@ -1,0 +1,26 @@
+//! check: run(exit=0, stdout="1000")
+//! phase: run
+//! conforms: std.map, type.map, mem.map.absent
+//!
+//! The reference-sized companion to get_many: identical operations at
+//! N=1000. The full N=10000 compiled and checked rows stay unchanged.
+
+use std.map
+
+fn main() -> !int {
+    var m = Map[str, int]()
+    var i = 0
+    while i < 1000 {
+        map.set(mut m, "0#key{i}", i)
+        i = i + 1
+    }
+    var hits = 0
+    i = 0
+    while i < 1000 {
+        let v = map.get(m, "0#key{i}") else -1
+        if v >= 0 { hits = hits + 1 }
+        i = i + 1
+    }
+    print("{hits}")
+    0
+}

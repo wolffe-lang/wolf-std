@@ -1,0 +1,46 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map, type.map.key, mem.map.absent
+//!
+//! Old trait-walk and index-read get agree for bool keys, including
+//! empty/nonempty misses, replacement, removal and reinsertion.
+
+use std.cmp
+use std.map
+
+fn old_get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    for pair in m.pairs() {
+        if cmp.Eq.eq(pair.0, k) {
+            return pair.1
+        }
+    }
+    none
+}
+
+fn agrees[K: cmp.Eq](m: Map[K, int], k: K, expected: int) -> bool {
+    let before = old_get(m, k) else -999
+    let after = map.get(m, k) else -999
+    before == expected && after == expected
+}
+
+fn bool_keys() -> bool {
+    var m = Map[bool, int]()
+    if !agrees(m, false, -999) { return false }
+    m[false] = 0
+    if !agrees(m, false, 0) { return false }
+    if !agrees(m, true, -999) { return false }
+    m[true] = -1
+    if !agrees(m, true, -1) { return false }
+    m[false] = 23
+    if !agrees(m, false, 23) { return false }
+    let removed = (mut m).remove(true) else -999
+    if removed != -1 { return false }
+    if !agrees(m, true, -999) { return false }
+    m[true] = 0
+    agrees(m, true, 0)
+}
+
+fn main() -> !int {
+    if !bool_keys() { print("FAIL get-bool"); return 1 }
+    0
+}

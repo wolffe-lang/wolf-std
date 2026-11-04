@@ -1,0 +1,49 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map, type.map.key, mem.map.absent
+//!
+//! Old trait-walk and index-read get agree for int keys, including
+//! empty/nonempty misses, replacement, removal and reinsertion.
+
+use std.cmp
+use std.map
+
+fn old_get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    for pair in m.pairs() {
+        if cmp.Eq.eq(pair.0, k) {
+            return pair.1
+        }
+    }
+    none
+}
+
+fn agrees[K: cmp.Eq](m: Map[K, int], k: K, expected: int) -> bool {
+    let before = old_get(m, k) else -999
+    let after = map.get(m, k) else -999
+    before == expected && after == expected
+}
+
+fn int_keys() -> bool {
+    var m = Map[int, int]()
+    let negative = -7
+    if !agrees(m, 0, -999) { return false }
+    m[0] = 0
+    m[negative] = -1
+    m[9223372036854775807] = 17
+    if !agrees(m, 0, 0) { return false }
+    if !agrees(m, -7, -1) { return false }
+    if !agrees(m, 9223372036854775807, 17) { return false }
+    if !agrees(m, 1, -999) { return false }
+    m[0] = 23
+    if !agrees(m, 0, 23) { return false }
+    let removed = (mut m).remove(-7) else -999
+    if removed != -1 { return false }
+    if !agrees(m, -7, -999) { return false }
+    m[negative] = 0
+    agrees(m, -7, 0)
+}
+
+fn main() -> !int {
+    if !int_keys() { print("FAIL get-int"); return 1 }
+    0
+}

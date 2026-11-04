@@ -1,0 +1,23 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map, mem.tier0.excl.1, mem.tier0.move.3
+//!
+//! Mutating the returned list value must not change the stored value.
+
+use std.map
+
+fn list_value_independent() -> bool {
+    var m = Map[str, List[int]]()
+    var xs = List[int]()
+    (mut xs).push(7)
+    m["a"] = xs
+    var v = map.get(m, "a") else { return false }
+    v[0] = 9
+    let source = m["a"] else { return false }
+    source[0] == 7 && v[0] == 9
+}
+
+fn main() -> !int {
+    if !list_value_independent() { print("FAIL get-list-independent"); return 1 }
+    0
+}

@@ -1,0 +1,50 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map, type.map.key, mem.map.absent
+//!
+//! Old trait-walk and index-read get agree for str keys, including
+//! empty/nonempty misses, replacement, removal and reinsertion.
+
+use std.cmp
+use std.map
+
+fn old_get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
+    for pair in m.pairs() {
+        if cmp.Eq.eq(pair.0, k) {
+            return pair.1
+        }
+    }
+    none
+}
+
+fn agrees[K: cmp.Eq](m: Map[K, int], k: K, expected: int) -> bool {
+    let before = old_get(m, k) else -999
+    let after = map.get(m, k) else -999
+    before == expected && after == expected
+}
+
+fn str_keys() -> bool {
+    var m = Map[str, int]()
+    if !agrees(m, "", -999) { return false }
+    m[""] = 0
+    m["0#key7"] = -1
+    m["é"] = 17
+    if !agrees(m, "", 0) { return false }
+    let n = 7
+    if !agrees(m, "0#key{n}", -1) { return false }
+    if !agrees(m, "é", 17) { return false }
+    if !agrees(m, "0#key77", -999) { return false }
+    if !agrees(m, "e", -999) { return false }
+    m[""] = 23
+    if !agrees(m, "", 23) { return false }
+    let removed = (mut m).remove("0#key7") else -999
+    if removed != -1 { return false }
+    if !agrees(m, "0#key7", -999) { return false }
+    m["0#key7"] = 0
+    agrees(m, "0#key7", 0)
+}
+
+fn main() -> !int {
+    if !str_keys() { print("FAIL get-str"); return 1 }
+    0
+}

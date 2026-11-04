@@ -1,0 +1,21 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.map, mem.tier0.excl.1, mem.tier0.move.3
+//!
+//! Mutating the returned str value must not change the stored value.
+
+use std.map
+
+fn str_value_independent() -> bool {
+    var m = Map[str, str]()
+    m["a"] = "wolf-é"
+    var v = map.get(m, "a") else { return false }
+    v += "!"
+    let source = m["a"] else { return false }
+    v == "wolf-é!" && source == "wolf-é"
+}
+
+fn main() -> !int {
+    if !str_value_independent() { print("FAIL get-str-independent"); return 1 }
+    0
+}
