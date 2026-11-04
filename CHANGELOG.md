@@ -5,13 +5,17 @@
 `std.map.get` reads through the language's index `m[k]`, as `has`
 already does, and copies only the selected value (wolf-std#109). Missing
 keys still raise `none`; the public signature and `cmp.Eq` bound are
-unchanged. It now returns an independent value: for List-valued maps it
-used to alias the stored value, contrary to the memory model. Mutating
-the returned List no longer changes the map's stored List. `get_or` and
+unchanged. It now returns an independent value on every machine: on the
+compiler tiers a List-valued result used to alias the stored value,
+contrary to the memory model; lupin already copied it. Mutating the
+returned List no longer changes the map's stored List. `get_or` and
 `tally` inherit the lookup without changing their bodies. Lookup no
 longer materializes a `pairs()` list or compares every entry through
 trait dispatch; its algorithm is the runtime's, so a hashed runtime
-benefits it directly. Two regression files bring the test count to 571.
+benefits it directly. Eight regression files bring the test count to 577.
+The full 10k program stays mandatory on checked and native; lupin runs a
+1k companion and records 10k as slow at its 60-second ceiling. Its old-walk
+char comparison is explicitly unsupported, with the exact refusal gated.
 
 ## sc77 — 2026-11-03 — a strict Ed25519 verify
 
