@@ -54,9 +54,12 @@
 //! The key functions keep their `[K: cmp.Eq]` bounds: that is the same
 //! public key protocol, not a new user-defined equality hook. For all four
 //! admitted key types, std.cmp's impl is exactly the language's `==`.
-//! `tests/map/get_index_agreement.lu` compares the old walk with `get` on
-//! each type. The map tests execute on lupin, checked and native; the
-//! local map witness also runs the release tier.
+//! The four `tests/map/get_*_agreement.lu` rows compare the old walk with
+//! `get` on each key type. Checked, native and the local release witness
+//! run all four; lupin 0.1.58 cannot resolve the old walk's `Eq.eq` for
+//! char. Its exact refusal is gated, while the other small rows run.
+//! The full 10k row runs on checked/native; lupin has a 1k companion and
+//! a loud slow cell for 10k at its 60-second ceiling.
 //!
 //! Absence is spelled `none`, the convention's own spelling — F-0003 is
 //! dead (sc05 pins, renamed at sc06) and nothing here waits on it.
@@ -212,15 +215,16 @@ pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
 /// Reads through the language's `m[k]`, copying only the selected value
 /// rather than materializing an entry list or calling a trait per entry.
 /// Lookup uses the runtime's algorithm. The absence row is handled before
-/// copying: native supports a heap-bearing `V`, but not a copy of the whole
-/// heap-bearing row. The `cmp.Eq` bound stays part of the signature; its
-/// four allowed key impls agree with index equality.
+/// copying, so List values do not ask native to copy a heap-bearing row.
+/// The `cmp.Eq` bound stays part of the signature; its four allowed key
+/// impls agree with index equality.
 /// `get_or` and `tally` inherit this lookup without changing their bodies.
 ///
-/// Until sc78, this function walked `m.pairs()` (wolf-std#109). For a
-/// List-valued map that also let the result alias the stored List,
-/// contrary to `[mem.tier0.excl.1]`. Returning an independent value now
-/// keeps a caller's mutation of the result from changing the stored value.
+/// Until sc78, this function walked `m.pairs()` (wolf-std#109). On the
+/// compiler tiers a List result could alias the stored List, contrary to
+/// `[mem.tier0.excl.1]`; lupin already returned independent values. Copying
+/// the selected value now prevents a caller's mutation from changing the
+/// stored value on every machine.
 ///
 /// ```wolf-doc-example
 /// var m = Map[str, int]()
