@@ -44,36 +44,18 @@
 //! module is the API surface over it, which is what §8's container rule
 //! has said all along.
 //!
-//! **LEDGER REALITY at the sc44 pins, measured rather than carried
-//! forward.** The old paragraph said every function here is
-//! `unsupported` under wolfc because `Map` is not typed there — "the
-//! whole module is, honestly, freight". That is over. What replaced it
-//! is not uniform and the differences are the point:
+//! `get` and `has` both ask the language's index read `m[k]`, including
+//! its `none` row for an absent key. Neither walks a `pairs()` snapshot
+//! or calls `Eq.eq` for every entry. `get_or` and `tally` keep their std
+//! defaulting behaviour and inherit `get`'s lookup. The runtime owns the
+//! lookup algorithm; a hashed runtime needs no further std change.
 //!
-//! - The compiler's two rungs TYPE this module now, which means every
-//!   body in it was read by the mem tier for the first time at this pin.
-//!   One refusal fell out of that first reading and it is recorded at
-//!   `set` below.
-//! - The `[K: Eq]` five (`get`, `get_or`, `has`, `remove`, `tally`)
-//!   EXECUTE on the checked tier AND on lupin, as of sc46. They were
-//!   `unsupported` on the reference machine for one release, and the
-//!   reason was never F-0002's old blanket claim: dispatch through a
-//!   trait declared in the ENTRY FILE ran on all three machines while
-//!   dispatch through an IMPORTED module's trait was `unsupported: `Eq`
-//!   is a trait; traits, enums and type-level items have no dynamic
-//!   semantics here`. Measured at sc44 with a twelve-line reduction,
-//!   filed as wolf-interp#96, and CLOSED in is46 — so F-0002's last
-//!   quarter goes with it. The three `[K: Eq]` rows flip
-//!   `unsupported` -> `run` on lupin in this sprint's ledger commit.
-//! - So the five are FENCED blocks again, which is what sc44 promised
-//!   would happen "on the wolf-interp release that closes it, and
-//!   nothing else has to change for that to happen" — nothing else did.
-//!   Five examples, all five at `exit(0)` on the reference machine.
-//! - The native rung refuses this module for a reason that is
-//!   `std.cmp`'s and not `std.map`'s: `impl Eq for Ordering`'s
-//!   `match (self, other)` is `unsupported — an enum or row test inside
-//!   a product pattern (deep trees, c06)`. Every importer of `std.cmp`
-//!   pays it; it is honest and it is older than this sprint.
+//! The key functions keep their `[K: cmp.Eq]` bounds: that is the same
+//! public key protocol, not a new user-defined equality hook. For all four
+//! admitted key types, std.cmp's impl is exactly the language's `==`.
+//! `tests/map/get_index_agreement.lu` compares the old walk with `get` on
+//! each type. The map tests execute on lupin, checked and native; the
+//! local map witness also runs the release tier.
 //!
 //! Absence is spelled `none`, the convention's own spelling — F-0003 is
 //! dead (sc05 pins, renamed at sc06) and nothing here waits on it.
@@ -225,12 +207,12 @@ pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
 /// The value bound to `k`; `none` when the key is absent — the absence
 /// row, never a zero-value sentinel (§2). No traps.
 ///
-/// **Fenced at sc46, and this is where F-0118's cost comes back.** sc44
-/// wrote this example and the four below in prose for one reason —
-/// lupin answered `unsupported` for a trait reached through an IMPORT,
-/// and `[K: Eq]` puts one in every signature here — and is46 closed it
-/// (wolf-interp#96). Five examples return to fences in one commit, all
-/// five at `exit(0)` on the reference machine.
+/// Delegates to the language's index read `m[k]`, as `has` does. It
+/// materializes no entry list and makes no per-entry trait calls; lookup
+/// uses the runtime's algorithm. The `cmp.Eq` bound stays part of the
+/// signature, and its four allowed key impls agree with index equality.
+/// `get_or` and `tally` inherit this lookup without changing their bodies.
+/// Until sc78, this function walked `m.pairs()` (wolf-std#109).
 ///
 /// ```wolf-doc-example
 /// var m = Map[str, int]()
@@ -239,12 +221,7 @@ pub fn extend[K, V](mut m: Map[K, V], other: Map[K, V]) {
 /// (map.get(m, "z") else 0 - 1) == 0 - 1
 /// ```
 pub fn get[K: cmp.Eq, V](m: Map[K, V], k: K) -> V ! {none} {
-    for pair in m.pairs() {
-        if cmp.Eq.eq(pair.0, k) {
-            return pair.1
-        }
-    }
-    none
+    m[k]
 }
 
 /// The value bound to `k`, or `d` when the key is absent — the eager
