@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+`std.map.get` delegates to the language's index read `m[k]`, as `has`
+already does (wolf-std#109). Missing keys still raise `none`; the public
+signature and `cmp.Eq` bound are unchanged. `get_or` and `tally` inherit
+the lookup without changing their bodies. Lookup no longer materializes
+a `pairs()` list or compares every entry through trait dispatch; its
+algorithm is the runtime's, so a hashed runtime benefits it directly.
+Two regression files bring the test count to 571.
+
 ## sc77 — 2026-11-03 — a strict Ed25519 verify
 
 `std.x.crypto.curve25519.verify_strict(pubkey, message, sig)` is new
