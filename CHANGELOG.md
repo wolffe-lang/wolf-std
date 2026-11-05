@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+**The public-PKI TLS client (sc79, wolf-std#101).** `std.x.tls.client`
+completes a TLS 1.3 handshake with servers whose certificates are RSA,
+RSA-PSS or ECDSA P-384, and with github.com:443 given a distribution's
+root bundle as DER.
+
+- `std.x.crypto.rsa` is new: RSASSA-PKCS1-v1_5 and RSASSA-PSS
+  verification (RFC 8017) over SHA-256, SHA-384 and SHA-512. Verify only.
+  `public_key` and `parse_public_key` refuse by name a modulus under 2048
+  bits (`small_modulus`) or over 4096 (`large_modulus`), an even one
+  (`bad_modulus`), an exponent that is even, below 3, at least n or at
+  least 2^256 (`bad_exponent`), and non-strict DER (`der`). PKCS#1 v1.5
+  verification encodes and compares, so a DigestInfo without its NULL
+  parameters is rejected.
+- `std.x.crypto.p384` is new: ECDSA P-384 verification (FIPS 186-5, SEC 1,
+  SP 800-186): `verify`, `verify_der`, and `verify_digest_der` for a
+  digest of any length.
+- `std.x.tls.cert`: `validate_path(chain, hostname, roots, now)` builds a
+  path from the leaf to a caller-supplied root set (concatenated DER),
+  depth-first with backtracking. Certificate signatures verify under
+  Ed25519, ECDSA P-256 (SHA-256) and P-384 (SHA-256/384/512), RSA PKCS#1
+  v1.5 and RSASSA-PSS. The leaf's keyUsage must allow digitalSignature and
+  its extendedKeyUsage serverAuth; an issuer's extendedKeyUsage must allow
+  serverAuth. SAN matching follows RFC 9525: `san_matches` accepts a
+  wildcard only as the whole left-most label. `host_matches` is unchanged.
+  `validate_chain` is now `validate_path` with one anchor.
+- New refusals, each by name: `weak_key` (an RSA key under 2048 bits or
+  with a bad exponent, anywhere in the path), `bad_usage` (keyUsage or
+  extendedKeyUsage), `name_constraints` (nameConstraints are refused, not
+  evaluated). SHA-1, P-521, Ed448, a P-256 key under SHA-384 or SHA-512,
+  RSASSA-PSS keys and RSA moduli over 4096 bits stay `unsupported_alg`.
+  **Breaking for exhaustive matches:** `validate_chain`, `validate_path`,
+  `verify_signed_by`, `client.complete` and
+  `client.verify_certificate_verify` carry the new rows; `client.named`
+  and `client.row_name` name them. The `Cert` struct gains `sig_params`,
+  `spki_curve`, `has_eku`, `eku` and `has_name_constraints`.
+- `std.x.tls.client` offers and verifies six signature schemes:
+  `ed25519`, `ecdsa_secp256r1_sha256`, `ecdsa_secp384r1_sha384` and
+  `rsa_pss_rsae_sha256/384/512` (`signature_schemes`). A weak RSA leaf key
+  is `weak_key`.
+- Vectors: every case of 17 Wycheproof RSA files (3395) and 4 P-384 files
+  (1798), each decided again by an independent Python checker written
+  from the specifications; a test PKI built and verified by an OpenSSL
+  binary (`vendor/vectors/pki/sc79`). Interop rows against an OpenSSL peer
+  for every key type and against github.com live in
+  `docs/sc79-witness/interop/`. The test count is 624.
+
 `std.map.get` reads through the language's index `m[k]`, as `has`
 already does, and copies only the selected value (wolf-std#109). Missing
 keys still raise `none`; the public signature and `cmp.Eq` bound are
