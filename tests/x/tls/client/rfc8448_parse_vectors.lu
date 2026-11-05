@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="parsed: SH EE Cert CV Fin\nsuite refused: handshake_failure\nrsa_pss refused: unsupported_alg")
+//! check: run(exit=0, stdout="parsed: SH EE Cert CV Fin\nsuite refused: handshake_failure\nrsa_pss refused: weak_key")
 //! phase: run
 //! conforms: std.x.tls.client, std.x.tls.handshake
 //!
@@ -14,14 +14,14 @@
 //! trace: RFC 8448's suite is TLS_AES_128_GCM_SHA256 (0x1301), which
 //! this profile does not speak — `check_negotiation` refuses it
 //! `handshake_failure` (not a silent mis-parse). And the trace's
-//! CertificateVerify is rsa_pss_rsae_sha256 (0x0804), whose crypto rung
-//! is unbuilt — `verify_certificate_verify` refuses it
-//! `unsupported_alg`, never a silent accept (the sc22 rule the sc21
-//! "verify nothing" posture retires INTO for the two schemes that CAN
-//! verify, ed25519/ecdsa — witnessed against a real key in
-//! `loopback_handshake.lu`).
+//! CertificateVerify is rsa_pss_rsae_sha256 (0x0804), which verifies
+//! since sc79 — but the trace's certificate carries a 1024-bit RSA key,
+//! under the 2048-bit floor, so `verify_certificate_verify` refuses it
+//! `weak_key` by name, before any arithmetic (sc79; until sc79 it was
+//! `unsupported_alg`, the rung being unbuilt).
 
 use std.hex
+use std.x.tls.cert
 use std.x.tls.client
 use std.x.tls.handshake as hs
 
@@ -94,7 +94,9 @@ fn main() -> !int {
     assert(scheme == 2052, "CV scheme (0x0804 rsa_pss_rsae_sha256)")
     assert(sig.len == 128, "CV signature length")
 
-    // rsa_pss is a NAMED unsupported_alg — never a silent accept.
+    // The trace's own key, out of its certificate: RSA-1024, refused by
+    // name as weak — never a silent accept.
+    let trace_cert = cert.parse(copy chain)?
     var rsa_msg = "?"
     var dummy_hash = List[byte]()
     var z = 0
@@ -103,8 +105,8 @@ fn main() -> !int {
         z = z + 1
     }
     let _rsa = client.verify_certificate_verify(
-        "1.2.840.113549.1.1.1",
-        List[byte](),
+        trace_cert.spki_alg,
+        copy trace_cert.spki_key,
         scheme,
         copy sig,
         dummy_hash,
@@ -115,6 +117,10 @@ fn main() -> !int {
         },
         bad_signature => {
             rsa_msg = "bad_signature"
+            0
+        },
+        weak_key => {
+            rsa_msg = "weak_key"
             0
         },
     }

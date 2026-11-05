@@ -1,0 +1,49 @@
+//! check: run(exit=0, stdout="san rows: 16 agree")
+//! phase: run
+//! conforms: std.x.tls.cert
+//!
+//! sc79: RFC 9525 §6.3 dNSName matching (`cert.san_matches`), one row
+//! per rule: exact names compare case-insensitively; a wildcard matches
+//! only as the complete left-most label, for exactly one non-empty host
+//! label, under at least two labels; every other `*` matches nothing.
+//! `host_matches` (exact only) is unchanged, because a caller outside
+//! certificate validation reads it. THREE-LANE (string work only).
+
+use std.x.tls.cert
+
+fn row(pattern: str, host: str, want: bool) -> int {
+    if cert.san_matches(pattern, host) == want {
+        return 0
+    }
+    print("FAIL san {pattern} {host}")
+    1
+}
+
+fn main() -> int {
+    var bad: int = 0
+    bad = bad + row("localhost", "localhost", true)
+    bad = bad + row("LocalHost", "localhost", true)
+    bad = bad + row("www.example.com", "WWW.EXAMPLE.COM", true)
+    bad = bad + row("*.example.com", "www.example.com", true)
+    bad = bad + row("*.Example.com", "API.example.COM", true)
+    bad = bad + row("*.example.com", "example.com", false)
+    bad = bad + row("*.example.com", "a.b.example.com", false)
+    bad = bad + row("*.example.com", ".example.com", false)
+    bad = bad + row("w*.example.com", "www.example.com", false)
+    bad = bad + row("*w.example.com", "www.example.com", false)
+    bad = bad + row("www.*.com", "www.example.com", false)
+    bad = bad + row("*.*.example.com", "a.b.example.com", false)
+    bad = bad + row("*", "localhost", false)
+    bad = bad + row("*.com", "example.com", false)
+    bad = bad + row("", "example.com", false)
+    bad = bad + row("example.com", "", false)
+    if bad > 0 {
+        return 1
+    }
+    if cert.host_matches("*.example.com", "www.example.com") {
+        print("FAIL host_matches-changed")
+        return 1
+    }
+    print("san rows: 16 agree")
+    0
+}
