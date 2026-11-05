@@ -1,22 +1,25 @@
 //! member: true
 //!
-//! std.x.tls.cert — X.509 v3 certificate parsing and Ed25519 chain
-//! validation (RFC 5280 over X.690 DER). Stability tier: x — the THIRD
-//! rung of the stdc-tls campaign (sprint sc22), the rung that makes
-//! sc21's opaque Certificate bytes MEAN something: sc21 carries the DER
-//! and builds the §4.4.3 signed octets; this module parses the
-//! certificate, checks its signature with the issuer's Ed25519 key
-//! (sc18), and validates a chain against a trust anchor, a hostname and
-//! a SUPPLIED time.
+//! std.x.tls.cert — X.509 v3 certificate parsing and path validation
+//! (RFC 5280 over X.690 DER, RFC 9525 names). Stability tier: x — the
+//! THIRD rung of the stdc-tls campaign (sprint sc22), the rung that
+//! makes sc21's opaque Certificate bytes MEAN something: sc21 carries
+//! the DER and builds the §4.4.3 signed octets; this module parses the
+//! certificate, checks each signature with its issuer's key, and
+//! validates a path to a caller-supplied root set (sc79) or one trust
+//! anchor, against a hostname and a SUPPLIED time.
 //!
 //! **The nursery banner (D31).** `std.x.tls.cert` is not `std.tls`: its
 //! path, names and behaviour may change or vanish in one sprint; no
 //! other std module may depend on it. Its reason and graduation trigger
-//! live in `std/x/README.md`. It depends on TWO sibling residents —
-//! `std.x.crypto.curve25519` (Ed25519 verify) and `std.x.crypto.p256`
-//! (ECDSA-P256 verify, sc23) — resident-on-resident edges the
-//! graduation move to `std.tls`/`std.crypto` must resolve, named in the
-//! register beside the record/handshake/jose edges.
+//! live in `std/x/README.md`. It depends on FIVE sibling residents —
+//! `std.x.crypto.curve25519` (Ed25519), `std.x.crypto.p256` (ECDSA
+//! P-256, sc23), `std.x.crypto.p384` (ECDSA P-384, sc79),
+//! `std.x.crypto.rsa` (RSASSA-PKCS1-v1_5 and RSASSA-PSS, sc79) and
+//! `std.x.crypto.sha2` (the digests P-384 verifies over) —
+//! resident-on-resident edges the graduation move to
+//! `std.tls`/`std.crypto` must resolve, named in the register beside
+//! the record/handshake/jose edges.
 //!
 //! **Built from the DOCUMENTS, not ported.** ITU-T X.690 (the DER
 //! encoding rules — §8.1 TLV structure and lengths, §8.3 INTEGER
@@ -47,22 +50,37 @@
 //!
 //! ## The scope line (honest about the crypto ladder)
 //!
-//! Signature VALIDATION is Ed25519 (sc18's `curve25519.verify`) and, as
-//! of sc23, ECDSA-P256 (`p256.verify_der` — ecdsa-with-SHA256 over a
-//! prime256v1 key, the algorithm real-world CAs issue). A certificate
-//! signed with any OTHER algorithm PARSES structurally (the hardening
-//! win is algorithm-independent) and validation answers the named
-//! `unsupported_alg` rejection — NEVER a silent accept: an unverified
-//! signature reported as valid would be a correctness failure, and that
-//! honesty is this rung's load-bearing post. RSA is the last
-//! `unsupported_alg` rung (its crypto rung is unbuilt). NAMED RESIDUE
-//! (deliberately not half-built): revocation (CRL/OCSP — its own rung),
-//! RFC 6125 wildcard matching (`host_matches` is exact-label only),
-//! the CN-fallback for hostnames (deprecated; SAN is the only source
-//! here), name constraints and the policy machinery (RFC 5280 §4.2.1.10
-//! / §6.1's policy tree), and non-dNSName SAN forms (IP, URI, email are
-//! carried, not matched).
+//! Signature VALIDATION (sc79's table, `verify_signed_by`): Ed25519
+//! (RFC 8410); ecdsa-with-SHA256 under a P-256 key; ecdsa-with-SHA256,
+//! -SHA384 and -SHA512 under a P-384 key (RFC 5758, the curve named in
+//! the key's parameters, RFC 5480); sha256/384/512WithRSAEncryption
+//! (RFC 8017 PKCS#1 v1.5) and RSASSA-PSS (RFC 4055 parameters: SHA-256,
+//! -384 or -512, MGF1 over the same hash, the stated salt length) under
+//! an rsaEncryption key of 2048 to 4096 bits. Every other pairing PARSES
+//! structurally (the hardening win is algorithm-independent) and
+//! validation answers the named `unsupported_alg` — NEVER a silent
+//! accept: SHA-1 and MD5 signatures, P-521, Ed448, a P-256 key under a
+//! digest other than SHA-256, an RSASSA-PSS (id-RSASSA-PSS) key, an RSA
+//! modulus over 4096 bits. An RSA key under 2048 bits, or with an
+//! exponent outside the rsa module's range, is `weak_key`, wherever it
+//! sits in a path.
 //!
+//! Path validation (RFC 5280 §6.1, this subset): validity at the
+//! supplied time, basicConstraints cA and pathLenConstraint, keyUsage
+//! keyCertSign on issuers and digitalSignature on the leaf (RFC 8446
+//! §4.4.2.2), extendedKeyUsage serverAuth (or anyExtendedKeyUsage) on
+//! the leaf and on every issuer that carries the extension, unknown
+//! critical extensions refused by name, `dNSName` SAN matching per RFC
+//! 9525 with a wildcard only as the whole left-most label (`san_matches`).
+//! NAMED LIMITS (deliberately not half-built): nameConstraints are
+//! REFUSED by name (`name_constraints`) wherever they appear, never
+//! evaluated; revocation (CRL/OCSP) is not consulted; the policy
+//! machinery (§4.2.1.4, §6.1's policy tree) is not implemented, so a
+//! CRITICAL policy extension is `unknown_critical`; the CN fallback for
+//! hostnames is not implemented (SAN is the only source); non-dNSName
+//! SAN forms (IP, URI, email) are carried, not matched; names chain by
+//! exact DER bytes, not by RFC 5280 §7.1's caseIgnoreMatch.
+
 //! ## ct: certificates are PUBLIC data
 //!
 //! Everything this module touches — the DER, the names, the validity
@@ -84,31 +102,40 @@
 //! a clock (it is capability-free: pure, comptime-refused only by its
 //! delegate curve25519 when a validation reaches a signature).
 //!
-//! ## The ws05-consumable seam (FROZEN)
+//! ## The seams: `validate_path` (sc79) and `validate_chain` (ws05, frozen in shape)
 //!
-//! `validate_chain(chain, hostname, anchor, now) -> Cert ! {...}` is
-//! the seam wolf-wws ws05 consumes: `chain` is the peer's certificate
-//! chain as CONCATENATED DER, leaf first (exactly the `cert_data`
+//! `validate_path(chain, hostname, roots, now) -> Cert ! {...}` is the
+//! public-PKI seam `std.x.tls.client` consumes: `chain` is the peer's
+//! certificate chain as CONCATENATED DER, leaf first (the `cert_data`
 //! entries of sc21's Certificate message, joined — DER is
-//! self-delimiting, `cert_end` finds each boundary); `hostname` is the
-//! SNI/target name; `anchor` is the trust anchor's DER (the pinned
-//! Ed25519 CA); `now` is the supplied validation time. The answer is
-//! the parsed LEAF (subject, SAN, validity, SPKI — the fields ws05
-//! reads) or a NAMED rejection: `der` (malformed encoding),
-//! `unsupported_alg`, `bad_signature`, `expired`, `not_yet_valid`,
-//! `name_mismatch`, `not_ca`, `issuer_mismatch`, `unknown_critical`.
-//! sc22 owns certificate meaning; sc21 owns the handshake flow that
-//! carries the bytes; ws05 owns the socket conversation. The seam is
-//! frozen at sc22; `std/x/README.md` records it.
+//! self-delimiting, `cert_end` finds each boundary), the rest in any
+//! order; `roots` is the caller's trust store as concatenated DER (a
+//! distribution's bundle converted to DER is the intended input; an
+//! entry this profile cannot parse is skipped); `now` is the supplied
+//! validation time. The path is built depth-first with backtracking,
+//! roots before the peer's intermediates at every step, bounded at
+//! eight certificates and sixteen link attempts.
+//! `validate_chain(chain, hostname, anchor, now)` is the sc22 seam
+//! wolf-wws ws05 consumes, unchanged in shape: the same validation with
+//! a root set of exactly one anchor. The answer is the parsed LEAF
+//! (subject, SAN, validity, SPKI — the fields ws05 reads) or a NAMED
+//! rejection: `der` (malformed encoding), `unsupported_alg`,
+//! `bad_signature`, `expired`, `not_yet_valid`, `name_mismatch`,
+//! `not_ca`, `issuer_mismatch`, `unknown_critical`, and since sc79
+//! `weak_key`, `bad_usage` and `name_constraints`. sc22 owns
+//! certificate meaning; sc21 owns the handshake flow that carries the
+//! bytes; ws05 owns the socket conversation. `std/x/README.md` records
+//! both seams.
 //!
 //! Byte sequences are `List[byte]` with the 0..255 element contract
 //! (§11's interim, F-0035), the whole ladder's convention. Chain
 //! validation is iterative (no recursion, no per-chain allocation
-//! beyond the parsed certificates); the trust anchor is validated like
-//! any chain certificate (validity + extension discipline) — a
-//! deliberately STRICTER reading than RFC 5280 §6.1.1(d)'s
-//! anchor-as-input, stated here because the pinned local CA is a
-//! certificate this module can and does hold to the profile.
+//! beyond the parsed certificates); a root that ends a path is validated
+//! like any chain certificate (validity, basicConstraints, keyUsage,
+//! extendedKeyUsage, key policy) — a deliberately STRICTER reading than
+//! RFC 5280 §6.1.1(d)'s anchor-as-input, stated here because every root
+//! a modern store carries meets the profile, and an expired or
+//! non-CA root is better refused than trusted.
 
 use std.x.crypto.curve25519
 use std.x.crypto.p256
@@ -1112,7 +1139,11 @@ fn rd_exts(b: List[byte], mut r: Rd) -> Exts ! {der} {
 /// compact `yyyymmddhhmmss` UTC ints. `path_len` and `key_usage` are
 /// -1 when their extensions are absent; `crit_unknown` is the first
 /// unrecognized CRITICAL extnID ("" when none — validation rejects a
-/// non-empty one by name, RFC 5280 §4.2's rule). This pin has no
+/// non-empty one by name, RFC 5280 §4.2's rule). sc79 adds:
+/// `sig_params` (the raw parameters TLV of the signature algorithm,
+/// read for RSASSA-PSS), `spki_curve` (an EC key's named-curve OID, ""
+/// otherwise), `has_eku`/`eku` (the extendedKeyUsage purposes, dotted)
+/// and `has_name_constraints` (refused by name in validation). This pin has no
 /// private fields, so a forged Cert is constructible; every consumer
 /// here treats the fields as data and answers with rows, never traps.
 /// ct: public data throughout — a certificate carries no secret.
@@ -1339,8 +1370,8 @@ pub fn cert_end(chain: List[byte], offset: int) -> int ! {der} {
 // Judgement helpers — algorithm names, hostname matching, timestamps.
 // ---------------------------------------------------------------------
 
-/// The Ed25519 algorithm OID (RFC 8410): the one signature algorithm
-/// this rung VALIDATES. Zero-argument functions stand in for `const`s
+/// The Ed25519 algorithm OID (RFC 8410), the key and the signature
+/// algorithm at once. Zero-argument functions stand in for `const`s
 /// (F-0025).
 /// ct: public data.
 pub fn oid_ed25519() -> str {
@@ -1354,9 +1385,10 @@ pub fn oid_ecdsa_sha256() -> str {
 }
 
 /// The id-ecPublicKey OID (X9.62 — an EC subjectPublicKey). The curve
-/// itself rides in the SPKI parameters; this rung validates P-256 (a
-/// 65-byte uncompressed point), and p256's on-curve check refuses any
-/// key that is not a P-256 point. ct: public data.
+/// itself rides in the SPKI parameters (RFC 5480's namedCurve, decoded
+/// into `Cert.spki_curve`): P-256 and P-384 validate, and each curve's
+/// on-curve check refuses a key that is not its point; any other curve
+/// is `unsupported_alg`. ct: public data.
 pub fn oid_ec_public_key() -> str {
     "1.2.840.10045.2.1"
 }
@@ -1365,8 +1397,8 @@ pub fn oid_ec_public_key() -> str {
 /// "rsa" (the PKCS#1 arc — signature algorithms and rsaEncryption),
 /// "ecdsa" (the X9.62 arc — ECDSA signatures and id-ecPublicKey),
 /// "ed448" (1.3.101.113), else "unknown". Classification is for
-/// REPORTING; validation asks for Ed25519 exactly and answers
-/// `unsupported_alg` for everything else.
+/// REPORTING; validation reads the exact OIDs (`verify_signed_by`'s
+/// table) and answers `unsupported_alg` for every pairing outside it.
 /// ct: public data.
 pub fn alg_name(dotted: str) -> str {
     if dotted == "1.3.101.112" {
@@ -1398,10 +1430,11 @@ pub fn ku_key_cert_sign() -> int {
 }
 
 /// Exact, case-insensitive DNS name match (DNS names compare
-/// case-insensitively; both sides are lowered). NO wildcard support:
-/// RFC 6125 §6.4.3 wildcard matching is named residue in the module
-/// header — a `*.` pattern here simply never matches a hostname, which
-/// fails CLOSED.
+/// case-insensitively; both sides are lowered). NO wildcard support — a
+/// `*.` pattern here never matches a hostname, which fails CLOSED. Kept
+/// exact because callers outside certificate validation read it (a
+/// server choosing its certificate by SNI); certificate validation
+/// matches SAN entries with `san_matches` (RFC 9525) since sc79.
 /// ct: public data.
 pub fn host_matches(pattern: str, host: str) -> bool {
     if pattern == "" {
