@@ -157,6 +157,55 @@ CAVP SigVer P/F verdicts, and all 484 Wycheproof verdicts — so a
 transcription error and an implementation error cannot agree (the
 sc17/sc18 discipline).
 
+## Sources (retrieved 2026-11-05, sc79 — RSA and ECDSA P-384)
+
+- `wycheproof/rsa_signature_{2048,3072,4096}_{sha256,sha384,sha512}_test.json`
+  (RSASSA-PKCS1-v1_5), `wycheproof/rsa_pss_*_test.json` (eight RSASSA-PSS
+  files, MGF1 over the message hash), and
+  `wycheproof/ecdsa_secp384r1_{sha384,sha384_p1363,sha256,sha512}_test.json`
+  — Project Wycheproof (C2SP), `testvectors_v1` at
+  `https://github.com/C2SP/wycheproof/tree/master/testvectors_v1/`, from
+  a sparse clone of the repository at commit
+  `d17cc89fa5c8f4f4d378b5385ebf75da5d0926c9` (2026-10-23).
+- The specifications behind the checkers are RFC 8017 (PKCS #1 v2.2),
+  FIPS 186-5, SEC 1 v2 and SP 800-186. They contribute rules and the
+  P-384 domain parameters, not vector data, and are not vendored.
+
+Every case in these 21 files was decided by an independent Python
+checker written from the specifications alone before a line of the wolf
+modules existed: `tests/x/crypto/rsa/rsa_check.py` (RFC 8017's RSAVP1,
+EMSA-PKCS1-v1_5 and EMSA-PSS with MGF1) and
+`tests/x/crypto/p384/p384_check.py` (the curve from SP 800-186, FIPS
+186-5 §6.4.2 verification, strict X.690 signature parsing). Python's
+`hashlib` is the one library call with cryptographic meaning, used as
+the SHA-2 oracle.
+
+sha256 of the sc79 files, as retrieved:
+
+```
+660c948e5433279ecdf966e8a1386b69ecec618efc1ff00269e85aa9dc84f0a6  wycheproof/ecdsa_secp384r1_sha256_test.json
+e27344bf6daae75fa19663620883809f91c79fc4b4420eff9eae8036b34476be  wycheproof/ecdsa_secp384r1_sha384_p1363_test.json
+8a5b3ae1760975143414811f13588c24d951d9d8c904195087ba327591dfe9cc  wycheproof/ecdsa_secp384r1_sha384_test.json
+f44bae32e419fc75c5b5af751cff4e35145cfbcc24944e378d5f30889d310513  wycheproof/ecdsa_secp384r1_sha512_test.json
+b22a8d9a2e7e47f681d0ff1d1a55455daaf325d989c64ad005f848bd50b9b4c0  wycheproof/rsa_pss_2048_sha256_mgf1_0_test.json
+7f6efafc160f4816b96cbf1c12188a31051d7e3f001e27505d9edb5f2a0e325c  wycheproof/rsa_pss_2048_sha256_mgf1_32_test.json
+66d464778b0b2f683a1d1a20e94f77e9472b8cc393b45f423fa08a48e677063c  wycheproof/rsa_pss_2048_sha384_mgf1_48_test.json
+cca48433e6d1accb57f65b3396c4f4dd93c776467101c3f0948e74c283fd4749  wycheproof/rsa_pss_3072_sha256_mgf1_32_test.json
+e627cbf5139a01e0a446c4fe15911f6268224fdd3ef4a1eb714b3942b5686410  wycheproof/rsa_pss_4096_sha256_mgf1_32_test.json
+d632649a7630f7c267eda576714ca11cf0ff068d6622f576b8701f923c112577  wycheproof/rsa_pss_4096_sha384_mgf1_48_test.json
+af1e1c1c593edf91be3e9880927231d57f9df082f2d8caec2a61d9874ade101f  wycheproof/rsa_pss_4096_sha512_mgf1_32_test.json
+c93ceaa56a190c9fd4707441c5c6a75839f108202d88aec891697f9623042547  wycheproof/rsa_pss_4096_sha512_mgf1_64_test.json
+94a917b01ff50fb874cfc05bf29b4af44868d944a6558201cf18380da93fb393  wycheproof/rsa_signature_2048_sha256_test.json
+c571c105d261c0ff588a2888a529f152563fb3b77894b7620d4e4f8f934f2c1d  wycheproof/rsa_signature_2048_sha384_test.json
+16ea24b039905d054bdb6004f5fd179374e150b7b6d73a7ba654b6d00eab12ef  wycheproof/rsa_signature_2048_sha512_test.json
+0f5f18cabfaad3e2792e82f7e9882f8999049b456714de924b8a5e202f61ca43  wycheproof/rsa_signature_3072_sha256_test.json
+73499ee649d8fb703b3f0f455fa36f7682fde677c590a736958ebce05ab27dae  wycheproof/rsa_signature_3072_sha384_test.json
+09aa3336fdb7be216180ce944ca7b2a052e1de38c210435c19506327d4a36ebd  wycheproof/rsa_signature_3072_sha512_test.json
+957aca128e30bd02c8982f8ca482d6521d16683f4bbc3f193cdfd4c8f04bc667  wycheproof/rsa_signature_4096_sha256_test.json
+bc26f16b9fc9a90628864d3d1111ef48a4bd00b9d4870bfab88ff326e309e073  wycheproof/rsa_signature_4096_sha384_test.json
+9d6e67b1eb0d7040db411835238efd20e9302399a258bdff82de3f38e0f2855a  wycheproof/rsa_signature_4096_sha512_test.json
+```
+
 ## What is taken, what is omitted (named, never silent)
 
 - **CAVP short-message sets**: ALL vectors (65 + 129 + 129), run on
@@ -305,3 +354,26 @@ vectors (28 RFC 8439 + 256 valid + 60 invalid Wycheproof, all green on
 the native lane, +9 trap-omissions named above; the 28 RFC vectors and
 the 20 smoke-subset vectors are differential under the interpreter,
 and the Poly1305 file is three-lane — the checked tier runs it too).
+
+- **Wycheproof RSA (sc79)**: 3395 cases accounted for, every one by
+  tcId. RSASSA-PKCS1-v1_5, nine files, 2330 cases: 68 `valid` (verify
+  answers true), 2253 `invalid` (false) and 9 `acceptable`, each file's
+  one `MissingNull` case, which verification REJECTS: RFC 8017 §8.2.2
+  builds the expected encoding and compares it, and §9.2 Note 1's
+  DigestInfo carries the NULL. The `SmallPublicKey` cases (e = 3) are
+  `valid` and verify: the exponent rule is RFC 8017 §3.1's, odd and at
+  least 3, below n and below 2^256. RSASSA-PSS, eight files, 1065 cases:
+  704 `valid` and 361 `invalid`, the salt length taken from each group's
+  `sLen`. OMITTED by name: the SHA-1, SHA-224, SHA-512/224, SHA-512/256,
+  SHA-3 and SHAKE files (outside the ladder), MGF1 under a hash other
+  than the message hash (no TLS 1.3 scheme uses it), the `_params` files
+  (RSASSA-PSS parameters carried in the key, which the module does not
+  take), `rsa_pss_misc`, the 8192-bit files (the module refuses a
+  modulus above 4096 bits by name; a hand row holds that refusal), and
+  every OAEP and PKCS#1 encryption file.
+- **Wycheproof ECDSA P-384 (sc79)**: 1798 cases accounted for: the
+  SHA-384 file in DER (504) and in IEEE P1363 r || s form (280), and
+  the SHA-256 (472) and SHA-512 (542) DER files, which exercise FIPS
+  186-5's bits2int with a digest shorter and longer than the order.
+  780 `valid`, 1018 `invalid`, no `acceptable`. The SHA-3 and SHAKE
+  files are omitted by name (outside the ladder).
