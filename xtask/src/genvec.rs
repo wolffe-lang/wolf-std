@@ -36,6 +36,17 @@
 //!   RFC 8439's own vectors are hand-written tests beside the
 //!   generated ones (`known_answers.lu`, `rfc8439_a*.lu`), hex quoted
 //!   from `vendor/vectors/rfc/rfc8439.txt`.
+//! - Wycheproof v1 RSA (sc79, `wycheproof/rsa_signature_*` and
+//!   `rsa_pss_*`, into `tests/x/crypto/rsa/`): every case of the nine
+//!   RSASSA-PKCS1-v1_5 and eight RSASSA-PSS files, one row file each,
+//!   plus a four-case smoke file for the interpreter and checked tiers.
+//!   `valid` accepts and `invalid` rejects; the one `acceptable`
+//!   flavour, `MissingNull`, rejects (RFC 8017 §8.2.2 compares the whole
+//!   encoding); anything else is a hard error. PSS groups must be MGF1
+//!   over the message hash.
+//! - Wycheproof v1 ECDSA P-384 (sc79, `wycheproof/ecdsa_secp384r1_*`, into
+//!   `tests/x/crypto/p384/`): every case of the SHA-384 DER and P1363
+//!   files and the SHA-256 and SHA-512 DER files, in parts.
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -102,6 +113,43 @@ const EDDSA_SMOKE_INVALID: usize = 1;
 /// never reach a scalar multiplication. 64 cases per part keeps each
 /// native program's runtime moderate.
 const ECDSA_CHUNK: usize = 64;
+
+/// sc79: the Wycheproof RSA files, one generated row file each. An RSA
+/// verify with e = 65537 is nineteen Montgomery multiplications, so a
+/// whole file (at most 260 cases at 4096 bits) runs natively in seconds;
+/// the interpreter and the checked tier run the four-case smoke file.
+const RSA_PKCS1_FILES: &[&str] = &[
+    "rsa_signature_2048_sha256",
+    "rsa_signature_2048_sha384",
+    "rsa_signature_2048_sha512",
+    "rsa_signature_3072_sha256",
+    "rsa_signature_3072_sha384",
+    "rsa_signature_3072_sha512",
+    "rsa_signature_4096_sha256",
+    "rsa_signature_4096_sha384",
+    "rsa_signature_4096_sha512",
+];
+const RSA_PSS_FILES: &[&str] = &[
+    "rsa_pss_2048_sha256_mgf1_0",
+    "rsa_pss_2048_sha256_mgf1_32",
+    "rsa_pss_2048_sha384_mgf1_48",
+    "rsa_pss_3072_sha256_mgf1_32",
+    "rsa_pss_4096_sha256_mgf1_32",
+    "rsa_pss_4096_sha384_mgf1_48",
+    "rsa_pss_4096_sha512_mgf1_32",
+    "rsa_pss_4096_sha512_mgf1_64",
+];
+
+/// sc79: the Wycheproof ECDSA P-384 files and the signature form each
+/// carries. A P-384 verify is a joint scalar multiplication over 384
+/// bits, so the files ride the native lane in parts of `P384_CHUNK`.
+const P384_FILES: &[(&str, &str)] = &[
+    ("ecdsa_secp384r1_sha384", "der"),
+    ("ecdsa_secp384r1_sha384_p1363", "p1363"),
+    ("ecdsa_secp384r1_sha256", "der"),
+    ("ecdsa_secp384r1_sha512", "der"),
+];
+const P384_CHUNK: usize = 120;
 
 /// What `place` does with each generated file (sc41).
 ///
@@ -427,6 +475,45 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
                 &emit_wycheproof_ecdsa(part, i + 1, parts.len(), cases.len()),
             )?;
             place(&out, &text, mode, &mut drift, &mut written)?;
+        }
+    }
+
+    // ---- sc79: RSA (PKCS#1 v1.5 and PSS) and ECDSA P-384, Wycheproof. ----
+    {
+        let out_dir = repo.join("tests/x/crypto/rsa");
+        let mut smoke: Vec<(String, WpRsaGroup, Vec<WpRsaCase>)> = Vec::new();
+        for name in RSA_PKCS1_FILES.iter().chain(RSA_PSS_FILES.iter()) {
+            let pss = name.starts_with("rsa_pss_");
+            let wp = vec_dir.join(format!("wycheproof/{name}_test.json"));
+            let groups = parse_wycheproof_rsa(&read(&wp)?, &show(&wp), pss)?;
+            let out = out_dir.join(format!("wycheproof_{name}.lu"));
+            let text = fmt(&show(&out), &emit_wycheproof_rsa(name, &groups, pss))?;
+            place(&out, &text, mode, &mut drift, &mut written)?;
+            if *name == "rsa_signature_2048_sha256" || *name == "rsa_pss_2048_sha256_mgf1_32" {
+                let g = &groups[0];
+                let mut pick: Vec<WpRsaCase> = Vec::new();
+                pick.extend(g.cases.iter().filter(|c| c.accept).take(1).cloned());
+                pick.extend(g.cases.iter().filter(|c| !c.accept).take(1).cloned());
+                smoke.push((name.to_string(), g.clone(), pick));
+            }
+        }
+        let out = out_dir.join("wycheproof_rsa_smoke.lu");
+        let text = fmt(&show(&out), &emit_wycheproof_rsa_smoke(&smoke))?;
+        place(&out, &text, mode, &mut drift, &mut written)?;
+
+        let out_dir = repo.join("tests/x/crypto/p384");
+        for (name, form) in P384_FILES {
+            let wp = vec_dir.join(format!("wycheproof/{name}_test.json"));
+            let cases = parse_wycheproof_p384(&read(&wp)?, &show(&wp))?;
+            let parts: Vec<&[WpP384Case]> = cases.chunks(P384_CHUNK).collect();
+            for (i, part) in parts.iter().enumerate() {
+                let out = out_dir.join(format!("wycheproof_{name}_p{}.lu", i + 1));
+                let text = fmt(
+                    &show(&out),
+                    &emit_wycheproof_p384(name, form, part, i + 1, parts.len(), cases.len()),
+                )?;
+                place(&out, &text, mode, &mut drift, &mut written)?;
+            }
         }
     }
 
@@ -1109,6 +1196,298 @@ fn emit_wycheproof_ecdsa(cases: &[WpEcdsaCase], part: usize, parts: usize, total
         );
     }
     s.push_str("    0\n}\n");
+    s
+}
+
+/// One Wycheproof RSA test group (sc79): the RSAPublicKey DER the
+/// rows parse, the hash, and for PSS the salt length.
+#[derive(Clone)]
+struct WpRsaGroup {
+    key_der: String,
+    hash: u32,
+    salt: u64,
+    cases: Vec<WpRsaCase>,
+}
+
+#[derive(Clone)]
+struct WpRsaCase {
+    tc_id: u64,
+    msg: String,
+    sig: String,
+    accept: bool,
+}
+
+/// The digest size Wycheproof's `sha` names, for the three hashes of
+/// the ladder; any other is a hard error (the vendored set holds none).
+fn rsa_hash(name: &str, what: &str) -> Result<u32, String> {
+    match name {
+        "SHA-256" => Ok(256),
+        "SHA-384" => Ok(384),
+        "SHA-512" => Ok(512),
+        other => Err(format!("{what}: hash `{other}` is outside the ladder")),
+    }
+}
+
+/// The Wycheproof RSA rules (sc79): `valid` accepts, `invalid` rejects,
+/// and `acceptable` is decided by its flags. The one acceptable flavour
+/// the vendored files carry is `MissingNull` (a DigestInfo without the
+/// NULL parameters), which RFC 8017 §8.2.2's encode-and-compare REJECTS.
+/// Any other result or flag set is a hard error, so a re-vendored file
+/// cannot grow an undecided case. PSS groups must be MGF1 over the
+/// message hash. `tests/x/crypto/rsa/rsa_check.py` decides every case
+/// again from RFC 8017 alone.
+fn parse_wycheproof_rsa(text: &str, what: &str, pss: bool) -> Result<Vec<WpRsaGroup>, String> {
+    let v: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("{what}: bad json: {e}"))?;
+    let mut out = Vec::new();
+    for gp in v["testGroups"].as_array().ok_or(format!("{what}: no testGroups"))? {
+        let hash = rsa_hash(gp["sha"].as_str().unwrap_or(""), what)?;
+        let mut salt = 0;
+        if pss {
+            if gp["mgf"].as_str() != Some("MGF1") || gp["mgfSha"] != gp["sha"] {
+                return Err(format!("{what}: a PSS group outside MGF1 over the message hash"));
+            }
+            salt = gp["sLen"].as_u64().ok_or(format!("{what}: sLen"))?;
+        }
+        let key_der = gp["publicKeyAsn"]
+            .as_str()
+            .ok_or(format!("{what}: group has no publicKeyAsn"))?
+            .to_string();
+        let mut cases = Vec::new();
+        for t in gp["tests"].as_array().ok_or(format!("{what}: no tests"))? {
+            let tc = t["tcId"].as_u64().ok_or(format!("{what}: tcId"))?;
+            let flags: Vec<&str> = t["flags"]
+                .as_array()
+                .map(|a| a.iter().filter_map(|f| f.as_str()).collect())
+                .unwrap_or_default();
+            let accept = match (t["result"].as_str().unwrap_or(""), flags.as_slice()) {
+                ("valid", _) => true,
+                ("invalid", _) => false,
+                ("acceptable", ["MissingNull"]) => false,
+                (other, f) => {
+                    return Err(format!(
+                        "{what}: tcId {tc} is `{other}` {f:?}, which no sc79 rule decides"
+                    ));
+                }
+            };
+            cases.push(WpRsaCase {
+                tc_id: tc,
+                msg: t["msg"].as_str().unwrap_or_default().to_string(),
+                sig: t["sig"].as_str().unwrap_or_default().to_string(),
+                accept,
+            });
+        }
+        out.push(WpRsaGroup { key_der, hash, salt, cases });
+    }
+    if out.is_empty() {
+        return Err(format!("{what}: no RSA groups parsed"));
+    }
+    Ok(out)
+}
+
+struct WpP384Case {
+    tc_id: u64,
+    pubkey: String,
+    hash: u32,
+    msg: String,
+    sig: String,
+    valid: bool,
+}
+
+/// The Wycheproof ECDSA P-384 rules (sc79): valid/invalid only, any
+/// other result a hard error; `tests/x/crypto/p384/p384_check.py`
+/// decides every case again from FIPS 186-5 and SP 800-186.
+fn parse_wycheproof_p384(text: &str, what: &str) -> Result<Vec<WpP384Case>, String> {
+    let v: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("{what}: bad json: {e}"))?;
+    let mut out = Vec::new();
+    for gp in v["testGroups"].as_array().ok_or(format!("{what}: no testGroups"))? {
+        let hash = rsa_hash(gp["sha"].as_str().unwrap_or(""), what)?;
+        let pk = gp["publicKey"]["uncompressed"]
+            .as_str()
+            .ok_or(format!("{what}: group has no publicKey.uncompressed"))?
+            .to_string();
+        for t in gp["tests"].as_array().ok_or(format!("{what}: no tests"))? {
+            let tc = t["tcId"].as_u64().ok_or(format!("{what}: tcId"))?;
+            let valid = match t["result"].as_str().unwrap_or("") {
+                "valid" => true,
+                "invalid" => false,
+                other => {
+                    return Err(format!(
+                        "{what}: tcId {tc} is `{other}`; the P-384 files are valid/invalid only"
+                    ));
+                }
+            };
+            out.push(WpP384Case {
+                tc_id: tc,
+                pubkey: pk.clone(),
+                hash,
+                msg: t["msg"].as_str().unwrap_or_default().to_string(),
+                sig: t["sig"].as_str().unwrap_or_default().to_string(),
+                valid,
+            });
+        }
+    }
+    if out.is_empty() {
+        return Err(format!("{what}: no P-384 vectors parsed"));
+    }
+    Ok(out)
+}
+
+const GEN_NOTE: &str = "//! GENERATED — `cargo xtask gen-vectors`, from the vendored source\n\
+    //! named below (provenance: `vendor/vectors/README.md`). Do not edit\n\
+    //! by hand; ci's `gen-vectors --check` holds this file byte-identical\n\
+    //! to its source. A case that answers the wrong verdict prints\n\
+    //! `FAIL <file>:tc<N>` and the program exits 1.\n";
+
+const ROW_FN: &str = "fn row(name: str, ok: bool) -> int {\n\
+    \x20   if ok {\n\x20       return 0\n\x20   }\n\
+    \x20   print(\"FAIL {name}\")\n\x20   1\n}\n\n";
+
+fn rsa_verify_fn(fname: &str, pss: bool, hash: u32, salt: u64) -> String {
+    let call = if pss {
+        format!("rsa.verify_pss(k, rsa.hash_sha{hash}(), m, s, {salt})")
+    } else {
+        format!("rsa.verify_pkcs1(k, rsa.hash_sha{hash}(), m, s)")
+    };
+    format!(
+        "fn {fname}(key: str, msg: str, sig: str, want: bool) -> bool {{\n\
+         \x20   let kb = hex.decode(key) else List[byte]()\n\
+         \x20   let k = rsa.parse_public_key(kb) else |_| {{\n\
+         \x20       return false\n\x20   }}\n\
+         \x20   let m = hex.decode(msg) else List[byte]()\n\
+         \x20   let s = hex.decode(sig) else List[byte]()\n\
+         \x20   {call} == want\n}}\n\n"
+    )
+}
+
+fn emit_wycheproof_rsa(name: &str, groups: &[WpRsaGroup], pss: bool) -> String {
+    let n: usize = groups.iter().map(|g| g.cases.len()).sum();
+    let a: usize = groups.iter().map(|g| g.cases.iter().filter(|c| c.accept).count()).sum();
+    let scheme = if pss {
+        "RSASSA-PSS (MGF1 over the message hash, the group's salt length)"
+    } else {
+        "RSASSA-PKCS1-v1_5"
+    };
+    let mut s = String::new();
+    s.push_str("//! check: run(exit=0)\n//! phase: run\n//! conforms: std.x.crypto.rsa, arith.checked\n//!\n");
+    s.push_str(GEN_NOTE);
+    let _ = write!(
+        s,
+        "//!\n//! Wycheproof v1 `{name}`: {scheme} verify, all {n} cases ({a}\n\
+         //! accept, {} reject; `acceptable` MissingNull rejects, RFC 8017\n\
+         //! §8.2.2). Source: `vendor/vectors/wycheproof/{name}_test.json`;\n\
+         //! `rsa_check.py` decides every case again from RFC 8017 alone.\n",
+        n - a
+    );
+    s.push_str("\nuse std.hex\nuse std.x.crypto.rsa\n\n");
+    for (gi, g) in groups.iter().enumerate() {
+        let _ = write!(s, "fn key{gi}() -> str {{\n    \"{}\"\n}}\n\n", g.key_der);
+    }
+    s.push_str(ROW_FN);
+    for (gi, g) in groups.iter().enumerate() {
+        s.push_str(&rsa_verify_fn(&format!("vd{gi}"), pss, g.hash, g.salt));
+    }
+    s.push_str("fn main() -> int {\n    var bad: int = 0\n");
+    for (gi, g) in groups.iter().enumerate() {
+        for c in &g.cases {
+            let _ = writeln!(
+                s,
+                "    bad = bad + row(\"{name}:tc{}\", vd{gi}(key{gi}(), \"{}\", \"{}\", {}))",
+                c.tc_id, c.msg, c.sig, c.accept
+            );
+        }
+    }
+    s.push_str("    if bad > 0 {\n        return 1\n    }\n    0\n}\n");
+    s
+}
+
+fn emit_wycheproof_rsa_smoke(picks: &[(String, WpRsaGroup, Vec<WpRsaCase>)]) -> String {
+    let mut s = String::new();
+    s.push_str("//! check: run(exit=0)\n//! phase: run\n//! conforms: std.x.crypto.rsa, arith.checked\n//!\n");
+    s.push_str(GEN_NOTE);
+    s.push_str(
+        "//!\n//! The RSA smoke subset: from each named file's first group, its first\n\
+         //! accepted and first rejected case, so the interpreter and the checked\n\
+         //! tier keep a differential column while the whole files ride the\n\
+         //! native lane.\n",
+    );
+    s.push_str("\nuse std.hex\nuse std.x.crypto.rsa\n\n");
+    for (i, (_, g, _)) in picks.iter().enumerate() {
+        let _ = write!(s, "fn key{i}() -> str {{\n    \"{}\"\n}}\n\n", g.key_der);
+    }
+    s.push_str(ROW_FN);
+    for (i, (name, g, _)) in picks.iter().enumerate() {
+        s.push_str(&rsa_verify_fn(&format!("vd{i}"), name.starts_with("rsa_pss_"), g.hash, g.salt));
+    }
+    s.push_str("fn main() -> int {\n    var bad: int = 0\n");
+    for (i, (name, _, cases)) in picks.iter().enumerate() {
+        for c in cases {
+            let _ = writeln!(
+                s,
+                "    bad = bad + row(\"{name}:tc{}\", vd{i}(key{i}(), \"{}\", \"{}\", {}))",
+                c.tc_id, c.msg, c.sig, c.accept
+            );
+        }
+    }
+    s.push_str("    if bad > 0 {\n        return 1\n    }\n    0\n}\n");
+    s
+}
+
+fn emit_wycheproof_p384(
+    name: &str,
+    form: &str,
+    cases: &[WpP384Case],
+    part: usize,
+    parts: usize,
+    total: usize,
+) -> String {
+    let nv = cases.iter().filter(|c| c.valid).count();
+    let hash = cases[0].hash;
+    let mut s = String::new();
+    s.push_str("//! check: run(exit=0)\n//! phase: run\n//! conforms: std.x.crypto.p384, arith.checked\n//!\n");
+    s.push_str(GEN_NOTE);
+    let shape = if form == "der" { "DER" } else { "IEEE P1363 r || s" };
+    let _ = write!(
+        s,
+        "//!\n//! Wycheproof v1 `{name}` ({shape}, SHA-{hash}), part {part} of {parts}:\n\
+         //! {} of the file's {total} cases ({nv} valid, {} invalid). NATIVE-ONLY:\n\
+         //! a P-384 verify is a 384-bit joint scalar multiplication, past the\n\
+         //! interpreter's and the checked tier's step budgets.\n\
+         //! Source: `vendor/vectors/wycheproof/{name}_test.json`;\n\
+         //! `p384_check.py` decides every case again from FIPS 186-5.\n",
+        cases.len(),
+        cases.len() - nv
+    );
+    s.push_str("\nuse std.hex\n");
+    if form == "der" && hash != 384 {
+        s.push_str("use std.x.crypto.sha2\n");
+    }
+    s.push_str("use std.x.crypto.p384\n\n");
+    s.push_str(ROW_FN);
+    let call = match (form, hash) {
+        ("p1363", _) => "p384.verify(key, m, d)".to_string(),
+        ("der", 384) => "p384.verify_der(key, m, d)".to_string(),
+        ("der", h) => format!("p384.verify_digest_der(key, sha2.sum{h}(m), d)"),
+        _ => unreachable!("a P-384 form outside the table"),
+    };
+    let _ = write!(
+        s,
+        "fn vd(pk: str, msg: str, sig: str, want: bool) -> bool {{\n\
+         \x20   let key = hex.decode(pk) else List[byte]()\n\
+         \x20   let m = hex.decode(msg) else List[byte]()\n\
+         \x20   let d = hex.decode(sig) else List[byte]()\n\
+         \x20   {call} == want\n}}\n\n"
+    );
+    s.push_str("fn main() -> int {\n    var bad: int = 0\n");
+    for c in cases {
+        let _ = writeln!(
+            s,
+            "    bad = bad + row(\"{name}:tc{}\", vd(\"{}\", \"{}\", \"{}\", {}))",
+            c.tc_id, c.pubkey, c.msg, c.sig, c.valid
+        );
+    }
+    s.push_str("    if bad > 0 {\n        return 1\n    }\n    0\n}\n");
     s
 }
 
