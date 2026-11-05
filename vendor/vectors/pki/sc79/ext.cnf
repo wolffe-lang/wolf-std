@@ -1,0 +1,68 @@
+[req]
+distinguished_name = dn
+[dn]
+[root]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+[root_pl0]
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+[int]
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,keyCertSign,cRLSign
+extendedKeyUsage = serverAuth,clientAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+[int_email]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,keyCertSign,cRLSign
+extendedKeyUsage = emailProtection
+[int_nc]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,keyCertSign,cRLSign
+nameConstraints = critical,permitted;DNS:localhost
+[int_nonca]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature
+[leaf]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = DNS:localhost,DNS:*.wolf.test,IP:127.0.0.1
+[leaf_client]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature
+extendedKeyUsage = clientAuth
+subjectAltName = DNS:localhost
+[leaf_kunosig]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = DNS:localhost
+[leaf_local]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature
+extendedKeyUsage = serverAuth
+subjectAltName = DNS:localhost
+[leaf_wild]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature
+subjectAltName = DNS:*.wild.wolf.test,DNS:exact.wolf.test
