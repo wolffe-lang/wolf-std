@@ -1,0 +1,442 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.p384, arith.checked
+//!
+//! GENERATED — `cargo xtask gen-vectors`, from the vendored source
+//! named below (provenance: `vendor/vectors/README.md`). Do not edit
+//! by hand; ci's `gen-vectors --check` holds this file byte-identical
+//! to its source. A case that answers the wrong verdict prints
+//! `FAIL <file>:tc<N>` and the program exits 1.
+//!
+//! Wycheproof v1 `ecdsa_secp384r1_sha384_p1363` (IEEE P1363 r || s, SHA-384), part 3 of 3:
+//! 40 of the file's 280 cases (30 valid, 10 invalid). NATIVE-ONLY:
+//! a P-384 verify is a 384-bit joint scalar multiplication, past the
+//! interpreter's and the checked tier's step budgets.
+//! Source: `vendor/vectors/wycheproof/ecdsa_secp384r1_sha384_p1363_test.json`;
+//! `p384_check.py` decides every case again from FIPS 186-5.
+
+use std.hex
+use std.x.crypto.p384
+
+fn row(name: str, ok: bool) -> int {
+    if ok {
+        return 0
+    }
+    print("FAIL {name}")
+    1
+}
+
+fn vd(pk: str, msg: str, sig: str, want: bool) -> bool {
+    let key = hex.decode(pk) else List[byte]()
+    let m = hex.decode(msg) else List[byte]()
+    let d = hex.decode(sig) else List[byte]()
+    p384.verify(key, m, d) == want
+}
+
+fn main() -> int {
+    var bad: int = 0
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc241",
+            vd(
+                "0410878fc4807f6732a23c883e838e38c787f7088f94c1824b84673e8b9eab16de1544ae4bf2c6fe3fe4fb343b7487e2b43036ff439533d22f951dae966584bafb23b217dcad2f8f4e0e6999c0c4d0f076634be805f676fd2a59c27f9fe7c5d95b",
+                "313233343030",
+                "aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab76666666666666666666666666666666666666666666666664fc15233fb49458c89a4057a8379dc9791f80a2ab84edd61",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc242",
+            vd(
+                "04036b253e3b4ac88bb8585a2b32b978766a931e5ad0d0e653a2e34b44d6ddcc0d386e20c4def2d8bb3f8da128c1eac69f9c8e3b5ff5dde2205af359b3974d52758d7abae812b8b275e1452c4e59cb62e9b6771d347dbd1dea761c70291cc5e0a6",
+                "313233343030",
+                "aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab799999999999999999999999999999999999999999999999977a1fb4df8ede852ce760837c536cae35af40f4014764c12",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc243",
+            vd(
+                "042783c1be922fce155864ecb41d0a316e193a55843e80192f1fe556772f3debd04b9fc93c27bc6f353938886a404419941a352cec336946424fa3c208ea7105f5549edde8688abd305344bf4f66dda7eabcda6f8557c9af88109804d702e9670b",
+                "313233343030",
+                "aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab7db6db6db6db6db6db6db6db6db6db6db6db6db6db6db6db6aae76701acc1950894a89e068772d8b281eef136f8a8fef5",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc244",
+            vd(
+                "04fa92538cdc740368caf16480ff1304cebbbe59a46a7a84603726b9592d105be069df1c61b5974f27e7552f797de97cdb620e03a46da862e4b089bafbb80df8f055c8f47991b3a3ddb2b089aedb2f15841a6a5b5e14c1dc36b3c155c4f74d3409",
+                "313233343030",
+                "aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab70eb10e5ab95f2f26a40700b1300fb8c3e754d5c453d9384ecce1daa38135a48a0a96c24efc2a76d00bde1d7aeedf7f6a",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc245",
+            vd(
+                "04aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab73617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f",
+                "313233343030",
+                "f9b127f0d81ebcd17b7ba0ea131c660d340b05ce557c82160e0f793de07d38179023942871acb7002dfafdfffc8deace2492492492492492492492492492492492492492492492491c7be680477598d6c3716fabc13dcec86afd2833d41c2a7e",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc246",
+            vd(
+                "04aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab73617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f",
+                "313233343030",
+                "064ed80f27e1432e84845f15ece399f2cbf4fa31aa837de9b953d44413b9f5c7c7f67989d703f07abef11b6ad0373ea52492492492492492492492492492492492492492492492491c7be680477598d6c3716fabc13dcec86afd2833d41c2a7e",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc247",
+            vd(
+                "04aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab7c9e821b569d9d390a26167406d6d23d6070be242d765eb831625ceec4a0f473ef59f4e30e2817e6285bce2846f15f1a0",
+                "313233343030",
+                "f9b127f0d81ebcd17b7ba0ea131c660d340b05ce557c82160e0f793de07d38179023942871acb7002dfafdfffc8deace2492492492492492492492492492492492492492492492491c7be680477598d6c3716fabc13dcec86afd2833d41c2a7e",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc248",
+            vd(
+                "04aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab7c9e821b569d9d390a26167406d6d23d6070be242d765eb831625ceec4a0f473ef59f4e30e2817e6285bce2846f15f1a0",
+                "313233343030",
+                "064ed80f27e1432e84845f15ece399f2cbf4fa31aa837de9b953d44413b9f5c7c7f67989d703f07abef11b6ad0373ea52492492492492492492492492492492492492492492492491c7be680477598d6c3716fabc13dcec86afd2833d41c2a7e",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc249",
+            vd(
+                "0429bdb76d5fa741bfd70233cb3a66cc7d44beb3b0663d92a8136650478bcefb61ef182e155a54345a5e8e5e88f064e5bc9a525ab7f764dad3dae1468c2b419f3b62b9ba917d5e8c4fb1ec47404a3fc76474b2713081be9db4c00e043ada9fc4a3",
+                "",
+                "32401249714e9091f05a5e109d5c1216fdc05e98614261aa0dbd9e9cd4415dee29238afbd3b103c1e40ee5c9144aee0f4326756fb2c4fd726360dd6479b5849478c7a9d054a833a58c1631c33b63c3441336ddf2c7fe0ed129aae6d4ddfeb753",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc250",
+            vd(
+                "0429bdb76d5fa741bfd70233cb3a66cc7d44beb3b0663d92a8136650478bcefb61ef182e155a54345a5e8e5e88f064e5bc9a525ab7f764dad3dae1468c2b419f3b62b9ba917d5e8c4fb1ec47404a3fc76474b2713081be9db4c00e043ada9fc4a3",
+                "4d7367",
+                "d7143a836608b25599a7f28dec6635494c2992ad1e2bbeecb7ef601a9c01746e710ce0d9c48accb38a79ede5b9638f3480f9e165e8c61035bf8aa7b5533960e46dd0e211c904a064edb6de41f797c0eae4e327612ee3f816f4157272bb4fabc9",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc251",
+            vd(
+                "0429bdb76d5fa741bfd70233cb3a66cc7d44beb3b0663d92a8136650478bcefb61ef182e155a54345a5e8e5e88f064e5bc9a525ab7f764dad3dae1468c2b419f3b62b9ba917d5e8c4fb1ec47404a3fc76474b2713081be9db4c00e043ada9fc4a3",
+                "313233343030",
+                "234503fcca578121986d96be07fbc8da5d894ed8588c6dbcdbe974b4b813b21c52d20a8928f2e2fdac14705b0705498ccd7b9b766b97b53d1a80fc0b760af16a11bf4a59c7c367c6c7275dfb6e18a88091eed3734bf5cf41b3dc6fecd6d3baaf",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc252",
+            vd(
+                "0429bdb76d5fa741bfd70233cb3a66cc7d44beb3b0663d92a8136650478bcefb61ef182e155a54345a5e8e5e88f064e5bc9a525ab7f764dad3dae1468c2b419f3b62b9ba917d5e8c4fb1ec47404a3fc76474b2713081be9db4c00e043ada9fc4a3",
+                "0000000000000000000000000000000000000000",
+                "5cad9ae1565f2588f86d821c2cc1b4d0fdf874331326568f5b0e130e4e0c0ec497f8f5f564212bd2a26ecb782cf0a18dbf2e9d0980fbb00696673e7fbb03e1f854b9d7596b759a17bf6e6e67a95ea6c1664f82dc449ae5ea779abd99c78e6840",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc253",
+            vd(
+                "04ffffffffaa63f1a239ac70197c6ebfcea5756dc012123f82c51fa874d66028be00e976a1080606737cc75c40bdfe4aacacbd85389088a62a6398384c22b52d492f23f46e4a27a4724ad55551da5c483438095a247cb0c3378f1f52c3425ff9f1",
+                "4d657373616765",
+                "07648b6660d01ba2520a09d298adf3b1a02c32744bd2877208f5a4162f6c984373139d800a4cdc1ffea15bce4871a0ed99fd367012cb9e02cde2749455e0d495c52818f3c14f6e6aad105b0925e2a7290ac4a06d9fadf4b15b578556fe332a5f",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc254",
+            vd(
+                "04ffffffffaa63f1a239ac70197c6ebfcea5756dc012123f82c51fa874d66028be00e976a1080606737cc75c40bdfe4aacacbd85389088a62a6398384c22b52d492f23f46e4a27a4724ad55551da5c483438095a247cb0c3378f1f52c3425ff9f1",
+                "4d657373616765",
+                "a049dcd96c72e4f36144a51bba30417b451a305dd01c9e30a5e04df94342617dc383f17727708e3277cd7246ca4407413970e264d85b228bf9e9b9c4947c5dd041ea8b5bde30b93aa59fedf2c428d3e2540a54e0530688acccb83ac7b29b79a2",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc255",
+            vd(
+                "04ffffffffaa63f1a239ac70197c6ebfcea5756dc012123f82c51fa874d66028be00e976a1080606737cc75c40bdfe4aacacbd85389088a62a6398384c22b52d492f23f46e4a27a4724ad55551da5c483438095a247cb0c3378f1f52c3425ff9f1",
+                "4d657373616765",
+                "441800ea9377c27865be000ad008eb3d7502bdd105824b26d15cf3d06452969a9d0607a915a8fe989215fc4d61af6e05dce29faa5137f75ad77e03918c8ee6747cc7a39b0a69f8b915654cac4cf4bfd9c87cc46ae1631b5c6baebd4fc08ff8fd",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc256",
+            vd(
+                "04d1827fc6f6f12f21992c5a409a0653b121d2ef02b2b0ab01a9161ce956280740b1e356b255701b0a6ddc9ec2ca8a9422c6ed5d2ced8d8ab7560fa5bb88c738e74541883d8a2b1c0e2ba7e36d030fc4d9bfb8b22f24db897ebac49dd400000000",
+                "4d657373616765",
+                "3244768016457c463b74f2097f216d9670b191f76281c74bc6a1a1971d19f209bf4696468f5eb75d6326a0a43c0a6529501e0ad985ed9f95697bd17fdbe3f9ca92e0f76426d3664e6896648d9c750bf588d0ce7d011c1a1e8d6c2e082422dc93",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc257",
+            vd(
+                "04d1827fc6f6f12f21992c5a409a0653b121d2ef02b2b0ab01a9161ce956280740b1e356b255701b0a6ddc9ec2ca8a9422c6ed5d2ced8d8ab7560fa5bb88c738e74541883d8a2b1c0e2ba7e36d030fc4d9bfb8b22f24db897ebac49dd400000000",
+                "4d657373616765",
+                "5e1af40f2480e3d97c4ae4bfd34a9f45269241356f3a46becd86a4a7c9716d73ca5aebdb3db1a7765650666683bc856b7e7c4b473a2baaa4953785be8aa2a10006f6d36b400ab981864d69cecec046718d0404b9647454b159aa5a92d76d7955",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc258",
+            vd(
+                "04d1827fc6f6f12f21992c5a409a0653b121d2ef02b2b0ab01a9161ce956280740b1e356b255701b0a6ddc9ec2ca8a9422c6ed5d2ced8d8ab7560fa5bb88c738e74541883d8a2b1c0e2ba7e36d030fc4d9bfb8b22f24db897ebac49dd400000000",
+                "4d657373616765",
+                "6688e36a26f15bdc1c3f91367f8a7667f7bb3e30a335d6f0900e9534eb88b260cb29344c723fedfbe7ac9c5a33f4bf0daa35fddf0fdc9017860b378f801cd806f3e2d754cd2fd94eb7bb36a46ce828cef87e9ebbf447068e630b87fee385ad8f",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc259",
+            vd(
+                "041099bb45100f55f5a85cca3de2b3bd5e250f4f6fad6631a3156c2e52a33d7d615dd279f79f8b4baff7c713ac00000000e6c9b736a8929f2ed7be0c753a54cbb48b8469e0411eaf93a4a82459ba0b681bba8f5fb383b4906d4901a3303e2f1557",
+                "4d657373616765",
+                "d4a8f3b0b4d3a5769e3a0bbc644b35f1d509355ed1fe401e170f667b661f693b32598e8c143a817a958982845042bb4804cc07578bbd1981dbf6e8a97a354c98d41b8b6f6e8a2c2b1763c7c2a29d79e24f8476075c9aed9aec6c64dff50461ae",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc260",
+            vd(
+                "041099bb45100f55f5a85cca3de2b3bd5e250f4f6fad6631a3156c2e52a33d7d615dd279f79f8b4baff7c713ac00000000e6c9b736a8929f2ed7be0c753a54cbb48b8469e0411eaf93a4a82459ba0b681bba8f5fb383b4906d4901a3303e2f1557",
+                "4d657373616765",
+                "c286d1928e9c79fdd3bebdf22a1dbd37c8105e8ecf41e9e3777fe341b6b8d5a89b9d986827d6d1dbb381cd8239484a22201119ae305b9360aa9b5e5d1567e0674c09e4f025556ebf81b987466b0f421b8d31f72bbe95f3ce2aa9874a84edfd40",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc261",
+            vd(
+                "041099bb45100f55f5a85cca3de2b3bd5e250f4f6fad6631a3156c2e52a33d7d615dd279f79f8b4baff7c713ac00000000e6c9b736a8929f2ed7be0c753a54cbb48b8469e0411eaf93a4a82459ba0b681bba8f5fb383b4906d4901a3303e2f1557",
+                "4d657373616765",
+                "d9c678550167f10c511e62acb4bd0a3f7f336bc090c94e6c6b02622439c348a2159c5f41f9b5aa4b470590d40dcd7cc21fd5eaee295abb4081cb626745f4ad279ceb44604062830b58e6c0465c562d41f02ba588fc0db1ebbe339cdc008d7a1b",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc262",
+            vd(
+                "04000000002b089edd754169010145f263f334fc167cc19dae8225970ae19cc8cb7ec73593d6a465c370f5478b0e539d69d1951d597b56a67345acb25809581f07cd0eb78d9538a3f8a65f300e68a1eb78507df76de650e8f8ee63a5f0c5687c98",
+                "4d657373616765",
+                "20fee7c71b6cb0d1da3641ec6622c055a3b16a1f596c64b34da1b2d0b868b66a8f0a0d0db983b3dc7e53bb7295da81978141a931d3579aec1cac9887d2fff9c6f12d47a27e4aab8cf262a9d14a715bca0b2057cbc3f18b6fd3d1df76f7410f16",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc263",
+            vd(
+                "04000000002b089edd754169010145f263f334fc167cc19dae8225970ae19cc8cb7ec73593d6a465c370f5478b0e539d69d1951d597b56a67345acb25809581f07cd0eb78d9538a3f8a65f300e68a1eb78507df76de650e8f8ee63a5f0c5687c98",
+                "4d657373616765",
+                "913eecc559b3cf7108a65d6cc3076bfdf36c6f94dcc6693d06690470f34a2e81564241e1de5f5f51421de30af467f10f649bd3717244e8ef3c6b0eda983f84dca5ea86d1bec15386b9c473ec43a8cd0ba558eee819f791d9ff9272b9afd59551",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc264",
+            vd(
+                "04000000002b089edd754169010145f263f334fc167cc19dae8225970ae19cc8cb7ec73593d6a465c370f5478b0e539d69d1951d597b56a67345acb25809581f07cd0eb78d9538a3f8a65f300e68a1eb78507df76de650e8f8ee63a5f0c5687c98",
+                "4d657373616765",
+                "23855c46403a97b76cbb316ec3fe7e2c422b818387604bda8c3d91121b4f20179d9107c5f92dedc8b620d7db87fccccd50f57343ab148e50662320c4161e44543c35bc992011ea5b1680b94382cf224ea0ec5da511e102f566cb67201f30a2ee",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc265",
+            vd(
+                "04fb01baad5f0b8f79b9cd104d12aab9310146add7d6b4c022d87ae6711178b94d618ca7b3af13854b1c588879e877b33600000000208b3f5ad3b3937acc9d606cc5ececab4a701f75ed42957ea4d7858d33f5c26c6ae20a9cccda56996700d6b4",
+                "4d657373616765",
+                "d200958d491fcebde667cd736c9dba0961c70db2ecaf573c31dd7fa41ecca32b40b5896f9a0ddf272110e3d21e84593ac2ecf73943b9adce596bac14fce62495ae93825c5ff6f61c247d1d8afcba52082fc96f63a26e55bccfc3779f88cfd799",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc266",
+            vd(
+                "04fb01baad5f0b8f79b9cd104d12aab9310146add7d6b4c022d87ae6711178b94d618ca7b3af13854b1c588879e877b33600000000208b3f5ad3b3937acc9d606cc5ececab4a701f75ed42957ea4d7858d33f5c26c6ae20a9cccda56996700d6b4",
+                "4d657373616765",
+                "6ac17d71260c79f81a7566124738cb3ee5d0aa690e73a98ae9e766f1336691e500cad51ba1302366c09cc06b8f7049e032ca965d6d7012ec187c7cab9544334d66c2a7658ddefa67e4ad40429815518ecc87b1492ddd57333bd2300b4660a835",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc267",
+            vd(
+                "04fb01baad5f0b8f79b9cd104d12aab9310146add7d6b4c022d87ae6711178b94d618ca7b3af13854b1c588879e877b33600000000208b3f5ad3b3937acc9d606cc5ececab4a701f75ed42957ea4d7858d33f5c26c6ae20a9cccda56996700d6b4",
+                "4d657373616765",
+                "e19a4646f0ed8a271fe86ba533f8be4fd81bbf4674716f668efa89a40cac51eec2a6cfbd92327d25efe91ca4ff712bc54a86b2e8e12378e633dec2691e3b1eed4e932cc48b28e45fa3d464cc0e948c02cc9decf2bb43b25937fcf37e9ad86ef0",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc268",
+            vd(
+                "04fb01baad5f0b8f79b9cd104d12aab9310146add7d6b4c022d87ae6711178b94d618ca7b3af13854b1c588879e877b336ffffffffdf74c0a52c4c6c8533629f933a131354b58fe08a12bd6a815b287a71cc0a3d92951df5633325a96798ff294b",
+                "4d657373616765",
+                "15aac6c0f435cb662d110db5cf686caee53c64fe2d6d600a83ebe505a0e6fc62dc5705160477c47528c8c903fa865b5d7f94ddc01a603f9bec5d10c9f2c89fb23b3ffab6b2b68d0f04336d499085e32d22bf3ab67a49a74c743f72473172b59f",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc269",
+            vd(
+                "04fb01baad5f0b8f79b9cd104d12aab9310146add7d6b4c022d87ae6711178b94d618ca7b3af13854b1c588879e877b336ffffffffdf74c0a52c4c6c8533629f933a131354b58fe08a12bd6a815b287a71cc0a3d92951df5633325a96798ff294b",
+                "4d657373616765",
+                "90b95a7d194b73498fba5afc95c1aea9be073162a9edc57c4d12f459f0a1730baf2f87d7d6624aea7b931ec53370fe47cbc1ef470e666010604c609384b872db7fa7b8a5a9f20fdefd656be2fcc75db53948102f7ab203ea1860a6a32af246a1",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc270",
+            vd(
+                "04fb01baad5f0b8f79b9cd104d12aab9310146add7d6b4c022d87ae6711178b94d618ca7b3af13854b1c588879e877b336ffffffffdf74c0a52c4c6c8533629f933a131354b58fe08a12bd6a815b287a71cc0a3d92951df5633325a96798ff294b",
+                "4d657373616765",
+                "dd4391ce7557cbd005e3d5d727cd264399dcc3c6501e4547505b6d57b40bbf0a7fac794dcc8d4233159dd0aa40d4e0b9a77fa1374fd60aa91600912200fc83c6aa447f8171ecea72ae322df32dccd68951dc5caf6c50380e400e45bf5c0e626b",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc271",
+            vd(
+                "04016d2db67561bc126ad6c344d6eeb2713a9e2892c649af0f015c6b7617f160c8a3b3a88add669d7155025073c5ac5b4f43bf2ed0088af08645c80aa0a24a567a94ba2d794e9689d3ad4b185bc5d2dd008333e2dd2ebb5069a9b32251a3cac71e",
+                "68656c6c6f2c20776f726c64",
+                "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52970",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc272",
+            vd(
+                "043354c45736316411d883a2b6fd4db06eba3f265a91b785483a7ae20762fa3c4c079d07ade93074c25bebe755ba359907acba758be8e3c4e0c2e7b81d31296dc4bb0ce13d3eeac936b016260912c6dc0e98c95b2455bf9f9633d80c5430054663",
+                "68656c6c6f2c20776f726c64",
+                "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52970",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc273",
+            vd(
+                "04016d2db67561bc126ad6c344d6eeb2713a9e2892c649af0f015c6b7617f160c8a3b3a88add669d7155025073c5ac5b4f43bf2ed0088af08645c80aa0a24a567a94ba2d794e9689d3ad4b185bc5d2dd008333e2dd2ebb5069a9b32251a3cac71e",
+                "68656c6c6f2c20776f726c64",
+                "ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52975ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52970",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc274",
+            vd(
+                "041ffc8be6cf440e2649263c7b0c535b5828effcd7403d1e3c0460b5d06e179eb09f4672c299ef0839719f01e3212522136df29eae630caabbfd328c538de8989e651a6192ba52a7117dccb23d822ccc3e1875a39d8c9621676fc67c952ac6e304",
+                "68656c6c6f2c20776f726c64",
+                "ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52971ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52970",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc275",
+            vd(
+                "0401b54a697305092bac2939fb906d7471b411c4eba8654169166a5da3810e1fc96795df921f7abbf519be4a027435176ca19012a3518773d508106d4153adee43c3c384fa62ce36a4addea08f593ec9c76b09a6b9c69d29bd7d47eb48e167dd2f",
+                "68656c6c6f2c20776f726c64",
+                "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52970",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc276",
+            vd(
+                "043c8ea2db06ef48ecd59f8c0e1accb1d0c40b9f5ff4e5af3d326c9c8cb74bc941b8fa489468a607bb04b9817ce039d6099629deac1964857b6d7268fb3ff50330a6dafc2510f557053bf42f11c61cf85ececc95cfa754725a05f5a8184920056a",
+                "68656c6c6f2c20776f726c64",
+                "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52970",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc277",
+            vd(
+                "044e5e4f1a6e97059a6cf2f4e8129e5c7c64cb84f9994a41ff5bf30b29c1bf5ba6898627c91a23c73e05cd1a43c8f908c006a0aed7f1e63a728f87dbd5360a67571a076ab0b4cde81b10d499959814ddb3a8c7854b0bbfa87cc272f90bca2a2254",
+                "68656c6c6f2c20776f726c64",
+                "000000000000000000000000000000000000000000000000389cb27e0bc8d21fa7e5f24cb74f58851313e696333ad68effffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52970",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc278",
+            vd(
+                "04a7d0faaa124302cddcc1f46addca5a4cac48e02387ed0c51c46641a58999f16278255343522467f104bb296670458f817896fa77fb2eb80058b4d86b94a633bc82184843c9b163155e3071c4e1c876f6de2c91444393b22019e4f83a8d34b0d2",
+                "68656c6c6f2c20776f726c64",
+                "000000000000000000000000000000000000000000000000389cb27e0bc8d220a7e5f24db74f58851313e695333ad68fffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52970",
+                false,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc279",
+            vd(
+                "040a2fc2edd21336babc59da04aa566dc9b6b068162f7970e311136883b61be8f894da03cc8e93a64803d4f4f83a19c1b973076220bf4d40aa9a41cacbafbd32d1f0bd183c327153cd6601bfa81d5e2ec21c0ecc517e004dd3fbedeca7f975a9ed",
+                "68656c6c6f2c20776f726c64",
+                "4fd5dd99138e6f1002d2d23591b2f94071a7f5ad49ddb970dc859275bfe51f193470d443e793196901e88bbe749614d7000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000",
+                true,
+            ),
+        )
+    bad = bad +
+        row(
+            "ecdsa_secp384r1_sha384_p1363:tc280",
+            vd(
+                "040a2fc2edd21336babc59da04aa566dc9b6b068162f7970e311136883b61be8f894da03cc8e93a64803d4f4f83a19c1b973076220bf4d40aa9a41cacbafbd32d1f0bd183c327153cd6601bfa81d5e2ec21c0ecc517e004dd3fbedeca7f975a9ed",
+                "68656c6c6f2c20776f726c64",
+                "4fd5dd99138e6f1002d2d23591b2f94071a7f5ad49ddb970dc859275bfe51f193470d443e793196901e88bbe749614d7ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372dde581a0db248b0a77aecec196accc52973",
+                true,
+            ),
+        )
+    if bad > 0 {
+        return 1
+    }
+    0
+}
