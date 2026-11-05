@@ -112,6 +112,9 @@
 
 use std.x.crypto.curve25519
 use std.x.crypto.p256
+use std.x.crypto.p384
+use std.x.crypto.rsa
+use std.x.crypto.sha2
 
 // ---------------------------------------------------------------------
 // Byte helpers — the 0..255 contract, sub-slices, equality. All public
@@ -601,6 +604,7 @@ fn rd_time(b: List[byte], mut r: Rd) -> int ! {der} {
 struct Alg {
     dotted: str,
     raw: List[byte],
+    params: List[byte],
 }
 
 struct NameInfo {
@@ -611,6 +615,7 @@ struct NameInfo {
 struct Spki {
     alg: str,
     key: List[byte],
+    curve: str,
 }
 
 struct Exts {
@@ -621,11 +626,16 @@ struct Exts {
     has_san: bool,
     san: List[str],
     crit_unknown: str,
+    has_eku: bool,
+    eku: List[str],
+    has_nc: bool,
 }
 
 /// AlgorithmIdentifier: SEQUENCE { algorithm OID, parameters ANY
 /// OPTIONAL }. The raw encoding is captured for the §4.1.2.3 equality
-/// check (TBS `signature` must equal the outer `signatureAlgorithm`).
+/// check (TBS `signature` must equal the outer `signatureAlgorithm`),
+/// and the parameters' raw TLV for the algorithms that read them
+/// (RSASSA-PSS's RFC 4055 parameters, an EC key's named curve).
 /// RFC 8410 §3: the Ed25519 identifier MUST have absent parameters —
 /// present parameters (even NULL) reject. Other algorithms' parameters
 /// are carried opaquely (RSA's NULL, ECDSA's named curve).
@@ -641,16 +651,19 @@ fn rd_alg(b: List[byte], mut r: Rd) -> Alg ! {der} {
             return der
         }
     }
+    var params = List[byte]()
     if r.pos < stop {
+        let p_start = r.pos
         let p = rd_tag_len(b, mut r)?
         rd_skip(b, mut r, p.len)
+        params = sub(b, p_start, r.pos)
     }
     if r.pos != stop {
         return der
     }
     r.end = saved
     let raw = sub(b, start, stop)
-    Alg { dotted: dotted, raw: raw }
+    Alg { dotted: dotted, raw: raw, params: params }
 }
 
 /// One AttributeTypeAndValue: SEQUENCE { type OID, value ANY }. The CN
@@ -746,8 +759,9 @@ fn rd_name(b: List[byte], mut r: Rd) -> NameInfo ! {der} {
 
 /// SubjectPublicKeyInfo (§4.1.2.7): SEQUENCE { AlgorithmIdentifier,
 /// subjectPublicKey BIT STRING }. The BIT STRING must have zero unused
-/// bits (every SPKI this profile reads is whole octets), and an
-/// Ed25519 key must be exactly 32 bytes (RFC 8410 §4).
+/// bits (every SPKI this profile reads is whole octets), an Ed25519 key
+/// must be exactly 32 bytes (RFC 8410 §4), and an EC key's named curve
+/// is decoded (RFC 5480 §2.1.1).
 fn rd_spki(b: List[byte], mut r: Rd) -> Spki ! {der} {
     let n = rd_expect(b, mut r, 48)?
     let stop = r.pos + n
@@ -772,7 +786,23 @@ fn rd_spki(b: List[byte], mut r: Rd) -> Spki ! {der} {
         return der
     }
     r.end = saved
-    Spki { alg: alg.dotted, key: key }
+    // RFC 5480 §2.1.1: an id-ecPublicKey's parameters name its curve
+    // (an OID); any other parameter form leaves the curve unnamed, and
+    // validation answers `unsupported_alg` for it.
+    var curve = ""
+    if alg.dotted == "1.2.840.10045.2.1" {
+        if alg.params.len > 0 {
+            if alg.params[0] as int == 6 {
+                let pn = alg.params.len
+                var pr = Rd { pos: 0, end: pn }
+                curve = rd_oid(alg.params, mut pr)?
+                if pr.pos != pn {
+                    return der
+                }
+            }
+        }
+    }
+    Spki { alg: alg.dotted, key: key, curve: curve }
 }
 
 /// basicConstraints (§4.2.1.9): SEQUENCE { cA BOOLEAN DEFAULT FALSE,
@@ -824,6 +854,9 @@ fn parse_bc(bs: List[byte]) -> Exts ! {der} {
         has_san: false,
         san: List[str](),
         crit_unknown: "",
+        has_eku: false,
+        eku: List[str](),
+        has_nc: false,
     }
 }
 
@@ -936,6 +969,27 @@ fn parse_san(bs: List[byte]) -> List[str] ! {der} {
     out
 }
 
+/// extendedKeyUsage (§4.2.1.12): SEQUENCE SIZE (1..MAX) OF KeyPurposeId
+/// (an OID each), decoded to their dotted forms.
+fn parse_eku(bs: List[byte]) -> List[str] ! {der} {
+    let bn0 = bs.len
+    var r = Rd { pos: 0, end: bn0 }
+    let n = rd_expect(bs, mut r, 48)?
+    if n == 0 {
+        return der
+    }
+    let stop = r.pos + n
+    var out = List[str]()
+    while r.pos < stop {
+        let id = rd_oid(bs, mut r)?
+        (mut out).push(id)
+    }
+    if r.pos != bn0 {
+        return der
+    }
+    out
+}
+
 /// The [3] extensions block (§4.1.2.9 + §4.2): a non-empty SEQUENCE OF
 /// Extension `{ extnID OID, critical BOOLEAN DEFAULT FALSE, extnValue
 /// OCTET STRING }`. Enforced here: an explicitly encoded FALSE rejects
@@ -963,6 +1017,9 @@ fn rd_exts(b: List[byte], mut r: Rd) -> Exts ! {der} {
     var has_san = false
     var san = List[str]()
     var crit_unknown = ""
+    var has_eku = false
+    var eku = List[str]()
+    var has_nc = false
     var seen = List[str]()
     while r.pos < stop {
         let en = rd_expect(b, mut r, 48)?
@@ -1009,6 +1066,14 @@ fn rd_exts(b: List[byte], mut r: Rd) -> Exts ! {der} {
         } else if id == "2.5.29.17" {
             san = parse_san(inner)?
             has_san = true
+        } else if id == "2.5.29.37" {
+            eku = parse_eku(inner)?
+            has_eku = true
+        } else if id == "2.5.29.30" {
+            // nameConstraints (§4.2.1.10): recognized so that validation
+            // can refuse it by its own name, never decoded (the named
+            // limit in the module header).
+            has_nc = true
         } else if critical {
             if crit_unknown == "" {
                 crit_unknown = id
@@ -1030,6 +1095,9 @@ fn rd_exts(b: List[byte], mut r: Rd) -> Exts ! {der} {
         has_san: has_san,
         san: san,
         crit_unknown: crit_unknown,
+        has_eku: has_eku,
+        eku: eku,
+        has_nc: has_nc,
     }
 }
 
@@ -1069,6 +1137,11 @@ pub struct Cert {
     crit_unknown: str,
     tbs: List[byte],
     sig: List[byte],
+    sig_params: List[byte],
+    spki_curve: str,
+    has_eku: bool,
+    eku: List[str],
+    has_name_constraints: bool,
 }
 
 /// Parse ONE DER certificate occupying the whole of `bytes` (RFC 5280
@@ -1159,6 +1232,9 @@ pub fn parse(bytes: List[byte]) -> Cert ! {der} {
         has_san: false,
         san: List[str](),
         crit_unknown: "",
+        has_eku: false,
+        eku: List[str](),
+        has_nc: false,
     }
     if r.pos < tbs_stop {
         let peek2 = r.pos
@@ -1220,6 +1296,11 @@ pub fn parse(bytes: List[byte]) -> Cert ! {der} {
         crit_unknown: exts.crit_unknown,
         tbs: tbs,
         sig: sig,
+        sig_params: tbs_alg.params,
+        spki_curve: spki.curve,
+        has_eku: exts.has_eku,
+        eku: exts.eku,
+        has_name_constraints: exts.has_nc,
     }
 }
 
@@ -1356,22 +1437,221 @@ pub fn timestamp(y: int, mo: int, d: int, h: int, mi: int, s: int) -> int {
 }
 
 // ---------------------------------------------------------------------
-// Signature validation (Ed25519, sc18) and chain validation (RFC 5280
-// §6.1, scoped to what Ed25519 chains exercise).
+// The public-PKI algorithm table (sc79): the OIDs validation reads.
+// ---------------------------------------------------------------------
+
+/// The rsaEncryption key OID (RFC 8017 A.1; RFC 3279 §2.3.1): an RSA
+/// subjectPublicKey whose BIT STRING holds the DER RSAPublicKey.
+/// ct: public data.
+pub fn oid_rsa_encryption() -> str {
+    "1.2.840.113549.1.1.1"
+}
+
+/// The prime256v1 (P-256) named-curve OID (RFC 5480 §2.1.1.1).
+/// ct: public data.
+pub fn oid_secp256r1() -> str {
+    "1.2.840.10045.3.1.7"
+}
+
+/// The secp384r1 (P-384) named-curve OID (RFC 5480 §2.1.1.1).
+/// ct: public data.
+pub fn oid_secp384r1() -> str {
+    "1.3.132.0.34"
+}
+
+/// The id-kp-serverAuth key purpose (RFC 5280 §4.2.1.12): the
+/// extendedKeyUsage value a TLS server's certificate must allow.
+/// ct: public data.
+pub fn oid_server_auth() -> str {
+    "1.3.6.1.5.5.7.3.1"
+}
+
+/// The digest size (256, 384, 512) a signature-algorithm or hash OID
+/// names, or 0: sha{256,384,512}WithRSAEncryption (RFC 8017 A.2.4),
+/// ecdsa-with-SHA{256,384,512} (RFC 5758 §3.2), id-sha{256,384,512}
+/// (NIST's hash arc).
+fn hash_bits_of(dotted: str) -> int {
+    if dotted == "1.2.840.113549.1.1.11" {
+        return 256
+    }
+    if dotted == "1.2.840.113549.1.1.12" {
+        return 384
+    }
+    if dotted == "1.2.840.113549.1.1.13" {
+        return 512
+    }
+    if dotted == "1.2.840.10045.4.3.2" {
+        return 256
+    }
+    if dotted == "1.2.840.10045.4.3.3" {
+        return 384
+    }
+    if dotted == "1.2.840.10045.4.3.4" {
+        return 512
+    }
+    if dotted == "2.16.840.1.101.3.4.2.1" {
+        return 256
+    }
+    if dotted == "2.16.840.1.101.3.4.2.2" {
+        return 384
+    }
+    if dotted == "2.16.840.1.101.3.4.2.3" {
+        return 512
+    }
+    0
+}
+
+fn digest_of(bits: int, m: List[byte]) -> List[byte] {
+    if bits == 384 {
+        return sha2.sum384(m)
+    }
+    if bits == 512 {
+        return sha2.sum512(m)
+    }
+    sha2.sum256(m)
+}
+
+/// An RSA public key from an rsaEncryption SPKI's key bytes, under
+/// `std.x.crypto.rsa`'s policy: a malformed RSAPublicKey is `der`; a
+/// modulus under 2048 bits, an even modulus or an exponent outside the
+/// sane range is `weak_key`; a modulus over 4096 bits is
+/// `unsupported_alg` (the bignum's named size).
+fn rsa_key(key: List[byte]) -> rsa.PublicKey ! {der, weak_key, unsupported_alg} {
+    let k = rsa.parse_public_key(key) else |e| match e {
+        der => {
+            return der
+        },
+        small_modulus => {
+            return weak_key
+        },
+        bad_modulus => {
+            return weak_key
+        },
+        bad_exponent => {
+            return weak_key
+        },
+        large_modulus => {
+            return unsupported_alg
+        },
+    }
+    k
+}
+
+/// RSASSA-PSS's AlgorithmIdentifier parameters, as this profile takes
+/// them: the hash (MGF1 over the same hash) and the salt length.
+struct PssParams {
+    hash: int,
+    salt: int,
+}
+
+/// RSASSA-PSS-params (RFC 4055 §3.1, RFC 8017 A.2.3): `SEQUENCE {
+/// [0] hashAlgorithm DEFAULT sha1, [1] maskGenAlgorithm DEFAULT
+/// mgf1SHA1, [2] saltLength DEFAULT 20, [3] trailerField DEFAULT 1 }`.
+/// `der` for a malformed encoding or a trailerField other than 1;
+/// `unsupported_alg` when the hash is not SHA-256, SHA-384 or SHA-512
+/// (SHA-1, the default, included) or the mask is not MGF1 over that
+/// same hash.
+fn pss_params(params: List[byte]) -> PssParams ! {der, unsupported_alg} {
+    let n0 = params.len
+    if n0 == 0 {
+        return der
+    }
+    var r = Rd { pos: 0, end: n0 }
+    let n = rd_expect(params, mut r, 48)?
+    let stop = r.pos + n
+    if stop != n0 {
+        return der
+    }
+    var hash: int = 0
+    var mgf_hash: int = 0
+    var salt: int = 20
+    if r.pos < stop {
+        if params[r.pos] as int == 160 {
+            let _h = rd_expect(params, mut r, 160)?
+            let h_alg = rd_alg(params, mut r)?
+            hash = hash_bits_of(h_alg.dotted)
+        }
+    }
+    if r.pos < stop {
+        if params[r.pos] as int == 161 {
+            let _m = rd_expect(params, mut r, 161)?
+            let m_alg = rd_alg(params, mut r)?
+            if m_alg.dotted != "1.2.840.113549.1.1.8" {
+                return unsupported_alg
+            }
+            let mn = m_alg.params.len
+            var mr = Rd { pos: 0, end: mn }
+            let inner = rd_alg(m_alg.params, mut mr)?
+            if mr.pos != mn {
+                return der
+            }
+            mgf_hash = hash_bits_of(inner.dotted)
+        }
+    }
+    if r.pos < stop {
+        if params[r.pos] as int == 162 {
+            let _s = rd_expect(params, mut r, 162)?
+            salt = rd_small_int(params, mut r)?
+        }
+    }
+    if r.pos < stop {
+        if params[r.pos] as int == 163 {
+            let _t = rd_expect(params, mut r, 163)?
+            let trailer = rd_small_int(params, mut r)?
+            if trailer != 1 {
+                return der
+            }
+        }
+    }
+    if r.pos != stop {
+        return der
+    }
+    if hash == 0 {
+        return unsupported_alg
+    }
+    if mgf_hash != hash {
+        return unsupported_alg
+    }
+    PssParams { hash: hash, salt: salt }
+}
+
+// ---------------------------------------------------------------------
+// Signature validation and path validation (RFC 5280 §6.1, the subset
+// the module header names).
 // ---------------------------------------------------------------------
 
 /// Verify `child`'s signature over its TBSCertificate bytes with
-/// `issuer`'s Ed25519 key. `unsupported_alg` when the child's signature
-/// algorithm or the issuer's key algorithm is anything but Ed25519 —
-/// the NAMED honest rejection, never a silent accept (the header's
-/// scope line). `bad_signature` when the Ed25519 verification fails
-/// (sc18's `verify` also answers false for wrong-length keys or
-/// signatures and non-canonical encodings, so those are `bad_signature`
-/// too). Returns 1 on success (the accept_finished shape).
-/// ct: public data — an Ed25519 VERIFY handles no secret (the sc18
-/// rule); curve25519's own ct: lines govern its internals.
-pub fn verify_signed_by(child: Cert, issuer: Cert) -> int ! {unsupported_alg, bad_signature} {
-    if child.sig_alg == oid_ed25519() {
+/// `issuer`'s key. The table (sc79):
+///
+/// - Ed25519 (RFC 8410) under an Ed25519 key — `curve25519.verify`;
+/// - ecdsa-with-SHA256 under a P-256 key — `p256.verify_der`;
+/// - ecdsa-with-SHA256, -SHA384 or -SHA512 under a P-384 key —
+///   `p384.verify_digest_der` (bits2int over the digest);
+/// - sha256/384/512WithRSAEncryption under an rsaEncryption key —
+///   `rsa.verify_pkcs1`;
+/// - RSASSA-PSS (RFC 4055) under an rsaEncryption key, the hash, MGF1
+///   and salt length from the signature's own parameters —
+///   `rsa.verify_pss`.
+///
+/// `unsupported_alg` for every other pairing — the NAMED honest
+/// rejection, never a silent accept: SHA-1 signatures, P-256 with a
+/// digest other than SHA-256, P-521, Ed448, an RSASSA-PSS key, a
+/// signature algorithm whose key type does not match the issuer's.
+/// `bad_signature` when the verification itself fails (each verifier
+/// also answers false for a malformed key point or signature encoding).
+/// `weak_key` and `der` from the issuer's RSA key (`rsa_key`), `der` and
+/// `unsupported_alg` from malformed or unsupported PSS parameters.
+/// Returns 1 on success (the accept_finished shape).
+/// ct: public data — a VERIFY handles no secret (the sc18 rule); the
+/// verifiers' own ct: lines govern their internals.
+pub fn verify_signed_by(child: Cert, issuer: Cert) -> int ! {
+    der,
+    unsupported_alg,
+    bad_signature,
+    weak_key,
+} {
+    let sa = child.sig_alg
+    if sa == oid_ed25519() {
         if issuer.spki_alg != oid_ed25519() {
             return unsupported_alg
         }
@@ -1380,22 +1660,54 @@ pub fn verify_signed_by(child: Cert, issuer: Cert) -> int ! {unsupported_alg, ba
         }
         return 1
     }
-    if child.sig_alg == oid_ecdsa_sha256() {
+    if sa.starts_with("1.2.840.10045.4.3.") {
+        let hb = hash_bits_of(sa)
+        if hb == 0 {
+            return unsupported_alg
+        }
         if issuer.spki_alg != oid_ec_public_key() {
             return unsupported_alg
         }
-        // A P-256 uncompressed point is 65 bytes; any other length is a
-        // curve this rung does not validate (P-384/P-521 are their own
-        // rungs, `unsupported_alg`). p256.verify_der SHA-256's the TBS,
-        // parses the DER (r, s) strictly, and — SEC1 §3.2.2 — refuses a
-        // key that is not a point on P-256 (a false `bad_signature`, not
-        // a false accept: the invalid-curve class the on-curve check
-        // closes). sc23 makes this a real verification; RSA stays
-        // `unsupported_alg` (its own rung).
-        if issuer.spki_key.len != 65 {
+        if issuer.spki_curve == oid_secp256r1() {
+            // p256's surface hashes with SHA-256 itself; a P-256 key
+            // under a longer digest is a pairing this rung names.
+            if hb != 256 {
+                return unsupported_alg
+            }
+            if !p256.verify_der(issuer.spki_key, child.tbs, child.sig) {
+                return bad_signature
+            }
+            return 1
+        }
+        if issuer.spki_curve == oid_secp384r1() {
+            if !p384.verify_digest_der(issuer.spki_key, digest_of(hb, child.tbs), child.sig) {
+                return bad_signature
+            }
+            return 1
+        }
+        return unsupported_alg
+    }
+    if sa == "1.2.840.113549.1.1.10" {
+        let pp = pss_params(child.sig_params)?
+        if issuer.spki_alg != oid_rsa_encryption() {
             return unsupported_alg
         }
-        if !p256.verify_der(issuer.spki_key, child.tbs, child.sig) {
+        let key = rsa_key(issuer.spki_key)?
+        if !rsa.verify_pss(key, pp.hash, child.tbs, child.sig, pp.salt) {
+            return bad_signature
+        }
+        return 1
+    }
+    if sa.starts_with("1.2.840.113549.1.1.") {
+        let hb = hash_bits_of(sa)
+        if hb == 0 {
+            return unsupported_alg
+        }
+        if issuer.spki_alg != oid_rsa_encryption() {
+            return unsupported_alg
+        }
+        let key = rsa_key(issuer.spki_key)?
+        if !rsa.verify_pkcs1(key, hb, child.tbs, child.sig) {
             return bad_signature
         }
         return 1
@@ -1448,17 +1760,126 @@ fn check_issuer_at(c: Cert, below: int) -> int ! {not_ca} {
     1
 }
 
+/// Whether an extendedKeyUsage list allows TLS server authentication:
+/// id-kp-serverAuth, or anyExtendedKeyUsage (2.5.29.37.0).
+fn eku_allows_server(eku: List[str]) -> bool {
+    var ok = false
+    for id in eku {
+        if id == oid_server_auth() {
+            ok = true
+        }
+        if id == "2.5.29.37.0" {
+            ok = true
+        }
+    }
+    ok
+}
+
+/// The leaf's purpose: a present keyUsage must assert digitalSignature
+/// (RFC 8446 §4.4.2.2 — the key signs CertificateVerify), and a present
+/// extendedKeyUsage must allow serverAuth (RFC 5280 §4.2.1.12).
+fn check_leaf_usage(c: Cert) -> int ! {bad_usage} {
+    if c.key_usage >= 0 {
+        if c.key_usage % 2 != 1 {
+            return bad_usage
+        }
+    }
+    if c.has_eku {
+        if !eku_allows_server(c.eku) {
+            return bad_usage
+        }
+    }
+    1
+}
+
+/// An issuer's purpose: a present extendedKeyUsage must allow serverAuth
+/// (the EKU-chaining reading: a CA restricted to other purposes does
+/// not issue TLS servers).
+fn check_ca_usage(c: Cert) -> int ! {bad_usage} {
+    if c.has_eku {
+        if !eku_allows_server(c.eku) {
+            return bad_usage
+        }
+    }
+    1
+}
+
+/// nameConstraints are refused by name wherever they appear in a path:
+/// this module does not evaluate them (the named limit in the header),
+/// and a constraint it cannot evaluate must not be ignored.
+fn check_constraints(c: Cert) -> int ! {name_constraints} {
+    if c.has_name_constraints {
+        return name_constraints
+    }
+    1
+}
+
+/// Every RSA key in a path is held to `std.x.crypto.rsa`'s policy.
+fn check_key(c: Cert) -> int ! {der, weak_key, unsupported_alg} {
+    if c.spki_alg == oid_rsa_encryption() {
+        let _k = rsa_key(c.spki_key)?
+    }
+    1
+}
+
+/// RFC 9525 §6.3 dNSName matching (DNS names compare case-insensitively;
+/// both sides are lowered). A pattern without `*` matches exactly. A
+/// wildcard matches only as the COMPLETE left-most label of a pattern
+/// with at least two labels after it (`*.example.com`): it stands for
+/// exactly one non-empty label of the host. Every other `*` (a partial
+/// label `w*.example.com`, a wildcard below the left-most label, a bare
+/// `*` or `*.com`) matches nothing — the rule fails CLOSED.
+/// ct: public data.
+///
+/// ```wolf-doc-example
+/// cert.san_matches("*.example.com", "www.example.com") == true
+/// cert.san_matches("*.example.com", "a.b.example.com") == false
+/// cert.san_matches("*.example.com", "example.com") == false
+/// cert.san_matches("w*.example.com", "www.example.com") == false
+/// cert.san_matches("Example.COM", "example.com") == true
+/// ```
+pub fn san_matches(pattern: str, host: str) -> bool {
+    if pattern == "" {
+        return false
+    }
+    if host == "" {
+        return false
+    }
+    let p = pattern.lower()
+    let h = host.lower()
+    if !p.contains("*") {
+        return p == h
+    }
+    if !p.starts_with("*.") {
+        return false
+    }
+    let rest = p[2..p.len]
+    if rest.contains("*") {
+        return false
+    }
+    if !rest.contains(".") {
+        return false
+    }
+    let dot = h.find(".") else {
+        return false
+    }
+    if dot == 0 {
+        return false
+    }
+    h[dot + 1..h.len] == rest
+}
+
 /// The leaf's hostname judgement: the target `hostname` must match a
-/// dNSName in the leaf's subjectAltName (exact, case-insensitive —
-/// `host_matches`). A leaf with NO SAN never matches (the CN fallback
-/// is deprecated and deliberately not implemented — named residue).
+/// dNSName in the leaf's subjectAltName under `san_matches` (RFC 9525).
+/// A leaf with NO SAN never matches (the CN fallback is deprecated and
+/// deliberately not implemented — named residue).
 fn check_hostname(c: Cert, hostname: str) -> int ! {name_mismatch} {
     if !c.has_san {
         return name_mismatch
     }
     var matched = false
     for n in c.san {
-        if host_matches(n, hostname) {
+        if san_matches(n, hostname) {
             matched = true
         }
     }
@@ -1468,30 +1889,271 @@ fn check_hostname(c: Cert, hostname: str) -> int ! {name_mismatch} {
     1
 }
 
-/// THE ws05 SEAM (frozen — the module header's contract): validate the
-/// peer's certificate chain against a trust anchor, a target hostname
-/// and a SUPPLIED time, returning the parsed LEAF on success.
+/// Append `c` parsed from `der_bytes` to `out`, or nothing when this
+/// profile cannot parse it (a root store may hold certificates outside
+/// the profile; they are skipped, never fatal).
+fn push_parsed(mut out: List[Cert], der_bytes: List[byte]) {
+    let c = parse(der_bytes) else |_| {
+        return
+    }
+    (mut out).push(c)
+}
+
+/// One link of a path: may `parent` issue `child` with `below`
+/// intermediates beneath it? The checks in order — the parent's
+/// critical extensions and validity, its authority (basicConstraints,
+/// keyCertSign, pathLenConstraint), its extendedKeyUsage, name
+/// constraints, its key, then the signature — each answered as a code:
+/// 0 links; 1 der, 2 unsupported_alg, 3 bad_signature, 4 expired,
+/// 5 not_yet_valid, 6 not_ca, 7 unknown_critical, 8 weak_key,
+/// 9 bad_usage, 10 name_constraints.
+fn link(child: Cert, parent: Cert, below: int, now: int) -> int {
+    let _a = check_cert_at(parent, now) else |e| match e {
+        expired => {
+            return 4
+        },
+        not_yet_valid => {
+            return 5
+        },
+        unknown_critical => {
+            return 7
+        },
+    }
+    let _b = check_issuer_at(parent, below) else |_| {
+        return 6
+    }
+    let _c = check_ca_usage(parent) else |_| {
+        return 9
+    }
+    let _d = check_constraints(parent) else |_| {
+        return 10
+    }
+    let _e = check_key(parent) else |e| match e {
+        der => {
+            return 1
+        },
+        weak_key => {
+            return 8
+        },
+        unsupported_alg => {
+            return 2
+        },
+    }
+    let _f = verify_signed_by(child, parent) else |e| match e {
+        der => {
+            return 1
+        },
+        unsupported_alg => {
+            return 2
+        },
+        bad_signature => {
+            return 3
+        },
+        weak_key => {
+            return 8
+        },
+    }
+    0
+}
+
+/// The row a link code names; 0 (no link was ever attempted) is
+/// `issuer_mismatch` — no candidate issuer carried the child's issuer
+/// name.
+fn refuse(code: int) -> int ! {
+    der,
+    unsupported_alg,
+    bad_signature,
+    expired,
+    not_yet_valid,
+    not_ca,
+    issuer_mismatch,
+    unknown_critical,
+    weak_key,
+    bad_usage,
+    name_constraints,
+} {
+    if code == 1 {
+        return der
+    }
+    if code == 2 {
+        return unsupported_alg
+    }
+    if code == 3 {
+        return bad_signature
+    }
+    if code == 4 {
+        return expired
+    }
+    if code == 5 {
+        return not_yet_valid
+    }
+    if code == 6 {
+        return not_ca
+    }
+    if code == 7 {
+        return unknown_critical
+    }
+    if code == 8 {
+        return weak_key
+    }
+    if code == 9 {
+        return bad_usage
+    }
+    if code == 10 {
+        return name_constraints
+    }
+    issuer_mismatch
+}
+
+/// Whether index `i` is among the first `depth` entries of the path.
+fn on_path(path: List[int], depth: int, i: int) -> bool {
+    var hit = false
+    var k: int = 0
+    while k < depth {
+        if path[k] == i {
+            hit = true
+        }
+        k = k + 1
+    }
+    hit
+}
+
+/// PATH VALIDATION against a root set (sc79, RFC 5280 §6.1 in the subset
+/// the module header names): build a path from the peer's leaf to one of
+/// the caller's roots and validate it at the SUPPLIED time, returning
+/// the parsed LEAF.
 ///
-/// `chain` is concatenated DER, LEAF FIRST (sc21's certificate_list
-/// cert_data entries joined; a single leaf is the common case).
-/// `anchor` is the trust anchor's DER (the pinned Ed25519 CA) — the
-/// chain may or may not include it; a self-signed tail chains to it
-/// either way. `now` is `timestamp(...)`-shaped UTC.
+/// `chain` is the peer's certificates as concatenated DER, LEAF FIRST
+/// (the TLS Certificate message's entries joined); the rest may arrive
+/// in any order and may include certificates the path does not use.
+/// `roots` is the caller's trust store as concatenated DER (a
+/// distribution's bundle converted to DER is the intended input); a
+/// root this profile cannot parse is skipped. `now` is
+/// `timestamp(...)`-shaped UTC. No clock is read and no file is opened.
 ///
-/// Checks, in order, each a NAMED rejection (RFC 5280 §6.1 scoped to
-/// what Ed25519 chains exercise): the encodings (`der`), every
-/// certificate's critical-extension discipline (`unknown_critical`) and
-/// validity window against `now` (`not_yet_valid`/`expired`), the
-/// leaf's SAN against `hostname` (`name_mismatch`), each link's
-/// issuer/subject name chaining by exact DER Name bytes
-/// (`issuer_mismatch`), each issuer's authority — basicConstraints cA,
-/// keyCertSign, pathLenConstraint (`not_ca`) — and each link's Ed25519
-/// signature (`bad_signature`; `unsupported_alg` for any signature or
-/// key algorithm outside the ladder, the honest scope line). The
-/// cheap structural checks run BEFORE any signature so a chain that
-/// fails on names or dates never pays a scalar multiplication.
-/// Revocation (CRL/OCSP) is NAMED RESIDUE: nothing here consults
-/// revocation state, and the header says so.
+/// The leaf first: `der` (any certificate of `chain` malformed), then
+/// `unknown_critical`, `not_yet_valid`, `expired`, `name_mismatch`
+/// (RFC 9525 against its SAN), `bad_usage` (keyUsage without
+/// digitalSignature, extendedKeyUsage without serverAuth),
+/// `name_constraints`, and its key (`weak_key` for an RSA key under
+/// 2048 bits). Then the path, depth-first with backtracking: at each
+/// step the roots whose subject is the current certificate's issuer are
+/// tried before the peer's other certificates, each candidate judged by
+/// `link` (validity, `not_ca`, `bad_usage`, `name_constraints`,
+/// `weak_key`, then the signature: `bad_signature`, `unsupported_alg`).
+/// A root that links ends the path. Bounds: at most eight certificates
+/// in a path and sixteen link attempts in all. When no path exists the
+/// answer is the FIRST link refusal met, or `issuer_mismatch` when no
+/// candidate ever carried the right name. Revocation (CRL/OCSP) is NAMED
+/// RESIDUE: nothing here consults revocation state.
+/// ct: public data throughout (certificates carry no secret).
+pub fn validate_path(chain: List[byte], hostname: str, roots: List[byte], now: int) -> Cert ! {
+    der,
+    unsupported_alg,
+    bad_signature,
+    expired,
+    not_yet_valid,
+    name_mismatch,
+    not_ca,
+    issuer_mismatch,
+    unknown_critical,
+    weak_key,
+    bad_usage,
+    name_constraints,
+} {
+    if chain.len == 0 {
+        return der
+    }
+    var certs = List[Cert]()
+    var pos: int = 0
+    while pos < chain.len {
+        let stop = cert_end(chain, pos)?
+        let c = parse(sub(chain, pos, stop))?
+        (mut certs).push(c)
+        pos = stop
+    }
+    var anchors = List[Cert]()
+    var rpos: int = 0
+    while rpos < roots.len {
+        let rstop = cert_end(roots, rpos)?
+        push_parsed(mut anchors, sub(roots, rpos, rstop))
+        rpos = rstop
+    }
+    let leaf_stop = cert_end(chain, 0)?
+    let leaf = parse(sub(chain, 0, leaf_stop))?
+    check_cert_at(leaf, now)?
+    check_hostname(leaf, hostname)?
+    check_leaf_usage(leaf)?
+    check_constraints(leaf)?
+    check_key(leaf)?
+    let nr = anchors.len
+    let nc = certs.len
+    // The path as indices into `certs` (the leaf at 0), and for each
+    // depth the next candidate to try: 0..nr-1 are the roots, nr.. are
+    // certs[1..]. At most eight certificates deep.
+    var path = List[int]()
+    var cursor = List[int]()
+    var z: int = 0
+    while z < 8 {
+        (mut path).push(0)
+        (mut cursor).push(0)
+        z = z + 1
+    }
+    var depth: int = 1
+    var tries: int = 0
+    var first: int = 0
+    while depth > 0 {
+        let d = depth - 1
+        let ci = path[d]
+        let cand = cursor[d]
+        if cand >= nr + nc - 1 {
+            depth = depth - 1
+        } else if tries >= 16 {
+            depth = depth - 1
+        } else {
+            cursor[d] = cand + 1
+            if cand < nr {
+                if bytes_eq(certs[ci].issuer, anchors[cand].subject) {
+                    tries = tries + 1
+                    let got = link(certs[ci], anchors[cand], d, now)
+                    if got == 0 {
+                        return leaf
+                    }
+                    if first == 0 {
+                        first = got
+                    }
+                }
+            } else {
+                let ii = cand - nr + 1
+                if depth < 8 {
+                    if !on_path(path, depth, ii) {
+                        if bytes_eq(certs[ci].issuer, certs[ii].subject) {
+                            tries = tries + 1
+                            let got = link(certs[ci], certs[ii], d, now)
+                            if got == 0 {
+                                path[depth] = ii
+                                cursor[depth] = 0
+                                depth = depth + 1
+                            } else if first == 0 {
+                                first = got
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let _never = refuse(first)?
+    issuer_mismatch
+}
+
+/// THE ws05 SEAM (frozen in shape since sc22): validate the peer's
+/// chain against ONE trust anchor — `validate_path` with a root set of
+/// exactly `anchor`, so it builds, judges and refuses exactly as that
+/// function does (sc79 widened what it accepts: RSA, RSA-PSS and P-384
+/// signatures, RFC 9525 wildcards; and what it refuses by name:
+/// `weak_key`, `bad_usage`, `name_constraints`). A malformed `anchor`
+/// is `der`, as it always was.
 /// ct: public data throughout (certificates carry no secret).
 pub fn validate_chain(chain: List[byte], hostname: str, anchor: List[byte], now: int) -> Cert ! {
     der,
@@ -1503,37 +2165,12 @@ pub fn validate_chain(chain: List[byte], hostname: str, anchor: List[byte], now:
     not_ca,
     issuer_mismatch,
     unknown_critical,
+    weak_key,
+    bad_usage,
+    name_constraints,
 } {
-    if chain.len == 0 {
-        return der
-    }
-    let anchor_cert = parse(anchor)?
-    check_cert_at(anchor_cert, now)?
-    let leaf_stop = cert_end(chain, 0)?
-    let leaf = parse(sub(chain, 0, leaf_stop))?
-    check_cert_at(leaf, now)?
-    check_hostname(leaf, hostname)?
-    var child = parse(sub(chain, 0, leaf_stop))?
-    var pos = leaf_stop
-    var below = 0
-    while pos < chain.len {
-        let nxt = cert_end(chain, pos)?
-        let parent = parse(sub(chain, pos, nxt))?
-        check_cert_at(parent, now)?
-        if !bytes_eq(child.issuer, parent.subject) {
-            return issuer_mismatch
-        }
-        check_issuer_at(parent, below)?
-        verify_signed_by(child, parent)?
-        child = parent
-        below = below + 1
-        pos = nxt
-    }
-    if !bytes_eq(child.issuer, anchor_cert.subject) {
-        return issuer_mismatch
-    }
-    check_issuer_at(anchor_cert, below)?
-    verify_signed_by(child, anchor_cert)?
+    let _anchor = parse(anchor)?
+    let leaf = validate_path(chain, hostname, anchor, now)?
     leaf
 }
 
