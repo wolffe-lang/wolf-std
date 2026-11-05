@@ -1,0 +1,906 @@
+//! member: true
+//!
+//! std.x.crypto.rsa — RSA signature VERIFICATION (RFC 8017, PKCS #1
+//! v2.2): RSASSA-PKCS1-v1_5 (§8.2.2) and RSASSA-PSS with MGF1 (§8.1.2,
+//! §9.1.2, B.2.1), over SHA-256, SHA-384 and SHA-512. Stability tier: x
+//! — the D53 crypto ladder's RSA rung (sprint sc79, wolf-std#101), the
+//! algorithm most of the public PKI still signs with: X.509 certificate
+//! signatures (PKCS#1 v1.5 and PSS) and TLS 1.3's `rsa_pss_rsae_*`
+//! CertificateVerify.
+//!
+//! **The nursery banner (D31).** `std.x.crypto.rsa` is not `std.crypto`:
+//! its path, names and behaviour may change or vanish in one sprint; no
+//! other std module may depend on it. Its reason and graduation trigger
+//! live in `std/x/README.md`. The digests are `std.x.crypto.sha2`'s,
+//! called through the module boundary — a resident-on-resident edge the
+//! graduation move must resolve (named beside curve25519's and p256's).
+//!
+//! **Verify only.** No signing, no key generation, no encryption or
+//! decryption: nothing in this module ever holds a private key.
+//!
+//! ## Public-key work: no constant-time obligation
+//!
+//! Every input here is public — a public key, a message, a signature —
+//! so no branch or memory access protects a secret, and this module
+//! carries no constant-time obligation (the sc18 verify-is-public rule).
+//! The modular exponentiation branches on the exponent's bits and the
+//! comparisons exit early; both are public. It is stated here, and on
+//! each `pub` fn, so that a later signing rung cannot inherit this
+//! bignum by assumption: signing needs its own constant-time design.
+//!
+//! ## The key policy (refusals by name)
+//!
+//! `public_key` and `parse_public_key` refuse, each by its own tag:
+//! `small_modulus` (n under 2048 bits), `large_modulus` (n over 4096
+//! bits: the bignum is sized for 2048–4096, and the bound keeps a
+//! hostile key from buying unbounded work), `bad_modulus` (an even n),
+//! `bad_exponent` (e even, e < 3, e ≥ n, or e ≥ 2^256 — RFC 8017 §3.1's
+//! range with FIPS 186-5's upper bound), and, for the DER form, `der`
+//! (an RSAPublicKey that is not strict X.690 DER: indefinite or
+//! non-minimal lengths, a negative or non-minimal INTEGER, trailing
+//! bytes). The verifiers re-check the policy on every call, because
+//! this pin has no private fields and a `PublicKey` can be forged: a key
+//! outside the policy verifies nothing.
+//!
+//! ## The two schemes, exactly as RFC 8017 writes them
+//!
+//! `verify_pkcs1` is RSASSA-PKCS1-V1_5-VERIFY: RSAVP1, then the
+//! ENCODE-AND-COMPARE of §8.2.2 steps 3–4 — the expected encoding
+//! `0x00 0x01 PS 0x00 T` is built from the message and compared octet
+//! for octet, with `T` the DER DigestInfo whose algorithm parameters
+//! are NULL (§9.2 Note 1). No ASN.1 is parsed out of a signature, so
+//! the BER-padding and garbage-in-DigestInfo forgery classes have
+//! nothing to hide in; a DigestInfo without the NULL is rejected.
+//! `verify_pss` is RSASSA-PSS-VERIFY with emBits = modBits − 1, MGF1
+//! over the message hash, and the salt length the caller names (TLS
+//! 1.3's `rsa_pss_rsae_*` require the digest length, RFC 8446 §4.2.3).
+//!
+//! ## The bignum
+//!
+//! Little-endian limbs of 24 bits in checked `int`s, so every product
+//! is under 2^48 and every accumulator under 2^50 (X3's checked
+//! arithmetic enforces the bound at each operation). Multiplication is
+//! Montgomery's (CIOS, R = 2^(24k) for k limbs); R² mod n is built by
+//! doubling 2^(L+t) mod n, where L = 24k = t·2^s with t odd, and then
+//! squaring it s times in the Montgomery domain. The exponentiation is
+//! left-to-right square-and-multiply over e's bits: 19 Montgomery
+//! multiplications for e = 65537.
+//!
+//! Byte sequences are `List[byte]`, big-endian (RFC 8017's I2OSP and
+//! OS2IP). `to_hex` is this module's own rendering (the ladder
+//! precedent).
+
+use std.x.crypto.sha2
+
+// ---------------------------------------------------------------------
+// The key, the policy, and the DER form (RFC 8017 §3.1, A.1.1).
+// ---------------------------------------------------------------------
+
+/// An RSA public key (RFC 8017 §3.1): the modulus n and the public
+/// exponent e as minimal big-endian bytes, and n's length in bits. Made
+/// by `public_key` or `parse_public_key`, which enforce the policy in
+/// the module header; every verifier checks it again, so a forged key
+/// answers false rather than trapping.
+/// ct: public data.
+pub struct PublicKey {
+    modulus: List[byte],
+    exponent: List[byte],
+    bits: int,
+}
+
+/// The SHA-256 selector for `verify_pkcs1` and `verify_pss`: its digest
+/// size in bits. ct: public.
+///
+/// ```wolf-doc-example
+/// rsa.hash_sha256() == 256
+/// ```
+pub fn hash_sha256() -> int {
+    256
+}
+
+/// The SHA-384 selector. ct: public.
+///
+/// ```wolf-doc-example
+/// rsa.hash_sha384() == 384
+/// ```
+pub fn hash_sha384() -> int {
+    384
+}
+
+/// The SHA-512 selector. ct: public.
+///
+/// ```wolf-doc-example
+/// rsa.hash_sha512() == 512
+/// ```
+pub fn hash_sha512() -> int {
+    512
+}
+
+/// `b` without its leading zero octets.
+fn strip(b: List[byte]) -> List[byte] {
+    var out = List[byte]()
+    var seen = false
+    for v in b {
+        if v as int != 0 {
+            seen = true
+        }
+        if seen {
+            (mut out).push(v)
+        }
+    }
+    out
+}
+
+/// 2^k for 0 <= k < 63.
+fn pow2(k: int) -> int {
+    var v: int = 1
+    var i: int = 0
+    while i < k {
+        v = v * 2
+        i = i + 1
+    }
+    v
+}
+
+/// The bit length of a minimal big-endian integer.
+fn bit_len(b: List[byte]) -> int {
+    if b.len == 0 {
+        return 0
+    }
+    var top: int = b[0] as int
+    var n: int = 0
+    while top > 0 {
+        n = n + 1
+        top = top / 2
+    }
+    (b.len - 1) * 8 + n
+}
+
+/// Compare two minimal big-endian integers: -1, 0 or 1.
+fn be_cmp(a: List[byte], b: List[byte]) -> int {
+    if a.len < b.len {
+        return 0 - 1
+    }
+    if a.len > b.len {
+        return 1
+    }
+    var i: int = 0
+    while i < a.len {
+        let x = a[i] as int
+        let y = b[i] as int
+        if x < y {
+            return 0 - 1
+        }
+        if x > y {
+            return 1
+        }
+        i = i + 1
+    }
+    0
+}
+
+/// An RSA public key from its modulus and exponent as big-endian bytes
+/// (leading zero octets allowed and dropped), under the module's policy.
+///
+/// Rows: `small_modulus` — n is under 2048 bits; `large_modulus` — n is
+/// over 4096 bits; `bad_modulus` — n is even; `bad_exponent` — e is
+/// even, below 3, at least n, or at least 2^256. Never traps.
+/// ct: public data.
+///
+/// Example (prose — a fenced example cannot carry a 2048-bit modulus on
+/// one line): `rsa.public_key(n, e)` answers the key for a 2048-bit odd
+/// n and e = 65537, and `small_modulus` for a 1024-bit n;
+/// `tests/x/crypto/rsa/key_policy_rows.lu` holds every refusal.
+pub fn public_key(modulus: List[byte], exponent: List[byte]) -> PublicKey ! {
+    small_modulus,
+    large_modulus,
+    bad_modulus,
+    bad_exponent,
+} {
+    let n = strip(modulus)
+    let e = strip(exponent)
+    let bits = bit_len(n)
+    if bits < 2048 {
+        return small_modulus
+    }
+    if bits > 4096 {
+        return large_modulus
+    }
+    if n[n.len - 1] as int % 2 == 0 {
+        return bad_modulus
+    }
+    if e.len == 0 {
+        return bad_exponent
+    }
+    if e[e.len - 1] as int % 2 == 0 {
+        return bad_exponent
+    }
+    if e.len == 1 {
+        if e[0] as int < 3 {
+            return bad_exponent
+        }
+    }
+    if e.len > 32 {
+        return bad_exponent
+    }
+    if be_cmp(e, n) >= 0 {
+        return bad_exponent
+    }
+    PublicKey { modulus: n, exponent: e, bits: bits }
+}
+
+/// A DER element's content: where it starts and how long it is.
+struct Span {
+    at: int,
+    len: int,
+}
+
+/// The TLV at `at` (inside `[at, end)`), which must carry the exact
+/// identifier octet `tag`: a definite length in its shortest form, at
+/// most two length octets (no RSAPublicKey needs more), not past `end`.
+fn der_tlv(b: List[byte], at: int, end: int, tag: int) -> Span ! {der} {
+    if at + 2 > end {
+        return der
+    }
+    if b[at] as int != tag {
+        return der
+    }
+    let first = b[at + 1] as int
+    var body: int = at + 2
+    var n: int = 0
+    if first < 128 {
+        n = first
+    } else {
+        let k = first - 128
+        if k < 1 {
+            return der
+        }
+        if k > 2 {
+            return der
+        }
+        if body + k > end {
+            return der
+        }
+        if b[body] as int == 0 {
+            return der
+        }
+        var i: int = 0
+        while i < k {
+            n = n * 256 + b[body + i] as int
+            i = i + 1
+        }
+        if n < 128 {
+            return der
+        }
+        body = body + k
+    }
+    if n > end - body {
+        return der
+    }
+    Span { at: body, len: n }
+}
+
+/// A non-negative INTEGER's magnitude (X.690 §8.3): non-empty, the
+/// sign bit clear, no redundant leading zero octet.
+fn der_uint(b: List[byte], sp: Span) -> List[byte] ! {der} {
+    if sp.len == 0 {
+        return der
+    }
+    let b0 = b[sp.at] as int
+    if b0 >= 128 {
+        return der
+    }
+    if sp.len > 1 {
+        if b0 == 0 {
+            if b[sp.at + 1] as int < 128 {
+                return der
+            }
+        }
+    }
+    b[sp.at..sp.at + sp.len]
+}
+
+/// An RSA public key from its DER `RSAPublicKey` (RFC 8017 A.1.1:
+/// `SEQUENCE { modulus INTEGER, publicExponent INTEGER }`) — the
+/// content of an X.509 rsaEncryption SubjectPublicKeyInfo's BIT STRING.
+///
+/// Rows: `der` — not exactly one strict-DER SEQUENCE of two non-negative
+/// minimal INTEGERs; then `public_key`'s four refusals. Never traps.
+/// ct: public data.
+pub fn parse_public_key(der_bytes: List[byte]) -> PublicKey ! {
+    der,
+    small_modulus,
+    large_modulus,
+    bad_modulus,
+    bad_exponent,
+} {
+    let total = der_bytes.len
+    let top = der_tlv(der_bytes, 0, total, 48)?
+    let stop = top.at + top.len
+    if stop != total {
+        return der
+    }
+    let ns = der_tlv(der_bytes, top.at, stop, 2)?
+    let n = der_uint(der_bytes, ns)?
+    let es = der_tlv(der_bytes, ns.at + ns.len, stop, 2)?
+    let e = der_uint(der_bytes, es)?
+    if es.at + es.len != stop {
+        return der
+    }
+    let key = public_key(n, e)?
+    key
+}
+
+// ---------------------------------------------------------------------
+// The bignum: 24-bit limbs, Montgomery multiplication (CIOS).
+// ---------------------------------------------------------------------
+
+/// The first `k` limbs of the big-endian integer `b` (b's value must be
+/// below 2^(24k); every caller sizes k from the modulus).
+fn limbs_from_be(b: List[byte], k: int) -> List[int] {
+    var out = List[int]()
+    var i: int = 0
+    while i < k {
+        var v: int = 0
+        var j: int = 2
+        while j >= 0 {
+            let p = b.len - 1 - 3 * i - j
+            v = v * 256
+            if p >= 0 {
+                v = v + b[p] as int
+            }
+            j = j - 1
+        }
+        (mut out).push(v)
+        i = i + 1
+    }
+    out
+}
+
+/// The integer in limbs `x` as exactly `nbytes` big-endian octets (the
+/// high octets beyond x's limbs are zero).
+fn limbs_to_be(x: List[int], nbytes: int) -> List[byte] {
+    var out = List[byte]()
+    var q: int = 0
+    while q < nbytes {
+        let idx = nbytes - 1 - q
+        let limb = idx / 3
+        let sh = idx % 3
+        var v: int = 0
+        if limb < x.len {
+            v = x[limb]
+            if sh >= 1 {
+                v = v / 256
+            }
+            if sh >= 2 {
+                v = v / 256
+            }
+            v = v % 256
+        }
+        (mut out).push(v as byte)
+        q = q + 1
+    }
+    out
+}
+
+/// Compare the first `k` limbs of `a` and `b`: -1, 0 or 1.
+fn cmp_limbs(a: List[int], b: List[int], k: int) -> int {
+    var j: int = k - 1
+    while j >= 0 {
+        if a[j] < b[j] {
+            return 0 - 1
+        }
+        if a[j] > b[j] {
+            return 1
+        }
+        j = j - 1
+    }
+    0
+}
+
+/// `t` (k limbs plus an overflow limb t[k]) reduced by one conditional
+/// subtraction of n: the caller guarantees t < 2n.
+fn cond_sub(t: List[int], n: List[int], k: int) -> List[int] {
+    var ge = t[k] > 0
+    if !ge {
+        ge = cmp_limbs(t, n, k) >= 0
+    }
+    var out = List[int]()
+    var j: int = 0
+    if ge {
+        var bw: int = 0
+        while j < k {
+            var v: int = t[j] - n[j] - bw
+            bw = 0
+            if v < 0 {
+                v = v + 16777216
+                bw = 1
+            }
+            (mut out).push(v)
+            j = j + 1
+        }
+    } else {
+        while j < k {
+            (mut out).push(t[j])
+            j = j + 1
+        }
+    }
+    out
+}
+
+/// -n0^-1 mod 2^24 for an odd low limb n0 — Newton's iteration
+/// x <- x(2 - n0 x), from x = n0 (correct to three bits for an odd n0),
+/// doubling the correct bits each round.
+fn n0_inv(n0: int) -> int {
+    var x: int = n0
+    var r: int = 0
+    while r < 4 {
+        let t = n0 * x % 16777216
+        let u = (2 - t + 16777216) % 16777216
+        x = x * u % 16777216
+        r = r + 1
+    }
+    (16777216 - x) % 16777216
+}
+
+/// Montgomery multiplication a·b·R^-1 mod n (CIOS, base 2^24, R =
+/// 2^(24k)): for a, b < n the answer is < n. The largest intermediate is
+/// a limb plus a 48-bit product plus a 25-bit carry, under 2^50.
+fn mont_mul(a: List[int], b: List[int], n: List[int], n0i: int, k: int) -> List[int] {
+    var t = List[int]()
+    var i: int = 0
+    while i < k + 2 {
+        (mut t).push(0)
+        i = i + 1
+    }
+    i = 0
+    while i < k {
+        let ai = a[i]
+        var c: int = 0
+        var j: int = 0
+        while j < k {
+            let tv = t[j] + ai * b[j] + c
+            c = tv / 16777216
+            t[j] = tv - c * 16777216
+            j = j + 1
+        }
+        let tk = t[k] + c
+        c = tk / 16777216
+        t[k] = tk - c * 16777216
+        let tk1 = t[k + 1] + c
+        t[k + 1] = tk1
+        let m = t[0] * n0i % 16777216
+        let f0 = t[0] + m * n[0]
+        c = f0 / 16777216
+        j = 1
+        while j < k {
+            let tv = t[j] + m * n[j] + c
+            c = tv / 16777216
+            t[j - 1] = tv - c * 16777216
+            j = j + 1
+        }
+        let top = t[k] + c
+        c = top / 16777216
+        t[k - 1] = top - c * 16777216
+        let top2 = t[k + 1] + c
+        t[k] = top2
+        t[k + 1] = 0
+        i = i + 1
+    }
+    cond_sub(t, n, k)
+}
+
+/// 2x mod n, for x < n.
+fn double_mod(x: List[int], n: List[int], k: int) -> List[int] {
+    var y = List[int]()
+    var c: int = 0
+    var j: int = 0
+    while j < k {
+        let v = x[j] * 2 + c
+        c = v / 16777216
+        (mut y).push(v - c * 16777216)
+        j = j + 1
+    }
+    (mut y).push(c)
+    cond_sub(y, n, k)
+}
+
+/// R² mod n, R = 2^L with L = 24k: write L = t·2^s with t odd, double
+/// 2^(nbits-1) (below n, since n is odd and has nbits bits) up to
+/// 2^(L+t) mod n, then square s times in the Montgomery domain — each
+/// squaring takes 2^(L+u) to 2^(L+2u), so s of them reach 2^(2L).
+fn r2_mod(n: List[int], k: int, nbits: int, n0i: int) -> List[int] {
+    let l = 24 * k
+    var s: int = 0
+    var t: int = l
+    while t % 2 == 0 {
+        t = t / 2
+        s = s + 1
+    }
+    var x = List[int]()
+    var i: int = 0
+    while i < k {
+        (mut x).push(0)
+        i = i + 1
+    }
+    x[(nbits - 1) / 24] = pow2((nbits - 1) % 24)
+    var d: int = l + t - (nbits - 1)
+    while d > 0 {
+        x = double_mod(x, n, k)
+        d = d - 1
+    }
+    var q: int = 0
+    while q < s {
+        x = mont_mul(x, x, n, n0i, k)
+        q = q + 1
+    }
+    x
+}
+
+/// s^e mod n by left-to-right square-and-multiply in the Montgomery
+/// domain (e is public: the per-bit branch protects nothing).
+fn modexp(s: List[int], e: List[byte], n: List[int], k: int, nbits: int) -> List[int] {
+    let n0i = n0_inv(n[0])
+    let r2 = r2_mod(n, k, nbits, n0i)
+    let sm = mont_mul(s, r2, n, n0i, k)
+    var acc = copy sm
+    var started = false
+    var idx: int = 0
+    while idx < e.len {
+        let ev = e[idx] as int
+        var bit: int = 7
+        while bit >= 0 {
+            let b = ev / pow2(bit) % 2
+            if started {
+                acc = mont_mul(acc, acc, n, n0i, k)
+                if b == 1 {
+                    acc = mont_mul(acc, sm, n, n0i, k)
+                }
+            } else if b == 1 {
+                started = true
+            }
+            bit = bit - 1
+        }
+        idx = idx + 1
+    }
+    var one = List[int]()
+    var i: int = 0
+    while i < k {
+        if i == 0 {
+            (mut one).push(1)
+        } else {
+            (mut one).push(0)
+        }
+        i = i + 1
+    }
+    mont_mul(acc, one, n, n0i, k)
+}
+
+/// RSAVP1 (§5.2.2) with I2OSP into k octets: s = OS2IP(sig), refused
+/// `too_large` when s >= n, else m = s^e mod n as k big-endian octets.
+/// The caller has checked sig's length against k.
+fn rsavp1(key: PublicKey, sig: List[byte]) -> List[byte] ! {too_large} {
+    let k = (key.bits + 23) / 24
+    let nb = (key.bits + 7) / 8
+    let n = limbs_from_be(key.modulus, k)
+    let s = limbs_from_be(sig, k)
+    if cmp_limbs(s, n, k) >= 0 {
+        return too_large
+    }
+    let m = modexp(s, key.exponent, n, k, key.bits)
+    limbs_to_be(m, nb)
+}
+
+// ---------------------------------------------------------------------
+// The encodings: DigestInfo, EMSA-PKCS1-v1_5, MGF1, EMSA-PSS.
+// ---------------------------------------------------------------------
+
+/// The digest of `m` under the selected hash. A selector other than the
+/// three `hash_*` values traps `assert`: it is the caller's constant.
+fn digest(hash: int, m: List[byte]) -> List[byte] {
+    if hash == 256 {
+        return sha2.sum256(m)
+    }
+    if hash == 384 {
+        return sha2.sum384(m)
+    }
+    if hash == 512 {
+        return sha2.sum512(m)
+    }
+    assert(false, "rsa: the hash is hash_sha256(), hash_sha384() or hash_sha512()")
+    List[byte]()
+}
+
+/// The DER DigestInfo of §9.2 Note 1: `SEQUENCE { SEQUENCE { OID
+/// 2.16.840.1.101.3.4.2.{1,2,3}, NULL }, OCTET STRING h }`.
+fn digest_info(hash: int, h: List[byte]) -> List[byte] {
+    var arc: int = 1
+    if hash == 384 {
+        arc = 2
+    }
+    if hash == 512 {
+        arc = 3
+    }
+    var t = List[byte]()
+    (mut t).push(48 as byte)
+    (mut t).push((17 + h.len) as byte)
+    (mut t).push(48 as byte)
+    (mut t).push(13 as byte)
+    (mut t).push(6 as byte)
+    (mut t).push(9 as byte)
+    (mut t).push(96 as byte)
+    (mut t).push(134 as byte)
+    (mut t).push(72 as byte)
+    (mut t).push(1 as byte)
+    (mut t).push(101 as byte)
+    (mut t).push(3 as byte)
+    (mut t).push(4 as byte)
+    (mut t).push(2 as byte)
+    (mut t).push(arc as byte)
+    (mut t).push(5 as byte)
+    (mut t).push(0 as byte)
+    (mut t).push(4 as byte)
+    (mut t).push(h.len as byte)
+    for v in h {
+        (mut t).push(v)
+    }
+    t
+}
+
+/// Byte-list equality. ct: public data.
+fn bytes_eq(a: List[byte], b: List[byte]) -> bool {
+    if a.len != b.len {
+        return false
+    }
+    var i: int = 0
+    var same = true
+    while i < a.len {
+        if a[i] != b[i] {
+            same = false
+        }
+        i = i + 1
+    }
+    same
+}
+
+/// a XOR b for two octets, bit by bit (the checked tier has no
+/// bitwise operators on int).
+fn xor8(a: int, b: int) -> int {
+    var x: int = a
+    var y: int = b
+    var out: int = 0
+    var w: int = 1
+    var i: int = 0
+    while i < 8 {
+        if x % 2 != y % 2 {
+            out = out + w
+        }
+        x = x / 2
+        y = y / 2
+        w = w * 2
+        i = i + 1
+    }
+    out
+}
+
+/// MGF1 (B.2.1) over the selected hash: the first `mask_len` octets of
+/// Hash(seed || C) for C = I2OSP(0, 4), I2OSP(1, 4), ...
+fn mgf1(hash: int, seed: List[byte], mask_len: int) -> List[byte] {
+    var out = List[byte]()
+    var counter: int = 0
+    while out.len < mask_len {
+        var block = copy seed
+        (mut block).push((counter / 16777216 % 256) as byte)
+        (mut block).push((counter / 65536 % 256) as byte)
+        (mut block).push((counter / 256 % 256) as byte)
+        (mut block).push((counter % 256) as byte)
+        let d = digest(hash, block)
+        for v in d {
+            if out.len < mask_len {
+                (mut out).push(v)
+            }
+        }
+        counter = counter + 1
+    }
+    out
+}
+
+/// EMSA-PSS-VERIFY (§9.1.2) for an encoded message `em` of emLen
+/// octets, emBits bits, the message digest `mhash` and the salt length.
+fn emsa_pss_verify(
+    hash: int,
+    mhash: List[byte],
+    em: List[byte],
+    em_bits: int,
+    salt_len: int,
+) -> bool {
+    let hlen = mhash.len
+    let em_len = em.len
+    if em_len < hlen + salt_len + 2 {
+        return false
+    }
+    if em[em_len - 1] as int != 188 {
+        return false
+    }
+    let db_len = em_len - hlen - 1
+    let masked = em[0..db_len]
+    let h = em[db_len..em_len - 1]
+    let keep = pow2(8 - (8 * em_len - em_bits))
+    if masked[0] as int >= keep {
+        return false
+    }
+    let mask = mgf1(hash, h, db_len)
+    var db = List[byte]()
+    var i: int = 0
+    while i < db_len {
+        var v: int = xor8(masked[i] as int, mask[i] as int)
+        if i == 0 {
+            v = v % keep
+        }
+        (mut db).push(v as byte)
+        i = i + 1
+    }
+    let zeros = em_len - hlen - salt_len - 2
+    var j: int = 0
+    while j < zeros {
+        if db[j] as int != 0 {
+            return false
+        }
+        j = j + 1
+    }
+    if db[zeros] as int != 1 {
+        return false
+    }
+    var mp = List[byte]()
+    var z: int = 0
+    while z < 8 {
+        (mut mp).push(0 as byte)
+        z = z + 1
+    }
+    for v in mhash {
+        (mut mp).push(v)
+    }
+    var q: int = db_len - salt_len
+    while q < db_len {
+        (mut mp).push(db[q])
+        q = q + 1
+    }
+    bytes_eq(digest(hash, mp), h)
+}
+
+// ---------------------------------------------------------------------
+// The verifiers.
+// ---------------------------------------------------------------------
+
+/// RSASSA-PKCS1-V1_5-VERIFY (RFC 8017 §8.2.2): true iff `sig` is the
+/// signature of `message` under `key` with the selected hash. The
+/// expected encoding `0x00 0x01 PS 0x00 T` (T the DER DigestInfo with
+/// NULL parameters, PS at least eight 0xFF octets) is built and compared
+/// whole with RSAVP1's output (steps 3–4), so nothing in the signature
+/// is parsed. False — never a trap — for a key outside the module's
+/// policy, a signature that is not exactly k octets, a signature
+/// representative ≥ n, or any octet that differs.
+///
+/// Traps `assert` only when `hash` is not one of the `hash_*` selectors
+/// (the caller's constant, not data).
+/// ct: VERIFY IS PUBLIC DATA — no branch here protects a secret.
+///
+/// Example (prose — a 2048-bit key does not fit a fenced example line):
+/// every case of the nine vendored Wycheproof RSASSA-PKCS1-v1_5 files is
+/// a row under `tests/x/crypto/rsa/`, decided again by `rsa_check.py`.
+pub fn verify_pkcs1(key: PublicKey, hash: int, message: List[byte], sig: List[byte]) -> bool {
+    let h = digest(hash, message)
+    let checked = public_key(key.modulus, key.exponent) else |_| {
+        return false
+    }
+    let nb = (checked.bits + 7) / 8
+    if sig.len != nb {
+        return false
+    }
+    let t = digest_info(hash, h)
+    if nb < t.len + 11 {
+        return false
+    }
+    let em = rsavp1(checked, sig) else |_| {
+        return false
+    }
+    var ok = true
+    if em[0] as int != 0 {
+        ok = false
+    }
+    if em[1] as int != 1 {
+        ok = false
+    }
+    let sep = nb - t.len - 1
+    var i: int = 2
+    while i < sep {
+        if em[i] as int != 255 {
+            ok = false
+        }
+        i = i + 1
+    }
+    if em[sep] as int != 0 {
+        ok = false
+    }
+    var j: int = 0
+    while j < t.len {
+        if em[sep + 1 + j] != t[j] {
+            ok = false
+        }
+        j = j + 1
+    }
+    ok
+}
+
+/// RSASSA-PSS-VERIFY (RFC 8017 §8.1.2, EMSA-PSS §9.1.2): true iff `sig`
+/// is a PSS signature of `message` under `key`, with MGF1 over the
+/// selected hash and a salt of exactly `salt_len` octets. emBits is
+/// modBits − 1, so for a modulus whose length is 1 mod 8 the encoded
+/// message is k − 1 octets and RSAVP1's leading octet must be zero.
+/// False — never a trap — for a key outside the policy, a signature
+/// that is not k octets, a representative ≥ n, or an inconsistent
+/// encoding.
+///
+/// TLS 1.3's `rsa_pss_rsae_sha256/384/512` pass the digest length as
+/// `salt_len` (RFC 8446 §4.2.3). Traps `assert` when `hash` is not a
+/// `hash_*` selector or `salt_len` is negative (the caller's constants).
+/// ct: VERIFY IS PUBLIC DATA.
+///
+/// Example (prose, as for `verify_pkcs1`): every case of the eight
+/// vendored Wycheproof RSASSA-PSS files is a row under
+/// `tests/x/crypto/rsa/`.
+pub fn verify_pss(
+    key: PublicKey,
+    hash: int,
+    message: List[byte],
+    sig: List[byte],
+    salt_len: int,
+) -> bool {
+    assert(salt_len >= 0, "rsa: a salt length is not negative")
+    let mhash = digest(hash, message)
+    let checked = public_key(key.modulus, key.exponent) else |_| {
+        return false
+    }
+    let nb = (checked.bits + 7) / 8
+    if sig.len != nb {
+        return false
+    }
+    let full = rsavp1(checked, sig) else |_| {
+        return false
+    }
+    let em_bits = checked.bits - 1
+    let em_len = (em_bits + 7) / 8
+    if em_len < nb {
+        if full[0] as int != 0 {
+            return false
+        }
+        return emsa_pss_verify(hash, mhash, full[1..nb], em_bits, salt_len)
+    }
+    emsa_pss_verify(hash, mhash, full, em_bits, salt_len)
+}
+
+// ---------------------------------------------------------------------
+// Hex rendering — this module's own (the ladder precedent). NOT
+// constant-time; a vector convenience only.
+// ---------------------------------------------------------------------
+
+/// Lowercase hex of a byte list. ct: public data (a rendering
+/// convenience only).
+///
+/// ```wolf-doc-example
+/// rsa.to_hex("abc".bytes()) == "616263"
+/// rsa.to_hex(List[byte]()) == ""
+/// ```
+pub fn to_hex(b: List[byte]) -> str {
+    let alphabet = "0123456789abcdef"
+    var out = ""
+    for raw in b {
+        let v = raw as int
+        let hi = v / 16
+        let lo = v % 16
+        let hd = alphabet[hi..hi + 1]
+        let ld = alphabet[lo..lo + 1]
+        out = "{out}{hd}{ld}"
+    }
+    out
+}
