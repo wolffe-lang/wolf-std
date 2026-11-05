@@ -1240,12 +1240,17 @@ fn parse_wycheproof_rsa(text: &str, what: &str, pss: bool) -> Result<Vec<WpRsaGr
     let v: serde_json::Value =
         serde_json::from_str(text).map_err(|e| format!("{what}: bad json: {e}"))?;
     let mut out = Vec::new();
-    for gp in v["testGroups"].as_array().ok_or(format!("{what}: no testGroups"))? {
+    for gp in v["testGroups"]
+        .as_array()
+        .ok_or(format!("{what}: no testGroups"))?
+    {
         let hash = rsa_hash(gp["sha"].as_str().unwrap_or(""), what)?;
         let mut salt = 0;
         if pss {
             if gp["mgf"].as_str() != Some("MGF1") || gp["mgfSha"] != gp["sha"] {
-                return Err(format!("{what}: a PSS group outside MGF1 over the message hash"));
+                return Err(format!(
+                    "{what}: a PSS group outside MGF1 over the message hash"
+                ));
             }
             salt = gp["sLen"].as_u64().ok_or(format!("{what}: sLen"))?;
         }
@@ -1277,7 +1282,12 @@ fn parse_wycheproof_rsa(text: &str, what: &str, pss: bool) -> Result<Vec<WpRsaGr
                 accept,
             });
         }
-        out.push(WpRsaGroup { key_der, hash, salt, cases });
+        out.push(WpRsaGroup {
+            key_der,
+            hash,
+            salt,
+            cases,
+        });
     }
     if out.is_empty() {
         return Err(format!("{what}: no RSA groups parsed"));
@@ -1301,7 +1311,10 @@ fn parse_wycheproof_p384(text: &str, what: &str) -> Result<Vec<WpP384Case>, Stri
     let v: serde_json::Value =
         serde_json::from_str(text).map_err(|e| format!("{what}: bad json: {e}"))?;
     let mut out = Vec::new();
-    for gp in v["testGroups"].as_array().ok_or(format!("{what}: no testGroups"))? {
+    for gp in v["testGroups"]
+        .as_array()
+        .ok_or(format!("{what}: no testGroups"))?
+    {
         let hash = rsa_hash(gp["sha"].as_str().unwrap_or(""), what)?;
         let pk = gp["publicKey"]["uncompressed"]
             .as_str()
@@ -1363,7 +1376,10 @@ fn rsa_verify_fn(fname: &str, pss: bool, hash: u32, salt: u64) -> String {
 
 fn emit_wycheproof_rsa(name: &str, groups: &[WpRsaGroup], pss: bool) -> String {
     let n: usize = groups.iter().map(|g| g.cases.len()).sum();
-    let a: usize = groups.iter().map(|g| g.cases.iter().filter(|c| c.accept).count()).sum();
+    let a: usize = groups
+        .iter()
+        .map(|g| g.cases.iter().filter(|c| c.accept).count())
+        .sum();
     let scheme = if pss {
         "RSASSA-PSS (MGF1 over the message hash, the group's salt length)"
     } else {
@@ -1418,7 +1434,12 @@ fn emit_wycheproof_rsa_smoke(picks: &[(String, WpRsaGroup, Vec<WpRsaCase>)]) -> 
     }
     s.push_str(ROW_FN);
     for (i, (name, g, _)) in picks.iter().enumerate() {
-        s.push_str(&rsa_verify_fn(&format!("vd{i}"), name.starts_with("rsa_pss_"), g.hash, g.salt));
+        s.push_str(&rsa_verify_fn(
+            &format!("vd{i}"),
+            name.starts_with("rsa_pss_"),
+            g.hash,
+            g.salt,
+        ));
     }
     s.push_str("fn main() -> int {\n    var bad: int = 0\n");
     for (i, (name, _, cases)) in picks.iter().enumerate() {
@@ -1447,7 +1468,11 @@ fn emit_wycheproof_p384(
     let mut s = String::new();
     s.push_str("//! check: run(exit=0)\n//! phase: run\n//! conforms: std.x.crypto.p384, arith.checked\n//!\n");
     s.push_str(GEN_NOTE);
-    let shape = if form == "der" { "DER" } else { "IEEE P1363 r || s" };
+    let shape = if form == "der" {
+        "DER"
+    } else {
+        "IEEE P1363 r || s"
+    };
     let _ = write!(
         s,
         "//!\n//! Wycheproof v1 `{name}` ({shape}, SHA-{hash}), part {part} of {parts}:\n\
