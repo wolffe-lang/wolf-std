@@ -5074,8 +5074,10 @@ native = "run"
 # runs in 0.5-3.6 s there). lupin answers a whole RSA file with its 50M
 # step-budget refusal in about 20 s (`unsupported`) and runs the four-case
 # smoke in about 17 s; the checked tier's budget is spent inside one
-# RSA-2048 verify (`unsupported` in about 3 s, smoke included). A P-384
-# verify costs more than both budgets on every file.
+# RSA-2048 verify (`unsupported` in about 3 s, smoke included). Every
+# P-384 part is native-only the same way: lupin's refusal in about 22 s,
+# the checked tier's in about 3 s (a 120-case part runs natively in
+# 0.5-5 s).
 [tests."x/crypto/rsa/wycheproof_rsa_pss_2048_sha256_mgf1_0.lu"]
 lupin = "unsupported"
 wolfc = "unsupported"
@@ -5167,86 +5169,86 @@ wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha256_p1.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha256_p2.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha256_p3.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha256_p4.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha384_p1.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha384_p1363_p1.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha384_p1363_p2.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha384_p1363_p3.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha384_p2.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha384_p3.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha384_p4.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha384_p5.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha512_p1.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha512_p2.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha512_p3.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha512_p4.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
 
 [tests."x/crypto/p384/wycheproof_ecdsa_secp384r1_sha512_p5.lu"]
-lupin = "slow"
+lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"

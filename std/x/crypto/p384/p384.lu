@@ -1,0 +1,870 @@
+//! member: true
+//!
+//! std.x.crypto.p384 — ECDSA signature VERIFICATION over the NIST P-384
+//! curve (secp384r1): FIPS 186-5 §6.4.2 (ECDSA verify), SEC 1 v2 (point
+//! encodings, §2.3.4, and public-key validation, §3.2.2), SP 800-186
+//! §3.2.1.4 (the domain parameters). Stability tier: x — the D53 crypto
+//! ladder's second Weierstrass rung (sprint sc79, wolf-std#101): the
+//! curve most public-PKI intermediates and many roots carry, and TLS
+//! 1.3's `ecdsa_secp384r1_sha384`.
+//!
+//! **The nursery banner (D31).** `std.x.crypto.p384` is not
+//! `std.crypto`: its path, names and behaviour may change or vanish in
+//! one sprint; no other std module may depend on it. Its reason and
+//! graduation trigger live in `std/x/README.md`. SHA-384 is
+//! `std.x.crypto.sha2`'s, through the module boundary — a
+//! resident-on-resident edge the graduation move must resolve.
+//!
+//! **Verify only.** No signing, no key generation, no ECDH: nothing in
+//! this module ever holds a private scalar. The surface mirrors
+//! `std.x.crypto.p256`'s verify half — `verify` over the raw r || s
+//! form, `verify_der` over the DER form X.509 and TLS carry — plus
+//! `verify_digest_der`, which takes a digest of any length so an X.509
+//! signature under ecdsa-with-SHA256 or -SHA512 by a P-384 key verifies
+//! through FIPS 186-5's bits2int.
+//!
+//! ## Public-key work: no constant-time obligation
+//!
+//! A public key, a message and a signature are all public, so no branch
+//! here protects a secret (the sc18 verify-is-public rule): the joint
+//! scalar multiplication branches on the bits of u1 and u2, the point
+//! formulas take their exceptional-case branches openly, and the
+//! comparisons exit early. That is why this module is NOT p256's
+//! table-free ladder: it is the verify-only shape, and a signing rung
+//! would need its own constant-time design.
+//!
+//! ## The arithmetic
+//!
+//! Field elements mod p and scalars mod n are sixteen little-endian
+//! limbs of 24 bits in checked `int`s, multiplied by Montgomery's method
+//! (CIOS, R = 2^384): every product is under 2^48 and every accumulator
+//! under 2^50, which X3's checked arithmetic enforces at each operation.
+//! p ≡ −1 mod 2^24, so the field's Montgomery quotient constant is 1;
+//! both constants are derived at run time by the same Newton iteration.
+//! R² mod p and R² mod n are built by doubling and squaring (L = 384 =
+//! 3·2^7). Points are Jacobian (X : Y : Z) with the a = −3 doubling and
+//! the general addition, each exceptional case (an input at infinity,
+//! P + P, P + (−P)) decided explicitly; verification is Shamir's joint
+//! double-and-add for u1·G + u2·Q over the 384 bits, and the final
+//! x-coordinate test compares X with r·Z² (and (r + n)·Z² when r + n < p)
+//! instead of inverting Z. s⁻¹ mod n is a Fermat power to the fixed
+//! public exponent n − 2.
+//!
+//! ## Refusals
+//!
+//! Every verifier answers FALSE, never a trap, for: a public key that is
+//! not the 97-byte uncompressed SEC 1 encoding (0x04 || X || Y), a
+//! coordinate ≥ p, a point off the curve (the invalid-curve class, SEC 1
+//! §3.2.2); r or s outside [1, n); a DER signature that is not exactly
+//! `SEQUENCE { INTEGER r, INTEGER s }` in strict X.690 DER (one short
+//! length octet each, minimal non-negative INTEGERs, nothing trailing);
+//! a raw signature that is not 96 bytes; and the point at infinity as
+//! the result. Byte sequences are `List[byte]`, big-endian (SEC 1).
+//! `to_hex` is this module's own rendering (the ladder precedent).
+
+use std.x.crypto.sha2
+
+// ---------------------------------------------------------------------
+// The domain parameters (SP 800-186 §3.2.1.4), as published.
+// ---------------------------------------------------------------------
+
+/// Bytes from lowercase hex (the module's own constants only).
+fn unhex(s: str) -> List[byte] {
+    let cs = s.bytes()
+    var out = List[byte]()
+    var i: int = 0
+    while i + 1 < cs.len {
+        let hi = hex_digit(cs[i] as int)
+        let lo = hex_digit(cs[i + 1] as int)
+        (mut out).push((hi * 16 + lo) as byte)
+        i = i + 2
+    }
+    out
+}
+
+fn hex_digit(c: int) -> int {
+    if c >= 97 {
+        return c - 87
+    }
+    c - 48
+}
+
+fn p_hex() -> str {
+    "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff"
+}
+
+fn n_hex() -> str {
+    "ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973"
+}
+
+/// n − 2, the Fermat exponent for s⁻¹ mod n.
+fn nm2_hex() -> str {
+    "ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52971"
+}
+
+fn b_hex() -> str {
+    "b3312fa7e23ee7e4988e056be3f82d19181d9c6efe8141120314088f5013875ac656398d8a2ed19d2a85c8edd3ec2aef"
+}
+
+fn gx_hex() -> str {
+    "aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab7"
+}
+
+fn gy_hex() -> str {
+    "3617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f"
+}
+
+// ---------------------------------------------------------------------
+// Sixteen-limb Montgomery arithmetic (base 2^24, R = 2^384).
+// ---------------------------------------------------------------------
+
+/// 2^k for 0 <= k < 63.
+fn pow2(k: int) -> int {
+    var v: int = 1
+    var i: int = 0
+    while i < k {
+        v = v * 2
+        i = i + 1
+    }
+    v
+}
+
+/// The sixteen limbs of a big-endian integer below 2^384 (`b` at most
+/// 48 bytes; shorter is left-padded).
+fn limbs_from_be(b: List[byte]) -> List[int] {
+    var out = List[int]()
+    var i: int = 0
+    while i < 16 {
+        var v: int = 0
+        var j: int = 2
+        while j >= 0 {
+            let p = b.len - 1 - 3 * i - j
+            v = v * 256
+            if p >= 0 {
+                v = v + b[p] as int
+            }
+            j = j - 1
+        }
+        (mut out).push(v)
+        i = i + 1
+    }
+    out
+}
+
+/// Sixteen limbs with the given low limb and zeros above it.
+fn small(v: int) -> List[int] {
+    var out = List[int]()
+    var i: int = 0
+    while i < 16 {
+        if i == 0 {
+            (mut out).push(v)
+        } else {
+            (mut out).push(0)
+        }
+        i = i + 1
+    }
+    out
+}
+
+/// Compare two sixteen-limb values: -1, 0 or 1.
+fn cmp16(a: List[int], b: List[int]) -> int {
+    var j: int = 15
+    while j >= 0 {
+        if a[j] < b[j] {
+            return 0 - 1
+        }
+        if a[j] > b[j] {
+            return 1
+        }
+        j = j - 1
+    }
+    0
+}
+
+fn is_zero16(a: List[int]) -> bool {
+    var z = true
+    for v in a {
+        if v != 0 {
+            z = false
+        }
+    }
+    z
+}
+
+/// `t` (sixteen limbs and an overflow limb t[16]) minus m once if it is
+/// at least m; the caller guarantees t < 2m.
+fn cond_sub(t: List[int], m: List[int]) -> List[int] {
+    var ge = t[16] > 0
+    if !ge {
+        ge = cmp16(t, m) >= 0
+    }
+    var out = List[int]()
+    var j: int = 0
+    if ge {
+        var bw: int = 0
+        while j < 16 {
+            var v: int = t[j] - m[j] - bw
+            bw = 0
+            if v < 0 {
+                v = v + 16777216
+                bw = 1
+            }
+            (mut out).push(v)
+            j = j + 1
+        }
+    } else {
+        while j < 16 {
+            (mut out).push(t[j])
+            j = j + 1
+        }
+    }
+    out
+}
+
+/// -m0^-1 mod 2^24 for an odd low limb, by Newton's iteration.
+fn m0_inv(m0: int) -> int {
+    var x: int = m0
+    var r: int = 0
+    while r < 4 {
+        let t = m0 * x % 16777216
+        let u = (2 - t + 16777216) % 16777216
+        x = x * u % 16777216
+        r = r + 1
+    }
+    (16777216 - x) % 16777216
+}
+
+/// a·b·2^-384 mod m (CIOS). For a, b < m the answer is < m.
+fn mont(a: List[int], b: List[int], m: List[int], mi: int) -> List[int] {
+    var t = List[int]()
+    var i: int = 0
+    while i < 18 {
+        (mut t).push(0)
+        i = i + 1
+    }
+    i = 0
+    while i < 16 {
+        let ai = a[i]
+        var c: int = 0
+        var j: int = 0
+        while j < 16 {
+            let tv = t[j] + ai * b[j] + c
+            c = tv / 16777216
+            t[j] = tv - c * 16777216
+            j = j + 1
+        }
+        let tk = t[16] + c
+        c = tk / 16777216
+        t[16] = tk - c * 16777216
+        let tk1 = t[17] + c
+        t[17] = tk1
+        let q = t[0] * mi % 16777216
+        let f0 = t[0] + q * m[0]
+        c = f0 / 16777216
+        j = 1
+        while j < 16 {
+            let tv = t[j] + q * m[j] + c
+            c = tv / 16777216
+            t[j - 1] = tv - c * 16777216
+            j = j + 1
+        }
+        let top = t[16] + c
+        c = top / 16777216
+        t[15] = top - c * 16777216
+        let top2 = t[17] + c
+        t[16] = top2
+        t[17] = 0
+        i = i + 1
+    }
+    cond_sub(t, m)
+}
+
+/// (a + b) mod m for a, b < m.
+fn add_mod(a: List[int], b: List[int], m: List[int]) -> List[int] {
+    var t = List[int]()
+    var c: int = 0
+    var j: int = 0
+    while j < 16 {
+        let v = a[j] + b[j] + c
+        c = v / 16777216
+        (mut t).push(v - c * 16777216)
+        j = j + 1
+    }
+    (mut t).push(c)
+    cond_sub(t, m)
+}
+
+/// (a − b) mod m for a, b < m.
+fn sub_mod(a: List[int], b: List[int], m: List[int]) -> List[int] {
+    var out = List[int]()
+    var bw: int = 0
+    var j: int = 0
+    while j < 16 {
+        var v: int = a[j] - b[j] - bw
+        bw = 0
+        if v < 0 {
+            v = v + 16777216
+            bw = 1
+        }
+        (mut out).push(v)
+        j = j + 1
+    }
+    if bw == 0 {
+        return out
+    }
+    var fixed = List[int]()
+    var c: int = 0
+    j = 0
+    while j < 16 {
+        let v = out[j] + m[j] + c
+        c = v / 16777216
+        (mut fixed).push(v - c * 16777216)
+        j = j + 1
+    }
+    fixed
+}
+
+/// R² mod m for an odd m of 384 bits: double 2^383 (below m) four times
+/// to 2^387 = 2^(384 + 3), then square seven times in the Montgomery
+/// domain (384 = 3·2^7; each squaring takes 2^(384+u) to 2^(384+2u)).
+fn r2_of(m: List[int], mi: int) -> List[int] {
+    var x = List[int]()
+    var i: int = 0
+    while i < 16 {
+        if i == 15 {
+            (mut x).push(8388608)
+        } else {
+            (mut x).push(0)
+        }
+        i = i + 1
+    }
+    var d: int = 0
+    while d < 4 {
+        x = add_mod(x, x, m)
+        d = d + 1
+    }
+    var q: int = 0
+    while q < 7 {
+        x = mont(x, x, m, mi)
+        q = q + 1
+    }
+    x
+}
+
+/// The curve's constants in the forms the verifier uses: the moduli and
+/// their quotient constants, R² for each, b and one in the field's
+/// Montgomery domain.
+struct Ctx {
+    p: List[int],
+    pi: int,
+    r2p: List[int],
+    n: List[int],
+    ni: int,
+    r2n: List[int],
+    bm: List[int],
+    onep: List[int],
+}
+
+fn ctx() -> Ctx {
+    let p = limbs_from_be(unhex(p_hex()))
+    let pi = m0_inv(p[0])
+    let r2p = r2_of(p, pi)
+    let n = limbs_from_be(unhex(n_hex()))
+    let ni = m0_inv(n[0])
+    let r2n = r2_of(n, ni)
+    let bm = mont(limbs_from_be(unhex(b_hex())), r2p, p, pi)
+    let onep = mont(small(1), r2p, p, pi)
+    Ctx {
+        p: p,
+        pi: pi,
+        r2p: r2p,
+        n: n,
+        ni: ni,
+        r2n: r2n,
+        bm: bm,
+        onep: onep,
+    }
+}
+
+fn fmul(c: Ctx, a: List[int], b: List[int]) -> List[int] {
+    mont(a, b, c.p, c.pi)
+}
+
+fn fadd(c: Ctx, a: List[int], b: List[int]) -> List[int] {
+    add_mod(a, b, c.p)
+}
+
+fn fsub(c: Ctx, a: List[int], b: List[int]) -> List[int] {
+    sub_mod(a, b, c.p)
+}
+
+// ---------------------------------------------------------------------
+// Points: Jacobian (X : Y : Z) over the field's Montgomery domain; Z = 0
+// is the point at infinity.
+// ---------------------------------------------------------------------
+
+struct Pt {
+    x: List[int],
+    y: List[int],
+    z: List[int],
+}
+
+fn infinity(c: Ctx) -> Pt {
+    Pt { x: copy c.onep, y: copy c.onep, z: small(0) }
+}
+
+/// [2]P for a = −3 (the "dbl-2001-b" formulas): delta = Z², gamma = Y²,
+/// beta = X·gamma, alpha = 3(X − delta)(X + delta), X3 = alpha² − 8 beta,
+/// Z3 = (Y + Z)² − gamma − delta, Y3 = alpha(4 beta − X3) − 8 gamma². The
+/// point at infinity doubles to Z3 = 0, and P-384 has no point of order
+/// two, so no case needs a branch.
+fn dbl(c: Ctx, pp: Pt) -> Pt {
+    let delta = fmul(c, pp.z, pp.z)
+    let gamma = fmul(c, pp.y, pp.y)
+    let beta = fmul(c, pp.x, gamma)
+    let t1 = fsub(c, pp.x, delta)
+    let t2 = fadd(c, pp.x, delta)
+    let t3 = fmul(c, t1, t2)
+    let alpha = fadd(c, fadd(c, t3, t3), t3)
+    let beta2 = fadd(c, beta, beta)
+    let beta4 = fadd(c, beta2, beta2)
+    let beta8 = fadd(c, beta4, beta4)
+    let x3 = fsub(c, fmul(c, alpha, alpha), beta8)
+    let yz = fadd(c, pp.y, pp.z)
+    let z3 = fsub(c, fsub(c, fmul(c, yz, yz), gamma), delta)
+    let g2 = fmul(c, gamma, gamma)
+    let g4 = fadd(c, g2, g2)
+    let g8 = fadd(c, g4, g4)
+    let g8b = fadd(c, g8, g8)
+    let y3 = fsub(c, fmul(c, alpha, fsub(c, beta4, x3)), g8b)
+    Pt { x: x3, y: y3, z: z3 }
+}
+
+/// P1 + P2, the general Jacobian addition ("add-2007-bl"), with every
+/// exceptional case taken explicitly: an input at infinity answers the
+/// other, H = 0 with r = 0 is a doubling, H = 0 otherwise is P + (−P).
+fn add(c: Ctx, p1: Pt, p2: Pt) -> Pt {
+    if is_zero16(p1.z) {
+        return Pt { x: copy p2.x, y: copy p2.y, z: copy p2.z }
+    }
+    if is_zero16(p2.z) {
+        return Pt { x: copy p1.x, y: copy p1.y, z: copy p1.z }
+    }
+    let z1z1 = fmul(c, p1.z, p1.z)
+    let z2z2 = fmul(c, p2.z, p2.z)
+    let u1 = fmul(c, p1.x, z2z2)
+    let u2 = fmul(c, p2.x, z1z1)
+    let s1 = fmul(c, fmul(c, p1.y, p2.z), z2z2)
+    let s2 = fmul(c, fmul(c, p2.y, p1.z), z1z1)
+    let h = fsub(c, u2, u1)
+    let rr0 = fsub(c, s2, s1)
+    if is_zero16(h) {
+        if is_zero16(rr0) {
+            return dbl(c, p1)
+        }
+        return infinity(c)
+    }
+    let h2 = fadd(c, h, h)
+    let i = fmul(c, h2, h2)
+    let j = fmul(c, h, i)
+    let rr = fadd(c, rr0, rr0)
+    let v = fmul(c, u1, i)
+    let x3 = fsub(c, fsub(c, fmul(c, rr, rr), j), fadd(c, v, v))
+    let sj = fmul(c, s1, j)
+    let y3 = fsub(c, fmul(c, rr, fsub(c, v, x3)), fadd(c, sj, sj))
+    let zz = fadd(c, p1.z, p2.z)
+    let z3 = fmul(c, fsub(c, fsub(c, fmul(c, zz, zz), z1z1), z2z2), h)
+    Pt { x: x3, y: y3, z: z3 }
+}
+
+/// u1·G + u2·Q by Shamir's joint double-and-add over the 384 bits
+/// (most significant first). The scalars are public.
+fn joint(c: Ctx, u1: List[int], u2: List[int], g: Pt, q: Pt) -> Pt {
+    let gq = add(c, g, q)
+    var w = List[int]()
+    var k: int = 0
+    while k < 24 {
+        (mut w).push(pow2(k))
+        k = k + 1
+    }
+    var acc = infinity(c)
+    var i: int = 383
+    while i >= 0 {
+        acc = dbl(c, acc)
+        let b1 = u1[i / 24] / w[i % 24] % 2
+        let b2 = u2[i / 24] / w[i % 24] % 2
+        if b1 == 1 {
+            if b2 == 1 {
+                acc = add(c, acc, gq)
+            } else {
+                acc = add(c, acc, g)
+            }
+        } else if b2 == 1 {
+            acc = add(c, acc, q)
+        }
+        i = i - 1
+    }
+    acc
+}
+
+/// The base point G in Jacobian form.
+fn base(c: Ctx) -> Pt {
+    let gx = mont(limbs_from_be(unhex(gx_hex())), c.r2p, c.p, c.pi)
+    let gy = mont(limbs_from_be(unhex(gy_hex())), c.r2p, c.p, c.pi)
+    Pt { x: gx, y: gy, z: copy c.onep }
+}
+
+/// Whether the affine point (x, y), in the Montgomery domain, satisfies
+/// y² = x³ − 3x + b (SEC 1 §3.2.2's on-curve test).
+fn on_curve(c: Ctx, x: List[int], y: List[int]) -> bool {
+    let lhs = fmul(c, y, y)
+    let x3 = fmul(c, fmul(c, x, x), x)
+    let three_x = fadd(c, fadd(c, x, x), x)
+    let rhs = fadd(c, fsub(c, x3, three_x), c.bm)
+    cmp16(lhs, rhs) == 0
+}
+
+/// Whether the big-endian 48-byte `b` is below the big-endian 48-byte
+/// `m`. ct: public data.
+fn bytes_lt(b: List[byte], m: List[byte]) -> bool {
+    var i: int = 0
+    while i < 48 {
+        if b[i] < m[i] {
+            return true
+        }
+        if b[i] > m[i] {
+            return false
+        }
+        i = i + 1
+    }
+    false
+}
+
+/// A validated public key Q, or the marker that decoding refused it.
+struct PtOpt {
+    ok: bool,
+    p: Pt,
+}
+
+/// Decode a 97-byte uncompressed SEC 1 point (0x04 || X || Y), refusing
+/// a wrong length or lead byte, a coordinate ≥ p, and a point that is
+/// not on the curve (the invalid-curve class). The point at infinity has
+/// no uncompressed encoding, so it is refused by length.
+fn decode_point(c: Ctx, raw: List[byte]) -> PtOpt {
+    let refused = PtOpt { ok: false, p: infinity(c) }
+    if raw.len != 97 {
+        return refused
+    }
+    if raw[0] as int != 4 {
+        return refused
+    }
+    let pb = unhex(p_hex())
+    let xb = raw[1..49]
+    let yb = raw[49..97]
+    if !bytes_lt(xb, pb) {
+        return refused
+    }
+    if !bytes_lt(yb, pb) {
+        return refused
+    }
+    let x = mont(limbs_from_be(xb), c.r2p, c.p, c.pi)
+    let y = mont(limbs_from_be(yb), c.r2p, c.p, c.pi)
+    if !on_curve(c, x, y) {
+        return refused
+    }
+    PtOpt { ok: true, p: Pt { x: x, y: y, z: copy c.onep } }
+}
+
+/// base^exp mod n in the Montgomery domain (`base_m` in Montgomery
+/// form, `exp` big-endian and public).
+fn pow_n(c: Ctx, base_m: List[int], exp: List[byte]) -> List[int] {
+    var acc = mont(small(1), c.r2n, c.n, c.ni)
+    for ev in exp {
+        var bit: int = 7
+        while bit >= 0 {
+            acc = mont(acc, acc, c.n, c.ni)
+            if ev as int / pow2(bit) % 2 == 1 {
+                acc = mont(acc, base_m, c.n, c.ni)
+            }
+            bit = bit - 1
+        }
+    }
+    acc
+}
+
+/// FIPS 186-5 §6.4.2 for a validated key: `digest` already computed,
+/// `rb` and `sb` the 48-byte big-endian r and s.
+fn verify_core(c: Ctx, q: Pt, digest: List[byte], rb: List[byte], sb: List[byte]) -> bool {
+    let nb = unhex(n_hex())
+    if !bytes_lt(rb, nb) {
+        return false
+    }
+    if !bytes_lt(sb, nb) {
+        return false
+    }
+    let r = limbs_from_be(rb)
+    let s = limbs_from_be(sb)
+    if is_zero16(r) {
+        return false
+    }
+    if is_zero16(s) {
+        return false
+    }
+    // bits2int: the leftmost 384 bits of the digest (all of a shorter
+    // one), then one conditional subtraction of n (the value is below
+    // 2^384 < 2n).
+    var eb = List[byte]()
+    var i: int = 0
+    while i < digest.len {
+        if i < 48 {
+            (mut eb).push(digest[i])
+        }
+        i = i + 1
+    }
+    var e0 = limbs_from_be(eb)
+    (mut e0).push(0)
+    let e = cond_sub(e0, c.n)
+    let w = pow_n(c, mont(s, c.r2n, c.n, c.ni), unhex(nm2_hex()))
+    let u1 = mont(e, w, c.n, c.ni)
+    let u2 = mont(r, w, c.n, c.ni)
+    let rp = joint(c, u1, u2, base(c), q)
+    if is_zero16(rp.z) {
+        return false
+    }
+    // x(R) mod n == r  <=>  X == r·Z² or, when r + n < p, X == (r + n)·Z².
+    let z2 = fmul(c, rp.z, rp.z)
+    let rm = mont(r, c.r2p, c.p, c.pi)
+    if cmp16(fmul(c, rm, z2), rp.x) == 0 {
+        return true
+    }
+    var rn = List[int]()
+    var carry: int = 0
+    var j: int = 0
+    while j < 16 {
+        let v = r[j] + c.n[j] + carry
+        carry = v / 16777216
+        (mut rn).push(v - carry * 16777216)
+        j = j + 1
+    }
+    if carry > 0 {
+        return false
+    }
+    if cmp16(rn, c.p) >= 0 {
+        return false
+    }
+    let rnm = mont(rn, c.r2p, c.p, c.pi)
+    cmp16(fmul(c, rnm, z2), rp.x) == 0
+}
+
+/// A strict-DER ECDSA signature's r and s as 48-byte big-endian values.
+struct SigOpt {
+    ok: bool,
+    r: List[byte],
+    s: List[byte],
+}
+
+/// One DER INTEGER at `at`: its magnitude left-padded to 48 bytes and
+/// the offset after it, or stop -1 on any violation (a tag other than
+/// INTEGER, a long-form length, an empty or negative or non-minimal
+/// body, a magnitude over 48 octets).
+struct DerInt {
+    val: List[byte],
+    stop: int,
+}
+
+fn read_der_int(b: List[byte], at: int) -> DerInt {
+    let fail = DerInt { val: List[byte](), stop: 0 - 1 }
+    if at + 2 > b.len {
+        return fail
+    }
+    if b[at] as int != 2 {
+        return fail
+    }
+    let ln = b[at + 1] as int
+    if ln > 127 {
+        return fail
+    }
+    if ln == 0 {
+        return fail
+    }
+    let start = at + 2
+    if start + ln > b.len {
+        return fail
+    }
+    if b[start] as int >= 128 {
+        return fail
+    }
+    if ln > 1 {
+        if b[start] as int == 0 {
+            if b[start + 1] as int < 128 {
+                return fail
+            }
+        }
+    }
+    var strip: int = 0
+    if b[start] as int == 0 {
+        strip = 1
+    }
+    let mag_len = ln - strip
+    if mag_len > 48 {
+        return fail
+    }
+    var out = List[byte]()
+    var pad: int = 0
+    while pad < 48 - mag_len {
+        (mut out).push(0 as byte)
+        pad = pad + 1
+    }
+    var k: int = start + strip
+    while k < start + ln {
+        (mut out).push(b[k])
+        k = k + 1
+    }
+    DerInt { val: out, stop: start + ln }
+}
+
+/// Parse `SEQUENCE { INTEGER r, INTEGER s }` under strict DER: the
+/// sequence's one short length octet must equal the rest of the input
+/// (no trailing bytes), and both INTEGERs must be strict.
+fn parse_der(b: List[byte]) -> SigOpt {
+    let bad = SigOpt { ok: false, r: List[byte](), s: List[byte]() }
+    if b.len < 8 {
+        return bad
+    }
+    if b[0] as int != 48 {
+        return bad
+    }
+    let l = b[1] as int
+    if l > 127 {
+        return bad
+    }
+    if l + 2 != b.len {
+        return bad
+    }
+    let DerInt { val: r_val, stop: r_stop } = read_der_int(b, 2)
+    if r_stop < 0 {
+        return bad
+    }
+    let DerInt { val: s_val, stop: s_stop } = read_der_int(b, r_stop)
+    if s_stop < 0 {
+        return bad
+    }
+    if s_stop != b.len {
+        return bad
+    }
+    SigOpt { ok: true, r: r_val, s: s_val }
+}
+
+// ---------------------------------------------------------------------
+// The verifiers.
+// ---------------------------------------------------------------------
+
+/// Verify an ECDSA P-384 signature (FIPS 186-5 §6.4.2) given as a
+/// precomputed digest of any length (bits2int takes its leftmost 384
+/// bits; a shorter digest is used whole) and a strict-DER signature.
+/// This is the X.509 path for ecdsa-with-SHA256 and -SHA512 under a
+/// P-384 key. False — never a trap — for every refusal in the module
+/// header.
+/// ct: VERIFY IS PUBLIC DATA — no branch here protects a secret.
+///
+/// Example (native lane, prose — a verify is a 384-bit joint scalar
+/// multiplication, past the interpreter's step budget): every case of
+/// the vendored Wycheproof SHA-256 and SHA-512 P-384 files is a row
+/// under `tests/x/crypto/p384/`.
+pub fn verify_digest_der(pubkey: List[byte], digest: List[byte], der: List[byte]) -> bool {
+    let SigOpt { ok, r, s } = parse_der(der)
+    if !ok {
+        return false
+    }
+    let c = ctx()
+    let q = decode_point(c, pubkey)
+    if !q.ok {
+        return false
+    }
+    verify_core(c, q.p, digest, r, s)
+}
+
+/// Verify an ECDSA P-384 signature with SHA-384 (TLS 1.3's
+/// `ecdsa_secp384r1_sha384`, X.509's ecdsa-with-SHA384) over `message`,
+/// the signature in the DER form X.509 and TLS carry. False — never a
+/// trap — for every refusal in the module header.
+/// ct: VERIFY IS PUBLIC DATA.
+///
+/// Example (native lane, prose): every case of the vendored Wycheproof
+/// `ecdsa_secp384r1_sha384` file is a row under `tests/x/crypto/p384/`;
+/// the early refusals (bad keys, bad DER, r or s out of range) are
+/// three-lane in `verify_reject_early.lu`.
+pub fn verify_der(pubkey: List[byte], message: List[byte], der: List[byte]) -> bool {
+    let SigOpt { ok, r, s } = parse_der(der)
+    if !ok {
+        return false
+    }
+    let c = ctx()
+    let q = decode_point(c, pubkey)
+    if !q.ok {
+        return false
+    }
+    verify_core(c, q.p, sha2.sum384(message), r, s)
+}
+
+/// Verify an ECDSA P-384 signature with SHA-384 over `message`, the
+/// signature as the raw 96-byte r || s (IEEE P1363) form. False — never
+/// a trap — for a signature that is not 96 bytes and every refusal in
+/// the module header.
+/// ct: VERIFY IS PUBLIC DATA.
+///
+/// Example (native lane, prose): every case of the vendored Wycheproof
+/// `ecdsa_secp384r1_sha384_p1363` file is a row under
+/// `tests/x/crypto/p384/`.
+pub fn verify(pubkey: List[byte], message: List[byte], sig: List[byte]) -> bool {
+    if sig.len != 96 {
+        return false
+    }
+    let c = ctx()
+    let q = decode_point(c, pubkey)
+    if !q.ok {
+        return false
+    }
+    verify_core(c, q.p, sha2.sum384(message), sig[0..48], sig[48..96])
+}
+
+/// The group self-test: G is on the curve and [n]G is the point at
+/// infinity, through the module's own point arithmetic. Total.
+/// ct: public constants only.
+///
+/// Example (native lane, prose): `p384.self_test()` is true;
+/// `tests/x/crypto/p384/self_test.lu` runs it.
+pub fn self_test() -> bool {
+    let c = ctx()
+    let g = base(c)
+    if !on_curve(c, g.x, g.y) {
+        return false
+    }
+    let n_g = joint(c, copy c.n, small(0), base(c), base(c))
+    is_zero16(n_g.z)
+}
+
+// ---------------------------------------------------------------------
+// Hex rendering — this module's own (the ladder precedent).
+// ---------------------------------------------------------------------
+
+/// Lowercase hex of a byte list. ct: public data (a rendering
+/// convenience only).
+///
+/// ```wolf-doc-example
+/// p384.to_hex("abc".bytes()) == "616263"
+/// p384.to_hex(List[byte]()) == ""
+/// ```
+pub fn to_hex(b: List[byte]) -> str {
+    let alphabet = "0123456789abcdef"
+    var out = ""
+    for raw in b {
+        let v = raw as int
+        let hi = v / 16
+        let lo = v % 16
+        let hd = alphabet[hi..hi + 1]
+        let ld = alphabet[lo..lo + 1]
+        out = "{out}{hd}{ld}"
+    }
+    out
+}
