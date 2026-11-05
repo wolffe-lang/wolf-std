@@ -94,7 +94,7 @@ The trunk run is `docs/sc79-witness/interop-trunk-3111d39.log`. The final record
 
 ### The cost
 
-`docs/sc79-witness/bench/bench.lu` runs one warm-up batch and five interleaved batches of 32 calls, and takes the median per call. Its inputs are the first valid case of each vendored Wycheproof file. It ran natively on one Linux x86-64 block of six CPUs under `taskset`, holding the block's two locks and its light lock, so nothing ran beside it. The run was at `b22ada4`, whose `std/` is identical to the head's (log: `docs/sc79-witness/cost-b22ada4.log`).
+`docs/sc79-witness/bench/bench.lu` runs one warm-up batch and five interleaved batches of 32 calls, and takes the median per call. Its inputs are the first valid case of each vendored Wycheproof file. It ran natively on one Linux x86-64 block of six CPUs under `taskset`, holding the block's two locks and its light lock, so nothing ran beside it. The run was at `b22ada4`, whose `std/` is identical to the head's (log: `docs/sc79-witness/cost-b22ada4.log`). That is the pre-rewrite name of `514cfcd`: before the first push, three witness logs were rewritten in place to drop the scheduler's lock-helper lines, so every later commit was replayed, and the trees are otherwise identical.
 
 | verify | default build (the rig's lane) | ratio to `p256.verify` | predicted | `--release` | ratio |
 |---|---|---|---|---|---|
