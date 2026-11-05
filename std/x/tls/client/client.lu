@@ -307,9 +307,10 @@ pub fn scheme_rsa_pss_sha512() -> int {
 /// (§4.4.2.2). ct: public.
 ///
 /// ```wolf-doc-example
-/// client.signature_schemes().len == 6
-/// client.signature_schemes()[0] == client.scheme_ed25519()
-/// client.signature_schemes()[5] == client.scheme_rsa_pss_sha512()
+/// let offered = client.signature_schemes()
+/// offered.len == 6
+/// offered[0] == client.scheme_ed25519()
+/// offered[5] == client.scheme_rsa_pss_sha512()
 /// ```
 pub fn signature_schemes() -> List[int] {
     var schemes = List[int]()
