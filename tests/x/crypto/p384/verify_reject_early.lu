@@ -1,0 +1,111 @@
+//! check: run(exit=0, stdout="short key: refused\ncompressed lead byte: refused\nx at least p: refused\noff the curve: refused\nr = 0: refused\ns = n: refused\ntrailing byte: refused\nlong-form length: refused\nnot a SEQUENCE: refused\nempty signature: refused\nraw 95 bytes: refused\nraw r = 0: refused")
+//! phase: run
+//! conforms: std.x.crypto.p384
+//!
+//! sc79: ECDSA P-384's early refusals, each answered false before the
+//! joint scalar multiplication: a public key that is not the 97-byte
+//! uncompressed SEC 1 form, a coordinate at least p, a point off the
+//! curve (SEC 1 §3.2.2, the invalid-curve class), r or s outside
+//! [1, n) (FIPS 186-5 §6.4.2 step 1), and DER that is not strict X.690.
+//! The key is the base point G itself (on the curve), so only the named
+//! defect refuses each row. THREE-LANE: no row reaches a scalar
+//! multiplication.
+
+use std.hex
+use std.x.crypto.p384
+
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
+}
+
+fn say(label: str, verdict: bool) {
+    if verdict {
+        print("{label}: accepted")
+    } else {
+        print("{label}: refused")
+    }
+}
+
+fn main() -> int {
+    let g = bytes_of(
+        "04aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab73617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f",
+    )
+    let m = "sc79".bytes()
+    let sig = bytes_of("3006020101020101")
+    say(
+        "short key",
+        p384.verify_der(
+            bytes_of(
+                "04aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab73617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e",
+            ),
+            m,
+            sig,
+        ),
+    )
+    say(
+        "compressed lead byte",
+        p384.verify_der(
+            bytes_of(
+                "02aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab73617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f",
+            ),
+            m,
+            sig,
+        ),
+    )
+    say(
+        "x at least p",
+        p384.verify_der(
+            bytes_of(
+                "04fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff3617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f",
+            ),
+            m,
+            sig,
+        ),
+    )
+    say(
+        "off the curve",
+        p384.verify_der(
+            bytes_of(
+                "04aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab73617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e60",
+            ),
+            m,
+            sig,
+        ),
+    )
+    say("r = 0", p384.verify_der(g, m, bytes_of("3006020100020101")))
+    say(
+        "s = n",
+        p384.verify_der(
+            g,
+            m,
+            bytes_of(
+                "3036020101023100ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973",
+            ),
+        ),
+    )
+    say("trailing byte", p384.verify_der(g, m, bytes_of("300602010102010100")))
+    say("long-form length", p384.verify_der(g, m, bytes_of("308106020101020101")))
+    say("not a SEQUENCE", p384.verify_der(g, m, bytes_of("3106020101020101")))
+    say("empty signature", p384.verify_der(g, m, List[byte]()))
+    say(
+        "raw 95 bytes",
+        p384.verify(
+            g,
+            m,
+            bytes_of(
+                "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            ),
+        ),
+    )
+    say(
+        "raw r = 0",
+        p384.verify(
+            g,
+            m,
+            bytes_of(
+                "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001",
+            ),
+        ),
+    )
+    0
+}

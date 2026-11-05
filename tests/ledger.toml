@@ -5252,3 +5252,39 @@ native = "run"
 lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
+
+# ---- sc79: the hand rows. Three-lane where no row reaches an RSA
+# exponentiation or a P-384 scalar multiplication (the key policy, the
+# early refusals, the trap, RFC 9525 matching); native-only where one
+# does (lupin's 50M-step refusal in about 20 s, the checked tier's in
+# about 3 s, measured on each file).
+[tests."x/crypto/rsa/key_policy_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/rsa/verify_reject_early.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/rsa/hash_selector_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/rsa/rsa2049_rows.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/p384/verify_reject_early.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/p384/self_test.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+

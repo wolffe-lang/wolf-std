@@ -1,0 +1,24 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.crypto.rsa, conf.trap.set
+//!
+//! sc79: a hash selector that is not one of `rsa.hash_sha256()`,
+//! `hash_sha384()` or `hash_sha512()` is the caller's constant, not
+//! data, so it traps `assert` (API-CONVENTIONS §2, §10) before any key
+//! or signature is read.
+
+use std.hex
+use std.x.crypto.rsa
+
+fn main() -> int {
+    let kb = hex.decode(
+        "3082010a028201010197cd671499081148e4beb5464e60d720979cbefa2705c93711953daedeeb69707d19b0837280a27bfe9a28613fa168080361df380361a9df42c260b74676576a28ff1ce82965d7f25cfbe4bb9c7935e45207d04404a127037ba87755bb03489b95af8f9de67e4b2ca031a650a381cb3a7056cadeb08d15a6b6e6191e38029a6827558c95427b4ae97cb1a0b549fb54ced237262334a6b09414a02bb0313244bc7c790dd1fda17c7181c3edbd477eda81d85c7fa800047ae4fd3a9589506e69ade1bc6bed37d687f539dd09000335488bc00adb5d719d1129de25963e2b8c8926e370dc6a2de3abf194e7cef50b89d003dc2aa6ff804ac962fa4fd3dd98a27e770203010001",
+    ) else List[byte]()
+    let key = rsa.parse_public_key(kb) else |_| {
+        return 2
+    }
+    if rsa.verify_pkcs1(key, 224, "m".bytes(), List[byte]()) {
+        return 3
+    }
+    0
+}

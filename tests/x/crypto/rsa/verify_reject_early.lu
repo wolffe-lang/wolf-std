@@ -1,0 +1,51 @@
+//! check: run(exit=0, stdout="short signature: refused\nlong signature: refused\nsignature at least n: refused\npss short signature: refused\npss signature at least n: refused")
+//! phase: run
+//! conforms: std.x.crypto.rsa
+//!
+//! sc79: the verifiers' early refusals, each answered false before any
+//! modular exponentiation (RFC 8017 §8.2.2 step 1 and §8.1.2 step 1: a
+//! signature that is not k octets; §5.2.2 step 1: a representative at
+//! least n). THREE-LANE for that reason. The key is the vendored
+//! 2049-bit one; the signatures are synthetic.
+
+use std.hex
+use std.x.crypto.rsa
+
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
+}
+
+fn filled(len: int, v: int) -> List[byte] {
+    var out = List[byte]()
+    var i: int = 0
+    while i < len {
+        (mut out).push(v as byte)
+        i = i + 1
+    }
+    out
+}
+
+fn say(label: str, verdict: bool) {
+    if verdict {
+        print("{label}: accepted")
+    } else {
+        print("{label}: refused")
+    }
+}
+
+fn main() -> int {
+    let kb = bytes_of(
+        "3082010a028201010197cd671499081148e4beb5464e60d720979cbefa2705c93711953daedeeb69707d19b0837280a27bfe9a28613fa168080361df380361a9df42c260b74676576a28ff1ce82965d7f25cfbe4bb9c7935e45207d04404a127037ba87755bb03489b95af8f9de67e4b2ca031a650a381cb3a7056cadeb08d15a6b6e6191e38029a6827558c95427b4ae97cb1a0b549fb54ced237262334a6b09414a02bb0313244bc7c790dd1fda17c7181c3edbd477eda81d85c7fa800047ae4fd3a9589506e69ade1bc6bed37d687f539dd09000335488bc00adb5d719d1129de25963e2b8c8926e370dc6a2de3abf194e7cef50b89d003dc2aa6ff804ac962fa4fd3dd98a27e770203010001",
+    )
+    let key = rsa.parse_public_key(kb) else |_| {
+        return 2
+    }
+    let msg = "sc79 row message".bytes()
+    let h = rsa.hash_sha256()
+    say("short signature", rsa.verify_pkcs1(key, h, msg, filled(256, 1)))
+    say("long signature", rsa.verify_pkcs1(key, h, msg, filled(258, 1)))
+    say("signature at least n", rsa.verify_pkcs1(key, h, msg, filled(257, 255)))
+    say("pss short signature", rsa.verify_pss(key, h, msg, filled(256, 1), 32))
+    say("pss signature at least n", rsa.verify_pss(key, h, msg, filled(257, 255), 32))
+    0
+}

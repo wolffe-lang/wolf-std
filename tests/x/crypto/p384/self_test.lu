@@ -1,0 +1,21 @@
+//! check: run(exit=0, stdout="p384: G is on the curve and [n]G is the point at infinity")
+//! phase: run
+//! conforms: std.x.crypto.p384
+//!
+//! sc79: the group self-test through the module's own arithmetic — the
+//! base point satisfies y^2 = x^3 - 3x + b, and the joint scalar
+//! multiplication takes [n]G to the point at infinity (the last addition
+//! is [n-1]G + G, the P + (-P) case). NATIVE-ONLY: one 384-bit scalar
+//! multiplication is past the interpreter's and the checked tier's step
+//! budgets.
+
+use std.x.crypto.p384
+
+fn main() -> int {
+    if !p384.self_test() {
+        print("FAIL p384-self-test")
+        return 1
+    }
+    print("p384: G is on the curve and [n]G is the point at infinity")
+    0
+}

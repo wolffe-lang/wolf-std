@@ -1,0 +1,64 @@
+//! check: run(exit=0, stdout="rsa2049: 9 rows")
+//! phase: run
+//! conforms: std.x.crypto.rsa
+//!
+//! sc79: a 2049-bit modulus, where RSASSA-PSS's encoded message is one
+//! octet shorter than the modulus (RFC 8017 §8.1.2 step 2c: emBits =
+//! modBits − 1 = 2048, so emLen = k − 1 and RSAVP1's leading octet must
+//! be zero). No Wycheproof file carries this shape. The key and both
+//! signatures are the pinned OpenSSL binary's
+//! (`vendor/vectors/pki/sc79/rsa2049*`), over the 16 bytes
+//! `sc79 row message`. Each row prints `FAIL <name>` when its verdict is
+//! wrong and the program then exits 1.
+
+use std.hex
+use std.x.crypto.rsa
+
+fn bytes_of(h: str) -> List[byte] {
+    hex.decode(h) else List[byte]()
+}
+
+fn row(name: str, ok: bool) -> int {
+    if ok {
+        return 0
+    }
+    print("FAIL {name}")
+    1
+}
+
+fn main() -> int {
+    let kb = bytes_of(
+        "3082010a028201010197cd671499081148e4beb5464e60d720979cbefa2705c93711953daedeeb69707d19b0837280a27bfe9a28613fa168080361df380361a9df42c260b74676576a28ff1ce82965d7f25cfbe4bb9c7935e45207d04404a127037ba87755bb03489b95af8f9de67e4b2ca031a650a381cb3a7056cadeb08d15a6b6e6191e38029a6827558c95427b4ae97cb1a0b549fb54ced237262334a6b09414a02bb0313244bc7c790dd1fda17c7181c3edbd477eda81d85c7fa800047ae4fd3a9589506e69ade1bc6bed37d687f539dd09000335488bc00adb5d719d1129de25963e2b8c8926e370dc6a2de3abf194e7cef50b89d003dc2aa6ff804ac962fa4fd3dd98a27e770203010001",
+    )
+    let key = rsa.parse_public_key(kb) else |_| {
+        print("FAIL rsa2049-key-parses")
+        return 1
+    }
+    let msg = "sc79 row message".bytes()
+    let pss = bytes_of(
+        "017d4c4ca07b7e047fa61e7b7ffee3ab29e732bfc4d08e4697e40d09b3b6a4325942cd0f83171015dd2d186b9b7e46fa9f464769f74565aa1afb4d2197aef3a620468d9dbaf0d5ebbbccad3747d7fcfe9553a07eb71940b0b0f76a3603f50f480dc9f050f0a49b57803d3be0bdfb5b9858325fbe429e160846604fd315fdd86241baecedbab0dd4b233edada7574858c5ab017f740ee5493058fa0dc3f7aa9c6a69fbfa1552d898aec0703da3799922ca67bdc2b4a2575d163b59df9a2a3fa74a76eb0f138f03146e17426d355a27bdb9c25fff35e91bc0ae93cde630dd8261d5f6c8be3435e9826f3d5a75789d4422d418282f2959650cf300ad8cdd0fee5828d",
+    )
+    let pk1 = bytes_of(
+        "010b0543afa29c2d26d1deb143f0a8a79090cc69ed5ad7e76b9df53492ad9e3eed4fd43523079149b3e147655fcc98bce45b4f289d41043f03f5438b487cec3574961da621a5e76991c983b39b87fdec6a62e3a0deff962c8ce01dda7a5b6419bcadf442076448eb3136e824ee8a72265297b779e06e99aba5b9139a49d5fa416f93ce125b41593702ae1c8fc40aa636b834587d0e2efadff050d99f7d081bd0ccc66330e4e01445b4b1a3acaac5fd0ce34279b4dc7e88001c2a0b706f8233ad4e0fba275aecc5a8fe4af83ba173d6a86663b7abbbc16e83fc7bd63b333eb63614e6743de7c0607fa0be1db3b2aead77b3019674ebc385a2097c25bff3da006d38",
+    )
+    let pss_flipped = bytes_of(
+        "017d4c4ca07b7e047fa61e7b7ffee3ab29e732bfc4d08e4697e40d09b3b6a4325942cd0f83171015dd2d186b9b7e46fa9f464769f74565aa1afb4d2197aef3a620468d9dbaf0d5ebbbccad3747d7fcfe9553a07eb71940b0b0f76a3603f50f480dc9f050f0a49b57803d3be0bdfb5b9858325fbe429e160846604fd315fdd86241baecedbab0dd4b233edada7574858c5ab017f740ee5493058fa0dc3f7aa9c6a69fbfa1552d898aec0703da3799922ca67bdc2b4a2575d163b59df9a2a3fa74a76eb0f138f03146e17426d355a27bdb9c25fff35e91bc0ae93cde630dd8261d5f6c8be3435e9826f3d5a75789d4422d418282f2959650cf300ad8cdd0fee5828c",
+    )
+    let sha256 = rsa.hash_sha256()
+    var bad: int = 0
+    bad = bad + row("rsa2049-modulus-bits", key.bits == 2049)
+    bad = bad + row("pss-2049-sha256-salt32", rsa.verify_pss(key, sha256, msg, pss, 32))
+    bad = bad + row("pss-2049-salt31-refused", !rsa.verify_pss(key, sha256, msg, pss, 31))
+    bad = bad + row("pss-2049-salt33-refused", !rsa.verify_pss(key, sha256, msg, pss, 33))
+    bad = bad +
+        row("pss-2049-sha384-refused", !rsa.verify_pss(key, rsa.hash_sha384(), msg, pss, 32))
+    bad = bad + row("pss-2049-flipped-refused", !rsa.verify_pss(key, sha256, msg, pss_flipped, 32))
+    bad = bad + row("pkcs1-2049-sha256", rsa.verify_pkcs1(key, sha256, msg, pk1))
+    bad = bad + row("pkcs1-2049-as-pss-refused", !rsa.verify_pss(key, sha256, msg, pk1, 32))
+    bad = bad + row("pss-2049-as-pkcs1-refused", !rsa.verify_pkcs1(key, sha256, msg, pss))
+    if bad > 0 {
+        return 1
+    }
+    print("rsa2049: 9 rows")
+    0
+}
