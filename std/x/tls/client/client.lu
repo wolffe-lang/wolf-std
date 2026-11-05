@@ -14,12 +14,14 @@
 //! **The nursery banner (D31).** `std.x.tls.client` is not `std.tls`:
 //! its path, names and behaviour may change or vanish in one sprint; no
 //! other std module may depend on it. Its reason and graduation trigger
-//! live in `std/x/README.md`. It depends on FIVE sibling residents —
+//! live in `std/x/README.md`. It depends on SEVEN sibling residents —
 //! `std.x.tls.record` (seal/open + the key-schedule primitives),
 //! `std.x.tls.handshake` (messages, transcript, schedule, Finished,
-//! the §4.1 state machine), `std.x.tls.cert` (chain validation),
-//! `std.x.crypto.curve25519` (X25519 + Ed25519 verify) and
-//! `std.x.crypto.p256` (ECDSA-P256 verify) — plus the `std.net` FACADE
+//! the §4.1 state machine), `std.x.tls.cert` (path validation),
+//! `std.x.crypto.curve25519` (X25519 + Ed25519 verify),
+//! `std.x.crypto.p256` (ECDSA-P256 verify), `std.x.crypto.p384`
+//! (ECDSA-P384 verify, sc79) and `std.x.crypto.rsa` (RSASSA-PSS verify,
+//! sc79) — plus the `std.net` FACADE
 //! (a resident may depend on the facade). The resident-on-resident
 //! edges are named in the register beside the earlier rungs' own.
 //!
@@ -27,10 +29,14 @@
 //!
 //! TLS 1.3 only, TLS_CHACHA20_POLY1305_SHA256 (0x1303 — the suite the
 //! server half speaks), X25519 the only group, SNI + the RFC 8446
-//! minimum extensions. CertificateVerify VERIFIES — see below. NAMED
-//! NON-TARGETS (this sprint's contract): OS truststore reading (trust
-//! anchors are CALLER-SUPPLIED), session resumption/0-RTT, rsa_pss
-//! verification (a named `unsupported_alg`, never a silent accept),
+//! minimum extensions. signature_algorithms offers the six schemes this
+//! client verifies (`signature_schemes`). CertificateVerify VERIFIES —
+//! see below. NAMED NON-TARGETS: OS truststore reading (the trust
+//! anchors are CALLER-SUPPLIED — a distribution's bundle converted to
+//! concatenated DER is the intended input, and std opens no file for
+//! it), session resumption/0-RTT, the rsa_pss_pss_* and rsa_pkcs1_*
+//! CertificateVerify schemes and P-521 (named `unsupported_alg`, never
+//! a silent accept), signature_algorithms_cert (not sent),
 //! TLS 1.2 (a downgrade-shaped ServerHello is a named refusal),
 //! HelloRetryRequest (one key share is offered and a server that
 //! cannot take it is a named refusal, not a second flight).
@@ -42,11 +48,17 @@
 //! two schemes at sc29: **ed25519 (0x0807)** verifies via sc18's
 //! `curve25519.verify` and **ecdsa_secp256r1_sha256 (0x0403)** verifies
 //! via sc23's `p256.verify_der` — both against the validated leaf's
-//! SPKI over the exact §4.4.3 content. `rsa_pss_rsae_sha256` (0x0804)
-//! and its family remain the named `unsupported_alg` rejection (RSA's
-//! crypto rung is unbuilt — the sc22 honesty split, unchanged).
-//! NOTHING about a peer is trusted before chain + CertificateVerify +
-//! Finished all pass.
+//! SPKI over the exact §4.4.3 content. sc79 adds the public PKI's:
+//! **ecdsa_secp384r1_sha384 (0x0503)** via `p384.verify_der` and
+//! **rsa_pss_rsae_sha256/384/512 (0x0804..0x0806)** via
+//! `rsa.verify_pss` (MGF1 over the same hash, salt = digest length,
+//! RFC 8446 §4.2.3); every other scheme remains the named
+//! `unsupported_alg` (the sc22 honesty split, unchanged), and a weak
+//! RSA leaf key is `weak_key`. NOTHING about a peer is trusted before
+//! path + CertificateVerify + Finished all pass. The path is
+//! `cert.validate_path` from the leaf to one of the caller's roots
+//! (sc79; the anchor-at-a-time search it replaces validated the whole
+//! chain once per root).
 //!
 //! ## The API shape: the caller owns the dial, the module owns the
 //! state machine — in TWO PHASES
@@ -87,11 +99,12 @@
 //! or the peer alerted mid-handshake), `unexpected_message` (§4.1
 //! flow violations — reordered/duplicated/illegal flights, via sc21's
 //! `hs_step`). Keys: `zero` (the all-zero X25519 shared secret, sc18's
-//! row, RFC 8446 §7.4.2). Identity: sc22's nine chain rows verbatim
-//! (`der`, `unsupported_alg`, `bad_signature`, `expired`,
+//! row, RFC 8446 §7.4.2). Identity: `cert.validate_path`'s twelve rows
+//! verbatim (`der`, `unsupported_alg`, `bad_signature`, `expired`,
 //! `not_yet_valid`, `name_mismatch`, `not_ca`, `issuer_mismatch`,
-//! `unknown_critical`) plus `bad_signature`/`unsupported_alg` again
-//! from CertificateVerify, and `decrypt_error` (a wrong Finished,
+//! `unknown_critical`, and since sc79 `weak_key`, `bad_usage`,
+//! `name_constraints`) plus `bad_signature`/`unsupported_alg`/`weak_key`
+//! again from CertificateVerify, and `decrypt_error` (a wrong Finished,
 //! §4.4.4 — sc21's tag). Application data: `invalid` on `write` for a
 //! non-byte element (the net byte tier's tag, §14).
 //!
@@ -964,8 +977,9 @@ pub struct Pending {
 ///
 /// `hostname` rides SNI and is the name the chain must certify;
 /// `anchors` is the caller-supplied root store (concatenated DER, one
-/// or more roots — NO OS truststore is read, the contract's named
-/// non-target); `now` is the compact `cert.timestamp(...)` UTC time
+/// or more roots — a distribution's bundle converted to DER is the
+/// intended input; NO OS truststore is read); `now` is the compact
+/// `cert.timestamp(...)` UTC time
 /// the chain is judged at (supplied, never the wall clock — sc22's
 /// determinism rule). `client_random` (32 bytes) and `key_seed` (the
 /// 32-byte X25519 private scalar) are the CALLER'S entropy; both are
@@ -973,9 +987,11 @@ pub struct Pending {
 /// the caller could have checked).
 ///
 /// The ClientHello this profile sends: 0x1303 alone, SNI, groups
-/// [x25519], signature_algorithms [ed25519, ecdsa_secp256r1_sha256,
-/// rsa_pss_rsae_sha256], supported_versions [0x0304], one X25519 key
-/// share. Rows: the transport's (`closed`, `io`).
+/// [x25519], signature_algorithms `signature_schemes()` (ed25519,
+/// ecdsa_secp256r1_sha256, ecdsa_secp384r1_sha384, rsa_pss_rsae_sha256,
+/// rsa_pss_rsae_sha384, rsa_pss_rsae_sha512), supported_versions
+/// [0x0304], one X25519 key share. Rows: the transport's (`closed`,
+/// `io`).
 ///
 /// To bound the WHOLE handshake, arm `net.set_deadline` on the socket
 /// BEFORE calling this — the budget is per-fd host state and survives
@@ -1048,8 +1064,9 @@ pub struct Client {
 /// (sc20's `open`: a forged/tampered record is `bad_record_mac` with
 /// zero plaintext exposed; handshake messages may span or share
 /// records — the client reassembles): EncryptedExtensions
-/// (structure-checked), Certificate (chain extracted, validated
-/// through sc22 against the caller's anchors — nine named rejections),
+/// (structure-checked), Certificate (chain extracted, a path built and
+/// validated by `cert.validate_path` to one of the caller's roots —
+/// twelve named rejections),
 /// CertificateVerify (VERIFIED — see `verify_certificate_verify`),
 /// server Finished (sc21's `accept_finished` — a wrong MAC is
 /// `decrypt_error` with nothing derived onward). Then the client
@@ -1385,7 +1402,7 @@ pub fn close(take c: Client) -> () ! {io} {
 
 /// The value of `v`, or the NAME of the row that refused it, coarsened
 /// into the single payload-carrying tag `Row(str)` — ONE handler arm at
-/// the consumer instead of this module's twenty.
+/// the consumer instead of this module's twenty-three.
 ///
 /// This is API-CONVENTIONS §12's coarsening rule at the protocol tier,
 /// and `errors.coarsen` is its shape: the widening is a NAMED call the
@@ -1409,9 +1426,10 @@ pub fn close(take c: Client) -> () ! {io} {
 /// breaking change to this surface and is spelled as one.
 ///
 /// The parameter is the module's WHOLE vocabulary — `complete`'s
-/// twenty rows plus `write`'s `invalid` — so any raising call in this
-/// module (and `cert.validate_chain`'s nine, which this module
-/// re-exports verbatim) rides in by width subtyping. `std.option`'s
+/// twenty-three rows (twenty until sc79 added `weak_key`, `bad_usage`
+/// and `name_constraints`) plus `write`'s `invalid` — so any raising
+/// call in this module (and `cert.validate_path`'s twelve, which this
+/// module re-exports verbatim) rides in by width subtyping. `std.option`'s
 /// `or`/`exists` are the house shape for a row in parameter position.
 ///
 /// Rows: `Row(str)` and nothing else. Total: no traps of its own.
