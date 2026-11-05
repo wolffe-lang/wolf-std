@@ -203,8 +203,62 @@ selfsigned ed448_root "wolf-std sc79 Ed448 root" root ""
 
 # A 2049-bit key (emLen = k - 1 under RSASSA-PSS) and CertificateVerify
 # fixtures: RFC 8446 section 4.4.3's signed content over a fixed
-# transcript hash, signed as each TLS 1.3 scheme signs it.
-key rsa2049 RSA -pkeyopt rsa_keygen_bits:2049
+# transcript hash, signed as each TLS 1.3 scheme signs it. OpenSSL 3.0's
+# key generation rounds an odd size down to an even one, so the 2049-bit
+# key's primes are drawn here (Miller-Rabin over Python's integers, the
+# RSAPrivateKey of RFC 8017 A.1.2 written as DER), and OpenSSL signs with
+# it as a black box.
+python3 -I - rsa2049.der <<'KEYGEN'
+import secrets, sys
+def probable_prime(n):
+    if n % 2 == 0:
+        return False
+    d, r = n - 1, 0
+    while d % 2 == 0:
+        d //= 2
+        r += 1
+    for _ in range(40):
+        a = secrets.randbelow(n - 3) + 2
+        x = pow(a, d, n)
+        if x in (1, n - 1):
+            continue
+        for _ in range(r - 1):
+            x = x * x % n
+            if x == n - 1:
+                break
+        else:
+            return False
+    return True
+def prime(bits):
+    while True:
+        c = secrets.randbits(bits) | (3 << (bits - 2)) | 1
+        if probable_prime(c) and (c - 1) % 65537:
+            return c
+e = 65537
+while True:
+    p, q = prime(1025), prime(1024)
+    n = p * q
+    if n.bit_length() == 2049 and p != q:
+        break
+lam = (p - 1) * (q - 1) // __import__("math").gcd(p - 1, q - 1)
+d = pow(e, -1, lam)
+def tlv(tag, body):
+    n = len(body)
+    if n < 128:
+        head = bytes([n])
+    else:
+        nb = n.to_bytes((n.bit_length() + 7) // 8, "big")
+        head = bytes([0x80 | len(nb)]) + nb
+    return bytes([tag]) + head + body
+def integer(v):
+    b = v.to_bytes(max(1, (v.bit_length() + 8) // 8), "big")
+    return tlv(2, b)
+body = b"".join(integer(v) for v in (0, n, e, d, p, q, d % (p - 1), d % (q - 1), pow(q, -1, p)))
+open(sys.argv[1], "wb").write(tlv(0x30, body))
+KEYGEN
+openssl pkey -inform DER -in rsa2049.der -out rsa2049.key
+rm -f rsa2049.der
+[ "$(openssl rsa -in rsa2049.key -noout -text | head -1)" = "Private-Key: (2049 bit, 2 primes)" ]
 printf 'sc79 row message' > msg.bin
 openssl dgst -sha256 -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:32 \
   -sign rsa2049.key -out rsa2049_pss_sha256.sig msg.bin

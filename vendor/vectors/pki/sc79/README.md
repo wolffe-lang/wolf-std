@@ -58,7 +58,10 @@ path building to step past the cross-sign.
 ## The signature fixtures
 
 - `rsa2049.pub.der`: a 2049-bit RSAPublicKey, so RSASSA-PSS's encoded
-  message is one octet shorter than the modulus (emBits = 2048);
+  message is one octet shorter than the modulus (emBits = 2048). OpenSSL
+  3.0 rounds an odd key size down, so the script draws this key's primes
+  itself (Miller-Rabin over Python's integers) and hands OpenSSL the
+  RSAPrivateKey to sign with;
   `rsa2049_pss_sha256.sig` (salt 32) and `rsa2049_pkcs1_sha256.sig` sign
   the 16 bytes `sc79 row message`.
 - `cv_rsa_pss_sha{256,384,512}.sig` (by `rsa_leaf.key`, salt = digest
