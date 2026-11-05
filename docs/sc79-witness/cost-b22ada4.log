@@ -1,0 +1,76 @@
+QUEUED perf 2026-11-05T20:18:58Z
+ACQUIRED perf 2026-11-05T20:34:28Z
+head b22ada44c747e3800e8c919627ba32d89489dc3d cpus Cpus_allowed_list:	0-5 load 4.73 4.95 4.21 3/1798 4
+== bench.lu, default build
+warmup p256.verify ns=523394004
+warmup rsa2048.verify_pkcs1 ns=52781622
+warmup rsa4096.verify_pkcs1 ns=220905369
+warmup rsa2048.verify_pss ns=53567247
+warmup p384.verify_der ns=832755607
+batch 1 p256.verify ns=524139888 ns_per_call=16379371
+batch 1 rsa2048.verify_pkcs1 ns=52393697 ns_per_call=1637303
+batch 1 rsa4096.verify_pkcs1 ns=221206802 ns_per_call=6912712
+batch 1 rsa2048.verify_pss ns=53536557 ns_per_call=1673017
+batch 1 p384.verify_der ns=832395870 ns_per_call=26012370
+batch 2 p256.verify ns=523709124 ns_per_call=16365910
+batch 2 rsa2048.verify_pkcs1 ns=52607827 ns_per_call=1643994
+batch 2 rsa4096.verify_pkcs1 ns=221137809 ns_per_call=6910556
+batch 2 rsa2048.verify_pss ns=53507187 ns_per_call=1672099
+batch 2 p384.verify_der ns=832425839 ns_per_call=26013307
+batch 3 p256.verify ns=523145249 ns_per_call=16348289
+batch 3 rsa2048.verify_pkcs1 ns=52121664 ns_per_call=1628802
+batch 3 rsa4096.verify_pkcs1 ns=218397597 ns_per_call=6824924
+batch 3 rsa2048.verify_pss ns=53246641 ns_per_call=1663957
+batch 3 p384.verify_der ns=826080127 ns_per_call=25815003
+batch 4 p256.verify ns=522743231 ns_per_call=16335725
+batch 4 rsa2048.verify_pkcs1 ns=52060710 ns_per_call=1626897
+batch 4 rsa4096.verify_pkcs1 ns=218480373 ns_per_call=6827511
+batch 4 rsa2048.verify_pss ns=53239678 ns_per_call=1663739
+batch 4 p384.verify_der ns=826174944 ns_per_call=25817967
+batch 5 p256.verify ns=522738804 ns_per_call=16335587
+batch 5 rsa2048.verify_pkcs1 ns=52305716 ns_per_call=1634553
+batch 5 rsa4096.verify_pkcs1 ns=218537764 ns_per_call=6829305
+batch 5 rsa2048.verify_pss ns=53303921 ns_per_call=1665747
+batch 5 p384.verify_der ns=823793275 ns_per_call=25743539
+MEDIAN p256.verify ns_per_call=16348289 ratio_to_p256_x1000=1000
+MEDIAN rsa2048.verify_pkcs1 ns_per_call=1634553 ratio_to_p256_x1000=99
+MEDIAN rsa4096.verify_pkcs1 ns_per_call=6829305 ratio_to_p256_x1000=417
+MEDIAN rsa2048.verify_pss ns_per_call=1665747 ratio_to_p256_x1000=101
+MEDIAN p384.verify_der ns_per_call=25817967 ratio_to_p256_x1000=1579
+== bench.lu, release build
+warmup p256.verify ns=231425777
+warmup rsa2048.verify_pkcs1 ns=20745428
+warmup rsa4096.verify_pkcs1 ns=97086283
+warmup rsa2048.verify_pss ns=21286110
+warmup p384.verify_der ns=271382828
+batch 1 p256.verify ns=227985025 ns_per_call=7124532
+batch 1 rsa2048.verify_pkcs1 ns=20984743 ns_per_call=655773
+batch 1 rsa4096.verify_pkcs1 ns=96982664 ns_per_call=3030708
+batch 1 rsa2048.verify_pss ns=21171082 ns_per_call=661596
+batch 1 p384.verify_der ns=269602927 ns_per_call=8425091
+batch 2 p256.verify ns=227522886 ns_per_call=7110090
+batch 2 rsa2048.verify_pkcs1 ns=20908037 ns_per_call=653376
+batch 2 rsa4096.verify_pkcs1 ns=96568935 ns_per_call=3017779
+batch 2 rsa2048.verify_pss ns=21217600 ns_per_call=663050
+batch 2 p384.verify_der ns=268803425 ns_per_call=8400107
+batch 3 p256.verify ns=227233163 ns_per_call=7101036
+batch 3 rsa2048.verify_pkcs1 ns=20517763 ns_per_call=641180
+batch 3 rsa4096.verify_pkcs1 ns=94463921 ns_per_call=2951997
+batch 3 rsa2048.verify_pss ns=20852094 ns_per_call=651627
+batch 3 p384.verify_der ns=264563577 ns_per_call=8267611
+batch 4 p256.verify ns=227084720 ns_per_call=7096397
+batch 4 rsa2048.verify_pkcs1 ns=20590799 ns_per_call=643462
+batch 4 rsa4096.verify_pkcs1 ns=94453711 ns_per_call=2951678
+batch 4 rsa2048.verify_pss ns=20812608 ns_per_call=650394
+batch 4 p384.verify_der ns=262984194 ns_per_call=8218256
+batch 5 p256.verify ns=227530087 ns_per_call=7110315
+batch 5 rsa2048.verify_pkcs1 ns=20347384 ns_per_call=635855
+batch 5 rsa4096.verify_pkcs1 ns=94034382 ns_per_call=2938574
+batch 5 rsa2048.verify_pss ns=20737175 ns_per_call=648036
+batch 5 p384.verify_der ns=260399691 ns_per_call=8137490
+MEDIAN p256.verify ns_per_call=7110090 ratio_to_p256_x1000=1000
+MEDIAN rsa2048.verify_pkcs1 ns_per_call=643462 ratio_to_p256_x1000=90
+MEDIAN rsa4096.verify_pkcs1 ns_per_call=2951997 ratio_to_p256_x1000=415
+MEDIAN rsa2048.verify_pss ns_per_call=651627 ratio_to_p256_x1000=91
+MEDIAN p384.verify_der ns_per_call=8267611 ratio_to_p256_x1000=1162
+load after 4.15 4.79 4.17 2/1787 60

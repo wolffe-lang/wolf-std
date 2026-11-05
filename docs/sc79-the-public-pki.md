@@ -28,7 +28,7 @@ The prediction was committed first, at `ba4c946` (`docs/sc79-prediction.md`), be
 - **P2, Wycheproof P-384:** held. 1798 cases: 780 accepted, 1018 rejected, with no verdict changed.
 - **P3, local handshakes:** the green half held, and the red half only in part. Every profile completes at the head. At trunk, the RSA, RSA-PSS-certificate and P-256-under-P-384 rows fail as predicted, with `complete=unsupported_alg`. The `rsa_pss_rsae_sha384`, `rsa_pss_rsae_sha512` and P-384-chain rows also fail at trunk, but with `complete=handshake_failure`, not the predicted `unsupported_alg`. Trunk did not offer those schemes, so the OpenSSL peer refused during the handshake, before any certificate reached the client.
 - **P4, github.com:** half held. The handshake completes, and the client reads application data. I predicted the row would record the chain's algorithms. It cannot, without a second connection, because the client does not expose the peer's chain (R-sc79-10).
-- **P5, cost:** see the evidence below. Every ratio fell inside its predicted range.
+- **P5, cost:** held at the edge. RSA-4096 (0.42) and P-384 (1.58) fell inside their predicted ranges. RSA-2048 came in at 0.099, against a predicted 0.1–0.4, at the range's floor.
 - **P6, existing rows:** held. `unsupported_alg_row.lu` now names Ed448, because its RSA certificate validates. `rfc8448_parse_vectors.lu`'s answer moves from `unsupported_alg` to `weak_key`, because the trace's key is RSA-1024. Every other existing row keeps its ledger word under the final record's `std-test`.
 - **P7, the plant:** see the evidence below.
 
@@ -94,7 +94,17 @@ The trunk run is `docs/sc79-witness/interop-trunk-3111d39.log`. The final record
 
 ### The cost
 
-`docs/sc79-witness/bench/bench.lu` runs one warm-up batch and five interleaved batches of 32 calls, and takes the median per call. Its inputs are the first valid case of each vendored Wycheproof file. The final record's `cost-witness` step runs it natively on one Linux x86-64 block under `taskset`, holding the block's light lock as well. The PR body quotes the figures. A calibration run on a shared light slot, which is not a measurement, gave `p256.verify` 21.9 ms, RSA-2048 0.13×, RSA-4096 0.55× and P-384 1.74×.
+`docs/sc79-witness/bench/bench.lu` runs one warm-up batch and five interleaved batches of 32 calls, and takes the median per call. Its inputs are the first valid case of each vendored Wycheproof file. It ran natively on one Linux x86-64 block of six CPUs under `taskset`, holding the block's two locks and its light lock, so nothing ran beside it. The run was at `b22ada4`, whose `std/` is identical to the head's (log: `docs/sc79-witness/cost-b22ada4.log`).
+
+| verify | default build (the rig's lane) | ratio to `p256.verify` | predicted | `--release` | ratio |
+|---|---|---|---|---|---|
+| `p256.verify` (the baseline) | 16.35 ms | 1 | — | 7.11 ms | 1 |
+| RSA-2048, PKCS#1 v1.5, SHA-256 | 1.63 ms | 0.099 | 0.1–0.4 | 0.64 ms | 0.090 |
+| RSA-2048, PSS, SHA-256 | 1.67 ms | 0.101 | — | 0.65 ms | 0.091 |
+| RSA-4096, PKCS#1 v1.5, SHA-256 | 6.83 ms | 0.417 | 0.3–1.2 | 2.95 ms | 0.415 |
+| P-384, SHA-384 | 25.82 ms | 1.58 | 1–4 | 8.27 ms | 1.16 |
+
+RSA-2048 lands at the bottom of its predicted range, 0.099 against a predicted 0.1. The other two land inside theirs. The final record's `cost-witness` step repeats the measurement, and the PR body quotes it.
 
 ### The plant
 
