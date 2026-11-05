@@ -198,6 +198,8 @@
 use std.net
 use std.x.crypto.curve25519
 use std.x.crypto.p256
+use std.x.crypto.p384
+use std.x.crypto.rsa
 use std.x.tls.cert
 use std.x.tls.handshake
 use std.x.tls.record
@@ -238,17 +240,73 @@ pub fn scheme_ecdsa_p256_sha256() -> int {
     1027
 }
 
-/// SignatureScheme rsa_pss_rsae_sha256 (0x0804) — OFFERED (RFC 8446
-/// §9.1 lists it MTI, and refusing to offer it would misdescribe the
-/// library to a compliant server) and NOT verifiable: a
-/// CertificateVerify under it is the named `unsupported_alg`
-/// rejection, never a silent accept. ct: public.
+/// SignatureScheme ecdsa_secp384r1_sha384 (0x0503) — verifies via
+/// sc79's `p384.verify_der` against a P-384 leaf key. ct: public.
+///
+/// ```wolf-doc-example
+/// client.scheme_ecdsa_p384_sha384() == 1283
+/// ```
+pub fn scheme_ecdsa_p384_sha384() -> int {
+    1283
+}
+
+/// SignatureScheme rsa_pss_rsae_sha256 (0x0804) — RFC 8446 §9.1's MTI
+/// RSA scheme; verifies since sc79 via `rsa.verify_pss` (SHA-256, MGF1
+/// over SHA-256, a 32-byte salt) against an rsaEncryption leaf key.
+/// ct: public.
 ///
 /// ```wolf-doc-example
 /// client.scheme_rsa_pss_sha256() == 2052
 /// ```
 pub fn scheme_rsa_pss_sha256() -> int {
     2052
+}
+
+/// SignatureScheme rsa_pss_rsae_sha384 (0x0805) — `rsa.verify_pss`
+/// with SHA-384 and a 48-byte salt. ct: public.
+///
+/// ```wolf-doc-example
+/// client.scheme_rsa_pss_sha384() == 2053
+/// ```
+pub fn scheme_rsa_pss_sha384() -> int {
+    2053
+}
+
+/// SignatureScheme rsa_pss_rsae_sha512 (0x0806) — `rsa.verify_pss`
+/// with SHA-512 and a 64-byte salt. ct: public.
+///
+/// ```wolf-doc-example
+/// client.scheme_rsa_pss_sha512() == 2054
+/// ```
+pub fn scheme_rsa_pss_sha512() -> int {
+    2054
+}
+
+/// The signature_algorithms this client offers (RFC 8446 §4.2.3), in
+/// preference order: ed25519, ecdsa_secp256r1_sha256,
+/// ecdsa_secp384r1_sha384, rsa_pss_rsae_sha256, rsa_pss_rsae_sha384,
+/// rsa_pss_rsae_sha512 — every scheme `verify_certificate_verify` can
+/// judge, and nothing else (rsa_pss_pss_*, rsa_pkcs1_* and the SHA-1
+/// schemes are not offered). The list also governs the certificate
+/// signatures (no signature_algorithms_cert is sent, §4.2.3), and
+/// `cert.validate_path` additionally accepts sha256/384/512WithRSA
+/// certificate signatures, which a server may present regardless
+/// (§4.4.2.2). ct: public.
+///
+/// ```wolf-doc-example
+/// client.signature_schemes().len == 6
+/// client.signature_schemes()[0] == client.scheme_ed25519()
+/// client.signature_schemes()[5] == client.scheme_rsa_pss_sha512()
+/// ```
+pub fn signature_schemes() -> List[int] {
+    var schemes = List[int]()
+    (mut schemes).push(scheme_ed25519())
+    (mut schemes).push(scheme_ecdsa_p256_sha256())
+    (mut schemes).push(scheme_ecdsa_p384_sha384())
+    (mut schemes).push(scheme_rsa_pss_sha256())
+    (mut schemes).push(scheme_rsa_pss_sha384())
+    (mut schemes).push(scheme_rsa_pss_sha512())
+    schemes
 }
 
 // ---------------------------------------------------------------------
@@ -697,28 +755,35 @@ pub fn finished_of(msg: List[byte]) -> List[byte] ! {decode_error} {
 /// octets (64 spaces + "TLS 1.3, server CertificateVerify" + 0x00 +
 /// the hash), built here via `handshake.certificate_verify_content`.
 ///
-/// Dispatch, each answer named: **ed25519 (0x0807)** — the SPKI must
-/// be an Ed25519 key (RFC 8410) and sc18's `curve25519.verify` judges;
-/// **ecdsa_secp256r1_sha256 (0x0403)** — the SPKI must be an EC key
-/// and sc23's `p256.verify_der` judges (the signature is the DER
-/// SEQUENCE the wire carries, verbatim); a recognized scheme over the
-/// WRONG key type is `bad_signature` (that key cannot have produced
-/// it); the rsa_pss family and every unrecognized scheme are the named
-/// `unsupported_alg` — never a silent accept (the sc22 honesty split).
-/// Answers 1 on success so the miss is a row, not a bool a caller can
-/// forget (§2).
+/// Dispatch, each answer named (RFC 8446 §4.2.3 binds each scheme to
+/// its key type, and for ECDSA to its curve):
+/// **ed25519 (0x0807)** — an Ed25519 key, sc18's `curve25519.verify`;
+/// **ecdsa_secp256r1_sha256 (0x0403)** — an EC key, sc23's
+/// `p256.verify_der` (a key that is not a P-256 point fails it);
+/// **ecdsa_secp384r1_sha384 (0x0503)** — an EC key of 97 bytes, sc79's
+/// `p384.verify_der`; **rsa_pss_rsae_sha256/384/512 (0x0804..0x0806)**
+/// — an rsaEncryption key, sc79's `rsa.verify_pss` with MGF1 over the
+/// same hash and a salt of the digest's length. The signature is the
+/// wire's bytes verbatim (DER for ECDSA). A recognized scheme over the
+/// WRONG key type, a malformed RSA key, or a failed verification is
+/// `bad_signature` (that key cannot have produced it); an RSA key the
+/// rsa module's policy refuses as weak (a modulus under 2048 bits, a bad
+/// exponent) is `weak_key`; a modulus over 4096 bits and every
+/// unrecognized scheme (rsa_pss_pss_*, rsa_pkcs1_*, SHA-1, ed448) are
+/// the named `unsupported_alg` — never a silent accept. Answers 1 on
+/// success so the miss is a row, not a bool a caller can forget (§2).
 ///
 /// ct: public data throughout (a signature, a public key and a
 /// transcript hash are wire material — the sc18 verify-is-public
-/// rule). The ECDSA path is native-only by sc23's lane note (two
-/// P-256 ladders); the Ed25519 path is three-lane.
+/// rule). The ECDSA paths are native-only by their verifiers' lane
+/// notes; the Ed25519 path is three-lane.
 pub fn verify_certificate_verify(
     spki_alg: str,
     spki_key: List[byte],
     scheme: int,
     sig: List[byte],
     transcript_hash: List[byte],
-) -> int ! {unsupported_alg, bad_signature} {
+) -> int ! {unsupported_alg, bad_signature, weak_key} {
     let content = handshake.certificate_verify_content(
         "TLS 1.3, server CertificateVerify",
         transcript_hash,
@@ -737,6 +802,54 @@ pub fn verify_certificate_verify(
             return bad_signature
         }
         if p256.verify_der(spki_key, content, sig) {
+            return 1
+        }
+        return bad_signature
+    }
+    if scheme == scheme_ecdsa_p384_sha384() {
+        if spki_alg != cert.oid_ec_public_key() {
+            return bad_signature
+        }
+        if spki_key.len != 97 {
+            return bad_signature
+        }
+        if p384.verify_der(spki_key, content, sig) {
+            return 1
+        }
+        return bad_signature
+    }
+    var hash: int = 0
+    if scheme == scheme_rsa_pss_sha256() {
+        hash = rsa.hash_sha256()
+    }
+    if scheme == scheme_rsa_pss_sha384() {
+        hash = rsa.hash_sha384()
+    }
+    if scheme == scheme_rsa_pss_sha512() {
+        hash = rsa.hash_sha512()
+    }
+    if hash != 0 {
+        if spki_alg != cert.oid_rsa_encryption() {
+            return bad_signature
+        }
+        let key = rsa.parse_public_key(spki_key) else |e| match e {
+            der => {
+                return bad_signature
+            },
+            small_modulus => {
+                return weak_key
+            },
+            bad_modulus => {
+                return weak_key
+            },
+            bad_exponent => {
+                return weak_key
+            },
+            large_modulus => {
+                return unsupported_alg
+            },
+        }
+        if rsa.verify_pss(key, hash, content, sig, hash / 8) {
             return 1
         }
         return bad_signature
@@ -830,41 +943,6 @@ fn plaintext_record(content_type: int, payload: List[byte]) -> List[byte] {
 }
 
 // ---------------------------------------------------------------------
-// Anchor selection — the caller-supplied root store.
-// ---------------------------------------------------------------------
-
-/// Whether `chain` validates against the single `anchor` (a probe —
-/// the tag is re-derived by the real validation afterwards).
-fn chain_validates(chain: List[byte], hostname: str, anchor: List[byte], now: int) -> bool {
-    let probe = cert.validate_chain(chain, hostname, anchor, now) else |_| {
-        return false
-    }
-    probe.version > 0
-}
-
-/// The byte offset (in `anchors`) of the first anchor the chain
-/// validates against, or 0 when none does — so the caller's `?`
-/// validation against the choice re-derives the FIRST anchor's named
-/// rejection deterministically. `anchors` is concatenated DER roots
-/// (DER is self-delimiting; `cert.cert_end` finds each boundary).
-fn pick_anchor(chain: List[byte], hostname: str, anchors: List[byte], now: int) -> int ! {der} {
-    let n = anchors.len
-    if n == 0 {
-        return der
-    }
-    var pos = 0
-    while pos < n {
-        let stop = cert.cert_end(anchors, pos)?
-        let anchor = sub(anchors, pos, stop)
-        if chain_validates(chain, hostname, anchor, now) {
-            return pos
-        }
-        pos = stop
-    }
-    0
-}
-
-// ---------------------------------------------------------------------
 // The two-phase handshake.
 // ---------------------------------------------------------------------
 
@@ -921,10 +999,7 @@ pub fn begin(
     let share = curve25519.x25519_base(key_seed)
     var groups = List[int]()
     (mut groups).push(29)
-    var schemes = List[int]()
-    (mut schemes).push(scheme_ed25519())
-    (mut schemes).push(scheme_ecdsa_p256_sha256())
-    (mut schemes).push(scheme_rsa_pss_sha256())
+    let schemes = signature_schemes()
     var exts = List[byte]()
     handshake.transcript_add(mut exts, handshake.ext_server_name(hostname))
     handshake.transcript_add(mut exts, handshake.ext_supported_groups(groups))
@@ -1010,6 +1085,9 @@ pub fn complete(take p: Pending) -> Client ! {
     not_ca,
     issuer_mismatch,
     unknown_critical,
+    weak_key,
+    bad_usage,
+    name_constraints,
 } {
     let fd = p.fd
     let hostname = p.hostname
@@ -1125,10 +1203,7 @@ pub fn complete(take p: Pending) -> Client ! {
             } else if stage == 3 {
                 // Certificate arrived: extract and validate the chain.
                 chain = certificate_chain_of(copy msg)?
-                let apos = pick_anchor(copy chain, hostname, copy anchors, now)?
-                let astop = cert.cert_end(copy anchors, apos)?
-                let anchor = sub(anchors, apos, astop)
-                let leaf = cert.validate_chain(copy chain, hostname, anchor, now)?
+                let leaf = cert.validate_path(copy chain, hostname, copy anchors, now)?
                 leaf_alg = leaf.spki_alg
                 leaf_key = leaf.spki_key
             } else if stage == 4 {
@@ -1369,6 +1444,9 @@ pub fn named[T](
         not_ca,
         issuer_mismatch,
         unknown_critical,
+        weak_key,
+        bad_usage,
+        name_constraints,
     },
 ) -> T ! {Row(str)} {
     let hit = v else |e| match e {
@@ -1435,6 +1513,15 @@ pub fn named[T](
         unknown_critical => {
             return Row("unknown_critical")
         },
+        weak_key => {
+            return Row("weak_key")
+        },
+        bad_usage => {
+            return Row("bad_usage")
+        },
+        name_constraints => {
+            return Row("name_constraints")
+        },
     }
     copy hit
 }
@@ -1480,6 +1567,9 @@ pub fn row_name[T](
         not_ca,
         issuer_mismatch,
         unknown_critical,
+        weak_key,
+        bad_usage,
+        name_constraints,
     },
 ) -> str {
     let hit = named(v) else |Row(name)| {
