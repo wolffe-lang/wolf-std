@@ -760,7 +760,7 @@ fn emsa_pss_verify(
     for v in mhash {
         (mut mp).push(v)
     }
-    var q: int = db_len - salt_len
+    var q: int = db_len - salt_len + 1
     while q < db_len {
         (mut mp).push(db[q])
         q = q + 1
