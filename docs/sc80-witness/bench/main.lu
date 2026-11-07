@@ -1,0 +1,38 @@
+// sc80's cost witness program: one scrypt of a fixed 13-octet password
+// and 14-octet salt (RFC 7914 §12's third vector's), 32 octets out, at
+// N = 2^ARG1, r = ARG2, p = ARG3, capped at exactly `scrypt.memory`.
+// (`env.args()` excludes the program's own name.) ARG1 = 0 derives nothing: the floor, the program's own footprint.
+// `bench/cost.py` times it from a small parent.
+
+use std.env
+use std.fmt
+use std.x.crypto.scrypt
+
+fn main() -> int {
+    let a = env.args()
+    if a.len != 3 {
+        print("usage: bench N_LOG2 R P")
+        return 2
+    }
+    let n_log2 = fmt.parse_int(a[0]) else -1
+    let r = fmt.parse_int(a[1]) else -1
+    let p = fmt.parse_int(a[2]) else -1
+    if n_log2 == 0 {
+        print("floor")
+        return 0
+    }
+    let dk = scrypt.scrypt(
+        "pleaseletmein".bytes(),
+        "SodiumChloride".bytes(),
+        n_log2,
+        r,
+        p,
+        32,
+        scrypt.memory(n_log2, r, p, 32),
+    ) else |_| {
+        print("refused")
+        return 1
+    }
+    print("{scrypt.to_hex(dk)}")
+    0
+}
