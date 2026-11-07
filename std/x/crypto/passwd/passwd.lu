@@ -1,0 +1,602 @@
+//! member: true
+//!
+//! std.x.crypto.passwd — password hashing in crypt(5)'s `$7$` form:
+//! scrypt (RFC 7914) behind the string a shadow(5) line stores. The
+//! module name is `passwd` (sprint sc80 chose it: the layer a `passwd`,
+//! `login`, `su` or `sudo` calls). Stability tier: x — the D53 crypto
+//! ladder's memory-hard rung, the hash under PAX's passwords.
+//!
+//! **The nursery banner (D31).** `std.x.crypto.passwd` is not
+//! `std.crypto`: its path, names and behaviour may change or vanish in
+//! one sprint; no other std module may depend on it; its reason and
+//! graduation trigger live in `std/x/README.md`. scrypt is
+//! `std.x.crypto.scrypt`'s through the module boundary, a
+//! resident-on-resident edge the graduation move must resolve.
+//!
+//! **The surface.** `gen_salt(random)` makes a salt string from octets
+//! the caller read from the OS random source (getrandom(2), or
+//! `/dev/urandom`): never a fixed salt, and a short or all-zero buffer
+//! is refused. `cost(n_log2, r, p)` checks scrypt's three parameters.
+//! `hash(password, salt, cost)` returns the exact `$7$` string.
+//! `verify(password, stored)` answers whether `password` hashes to
+//! `stored`, comparing the derived key in constant time, and refuses by
+//! name a string it cannot check. `parse(stored)` is the parser both
+//! use, and `encode` is its inverse.
+//!
+//! **The string.** crypt(5) gives `$7$`'s shape as
+//! `\$7\$[./A-Za-z0-9]{11,97}\$[./A-Za-z0-9]{43}` and nothing of its
+//! inner encoding. That encoding was learned from Ubuntu 24.04's crypt
+//! (libxcrypt 4.4.36) run as a black box, and is held to it by sc80's
+//! interop rows. After `$7$` come: one character, log2 N; five, r; five,
+//! p; then the salt characters; then `$` and 43 characters of the
+//! 32-octet derived key. The alphabet is crypt's
+//! `./0-9A-Za-z` (value 0 to 63, in that order). r and p are 30-bit
+//! numbers, six bits a character, least significant first. The key is
+//! written three octets to four characters, the first octet in the low
+//! bits and the low six bits first; its last two octets take three
+//! characters, so the 43rd carries four bits and is canonical only below
+//! 16. **The salt characters ARE scrypt's salt octets** (they are not
+//! decoded first): scrypt(password, salt-string, N, r, p, 32).
+//!
+//! **What is refused, by name** (lowercase marks): `empty` (an empty
+//! field, which shadow(5) reads as "no password"), `locked` (a field
+//! starting `!` or `*`), `unsupported` (another crypt(5) method:
+//! `$y$`, `$gy$`, `$2a$`/`$2b$`/`$2x$`/`$2y$`, `$6$`, `$5$`, `$sha1$`,
+//! `$md5`, `$1$`, `$3$`, any other `$id$` or `$id,` prefix, BSDi's `_`
+//! form and the 13-to-178-character DES forms), `malformed` (any other
+//! shape, and a `$7$` setting with no `$` before a hash), `bad_n` (log2
+//! N not a character of the alphabet, below 1, or not below 16·r),
+//! `bad_rp` (r or p not five characters of the alphabet, below 1, or
+//! r·p at least 2^30), `bad_salt` (a character outside the alphabet, or
+//! more than 86), `bad_hash` (not 43 characters of the alphabet, or a
+//! non-canonical last character), `over_cap` (scrypt's working memory
+//! over the cap) and `bad_random` (`gen_salt`'s input). None of them
+//! traps.
+//!
+//! **The cap.** `verify` holds a stored string's cost to `default_cap()`:
+//! `scrypt.memory(18, 32, 1, 32)`, a little over 1 GiB, the largest cost
+//! Ubuntu's `crypt_gensalt` writes (`mkpasswd -R 11`). `verify_capped`
+//! takes a caller's own. `hash` uses `default_cap()` too, so every
+//! string it makes verifies under the default.
+//!
+//! **A named difference.** crypt(3) reads the password as a C string and
+//! stops at a zero octet; `hash` and `verify` hash every octet of the
+//! `List[byte]` they are given. A password containing a zero octet
+//! therefore hashes differently here than under crypt(3).
+//!
+//! **What is and is not constant-time** (D53's retrofit clause; c28
+//! does not exist yet, so these are recorded, not verified):
+//! - `verify`'s comparison of the derived key with the stored one is
+//!   constant-time over the 32 octets: it ORs every octet's XOR into one
+//!   accumulator and tests it once, with no early exit.
+//! - scrypt itself is NOT: ROMix indexes V by secret state, by design
+//!   (`std.x.crypto.scrypt`'s header).
+//! - The parser, the base-64 alphabet and `encode` branch and index on
+//!   the stored string's characters. The string is what shadow(5)
+//!   stores, and the salt and cost are public parts of it; the stored
+//!   key is decoded with value-indexed lookups, which a local observer
+//!   with a cache side channel could in principle see.
+//! - `gen_salt` indexes the alphabet by the random octets' values. A
+//!   salt is public once stored.
+//! - Every path's control flow depends on the password's length
+//!   (HMAC's key path, `std.x.crypto.sha2`), never on its octets.
+
+use std.x.crypto.scrypt
+
+/// scrypt's three cost parameters, as a `$7$` string carries them: N =
+/// 2^`n_log2`, block size `r`, parallelization `p`. Make one with
+/// `cost`, which checks them; a hand-edited one that breaks the checks
+/// is refused by `hash` with the same names.
+pub struct Cost {
+    n_log2: int,
+    r: int,
+    p: int,
+}
+
+/// A parsed `$7$` string: its cost, its salt characters (scrypt's salt
+/// octets) and the 32-octet derived key it stores.
+pub struct Hashed {
+    cost: Cost,
+    salt: str,
+    digest: List[byte],
+}
+
+/// The cost N = 2^`n_log2`, r, p, checked as a `$7$` string must carry
+/// it. Rows: `bad_rp` when r or p is below 1 or r·p is at least 2^30
+/// (five characters hold 30 bits, and RFC 7914 §2's bound on p); `bad_n`
+/// when `n_log2` is below 1, above 63 (one character), or not below
+/// 16·r (RFC 7914 §2: N < 2^(128·r/8)). Never traps.
+/// ct: public parameters only.
+///
+/// ```wolf-doc-example
+/// let c = passwd.cost(14, 8, 1)?
+/// c.n_log2 == 14 && c.r == 8 && c.p == 1
+/// ```
+pub fn cost(n_log2: int, r: int, p: int) -> Cost ! {bad_n, bad_rp} {
+    if r < 1 {
+        return bad_rp
+    }
+    if p < 1 {
+        return bad_rp
+    }
+    if r > 1073741823 / p {
+        return bad_rp
+    }
+    if n_log2 < 1 {
+        return bad_n
+    }
+    if n_log2 > 63 {
+        return bad_n
+    }
+    if n_log2 >= 16 * r {
+        return bad_n
+    }
+    Cost { n_log2: n_log2, r: r, p: p }
+}
+
+/// The working-memory ceiling `verify` and `hash` hold a cost to:
+/// `scrypt.memory(18, 32, 1, 32)` octets (N = 2^18, r = 32, p = 1, the
+/// largest cost Ubuntu's `crypt_gensalt` writes). Total.
+/// ct: a constant.
+///
+/// ```wolf-doc-example
+/// passwd.default_cap() > 1073741824
+/// ```
+pub fn default_cap() -> int {
+    scrypt.memory(18, 32, 1, 32)
+}
+
+// ---------------------------------------------------------------------
+// crypt's base-64 alphabet, `./0-9A-Za-z`.
+// ---------------------------------------------------------------------
+
+/// The alphabet, value 0 to 63 in order.
+fn alphabet() -> str {
+    "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+}
+
+/// The value of the octet `c` in the alphabet, or -1.
+fn value_of(c: int) -> int {
+    if c == 46 {
+        return 0
+    }
+    if c == 47 {
+        return 1
+    }
+    if c >= 48 && c <= 57 {
+        return c - 46
+    }
+    if c >= 65 && c <= 90 {
+        return c - 53
+    }
+    if c >= 97 && c <= 122 {
+        return c - 59
+    }
+    -1
+}
+
+/// The character for the value `v` (0 to 63).
+fn char_of(v: int) -> str {
+    let a = alphabet()
+    a[v..v + 1]
+}
+
+/// `v` (below 2^30) as five characters, six bits each, least significant
+/// first.
+fn encode30(v: int) -> str {
+    var out = ""
+    var x = v
+    var i: int = 0
+    while i < 5 {
+        out = "{out}{char_of(x % 64)}"
+        x = x / 64
+        i = i + 1
+    }
+    out
+}
+
+/// The 30-bit number at `s[at .. at + 5]`, or -1 when a character is
+/// outside the alphabet. Requires `at + 5 <= s.len`.
+fn decode30(s: List[byte], at: int) -> int {
+    var v: int = 0
+    var scale: int = 1
+    var i: int = 0
+    while i < 5 {
+        let d = value_of(s[at + i] as int)
+        if d < 0 {
+            return -1
+        }
+        v = v + d * scale
+        scale = scale * 64
+        i = i + 1
+    }
+    v
+}
+
+/// Octets as crypt's base-64: each three octets, the first in the low
+/// bits, become four characters, low six bits first; a last pair takes
+/// three characters and a last single octet two.
+/// ct: NOT constant-time — the alphabet is indexed by value.
+fn encode_octets(b: List[byte]) -> str {
+    var out = ""
+    var i: int = 0
+    while i < b.len {
+        var v = b[i] as int
+        var chars: int = 2
+        if i + 1 < b.len {
+            v = v + b[i + 1] as int * 256
+            chars = 3
+        }
+        if i + 2 < b.len {
+            v = v + b[i + 2] as int * 65536
+            chars = 4
+        }
+        var k: int = 0
+        while k < chars {
+            out = "{out}{char_of(v % 64)}"
+            v = v / 64
+            k = k + 1
+        }
+        i = i + 3
+    }
+    out
+}
+
+/// The 32 octets that 43 characters at `s[at ..]` encode, or an empty
+/// list when a character is outside the alphabet or the last one is not
+/// canonical (it carries bits above the 256th). Requires
+/// `at + 43 <= s.len`.
+fn decode_digest(s: List[byte], at: int) -> List[byte] {
+    var out = List[byte]()
+    var i: int = 0
+    while i < 43 {
+        if value_of(s[at + i] as int) < 0 {
+            return List[byte]()
+        }
+        i = i + 1
+    }
+    if value_of(s[at + 42] as int) >= 16 {
+        return List[byte]()
+    }
+    i = 0
+    while i < 43 {
+        var chars: int = 4
+        var octets: int = 3
+        if i == 40 {
+            chars = 3
+            octets = 2
+        }
+        var v: int = 0
+        var scale: int = 1
+        var k: int = 0
+        while k < chars {
+            v = v + value_of(s[at + i + k] as int) * scale
+            scale = scale * 64
+            k = k + 1
+        }
+        k = 0
+        while k < octets {
+            (mut out).push((v % 256) as byte)
+            v = v / 256
+            k = k + 1
+        }
+        i = i + chars
+    }
+    out
+}
+
+/// Whether every octet of `s[from .. to]` is in the alphabet.
+fn all_alphabet(s: List[byte], from: int, to: int) -> bool {
+    var i = from
+    while i < to {
+        if value_of(s[i] as int) < 0 {
+            return false
+        }
+        i = i + 1
+    }
+    true
+}
+
+// ---------------------------------------------------------------------
+// The salt.
+// ---------------------------------------------------------------------
+
+/// A salt string from `random`, octets the caller read from the OS
+/// random source (getrandom(2) or `/dev/urandom`; std draws no entropy
+/// of its own): the octets in crypt's base-64, so 16 octets make the 22
+/// characters Ubuntu's `crypt_gensalt` writes and 64 make the 86 a `$7$`
+/// string holds at most. Rows: `bad_random` when `random` is shorter
+/// than 16 octets (crypt(5)'s 128 recommended bits), longer than 64, or
+/// all zero (an unfilled buffer, never a draw). Never traps.
+/// ct: NOT constant-time — the alphabet is indexed by the octets'
+/// values. A salt is public once it is stored.
+///
+/// ```wolf-doc-example
+/// passwd.gen_salt("0123456789abcdef".bytes())? == "k2XAnEHBqQ1Ct2aMXFKNa/"
+/// ```
+pub fn gen_salt(random: List[byte]) -> str ! {bad_random} {
+    if random.len < 16 {
+        return bad_random
+    }
+    if random.len > 64 {
+        return bad_random
+    }
+    var any = false
+    for b in random {
+        if b as int != 0 {
+            any = true
+        }
+    }
+    if !any {
+        return bad_random
+    }
+    encode_octets(random)
+}
+
+// ---------------------------------------------------------------------
+// The string: encode and parse.
+// ---------------------------------------------------------------------
+
+/// The `$7$` string for `h`: `$7$`, log2 N, r and p, the salt, `$`, the
+/// 43-character key. The inverse of `parse` on every string `parse`
+/// accepts. Traps `assert` when `h` was not made by `parse` or `hash`
+/// (a digest that is not 32 octets, or a cost outside one character and
+/// thirty bits): the caller could have checked.
+/// ct: NOT constant-time — the alphabet is indexed by the key's octets.
+///
+/// ```wolf-doc-example
+/// let line = "$7$C6..../....yb/XZj1NCg1rb/5RytWq5/$N8T0E6rYyvGsPmqhviAsRS2f9A6wYzomUd6ouVMA/S2"
+/// passwd.encode(passwd.parse(line)?) == line
+/// ```
+pub fn encode(h: Hashed) -> str {
+    if h.digest.len != 32 {
+        assert(false, "passwd: a digest is 32 octets")
+    }
+    if h.cost.n_log2 < 0 || h.cost.n_log2 > 63 {
+        assert(false, "passwd: log2 N is one character")
+    }
+    if h.cost.r < 0 || h.cost.r > 1073741823 || h.cost.p < 0 || h.cost.p > 1073741823 {
+        assert(false, "passwd: r and p are thirty bits")
+    }
+    let n = char_of(h.cost.n_log2)
+    let r = encode30(h.cost.r)
+    let p = encode30(h.cost.p)
+    let salt = h.salt
+    let k = encode_octets(h.digest)
+    "$7${n}{r}{p}{salt}${k}"
+}
+
+/// Whether `s` opens with another crypt(5) method's `$id$` or `$id,`
+/// prefix: `$`, one or more of `[0-9a-z]`, then `$` or `,`.
+fn other_method(s: List[byte]) -> bool {
+    var i: int = 1
+    while i < s.len {
+        let c = s[i] as int
+        if c >= 48 && c <= 57 || c >= 97 && c <= 122 {
+            i = i + 1
+        } else {
+            return i > 1 && (c == 36 || c == 44)
+        }
+    }
+    false
+}
+
+/// Parses a stored crypt(5) field as a `$7$` string. Rows, in this
+/// order: `empty` (no characters), `locked` (a leading `!` or `*`,
+/// shadow(5)'s marks), `unsupported` (another method's form: a `$id$` or
+/// `$id,` prefix other than `$7$`, BSDi's 20-character `_` form, or the
+/// 13-to-178-character DES forms), `malformed` (any other shape, a
+/// `$7$` string too short to hold its eleven parameter characters, or
+/// one with no `$` before a hash), then `bad_n`, `bad_rp`, `bad_salt`
+/// and `bad_hash` as the module header defines them. Never traps.
+/// ct: branches on the string's characters (see the module header).
+///
+/// ```wolf-doc-example
+/// let h = passwd.parse("$7$C6..../....yb/XZj1NCg1rb/5RytWq5/$N8T0E6rYyvGsPmqhviAsRS2f9A6wYzomUd6ouVMA/S2")?
+/// h.cost.n_log2 == 14 && h.cost.r == 8 && h.cost.p == 1
+/// h.salt == "yb/XZj1NCg1rb/5RytWq5/" && h.digest.len == 32
+/// ```
+pub fn parse(stored: str) -> Hashed ! {
+    empty,
+    locked,
+    unsupported,
+    malformed,
+    bad_n,
+    bad_rp,
+    bad_salt,
+    bad_hash,
+} {
+    let s = stored.bytes()
+    if s.len == 0 {
+        return empty
+    }
+    let c0 = s[0] as int
+    if c0 == 33 || c0 == 42 {
+        return locked
+    }
+    let scrypt_form = s.len >= 3 && c0 == 36 && s[1] as int == 55 && s[2] as int == 36
+    if !scrypt_form {
+        if c0 == 36 {
+            if other_method(s) {
+                return unsupported
+            }
+            return malformed
+        }
+        if c0 == 95 && s.len == 20 && all_alphabet(s, 1, 20) {
+            return unsupported
+        }
+        if s.len >= 13 && s.len <= 178 && all_alphabet(s, 0, s.len) {
+            return unsupported
+        }
+        return malformed
+    }
+    if s.len < 14 {
+        return malformed
+    }
+    let n_log2 = value_of(s[3] as int)
+    let r = decode30(s, 4)
+    let p = decode30(s, 9)
+    if r < 1 || p < 1 {
+        return bad_rp
+    }
+    if r > 1073741823 / p {
+        return bad_rp
+    }
+    if n_log2 < 1 || n_log2 >= 16 * r {
+        return bad_n
+    }
+    var j: int = 14
+    while j < s.len && s[j] as int != 36 {
+        j = j + 1
+    }
+    if j == s.len {
+        return malformed
+    }
+    if j - 14 > 86 || !all_alphabet(s, 14, j) {
+        return bad_salt
+    }
+    if s.len - (j + 1) != 43 {
+        return bad_hash
+    }
+    let digest = decode_digest(s, j + 1)
+    if digest.len != 32 {
+        return bad_hash
+    }
+    Hashed {
+        cost: Cost { n_log2: n_log2, r: r, p: p },
+        salt: stored[14..j],
+        digest: digest,
+    }
+}
+
+// ---------------------------------------------------------------------
+// hash and verify.
+// ---------------------------------------------------------------------
+
+/// The 32-octet scrypt key for `password` under `salt` and `c`, held to
+/// `cap`. scrypt's `bad_dk_len` cannot arise (the length is 32).
+fn derive(password: List[byte], salt: str, c: Cost, cap: int) -> List[byte] ! {
+    bad_n,
+    bad_rp,
+    over_cap,
+} {
+    scrypt.scrypt(password, salt.bytes(), c.n_log2, c.r, c.p, 32, cap) else |e| match e {
+        bad_n => {
+            return bad_n
+        },
+        bad_rp => {
+            return bad_rp
+        },
+        over_cap => {
+            return over_cap
+        },
+        bad_dk_len => {
+            assert(false, "passwd: a 32-octet key is in range")
+            return over_cap
+        },
+    }
+}
+
+/// The `$7$` string for `password` under `salt` and `c`: scrypt(password,
+/// salt, 2^n_log2, r, p, 32) behind the parameters, exactly as Ubuntu's
+/// crypt writes it for the same setting. `salt` is a string of 0 to 86
+/// alphabet characters, normally `gen_salt`'s. Rows: `bad_salt` (a
+/// character outside the alphabet, or more than 86), `bad_n` and
+/// `bad_rp` (a `Cost` edited past `cost`'s checks), `over_cap` (the cost
+/// needs more than `default_cap()`). Never traps.
+/// ct: see the module header — the derived key's encoding indexes the
+/// alphabet by value; scrypt indexes V by secret state.
+///
+/// ```wolf-doc-example
+/// let c = passwd.cost(4, 1, 1)?
+/// let line = passwd.hash("pleaseletmein".bytes(), "SodiumChloride", c)?
+/// line == "$7$2/..../....SodiumChloride$vqI1uzLxlCqAVSFu53sXGjHrKfJFlaQ0Qh2wdmJ4QP/"
+/// ```
+pub fn hash(password: List[byte], salt: str, c: Cost) -> str ! {bad_n, bad_rp, bad_salt, over_cap} {
+    let sb = salt.bytes()
+    if sb.len > 86 || !all_alphabet(sb, 0, sb.len) {
+        return bad_salt
+    }
+    if c.n_log2 > 63 || c.r > 1073741823 || c.p > 1073741823 {
+        return over_cap
+    }
+    let dk = derive(password, salt, c, default_cap())?
+    encode(Hashed { cost: c, salt: salt, digest: dk })
+}
+
+/// Whether `a` and `b` hold the same octets, in time that depends on
+/// their lengths only: every octet's XOR is ORed into one accumulator,
+/// which is tested once.
+/// ct: constant-time over equal-length inputs (the lengths are public:
+/// both are 32 in `verify`).
+fn ct_eq(a: List[byte], b: List[byte]) -> bool {
+    if a.len != b.len {
+        return false
+    }
+    var acc: wrapping[u32] = 0
+    var i: int = 0
+    while i < a.len {
+        acc = acc | a[i] as int as wrapping[u32] ^ b[i] as int as wrapping[u32]
+        i = i + 1
+    }
+    acc == 0
+}
+
+/// `verify` with the caller's own memory ceiling: whether `password`
+/// hashes to `stored` when scrypt's working memory for the stored cost
+/// is at most `cap` octets. Rows: every `parse` row, then `over_cap`.
+/// A wrong password is `false`, never a row. Never traps.
+/// ct: the key comparison is constant-time (the module header).
+///
+/// ```wolf-doc-example
+/// let line = passwd.hash("pleaseletmein".bytes(), "SodiumChloride", passwd.cost(4, 1, 1)?)?
+/// passwd.verify_capped("pleaseletmein".bytes(), line, 65536)? == true
+/// ```
+pub fn verify_capped(password: List[byte], stored: str, cap: int) -> bool ! {
+    empty,
+    locked,
+    unsupported,
+    malformed,
+    bad_n,
+    bad_rp,
+    bad_salt,
+    bad_hash,
+    over_cap,
+} {
+    let h = parse(stored)?
+    if scrypt.memory(h.cost.n_log2, h.cost.r, h.cost.p, 32) > cap {
+        return over_cap
+    }
+    let dk = derive(password, h.salt, h.cost, cap)?
+    ct_eq(dk, h.digest)
+}
+
+/// Whether `password` hashes to `stored`, a crypt(5) field: the stored
+/// `$7$` string's own cost and salt are used, and the derived key is
+/// compared with the stored one in constant time. The cost is held to
+/// `default_cap()`. Rows: `empty`, `locked`, `unsupported`, `malformed`,
+/// `bad_n`, `bad_rp`, `bad_salt`, `bad_hash` (`parse`'s), and `over_cap`
+/// (a stored cost over the cap). A wrong password is `false`, never a
+/// row. Never traps.
+/// ct: the key comparison is constant-time (the module header).
+///
+/// ```wolf-doc-example
+/// let line = passwd.hash("pleaseletmein".bytes(), "SodiumChloride", passwd.cost(4, 1, 1)?)?
+/// passwd.verify("pleaseletmein".bytes(), line)? == true
+/// var wrong = "pleaseletmein".bytes()
+/// wrong[0] = 0 as byte
+/// passwd.verify(wrong, line)? == false
+/// ```
+pub fn verify(password: List[byte], stored: str) -> bool ! {
+    empty,
+    locked,
+    unsupported,
+    malformed,
+    bad_n,
+    bad_rp,
+    bad_salt,
+    bad_hash,
+    over_cap,
+} {
+    verify_capped(password, stored, default_cap())
+}
