@@ -54,7 +54,9 @@ index read, as `has` does, without copying an entry list per lookup.
 `std.x.crypto.rsa` and `std.x.crypto.p384` verify RSA (PKCS#1 v1.5 and
 PSS) and ECDSA P-384 signatures, and `std.x.tls.client` validates a
 public-PKI chain to roots its caller supplies, so a handshake with
-github.com completes.
+github.com completes. `std.x.crypto.scrypt` is RFC 7914's memory-hard
+key derivation, and `std.x.crypto.passwd` writes and checks crypt(5)'s
+`$7$` scrypt strings, the ones Ubuntu's crypt reads.
 
 `std.time` reads TZif zones, including leap-aware `right/` files. With
 leap records, the integer timestamp is UNIX leap time, as with the host
@@ -70,7 +72,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 624 tests. A test that passes deeper than its ledger entry claims
+all 634 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
