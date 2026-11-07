@@ -1,0 +1,704 @@
+//! member: true
+//!
+//! std.x.crypto.scrypt — the scrypt password-based key derivation
+//! function (RFC 7914) and PBKDF2-HMAC-SHA-256 (RFC 8018 §5.2).
+//! Stability tier: x — the D53 crypto ladder's memory-hard rung (sprint
+//! sc80, the hash under PAX's passwords).
+//!
+//! **The nursery banner (D31).** `std.x.crypto.scrypt` is not
+//! `std.crypto`: its path, names and behaviour may change or vanish in
+//! one sprint; no other std module may depend on it; its reason and
+//! graduation trigger live in `std/x/README.md`. HMAC-SHA-256 is
+//! `std.x.crypto.sha2`'s through the module boundary, a
+//! resident-on-resident edge the graduation move must resolve (beside
+//! p256's, rsa's and curve25519's).
+//!
+//! **Implemented from the RFC 7914 DOCUMENT, not ported.** Salsa20/8
+//! Core is §3's word specification, scryptBlockMix §4, scryptROMix §5
+//! and scrypt §6; PBKDF2 is RFC 8018 §5.2 with RFC 2104's HMAC (FIPS
+//! 180-4's SHA-256, `sha2.hmac256`). The texts are vendored at
+//! `vendor/vectors/rfc/rfc7914.txt`, `rfc8018.txt` and `rfc2104.txt`.
+//! Every vector RFC 7914 prints (§8–§13) is a row under
+//! `tests/x/crypto/scrypt/`; the document is the authority.
+//!
+//! **The word currency is `wrapping[u32]`, four octets an element.**
+//! Salsa's adds and rotations are the type's own (no masks), and a
+//! `List[wrapping[u32]]` strides by four octets, so V costs exactly
+//! RFC 7914's 128·r·N octets. Octet strings cross the API as
+//! `List[byte]`, little-endian per word (§3: "without endianness
+//! conversion", and the vectors are little-endian words).
+//!
+//! **The inner loops allocate nothing.** A callee's allocation lives in
+//! the caller's ambient region until that region dies, so a BlockMix
+//! that built a list per call would hold 2·N·128·r octets of garbage by
+//! the end of ROMix. BlockMix and ROMix therefore work in place over
+//! four buffers made once per scrypt call (X, Y, T and V), and every
+//! HMAC that PBKDF2 iterates runs inside its own `region` block, so the
+//! c = 80000 vector holds a constant footprint. ROMix's V lives in a
+//! region of its own and is gone before the final PBKDF2 runs.
+//!
+//! **Memory and the cap.** `memory(n_log2, r, p, dk_len)` is the
+//! octets `scrypt` allocates at its peak, 128·r·(N + 2p + 2) plus the
+//! key's `dk_len` octets and a fixed 16 KiB for T and the HMAC states,
+//! and `scrypt` refuses `over_cap`
+//! before allocating anything when that exceeds the caller's cap
+//! (RFC 7914 §14: "systems should protect against a denial-of-service
+//! attack resulting from attackers presenting unreasonably large
+//! parameters"). The caller's own password and salt, and one transient
+//! copy of the salt, are not counted. `romix` alone is uncapped: it is
+//! the primitive, and `scrypt` is the guarded entry; PBKDF2 likewise
+//! allocates the `dk_len` octets its caller asks for.
+//!
+//! **Refusals, by name** (lowercase marks, API-CONVENTIONS §12): `bad_n`
+//! (log2 N below 1, or N not below 2^(16·r), RFC 7914 §2; `romix`'s N
+//! not a power of two above 1), `bad_rp` (r or p below 1, or r·p at
+//! least 2^30, which is §2's p ≤ ((2^32 − 1)·32)/(128·r) in integers),
+//! `over_cap`, `bad_dk_len` (below 1, or above (2^32 − 1)·32) and
+//! PBKDF2's `bad_count` (an iteration count below 1). A wrong-length
+//! block handed to `salsa20_8`, `blockmix` or `romix` traps `assert`: the
+//! caller could have checked (§2's trap rule).
+//!
+//! **Constant-time obligations (D53's retrofit clause; c28 does not
+//! exist yet, so these are recorded, not verified).** Salsa20/8 and
+//! BlockMix are add-rotate-xor over words with indices that depend on r
+//! and the loop counters only: no secret-dependent branch or index.
+//! **ROMix is NOT constant-time, by design:** its second loop reads
+//! V[Integerify(X) mod N], a memory index computed from secret state.
+//! That access pattern is scrypt's memory-hardness (RFC 7914 §5), and a
+//! cache-timing observer can learn it; Argon2id's data-independent
+//! first pass is the answer to that, and is a named follow-on. PBKDF2
+//! inherits `sha2.hmac256`'s obligations (control flow depends on the
+//! password's LENGTH only). The parameter checks branch on public
+//! parameters. `to_hex` indexes an alphabet by value and is for public
+//! data.
+
+use std.x.crypto.sha2
+
+// ---------------------------------------------------------------------
+// Words and octets: little-endian 32-bit words (RFC 7914 §3, §8–§10).
+// ---------------------------------------------------------------------
+
+/// `count` zero words.
+fn zero_words(count: int) -> List[wrapping[u32]] {
+    var w = List[wrapping[u32]]()
+    (mut w).reserve(count)
+    var i: int = 0
+    while i < count {
+        (mut w).push(0)
+        i = i + 1
+    }
+    w
+}
+
+/// The little-endian word at `b[at .. at + 4]`.
+fn le32(b: List[byte], at: int) -> wrapping[u32] {
+    b[at] as int as wrapping[u32] |
+        b[at + 1] as int as wrapping[u32] << 8 |
+        b[at + 2] as int as wrapping[u32] << 16 |
+        b[at + 3] as int as wrapping[u32] << 24
+}
+
+/// Overwrite `x[0 .. words]` with the little-endian words of
+/// `b[off .. off + 4·words]`.
+fn load_words(b: List[byte], off: int, mut x: List[wrapping[u32]], words: int) {
+    var k: int = 0
+    while k < words {
+        x[k] = le32(b, off + 4 * k)
+        k = k + 1
+    }
+}
+
+/// Overwrite `b[off .. off + 4·words]` with `x[0 .. words]`, each word
+/// little-endian.
+fn store_words(x: List[wrapping[u32]], mut b: List[byte], off: int, words: int) {
+    var k: int = 0
+    while k < words {
+        let w = x[k]
+        let at = off + 4 * k
+        b[at] = (w & 0xff) as int as byte
+        b[at + 1] = (w >> 8 & 0xff) as int as byte
+        b[at + 2] = (w >> 16 & 0xff) as int as byte
+        b[at + 3] = (w >> 24 & 0xff) as int as byte
+        k = k + 1
+    }
+}
+
+/// `count` zero octets.
+fn zero_bytes(count: int) -> List[byte] {
+    var b = List[byte]()
+    (mut b).reserve(count)
+    var i: int = 0
+    while i < count {
+        (mut b).push(0 as byte)
+        i = i + 1
+    }
+    b
+}
+
+// ---------------------------------------------------------------------
+// RFC 7914 §3 — the Salsa20/8 Core. R(a, b) is a left rotation by b,
+// spelled with literal shift amounts (a shift by a binding is refused
+// natively, sc16's measurement).
+// ---------------------------------------------------------------------
+
+fn r7(x: wrapping[u32]) -> wrapping[u32] {
+    x << 7 | x >> 25
+}
+
+fn r9(x: wrapping[u32]) -> wrapping[u32] {
+    x << 9 | x >> 23
+}
+
+fn r13(x: wrapping[u32]) -> wrapping[u32] {
+    x << 13 | x >> 19
+}
+
+fn r18(x: wrapping[u32]) -> wrapping[u32] {
+    x << 18 | x >> 14
+}
+
+/// Salsa20/8 Core over `t[0 .. 16]`, in place: §3's four double rounds
+/// (`for (i = 8; i > 0; i -= 2)`), each a column round then a row round,
+/// then `out[i] = x[i] + in[i]`.
+/// ct: add-rotate-xor over sixteen locals; no branch on a word, no
+/// index from a word.
+fn salsa_core(mut t: List[wrapping[u32]]) {
+    var x0 = t[0]
+    var x1 = t[1]
+    var x2 = t[2]
+    var x3 = t[3]
+    var x4 = t[4]
+    var x5 = t[5]
+    var x6 = t[6]
+    var x7 = t[7]
+    var x8 = t[8]
+    var x9 = t[9]
+    var x10 = t[10]
+    var x11 = t[11]
+    var x12 = t[12]
+    var x13 = t[13]
+    var x14 = t[14]
+    var x15 = t[15]
+    var i: int = 8
+    while i > 0 {
+        x4 = x4 ^ r7(x0 + x12)
+        x8 = x8 ^ r9(x4 + x0)
+        x12 = x12 ^ r13(x8 + x4)
+        x0 = x0 ^ r18(x12 + x8)
+        x9 = x9 ^ r7(x5 + x1)
+        x13 = x13 ^ r9(x9 + x5)
+        x1 = x1 ^ r13(x13 + x9)
+        x5 = x5 ^ r18(x1 + x13)
+        x14 = x14 ^ r7(x10 + x6)
+        x2 = x2 ^ r9(x14 + x10)
+        x6 = x6 ^ r13(x2 + x14)
+        x10 = x10 ^ r18(x6 + x2)
+        x3 = x3 ^ r7(x15 + x11)
+        x7 = x7 ^ r9(x3 + x15)
+        x11 = x11 ^ r13(x7 + x3)
+        x15 = x15 ^ r18(x11 + x7)
+        x1 = x1 ^ r7(x0 + x3)
+        x2 = x2 ^ r9(x1 + x0)
+        x3 = x3 ^ r13(x2 + x1)
+        x0 = x0 ^ r18(x3 + x2)
+        x6 = x6 ^ r7(x5 + x4)
+        x7 = x7 ^ r9(x6 + x5)
+        x4 = x4 ^ r13(x7 + x6)
+        x5 = x5 ^ r18(x4 + x7)
+        x11 = x11 ^ r7(x10 + x9)
+        x8 = x8 ^ r9(x11 + x10)
+        x9 = x9 ^ r13(x8 + x11)
+        x10 = x10 ^ r18(x9 + x8)
+        x12 = x12 ^ r7(x15 + x14)
+        x13 = x13 ^ r9(x12 + x15)
+        x14 = x14 ^ r13(x13 + x12)
+        x15 = x15 ^ r18(x14 + x13)
+        i = i - 2
+    }
+    t[0] = t[0] + x0
+    t[1] = t[1] + x1
+    t[2] = t[2] + x2
+    t[3] = t[3] + x3
+    t[4] = t[4] + x4
+    t[5] = t[5] + x5
+    t[6] = t[6] + x6
+    t[7] = t[7] + x7
+    t[8] = t[8] + x8
+    t[9] = t[9] + x9
+    t[10] = t[10] + x10
+    t[11] = t[11] + x11
+    t[12] = t[12] + x12
+    t[13] = t[13] + x13
+    t[14] = t[14] + x14
+    t[15] = t[15] + x15
+}
+
+/// Salsa20/8 Core (RFC 7914 §3) of one 64-octet block: sixteen
+/// little-endian words in, sixteen out. Traps `assert` unless
+/// `input.len == 64` (the caller could have checked).
+/// ct: as the core — no secret-dependent branch or index.
+///
+/// ```wolf-doc-example
+/// let out = scrypt.salsa20_8("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".bytes())
+/// out.len == 64
+/// ```
+pub fn salsa20_8(input: List[byte]) -> List[byte] {
+    if input.len != 64 {
+        assert(false, "scrypt: salsa20_8 takes one 64-octet block")
+    }
+    var t = zero_words(16)
+    load_words(input, 0, mut t, 16)
+    salsa_core(mut t)
+    var out = zero_bytes(64)
+    store_words(t, mut out, 0, 16)
+    out
+}
+
+// ---------------------------------------------------------------------
+// RFC 7914 §4 — scryptBlockMix, from a source block into a destination
+// buffer, so ROMix never copies a block it does not have to.
+// ---------------------------------------------------------------------
+
+/// scryptBlockMix (RFC 7914 §4) of the 32·r words `src[so .. so + 32r]`
+/// into `dst[0 .. 32r]`, with `t` (16 words) as X. `src` and `dst` are
+/// different lists. Step 1: X = B[2r − 1]. Step 2: for each i, X =
+/// Salsa(X xor B[i]), Y[i] = X. Step 3: B' = (Y[0], Y[2], …, Y[2r − 2],
+/// Y[1], Y[3], …, Y[2r − 1]): Y[i] lands at block i/2 when i is even and
+/// at block r + i/2 when it is odd.
+/// ct: indices depend on r and the loop counters only.
+fn blockmix_into(
+    src: List[wrapping[u32]],
+    so: int,
+    mut dst: List[wrapping[u32]],
+    mut t: List[wrapping[u32]],
+    r: int,
+) {
+    let last = so + (2 * r - 1) * 16
+    var k: int = 0
+    while k < 16 {
+        t[k] = src[last + k]
+        k = k + 1
+    }
+    var i: int = 0
+    while i < 2 * r {
+        let bi = so + i * 16
+        k = 0
+        while k < 16 {
+            t[k] = t[k] ^ src[bi + k]
+            k = k + 1
+        }
+        salsa_core(mut t)
+        var at = i / 2 * 16
+        if i % 2 == 1 {
+            at = (r + i / 2) * 16
+        }
+        k = 0
+        while k < 16 {
+            dst[at + k] = t[k]
+            k = k + 1
+        }
+        i = i + 1
+    }
+}
+
+/// The 128·r-octet contract every block-level entry shares. Traps
+/// `assert` when it is broken: the caller could have checked.
+fn require_block(b: List[byte], r: int) {
+    if r < 1 {
+        assert(false, "scrypt: r is at least 1")
+    }
+    if b.len != 128 * r {
+        assert(false, "scrypt: a block is 128 * r octets")
+    }
+}
+
+/// scryptBlockMix (RFC 7914 §4) of `b`, 2·r 64-octet blocks, with
+/// Salsa20/8 as H. Traps `assert` unless `r >= 1` and
+/// `b.len == 128 * r`.
+/// ct: indices depend on r only; see `salsa20_8`.
+///
+/// ```wolf-doc-example
+/// scrypt.blockmix("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".bytes(), 1).len == 128
+/// ```
+pub fn blockmix(b: List[byte], r: int) -> List[byte] {
+    require_block(b, r)
+    var x = zero_words(32 * r)
+    load_words(b, 0, mut x, 32 * r)
+    var y = zero_words(32 * r)
+    var t = zero_words(16)
+    blockmix_into(x, 0, mut y, mut t, r)
+    var out = zero_bytes(128 * r)
+    store_words(y, mut out, 0, 32 * r)
+    out
+}
+
+// ---------------------------------------------------------------------
+// RFC 7914 §5 — scryptROMix.
+// ---------------------------------------------------------------------
+
+/// log2 of `n` when `n` is a power of two above 1, else -1.
+fn log2_exact(n: int) -> int {
+    if n < 2 {
+        return -1
+    }
+    var m = n
+    var k: int = 0
+    while m > 1 {
+        if m % 2 != 0 {
+            return -1
+        }
+        m = m / 2
+        k = k + 1
+    }
+    k
+}
+
+/// 2^k for 0 <= k <= 62.
+fn pow2(k: int) -> int {
+    var v: int = 1
+    var i: int = 0
+    while i < k {
+        v = v * 2
+        i = i + 1
+    }
+    v
+}
+
+/// Integerify(X) mod N (RFC 7914 §5): B[2r − 1] read as a little-endian
+/// integer, reduced mod N. N is a power of two, so only the low log2 N
+/// bits matter: the block's first word, and its second when N > 2^32.
+/// ct: NOT constant-time by design — the result indexes V (the module
+/// header).
+fn integerify(x: List[wrapping[u32]], r: int, n: int) -> int {
+    let at = (2 * r - 1) * 16
+    let lo = x[at] as int
+    if n <= 4294967296 {
+        return lo % n
+    }
+    let hi = x[at + 1] as int
+    lo + hi % (n / 4294967296) * 4294967296
+}
+
+/// scryptROMix (RFC 7914 §5) over `x` (32·r words), in place, with `v`,
+/// `y` (32·r words) and `t` (16 words) as scratch. `v` is emptied and
+/// refilled: N·32·r words. Step 2 writes V[i] = X and then X =
+/// BlockMix(V[i]); step 3 forms T = X xor V[j] in `y` and then X =
+/// BlockMix(T).
+fn romix_words(
+    mut x: List[wrapping[u32]],
+    mut v: List[wrapping[u32]],
+    mut y: List[wrapping[u32]],
+    mut t: List[wrapping[u32]],
+    r: int,
+    n: int,
+) {
+    let w = 32 * r
+    (mut v).reset()
+    var i: int = 0
+    while i < n {
+        var k: int = 0
+        while k < w {
+            (mut v).push(x[k])
+            k = k + 1
+        }
+        blockmix_into(v, i * w, mut x, mut t, r)
+        i = i + 1
+    }
+    i = 0
+    while i < n {
+        let base = integerify(x, r, n) * w
+        var k: int = 0
+        while k < w {
+            y[k] = x[k] ^ v[base + k]
+            k = k + 1
+        }
+        blockmix_into(y, 0, mut x, mut t, r)
+        i = i + 1
+    }
+}
+
+/// scryptROMix (RFC 7914 §5) of one 128·r-octet block with cost `n`.
+/// Rows: `bad_n` when `n` is not a power of two above 1, or not below
+/// 2^(16·r) (§5's "less than 2^(128 * r / 8)"). Traps `assert` unless
+/// `r >= 1` and `b.len == 128 * r`. **Uncapped:** it allocates
+/// 128·r·n octets for V; `scrypt` is the entry that refuses a cap.
+/// ct: NOT constant-time — V is indexed by Integerify(X) (the module
+/// header).
+///
+/// ```wolf-doc-example
+/// let out = scrypt.romix("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".bytes(), 1, 16)?
+/// out.len == 128
+/// ```
+pub fn romix(b: List[byte], r: int, n: int) -> List[byte] ! {bad_n} {
+    require_block(b, r)
+    let k = log2_exact(n)
+    if k < 1 {
+        return bad_n
+    }
+    if k >= 16 * r {
+        return bad_n
+    }
+    var x = zero_words(32 * r)
+    load_words(b, 0, mut x, 32 * r)
+    var v = List[wrapping[u32]]()
+    (mut v).reserve(n * 32 * r)
+    var y = zero_words(32 * r)
+    var t = zero_words(16)
+    romix_words(mut x, mut v, mut y, mut t, r, n)
+    var out = zero_bytes(128 * r)
+    store_words(x, mut out, 0, 32 * r)
+    out
+}
+
+// ---------------------------------------------------------------------
+// RFC 8018 §5.2 — PBKDF2 with HMAC-SHA-256 as the PRF (hLen = 32).
+// ---------------------------------------------------------------------
+
+/// (2^32 − 1) · 32, RFC 8018 §5.2 step 1's dkLen ceiling for hLen = 32
+/// (and RFC 7914 §6's).
+fn dk_len_max() -> int {
+    137438953440
+}
+
+/// `a xor b`, one octet.
+fn xor_octet(a: byte, b: byte) -> byte {
+    (a as int as wrapping[u32] ^ b as int as wrapping[u32]) as int as byte
+}
+
+/// PBKDF2 (RFC 8018 §5.2) with HMAC-SHA-256, for parameters already
+/// checked. T_i = U_1 xor … xor U_c, U_1 = PRF(P, S || INT(i)), U_j =
+/// PRF(P, U_{j−1}); DK = T_1 || … clipped to dkLen. Every PRF call runs
+/// in its own region, so c iterations hold a constant footprint.
+/// ct: `sha2.hmac256`'s obligations; branches on c, dkLen and the block
+/// counter (public).
+fn pbkdf2(password: List[byte], salt: List[byte], c: int, dk_len: int) -> List[byte] {
+    var dk = List[byte]()
+    (mut dk).reserve(dk_len)
+    var u = zero_bytes(32)
+    var t = zero_bytes(32)
+    var i: int = 1
+    while dk.len < dk_len {
+        region first {
+            var s = List[byte]()
+            (mut s).reserve(salt.len + 4)
+            for sb in salt {
+                (mut s).push(sb)
+            }
+            (mut s).push((i / 16777216 % 256) as byte)
+            (mut s).push((i / 65536 % 256) as byte)
+            (mut s).push((i / 256 % 256) as byte)
+            (mut s).push((i % 256) as byte)
+            let u1 = sha2.hmac256(password, s)
+            var k: int = 0
+            while k < 32 {
+                u[k] = u1[k]
+                t[k] = u1[k]
+                k = k + 1
+            }
+        }
+        var j: int = 2
+        while j <= c {
+            region step {
+                let uj = sha2.hmac256(password, u)
+                var k: int = 0
+                while k < 32 {
+                    u[k] = uj[k]
+                    t[k] = xor_octet(t[k], uj[k])
+                    k = k + 1
+                }
+            }
+            j = j + 1
+        }
+        var k: int = 0
+        while k < 32 {
+            if dk.len < dk_len {
+                (mut dk).push(t[k])
+            }
+            k = k + 1
+        }
+        i = i + 1
+    }
+    dk
+}
+
+/// PBKDF2-HMAC-SHA-256 (RFC 8018 §5.2): `dk_len` octets derived from
+/// `password` and `salt` with `c` iterations. Rows: `bad_count` when
+/// `c < 1`; `bad_dk_len` when `dk_len < 1` or `dk_len > (2^32 − 1)·32`
+/// (step 1's "derived key too long"). Never traps.
+/// ct: `sha2.hmac256`'s obligations — control flow depends on the
+/// password's length, `c` and `dk_len` (public), never on a secret
+/// octet.
+///
+/// ```wolf-doc-example
+/// let dk = scrypt.pbkdf2_hmac_sha256("passwd".bytes(), "salt".bytes(), 1, 64)?
+/// scrypt.to_hex(dk)[0..16] == "55ac046e56e3089f"
+/// ```
+pub fn pbkdf2_hmac_sha256(
+    password: List[byte],
+    salt: List[byte],
+    c: int,
+    dk_len: int,
+) -> List[byte] ! {bad_count, bad_dk_len} {
+    if c < 1 {
+        return bad_count
+    }
+    if dk_len < 1 {
+        return bad_dk_len
+    }
+    if dk_len > dk_len_max() {
+        return bad_dk_len
+    }
+    pbkdf2(password, salt, c, dk_len)
+}
+
+// ---------------------------------------------------------------------
+// RFC 7914 §6 — scrypt.
+// ---------------------------------------------------------------------
+
+/// `a * b` for non-negative operands, saturating at the int ceiling.
+fn sat_mul(a: int, b: int) -> int {
+    if a == 0 {
+        return 0
+    }
+    if b > 9223372036854775807 / a {
+        return 9223372036854775807
+    }
+    a * b
+}
+
+/// `a + b` for non-negative operands, saturating at the int ceiling.
+fn sat_add(a: int, b: int) -> int {
+    if b > 9223372036854775807 - a {
+        return 9223372036854775807
+    }
+    a + b
+}
+
+/// The octets `scrypt` allocates at its peak for these parameters:
+/// 128·r·(N + 2p + 2) — V, B, the final PBKDF2's copy of B and the two
+/// scratch blocks X and Y — plus the `dk_len` octets of the key it
+/// returns and a fixed 16 KiB for Salsa's T and the HMAC states. The
+/// caller's own password and salt are not counted. Saturates at the int
+/// ceiling (so log2 N of 63 and up answer the ceiling). Traps `assert`
+/// unless `n_log2 >= 0`, `r >= 1`, `p >= 1` and `dk_len >= 0`: the
+/// domain is the caller's to check (`scrypt` checks before it calls
+/// this).
+/// ct: public parameters only.
+///
+/// ```wolf-doc-example
+/// scrypt.memory(14, 8, 1, 32) == 128 * 8 * (16384 + 4) + 32 + 16384
+/// scrypt.memory(70, 8, 1, 32) == 9223372036854775807
+/// ```
+pub fn memory(n_log2: int, r: int, p: int, dk_len: int) -> int {
+    if n_log2 < 0 {
+        assert(false, "scrypt: memory needs n_log2 >= 0")
+    }
+    if r < 1 {
+        assert(false, "scrypt: memory needs r >= 1")
+    }
+    if p < 1 {
+        assert(false, "scrypt: memory needs p >= 1")
+    }
+    if dk_len < 0 {
+        assert(false, "scrypt: memory needs dk_len >= 0")
+    }
+    if n_log2 > 62 {
+        return 9223372036854775807
+    }
+    let blocks = sat_add(pow2(n_log2), sat_add(sat_mul(2, p), 2))
+    sat_add(sat_add(sat_mul(sat_mul(128, r), blocks), dk_len), 16384)
+}
+
+/// scrypt (RFC 7914 §6): `dk_len` octets derived from `password` and
+/// `salt` with N = 2^`n_log2`, block size `r` and parallelization `p`,
+/// refusing before it allocates anything when
+/// `memory(n_log2, r, p, dk_len)` exceeds `cap` octets. Step 1: B = PBKDF2-HMAC-SHA256(P, S, 1,
+/// p·128·r); step 2: each B[i] = scryptROMix(r, B[i], N), in order;
+/// step 3: DK = PBKDF2-HMAC-SHA256(P, B, 1, dkLen).
+///
+/// Rows, checked in this order: `bad_rp` (r or p below 1, or r·p at
+/// least 2^30), `bad_n` (log2 N below 1, or N not below 2^(16·r)),
+/// `bad_dk_len` (below 1, or above (2^32 − 1)·32), `over_cap` (the
+/// working memory over `cap`). Never traps.
+/// ct: NOT constant-time — ROMix indexes V by secret state (the module
+/// header); the parameter checks branch on public parameters only.
+///
+/// ```wolf-doc-example
+/// let dk = scrypt.scrypt(List[byte](), List[byte](), 4, 1, 1, 64, scrypt.memory(4, 1, 1, 64))?
+/// scrypt.to_hex(dk)[0..16] == "77d6576238657b20"
+/// ```
+pub fn scrypt(
+    password: List[byte],
+    salt: List[byte],
+    n_log2: int,
+    r: int,
+    p: int,
+    dk_len: int,
+    cap: int,
+) -> List[byte] ! {bad_n, bad_rp, over_cap, bad_dk_len} {
+    if r < 1 {
+        return bad_rp
+    }
+    if p < 1 {
+        return bad_rp
+    }
+    if r > 1073741823 / p {
+        return bad_rp
+    }
+    if n_log2 < 1 {
+        return bad_n
+    }
+    if n_log2 >= 16 * r {
+        return bad_n
+    }
+    if dk_len < 1 {
+        return bad_dk_len
+    }
+    if dk_len > dk_len_max() {
+        return bad_dk_len
+    }
+    if memory(n_log2, r, p, dk_len) > cap {
+        return over_cap
+    }
+    let n = pow2(n_log2)
+    let blen = 128 * r
+    let w = 32 * r
+    var b = pbkdf2(password, salt, 1, p * blen)
+    region mix {
+        var x = zero_words(w)
+        var y = zero_words(w)
+        var t = zero_words(16)
+        var v = List[wrapping[u32]]()
+        (mut v).reserve(n * w)
+        var i: int = 0
+        while i < p {
+            load_words(b, i * blen, mut x, w)
+            romix_words(mut x, mut v, mut y, mut t, r, n)
+            store_words(x, mut b, i * blen, w)
+            i = i + 1
+        }
+    }
+    pbkdf2(password, b, 1, dk_len)
+}
+
+/// Lowercase hex of `b`, this module's own so that its tests and doc
+/// examples import exactly one module (sha2's precedent).
+/// ct: NOT constant-time — indexes an alphabet by each octet's value.
+/// Render public values with it.
+///
+/// ```wolf-doc-example
+/// scrypt.to_hex("ab".bytes()) == "6162"
+/// ```
+pub fn to_hex(b: List[byte]) -> str {
+    let alphabet = "0123456789abcdef"
+    var out = ""
+    for raw in b {
+        let v = raw as int
+        let hi = v / 16
+        let lo = v % 16
+        let hd = alphabet[hi..hi + 1]
+        let ld = alphabet[lo..lo + 1]
+        out = "{out}{hd}{ld}"
+    }
+    out
+}
