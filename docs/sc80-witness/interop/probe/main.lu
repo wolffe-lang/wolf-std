@@ -1,0 +1,186 @@
+// sc80's interop probe: the wolf side of `docs/sc80-witness/interop/run.py`.
+// Reads one request a line on stdin and answers one line on stdout. Every
+// password, salt and random input arrives from the harness at run time as
+// hex; nothing secret is written here. Requests:
+//   gensalt HEX                    -> salt S | salt refused NAME
+//   hash HEXPW SALT N R P          -> hash LINE | hash refused NAME  (SALT "-" is empty)
+//   verify HEXPW STORED            -> verify true|false | verify refused NAME
+//   parse STORED                   -> parse N R P SALTLEN | parse refused NAME
+//   scrypt HEXP HEXS N R P DKLEN   -> scrypt HEX | scrypt refused NAME
+//   end                            -> (stops)
+
+use std.fmt
+use std.hex
+use std.io
+use std.str
+use std.x.crypto.passwd
+use std.x.crypto.scrypt
+
+fn octets(h: str) -> List[byte] {
+    if h == "-" {
+        return List[byte]()
+    }
+    hex.decode(h) else List[byte]()
+}
+
+fn num(s: str) -> int {
+    fmt.parse_int(s) else -1
+}
+
+fn gensalt(f: List[str]) -> str {
+    let s = passwd.gen_salt(octets(f[1])) else |e| match e {
+        bad_random => {
+            return "salt refused bad_random"
+        },
+    }
+    "salt {s}"
+}
+
+fn hash(f: List[str]) -> str {
+    var salt = f[2]
+    if salt == "-" {
+        salt = ""
+    }
+    let c = passwd.cost(num(f[3]), num(f[4]), num(f[5])) else |e| match e {
+        bad_n => {
+            return "hash refused bad_n"
+        },
+        bad_rp => {
+            return "hash refused bad_rp"
+        },
+    }
+    let line = passwd.hash(octets(f[1]), salt, c) else |e| match e {
+        bad_n => {
+            return "hash refused bad_n"
+        },
+        bad_rp => {
+            return "hash refused bad_rp"
+        },
+        bad_salt => {
+            return "hash refused bad_salt"
+        },
+        over_cap => {
+            return "hash refused over_cap"
+        },
+    }
+    "hash {line}"
+}
+
+fn verify(f: List[str]) -> str {
+    let ok = passwd.verify(octets(f[1]), f[2]) else |e| match e {
+        empty => {
+            return "verify refused empty"
+        },
+        locked => {
+            return "verify refused locked"
+        },
+        unsupported => {
+            return "verify refused unsupported"
+        },
+        malformed => {
+            return "verify refused malformed"
+        },
+        bad_n => {
+            return "verify refused bad_n"
+        },
+        bad_rp => {
+            return "verify refused bad_rp"
+        },
+        bad_salt => {
+            return "verify refused bad_salt"
+        },
+        bad_hash => {
+            return "verify refused bad_hash"
+        },
+        over_cap => {
+            return "verify refused over_cap"
+        },
+    }
+    "verify {ok}"
+}
+
+fn parse(f: List[str]) -> str {
+    let h = passwd.parse(f[1]) else |e| match e {
+        empty => {
+            return "parse refused empty"
+        },
+        locked => {
+            return "parse refused locked"
+        },
+        unsupported => {
+            return "parse refused unsupported"
+        },
+        malformed => {
+            return "parse refused malformed"
+        },
+        bad_n => {
+            return "parse refused bad_n"
+        },
+        bad_rp => {
+            return "parse refused bad_rp"
+        },
+        bad_salt => {
+            return "parse refused bad_salt"
+        },
+        bad_hash => {
+            return "parse refused bad_hash"
+        },
+    }
+    "parse {h.cost.n_log2} {h.cost.r} {h.cost.p} {h.salt.len}"
+}
+
+fn derive(f: List[str]) -> str {
+    let n = num(f[3])
+    let r = num(f[4])
+    let p = num(f[5])
+    let dk = scrypt.scrypt(
+        octets(f[1]),
+        octets(f[2]),
+        n,
+        r,
+        p,
+        num(f[6]),
+        1073741824,
+    ) else |e| match e {
+        bad_n => {
+            return "scrypt refused bad_n"
+        },
+        bad_rp => {
+            return "scrypt refused bad_rp"
+        },
+        over_cap => {
+            return "scrypt refused over_cap"
+        },
+        bad_dk_len => {
+            return "scrypt refused bad_dk_len"
+        },
+    }
+    "scrypt {scrypt.to_hex(dk)}"
+}
+
+fn main() -> int {
+    while true {
+        let line = io.input_line() else |_| {
+            return 0
+        }
+        let f = str.split(str.trim(line), " ")
+        let op = f[0]
+        if op == "end" {
+            return 0
+        }
+        if op == "gensalt" && f.len == 2 {
+            print(gensalt(f))
+        } else if op == "hash" && f.len == 6 {
+            print(hash(f))
+        } else if op == "verify" && f.len == 3 {
+            print(verify(f))
+        } else if op == "parse" && f.len == 2 {
+            print(parse(f))
+        } else if op == "scrypt" && f.len == 7 {
+            print(derive(f))
+        } else {
+            print("bad request")
+        }
+    }
+    0
+}
