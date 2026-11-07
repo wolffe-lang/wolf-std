@@ -94,7 +94,7 @@ The Mac figures are from one take behind the Mac build lock, at `fb6456b`, whose
 
 ### The plant
 
-`sc80-plant-blockmix-order` is pushed without a PR: one commit, one file, one hunk on the final head. scryptBlockMix writes the odd-indexed Salsa outputs to the first half of B' and the even ones to the second. The plant record names `rfc7914-s9-blockmix` and `rfc7914-s10-romix`, each a `FAIL` line in the nonzero `sc80-rows-native` step. The §8 Salsa row and both §11 PBKDF2 rows stay green.
+`sc80-plant-blockmix-order` is pushed without a PR: one commit, one file, one hunk (one line) on the final head. scryptBlockMix's step 3 tests the wrong parity, so the even-indexed Salsa outputs go to the second half of B' and the odd ones to the first. The plant record names `rfc7914-s9-blockmix` and `rfc7914-s10-romix`, each a `FAIL` line in the nonzero `sc80-rows-native` step. The §8 Salsa row and both §11 PBKDF2 rows stay green.
 
 ### The gauntlet
 
@@ -106,7 +106,7 @@ The Mac figures are from one take behind the Mac build lock, at `fb6456b`, whose
 4. every `cargo xtask ci` step: `time-oracle`, `fmt`, `clippy`, `test`, `sync-pin`, `doctor`, `ledger-check`, `lint-conventions`, `fmt-lu`, `gen-vectors`, `std-test` (634 files, three lanes), `doc-examples` and `ulp`;
 5. the cost witness.
 
-`--mac` runs the toolchain, the rows and the cost witness. The local-gate recorder writes the green, plant and Mac records. The PR body gives their paths and every `END` line.
+`--mac` runs the toolchain, the rows and the cost witness, and `--plant` the toolchain and the rows, on either host. The local-gate recorder writes the green and plant records on Linux, and a green and a plant record on the Mac. The PR body gives their paths and every `END` line.
 
 ## Rulings asked (R-list)
 
