@@ -8,7 +8,7 @@
 #
 #   bash docs/sc80-witness/gauntlet.sh            the full gauntlet (Linux,
 #                                                 sc80's pinned Ubuntu image)
-#   bash docs/sc80-witness/gauntlet.sh --plant    toolchain + the sc80 rows
+#   bash docs/sc80-witness/gauntlet.sh --plant    toolchain + the sc80 rows (either host)
 #   bash docs/sc80-witness/gauntlet.sh --mac      toolchain, the sc80 rows
 #                                                 and the cost witness (macOS)
 #
@@ -46,7 +46,7 @@ toolchain() {
     python3 --version
     digest "$WOLF_BIN" "$LUPIN_BIN" "$WOLF_RT_LIB"
     uname -sm
-    if [ "$mode" = --mac ]; then
+    if [ "$(uname -s)" = Darwin ]; then
         sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize
         uptime
     else
