@@ -206,6 +206,37 @@ bc26f16b9fc9a90628864d3d1111ef48a4bd00b9d4870bfab88ff326e309e073  wycheproof/rsa
 9d6e67b1eb0d7040db411835238efd20e9302399a258bdff82de3f38e0f2855a  wycheproof/rsa_signature_4096_sha512_test.json
 ```
 
+## Sources (retrieved 2026-11-07, sc80 — scrypt and the `$7$` string)
+
+- `rfc/rfc7914.txt` — the RFC Editor's canonical text
+  (`https://www.rfc-editor.org/rfc/rfc7914.txt`), "The scrypt
+  Password-Based Key Derivation Function": the implementation source of
+  `std.x.crypto.scrypt` (§3 Salsa20/8 Core, §4 scryptBlockMix, §5
+  scryptROMix, §6 scrypt) and every vector its rows quote (§8–§13).
+- `rfc/rfc8018.txt` — the RFC Editor's canonical text
+  (`https://www.rfc-editor.org/rfc/rfc8018.txt`), PKCS #5 v2.1: §5.2's
+  PBKDF2, which scrypt uses with HMAC-SHA-256 and the module exposes.
+- `rfc/rfc2104.txt` — the RFC Editor's canonical text
+  (`https://www.rfc-editor.org/rfc/rfc2104.txt`), HMAC, the PRF under
+  PBKDF2 (`std.x.crypto.sha2.hmac256`, FIPS 180-4's SHA-256).
+- `man/crypt.5` — the crypt(5) manual page as Ubuntu 24.04 (noble)
+  ships it with libxcrypt, from
+  `https://manpages.ubuntu.com/manpages.gz/noble/man5/crypt.5.gz`
+  (gzip sha256 `c2463c0f58d9f1da2d4f5c2b0bb5e575d3af9c578db164832d37397687cacaa2`),
+  stored decompressed. Its own header places it in the public domain.
+  It gives the `$7$` string's regular expression and nothing of the
+  string's inner encoding. `std.x.crypto.passwd`'s header records how
+  that encoding was learned, from Ubuntu's crypt run as a black box.
+
+sha256 of the sc80 files, as retrieved:
+
+```
+df55932f8b6a5d271f36a634d91a25903724e189ba6c120bf7257cd47f10b197  rfc/rfc7914.txt
+cf96b02e68216f618ea33b20b49d476edba9d70f2333597ec516629d22971cda  rfc/rfc8018.txt
+64d5245a9101929025336e470e3737f118704001249d503c85a86e19fe9fbb01  rfc/rfc2104.txt
+858fea44d1e1e15ef5a1fba8c13cc0280cf2dc770725c1729da3fc31cba74443  man/crypt.5
+```
+
 ## What is taken, what is omitted (named, never silent)
 
 - **CAVP short-message sets**: ALL vectors (65 + 129 + 129), run on
@@ -377,3 +408,12 @@ and the Poly1305 file is three-lane — the checked tier runs it too).
   186-5's bits2int with a digest shorter and longer than the order.
   780 `valid`, 1018 `invalid`, no `acceptable`. The SHA-3 and SHAKE
   files are omitted by name (outside the ladder).
+- **RFC 7914 (sc80)**: every vector the RFC prints, each a hand-written
+  row under `tests/x/crypto/scrypt/`: §8 (one Salsa20/8 Core
+  input/output pair), §9 (one scryptBlockMix pair, r = 1), §10 (one
+  scryptROMix pair, r = 1, N = 16), §11 (both PBKDF2-HMAC-SHA-256
+  vectors, c = 1 and c = 80000), §12 (all four scrypt vectors) and §13
+  (the PKCS#8 example's 32-octet derived key, N = 2^20). The two N = 2^20
+  rows (§12's fourth and §13's) run only in the local record, under a
+  hard memory cap (`docs/sc80-witness/`); §13's AES-256-CBC decryption of
+  the private key is outside scrypt and is not asserted.
