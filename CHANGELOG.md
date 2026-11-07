@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+**The password hash (sc80): scrypt, in crypt's `$7$` form.** PAX's
+`passwd`, `login`, `su` and `sudo` get a memory-hard hash whose shadow(5)
+lines Ubuntu's crypt also reads.
+
+- `std.x.crypto.scrypt` is new: scrypt (RFC 7914) and PBKDF2-HMAC-SHA-256
+  (RFC 8018 §5.2): `salsa20_8`, `blockmix`, `romix`, `pbkdf2_hmac_sha256`,
+  `scrypt(password, salt, n_log2, r, p, dk_len, cap)` and
+  `memory(n_log2, r, p, dk_len)`, the peak octets `scrypt` checks against
+  the caller's cap before it allocates. Refused by name: `bad_n`,
+  `bad_rp`, `over_cap`, `bad_dk_len`, and PBKDF2's `bad_count`. Every
+  vector RFC 7914 prints passes; the two N = 2^20 ones run in the local
+  record only. ROMix is not constant-time, by scrypt's design (the
+  module header says what is and is not).
+- `std.x.crypto.passwd` is new: the crypt(5) `$7$` string. `hash` gives
+  the exact string Ubuntu 24.04's crypt gives for the same password,
+  salt and cost; `verify` checks a stored string and compares the key in
+  constant time; `gen_salt` encodes octets the caller drew from the OS
+  random source; `parse` and `encode` are the string's two directions.
+  Another crypt method is `unsupported`, and an empty, locked or
+  malformed field is refused by name. A password with a zero octet hashes
+  every octet here, where crypt(3) stops at it.
+
 **The public-PKI TLS client (sc79, wolf-std#101).** `std.x.tls.client`
 completes a TLS 1.3 handshake with servers whose certificates are RSA,
 RSA-PSS or ECDSA P-384, and with github.com:443 given a distribution's
