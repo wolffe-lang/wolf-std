@@ -1,0 +1,97 @@
+//! check: run(exit=0, stdout="r = 0: bad_rp\np = 0: bad_rp\nr * p = 2^30: bad_rp\nr * p = 2^30 - 1: over_cap\nr = 0 and log2 N = 0: bad_rp\nlog2 N = 0: bad_n\nlog2 N = -3: bad_n\nN = 2^16 at r = 1: bad_n\nN = 2^15 at r = 1: over_cap\nN = 2^63 at r = 4: over_cap\ndk_len = 0: bad_dk_len\ndk_len = (2^32 - 1) * 32 + 1: bad_dk_len\ndk_len = (2^32 - 1) * 32: over_cap\ncap one under: over_cap\ncap exact: ok 64\nromix N = 16: ok 128\nromix N = 15: bad_n\nromix N = 24: bad_n\nromix N = 1: bad_n\nromix N = 0: bad_n\nromix N = -16: bad_n\nromix N = 2^16 at r = 1: bad_n\npbkdf2 c = 0: bad_count\npbkdf2 c = -1: bad_count\npbkdf2 dk_len = 0: bad_dk_len\npbkdf2 dk_len = (2^32 - 1) * 32 + 1: bad_dk_len\nmemory(14, 8, 1, 64) = 16797760\nmemory(63, 8, 1, 64) saturates: true\nmemory(62, 2^29, 1, 64) saturates: true")
+//! phase: run
+//! conforms: std.x.crypto.scrypt, err.row, err.else
+//!
+//! sc80: scrypt's parameter refusals, each by name, in the documented
+//! order (`bad_rp`, `bad_n`, `bad_dk_len`, `over_cap`), with each
+//! boundary shown from both sides: r·p = 2^30 is `bad_rp` and 2^30 − 1
+//! passes to the cap check; N = 2^16 is `bad_n` at r = 1 (RFC 7914 §2's
+//! N < 2^(128·r/8)) and 2^15 passes; dk_len (2^32 − 1)·32 passes and one
+//! more is `bad_dk_len`; a cap one octet under `memory` is `over_cap` and
+//! the exact figure runs. `romix` refuses an N that is not a power of
+//! two above 1. PBKDF2 refuses an iteration count below 1. The password
+//! and salt are empty (RFC 7914 §12's first vector's). THREE-LANE: the
+//! only derivations are at N = 16, r = 1.
+
+use std.x.crypto.scrypt
+
+fn word(n_log2: int, r: int, p: int, dk_len: int, cap: int) -> str {
+    let dk = scrypt.scrypt(List[byte](), List[byte](), n_log2, r, p, dk_len, cap) else |e| match e {
+        bad_n => {
+            return "bad_n"
+        },
+        bad_rp => {
+            return "bad_rp"
+        },
+        over_cap => {
+            return "over_cap"
+        },
+        bad_dk_len => {
+            return "bad_dk_len"
+        },
+    }
+    "ok {dk.len}"
+}
+
+fn romix_word(r: int, n: int) -> str {
+    var b = List[byte]()
+    var i: int = 0
+    while i < 128 * r {
+        (mut b).push((i % 256) as byte)
+        i = i + 1
+    }
+    let out = scrypt.romix(b, r, n) else |e| match e {
+        bad_n => {
+            return "bad_n"
+        },
+    }
+    "ok {out.len}"
+}
+
+fn pbkdf2_word(c: int, dk_len: int) -> str {
+    let dk = scrypt.pbkdf2_hmac_sha256(List[byte](), List[byte](), c, dk_len) else |e| match e {
+        bad_count => {
+            return "bad_count"
+        },
+        bad_dk_len => {
+            return "bad_dk_len"
+        },
+    }
+    "ok {dk.len}"
+}
+
+fn main() -> int {
+    let small = scrypt.memory(4, 1, 1, 64)
+    let big: int = 9223372036854775807
+    let dk_max: int = 137438953440
+    print("r = 0: {word(4, 0, 1, 64, big)}")
+    print("p = 0: {word(4, 1, 0, 64, big)}")
+    print("r * p = 2^30: {word(4, 1024, 1048576, 64, big)}")
+    print("r * p = 2^30 - 1: {word(4, 1, 1073741823, 64, small)}")
+    print("r = 0 and log2 N = 0: {word(0, 0, 1, 64, big)}")
+    print("log2 N = 0: {word(0, 1, 1, 64, big)}")
+    print("log2 N = -3: {word(-3, 1, 1, 64, big)}")
+    print("N = 2^16 at r = 1: {word(16, 1, 1, 64, big)}")
+    print("N = 2^15 at r = 1: {word(15, 1, 1, 64, scrypt.memory(15, 1, 1, 64) - 1)}")
+    print("N = 2^63 at r = 4: {word(63, 4, 1, 64, big - 1)}")
+    print("dk_len = 0: {word(4, 1, 1, 0, big)}")
+    print("dk_len = (2^32 - 1) * 32 + 1: {word(4, 1, 1, dk_max + 1, big)}")
+    print("dk_len = (2^32 - 1) * 32: {word(4, 1, 1, dk_max, small)}")
+    print("cap one under: {word(4, 1, 1, 64, small - 1)}")
+    print("cap exact: {word(4, 1, 1, 64, small)}")
+    print("romix N = 16: {romix_word(1, 16)}")
+    print("romix N = 15: {romix_word(1, 15)}")
+    print("romix N = 24: {romix_word(1, 24)}")
+    print("romix N = 1: {romix_word(1, 1)}")
+    print("romix N = 0: {romix_word(1, 0)}")
+    print("romix N = -16: {romix_word(1, -16)}")
+    print("romix N = 2^16 at r = 1: {romix_word(1, 65536)}")
+    print("pbkdf2 c = 0: {pbkdf2_word(0, 32)}")
+    print("pbkdf2 c = -1: {pbkdf2_word(-1, 32)}")
+    print("pbkdf2 dk_len = 0: {pbkdf2_word(1, 0)}")
+    print("pbkdf2 dk_len = (2^32 - 1) * 32 + 1: {pbkdf2_word(1, dk_max + 1)}")
+    print("memory(14, 8, 1, 64) = {scrypt.memory(14, 8, 1, 64)}")
+    print("memory(63, 8, 1, 64) saturates: {scrypt.memory(63, 8, 1, 64) == big}")
+    print("memory(62, 2^29, 1, 64) saturates: {scrypt.memory(62, 536870912, 1, 64) == big}")
+    0
+}

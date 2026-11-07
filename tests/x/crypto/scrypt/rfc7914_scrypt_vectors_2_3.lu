@@ -1,0 +1,59 @@
+//! check: run(exit=0, stdout="rfc7914 scrypt vectors 2 and 3: 2 rows")
+//! phase: run
+//! conforms: std.x.crypto.scrypt
+//!
+//! sc80: RFC 7914 §12's second and third scrypt vectors, quoted from
+//! `vendor/vectors/rfc/rfc7914.txt`: P = "password", S = "NaCl", N = 1024,
+//! r = 8, p = 16 (sixteen ROMix calls over one V), and P =
+//! "pleaseletmein", S = "SodiumChloride", N = 16384, r = 8, p = 1 (16 MiB
+//! of V). Each cap is exactly `scrypt.memory` of its parameters. The
+//! fourth vector (N = 2^20) runs only in the local record, under a hard
+//! memory cap (`docs/sc80-witness/`). Native only: both exhaust the
+//! interpreter's and the checked tier's step budgets.
+
+use std.x.crypto.scrypt
+
+fn row(name: str, ok: bool) -> int {
+    if ok {
+        return 0
+    }
+    print("FAIL {name}")
+    1
+}
+
+fn main() -> int {
+    let want2 = "fdbabe1c9d3472007856e7190d01e9fe7c6ad7cbc8237830e77376634b3731622eaf30d92e22a3886ff109279d9830dac727afb94a83ee6d8360cbdfa2cc0640"
+    let want3 = "7023bdcb3afd7348461c06cd81fd38ebfda8fbba904f8e3ea9b543f6545da1f2d5432955613f0fcf62d49705242a9af9e61e85dc0d651e40dfcf017b45575887"
+    let v2 = scrypt.scrypt(
+        "password".bytes(),
+        "NaCl".bytes(),
+        10,
+        8,
+        16,
+        64,
+        scrypt.memory(10, 8, 16, 64),
+    ) else |_| {
+        print("FAIL rfc7914-s12-vector2")
+        return 1
+    }
+    let v3 = scrypt.scrypt(
+        "pleaseletmein".bytes(),
+        "SodiumChloride".bytes(),
+        14,
+        8,
+        1,
+        64,
+        scrypt.memory(14, 8, 1, 64),
+    ) else |_| {
+        print("FAIL rfc7914-s12-vector3")
+        return 1
+    }
+    var bad: int = 0
+    bad = bad + row("rfc7914-s12-vector2", scrypt.to_hex(v2) == want2)
+    bad = bad + row("rfc7914-s12-vector3", scrypt.to_hex(v3) == want3)
+    if bad > 0 {
+        return 1
+    }
+    print("rfc7914 scrypt vectors 2 and 3: 2 rows")
+    0
+}

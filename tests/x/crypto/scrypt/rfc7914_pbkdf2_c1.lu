@@ -1,0 +1,25 @@
+//! check: run(exit=0, stdout="rfc7914 pbkdf2 c=1: 1 row")
+//! phase: run
+//! conforms: std.x.crypto.scrypt
+//!
+//! sc80: RFC 7914 §11's first PBKDF2-HMAC-SHA-256 vector, P = "passwd",
+//! S = "salt", c = 1, 64 octets (two PRF blocks), quoted from
+//! `vendor/vectors/rfc/rfc7914.txt`. RFC 8018 §5.2 is the algorithm.
+//! THREE-LANE. The second vector (c = 80000) is
+//! `rfc7914_pbkdf2_c80000.lu`, native only.
+
+use std.x.crypto.scrypt
+
+fn main() -> int {
+    let want = "55ac046e56e3089fec1691c22544b605f94185216dde0465e68b9d57c20dacbc49ca9cccf179b645991664b39d77ef317c71b845b1e30bd509112041d3a19783"
+    let dk = scrypt.pbkdf2_hmac_sha256("passwd".bytes(), "salt".bytes(), 1, 64) else |_| {
+        print("FAIL rfc7914-s11-pbkdf2-c1")
+        return 1
+    }
+    if scrypt.to_hex(dk) != want {
+        print("FAIL rfc7914-s11-pbkdf2-c1")
+        return 1
+    }
+    print("rfc7914 pbkdf2 c=1: 1 row")
+    0
+}

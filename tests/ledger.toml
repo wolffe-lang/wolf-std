@@ -5317,3 +5317,46 @@ native = "run"
 lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
+
+# ---- sc80: std.x.crypto.scrypt (RFC 7914, RFC 8018 §5.2) and
+# std.x.crypto.passwd (crypt(5)'s `$7$` string). Every RFC 7914 vector
+# is a row except the two N = 2^20 ones, which run only in the local
+# record under a hard memory cap (docs/sc80-witness/). The building
+# blocks, the c = 1 PBKDF2, the first scrypt vector, the refusals and the
+# parser are three-lane; the c = 80000 PBKDF2, the N = 2^10 to 2^15
+# vectors and the Ubuntu strings exhaust the interpreter's and the
+# checked tier's step budgets.
+[tests."x/crypto/scrypt/rfc7914_core_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/scrypt/rfc7914_pbkdf2_c1.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/scrypt/rfc7914_pbkdf2_c80000.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/scrypt/rfc7914_scrypt_vector1.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/scrypt/rfc7914_scrypt_vectors_2_3.lu"]
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/scrypt/parameter_refusals.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."x/crypto/scrypt/salsa_length_trap.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"

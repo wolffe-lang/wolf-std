@@ -1,0 +1,47 @@
+// sc80: RFC 7914's two N = 2^20 vectors, quoted from
+// `vendor/vectors/rfc/rfc7914.txt`: §12's fourth scrypt vector (P =
+// "pleaseletmein", S = "SodiumChloride", N = 1048576, r = 8, p = 1, 64
+// octets) and §13's PKCS#8 example's derived key (P = "Rabbit", S =
+// "Mouse", N = 1048576, r = 8, p = 1, 32 octets). Each needs 1 GiB of V.
+// Outside `tests/` on purpose: the rig would run it everywhere, and a
+// run that holds a gigabyte goes under a hard cap (the local record runs
+// it under `prlimit --as`). Each row prints `FAIL <name>` when it
+// differs, and the program then exits 1.
+
+use std.x.crypto.scrypt
+
+fn main() -> int {
+    let want4 = "2101cb9b6a511aaeaddbbe09cf70f881ec568d574a2ffd4dabe5ee9820adaa478e56fd8f4ba5d09ffa1c6d927c40f4c337304049e8a952fbcbf45c6fa77a41a4"
+    let want13 = "e277ea2cacb23edafc039d229b79dc13ecedb601d99b182a9fedba1e2bfb4f58"
+    let cap = scrypt.memory(20, 8, 1, 64)
+    var bad: int = 0
+    let v4 = scrypt.scrypt(
+        "pleaseletmein".bytes(),
+        "SodiumChloride".bytes(),
+        20,
+        8,
+        1,
+        64,
+        cap,
+    ) else |_| {
+        print("FAIL rfc7914-s12-vector4")
+        return 1
+    }
+    if scrypt.to_hex(v4) != want4 {
+        print("FAIL rfc7914-s12-vector4")
+        bad = bad + 1
+    }
+    let k13 = scrypt.scrypt("Rabbit".bytes(), "Mouse".bytes(), 20, 8, 1, 32, cap) else |_| {
+        print("FAIL rfc7914-s13-pkcs8-key")
+        return 1
+    }
+    if scrypt.to_hex(k13) != want13 {
+        print("FAIL rfc7914-s13-pkcs8-key")
+        bad = bad + 1
+    }
+    if bad > 0 {
+        return 1
+    }
+    print("rfc7914 N = 2^20: 2 rows (cap {cap} octets)")
+    0
+}

@@ -1,0 +1,26 @@
+//! check: run(exit=0, stdout="rfc7914 pbkdf2 c=80000: 1 row")
+//! phase: run
+//! conforms: std.x.crypto.scrypt
+//!
+//! sc80: RFC 7914 §11's second PBKDF2-HMAC-SHA-256 vector, P =
+//! "Password", S = "NaCl", c = 80000, 64 octets, quoted from
+//! `vendor/vectors/rfc/rfc7914.txt`. 160,000 HMAC calls: the row also
+//! holds the module's claim that iterating the PRF keeps a constant
+//! footprint (each call runs in its own region). Native only: the
+//! interpreter and the checked tier exhaust their step budgets.
+
+use std.x.crypto.scrypt
+
+fn main() -> int {
+    let want = "4ddcd8f60b98be21830cee5ef22701f9641a4418d04c0414aeff08876b34ab56a1d425a1225833549adb841b51c9b3176a272bdebba1d078478f62b397f33c8d"
+    let dk = scrypt.pbkdf2_hmac_sha256("Password".bytes(), "NaCl".bytes(), 80000, 64) else |_| {
+        print("FAIL rfc7914-s11-pbkdf2-c80000")
+        return 1
+    }
+    if scrypt.to_hex(dk) != want {
+        print("FAIL rfc7914-s11-pbkdf2-c80000")
+        return 1
+    }
+    print("rfc7914 pbkdf2 c=80000: 1 row")
+    0
+}

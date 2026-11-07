@@ -1,0 +1,17 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.x.crypto.scrypt, conf.trap.set
+//!
+//! sc80: the Salsa20/8 Core takes exactly one 64-octet block (RFC 7914
+//! §3). A block of another length is the caller's contract broken, not
+//! data, so it traps `assert` (API-CONVENTIONS §2) before any word is
+//! read.
+
+use std.x.crypto.scrypt
+
+fn main() -> int {
+    let out = scrypt.salsa20_8(
+        "sixty-three octets are one short of a Salsa20/8 block, a trap..".bytes(),
+    )
+    out.len
+}
