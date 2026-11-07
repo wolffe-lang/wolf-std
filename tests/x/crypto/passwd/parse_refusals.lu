@@ -1,0 +1,193 @@
+//! check: run(exit=0, stdout="ubuntu string: ok 14 8 1 salt 22\nempty: empty\nbang: locked\nbang before a hash: locked\nstar: locked\ndouble bang: locked\nyescrypt: unsupported\ngost-yescrypt: unsupported\nbcrypt 2b: unsupported\nbcrypt 2a: unsupported\nbcrypt 2y: unsupported\nbcrypt 2x: unsupported\nsha512crypt: unsupported\nsha256crypt: unsupported\nsha1crypt: unsupported\nsunmd5: unsupported\nmd5crypt: unsupported\nnt: unsupported\nunknown id: unsupported\nbsdicrypt: unsupported\ndescrypt: unsupported\ndollar: malformed\ndollar dollar: malformed\ndollar seven: malformed\ndollar 7x: malformed\nspace: malformed\none letter: malformed\ncolon in a DES shape: malformed\nseven alone: malformed\nseven, short params: malformed\nseven, no hash: malformed\nN = 0: bad_n\nN not in the alphabet: bad_n\nN = 2^20 at r = 1: bad_n\nN = 2^18 at r = 2: ok 18 2 1 salt 22\nN = 2^63 at r = 4: ok 63 4 1 salt 22\nr = 0: bad_rp\np = 0: bad_rp\nr not in the alphabet: bad_rp\nr * p = 2^31 - 2: bad_rp\nsalt with a hyphen: bad_salt\nsalt of 87: bad_salt\nsalt of 86: ok 14 8 1 salt 86\nempty salt: ok 14 8 1 salt 0\nhash of 42: bad_hash\nhash of 44: bad_hash\nhash with a hyphen: bad_hash\nlast character 18: bad_hash\nlast character 15: ok 14 8 1 salt 22\ntrailing field: bad_hash\nround trip, ubuntu string: true\nround trip, salt of 86: true\nround trip, empty salt: true\nround trip, last character 15: true\nverify, locked: locked\nverify, sha512crypt: unsupported\nverify, malformed: malformed\nverify, bad hash: bad_hash")
+//! phase: run
+//! conforms: std.x.crypto.passwd, err.row, err.else
+//!
+//! sc80: `passwd.parse` refuses every shape it cannot check by name, and
+//! `verify` carries the same names. The `$7$` base string and the other
+//! methods' strings were made by Ubuntu 24.04's `crypt` and `mkpasswd`
+//! from random passwords that were then discarded (generated test data);
+//! every mutation is built here from their parts. The rows cover each
+//! field's boundary from both sides: log2 N against 16·r, r·p against
+//! 2^30, a salt of 86 characters and 87, a key of 43 characters with a
+//! canonical and a non-canonical last character. The password `verify`
+//! is given is made at run time. THREE-LANE: no row reaches scrypt.
+
+use std.rand
+use std.x.crypto.passwd
+
+fn word(s: str) -> str {
+    let h = passwd.parse(s) else |e| match e {
+        empty => {
+            return "empty"
+        },
+        locked => {
+            return "locked"
+        },
+        unsupported => {
+            return "unsupported"
+        },
+        malformed => {
+            return "malformed"
+        },
+        bad_n => {
+            return "bad_n"
+        },
+        bad_rp => {
+            return "bad_rp"
+        },
+        bad_salt => {
+            return "bad_salt"
+        },
+        bad_hash => {
+            return "bad_hash"
+        },
+    }
+    "ok {h.cost.n_log2} {h.cost.r} {h.cost.p} salt {h.salt.len}"
+}
+
+fn verify_word(pw: List[byte], s: str) -> str {
+    let ok = passwd.verify(pw, s) else |e| match e {
+        empty => {
+            return "empty"
+        },
+        locked => {
+            return "locked"
+        },
+        unsupported => {
+            return "unsupported"
+        },
+        malformed => {
+            return "malformed"
+        },
+        bad_n => {
+            return "bad_n"
+        },
+        bad_rp => {
+            return "bad_rp"
+        },
+        bad_salt => {
+            return "bad_salt"
+        },
+        bad_hash => {
+            return "bad_hash"
+        },
+        over_cap => {
+            return "over_cap"
+        },
+    }
+    "answered {ok}"
+}
+
+fn round_trip(s: str) -> bool {
+    let h = passwd.parse(s) else |_| {
+        return false
+    }
+    passwd.encode(h) == s
+}
+
+/// A printable password of `len` octets, drawn at run time.
+fn password(seed: int, len: int) -> List[byte] {
+    var g = rand.new(seed)
+    var out = List[byte]()
+    var i: int = 0
+    while i < len {
+        (mut out).push((32 + rand.below(mut g, 95)) as byte)
+        i = i + 1
+    }
+    out
+}
+
+fn say(label: str, w: str) {
+    print("{label}: {w}")
+}
+
+fn main() -> int {
+    let salt = "yb/XZj1NCg1rb/5RytWq5/"
+    let key = "N8T0E6rYyvGsPmqhviAsRS2f9A6wYzomUd6ouVMA/S2"
+    let key42 = key[0..42]
+    let base = "$7$C6..../....{salt}${key}"
+    let salt86 = "{salt}{salt}{salt}{salt[0..20]}"
+    let salt87 = "{salt86}a"
+    let bcrypt = "$2b$05$57NwyscLxC0H7/yQWvNaXef.48RIeevexTET9TIdCptcs58RteiSC"
+    say("ubuntu string", word(base))
+    say("empty", word(""))
+    say("bang", word("!"))
+    say("bang before a hash", word("!{base}"))
+    say("star", word("*"))
+    say("double bang", word("!!"))
+    say(
+        "yescrypt",
+        word("$y$j9T$9NCKHTdhj9GcmFzKOyY75/$ftqWEiSPODgbkSzna.rtYi9KPvFDWZmULY47yKo6Dv0"),
+    )
+    say(
+        "gost-yescrypt",
+        word("$gy$j9T$34ppOpPUxUUcamDHRid590$lEEmL/QHDReJ3EXcETCiVszWoBc80gZWsirUpyUAS3C"),
+    )
+    say("bcrypt 2b", word(bcrypt))
+    say("bcrypt 2a", word("$2a$05$2QzoRcZctY9hAju6K4P1R.fp8bfxw6QHP5fXhMwq4M6rVIZ4oMYp6"))
+    let bcrypt_tail = bcrypt[3..bcrypt.len]
+    say("bcrypt 2y", word("$2y{bcrypt_tail}"))
+    say("bcrypt 2x", word("$2x{bcrypt_tail}"))
+    say(
+        "sha512crypt",
+        word(
+            "$6$A4Q8KYiEC6KRiRtx$V89SRkcE0w6NOGvwohDfZ7RQpy/HNFgf1XV0k7MeaSmuAMha.V9om2utYfvWKeQL9WCzfy4cq4ki/1zPJeonX/",
+        ),
+    )
+    say("sha256crypt", word("$5$86Ab3b4yYye0aNox$Ki4NC25M6UnsCRT5kk93RdmVKYKQjOT9bZi26M95f05"))
+    say("sha1crypt", word("$sha1$40000$jtNX3nZ2${key[0..28]}"))
+    say("sunmd5", word("$md5,rounds=70610$S9.2nJ6M$$1oL3Sw.WyMfPWp6oC1Z/q."))
+    say("md5crypt", word("$1$.Z0XxKqh$QZ8kyHLCskzVK6kSFnG34."))
+    say("nt", word("$3$$ae5fc7f5828b2a37d2e88bf06bcd93af"))
+    say("unknown id", word("$7x${salt}${key}"))
+    say("bsdicrypt", word("_J9..8xOzO1mCLfOil86"))
+    say("descrypt", word("NN/lCWppFTf6k"))
+    say("dollar", word("$"))
+    say("dollar dollar", word("$$"))
+    say("dollar seven", word("$7"))
+    say("dollar 7x", word("$7x"))
+    say("space", word("hello world"))
+    say("one letter", word("x"))
+    say("colon in a DES shape", word("NN/lCWpp:Tf6k"))
+    say("seven alone", word("$7$"))
+    say("seven, short params", word("$7$C6..../..."))
+    say("seven, no hash", word("$7$C6..../....{salt}"))
+    say("N = 0", word("$7$.6..../....{salt}${key}"))
+    say("N not in the alphabet", word("$7$%6..../....{salt}${key}"))
+    say("N = 2^20 at r = 1", word("$7$I/..../....{salt}${key}"))
+    say("N = 2^18 at r = 2", word("$7$G0..../....{salt}${key}"))
+    say("N = 2^63 at r = 4", word("$7$z2..../....{salt}${key}"))
+    say("r = 0", word("$7$C...../....{salt}${key}"))
+    say("p = 0", word("$7$C6.........{salt}${key}"))
+    say("r not in the alphabet", word("$7$C%..../....{salt}${key}"))
+    say("r * p = 2^31 - 2", word("$7$Czzzzz0....{salt}${key}"))
+    say("salt with a hyphen", word("$7$C6..../....{salt[0..10]}-{salt[11..22]}${key}"))
+    say("salt of 87", word("$7$C6..../....{salt87}${key}"))
+    say("salt of 86", word("$7$C6..../....{salt86}${key}"))
+    say("empty salt", word("$7$C6..../....${key}"))
+    say("hash of 42", word("$7$C6..../....{salt}${key42}"))
+    say("hash of 44", word("$7$C6..../....{salt}${key}."))
+    say("hash with a hyphen", word("$7$C6..../....{salt}${key[0..20]}-{key[21..43]}"))
+    say("last character 18", word("$7$C6..../....{salt}${key42}G"))
+    say("last character 15", word("$7$C6..../....{salt}${key42}D"))
+    say("trailing field", word("$7$C6..../....{salt}${key}$x"))
+    say("round trip, ubuntu string", "{round_trip(base)}")
+    let long_salt = "$7$C6..../....{salt86}${key}"
+    let no_salt = "$7$C6..../....${key}"
+    let last15 = "$7$C6..../....{salt}${key42}D"
+    say("round trip, salt of 86", "{round_trip(long_salt)}")
+    say("round trip, empty salt", "{round_trip(no_salt)}")
+    say("round trip, last character 15", "{round_trip(last15)}")
+    let pw = password(80, 12)
+    say("verify, locked", verify_word(pw, "!{base}"))
+    say(
+        "verify, sha512crypt",
+        verify_word(
+            pw,
+            "$6$A4Q8KYiEC6KRiRtx$V89SRkcE0w6NOGvwohDfZ7RQpy/HNFgf1XV0k7MeaSmuAMha.V9om2utYfvWKeQL9WCzfy4cq4ki/1zPJeonX/",
+        ),
+    )
+    say("verify, malformed", verify_word(pw, "$7$C6..../....{salt}"))
+    say("verify, bad hash", verify_word(pw, "$7$C6..../....{salt}${key42}G"))
+    0
+}

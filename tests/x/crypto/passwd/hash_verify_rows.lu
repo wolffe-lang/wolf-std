@@ -1,0 +1,244 @@
+//! check: run(exit=0, stdout="passwd hash and verify: 37 rows")
+//! phase: run
+//! conforms: std.x.crypto.passwd, std.x.crypto.scrypt, err.row, err.else
+//!
+//! sc80: `cost`, `gen_salt`, `hash`, `verify` and `verify_capped`, row by
+//! row. Every password is drawn at run time from a seeded generator
+//! (none is written here), and so is every salt's random input. The rows
+//! hold: a hash verifies and a password one octet away does not; the key
+//! a string stores is `scrypt.scrypt` of the password and the salt
+//! characters; empty, long (over HMAC's 64-octet block) and zero-octet
+//! passwords; salts of 0, 22 and 86 characters; each refusal at its
+//! boundary. Each row prints `FAIL <name>` when it is wrong, and the
+//! program then exits 1. THREE-LANE: every derivation is at N <= 32 with
+//! r <= 2.
+
+use std.rand
+use std.x.crypto.passwd
+use std.x.crypto.scrypt
+
+fn row(name: str, ok: bool) -> int {
+    if ok {
+        return 0
+    }
+    print("FAIL {name}")
+    1
+}
+
+/// `len` octets drawn at run time: printable when `printable`, else any
+/// value 0 to 255.
+fn draw(mut g: rand.Rng, len: int, printable: bool) -> List[byte] {
+    var out = List[byte]()
+    var i: int = 0
+    while i < len {
+        if printable {
+            (mut out).push((32 + rand.below(mut g, 95)) as byte)
+        } else {
+            (mut out).push(rand.below(mut g, 256) as byte)
+        }
+        i = i + 1
+    }
+    out
+}
+
+fn cost_word(n_log2: int, r: int, p: int) -> str {
+    let c = passwd.cost(n_log2, r, p) else |e| match e {
+        bad_n => {
+            return "bad_n"
+        },
+        bad_rp => {
+            return "bad_rp"
+        },
+    }
+    "ok {c.n_log2}"
+}
+
+fn salt_word(random: List[byte]) -> str {
+    let s = passwd.gen_salt(random) else |e| match e {
+        bad_random => {
+            return "bad_random"
+        },
+    }
+    "ok {s.len}"
+}
+
+fn hash_word(pw: List[byte], salt: str, c: passwd.Cost) -> str {
+    let line = passwd.hash(pw, salt, c) else |e| match e {
+        bad_n => {
+            return "bad_n"
+        },
+        bad_rp => {
+            return "bad_rp"
+        },
+        bad_salt => {
+            return "bad_salt"
+        },
+        over_cap => {
+            return "over_cap"
+        },
+    }
+    line
+}
+
+/// "true", "false", or the refusal's name.
+fn verify_word(pw: List[byte], stored: str, cap: int) -> str {
+    let ok = passwd.verify_capped(pw, stored, cap) else |e| match e {
+        empty => {
+            return "empty"
+        },
+        locked => {
+            return "locked"
+        },
+        unsupported => {
+            return "unsupported"
+        },
+        malformed => {
+            return "malformed"
+        },
+        bad_n => {
+            return "bad_n"
+        },
+        bad_rp => {
+            return "bad_rp"
+        },
+        bad_salt => {
+            return "bad_salt"
+        },
+        bad_hash => {
+            return "bad_hash"
+        },
+        over_cap => {
+            return "over_cap"
+        },
+    }
+    "{ok}"
+}
+
+fn zeros(n: int) -> List[byte] {
+    var out = List[byte]()
+    var i: int = 0
+    while i < n {
+        (mut out).push(0 as byte)
+        i = i + 1
+    }
+    out
+}
+
+fn main() -> int {
+    var g = rand.new(8080)
+    let cap = passwd.default_cap()
+    var bad: int = 0
+    bad = bad + row("cost-n-zero", cost_word(0, 1, 1) == "bad_n")
+    bad = bad + row("cost-n-64", cost_word(64, 8, 1) == "bad_n")
+    bad = bad + row("cost-n-16-at-r-1", cost_word(16, 1, 1) == "bad_n")
+    bad = bad + row("cost-n-15-at-r-1", cost_word(15, 1, 1) == "ok 15")
+    bad = bad + row("cost-n-63-at-r-4", cost_word(63, 4, 1) == "ok 63")
+    bad = bad + row("cost-r-zero", cost_word(14, 0, 1) == "bad_rp")
+    bad = bad + row("cost-p-zero", cost_word(14, 8, 0) == "bad_rp")
+    bad = bad + row("cost-rp-2^30", cost_word(14, 1024, 1048576) == "bad_rp")
+    bad = bad + row("cost-rp-2^30-minus-1", cost_word(14, 1, 1073741823) == "ok 14")
+    bad = bad + row("salt-15-octets", salt_word(draw(mut g, 15, false)) == "bad_random")
+    bad = bad + row("salt-65-octets", salt_word(draw(mut g, 65, false)) == "bad_random")
+    bad = bad + row("salt-16-zeros", salt_word(zeros(16)) == "bad_random")
+    bad = bad + row("salt-16-octets", salt_word(draw(mut g, 16, false)) == "ok 22")
+    bad = bad + row("salt-17-octets", salt_word(draw(mut g, 17, false)) == "ok 23")
+    bad = bad + row("salt-64-octets", salt_word(draw(mut g, 64, false)) == "ok 86")
+    let c = passwd.cost(4, 1, 1) else |_| {
+        print("FAIL cost-4-1-1")
+        return 1
+    }
+    let salt22 = passwd.gen_salt(draw(mut g, 16, false)) else |_| {
+        print("FAIL gen-salt-22")
+        return 1
+    }
+    let salt86 = passwd.gen_salt(draw(mut g, 64, false)) else |_| {
+        print("FAIL gen-salt-86")
+        return 1
+    }
+    let pw = draw(mut g, 12, true)
+    let line = hash_word(pw, salt22, c)
+    bad = bad + row("hash-shape", line.len == 3 + 11 + 22 + 1 + 43)
+    bad = bad + row("verify-own-hash", verify_word(pw, line, cap) == "true")
+    var near = draw(mut g, 0, true)
+    for b in pw {
+        (mut near).push(b)
+    }
+    near[5] = ((near[5] as int + 1) % 256) as byte
+    bad = bad + row("verify-one-octet-away", verify_word(near, line, cap) == "false")
+    var longer = draw(mut g, 0, true)
+    for b in pw {
+        (mut longer).push(b)
+    }
+    (mut longer).push(65 as byte)
+    bad = bad + row("verify-one-octet-longer", verify_word(longer, line, cap) == "false")
+    bad = bad +
+        row("verify-empty-password-against-it", verify_word(List[byte](), line, cap) == "false")
+    let parsed = passwd.parse(line) else |_| {
+        print("FAIL parse-own-hash")
+        return 1
+    }
+    let dk = scrypt.scrypt(pw, salt22.bytes(), 4, 1, 1, 32, scrypt.memory(4, 1, 1, 32)) else |_| {
+        print("FAIL scrypt-of-salt-characters")
+        return 1
+    }
+    bad = bad +
+        row(
+            "stored-key-is-scrypt-of-salt-characters",
+            scrypt.to_hex(parsed.digest) == scrypt.to_hex(dk),
+        )
+    bad = bad + row("parse-own-hash-salt", parsed.salt == salt22)
+    bad = bad + row("encode-parse-own-hash", passwd.encode(parsed) == line)
+    let empty_pw = List[byte]()
+    let line_e = hash_word(empty_pw, salt22, c)
+    bad = bad + row("empty-password", verify_word(empty_pw, line_e, cap) == "true")
+    let long_pw = draw(mut g, 100, true)
+    let line_l = hash_word(long_pw, salt22, c)
+    bad = bad + row("long-password", verify_word(long_pw, line_l, cap) == "true")
+    var trunc = draw(mut g, 0, true)
+    var i: int = 0
+    while i < 99 {
+        (mut trunc).push(long_pw[i])
+        i = i + 1
+    }
+    bad = bad + row("long-password-truncated", verify_word(trunc, line_l, cap) == "false")
+    var zero_pw = draw(mut g, 6, true)
+    (mut zero_pw).push(0 as byte)
+    for b in draw(mut g, 5, true) {
+        (mut zero_pw).push(b)
+    }
+    let line_z = hash_word(zero_pw, salt22, c)
+    bad = bad + row("zero-octet-password", verify_word(zero_pw, line_z, cap) == "true")
+    var zero_cut = draw(mut g, 0, true)
+    i = 0
+    while i < 6 {
+        (mut zero_cut).push(zero_pw[i])
+        i = i + 1
+    }
+    bad = bad + row("zero-octet-password-cut", verify_word(zero_cut, line_z, cap) == "false")
+    let line_86 = hash_word(pw, salt86, c)
+    bad = bad + row("salt-86", verify_word(pw, line_86, cap) == "true")
+    let line_0 = hash_word(pw, "", c)
+    bad = bad + row("salt-empty", verify_word(pw, line_0, cap) == "true")
+    bad = bad + row("salt-87-refused", hash_word(pw, "{salt86}a", c) == "bad_salt")
+    bad = bad + row("salt-dollar-refused", hash_word(pw, "ab$cd", c) == "bad_salt")
+    let c2 = passwd.cost(5, 2, 2) else |_| {
+        print("FAIL cost-5-2-2")
+        return 1
+    }
+    let line_rp = hash_word(pw, salt22, c2)
+    bad = bad + row("r-2-p-2", verify_word(pw, line_rp, cap) == "true")
+    let big = passwd.cost(19, 32, 1) else |_| {
+        print("FAIL cost-19-32-1")
+        return 1
+    }
+    bad = bad + row("hash-over-default-cap", hash_word(pw, salt22, big) == "over_cap")
+    let tight = scrypt.memory(4, 1, 1, 32)
+    bad = bad + row("verify-capped-exact", verify_word(pw, line, tight) == "true")
+    bad = bad + row("verify-capped-one-under", verify_word(pw, line, tight - 1) == "over_cap")
+    bad = bad + row("hashes-differ-by-salt", hash_word(pw, salt86, c) != hash_word(pw, salt22, c))
+    if bad > 0 {
+        return 1
+    }
+    print("passwd hash and verify: 37 rows")
+    0
+}
