@@ -1,0 +1,136 @@
+//! check: run(exit=0, stdout="pair: name form true, slave a terminal true\nunapplied: true\nchild: ready at the size set before it true, foreground true\nchild: a new size heard true\nchild: Ctrl-G interrupts true, status 7\ngone: true")
+//! phase: run
+//! conforms: std.term, std.process, os.term.pty, os.term.size.set, os.term.attr, os.term.session
+//!
+//! **s292: a program run on a pty, through std** (native: the checked
+//! machine has no fork). `term.open_pty` answers the master, a slave and
+//! the slave's name; `term.set_size` and `term.set_attrs` set the window
+//! and the modes before the child exists, and `set_attrs` answers the ops
+//! the host could not apply (linux: 11, 15 and 17, which it lacks, and 90
+//! and 92, which its pty does not keep; macOS: 15, 16, 37, 52, 71 and 62);
+//! the forked child leads a session and opens the slave by name, which
+//! makes it its terminal; the parent closes its slave, resizes (heard) and
+//! writes the VINTR it set (Ctrl-G), which interrupts the child; after the
+//! master's close the name is gone.
+
+use std.fs
+use std.process
+use std.term
+
+fn count(hay: str, needle: str) -> int {
+    let h = hay.bytes()
+    let n = needle.bytes()
+    var found = 0
+    var i = 0
+    while i + n.len <= h.len {
+        var j = 0
+        while j < n.len && h[i + j] == n[j] {
+            j = j + 1
+        }
+        if j == n.len {
+            found = found + 1
+        }
+        i = i + 1
+    }
+    found
+}
+
+fn read_until(m: int, text: str, needle: str, ms: int) -> !str {
+    var t = text
+    var left = ms
+    while count(t, needle) < 1 && left > 0 {
+        let (i, _mm) = os_signal_wait_fds([m], 16, 100)?
+        if i == 0 {
+            let b = fs_read_chunk(m, 4096) else |_| List[byte]()
+            t = "{t}{str_from_utf8(b) else ""}"
+        }
+        left = left - 100
+    }
+    t
+}
+
+fn child(p: term.Pty) -> !int {
+    os_setsid()?
+    let t = fs_open_mode(p.name, 3)?
+    fs_close(p.master.fd)?
+    fs_close(p.slave.fd)?
+    os_signal_listen(16 + 16384)?
+    let tty = fs.File { fd: t }
+    let s = term.size(tty)?
+    let fg = term.foreground(tty)? == term.group()?
+    fs_write_chunk(t, "ready {s.rows} {s.columns} {fg}\n".bytes())?
+    loop {
+        let (_i, mm) = os_signal_wait_fds(List[int](), 16 + 16384, 5000)?
+        if mm == 0 {
+            process.exit(3)
+        }
+        if mm == 16384 {
+            let r = term.size(tty)?
+            fs_write_chunk(t, "resize {r.rows} {r.columns}\n".bytes())?
+        }
+        if mm == 16 {
+            fs_write_chunk(t, "interrupted\n".bytes())?
+            process.exit(7)
+        }
+    }
+    0
+}
+
+fn main() -> !int {
+    let p = term.open_pty()?
+    let form = if os_name() == "macos" { "/dev/ttys" } else { "/dev/pts/" }
+    print("pair: name form {count(p.name, form) == 1}, slave a terminal {os_isatty(p.slave.fd)?}")
+    term.set_size(p.master, term.Size { rows: 24, columns: 80 }, 0, 0)?
+    var pairs = List[int]()
+    for op in term.attr_ops() {
+        if op != 1 && op != 128 && op != 129 {
+            (mut pairs).push(op)
+            (mut pairs).push(if op <= 18 { 7 } else { 1 })
+        }
+    }
+    (mut pairs).push(1)
+    (mut pairs).push(7)
+    let left = term.set_attrs(p.slave, pairs)?
+    let want = if os_name() == "macos" { [15, 16, 37, 52, 62, 71] } else { [11, 15, 17, 90, 92] }
+    var same = left.len == want.len
+    if same {
+        var i = 0
+        while i < left.len {
+            if left[i] != want[i] {
+                same = false
+            }
+            i = i + 1
+        }
+    }
+    print("unapplied: {same}")
+    if !same {
+        print("unapplied ops: {left}")
+    }
+    // Back to a usual terminal for the child, VINTR left at Ctrl-G.
+    term.set_mode(p.slave, term.unpack(1 + 2 + 4 + 8 + 16))?
+    for op in [7, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 18] {
+        term.set_attr(p.slave, op, -1) else |_| {}
+    }
+    for op in [34, 35, 37, 52, 71, 73, 74, 75, 33, 31] {
+        term.set_attr(p.slave, op, 0) else |_| {}
+    }
+    let f = process.fork()?
+    if process.is_child(f) {
+        return child(p)
+    }
+    fs_close(p.slave.fd)?
+    let m = p.master.fd
+    var t = read_until(m, "", "ready", 5000)?
+    print("child: ready at the size set before it {count(t, "ready 24 80") == 1}, foreground {count(t, " true") == 1}")
+    term.set_size(p.master, term.Size { rows: 40, columns: 132 }, 0, 0)?
+    t = read_until(m, t, "resize 40 132", 3000)?
+    print("child: a new size heard {count(t, "resize 40 132") == 1}")
+    fs_write_chunk(m, [7 as byte])?
+    t = read_until(m, t, "interrupted", 3000)?
+    var ch = process.Child { slot: f.child.slot }
+    let st = process.wait_status(take ch)?
+    print("child: Ctrl-G interrupts {count(t, "interrupted") == 1}, status {st}")
+    fs_close(m)?
+    print("gone: {!fs_exists(p.name)}")
+    0
+}
