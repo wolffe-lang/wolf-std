@@ -1,0 +1,72 @@
+//! check: run(exit=0, stdout="child: leads its session true\nchild: leads its group true\nchild: /dev/tty opens false\nparent: session unchanged true\nparent: child status 0")
+//! phase: run
+//! conforms: std.process, os.proc.session, os.term.session
+//!
+//! **s290: a child started with `start_session` leads a new session.**
+//! The program starts itself again (`env.arg0()`, with a role argument):
+//! in the child `own_session()` and `own_group()` are its own process id
+//! and `/dev/tty` does not open (no controlling terminal); the parent's
+//! session is unchanged and it reaps the child with 0. The child prints
+//! before it ends and the parent after its wait, so the lines' order is
+//! fixed. **The checked machine** runs no program file (its `arg0` is
+//! empty) and **windows** has no sessions: each prints the lines for that
+//! reason, as `fork_rows.lu` does. The terminal rows on a pseudo-terminal
+//! are wolf-lang's `session_lanes`.
+
+use std.env
+use std.fs
+use std.process
+
+fn every_line() {
+    print("child: leads its session true")
+    print("child: leads its group true")
+    print("child: /dev/tty opens false")
+    print("parent: session unchanged true")
+    print("parent: child status 0")
+}
+
+fn child() -> !int {
+    let me = env.pid()
+    print("child: leads its session {process.own_session()? == me}")
+    print("child: leads its group {process.own_group()?.id == me}")
+    var t = fs.open("/dev/tty") else |_| {
+        print("child: /dev/tty opens false")
+        return 0
+    }
+    fs.close(take t) else |_| {}
+    print("child: /dev/tty opens true")
+    0
+}
+
+fn main() -> !int {
+    let role = env.arg(0) else ""
+    if role == "child" {
+        return child()
+    }
+    let self = env.arg0()
+    let before = process.own_session() else |_| {
+        every_line()
+        return 0
+    }
+    if self == "" {
+        every_line()
+        return 0
+    }
+    var c = process.command(self)
+    process.push_arg(mut c, "child")
+    var ch = process.start_session(c, 0) else |e| {
+        let w = match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+        print("parent: start_session {w}")
+        return 1
+    }
+    let st = process.wait_status(take ch)?
+    print("parent: session unchanged {process.own_session()? == before}")
+    print("parent: child status {st}")
+    0
+}

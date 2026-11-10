@@ -1,0 +1,60 @@
+//! check: run(exit=0, stdout="child: lead_session ok\nchild: leads its session true\nchild: again denied\nparent: child status 0")
+//! phase: run
+//! conforms: std.process, os.term.session, os.proc.fork, err.row
+//!
+//! **s290: `lead_session` in the child of a fork.** The child leads no
+//! group, so the call moves it: `ok`, and `own_session()` is its own
+//! process id after; a second call is `denied` (it leads its session
+//! now, and a session leader may not move). The parent never calls it.
+//! The child prints before it ends and the parent after its wait.
+//! **The checked machine** and **windows** answer the fork `unsupported`
+//! as a ROW, and the row prints its lines for that reason, as
+//! `fork_rows.lu` does.
+
+use std.env
+use std.process
+
+fn every_line() {
+    print("child: lead_session ok")
+    print("child: leads its session true")
+    print("child: again denied")
+    print("parent: child status 0")
+}
+
+fn word(r: () ! {denied, io, unsupported}) -> str {
+    r else |e| {
+        return match e {
+            denied => "denied",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let f = process.fork() else |e| {
+        let w = match e {
+            busy => "busy",
+            io => "io",
+            unsupported => "unsupported",
+        }
+        if w == "unsupported" {
+            every_line()
+            return 0
+        }
+        print("fork {w}")
+        return 1
+    }
+    if process.is_child(f) {
+        print("child: lead_session {word(process.lead_session())}")
+        let sid = process.own_session() else -1
+        print("child: leads its session {sid == env.pid()}")
+        print("child: again {word(process.lead_session())}")
+        process.exit(0)
+    }
+    var ch = process.Child { slot: f.child.slot }
+    let st = process.wait_status(take ch)?
+    print("parent: child status {st}")
+    0
+}

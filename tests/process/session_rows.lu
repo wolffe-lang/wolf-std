@@ -1,0 +1,52 @@
+//! check: run(exit=0, stdout="defaults_negative=invalid\ndefaults_wide=invalid\nmissing=not_found\nown_session=positive\nread_twice=same")
+//! phase: run
+//! conforms: std.process, os.proc.session, os.term.session, err.row
+//!
+//! **s290: `start_session`'s rows that start nothing, and
+//! `own_session`.** A `defaults` below 0 or with a bit outside the
+//! twenty meanings is `invalid` before the program is looked for, on
+//! every host; a program no host has is `not_found`; this process's
+//! session id is positive and reading it moves nothing. **windows** has
+//! no sessions of this kind: past the shape every call is `unsupported`,
+//! and the row prints unix's lines for that reason, as `fork_rows.lu`
+//! does. The live rows (a child that leads its session) are
+//! `session_child.lu`.
+
+use std.process
+
+fn start_word(c: process.Command, defaults: int) -> str {
+    var ch = process.start_session(c, defaults) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    let s = process.wait_status(take ch) else -1000
+    "started {s}"
+}
+
+fn main() -> !int {
+    let c = process.command("no-such-program-s290")
+    print("defaults_negative={start_word(c, -1)}")
+    print("defaults_wide={start_word(c, 1048576)}")
+    let missing = start_word(c, 0)
+    let sid = process.own_session() else |_| {
+        // windows: unsupported past the shape, for the spawn and the read.
+        if missing == "unsupported" {
+            print("missing=not_found")
+            print("own_session=positive")
+            print("read_twice=same")
+            return 0
+        }
+        print("missing={missing}")
+        return 1
+    }
+    print("missing={missing}")
+    print(if sid > 0 { "own_session=positive" } else { "own_session={sid}" })
+    let again = process.own_session()?
+    print(if again == sid { "read_twice=same" } else { "read_twice={again}" })
+    0
+}

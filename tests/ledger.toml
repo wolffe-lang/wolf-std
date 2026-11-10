@@ -4511,6 +4511,35 @@ lupin = "unsupported"
 wolfc = "run"
 native = "run"
 
+# ---- s290 (wolf-lang's `[os.proc.session]`, `[os.term.session]`): the
+# session calls, recorded against a wolf built from wolf-lang's branch
+# until a release carries them. lupin 0.1.60 does not resolve the three
+# builtins; its mirror refuses each well-formed call by name. ----
+
+# `process/session_rows.lu`: the shape rows and the session read.
+[tests."process/session_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `process/session_child.lu`: the program started again in a new session.
+# The checked machine runs no program file and prints the lines.
+[tests."process/session_child.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `process/lead_session_rows.lu`: a forked child moves, then is denied.
+[tests."process/lead_session_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."process/comptime_refuses_session.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
 [tests."signal/comptime_refuses_send_group.lu"]
 lupin = "unsupported"
 wolfc = "run"

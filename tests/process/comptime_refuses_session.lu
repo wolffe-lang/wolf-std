@@ -1,0 +1,25 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.exec
+//!
+//! **D33 for `process.start_session`, `lead_session` and
+//! `own_session` (s290), held one level down at the builtins**: starting
+//! a child in a new session and moving a process into one are process
+//! control (`exec`), and reading the session is a read of this process
+//! (`env`); a compile may do none of them. The pure `status_from` runs at
+//! run time to keep the import used.
+
+use std.process
+
+comptime fn probe() -> int {
+    os_setsid() else |_| { return 1 }
+    os_sid() else |_| { return 2 }
+    os_spawn_session("no-such-program-s290", List[str](), List[int](), 0) else |_| { return 3 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {process.is_exited(process.status_from(0))}")
+    0
+}
