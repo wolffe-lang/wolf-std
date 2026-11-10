@@ -1,0 +1,68 @@
+//! check: run(exit=0, stdout="raw_lf_bit=16777216\nchecked=2304\nmismatches=0\nread_then_set_keeps_onlcr_off=true\nraw_keeps_raw_lf=true\nraw_bytes_keeps_raw_lf=true\nusual_mode_unchanged=true\nhand_built=16777471")
+//! phase: run
+//! conforms: std.term, os.term.mode
+//!
+//! **s292: `term.Mode`'s `raw_lf`** (the runtime's bit 24, `ONLCR`
+//! cleared, since wolf 0.2.37). Before it `unpack` dropped the bit and
+//! `pack` never set it, so a mode read and set back through std turned
+//! `ONLCR` on for a terminal that had it off. Now `pack(unpack(v)) == v`
+//! with bit 24 set, for every flag combination of bits 0..7 with `min` and
+//! `time` at 0, 1 and 255; `raw` and `raw_bytes` keep it as the mode had
+//! it; a mode without it packs what it packed before. A `Mode` built by
+//! hand names all eleven fields. Pure: every machine, every host.
+
+use std.term
+
+fn edge(i: int) -> int {
+    if i == 0 {
+        return 0
+    }
+    if i == 1 {
+        return 1
+    }
+    255
+}
+
+fn main() -> !int {
+    let bit = 16777216
+    let one = term.unpack(bit)
+    print("raw_lf_bit={if one.raw_lf && !one.raw_output { term.pack(one) } else { 0 }}")
+    var checked = 0
+    var bad = 0
+    var flags = 0
+    while flags < 256 {
+        var i = 0
+        while i < 9 {
+            let v = bit + flags + edge(i / 3) * 256 + edge(i % 3) * 65536
+            checked = checked + 1
+            if term.pack(term.unpack(v)) != v {
+                bad = bad + 1
+            }
+            i = i + 1
+        }
+        flags = flags + 1
+    }
+    print("checked={checked}")
+    print("mismatches={bad}")
+    // A terminal with ONLCR off reads bit 24; the mode set back carries it.
+    let read = term.unpack(1 + 2 + 4 + 8 + 16 + bit)
+    print("read_then_set_keeps_onlcr_off={term.pack(read) / bit % 2 == 1}")
+    print("raw_keeps_raw_lf={term.raw(read).raw_lf && !term.raw(term.unpack(31)).raw_lf}")
+    print("raw_bytes_keeps_raw_lf={term.raw_bytes(read).raw_lf}")
+    print("usual_mode_unchanged={term.pack(term.unpack(31 + 256)) == 31 + 256}")
+    let hand = term.Mode {
+        canonical: true,
+        echo: true,
+        signals: true,
+        flow: true,
+        extended: true,
+        raw_cr: true,
+        raw_output: true,
+        strip8: true,
+        raw_lf: true,
+        min: 0,
+        time: 0,
+    }
+    print("hand_built={term.pack(hand)}")
+    0
+}
