@@ -19,8 +19,10 @@
 //! erase, reprint, discard), the three a terminal does not usually have
 //! (`raw_cr`: a typed carriage return reaches the program as CR, not LF;
 //! `raw_output`: a written LF reaches the terminal as LF, not CR LF;
-//! `strip8`: input stripped to seven bits) and, when not canonical, how a
-//! read waits — `min` bytes, or `time` tenths of a second. Every other
+//! `strip8`: input stripped to seven bits; since wolf 0.2.37 `raw_lf`: a
+//! written LF reaches the terminal as LF even with output processing on)
+//! and, when not canonical, how a read waits — `min` bytes, or `time`
+//! tenths of a second. Every other
 //! setting is left as found, so a mode read and set back restores exactly
 //! what was changed. Save it, change it, put it back
 //! (`term.set_mode(tty, saved)`); or, since wolf 0.2.34, register the put
@@ -81,7 +83,11 @@ use std.fs
 /// The terminal's mode, unpacked (`[os.term.mode]`). `raw_cr`,
 /// `raw_output` and `strip8` (wolf 0.2.34) are each `false` on a usual
 /// terminal: a typed Enter reads as LF, a written LF reaches the screen
-/// as CR LF, and input keeps its eighth bit.
+/// as CR LF, and input keeps its eighth bit. `raw_lf` (the runtime's bit
+/// 24, wolf 0.2.37) is `false` on a usual terminal too: a written LF is
+/// mapped to CR LF while output processing is on. Before s292 std dropped
+/// it, so a mode read and set back turned the mapping on for a terminal
+/// that had it off.
 pub struct Mode {
     canonical: bool,
     echo: bool,
@@ -91,6 +97,7 @@ pub struct Mode {
     raw_cr: bool,
     raw_output: bool,
     strip8: bool,
+    raw_lf: bool,
     min: int,
     time: int,
 }
@@ -107,7 +114,8 @@ fn clamp(n: int) -> int {
 
 /// The packed int the builtin reads: canonical=1, echo=2, signals=4,
 /// flow=8, extended=16, raw_cr=32, raw_output=64, strip8=128, `min` in
-/// bits 8..15, `time` in bits 16..23 (`[os.term.mode]`).
+/// bits 8..15, `time` in bits 16..23, raw_lf=16777216 (bit 24)
+/// (`[os.term.mode]`).
 /// `pack(unpack(v)) == v` for every mode the runtime reports, and a
 /// `Mode` whose three new fields are `false` packs the int it packed
 /// before wolf 0.2.34.
@@ -137,6 +145,9 @@ pub fn pack(m: Mode) -> int {
     if m.strip8 {
         v = v + 128
     }
+    if m.raw_lf {
+        v = v + 16777216
+    }
     v + clamp(m.min) * 256 + clamp(m.time) * 65536
 }
 
@@ -151,6 +162,7 @@ pub fn unpack(v: int) -> Mode {
         raw_cr: v / 32 % 2 == 1,
         raw_output: v / 64 % 2 == 1,
         strip8: v / 128 % 2 == 1,
+        raw_lf: v / 16777216 % 2 == 1,
         min: v / 256 % 256,
         time: v / 65536 % 256,
     }
@@ -187,6 +199,7 @@ pub fn raw(m: Mode) -> Mode {
         raw_cr: m.raw_cr,
         raw_output: m.raw_output,
         strip8: m.strip8,
+        raw_lf: m.raw_lf,
         min: 1,
         time: 0,
     }
@@ -220,6 +233,7 @@ pub fn raw_bytes(m: Mode) -> Mode {
         raw_cr: true,
         raw_output: true,
         strip8: false,
+        raw_lf: r.raw_lf,
         min: r.min,
         time: r.time,
     }

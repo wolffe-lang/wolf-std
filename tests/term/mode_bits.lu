@@ -10,7 +10,7 @@
 //! as the mode had them (so `raw` of a cooked mode still packs 260, as
 //! at sc61), and `raw_bytes` sets `raw_cr` and `raw_output` and clears
 //! `strip8` (4 + 32 + 64 + 256 = 356). A `Mode` built by hand names all
-//! ten fields. Pure: every machine, every host.
+//! eleven fields (s292: `raw_lf`). Pure: every machine, every host.
 
 use std.term
 
@@ -80,6 +80,7 @@ fn main() -> !int {
         raw_cr: true,
         raw_output: true,
         strip8: true,
+        raw_lf: false,
         min: 0,
         time: 0,
     }
