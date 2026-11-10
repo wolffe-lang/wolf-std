@@ -7,7 +7,8 @@
 //! the slave's name; `term.set_size` and `term.set_attrs` set the window
 //! and the modes before the child exists, and `set_attrs` answers the ops
 //! the host could not apply (linux: 11, 15 and 17, which it lacks, and 90
-//! and 92, which its pty does not keep; macOS: 15, 16, 37, 52, 71 and 62);
+//! and 92, which its pty does not keep; macOS: 15, 16, 37, 52 and 71 —
+//! its PENDIN refuses only a clear while its kernel holds the flag);
 //! the forked child leads a session and opens the slave by name, which
 //! makes it its terminal; the parent closes its slave, resizes (heard) and
 //! writes the VINTR it set (Ctrl-G), which interrupts the child; after the
@@ -91,7 +92,7 @@ fn main() -> !int {
     (mut pairs).push(1)
     (mut pairs).push(7)
     let left = term.set_attrs(p.slave, pairs)?
-    let want = if os_name() == "macos" { [15, 16, 37, 52, 62, 71] } else { [11, 15, 17, 90, 92] }
+    let want = if os_name() == "macos" { [15, 16, 37, 52, 71] } else { [11, 15, 17, 90, 92] }
     var same = left.len == want.len
     if same {
         var i = 0
@@ -121,7 +122,9 @@ fn main() -> !int {
     fs_close(p.slave.fd)?
     let m = p.master.fd
     var t = read_until(m, "", "ready", 5000)?
-    print("child: ready at the size set before it {count(t, "ready 24 80") == 1}, foreground {count(t, " true") == 1}")
+    print(
+        "child: ready at the size set before it {count(t, "ready 24 80") == 1}, foreground {count(t, " true") == 1}",
+    )
     term.set_size(p.master, term.Size { rows: 40, columns: 132 }, 0, 0)?
     t = read_until(m, t, "resize 40 132", 3000)?
     print("child: a new size heard {count(t, "resize 40 132") == 1}")

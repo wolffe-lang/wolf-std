@@ -29,7 +29,9 @@ fn main() -> !int {
         names = if names == "" { term.attr_name(op) } else { "{names} {term.attr_name(op)}" }
     }
     print("names={names}")
-    print("outside_named={term.attr_name(0) == "" && term.attr_name(19) == "" && term.attr_name(130) == ""}")
+    print(
+        "outside_named={term.attr_name(0) == "" && term.attr_name(19) == "" && term.attr_name(130) == ""}",
+    )
     var every = true
     for op in ops {
         if term.attr_name(op) == "" {

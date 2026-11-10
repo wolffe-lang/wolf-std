@@ -10,7 +10,7 @@
 use std.term
 
 comptime fn probe() -> int {
-    let (_m, _s) = os_term_open_pty() else |_| { return 1 }
+    os_term_open_pty() else |_| { return 1 }
     0
 }
 

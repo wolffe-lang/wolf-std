@@ -11,9 +11,13 @@
 use std.fs
 use std.term
 
-
 fn size(rows: int, columns: int, xp: int, yp: int) -> str {
-    term.set_size(fs.File { fd: 1000000 }, term.Size { rows: rows, columns: columns }, xp, yp) else |e| {
+    term.set_size(
+        fs.File { fd: 1000000 },
+        term.Size { rows: rows, columns: columns },
+        xp,
+        yp,
+    ) else |e| {
         return match e {
             invalid => "invalid",
             io => "io",
