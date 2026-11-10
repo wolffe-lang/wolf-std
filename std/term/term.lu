@@ -71,12 +71,24 @@
 //! shape takes bits 5–7 (0.1.55 refused them `invalid`, wolf-interp#268)
 //! and `os_term_restore_at_exit` answers its shape and `io` rows.
 //!
+//! **A terminal for a program this one runs** (s292, the wolf release
+//! that carries `[os.term.pty]`): `open_pty` makes a pseudo-terminal
+//! (`Pty`: the master, a slave and its name), `set_size` sets its window
+//! (with RFC 4254's pixel sizes) and `attr`, `set_attr` and `set_attrs`
+//! read and set its modes one at a time by RFC 4254 section 8's opcodes
+//! (`attr_ops`, `attr_name`, `attr_from_wire` name them), each set read
+//! back so that a mode the host cannot keep is `unsupported` by name. An
+//! SSH server's `pty-req` is `open_pty`, `set_size`, `set_attrs` of the
+//! decoded modes, then the program on the slave in a session of its own.
+//!
 //! **Capability:** `foreground`, `mode`, `set_mode`, `restore_at_exit`,
-//! `size` and `chars` are `io` (they act on a descriptor the program
-//! holds, as `io.is_terminal`); `set_foreground` is `exec` (process
-//! control) and `group` `env` (process context).
-//! `pack`, `unpack`, `raw`, `raw_bytes`, `chars_from` and
-//! `char_disabled` are pure, comptime-safe.
+//! `size`, `chars`, `pty_name`, `set_size`, `attr`, `set_attr` and
+//! `set_attrs` are `io` (they act on a descriptor the program holds, as
+//! `io.is_terminal`); `set_foreground` and `open_pty` are `exec` (process
+//! control; a pty is made to run a program on) and `group` `env`
+//! (process context). `pack`, `unpack`, `raw`, `raw_bytes`, `chars_from`,
+//! `char_disabled`, `attr_ops`, `attr_name` and `attr_from_wire` are pure,
+//! comptime-safe.
 
 use std.fs
 
@@ -414,4 +426,324 @@ pub fn chars_from(v: List[int]) -> Chars {
 /// `char_disabled`).
 pub fn chars(tty: fs.File) -> Chars ! {unsupported, io} {
     chars_from(os_term_chars(tty.fd)?)
+}
+
+/// **s292 (`[os.term.pty]`): a pseudo-terminal.** The master, a slave,
+/// both close-on-exec and neither the caller's controlling terminal, and
+/// the slave's name (`/dev/pts/N` on linux and PAX, `/dev/ttysN` on
+/// macOS). Bytes written to `master` are the terminal's input, taken by
+/// its line discipline; what a program writes to the slave is read from
+/// `master`.
+pub struct Pty {
+    master: fs.File,
+    slave: fs.File,
+    name: str,
+}
+
+/// **Make a pseudo-terminal** (`os_term_open_pty`, then
+/// `os_term_pty_name`). The order every host keeps for running a program
+/// on it: open it; `set_size` and `set_attr` (or `set_attrs`) on either
+/// end; fork (or start the program with `slave` in its descriptor map);
+/// the child keeps the slave it inherited until, after leading a session
+/// of its own (`os_setsid`), it opens `name` with `fs.open_mode(name, 3)`,
+/// which makes the slave its controlling terminal and its group the
+/// foreground; the parent closes its `slave` after the fork, or `master`
+/// never reads the end (linux `io`, macOS end of file) once the program's
+/// own descriptors close. macOS puts a pty's settings and size back to its
+/// defaults when the slave is opened while no descriptor of it is open,
+/// which the held `slave` prevents.
+///
+/// Rows: `io` for a host that cannot make one (no `/dev/ptmx`, none free,
+/// the descriptor limit), with the host's number in `os.error()`, and
+/// nothing left open; `unsupported` on windows. Capability `exec` (a pty
+/// is made to run a program on, with `process.pipe`); refused at
+/// comptime.
+pub fn open_pty() -> Pty ! {io, unsupported} {
+    let (m, s) = os_term_open_pty()?
+    let name = os_term_pty_name(m) else |e| {
+        fs_close(s) else {}
+        fs_close(m) else {}
+        match e {
+            io => { return io },
+            unsupported => { return unsupported },
+        }
+    }
+    Pty { master: fs.File { fd: m }, slave: fs.File { fd: s }, name: name }
+}
+
+/// The slave's name for `master` (`os_term_pty_name`). Rows: `io` for a
+/// handle that is closed, forged or not a master (a file, a slave,
+/// another terminal); `unsupported` on windows. Capability `io`
+/// (uncharged).
+pub fn pty_name(master: fs.File) -> str ! {io, unsupported} {
+    os_term_pty_name(master.fd)?
+}
+
+/// **Set the window's size** (`[os.term.size.set]`): the rows and columns
+/// `size` reads, and the two pixel sizes RFC 4254 carries (0 when not
+/// known), on either end of a pty after `open_pty` (or any terminal). The
+/// host sends `signal.resize()` to the terminal's foreground group when
+/// any of the four changes, a pixel-only change included, and nothing for
+/// the same four again. Rows: `invalid` for a field outside 0..65535,
+/// before the handle; `unsupported` on windows; `io` for a handle that is
+/// closed, forged or not a terminal. Capability `io` (uncharged).
+pub fn set_size(tty: fs.File, s: Size, xpixels: int, ypixels: int) -> () ! {
+    invalid,
+    io,
+    unsupported,
+} {
+    os_term_set_size(tty.fd, s.rows, s.columns, xpixels, ypixels)?
+}
+
+/// Every op `attr` and `set_attr` take, in order: RFC 4254 section 8's
+/// opcodes for a terminal's modes, with RFC 8160's 42 (IUTF8) — 1..18
+/// the special characters, 30..42 input, 50..62 local and 70..75 output
+/// flags, 90 CS7 and 91 CS8, 92 PARENB and 93 PARODD, 128 and 129 the
+/// input and output speeds. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// term.attr_ops().len == 56
+/// ```
+pub fn attr_ops() -> List[int] {
+    [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        90,
+        91,
+        92,
+        93,
+        128,
+        129,
+    ]
+}
+
+fn name_in(names: List[str], i: int) -> str {
+    if i < 0 || i >= names.len {
+        return ""
+    }
+    names[i]
+}
+
+/// The RFC's mnemonic for `op` (`"VINTR"`, `"ICANON"`, `"TTY_OP_OSPEED"`),
+/// `""` for an op outside the vocabulary. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// term.attr_name(1) == "VINTR"
+/// term.attr_name(19) == ""
+/// ```
+pub fn attr_name(op: int) -> str {
+    if op >= 1 && op <= 18 {
+        return name_in(
+            [
+                "VINTR",
+                "VQUIT",
+                "VERASE",
+                "VKILL",
+                "VEOF",
+                "VEOL",
+                "VEOL2",
+                "VSTART",
+                "VSTOP",
+                "VSUSP",
+                "VDSUSP",
+                "VREPRINT",
+                "VWERASE",
+                "VLNEXT",
+                "VFLUSH",
+                "VSWTCH",
+                "VSTATUS",
+                "VDISCARD",
+            ],
+            op - 1,
+        )
+    }
+    if op >= 30 && op <= 42 {
+        return name_in(
+            [
+                "IGNPAR",
+                "PARMRK",
+                "INPCK",
+                "ISTRIP",
+                "INLCR",
+                "IGNCR",
+                "ICRNL",
+                "IUCLC",
+                "IXON",
+                "IXANY",
+                "IXOFF",
+                "IMAXBEL",
+                "IUTF8",
+            ],
+            op - 30,
+        )
+    }
+    if op >= 50 && op <= 62 {
+        return name_in(
+            [
+                "ISIG",
+                "ICANON",
+                "XCASE",
+                "ECHO",
+                "ECHOE",
+                "ECHOK",
+                "ECHONL",
+                "NOFLSH",
+                "TOSTOP",
+                "IEXTEN",
+                "ECHOCTL",
+                "ECHOKE",
+                "PENDIN",
+            ],
+            op - 50,
+        )
+    }
+    if op >= 70 && op <= 75 {
+        return name_in(["OPOST", "OLCUC", "ONLCR", "OCRNL", "ONOCR", "ONLRET"], op - 70)
+    }
+    if op >= 90 && op <= 93 {
+        return name_in(["CS7", "CS8", "PARENB", "PARODD"], op - 90)
+    }
+    if op == 128 {
+        return "TTY_OP_ISPEED"
+    }
+    if op == 129 {
+        return "TTY_OP_OSPEED"
+    }
+    ""
+}
+
+/// The value an SSH client sent for `op`, as `set_attr` takes it: a
+/// character's 255 ("none") is `char_disabled()` (-1), a flag's or a
+/// size's non-zero is 1; every other value, and any value of an op outside
+/// the vocabulary, as it came. Pure and comptime-safe.
+///
+/// ```wolf-doc-example
+/// term.attr_from_wire(1, 255) == term.char_disabled()
+/// term.attr_from_wire(53, 7) == 1
+/// ```
+pub fn attr_from_wire(op: int, value: int) -> int {
+    if op >= 1 && op <= 18 && value == 255 {
+        return char_disabled()
+    }
+    let flag = op >= 30 && op <= 42 || op >= 50 && op <= 62 || op >= 70 && op <= 75
+    if (flag || op >= 90 && op <= 93) && value != 0 {
+        return 1
+    }
+    value
+}
+
+/// **One setting of the terminal by its RFC 4254 opcode**
+/// (`[os.term.attr]`): a character's byte or -1 disabled; a flag 0 or 1;
+/// for 90 and 91, 1 when the character size is that one; a speed in bits
+/// per second. Rows: `invalid` for an op outside `attr_ops()`;
+/// `unsupported` on windows, for an op the host lacks (linux and PAX: 11,
+/// 15, 17; macOS: 15, 16, 37, 52, 71) and for a speed the runtime's table
+/// does not name; `io` for a handle that is closed, forged or not a
+/// terminal. Capability `io` (uncharged).
+pub fn attr(tty: fs.File, op: int) -> int ! {invalid, io, unsupported} {
+    os_term_attr(tty.fd, op)?
+}
+
+/// **Set one setting by its RFC 4254 opcode**, every other as found (the
+/// way `set_mode` sets), then read it back: a set the host did not keep is
+/// `unsupported` with everything as it was (linux's pty keeps CS8 and
+/// parity off, so 90 and 92; macOS keeps PENDIN to itself, 62). A set of
+/// 0 for 90 or 91 leaves the size as found. Rows: `invalid` for an op
+/// outside `attr_ops()` or a value outside its range (a character outside
+/// -1..255, a flag outside 0..1, a speed outside 0..4294967295); then
+/// `unsupported` as for `attr`, and a speed outside the runtime's table
+/// (0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800,
+/// 9600, 19200, 38400, 57600, 115200, 230400); then `io` for the handle
+/// or a set the host refused. Capability `io` (uncharged).
+pub fn set_attr(tty: fs.File, op: int, value: int) -> () ! {invalid, io, unsupported} {
+    os_term_set_attr(tty.fd, op, value)?
+}
+
+/// **Set many settings, pair by pair** (`pairs` is `[op, value, op,
+/// value, …]`, an SSH `pty-req`'s modes decoded with `attr_from_wire`),
+/// answering the ops the host could not apply (`unsupported` from
+/// `set_attr`), in order. The shape is held first: a list of odd length,
+/// an op outside `attr_ops()` or a value outside its range is `invalid`
+/// before anything is set; the first `io` stops it (what came before is
+/// set). Capability `io` (uncharged).
+pub fn set_attrs(tty: fs.File, pairs: List[int]) -> List[int] ! {invalid, io, unsupported} {
+    if pairs.len % 2 != 0 {
+        return invalid
+    }
+    var i = 0
+    while i < pairs.len {
+        let op = pairs[i]
+        let v = pairs[i + 1]
+        let ok = attr_name(op) != "" &&
+            if op <= 18 {
+                v >= -1 && v <= 255
+            } else if op >= 128 {
+                v >= 0 && v <= 4294967295
+            } else {
+                v >= 0 && v <= 1
+            }
+        if !ok {
+            return invalid
+        }
+        i = i + 2
+    }
+    var left = List[int]()
+    i = 0
+    while i < pairs.len {
+        os_term_set_attr(tty.fd, pairs[i], pairs[i + 1]) else |e| match e {
+            invalid => { return invalid },
+            io => { return io },
+            unsupported => { (mut left).push(pairs[i]) },
+        }
+        i = i + 2
+    }
+    left
 }
