@@ -86,3 +86,11 @@ program with the slave in its descriptor map); the child keeps the slave it inhe
 the parent closes its `slave` after the fork, or the master never reads the end. The rows in P2 gain
 the measured per-host answers: linux keeps CS8 and parity off on a pty and macOS keeps PENDIN to
 itself, each `unsupported` from `set_attr`.
+
+burrow's `notes/bw06-wolf-needs.md` (its branch `bw06`) then stated the consumer's needs. Two more
+changes follow from it, if ruled with wolf-lang's revised Q3: `set_size(tty: fs.File, s: Size,
+xpixels: int, ypixels: int)`, since the size set takes RFC 4254's two pixel sizes too (the read stays
+`Size`); and `set_attrs(tty: fs.File, pairs: List[int]) -> List[int] ! {invalid, io, unsupported}`,
+over `set_attr` one pair at a time, answering the ops it could not apply (`unsupported`) and
+stopping at the first `invalid` or `io`, which is burrow's `set_modes`. `attr_from_wire` also maps a
+flag's non-zero wire value to 1, so a decoded pty request passes through it unchanged otherwise.
