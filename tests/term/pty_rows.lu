@@ -1,0 +1,87 @@
+//! check: run(exit=0, stdout="size_rows_negative=invalid\nsize_columns_past=invalid\nsize_pixels_past=invalid\nattr_op_zero=invalid\nattr_op_gap=invalid\nattr_op_past=invalid\nset_char_past=invalid\nset_flag_two=invalid\nset_attrs_odd=invalid\nset_attrs_shape_first=invalid\nforged_name: true\nforged_size: true\nforged_attr: true\nforged_set_attr: true\nforged_set_attrs: true")
+//! phase: run
+//! conforms: std.term, os.term.pty, os.term.size.set, os.term.attr
+//!
+//! **s292: the pty calls' rows that reach no terminal**, deterministic on
+//! every host: the shape first (a size field outside 0..65535, an op
+//! outside the vocabulary, a value outside its op's range, a pair list of
+//! odd length, each `invalid`), then windows `unsupported`, then a forged
+//! handle `io` on unix.
+
+use std.fs
+use std.term
+
+
+fn size(rows: int, columns: int, xp: int, yp: int) -> str {
+    term.set_size(fs.File { fd: 1000000 }, term.Size { rows: rows, columns: columns }, xp, yp) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn attr(op: int) -> str {
+    let _v = term.attr(fs.File { fd: 1000000 }, op) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn set_attr(op: int, value: int) -> str {
+    term.set_attr(fs.File { fd: 1000000 }, op, value) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn set_attrs(pairs: List[int]) -> str {
+    let _left = term.set_attrs(fs.File { fd: 1000000 }, pairs) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn name() -> str {
+    let _n = term.pty_name(fs.File { fd: 1000000 }) else |e| {
+        return match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let want = if os_name() == "windows" { "unsupported" } else { "io" }
+    print("size_rows_negative={size(-1, 80, 0, 0)}")
+    print("size_columns_past={size(24, 65536, 0, 0)}")
+    print("size_pixels_past={size(24, 80, 0, 70000)}")
+    print("attr_op_zero={attr(0)}")
+    print("attr_op_gap={attr(19)}")
+    print("attr_op_past={attr(160)}")
+    print("set_char_past={set_attr(1, 256)}")
+    print("set_flag_two={set_attr(53, 2)}")
+    print("set_attrs_odd={set_attrs([53, 1, 50])}")
+    print("set_attrs_shape_first={set_attrs([53, 1, 19, 1])}")
+    print("forged_name: {name() == want}")
+    print("forged_size: {size(24, 80, 0, 0) == want}")
+    print("forged_attr: {attr(1) == want}")
+    print("forged_set_attr: {set_attr(53, 1) == want}")
+    print("forged_set_attrs: {set_attrs([53, 1]) == want}")
+    0
+}

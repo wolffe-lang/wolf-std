@@ -1,0 +1,47 @@
+//! check: run(exit=0, stdout="ops=56\nfirst=1 last=129\nin_order=true\nnames=VINTR VDISCARD IGNPAR IUTF8 ISIG PENDIN OPOST ONLRET CS7 CS8 PARENB PARODD TTY_OP_ISPEED TTY_OP_OSPEED\noutside_named=true\nevery_op_named=true\nwire_none=-1\nwire_char=3\nwire_flag=1\nwire_flag_off=0\nwire_speed=38400\nwire_outside=255")
+//! phase: run
+//! conforms: std.term, os.term.attr
+//!
+//! **s292: the vocabulary of `term.attr` and `term.set_attr`, pure.** The
+//! 56 opcodes RFC 4254 section 8 gives a terminal's modes (with RFC 8160's
+//! 42, IUTF8) in order; each op's mnemonic, `""` outside the vocabulary;
+//! `attr_from_wire` maps an SSH client's value to the one `set_attr` takes:
+//! a character's 255 ("none") is `char_disabled()` (-1), a flag's non-zero
+//! is 1, every other value as it came. Every machine, every host.
+
+use std.term
+
+fn main() -> !int {
+    let ops = term.attr_ops()
+    print("ops={ops.len}")
+    print("first={ops[0]} last={ops[ops.len - 1]}")
+    var sorted = true
+    var i = 1
+    while i < ops.len {
+        if ops[i - 1] >= ops[i] {
+            sorted = false
+        }
+        i = i + 1
+    }
+    print("in_order={sorted}")
+    var names = ""
+    for op in [1, 18, 30, 42, 50, 62, 70, 75, 90, 91, 92, 93, 128, 129] {
+        names = if names == "" { term.attr_name(op) } else { "{names} {term.attr_name(op)}" }
+    }
+    print("names={names}")
+    print("outside_named={term.attr_name(0) == "" && term.attr_name(19) == "" && term.attr_name(130) == ""}")
+    var every = true
+    for op in ops {
+        if term.attr_name(op) == "" {
+            every = false
+        }
+    }
+    print("every_op_named={every}")
+    print("wire_none={term.attr_from_wire(1, 255)}")
+    print("wire_char={term.attr_from_wire(1, 3)}")
+    print("wire_flag={term.attr_from_wire(53, 7)}")
+    print("wire_flag_off={term.attr_from_wire(53, 0)}")
+    print("wire_speed={term.attr_from_wire(129, 38400)}")
+    print("wire_outside={term.attr_from_wire(19, 255)}")
+    0
+}
