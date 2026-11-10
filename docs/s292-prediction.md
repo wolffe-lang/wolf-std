@@ -71,3 +71,18 @@ wolf built from wolf-lang's branch through `WOLF_BIN`, recorded, not landed.
 `std.term`'s `Mode` carries no `raw_lf` (the runtime's bit 24, `RAW_LF`, since wolf 0.2.37): `unpack`
 drops it and `pack` never sets it, so a mode read and set back through std turns `ONLCR` on for a
 terminal that had it off. Named here for the module's next change.
+
+## P5. After wolf-lang's probe (added once its outputs were read)
+
+wolf-lang's phase-1 probe (`notes/s292-ptys.md` and `notes/s292-evidence/` on its branch `s292`)
+moves its Q1 from a master alone to a pair: macOS puts a pty's settings and size back to its
+defaults when the slave is opened while no descriptor of it is open, and its master takes neither
+before the slave's first open, so a holder that sets them before the program runs needs a slave of
+its own, opened with `O_NOCTTY`, which only the runtime can do. If that is ruled, `open_pty` answers
+`Pty { master: fs.File, slave: fs.File, name: str }` (both close-on-exec), and its doc gives the
+order every host keeps: open the pair; `set_size` and `set_attr` on either end; fork (or start the
+program with the slave in its descriptor map); the child keeps the slave it inherited until its own
+`fs.open_mode(name, 3)`, after `process.lead_session()`, makes the slave its controlling terminal;
+the parent closes its `slave` after the fork, or the master never reads the end. The rows in P2 gain
+the measured per-host answers: linux keeps CS8 and parity off on a pty and macOS keeps PENDIN to
+itself, each `unsupported` from `set_attr`.
