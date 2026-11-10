@@ -30,8 +30,9 @@
 //!
 //! **Capability: `Exec` (I13).** `start`, `run`, `wait`, `kill`, `exit`,
 //! `exit_signal`, `fork`, `poll`, `wait_status_core`, `poll_core`,
-//! `lead_group`, `join_group`, `set_core_limit` and `core_off` reach the
-//! host's process table (`own_group` and `core_limit` read this process's
+//! `lead_group`, `join_group`, `start_session`, `lead_session`,
+//! `set_core_limit` and `core_off` reach the host's process table
+//! (`own_group`, `own_session` and `core_limit` read this process's
 //! context: `env`), are tagged `exec` in the toolchain's
 //! sandbox table, and are categorically refused at comptime (D33) — with
 //! the sandbox table's own reason, which is worth quoting because it is
@@ -768,6 +769,34 @@ pub fn start_foreground(c: Command, group: int, tty: fs.File, defaults: int) -> 
     Child { slot: os_spawn_job(exe, args, c.fds, group, tty.fd, defaults)? }
 }
 
+/// **s290 (`[os.proc.session]`): start `c` as the leader of a new
+/// session**, with no controlling terminal. Its session id, its group id
+/// and `pid(child)` are one number, so `group_of(child)` names its group
+/// and `signal.send_group` reaches everything it starts; no key typed at
+/// this process's terminal, no hangup and no background stop reaches it.
+/// `defaults` and the descriptor map are `start_job`'s. A child that opens
+/// a terminal no session holds takes it as its own (the runtime's opens
+/// pass no `O_NOCTTY`); one that must stay without opens none.
+///
+/// Rows, in the order they are decided: `invalid` for a descriptor map or
+/// a `defaults` bit `start_job` calls invalid; `unsupported` on windows;
+/// `not_found`, `denied`, `io` from the program, as `start`. Nothing of
+/// this process moves: its session, group and terminal stay as they were.
+///
+/// Capability `Exec`; refused at comptime (D33). Delegates to
+/// `os_spawn_session`.
+pub fn start_session(c: Command, defaults: int) -> Child ! {
+    unsupported,
+    invalid,
+    not_found,
+    denied,
+    io,
+} {
+    let (exe, args, named) = split_argv(c)
+    if !named { return not_found }
+    Child { slot: os_spawn_session(exe, args, c.fds, defaults)? }
+}
+
 /// The child's operating-system process id (`io` once it is reaped).
 pub fn pid(ch: Child) -> int ! {io} {
     os_proc_pid(ch.slot)?
@@ -1185,6 +1214,40 @@ pub fn lead_group() -> () ! {denied, invalid, io, unsupported} {
 /// ```
 pub fn join_group(g: Group) -> () ! {denied, invalid, io, unsupported} {
     os_set_pgid(g.id)?
+}
+
+/// This process's session id (`[os.term.session]`, `getsid(0)`): the
+/// process id of the session's leader. An int, not a struct: no call takes
+/// a session. Rows: `unsupported` on windows. lupin declines by name, so
+/// the example is prose: in a child started with `start_session`,
+/// `process.own_session()?` is its own process id.
+///
+/// Capability `env` (it reads this process's context, with `own_group`);
+/// refused at comptime (D33). Delegates to `os_sid`.
+pub fn own_session() -> int ! {unsupported} {
+    os_sid()?
+}
+
+/// Make THIS process the leader of a new session of its own
+/// (`[os.term.session]`, `setsid`): its session id and its group id become
+/// its process id, and it has no controlling terminal after (`/dev/tty`
+/// does not open; the old terminal's foreground is no longer its to set).
+/// A daemon's call: a listener started from a login keeps no terminal, and
+/// a `kill 0` by anything it starts no longer reaches the login's group.
+///
+/// Rows: `denied` for a process that leads a group, a session leader
+/// included (POSIX's `EPERM`; nothing moves); `unsupported` on windows;
+/// `io` otherwise. Never traps. Three sound ways to call it: in a process
+/// started in its parent's group (`start`, `start_job` with group -1), in
+/// the child of `fork`, or in a process that started itself again with
+/// `start_session` (which already leads one). lupin declines by name, so
+/// the example is prose: after `process.lead_session()?`,
+/// `process.own_session()?` is this process's id.
+///
+/// Capability `Exec`, with `lead_group`; refused at comptime (D33).
+/// Delegates to `os_setsid`.
+pub fn lead_session() -> () ! {denied, io, unsupported} {
+    os_setsid()?
 }
 
 /// Wait for `ch` to finish and answer its exit code, consuming the handle.
