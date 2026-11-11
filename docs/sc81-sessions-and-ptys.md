@@ -44,6 +44,59 @@ A command without a terminal needs only step 3's first call: `process.lead_sessi
 
 ## Prediction
 
+Committed first, at `435fdea` (`docs/sc81-prediction.md`), before any measurement; the design followed at `a3730e7`.
+
+- **The surface:** held as predicted, name for name and row for row, with one addition the rows asked for: the shell part of `term/pty_session` became a non-blocking relay and reads the master's end (below).
+- **P1, the pins alone:** held. `doctor` matched both binaries and `sync-pin` passed at `3fc86f77`; the anchors grew 706 to 742, 36 added, none removed or changed. At the bare pins (`c8e11c6`, a six-CPU block) `std-test` was red on lupin cells only, on exactly wolf-std#125's seven rows, and `doc-examples` on exactly the two `std.os` mirror-lag entries; no `wolfc` or `native` cell moved, and lupin 0.1.61 advanced nothing past what 0.1.60 had. Each row was flipped in its own commit, and the two entries retired with `os/host_rows`.
+- **P2, red first:** held on the compiler lanes, `fail(E0301)` at the rows tip `572f6b7` for every row that calls the new surface. **Missed on lupin:** it answers a name a module does not declare as `unsupported` with "does not resolve", not as a static code. The five comptime rows were green at the rows tip: they hold the builtins' sandbox posture one level down and call only std functions that already existed, so they had nothing to be red on.
+- **P3, the rows:** held on Linux, every line as written (the tables below). The comptime rows hold `os_setsid`, `os_sid`, `os_term_open_pty`, `os_term_set_size` and `os_term_set_attr`. **Changed from the prediction:** not `os_spawn_session`, whose `List[str]` argument is outside the comptime engine's subset, as `os_spawn`'s is (the `std.process` header); `os_term_set_attr` took its place.
+- **P4, lupin:** held. Every `unsupported` cell names the builtin the prediction gave: `os_sid` (`process/session_spawn`, `process/session_child`, `term/pty_session`), `os_pgid` (`term/open_controlling_rows`), `os_term_open_pty` (`term/pty_pair`, `term/pty_child`); the shape rows run there. The windows cells are predictions for CI's `rig (windows-latest)`.
+- **P5, the platforms:** as stated. Linux measured; macOS only by CI's `tier all`; PAX not measured (no leg); windows by the full tier's rig.
+- **P6, the plant:** see the records.
+
 ## Evidence index
 
+### The surface
+
+- `std/process/process.lu`: `start_session(c: Command, defaults: int) -> Child ! {unsupported, invalid, not_found, denied, io}`, `lead_session() -> () ! {denied, io, unsupported}`, `own_session() -> int ! {unsupported}`, and the module header's paragraph on sessions.
+- `std/term/term.lu`: `Pty { master: fs.File, slave: fs.File }`, `open_pty() -> Pty ! {io, unsupported}`, `pty_name(master: fs.File) -> str ! {io, unsupported}`, `set_size(tty: fs.File, s: Size, xpixels: int, ypixels: int) -> () ! {invalid, io, unsupported}`, `attr(tty: fs.File, op: int) -> int ! {invalid, io, unsupported}`, `set_attr(tty: fs.File, op: int, value: int) -> () ! {invalid, io, unsupported}`, `open_controlling(name: str) -> fs.File ! {denied, io, not_found, unsupported}`, and the module header's paragraph. `Pty`'s doc is the order a server follows.
+
+### Rows
+
+| row | holds | lanes |
+|---|---|---|
+| `process/session_shape_rows` | a child descriptor outside 0..255, a `defaults` bit outside the meanings or below 0: `invalid`; an empty argv `not_found`; a bad map before a missing program | all three |
+| `process/session_spawn` | a `/bin/sh` child's own pid is `pid(child)`; `continued()` to its group is served; a spawn joining its group is `denied`, one joining a job's group of this session served; this process unchanged; status 0 | checked, native |
+| `process/session_child` | a fork's child: `lead_session` served, session and group equal its pid, a second call `denied`; a self-spawn under `start_session`: its session id is its pid and `pid(child)`, not the parent's, its group its pid, its `lead_session` `denied` | native (checked and windows print the lines) |
+| `term/pty_shape_rows` | sizes outside 0..65535 (pixels included), opcodes outside the vocabulary, values outside their op: `invalid`; each host's lacking ops and an unlisted speed `unsupported`; a forged handle `io` | all three |
+| `term/open_controlling_rows` | a missing name `not_found` and nothing created; a regular file and a directory `io`, the file unchanged | checked, native |
+| `term/pty_pair` | two handles; the name `/dev/pts/N`; a slave's name `io`; both ends terminals; a size on the master read on both ends and one on the slave on the master; a bad size `invalid`; ECHO and a speed round-trip; VFLUSH `unsupported`; bytes both ways; `open_controlling` from a process that leads no session `io`, its session unchanged; after both close, every call `io` | checked, native |
+| `term/pty_child` | `start_session` with the slave on 0, 1, 2: three terminals, no controlling terminal, `stty size` reads 30 by 100, the shell reads the master's line and the master reads its answer; the master's close ends the shell's next read; status 0 | checked, native |
+| `term/pty_session` | the fork route: `lead_session` served; `open_controlling` taken, foreground its own group, `/dev/tty` opens; `resize()` for a change to 40 by 120 and the new size read, none for the same four, `resize()` for the pixels alone; the master's close ends the child's read and it hears the hangup; then `/bin/sh` exec'd on a second pty and relayed without blocking: three terminals, a controlling terminal, the size read, the line read and answered, 0x03 ends it by `interrupt()`'s signal, and the master's next read is `io` on linux | native (checked and windows print the lines) |
+| `process/comptime_refuses_setsid`, `process/comptime_refuses_sid`, `term/comptime_refuses_open_pty`, `term/comptime_refuses_set_size`, `term/comptime_refuses_set_attr` | E0701, one level down | checked, native |
+
+`docs/sc81-witness/rows.py` runs each row on lupin, the checked machine and native, holds each line to its directive and names a red line `FAIL <test>:<lane>:<key>`, and holds each lupin refusal to the builtin above by its sentence. `docs/sc81-witness/rig/` is the recorder's rig: `gauntlet.manifest` (the rows, then every `cargo xtask ci` step and `ulp`) and `short.manifest` (the rows alone, for the red take and the plant), each step in the org's Rust toolchain image (Ubuntu 24.04, as CI's `ubuntu-latest`), the command a session leader's child with no controlling terminal, pid 1 a foreign uid.
+
+### Measurements
+
+- **The bare pins**, `c8e11c6`, one job on a six-CPU block (job log sha256 `aa03299b…`, std-test output `2b2cdd42…`): `std-test` 634 tests, red only on the seven lupin rows; `doc-examples` red only on `os.lu:101` and `:121`, "the mirror moved", each entry "never fired".
+- **The whole gate on a light slot** (two CPUs), at a development commit carrying this surface and these rows but not yet the flips (record sha256 `b7650edf…`): the rows, fmt, clippy, test, sync-pin, doctor, ledger-check, lint-conventions, gen-vectors, time-oracle and ulp green; `fmt-lu` red on three new rows' line breaks (re-laid with `wolf fmt` before the rows were committed); `std-test` (647 tests) red on the same seven lupin rows alone, every new row as its ledger says; `doc-examples` red on the same two entries alone, every new example running.
+- **Red first**, `572f6b7` (the rows tip, a light slot; record sha256 `da5acb1b…`): every non-comptime row red by name on every lane, for example `FAIL term/pty_session.lu:native:verdict want exit(0), observed fail(E0301)` and ``FAIL term/pty_pair.lu:lupin:refusal names no `os_term_open_pty`: `term.open_pty` does not resolve``.
+
+### What the rows showed on Linux
+
+- A fork's child leads no group, so `lead_session` is served there and `denied` the second time; a child of `start_session` already leads one, so its `lead_session` is `denied`.
+- From outside, a session of its own is told by the join: a spawn into a group of another session is `denied`, into one of this session served.
+- A pty slave in a spawn's map is a terminal on 0, 1 and 2 but not a controlling one (`/dev/tty` fails), and with no session holding it, the master's close sends nothing: the shell's next read ends instead. Taken by name after `lead_session`, it is controlling: `/dev/tty` opens, a size change signals the foreground, 0x03 interrupts it.
+- A change of the pixels alone signals; the same four fields do not.
+- With the slave's last descriptor closed, the master's read is `io` on linux.
+
 ## Done-when
+
+- [x] Prediction first (`435fdea`), the design and rulings next (`a3730e7`), scored above.
+- [x] The binary pin (`fff1ad2`) and the data pin (`c8e11c6`), each alone; the bare pins measured; seven lupin cells flipped, one commit each, and the two mirror-lag entries retired with `os/host_rows`.
+- [x] The rows runner and rig (`508c158`); the rows red first (`861395f`, `572f6b7`), recorded red by name at `572f6b7`.
+- [x] `std.process` (`eed2fea`) and `std.term` (`a8b750f`); every row green on Linux.
+- [x] README (`0b3393b`, the newest-surface paragraph and the count, 647) and CHANGELOG (`de2402a`).
+- [ ] The green record at the final head and the plant's record (red by name): the PR's.
+- [ ] macOS: CI's `tier all` (the full tier runs macOS's doc examples, not the rows). PAX: no leg here.
