@@ -30,8 +30,9 @@
 //!
 //! **Capability: `Exec` (I13).** `start`, `run`, `wait`, `kill`, `exit`,
 //! `exit_signal`, `fork`, `poll`, `wait_status_core`, `poll_core`,
-//! `lead_group`, `join_group`, `set_core_limit` and `core_off` reach the
-//! host's process table (`own_group` and `core_limit` read this process's
+//! `lead_group`, `join_group`, `start_session`, `lead_session`,
+//! `set_core_limit` and `core_off` reach the host's process table
+//! (`own_group`, `own_session` and `core_limit` read this process's
 //! context: `env`), are tagged `exec` in the toolchain's
 //! sandbox table, and are categorically refused at comptime (D33) — with
 //! the sandbox table's own reason, which is worth quoting because it is
@@ -174,6 +175,19 @@
 //! before it ends itself by its command's signal (`exit_signal`). The
 //! reader is `env` (it reads this process's context, with `own_group`);
 //! the set and the off call are `exec`, with `exit_signal`.
+//!
+//! **A session of its own (sc81, wolf 0.2.39's s290, `[os.proc.session]`,
+//! `[os.term.session]`).** A session is the unit a terminal belongs to:
+//! its keys, its hangup and its background stops reach every group of the
+//! session that holds it, and nothing outside. `start_session` starts a
+//! child that leads a new session, with no controlling terminal; a server
+//! that forks calls `lead_session` in the child before its exec, which is
+//! what `sshd` does for each command it runs, so no key, hangup or
+//! `kill 0` of the server's session reaches the command, and none of the
+//! command's reaches the server. `own_session` reads this process's
+//! session id. A child that must have a terminal of its own takes it
+//! after `lead_session`, with `std.term.open_controlling`; `std.term`'s
+//! `Pty` says the whole order.
 //!
 //! **What is deliberately absent.** Each is a reviewed contract with a
 //! filing behind it rather than an approximation:
@@ -768,6 +782,62 @@ pub fn start_foreground(c: Command, group: int, tty: fs.File, defaults: int) -> 
     Child { slot: os_spawn_job(exe, args, c.fds, group, tty.fd, defaults)? }
 }
 
+/// **s290 (`[os.proc.session]`, sc81): start `c` as the leader of a new
+/// session**, WITHOUT waiting for it. The child's session id, group id and
+/// process id are one number (`pid(child)`, and `group_of(child)` names its
+/// group); it is in no group of this process's session, and it has no
+/// controlling terminal: no key, hangup or background stop of this
+/// process's terminal reaches it or anything it starts, and `/dev/tty`
+/// does not open in it. `defaults` and the descriptor map are placed as
+/// `start_job` places them. Nothing of this process moves: its session,
+/// its group and its terminal stay as they were.
+///
+/// **A terminal is not given here.** A pty's slave in the map
+/// (`set_stdin`, `set_stdout`, `set_stderr`) is a terminal on those
+/// descriptors, but not the child's CONTROLLING terminal: the map never
+/// makes one, so the child gets no job control, no interrupt from the
+/// terminal's keys and no `resize()`. A program that must have one forks,
+/// calls `lead_session` and `std.term.open_controlling` in the child, and
+/// execs (`std.term.Pty` says the order).
+///
+/// Rows, in `start_job`'s order: `not_found` for an empty argv (decided
+/// here, on every host); `invalid` for a map the builders could not make
+/// well-formed (a child descriptor outside `0..255`) and a `defaults` bit
+/// outside the meanings, before the host; `unsupported` on windows, which
+/// has no sessions of this kind; `io` for a closed or forged file in the
+/// map; then the program's `not_found`, `denied` and `io`, with the
+/// host's number in `os_error()`. Never traps, and a row starts nothing.
+/// A started child MUST be waited for, as `start`'s.
+///
+/// Capability `Exec`; refused at comptime (D33). The checked machine
+/// spawns through its own path, its child taking the same first step.
+/// lupin 0.1.61 answers the shape rows and refuses a well-formed spawn by
+/// name (Rust's standard library has no stable new-session spawn).
+/// Delegates to `os_spawn_session`.
+///
+/// ```wolf-doc-example
+/// var c = process.command("wolf-sc81-no-such-program-here")
+/// process.close_fd(mut c, 300)
+/// var row = "started"
+/// var ch = process.start_session(c, 0) else |e| {
+///     row = "{e}"
+///     process.Child { slot: 0 - 1 }
+/// }
+/// row == "invalid"
+/// (process.wait(take ch) else -1) == -1
+/// ```
+pub fn start_session(c: Command, defaults: int) -> Child ! {
+    unsupported,
+    invalid,
+    not_found,
+    denied,
+    io,
+} {
+    let (exe, args, named) = split_argv(c)
+    if !named { return not_found }
+    Child { slot: os_spawn_session(exe, args, c.fds, defaults)? }
+}
+
 /// The child's operating-system process id (`io` once it is reaped).
 pub fn pid(ch: Child) -> int ! {io} {
     os_proc_pid(ch.slot)?
@@ -1185,6 +1255,58 @@ pub fn lead_group() -> () ! {denied, invalid, io, unsupported} {
 /// ```
 pub fn join_group(g: Group) -> () ! {denied, invalid, io, unsupported} {
     os_set_pgid(g.id)?
+}
+
+/// **s290 (`[os.term.session]`, sc81): make THIS process the leader of a
+/// new session**, and of a new group in it, both ids its process id
+/// (`own_session()`, `own_group().id` and `std.env.pid()` agree after),
+/// with no controlling terminal. The terminal it had stops being its
+/// controlling terminal for every thread at once: its keys, its hangup
+/// and its background stops reach the process no more, and `/dev/tty`
+/// does not open. Every descriptor, the terminal's mode and a registered
+/// `term.restore_at_exit` stay.
+///
+/// **Who may call it.** A process that leads a group may not (a session
+/// leader included): `denied`, and nothing has moved. So the call is made
+/// where the process leads no group: in the child of `fork`, which never
+/// leads one — the server's order, `fork` then `lead_session` then the
+/// exec, as `sshd` runs each command — or in a child started in its
+/// parent's group. A child that must have a terminal of its own opens it
+/// after this call (`std.term.open_controlling`).
+///
+/// Rows: `unsupported` on windows; `denied` for a group leader (the
+/// host's `EPERM`, 1 in `os_error()`); `io` for any other refusal (no host
+/// was seen to make one). Never traps. The checked machine moves the
+/// `wolf` process, the process the program runs as. lupin 0.1.61 refuses
+/// the call by name (Rust's standard library has no `setsid`). The example
+/// is prose, since a call that succeeds moves the process that runs it: in
+/// a fork's child, `process.lead_session()?` and then
+/// `process.own_session()? == env.pid()`.
+///
+/// Capability `Exec`, with `lead_group`; refused at comptime (D33).
+/// Delegates to `os_setsid`.
+pub fn lead_session() -> () ! {denied, io, unsupported} {
+    os_setsid()?
+}
+
+/// **s290 (`[os.term.session]`, sc81): this process's session id**
+/// (`getsid(0)`): its own process id when it leads its session, the
+/// leader's otherwise. A session id is compared, never passed: no call
+/// takes one, so it is an `int` (a `Group` is a type because
+/// `std.signal.send_group` takes one).
+///
+/// Rows: `unsupported` on windows. Never traps. The checked machine reads
+/// the `wolf` process's session. lupin 0.1.61 refuses the call by name.
+///
+/// Capability `env` (process context, with `own_group`); refused at
+/// comptime (D33). Delegates to `os_sid`.
+///
+/// ```wolf-doc-example
+/// let s = process.own_session() else -1
+/// s > 0 || s == -1
+/// ```
+pub fn own_session() -> int ! {unsupported} {
+    os_sid()?
 }
 
 /// Wait for `ch` to finish and answer its exit code, consuming the handle.
