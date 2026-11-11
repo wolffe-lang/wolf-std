@@ -40,10 +40,15 @@ Every function names the capability it reaches and records which
 execution rungs run it.
 
 The library is pre-alpha, with the compiler. The newest surfaces are
-wolf 0.2.36's: `std.env`'s `arg0` and `args_bytes`, the name a program
-was invoked by and every argument as bytes. `std.strbuf` builds over a
-growable byte list, so a long build is linear in time and memory. Before
-them, wolf 0.2.35's: `std.fs`'s advisory locks, fifos, handle records,
+wolf 0.2.39's sessions and pseudo-terminals: `std.process`'s
+`start_session`, `lead_session` and `own_session` put a child, or this
+process, in a session of its own, and `std.term`'s `open_pty`,
+`pty_name`, `set_size`, `attr`, `set_attr` and `open_controlling` give a
+program a terminal of its own, which an ssh server's terminal request
+needs. Before them, wolf 0.2.36's: `std.env`'s `arg0` and `args_bytes`,
+the name a program was invoked by and every argument as bytes.
+`std.strbuf` builds over a growable byte list, so a long build is linear
+in time and memory. Before them, wolf 0.2.35's: `std.fs`'s advisory locks, fifos, handle records,
 non-blocking writes and reads into a caller's buffer; `std.process`'s
 core limits; `std.os`'s `name` and `arch`. `std.list`'s mutators work in
 place. `std.x.crypto.sha2` reuses its message schedules and block
@@ -72,7 +77,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 634 tests. A test that passes deeper than its ledger entry claims
+all 647 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
