@@ -1457,7 +1457,7 @@ pub struct CoreLimit {
 ///
 /// Rows: `unsupported` on windows, which keeps no core limit. Never
 /// traps. The checked machine reads the `wolf` process's own limit (the
-/// process the program runs as). lupin 0.1.56 does not resolve the call
+/// process the program runs as). lupin resolves the call from 0.1.59
 /// (wolf-interp#277).
 ///
 /// Capability `env` (it reads this process's context, with `own_group`);
@@ -1484,8 +1484,8 @@ pub fn core_limit() -> CoreLimit ! {unsupported} {
 /// then `denied` where the host refuses a raise of the hard limit — a
 /// process may lower its hard limit and, without the privilege for it,
 /// never raise it again. Nothing changes on a row. Never traps. The
-/// checked machine sets the `wolf` process's own limit. lupin 0.1.56 does
-/// not resolve the call (wolf-interp#277).
+/// checked machine sets the `wolf` process's own limit. lupin resolves the
+/// call from 0.1.59 (wolf-interp#277).
 ///
 /// Capability `Exec` (with `exit_signal`); refused at comptime (D33).
 /// Delegates to `os_set_core_limit`.
@@ -1521,8 +1521,8 @@ pub fn set_core_limit(soft: int, hard: int) -> () ! {denied, invalid, unsupporte
 /// process of the same user can no longer `ptrace` it.
 ///
 /// Rows: `unsupported` on windows. Never traps. The checked machine sets
-/// the `wolf` process's own attribute. lupin 0.1.56 does not resolve the
-/// call (wolf-interp#277).
+/// the `wolf` process's own attribute. lupin resolves the call from 0.1.59
+/// (wolf-interp#277).
 ///
 /// Capability `Exec` (with `exit_signal`); refused at comptime (D33).
 /// Delegates to `os_core_off`.
