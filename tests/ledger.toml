@@ -5036,9 +5036,10 @@ native = "run"
 # `env/arg0_rows.lu`: `env.arg0` and `env.args_bytes` against `env.args`,
 # relations only: stable, the byte list the text list with the name in
 # front (or empty with an empty name), its first entry the name's bytes.
-# lupin 0.1.58 does not resolve `env_arg0` (wolf-interp#295).
+# lupin 0.1.58 did not resolve `env_arg0` (wolf-interp#295); lupin 0.1.61
+# runs the row (sc81's pin bump, measured).
 [tests."env/arg0_rows.lu"]
-lupin = "unsupported"
+lupin = "run"
 wolfc = "run"
 native = "run"
 
