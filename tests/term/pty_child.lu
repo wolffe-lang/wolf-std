@@ -1,0 +1,110 @@
+//! check: run(exit=0, stdout="three_terminals=true\nnot_controlling=true\nreads_the_size=true\nreads_the_master=true\nread_ends_on_master_close=true\nchild_status=0")
+//! phase: run
+//! conforms: std.term, std.process, os.term.pty, os.term.size.set, os.term.attr, os.proc.session, os.proc.fds, err.row
+//!
+//! **sc81: a program on a pseudo-terminal, started by
+//! `process.start_session`**, on both compiler machines. The pty is sized
+//! 30 by 100 and its echo and output processing are turned off on the
+//! master (ops 53 and 70) before the spawn; the slave is the child's 0, 1
+//! and 2, and a pipe its 3. The child, `/bin/sh`, finds a terminal on each
+//! of 0, 1 and 2; finds no controlling terminal (`/dev/tty` does not open:
+//! a map never makes one, which is why a server forks for a terminal
+//! request, `term/pty_session.lu`); reads the size set on the master with
+//! `stty size`; and reads the line the master writes, printing it back,
+//! which the master reads. When the master closes, the shell's next read
+//! of its terminal ends, and it says so on the pipe. It ends with 0. This
+//! process closes its slave after the spawn, as a server does.
+//!
+//! **windows** answers `open_pty`'s `unsupported` on every machine, and
+//! the row prints its lines for that reason. **lupin** 0.1.61 refuses
+//! `os_term_open_pty` by name.
+
+use std.fs
+use std.process
+use std.str
+use std.term
+
+fn every_line() {
+    print("three_terminals=true")
+    print("not_controlling=true")
+    print("reads_the_size=true")
+    print("reads_the_master=true")
+    print("read_ends_on_master_close=true")
+    print("child_status=0")
+}
+
+fn script() -> str {
+    var lines = List[str]()
+    (mut lines).push(
+        "if test -t 0 && test -t 1 && test -t 2; then echo terminals=3; else echo terminals=no; fi",
+    )
+    (mut lines).push(
+        "if (: </dev/tty) 2>/dev/null; then echo controlling=yes; else echo controlling=no; fi",
+    )
+    (mut lines).push("stty size")
+    (mut lines).push("IFS= read -r line")
+    (mut lines).push("echo \"got=$line\"")
+    (mut lines).push(
+        "if IFS= read -r second; then echo second=read >&3; else echo second=ended >&3; fi",
+    )
+    str.join("\n", lines)
+}
+
+// Read the master until `want` has arrived, its end, or 64 reads.
+fn read_until(mut m: fs.File, want: str) -> str {
+    var got = ""
+    var n = 0
+    while n < 64 && !str.contains(got, want) {
+        let chunk = fs.read(mut m, 256) else |_| {
+            return got
+        }
+        got = got + chunk
+        n = n + 1
+    }
+    got
+}
+
+fn main() -> !int {
+    let p = term.open_pty() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            io => print("open_pty=io {os_error()}"),
+        }
+        return 1
+    }
+    var m = p.master
+    var s = p.slave
+    term.set_size(m, term.Size { rows: 30, columns: 100 }, 0, 0)?
+    term.set_attr(m, 53, 0)?
+    term.set_attr(m, 70, 0)?
+    let q = process.pipe()?
+    var qr = q.read
+    var qw = q.write
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, script())
+    process.set_stdin(mut c, s)
+    process.set_stdout(mut c, s)
+    process.set_stderr(mut c, s)
+    process.set_fd(mut c, 3, qw)
+    var ch = process.start_session(c, 0)?
+    fs.close(take s)?
+    fs.close(take qw)?
+    let head = read_until(mut m, "30 100\n")
+    print("three_terminals={str.contains(head, "terminals=3\n")}")
+    print("not_controlling={str.contains(head, "controlling=no\n")}")
+    print("reads_the_size={str.contains(head, "30 100\n")}")
+    fs.write(mut m, "hello\n")?
+    let echoed = read_until(mut m, "got=hello\n")
+    print("reads_the_master={str.contains(echoed, "got=hello\n")}")
+    fs.close(take m)?
+    let report = fs.read(mut qr, 64) else "nothing"
+    fs.close(take qr)?
+    print("read_ends_on_master_close={report == "second=ended\n"}")
+    let st = process.wait_status(take ch)?
+    print("child_status={st}")
+    0
+}

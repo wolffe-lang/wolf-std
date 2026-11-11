@@ -1,0 +1,59 @@
+//! check: run(exit=0, stdout="missing=not_found\nmissing_still_missing=true\nregular_file=io\nregular_file_kept=true\ndirectory=io")
+//! phase: run
+//! conforms: std.term, std.fs, os.term.pty, os.term.session, os.fs.stat, err.row
+//!
+//! **sc81: `term.open_controlling`'s rows that take no terminal.** A name
+//! that does not exist is `not_found`, and nothing is created for it (an
+//! open for reading and writing would have made a regular file); a
+//! regular file and a directory are `io`, refused before any open, and
+//! the file keeps its bytes. None of these moves this process or its
+//! session. A terminal's own rows are `term/pty_pair.lu`'s (a process
+//! that leads no session is refused) and `term/pty_session.lu`'s (a
+//! fork's child that leads one takes it).
+//!
+//! **windows** answers `unsupported` before the name is looked at, and
+//! the row prints its lines for that reason. **lupin** 0.1.61 refuses the
+//! call by name at its first step (`os_pgid`).
+
+use std.fs
+use std.term
+
+fn every_line() {
+    print("missing=not_found")
+    print("missing_still_missing=true")
+    print("regular_file=io")
+    print("regular_file_kept=true")
+    print("directory=io")
+}
+
+fn open_word(name: str) -> str {
+    var f = term.open_controlling(name) else |e| {
+        return match e {
+            denied => "denied",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    fs.close(take f) else |_| {}
+    "opened"
+}
+
+fn main() -> !int {
+    let missing = open_word("sc81-no-such-terminal.tmp")
+    if missing == "unsupported" {
+        every_line()
+        return 0
+    }
+    print("missing={missing}")
+    print("missing_still_missing={!fs.exists("sc81-no-such-terminal.tmp")}")
+    fs.write_text("sc81-not-a-terminal.tmp", "howl")?
+    print("regular_file={open_word("sc81-not-a-terminal.tmp")}")
+    let kept = fs.read_text("sc81-not-a-terminal.tmp")?
+    fs.remove("sc81-not-a-terminal.tmp")?
+    print("regular_file_kept={kept == "howl"}")
+    fs.create_dir("sc81-dir.tmp")?
+    print("directory={open_word("sc81-dir.tmp")}")
+    fs.remove_dir("sc81-dir.tmp")?
+    0
+}

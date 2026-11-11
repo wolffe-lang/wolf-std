@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.term, comptime.sandbox, comptime.sandbox.io
+//!
+//! **D33 for `term.set_attr` (sc81), held one level down at
+//! `os_term_set_attr`**: it acts on a descriptor (`io`, with
+//! `os_term_set_mode`), and a compile touches none of the compiler's. The
+//! row is handled locally (F-0069); the pure `pack` runs at run time to
+//! keep the import used.
+
+use std.term
+
+comptime fn probe() -> int {
+    os_term_set_attr(0, 53, 0) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {term.pack(term.unpack(1))}")
+    0
+}

@@ -1,0 +1,305 @@
+//! check: run(exit=0, stdout="lead_session=served\ncontrolling=taken\nforeground_is_its_group=true\ndev_tty_opens=true\nfirst_change=resize 40x120\nsame_four=none\npixels_alone=resize\nread_end=ended\nhangup=heard\nprobe_status=0\nshell_terminals=3\nshell_controlling=yes\nshell_reads_the_size=true\nshell_reads_the_master=true\ninterrupt_ends_the_shell=true\nthis_process_unchanged=true")
+//! phase: run
+//! conforms: std.term, std.process, std.signal, os.term.pty, os.term.session, os.term.size.set, os.term.attr, os.proc.fork, os.proc.exec, os.signal.wait.fds, err.row
+//!
+//! **sc81: an ssh server's answer to a terminal request, natively, the
+//! order `term.Pty` documents.** A pty is opened, named and sized, its
+//! echo and output processing turned off on the master; then `fork`.
+//!
+//! **The probe child** (this program) calls `process.lead_session`, takes
+//! the slave by name with `term.open_controlling` (its foreground is its
+//! own group, and `/dev/tty` opens), closes the ends it inherited, and
+//! listens for `resize()` and `reload()`. The parent cues it through the
+//! master, one line per step, and the child reports on a pipe: a change of
+//! the size to 40 by 120 delivers `resize()`, and the child reads the new
+//! size; the same four fields again deliver nothing; a change of the
+//! pixels alone delivers `resize()`. When the parent closes the master the
+//! child's next read of its terminal ends, and it hears the hangup
+//! (`reload()`, which it listens for). It ends with 0.
+//!
+//! **The shell child**, on a second pty, is burrowd's exec: the same two
+//! calls, then `/bin/sh` exec'd with the terminal on 0, 1 and 2. It finds
+//! three terminals and a controlling terminal, reads the size, reads the
+//! line the master writes and prints it back, then becomes `sleep 30`;
+//! the interrupt character written to the master (0x03, the terminal's
+//! own key) ends it by `interrupt()`'s signal, which is the proof that its
+//! group is the terminal's foreground. This process's session and group
+//! are unchanged. Every child and every signal is this row's own.
+//!
+//! **The checked machine** answers `fork`'s `unsupported` on every host,
+//! and **windows** answers `open_pty`'s: the row prints its lines for
+//! that reason. **lupin** 0.1.61 refuses `os_sid` by name.
+
+use std.env
+use std.fs
+use std.process
+use std.signal
+use std.str
+use std.term
+
+fn every_line() {
+    print("lead_session=served")
+    print("controlling=taken")
+    print("foreground_is_its_group=true")
+    print("dev_tty_opens=true")
+    print("first_change=resize 40x120")
+    print("same_four=none")
+    print("pixels_alone=resize")
+    print("read_end=ended")
+    print("hangup=heard")
+    print("probe_status=0")
+    print("shell_terminals=3")
+    print("shell_controlling=yes")
+    print("shell_reads_the_size=true")
+    print("shell_reads_the_master=true")
+    print("interrupt_ends_the_shell=true")
+    print("this_process_unchanged=true")
+}
+
+fn newlines(s: str) -> int {
+    str.split(s, "\n").len - 1
+}
+
+// Read `f` until `have` and what follows hold `n` lines, its end, or 64 reads.
+fn read_lines(mut f: fs.File, have: str, n: int) -> str {
+    var got = have
+    var k = 0
+    while k < 64 && newlines(got) < n {
+        let chunk = fs.read(mut f, 256) else |_| {
+            return got
+        }
+        got = got + chunk
+        k = k + 1
+    }
+    got
+}
+
+fn line_at(s: str, i: int) -> str {
+    let parts = str.split(s, "\n")
+    if i < parts.len { parts[i] } else { "missing" }
+}
+
+// Read `f` until `want` has arrived, its end, or 64 reads.
+fn read_until(mut f: fs.File, want: str) -> str {
+    var got = ""
+    var k = 0
+    while k < 64 && !str.contains(got, want) {
+        let chunk = fs.read(mut f, 256) else |_| {
+            return got
+        }
+        got = got + chunk
+        k = k + 1
+    }
+    got
+}
+
+fn heard(set: int, ms: int) -> str {
+    let w = signal.wait_fds(List[fs.File](), set, ms) else |_| {
+        return "io"
+    }
+    if w.meaning == set { "resize" } else { "none" }
+}
+
+fn lead_word() -> str {
+    process.lead_session() else |e| {
+        return match e {
+            denied => "denied",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "served"
+}
+
+fn take_word(name: str) -> (str, fs.File) {
+    let f = term.open_controlling(name) else |e| {
+        let w = match e {
+            denied => "denied",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+        return (w, fs.File { fd: -1 })
+    }
+    ("taken", f)
+}
+
+// The probe child, after it has taken its terminal and closed the ends it
+// inherited: everything it learns goes to `rep`, one line a step.
+fn probe(lead: str, mut tty: fs.File, mut rep: fs.File) -> !int {
+    let fg = term.foreground(tty)?
+    let own = term.group()?
+    var dev_tty = "true"
+    var d = fs.open_mode("/dev/tty", 3) else |_| {
+        dev_tty = "false"
+        fs.File { fd: -1 }
+    }
+    fs.close(take d) else |_| {}
+    signal.listen(signal.resize())?
+    signal.listen(signal.reload())?
+    fs.write(mut rep, "{lead}\ntaken\n{fg == own}\n{dev_tty}\n")?
+    let _first = fs.read(mut tty, 64)?
+    let first = heard(signal.resize(), 3000)
+    let size = term.size(tty)?
+    fs.write(mut rep, "{first} {size.rows}x{size.columns}\n")?
+    let _same = fs.read(mut tty, 64)?
+    let same = heard(signal.resize(), 1500)
+    fs.write(mut rep, "{same}\n")?
+    let _pixels = fs.read(mut tty, 64)?
+    let pixels = heard(signal.resize(), 3000)
+    fs.write(mut rep, "{pixels}\n")?
+    var end = "read"
+    let _gone = fs.read(mut tty, 64) else |_| {
+        end = "ended"
+        ""
+    }
+    let hup = signal.wait_fds(List[fs.File](), signal.reload(), 3000)?
+    let hangup = if hup.meaning == signal.reload() { "heard" } else { "none" }
+    fs.write(mut rep, "{end}\n{hangup}\n")?
+    0
+}
+
+fn shell_script() -> str {
+    var lines = List[str]()
+    (mut lines).push(
+        "if test -t 0 && test -t 1 && test -t 2; then echo terminals=3; else echo terminals=no; fi",
+    )
+    (mut lines).push(
+        "if (: </dev/tty) 2>/dev/null; then echo controlling=yes; else echo controlling=no; fi",
+    )
+    (mut lines).push("stty size")
+    (mut lines).push("IFS= read -r line")
+    (mut lines).push("echo \"got=$line\"")
+    (mut lines).push("exec sleep 30")
+    str.join("\n", lines)
+}
+
+fn main() -> !int {
+    let me = process.own_session() else |e| {
+        match e {
+            unsupported => every_line(),
+        }
+        return 0
+    }
+    let my_group = process.own_group()?
+    let p = term.open_pty() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            io => print("open_pty=io {os_error()}"),
+        }
+        return 1
+    }
+    var m = p.master
+    var s = p.slave
+    let name = term.pty_name(m)?
+    term.set_size(m, term.Size { rows: 24, columns: 80 }, 0, 0)?
+    term.set_attr(m, 53, 0)?
+    term.set_attr(m, 70, 0)?
+    let q = process.pipe()?
+    var qr = q.read
+    var qw = q.write
+    let f = process.fork() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            busy => print("fork=busy"),
+            io => print("fork=io"),
+        }
+        return 1
+    }
+    if process.is_child(f) {
+        fs.close(take qr)?
+        let lead = lead_word()
+        let (word, tty_file) = take_word(name)
+        var tty = tty_file
+        fs.close(take m)?
+        fs.close(take s)?
+        if word != "taken" {
+            fs.write(mut qw, "{lead}\n{word}\n")?
+            process.exit(1)
+            return 1
+        }
+        let rc = probe(lead, mut tty, mut qw)?
+        process.exit(rc)
+        return rc
+    }
+    fs.close(take s)?
+    fs.close(take qw)?
+    let head = read_lines(mut qr, "", 4)
+    print("lead_session={line_at(head, 0)}")
+    print("controlling={line_at(head, 1)}")
+    print("foreground_is_its_group={line_at(head, 2)}")
+    print("dev_tty_opens={line_at(head, 3)}")
+    term.set_size(m, term.Size { rows: 40, columns: 120 }, 0, 0)?
+    fs.write(mut m, "first\n")?
+    let a = read_lines(mut qr, head, 5)
+    print("first_change={line_at(a, 4)}")
+    term.set_size(m, term.Size { rows: 40, columns: 120 }, 0, 0)?
+    fs.write(mut m, "same\n")?
+    let b = read_lines(mut qr, a, 6)
+    print("same_four={line_at(b, 5)}")
+    term.set_size(m, term.Size { rows: 40, columns: 120 }, 800, 600)?
+    fs.write(mut m, "pixels\n")?
+    let c = read_lines(mut qr, b, 7)
+    print("pixels_alone={line_at(c, 6)}")
+    fs.close(take m)?
+    let d = read_lines(mut qr, c, 9)
+    fs.close(take qr)?
+    print("read_end={line_at(d, 7)}")
+    print("hangup={line_at(d, 8)}")
+    var probe_child = process.Child { slot: f.child.slot }
+    print("probe_status={process.wait_status(take probe_child)?}")
+    let p2 = term.open_pty()?
+    var m2 = p2.master
+    var s2 = p2.slave
+    let name2 = term.pty_name(m2)?
+    term.set_size(m2, term.Size { rows: 50, columns: 132 }, 0, 0)?
+    term.set_attr(m2, 53, 0)?
+    term.set_attr(m2, 70, 0)?
+    let g = process.fork()?
+    if process.is_child(g) {
+        if lead_word() != "served" {
+            process.exit(7)
+        }
+        let (word, tty) = take_word(name2)
+        if word != "taken" {
+            process.exit(8)
+        }
+        var c2 = process.command("/bin/sh")
+        process.push_arg(mut c2, "-c")
+        process.push_arg(mut c2, shell_script())
+        process.set_stdin(mut c2, tty)
+        process.set_stdout(mut c2, tty)
+        process.set_stderr(mut c2, tty)
+        process.exec(c2, env.vars()) else |_| {}
+        process.exit(9)
+        return 9
+    }
+    fs.close(take s2)?
+    let out = read_until(mut m2, "50 132\n")
+    let terminals = if str.contains(out, "terminals=3\n") { "3" } else { out }
+    let controlling = if str.contains(out, "controlling=yes\n") { "yes" } else { out }
+    print("shell_terminals={terminals}")
+    print("shell_controlling={controlling}")
+    print("shell_reads_the_size={str.contains(out, "50 132\n")}")
+    fs.write(mut m2, "hello\n")?
+    let back = read_until(mut m2, "got=hello\n")
+    print("shell_reads_the_master={str.contains(back, "got=hello\n")}")
+    var intr = List[byte]()
+    (mut intr).push(3 as byte)
+    fs.write_chunk(mut m2, intr)?
+    var shell = process.Child { slot: g.child.slot }
+    let st = process.wait_status(take shell)?
+    let int_n = signal.number(signal.interrupt())?
+    print("interrupt_ends_the_shell={st == 0 - int_n}")
+    fs.close(take m2)?
+    let after = process.own_session()?
+    let after_group = process.own_group()?
+    print("this_process_unchanged={after == me && after_group.id == my_group.id}")
+    0
+}

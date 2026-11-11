@@ -1,0 +1,170 @@
+//! check: run(exit=0, stdout="handles=true\nname_form=true\nslave_name=io\nslave_is_terminal=true\nmaster_is_terminal=true\nsize_on_both_ends=true\nsize_from_the_slave=true\nsize_shape=invalid\necho_round_trip=true\nspeed_round_trip=true\nlacking_op=unsupported\nmaster_to_slave=true\nslave_to_master=true\nnot_a_session_leader=io\nsession_unchanged=true\nclosed_name=io\nclosed_size=io\nclosed_attr=io\nclosed_set_attr=io")
+//! phase: run
+//! conforms: std.term, std.process, std.os, os.term.pty, os.term.size, os.term.size.set, os.term.attr, os.term.session, err.row
+//!
+//! **sc81: a pseudo-terminal pair, with no child.** `term.open_pty`
+//! answers a master and a slave, two distinct handles; the master names
+//! its slave (`/dev/pts/N` on linux, `/dev/ttysN` on macOS) and a slave
+//! names nothing (`io`); both ends are terminals. A size set on the master
+//! is read on both ends, and one set on the slave on the master; a size
+//! field outside `0..65535` is `invalid` on a real handle too. `ECHO` (op
+//! 53) and the output speed (op 129) round-trip on the slave, and VFLUSH
+//! (op 15), which neither linux's nor macOS's driver has, is `unsupported`
+//! there. With echo and output processing off (ops 53 and 70), a line
+//! written to the master is the line the slave reads, and one written to
+//! the slave is the bytes the master reads. `term.open_controlling` from
+//! this process, which leads no session, is `io`: the terminal is not
+//! taken and this process's session is unchanged. Once both ends are
+//! closed every call on them is `io`.
+//!
+//! **windows** answers `open_pty`'s `unsupported` on every machine, and
+//! the row prints its lines for that reason. **lupin** 0.1.61 refuses
+//! `os_term_open_pty` by name.
+
+use std.fs
+use std.os
+use std.process
+use std.str
+use std.term
+
+fn every_line() {
+    print("handles=true")
+    print("name_form=true")
+    print("slave_name=io")
+    print("slave_is_terminal=true")
+    print("master_is_terminal=true")
+    print("size_on_both_ends=true")
+    print("size_from_the_slave=true")
+    print("size_shape=invalid")
+    print("echo_round_trip=true")
+    print("speed_round_trip=true")
+    print("lacking_op=unsupported")
+    print("master_to_slave=true")
+    print("slave_to_master=true")
+    print("not_a_session_leader=io")
+    print("session_unchanged=true")
+    print("closed_name=io")
+    print("closed_size=io")
+    print("closed_attr=io")
+    print("closed_set_attr=io")
+}
+
+fn name_word(f: fs.File) -> str {
+    let _n = term.pty_name(f) else |e| {
+        return match e {
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "named"
+}
+
+fn size_word(f: fs.File, rows: int, columns: int) -> str {
+    term.set_size(f, term.Size { rows: rows, columns: columns }, 0, 0) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "set"
+}
+
+fn attr_word(f: fs.File, op: int) -> str {
+    let v = term.attr(f, op) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "{v}"
+}
+
+fn set_attr_word(f: fs.File, op: int, value: int) -> str {
+    term.set_attr(f, op, value) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "set"
+}
+
+fn control_word(name: str) -> str {
+    var f = term.open_controlling(name) else |e| {
+        return match e {
+            denied => "denied",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    fs.close(take f) else |_| {}
+    "taken"
+}
+
+fn main() -> !int {
+    let p = term.open_pty() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            io => print("open_pty=io {os_error()}"),
+        }
+        return 1
+    }
+    var m = p.master
+    var s = p.slave
+    let mfd = m.fd
+    let sfd = s.fd
+    print("handles={mfd >= 3 && sfd >= 3 && mfd != sfd}")
+    let name = term.pty_name(m)?
+    let host = os.name()
+    let prefix = if host == "macos" { "/dev/ttys" } else { "/dev/pts/" }
+    print("name_form={str.starts_with(name, prefix) && name.len > prefix.len}")
+    print("slave_name={name_word(s)}")
+    print("slave_is_terminal={os_isatty(sfd)?}")
+    print("master_is_terminal={os_isatty(mfd)?}")
+    term.set_size(m, term.Size { rows: 24, columns: 80 }, 0, 0)?
+    let a = term.size(m)?
+    let b = term.size(s)?
+    print("size_on_both_ends={a.rows == 24 && a.columns == 80 && b.rows == 24 && b.columns == 80}")
+    term.set_size(s, term.Size { rows: 30, columns: 100 }, 300, 200)?
+    let c = term.size(m)?
+    print("size_from_the_slave={c.rows == 30 && c.columns == 100}")
+    print("size_shape={size_word(m, -1, 80)}")
+    let echo_on = term.attr(s, 53)?
+    term.set_attr(s, 53, 0)?
+    let echo_off = term.attr(s, 53)?
+    term.set_attr(s, 53, 1)?
+    let echo_back = term.attr(s, 53)?
+    print("echo_round_trip={echo_on == 1 && echo_off == 0 && echo_back == 1}")
+    term.set_attr(s, 129, 9600)?
+    let slow = term.attr(s, 129)?
+    term.set_attr(s, 129, 38400)?
+    let fast = term.attr(s, 129)?
+    print("speed_round_trip={slow == 9600 && fast == 38400}")
+    print("lacking_op={attr_word(s, 15)}")
+    term.set_attr(s, 53, 0)?
+    term.set_attr(s, 70, 0)?
+    fs.write(mut m, "howl\n")?
+    let line = fs.read(mut s, 64) else "nothing"
+    print("master_to_slave={line == "howl\n"}")
+    fs.write(mut s, "wolf\n")?
+    let back = fs.read(mut m, 64) else "nothing"
+    print("slave_to_master={back == "wolf\n"}")
+    let before = process.own_session()?
+    print("not_a_session_leader={control_word(name)}")
+    let after = process.own_session()?
+    print("session_unchanged={before == after}")
+    fs.close(take m)?
+    fs.close(take s)?
+    print("closed_name={name_word(fs.File { fd: mfd })}")
+    print("closed_size={size_word(fs.File { fd: mfd }, 24, 80)}")
+    print("closed_attr={attr_word(fs.File { fd: sfd }, 53)}")
+    print("closed_set_attr={set_attr_word(fs.File { fd: sfd }, 53, 1)}")
+    0
+}

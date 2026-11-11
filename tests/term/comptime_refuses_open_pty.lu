@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.term, comptime.sandbox, comptime.sandbox.exec
+//!
+//! **D33 for `term.open_pty` (sc81), held one level down at
+//! `os_term_open_pty`**: a pty is made to run a program on (`exec`, with
+//! `os_pipe`), and a compile may not make one on the machine that
+//! compiles it. The row is handled locally (F-0069); the pure `pack` runs
+//! at run time to keep the import used.
+
+use std.term
+
+comptime fn probe() -> int {
+    let _pair = os_term_open_pty() else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {term.pack(term.unpack(1))}")
+    0
+}

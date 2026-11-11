@@ -5434,3 +5434,59 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# sc81's pseudo-terminal rows. The pty calls' shape, host and
+# forged-handle rows run on three lanes.
+[tests."term/pty_shape_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# `open_controlling` on names that are not terminals. lupin refuses at
+# its first step, `os_pgid`, by name.
+[tests."term/open_controlling_rows.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# The pair with no child. lupin refuses `os_term_open_pty` by name.
+[tests."term/pty_pair.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# `/bin/sh` on a pty by `start_session`. lupin refuses
+# `os_term_open_pty` by name.
+[tests."term/pty_child.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# A server's answer to a terminal request, by fork: the checked machine
+# prints the lines (`fork`'s `unsupported`). lupin refuses `os_sid` by
+# name.
+[tests."term/pty_session.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# D33 one level down at `os_term_open_pty`, `os_term_set_size` and
+# `os_term_set_attr`. lupin has no comptime tier.
+[tests."term/comptime_refuses_open_pty.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."term/comptime_refuses_set_size.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."term/comptime_refuses_set_attr.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
