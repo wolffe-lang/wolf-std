@@ -187,7 +187,19 @@ jobs:
     # what it meets here it declines by name), macOS 31 min. 90 leaves
     # headroom over the windows number without pretending 75 was
     # re-earned on a host that now runs half again as many invocations.
-    timeout-minutes: 90
+    #
+    # sc81: WINDOWS OUTGREW 90, so its leg alone gets 120; ubuntu and
+    # macOS keep 90 (not re-measured here). The windows rig's job time on
+    # trunk's runs: 45.4, 50.5 min at `b1babae` and `3111d39` (11-03,
+    # 11-05); then the public-PKI rows landed (`d4a4d4c`: x/crypto/rsa and
+    # x/crypto/p384 each about 11 min there, x/tls/cert 3 more, nearly all
+    # of it lupin's step budget on rows it declines, about 37 s a row) and
+    # the same commit ran 89.5, 68.6 and 89.3 min (11-05, 11-06, 11-07);
+    # `2411d86` (scrypt and passwd, 4.3 min more) 85.6 min green on 11-10
+    # and cut at 90 on 11-08 and 11-09. The same rows ran 1.30 times
+    # slower on one runner than another (68.6 against 89.5), and the
+    # slowest whole job seen is 89.5 min; 120 is 1.34 times it.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 120 || 90 }}
     steps:
       - uses: actions/checkout@v4
         # No `submodules:` — upstream/ is private and CI cannot clone it
