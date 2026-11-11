@@ -2276,7 +2276,7 @@ pub fn open_mode(path: str, mode: int) -> File ! {not_found, denied, exists, inv
 /// write on a read-only mount included); `not_found` for a missing name,
 /// a dangling link included; `io` otherwise (a component that is no
 /// directory, a loop of links), the host's number in `os_error()`. Never
-/// traps. lupin 0.1.56 does not resolve the call (wolf-interp#278).
+/// traps. lupin resolves the call from 0.1.59 (wolf-interp#278).
 ///
 /// Capability `fs`; refused at comptime (D33). Delegates to `fs_access`.
 ///
