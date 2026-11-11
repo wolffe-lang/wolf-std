@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+**Sessions and pseudo-terminals (sc81), at wolf 0.2.39 and lupin 0.1.61.**
+An ssh server can run each remote command in a session of its own and
+answer a terminal request by running a login shell on a pty.
+
+- `std.process` gains `start_session(c, defaults)`, a child that leads a
+  new session with no controlling terminal; `lead_session()`, this
+  process into a session of its own (`denied` for a group leader), the
+  step a server takes in a fork's child before its exec; and
+  `own_session()`, this process's session id.
+- `std.term` gains `Pty { master, slave }` and `open_pty()`;
+  `pty_name(master)`, the slave's name; `set_size(tty, size, xpixels,
+  ypixels)`, all four of a window's fields, the pixels included;
+  `attr(tty, op)` and `set_attr(tty, op, value)`, one setting by its RFC
+  4254 opcode; and `open_controlling(name)`, which opens a terminal as
+  this process's controlling terminal and says so, or answers `io` and
+  holds nothing. `Pty`'s doc gives the order a server follows.
+- Windows answers `unsupported` for every new call. lupin 0.1.61 answers
+  the rows decided before a session or a terminal and refuses the rest
+  by name.
+- The pins move to wolf 0.2.39 and lupin 0.1.61. The lupin cells lupin
+  0.1.59 to 0.1.61 advanced now run, and `std.os`'s `name` and `arch`
+  examples run on lupin.
+
 **The password hash (sc80): scrypt, in crypt's `$7$` form.** PAX's
 `passwd`, `login`, `su` and `sudo` get a memory-hard hash whose shadow(5)
 lines Ubuntu's crypt also reads.
