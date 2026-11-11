@@ -4905,9 +4905,17 @@ native = "run"
 # `fs/fstat_record_rows.lu`: the handle's record against the path's, after
 # a rename, a directory, a pipe, standard output, a forged and a closed
 # handle. lupin 0.1.61 runs the row (wolf-interp#278; sc81's pin bump,
-# measured).
+# measured on linux). On windows it does not: `[os.fs.std]`'s host
+# posture, as for `fs/std_handles.lu`. The row's `stream` line asks the
+# record of descriptor 1, and lupin, with no `GetFileType`, declines a call
+# on 0, 1 and 2 on windows by name ("is a standard stream; on windows what
+# it IS is `GetFileType`'s answer, which this machine (no `unsafe`) cannot
+# ask", the windows lupin 0.1.61 binary's own sentence). Measured
+# `unsupported` on rig (windows-latest), CI run 43018266201 (job
+# 130515525276), the one red of that run.
 [tests."fs/fstat_record_rows.lu"]
 lupin = "run"
+lupin-windows = "unsupported"
 wolfc = "run"
 native = "run"
 
