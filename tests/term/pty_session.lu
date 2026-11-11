@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="lead_session=served\ncontrolling=taken\nforeground_is_its_group=true\ndev_tty_opens=true\nfirst_change=resize 40x120\nsame_four=none\npixels_alone=resize\nread_end=ended\nhangup=heard\nprobe_status=0\nshell_terminals=3\nshell_controlling=yes\nshell_reads_the_size=true\nshell_reads_the_master=true\ninterrupt_ends_the_shell=true\nthis_process_unchanged=true")
+//! check: run(exit=0, stdout="lead_session=served\ncontrolling=taken\nforeground_is_its_group=true\ndev_tty_opens=true\nfirst_change=resize 40x120\nsame_four=none\npixels_alone=resize\nread_end=ended\nhangup=heard\nprobe_status=0\nshell_terminals=3\nshell_controlling=yes\nshell_reads_the_size=true\nshell_reads_the_master=true\ninterrupt_ends_the_shell=true\nmaster_read_at_the_end=true\nthis_process_unchanged=true")
 //! phase: run
 //! conforms: std.term, std.process, std.signal, os.term.pty, os.term.session, os.term.size.set, os.term.attr, os.proc.fork, os.proc.exec, os.signal.wait.fds, err.row
 //!
@@ -18,13 +18,18 @@
 //! (`reload()`, which it listens for). It ends with 0.
 //!
 //! **The shell child**, on a second pty, is burrowd's exec: the same two
-//! calls, then `/bin/sh` exec'd with the terminal on 0, 1 and 2. It finds
-//! three terminals and a controlling terminal, reads the size, reads the
-//! line the master writes and prints it back, then becomes `sleep 30`;
-//! the interrupt character written to the master (0x03, the terminal's
-//! own key) ends it by `interrupt()`'s signal, which is the proof that its
-//! group is the terminal's foreground. This process's session and group
-//! are unchanged. Every child and every signal is this row's own.
+//! calls, then `/bin/sh` exec'd with the terminal on 0, 1 and 2. The
+//! parent relays its master as a server does, never blocking: the master
+//! non-blocking, `signal.wait_fds` until it is ready, `fs.read_chunk`, and
+//! `fs.write_some`. The shell finds three terminals and a controlling
+//! terminal, reads the size, reads the line the master writes and prints
+//! it back, then becomes `sleep 30`; the interrupt character written to
+//! the master (0x03, the terminal's own key) ends it by `interrupt()`'s
+//! signal, which is the proof that its group is the terminal's foreground.
+//! With every descriptor of the slave closed, a read of the master ends:
+//! `io` on linux (the host's `EIO`), `eof` on macOS, as `term.Pty` says.
+//! This process's session and group are unchanged. Every child and every
+//! signal is this row's own.
 //!
 //! **The checked machine** answers `fork`'s `unsupported` on every host,
 //! and **windows** answers `open_pty`'s: the row prints its lines for
@@ -32,6 +37,7 @@
 
 use std.env
 use std.fs
+use std.os
 use std.process
 use std.signal
 use std.str
@@ -53,6 +59,7 @@ fn every_line() {
     print("shell_reads_the_size=true")
     print("shell_reads_the_master=true")
     print("interrupt_ends_the_shell=true")
+    print("master_read_at_the_end=true")
     print("this_process_unchanged=true")
 }
 
@@ -79,18 +86,35 @@ fn line_at(s: str, i: int) -> str {
     if i < parts.len { parts[i] } else { "missing" }
 }
 
-// Read `f` until `want` has arrived, its end, or 64 reads.
-fn read_until(mut f: fs.File, want: str) -> str {
+// The relay's read: wait until the master is ready (or 5 s pass), read
+// what is there, until `want` has arrived, its end, or 64 turns.
+fn relay_until(mut m: fs.File, want: str) -> str {
     var got = ""
     var k = 0
     while k < 64 && !str.contains(got, want) {
-        let chunk = fs.read(mut f, 256) else |_| {
+        var watched = List[fs.File]()
+        (mut watched).push(m)
+        let w = signal.wait_fds(watched, signal.child(), 5000) else |_| {
             return got
         }
-        got = got + chunk
+        if w.ready != 0 {
+            return got
+        }
+        let chunk = fs.read_chunk(mut m, 256) else |_| {
+            return got
+        }
+        got = got + (str_from_utf8(chunk) else "")
         k = k + 1
     }
     got
+}
+
+fn bytes_of(s: str) -> List[byte] {
+    var out = List[byte]()
+    for b in s.bytes() {
+        (mut out).push(b)
+    }
+    out
 }
 
 fn heard(set: int, ms: int) -> str {
@@ -281,22 +305,34 @@ fn main() -> !int {
         return 9
     }
     fs.close(take s2)?
-    let out = read_until(mut m2, "50 132\n")
+    fs.set_nonblock(mut m2, true)?
+    let out = relay_until(mut m2, "50 132\n")
     let terminals = if str.contains(out, "terminals=3\n") { "3" } else { out }
     let controlling = if str.contains(out, "controlling=yes\n") { "yes" } else { out }
     print("shell_terminals={terminals}")
     print("shell_controlling={controlling}")
     print("shell_reads_the_size={str.contains(out, "50 132\n")}")
-    fs.write(mut m2, "hello\n")?
-    let back = read_until(mut m2, "got=hello\n")
-    print("shell_reads_the_master={str.contains(back, "got=hello\n")}")
+    let sent = fs.write_some(mut m2, bytes_of("hello\n"))?
+    let back = relay_until(mut m2, "got=hello\n")
+    print("shell_reads_the_master={sent == 6 && str.contains(back, "got=hello\n")}")
     var intr = List[byte]()
     (mut intr).push(3 as byte)
-    fs.write_chunk(mut m2, intr)?
+    let _one = fs.write_some(mut m2, intr)?
     var shell = process.Child { slot: g.child.slot }
     let st = process.wait_status(take shell)?
     let int_n = signal.number(signal.interrupt())?
     print("interrupt_ends_the_shell={st == 0 - int_n}")
+    var end = "data"
+    let _rest = fs.read_chunk(mut m2, 64) else |e| {
+        end = match e {
+            eof => "eof",
+            io => "io",
+        }
+        List[byte]()
+    }
+    let want_end = if os.name() == "macos" { "eof" } else { "io" }
+    let end_word = if end == want_end { "true" } else { end }
+    print("master_read_at_the_end={end_word}")
     fs.close(take m2)?
     let after = process.own_session()?
     let after_group = process.own_group()?
