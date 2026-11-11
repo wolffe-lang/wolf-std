@@ -33,7 +33,7 @@ A command without a terminal needs only step 3's first call: `process.lead_sessi
 - No libc source, no kernel source, no ssh server's or client's source, and no source of the compiler's or the interpreter's crates was read. wolf-lang was read at the tag only in `spec/` (`11-os.md`: `[os.proc.session]`, `[os.term.session]`, `[os.term.pty]`, `[os.term.size.set]`, `[os.term.attr]`, the two design notes, the prelude table), `docs/releases/0.2.39.md`, the CHANGELOG, and the two corpus rows the release note names (`corpus/os/session_rows.lu`, `corpus/os/pty_rows.lu`), which this repository vendors the namespace of.
 - The consumer, burrow, was read and not changed: `src/ssession/ssession.lu` (how the server forks and execs a session's program today), and its notes on the process-group stopgap and on a shell without a pty.
 - Everything about a host's behaviour here is measured black-box through the rows, in a container of the org's Rust toolchain image.
-- **Unchanged:** CI, the rig's code apart from the mirror-lag table, and every other module's behaviour.
+- **Unchanged:** CI apart from the windows rig's time cap (below), the rig's code apart from the mirror-lag table, and every other module's behaviour.
 
 ## Inputs verified
 
@@ -83,6 +83,15 @@ Committed first, at `435fdea` (`docs/sc81-prediction.md`), before any measuremen
 - **The bare pins**, `c8e11c6`, one job on a six-CPU block (job log sha256 `aa03299b…`, std-test output `2b2cdd42…`): `std-test` 634 tests, red only on the seven lupin rows; `doc-examples` red only on `os.lu:101` and `:121`, "the mirror moved", each entry "never fired".
 - **The whole gate on a light slot** (two CPUs), at a development commit carrying this surface and these rows but not yet the flips (record sha256 `b7650edf…`): the rows, fmt, clippy, test, sync-pin, doctor, ledger-check, lint-conventions, gen-vectors, time-oracle and ulp green; `fmt-lu` red on three new rows' line breaks (re-laid with `wolf fmt` before the rows were committed); `std-test` (647 tests) red on the same seven lupin rows alone, every new row as its ledger says; `doc-examples` red on the same two entries alone, every new example running.
 - **Red first**, `572f6b7` (the rows tip, a light slot; record sha256 `da5acb1b…`): every non-comptime row red by name on every lane, for example `FAIL term/pty_session.lu:native:verdict want exit(0), observed fail(E0301)` and ``FAIL term/pty_pair.lu:lupin:refusal names no `os_term_open_pty`: `term.open_pty` does not resolve``.
+
+### The windows rig's time
+
+The second labelled run at `89b6450` (run 43031208211) was cut at the windows rig's 90-minute cap twice, and trunk's nightly was cut the same way on 11-08 and 11-09, before this branch. Read from the hosted logs (each test line's timestamp, and the slowest-invocation tables):
+
+- The windows rig job took 45.4 and 50.5 min on trunk at `b1babae` and `3111d39` (11-03, 11-05). At `d4a4d4c` (the public-PKI rows) the same job took 89.5, 68.6 and 89.3 min (11-05, 11-06, 11-07); at `2411d86` (scrypt and passwd) 85.6 min green on 11-10.
+- Against 11-05's 49.7 min of `std-test`, 11-07's 88.4 min holds `x/crypto/rsa` (11.0 min) and `x/crypto/p384` (10.9 min) that were not there, and `x/tls/cert` grew 3.1 min. Each of those rows costs about 37 s on windows, nearly all of it lupin running into its step budget before it declines; the slowest-invocation tables are lupin's crypto rows, 50 to 97 s each.
+- The same rows on another runner differ by about 30%: `x/crypto/curve25519` took 20.8 and 27.2 min, and the commit `d4a4d4c` ran 68.6 and 89.5 min whole. This branch's first labelled run took 72.2 min there; sc81's thirteen rows cost 6 s of it.
+- No cheap fix: the time is lupin's honest budget refusals on rows the ledger records as `unsupported`. Marking them `slow` would skip the lane, a SKIP where a refusal was measured. So the cap moves instead: 120 min for the windows leg (1.34 times the slowest whole job seen, 89.5 min), ubuntu and macOS unchanged at 90 (`b1845cf`).
 
 ### What the rows showed on Linux
 
