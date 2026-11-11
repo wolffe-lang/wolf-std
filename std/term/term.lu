@@ -69,10 +69,27 @@
 //! shape takes bits 5–7 (0.1.55 refused them `invalid`, wolf-interp#268)
 //! and `os_term_restore_at_exit` answers its shape and `io` rows.
 //!
+//! **A terminal for a program this one runs** (sc81, wolf 0.2.39's s292:
+//! `[os.term.pty]`, `[os.term.size.set]`, `[os.term.attr]`). `open_pty`
+//! makes a pseudo-terminal, a `Pty`: what the program on its `slave`
+//! writes is read from its `master`, and what is written to the master is
+//! the terminal's input, taken by its line discipline. `pty_name` is the
+//! slave's name, `set_size` sets the window's size with RFC 4254's pixel
+//! fields (the foreground group hears `signal.resize()` when any of the
+//! four changes), and `attr` and `set_attr` read and set one setting by
+//! its RFC 4254 opcode, as an SSH client sends them. A child takes the
+//! slave as its controlling terminal with `open_controlling`, after
+//! `std.process.lead_session`; `Pty` says the whole order, which is an
+//! ssh server's answer to a `pty-req`. The master is an `fs.File`:
+//! `signal.wait_fds` waits on it, `fs.set_nonblock` and `fs.write_some`
+//! write to it without blocking, and `fs.read_chunk` reads it.
+//!
 //! **Capability:** `foreground`, `mode`, `set_mode`, `restore_at_exit`,
-//! `size` and `chars` are `io` (they act on a descriptor the program
-//! holds, as `io.is_terminal`); `set_foreground` is `exec` (process
-//! control) and `group` `env` (process context).
+//! `size`, `chars`, `pty_name`, `set_size`, `attr` and `set_attr` are `io`
+//! (they act on a descriptor the program holds, as `io.is_terminal`);
+//! `set_foreground`, `open_pty` (with `process.pipe`: a pty is made to run
+//! a program on) and `open_controlling` (it changes the process's
+//! terminal) are `exec`, and `group` `env` (process context).
 //! `pack`, `unpack`, `raw`, `raw_bytes`, `chars_from` and
 //! `char_disabled` are pure, comptime-safe.
 
@@ -310,6 +327,232 @@ pub struct Size {
 pub fn size(tty: fs.File) -> Size ! {unsupported, io} {
     let (r, c) = os_term_size(tty.fd)?
     Size { rows: r, columns: c }
+}
+
+/// **s292 (`[os.term.size.set]`, sc81): set the window's size** of the
+/// terminal `tty` names, as an emulator or `stty rows … cols …` does: `s`
+/// is the rows and the columns `size` reads back, on either end of a
+/// pseudo-terminal, and `xpixels` and `ypixels` the window's width and
+/// height in pixels, RFC 4254's two other fields (0 when the client does
+/// not know). The pixels are written at every call, so a server cannot
+/// drop what a client sent: a change of the pixels alone signals too.
+///
+/// When any of the four changes, the host sends `signal.resize()` to the
+/// terminal's foreground group (the program on a pty's slave), and the
+/// same four again send nothing. An ssh server calls this on the master
+/// for the `pty-req` and for each `window-change`.
+///
+/// Rows, in the order they are decided: `invalid` for any of the four
+/// outside `0..65535`, before the handle is read; `unsupported` on
+/// windows; `io` for a handle that is closed, forged or not a terminal.
+/// Never traps. lupin 0.1.61 answers the shape and handle rows and
+/// refuses a set on a terminal by name.
+///
+/// Capability `io` (uncharged, as `set_mode`); refused at comptime.
+/// Delegates to `os_term_set_size`. The example is prose, since a handle
+/// comes from `std.fs`: a `window-change` of 120 columns, 40 rows, 960 by
+/// 640 pixels is `term.set_size(p.master, term.Size { rows: 40, columns:
+/// 120 }, 960, 640)?`, and `term.size(p.slave)?.columns` is 120 after.
+pub fn set_size(tty: fs.File, s: Size, xpixels: int, ypixels: int) -> () ! {
+    invalid,
+    io,
+    unsupported,
+} {
+    os_term_set_size(tty.fd, s.rows, s.columns, xpixels, ypixels)?
+}
+
+/// A pseudo-terminal (`[os.term.pty]`): two `std.fs` files, the
+/// `master`, which the program that made it keeps, and a `slave`, the
+/// terminal another program runs on. Bytes written to the master are the
+/// terminal's input, taken by its line discipline (echo, editing, the
+/// signal characters); what the program writes to the slave is read from
+/// the master. Both are close-on-exec: neither reaches a child except
+/// through a descriptor map.
+///
+/// **Who closes what, in the order a server follows** (an ssh server's
+/// answer to a `pty-req`, which `std.process.fork` and the calls here
+/// make together):
+///
+/// 1. `let p = term.open_pty()?` and `let name = term.pty_name(p.master)?`.
+/// 2. `term.set_size(p.master, …)` and `term.set_attr(p.master, op, v)`
+///    for each mode the client sent (an op the host lacks is
+///    `unsupported`; pass over it).
+/// 3. `let f = process.fork()?`. **In the child:**
+///    `process.lead_session()?`, then `var tty = term.open_controlling(name)?`,
+///    then the program with `tty` on 0, 1 and 2 (`process.set_stdin`,
+///    `set_stdout`, `set_stderr`) by `process.exec`. The child keeps the
+///    slave it inherited until its own open (macOS puts a terminal's size
+///    and settings back when its slave is opened while no descriptor of it
+///    is open); the exec closes the inherited master and slave, being
+///    close-on-exec.
+/// 4. **In the parent:** `fs.close(take p.slave)?` after the fork, then
+///    relay the master: `signal.wait_fds` waits on it, `fs.set_nonblock`
+///    with `fs.write_some` writes what it takes, `fs.read_chunk` reads what
+///    is there; `set_size` at each window change; `fs.close(take
+///    p.master)` at the end, which hangs the terminal up for the program.
+///
+/// **The end, read on the master.** Once every descriptor of the slave is
+/// closed (the program and everything it started have ended), a read of
+/// the master answers `io` on linux (the host's `EIO`, 5 in `os_error()`)
+/// and `eof` on macOS; either ends the relay. After the master's last
+/// close the slave's name is gone.
+pub struct Pty {
+    master: fs.File,
+    slave: fs.File,
+}
+
+/// **s292 (`[os.term.pty]`, sc81): a new pseudo-terminal**, its master and
+/// a slave, both close-on-exec; the slave granted and unlocked, and
+/// neither end this process's controlling terminal, whatever it leads.
+///
+/// Rows: `unsupported` on windows, by name; `io` for a host that cannot
+/// make one (no `/dev/ptmx`, none free, the descriptor limit), with the
+/// host's number in `os_error()`, and nothing left open. Never traps.
+/// The checked machine opens the pair in the `wolf` process. lupin 0.1.61
+/// refuses the call by name (Rust's standard library has no
+/// `posix_openpt`), so the example is prose: `let p = term.open_pty()?`,
+/// then `term.pty_name(p.master)?` is `/dev/pts/N` on linux.
+///
+/// Capability `exec` (with `process.pipe`: a pty is made to run a program
+/// on); refused at comptime. Delegates to `os_term_open_pty`.
+pub fn open_pty() -> Pty ! {io, unsupported} {
+    let (m, s) = os_term_open_pty()?
+    Pty { master: fs.File { fd: m }, slave: fs.File { fd: s } }
+}
+
+/// **s292 (`[os.term.pty]`, sc81): the slave's name** for the master
+/// `master` names: `/dev/pts/N` on linux and PAX, `/dev/ttysN` on macOS.
+/// A child opens it by this name to take it as its controlling terminal
+/// (`open_controlling`).
+///
+/// Rows: `unsupported` on windows; `io` for a handle that is closed,
+/// forged or not a master (a file, a slave, another terminal). Never
+/// traps. lupin 0.1.61 answers a closed or forged handle's `io` and
+/// refuses the rest by name.
+///
+/// Capability `io` (uncharged, with `mode`); refused at comptime.
+/// Delegates to `os_term_pty_name`. The example is prose, since a handle
+/// comes from `std.fs` or `open_pty`: `term.pty_name(p.master)?` names the
+/// slave, and `term.pty_name(p.slave)` is `io`.
+pub fn pty_name(master: fs.File) -> str ! {io, unsupported} {
+    os_term_pty_name(master.fd)?
+}
+
+/// **s292 (`[os.term.attr]`, sc81): one setting of the terminal `tty`
+/// names, by its RFC 4254 section 8 opcode** (with RFC 8160's 42, IUTF8):
+/// a special character, 1 to 18, as its byte or -1 for disabled (as
+/// `chars` reads it); a flag (30 to 42 input, 50 to 62 local, 70 to 75
+/// output, 92 and 93 control) as 0 or 1; the character size, 90 CS7 and 91
+/// CS8, 1 for the size the terminal has; the speeds, 128 input and 129
+/// output, in bits per second. The opcode is the published number an SSH
+/// client sends, and it is the vocabulary here.
+///
+/// Rows, in the order they are decided: `invalid` for an opcode outside
+/// the vocabulary (0, 19..29, 43..49, 63..69, 76..89, 94..127, 130 and up,
+/// a negative); `unsupported` on windows, for an op the host's terminal
+/// driver lacks (linux 11, 15 and 17; macOS 15, 16, 37, 52 and 71) and for
+/// a speed the runtime's table does not name; `io` for a handle that is
+/// closed, forged or not a terminal. Never traps. lupin 0.1.61 answers
+/// every row decided before a terminal is reached and refuses the rest by
+/// name.
+///
+/// Capability `io` (uncharged, as `mode`); refused at comptime. Delegates
+/// to `os_term_attr`. The example is prose, since a handle comes from
+/// `std.fs` or `open_pty`: `term.attr(p.slave, 53)?` is 1 while the
+/// terminal echoes, and `term.attr(p.slave, 19)` is `invalid` on every
+/// host.
+pub fn attr(tty: fs.File, op: int) -> int ! {invalid, io, unsupported} {
+    os_term_attr(tty.fd, op)?
+}
+
+/// **s292 (`[os.term.attr]`, sc81): set one setting of the terminal `tty`
+/// names, by its RFC 4254 opcode**, every other field as found (output
+/// already written drains first, as `set_mode`). `value` is in the op's
+/// range (`attr` names them): a character -1..255 (a byte equal to the
+/// host's disabled value disables it too), a flag 0 or 1, a size 0 or 1
+/// (1 selects it; 0 leaves the size as found, since a client sends both),
+/// a speed in bits per second from the runtime's table (0, 50, 75, 110,
+/// 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200, 38400,
+/// 57600, 115200, 230400). The setting is read back after the set, so an
+/// answer of `()` means the terminal holds what was asked.
+///
+/// Rows, in the order they are decided: `invalid` for an opcode outside
+/// the vocabulary or a value outside its op's range; `unsupported` on
+/// windows, for an op the host lacks, for a speed not in the table, and
+/// for a set the host did not keep (linux's pseudo-terminal keeps neither
+/// CS7 nor PARENB; macOS keeps a set PENDIN), with every other field as it
+/// was; `io` for a handle that is closed, forged or not a terminal, and
+/// for any other refusal of the host's. Never traps. A server applying a
+/// client's modes passes over `unsupported`, as `sshd` does. lupin 0.1.61
+/// answers every row decided before a terminal is reached and refuses the
+/// rest by name.
+///
+/// Capability `io` (uncharged, as `set_mode`); refused at comptime.
+/// Delegates to `os_term_set_attr`. The example is prose, since a handle
+/// comes from `std.fs` or `open_pty`: a client's `ECHO 0` is
+/// `term.set_attr(p.master, 53, 0)?`, and `term.set_attr(p.master, 53, 2)`
+/// is `invalid` on every host.
+pub fn set_attr(tty: fs.File, op: int, value: int) -> () ! {invalid, io, unsupported} {
+    os_term_set_attr(tty.fd, op, value)?
+}
+
+/// **sc81: open the terminal `name` as THIS process's controlling
+/// terminal** — the step a pty's program takes in its own session, after
+/// `std.process.lead_session`, so that the terminal's interrupt, quit and
+/// suspend keys, its hangup and `signal.resize()` reach it and `/dev/tty`
+/// opens (`[os.term.pty]`, `[os.term.session]`). The answer is the
+/// terminal, open for reading and writing, to be placed on 0, 1 and 2
+/// for the program's exec; it is this process's controlling terminal, with
+/// this process's group its foreground.
+///
+/// It is the open the runtime makes without `O_NOCTTY`: a session leader
+/// with no controlling terminal that opens a terminal no session holds
+/// takes it. The call checks that it did, because nothing else would say
+/// so: an open made before `lead_session`, or from a process that leads
+/// none, or of a terminal another session holds, gives a terminal that is
+/// not the controlling one, and a program on it gets no job control and no
+/// keys' signals.
+///
+/// Rows, in the order they are decided: `unsupported` on windows, before
+/// the name is looked at; `not_found` for a name that does not exist;
+/// `io` for one that is not a character device, without opening it (so
+/// nothing is created); `denied` for an open the host refuses; `io` for
+/// one that is not a terminal, or did not become this process's
+/// controlling terminal with its group in the foreground — the file is
+/// closed then, and the terminal is not held. Never traps. The checked
+/// machine opens in the `wolf` process. lupin 0.1.61 refuses the call by
+/// name (at `os_pgid`).
+///
+/// Capability `exec` (it changes the process's terminal, as
+/// `set_foreground`); refused at comptime. Delegates to `fs_stat`,
+/// `fs_open_mode` (mode 3), `os_isatty`, `os_term_foreground` and
+/// `os_pgid`. The example is prose, since the call that succeeds takes a
+/// terminal: in a fork's child, `process.lead_session()?`, then
+/// `var tty = term.open_controlling(name)?` and `term.foreground(tty)? ==
+/// term.group()?`.
+pub fn open_controlling(name: str) -> fs.File ! {denied, io, not_found, unsupported} {
+    let g = os_pgid()?
+    let info = fs.stat(name)?
+    if info.kind != 6 {
+        return io
+    }
+    let fd = fs_open_mode(name, 3) else |e| match e {
+        not_found => { return not_found },
+        denied => { return denied },
+        exists => { return io },
+        invalid => { return io },
+        io => { return io },
+    }
+    let is_tty = os_isatty(fd) else false
+    var fg = -1
+    if is_tty {
+        fg = os_term_foreground(fd) else -1
+    }
+    if fg != g {
+        fs_close(fd) else {}
+        return io
+    }
+    fs.File { fd: fd }
 }
 
 /// The terminal's special characters (`[os.term.chars]`): the byte the
