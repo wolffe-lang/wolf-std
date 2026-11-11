@@ -1,0 +1,22 @@
+# docs/sc81-witness/rig/gauntlet.manifest — sc81's green take at the final head (the recorder's steps
+# mode with --keep-going and --preflight): sc81's rows on three lanes, then every step of `cargo xtask
+# ci` and ulp, each in the org's Rust toolchain image on the slot's CPUs (lib.sh's `ctr`).
+floor 35
+rig lib.sh committed=../../..:HEAD:docs/sc81-witness/rig/lib.sh
+rig gauntlet.manifest committed=../../..:HEAD:docs/sc81-witness/rig/gauntlet.manifest
+rig ../rows.py committed=../../..:HEAD:docs/sc81-witness/rows.py
+step toolchain image=localhost/r41-toolchain:1 tools=python3,git,sha256sum script=step.sh -- toolchain
+step sc81-rows needs=toolchain image=localhost/r41-toolchain:1 tools=python3,sh,stty,sleep script=step.sh -- rows
+step fmt image=localhost/r41-toolchain:1 script=step.sh -- cargo fmt --all --check
+step clippy image=localhost/r41-toolchain:1 script=step.sh -- cargo clippy --workspace --all-targets -- -D warnings
+step test image=localhost/r41-toolchain:1 script=step.sh -- cargo test --workspace
+step sync-pin image=localhost/r41-toolchain:1 tools=git script=step.sh -- xtask sync-pin
+step doctor image=localhost/r41-toolchain:1 script=step.sh -- xtask doctor
+step ledger-check image=localhost/r41-toolchain:1 script=step.sh -- xtask ledger-check
+step lint-conventions image=localhost/r41-toolchain:1 script=step.sh -- xtask std-test --lint-conventions
+step fmt-lu image=localhost/r41-toolchain:1 script=step.sh -- xtask fmt-lu
+step gen-vectors image=localhost/r41-toolchain:1 script=step.sh -- xtask gen-vectors --check
+step time-oracle image=localhost/r41-toolchain:1 tools=date script=step.sh -- xtask time-oracle
+step ulp image=localhost/r41-toolchain:1 script=step.sh -- xtask ulp
+step std-test image=localhost/r41-toolchain:1 script=step.sh -- xtask std-test
+step doc-examples image=localhost/r41-toolchain:1 script=step.sh -- xtask doc-examples

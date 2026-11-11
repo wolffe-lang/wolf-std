@@ -1,0 +1,8 @@
+# docs/sc81-witness/rig/short.manifest — sc81's red take at the rows' commit and the plant's take: the
+# toolchain and sc81's rows on three lanes. A row's red line is `FAIL <test>:<lane>:<key>` at column 0.
+floor 35
+rig lib.sh committed=../../..:HEAD:docs/sc81-witness/rig/lib.sh
+rig short.manifest committed=../../..:HEAD:docs/sc81-witness/rig/short.manifest
+rig ../rows.py committed=../../..:HEAD:docs/sc81-witness/rows.py
+step toolchain image=localhost/r41-toolchain:1 tools=python3,git,sha256sum script=step.sh -- toolchain
+step sc81-rows needs=toolchain image=localhost/r41-toolchain:1 tools=python3,sh,stty,sleep script=step.sh -- rows
