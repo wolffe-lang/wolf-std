@@ -4882,10 +4882,12 @@ native = "run"
 
 # `fs/nofollow_rows.lu`: `open_mode` under `NOFOLLOW`: a file, a final link
 # refused in three modes, the exclusive create, a middle link, the bits
-# above, mode 3 in place.
+# above, mode 3 in place. sc72's `divergent(stdout)` (lupin 0.1.56
+# answered bit 16 `invalid`, wolf-interp#278) healed at lupin 0.1.60's
+# no-follow opens: lupin 0.1.61 prints the directive's lines (sc81's pin
+# bump, measured), so the windows cell, which said `run`, goes with it.
 [tests."fs/nofollow_rows.lu"]
-lupin = "divergent(stdout)"  # sc72: lupin 0.1.56 answers bit 16 `invalid`, a mode outside its set (wolf-interp#278)
-lupin-windows = "run"  # windows refuses bit 16 on every machine and lupin's symlink answers `unsupported` there: the row's windows lines
+lupin = "run"
 wolfc = "run"
 native = "run"
 

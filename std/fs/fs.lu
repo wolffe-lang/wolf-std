@@ -2228,9 +2228,8 @@ pub const NOFOLLOW: int = 16
 /// and any other bit above them, before the filesystem is touched; and
 /// for a final link under `NOFOLLOW`; `exists` for mode 4 on a taken
 /// name; `not_found` for a missing name (modes 0 and 5) or parent;
-/// `denied`; `io` otherwise. Never traps. lupin 0.1.56 serves the six
-/// modes inside its tree and answers the flag `invalid`, a mode outside
-/// its set (wolf-interp#278).
+/// `denied`; `io` otherwise. Never traps. lupin serves the six modes
+/// inside its tree, and the flag from 0.1.60 (wolf-interp#278).
 ///
 /// Capability `fs`; refused at comptime (D33). Delegates to
 /// `fs_open_mode`.
