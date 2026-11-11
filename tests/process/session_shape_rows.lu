@@ -1,0 +1,43 @@
+//! check: run(exit=0, stdout="child_fd_past=invalid\ndefaults_outside=invalid\ndefaults_negative=invalid\nempty_argv=not_found\nshape_before_program=invalid")
+//! phase: run
+//! conforms: std.process, os.proc.session, os.proc.fds, err.row
+//!
+//! **sc81: `process.start_session`'s rows that start nothing**, the same
+//! on every host and every machine. The SHAPE is decided first, on windows
+//! too: a map entry for a child descriptor outside `0..255`, and a
+//! `defaults` bit outside the meanings (or below 0), are each `invalid`.
+//! An empty argv names no program and is `not_found`, decided by std
+//! before the builtin, as `start_job` decides it. A shape row is answered
+//! before the program is looked for: a program no host has, with a bad
+//! map, is `invalid` and not `not_found`. lupin 0.1.61 answers every one
+//! of these rows (its mirror decides the shape before refusing a
+//! well-formed spawn by name).
+
+use std.process
+
+fn row(c: process.Command, defaults: int) -> str {
+    var ch = process.start_session(c, defaults) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    let _st = process.wait_status(take ch) else -1
+    "started"
+}
+
+fn main() -> !int {
+    var past = process.command("true")
+    process.close_fd(mut past, 256)
+    print("child_fd_past={row(past, 0)}")
+    print("defaults_outside={row(process.command("true"), 1048576)}")
+    print("defaults_negative={row(process.command("true"), -1)}")
+    print("empty_argv={row(process.from_argv(List[str]()), 0)}")
+    var missing = process.command("wolf-sc81-no-such-program-here")
+    process.close_fd(mut missing, 300)
+    print("shape_before_program={row(missing, 0)}")
+    0
+}

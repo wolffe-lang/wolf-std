@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.env
+//!
+//! **D33 for `process.own_session` (sc81), held one level down at
+//! `os_sid`**: the session id is this process's context (`env`, with
+//! `os_pgid`), and a compile reads none of the compiler's. The row is
+//! handled locally (F-0069); the pure `status_from` runs at run time to
+//! keep the import used.
+
+use std.process
+
+comptime fn probe() -> int {
+    let s = os_sid() else |_| { return 1 }
+    s
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {process.is_exited(process.status_from(0))}")
+    0
+}

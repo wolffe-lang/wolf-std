@@ -1,0 +1,112 @@
+//! check: run(exit=0, stdout="own_session_positive=true\nchild_reports_its_pid=true\nchild_group_reached=true\njoin_child_group=denied\njoin_job_group=served\nthis_process_unchanged=true\nchild_status=0")
+//! phase: run
+//! conforms: std.process, std.signal, os.proc.session, os.term.session, os.proc.job, os.signal.send.group, err.row
+//!
+//! **sc81: a child started by `process.start_session` leads a group that
+//! lies in another session**, held from outside, on both compiler
+//! machines. The child is `/bin/sh` (an interpreter's `os_exe` names the
+//! interpreter, so a self-spawn witness is native-only:
+//! `process/session_child.lu`). It prints its own process id through the
+//! map's stdout pipe, which is `pid(child)`; a `continued()` sent to the
+//! group of that id is served (the group exists: the child leads it); and
+//! a spawn that asks to JOIN that group is `denied`, the host's answer for
+//! a group of another session (`[os.proc.job]`), while the same spawn
+//! joining the group of a job this process started (`start_job` with group
+//! 0, a group of this session) is served. So the child leads a group in a
+//! session that is not this one: a session of its own. This process's
+//! session and group read the same after. Closing the child's input ends
+//! it with 0. Every child is this row's own and every signal goes to this
+//! row's own group.
+//!
+//! **windows** has no sessions of this kind (`own_session` is
+//! `unsupported` on every machine) and the row prints its lines for that
+//! reason. **lupin** 0.1.61 refuses `os_sid` by name.
+
+use std.fs
+use std.process
+use std.signal
+
+fn every_line() {
+    print("own_session_positive=true")
+    print("child_reports_its_pid=true")
+    print("child_group_reached=true")
+    print("join_child_group=denied")
+    print("join_job_group=served")
+    print("this_process_unchanged=true")
+    print("child_status=0")
+}
+
+fn sh(script: str) -> process.Command {
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, script)
+    c
+}
+
+// A child that asks to join group `g` and exits 0 at once.
+fn join(g: int) -> str {
+    var ch = process.start_job(sh("exit 0"), g, 0) else |e| {
+        return match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    let st = process.wait_status(take ch) else -1
+    if st == 0 { "served" } else { "status {st}" }
+}
+
+fn main() -> !int {
+    let me = process.own_session() else |e| {
+        match e {
+            unsupported => every_line(),
+        }
+        return 0
+    }
+    let my_group = process.own_group()?
+    print("own_session_positive={me > 0}")
+    let inp = process.pipe()?
+    var in_r = inp.read
+    var in_w = inp.write
+    let out = process.pipe()?
+    var out_r = out.read
+    var out_w = out.write
+    var c = sh("echo $$; read line; exit 0")
+    process.set_stdin(mut c, in_r)
+    process.set_stdout(mut c, out_w)
+    var ch = process.start_session(c, 0)?
+    fs.close(take in_r)?
+    fs.close(take out_w)?
+    let line = fs.read(mut out_r, 64) else "nothing"
+    let pid = process.pid(ch)?
+    print("child_reports_its_pid={line == "{pid}\n"}")
+    var reached = "served"
+    signal.send_group(process.Group { id: pid }, signal.continued()) else |e| {
+        reached = match e {
+            unsupported => "unsupported",
+            invalid => "invalid",
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+    }
+    print("child_group_reached={reached == "served"}")
+    print("join_child_group={join(pid)}")
+    var sleeper = process.command("/bin/sleep")
+    process.push_arg(mut sleeper, "30")
+    var job = process.start_job(sleeper, 0, 0)?
+    let job_group = process.pid(job)?
+    print("join_job_group={join(job_group)}")
+    process.kill(mut job)?
+    let _ended = process.wait_status(take job)?
+    let after = process.own_session()?
+    let after_group = process.own_group()?
+    print("this_process_unchanged={after == me && after_group.id == my_group.id}")
+    fs.close(take in_w)?
+    let st = process.wait_status(take ch)?
+    fs.close(take out_r)?
+    print("child_status={st}")
+    0
+}

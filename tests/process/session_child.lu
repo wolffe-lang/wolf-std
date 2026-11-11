@@ -1,0 +1,142 @@
+//! check: run(exit=0, stdout="fork_child_moved=true\nfork_child_leads_group=true\nfork_child_again=denied\nfork_child_status=0\nspawned_reports_its_pid=true\nspawned_session_is_pid=true\nspawned_group_is_pid=true\nspawned_session_not_parents=true\nspawned_lead_again=denied\nspawned_status=0\nthis_process_unchanged=true")
+//! phase: run
+//! conforms: std.process, std.env, os.proc.session, os.term.session, os.proc.fork, os.proc.pipe, err.row
+//!
+//! **sc81: a session read from inside the child**, both ways a server
+//! makes one, natively. **The fork's child** reads the parent's session,
+//! calls `lead_session` (served: a fork's child leads no group), then
+//! reads its session id and its group id each equal to its own process
+//! id, and a second `lead_session` is `denied` (a session leader may not).
+//! **A child started by `start_session`** is this program again, given an
+//! argument naming the parent's session: it reports its process id, which
+//! is `pid(child)`, its session id and group id equal to it, its session
+//! not the parent's, and `lead_session` `denied`. Each child writes its
+//! report to a pipe made before it and ends with 0; this process's session
+//! and group read the same after. Every child is this row's own.
+//!
+//! **The checked machine** answers `fork`'s `unsupported` on every host
+//! (an interpreter's `os_exe` also names the interpreter, so a self-spawn
+//! means nothing there), and so does **windows**: the row prints its
+//! lines for that reason. **lupin** 0.1.61 refuses `os_fork` by name on
+//! unix and answers windows' `unsupported`.
+
+use std.env
+use std.fs
+use std.process
+use std.str
+
+fn every_line() {
+    print("fork_child_moved=true")
+    print("fork_child_leads_group=true")
+    print("fork_child_again=denied")
+    print("fork_child_status=0")
+    print("spawned_reports_its_pid=true")
+    print("spawned_session_is_pid=true")
+    print("spawned_group_is_pid=true")
+    print("spawned_session_not_parents=true")
+    print("spawned_lead_again=denied")
+    print("spawned_status=0")
+    print("this_process_unchanged=true")
+}
+
+fn lead_word() -> str {
+    process.lead_session() else |e| {
+        return match e {
+            denied => "denied",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "served"
+}
+
+// The spawned child: its report, one line to standard output.
+fn spawned(parent_sid: str) -> !int {
+    let me = env.pid()
+    let sid = process.own_session()?
+    let g = process.own_group()?
+    let not_parents = "{sid}" != parent_sid
+    let again = lead_word()
+    print("{me} {sid == me} {g.id == me} {not_parents} {again}")
+    0
+}
+
+fn main() -> !int {
+    let argv = env.args()
+    if argv.len == 2 && argv[0] == "--sc81-session-child" {
+        return spawned(argv[1])
+    }
+    let me = process.own_session() else |e| {
+        match e {
+            unsupported => every_line(),
+        }
+        return 0
+    }
+    let my_group = process.own_group()?
+    let p = process.pipe()?
+    var r = p.read
+    var w = p.write
+    let f = process.fork() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            busy => print("fork=busy"),
+            io => print("fork=io"),
+        }
+        return 1
+    }
+    if process.is_child(f) {
+        let before = process.own_session() else -1
+        let first = lead_word()
+        let after = process.own_session() else -1
+        let g = process.own_group() else process.Group { id: -1 }
+        let again = lead_word()
+        let me_now = env.pid()
+        fs.write(
+            mut w,
+            "{before == me && first == "served" && after == me_now} {g.id == me_now} {again}",
+        )?
+        process.exit(0)
+    }
+    fs.close(take w)?
+    let report = fs.read(mut r, 128) else "nothing"
+    fs.close(take r)?
+    var fch = process.Child { slot: f.child.slot }
+    let fst = process.wait_status(take fch)?
+    let parts = str.split(report, " ")
+    let three = parts.len == 3
+    let again = if three { parts[2] } else { report }
+    print("fork_child_moved={three && parts[0] == "true"}")
+    print("fork_child_leads_group={three && parts[1] == "true"}")
+    print("fork_child_again={again}")
+    print("fork_child_status={fst}")
+    let q = process.pipe()?
+    var qr = q.read
+    var qw = q.write
+    var c = process.command(os_exe()?)
+    process.push_arg(mut c, "--sc81-session-child")
+    process.push_arg(mut c, "{me}")
+    process.set_stdout(mut c, qw)
+    var ch = process.start_session(c, 0)?
+    fs.close(take qw)?
+    let line = fs.read(mut qr, 128) else "nothing"
+    fs.close(take qr)?
+    let pid = process.pid(ch)?
+    let words = str.split(str.trim(line), " ")
+    let ok = words.len == 5
+    let pid_word = "{pid}"
+    let lead_again = if ok { words[4] } else { line }
+    print("spawned_reports_its_pid={ok && words[0] == pid_word}")
+    print("spawned_session_is_pid={ok && words[1] == "true"}")
+    print("spawned_group_is_pid={ok && words[2] == "true"}")
+    print("spawned_session_not_parents={ok && words[3] == "true"}")
+    print("spawned_lead_again={lead_again}")
+    let st = process.wait_status(take ch)?
+    print("spawned_status={st}")
+    let after = process.own_session()?
+    let after_group = process.own_group()?
+    print("this_process_unchanged={after == me && after_group.id == my_group.id}")
+    0
+}

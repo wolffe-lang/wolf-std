@@ -5384,3 +5384,53 @@ native = "run"
 lupin = "unsupported"
 wolfc = "unsupported"
 native = "run"
+
+# =====================================================================
+# sc81 — sessions and pseudo-terminals (wolf 0.2.39's s290 and s292;
+# lupin 0.1.61). `std.process`'s `start_session`, `lead_session` and
+# `own_session`; `std.term`'s `Pty`, `open_pty`, `pty_name`, `set_size`,
+# `attr`, `set_attr` and `open_controlling`. lupin answers every row a
+# call decides before a session or a terminal is reached (the shapes, a
+# forged handle, windows) and refuses the rest by name; each lupin
+# `unsupported` below names the builtin its refusal stops at
+# (`docs/sc81-witness/rows.py` holds each sentence to that name), and on
+# windows every new call answers `unsupported` as a row, so each row
+# prints its lines there, lupin's included (`lupin-windows = "run"`).
+# A row that moves a process does it in a child: on the checked machine
+# `lead_session` and `open_controlling` would move the `wolf` process.
+# =====================================================================
+
+# Shape rows of the spawn in a new session; std answers an empty argv.
+[tests."process/session_shape_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# A `/bin/sh` child in a session of its own, held from outside. lupin
+# refuses `os_sid` by name.
+[tests."process/session_spawn.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# A fork's child and a self-spawn read their sessions from inside; the
+# checked machine answers `fork`'s `unsupported` as a row and prints the
+# lines. lupin refuses `os_sid` by name.
+[tests."process/session_child.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# D33 one level down at `os_setsid` and `os_sid`. lupin has no comptime
+# tier.
+[tests."process/comptime_refuses_setsid.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."process/comptime_refuses_sid.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"

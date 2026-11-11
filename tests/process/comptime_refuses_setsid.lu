@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.process, comptime.sandbox, comptime.sandbox.exec
+//!
+//! **D33 for `process.lead_session` (sc81), held one level down at
+//! `os_setsid`**: moving a process into a session of its own is process
+//! control (`exec`, with `os_set_pgid`), and a compile may not move the
+//! compiler. The row is handled locally (F-0069); the pure `status_from`
+//! runs at run time to keep the import used.
+
+use std.process
+
+comptime fn probe() -> int {
+    os_setsid() else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const P = probe()
+    print("p: {P} {process.is_exited(process.status_from(0))}")
+    0
+}
