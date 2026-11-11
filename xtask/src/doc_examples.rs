@@ -233,18 +233,13 @@ pub(crate) const LUPIN_MIRROR_LAG: &[(&str, &str, &str, &str)] = &[
     // (its `cpus` example runs on lupin), so the entries are keyed by the
     // call and the module's other example stays gated on three lanes. Both
     // go red the day the pinned lupin runs them, and leave in that commit.
-    (
-        "os",
-        "os.name(",
-        "`os_name` does not resolve",
-        "wolf-interp#277",
-    ),
-    (
-        "os",
-        "os.arch(",
-        "`os_arch` does not resolve",
-        "wolf-interp#277",
-    ),
+    //
+    // sc81 (wolf 0.2.39 / lupin 0.1.61) RETIRES both, in the commit that
+    // flips `os/host_rows`: lupin resolves `os_name` and `os_arch` from
+    // 0.1.59 (wolf-interp#277), the gate said "the mirror moved" at
+    // `os.lu:101` and `:121` and "never fired" for both entries
+    // (wolf-std#125, measured again at this pin), and the two examples run
+    // on three lanes. EMPTY again, as at sc51 and sc68.
 ];
 
 /// Does the reference lane's answer hold a mirror-lag entry's refusal?
