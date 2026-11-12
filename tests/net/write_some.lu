@@ -127,10 +127,10 @@ fn main() -> !int {
                 print("empty_closed_handle={empty_stale}")
                 return 0
             },
-            exists => { return exists },
-            not_found => { return not_found },
-            denied => { return denied },
-            io => { return io },
+            exists => { eprint("Unix listen failed: exists"); return 1 },
+            not_found => { eprint("Unix listen failed: not_found"); return 1 },
+            denied => { eprint("Unix listen failed: denied"); return 1 },
+            io => { eprint("Unix listen failed: io"); return 1 },
         }
     }
     var uc = unix.connect("write-some.sock")?
