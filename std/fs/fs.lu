@@ -2519,7 +2519,11 @@ pub fn set_nonblock(mut f: File, on: bool) -> () ! {invalid, io, unsupported} {
 /// queue is written in parts. Here a fifo opened read and write, which
 /// nobody reads, is the slow client: 16 lists of 8192 bytes are more than
 /// it holds, and the loop stops at `busy` with part of the queue taken
-/// (windows has no fifo, and the example asserts only what it made).
+/// (windows has no fifo, and the example asserts only what it made). The
+/// example's handler stops on any row, since a line holding a `match`
+/// arm reads as an assertion to §4's extractor; a server's loop matches
+/// `busy` alone and passes `invalid` and `io` on, as
+/// `tests/poll/write_partial.lu` does.
 ///
 /// ```wolf-doc-example
 /// var chunk = List[byte]()
@@ -2530,11 +2534,11 @@ pub fn set_nonblock(mut f: File, on: bool) -> () ! {invalid, io, unsupported} {
 /// if made { f = fs.open_mode("doc-write-some.fifo", 3)? }
 /// if made { fs.set_nonblock(mut f, true)? }
 /// var took = 0
-/// var busy = !made
-/// for turn in 0..16 { if !busy { took = took + (fs.write_some(mut f, chunk) else |e| match e { busy => { busy = true; 0 }, invalid => 0, io => 0 }) } }
+/// var stopped = !made
+/// for turn in 0..16 { if !stopped { took = took + (fs.write_some(mut f, chunk) else |_| { stopped = true; 0 }) } }
 /// if made { fs.close(take f)? }
 /// if made { fs.remove("doc-write-some.fifo")? }
-/// busy == true
+/// stopped == true
 /// (took > 0 && took < 16 * 8192) == made
 /// ```
 pub fn write_some(mut f: File, b: List[byte]) -> int ! {busy, invalid, io} {
