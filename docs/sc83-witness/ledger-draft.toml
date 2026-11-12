@@ -1,0 +1,76 @@
+# Classification draft only: DO NOT merge this as tests/ledger.toml.
+# Compiler cells are observed at wolf-lang ead70b82, row sources 7d8002a.
+# "run" includes satisfying a fail(...) directive, as the main ledger does.
+# No lupin cells are supplied: measure published 0.1.62 before filling them.
+# No Windows or macOS classification is inferred from these Linux results.
+
+[measurement]
+compiler_source = "ead70b824e1ff1a0a1d353a2666aaa96d126b3fd"
+row_sources = "7d8002a7ab6bc09c934826ff5cc384e16db31b2a"
+compiler_version = "0.2.39+dev.unknown"
+released_pin = false
+
+[tests."poll/capacity.lu"]
+wolfc = "run"
+native = "run"
+
+[tests."poll/set_mutation.lu"]
+wolfc = "run"
+native = "run"
+
+[tests."poll/error_hangup.lu"]
+wolfc = "run"
+native = "run"
+
+[tests."poll/signal_socket.lu"]
+wolfc = "run"
+native = "run"
+
+[tests."poll/socket_queue.lu"]
+wolfc = "run"
+native = "run"
+
+[tests."poll/comptime_refuses.lu"]
+wolfc = "run" # fail(E0701) satisfied
+native = "run"
+
+[tests."net/write_some.lu"]
+wolfc = "run"
+native = "run"
+
+[tests."net/write_some_invalid_row.lu"]
+wolfc = "run" # fail(E0401) satisfied
+native = "run"
+
+[tests."net/comptime_refuses_write_some.lu"]
+# The normative fail(E0701) check remains in the source. These compiler
+# cells do NOT claim to have reached the send's own comptime barrier.
+# Observed verbatim reason:
+# `List` construction at comptime (the engine's values are hash-consed and immutable — scalars, `str`, tuples and comptime slices; no container with identity yet, so a builtin whose argument is a `List` is unreachable here whatever the D33 sandbox says about it)
+# Known current-edition limit: [type.list.lit.value], wolf-lang#101.
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."net/unix/peer_credentials.lu"]
+wolfc = "run"
+native = "run"
+
+[tests."net/unix/peer_credentials_child.lu"]
+wolfc = "run" # explicit os_fork SKIP, NOT a checked fork measurement
+native = "run" # genuine separate-pid client
+
+[tests."net/unix/comptime_refuses_credentials.lu"]
+wolfc = "run" # fail(E0701) satisfied
+native = "run"
+
+[reference_pending]
+# Existing cells whose expected refusal point changes with std.poll must
+# also be remeasured; these are NOT values to paste into the main ledger.
+existing_rows = ["poll/waiter_rows.lu", "poll/sockets_all_ready.lu", "poll/deadline.lu"]
+new_rows = [
+  "poll/capacity.lu", "poll/set_mutation.lu", "poll/error_hangup.lu",
+  "poll/signal_socket.lu", "poll/socket_queue.lu", "poll/comptime_refuses.lu",
+  "net/write_some.lu", "net/write_some_invalid_row.lu",
+  "net/comptime_refuses_write_some.lu", "net/unix/peer_credentials.lu",
+  "net/unix/peer_credentials_child.lu", "net/unix/comptime_refuses_credentials.lu",
+]
