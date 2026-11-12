@@ -1,0 +1,121 @@
+//! check: run(exit=0, stdout="short_send=true\nbusy_before_reader=true\nfull_wait=true\nqueue_drained=true\nbytes_in_order=true\nwrite_disabled=true")
+//! phase: run
+//! conforms: std.poll, std.net, std.net.unix, std.time, os.net.io, err.row
+//!
+//! sc83: a 1 MiB output queue through a Unix stream and a slow reader.
+//! The first send is the whole queue: every serving host takes a prefix
+//! (PAX's 4096-byte direction is included). Fill until busy before reading
+//! anything, wait out a full writer's deadline, then read at most 4096
+//! bytes per turn after a delay. Every send is write_some, even after a
+//! WRITE wake. Disable WRITE when the queue empties. lupin refuses
+//! os_ready_open by name before constructing the large queue.
+
+use std.net
+use std.net.unix
+use std.poll
+use std.time
+
+fn skipped() {
+    print("short_send=true")
+    print("busy_before_reader=true")
+    print("full_wait=true")
+    print("queue_drained=true")
+    print("bytes_in_order=true")
+    print("write_disabled=true")
+}
+
+fn send(mut s: net.Socket, b: List[byte]) -> int ! {closed, invalid, io} {
+    net.write_some(mut s, b) else |e| match e {
+        busy => -1,
+        closed => { return closed },
+        invalid => { return invalid },
+        io => { return io },
+    }
+}
+
+fn suffix(q: List[byte], at: int) -> List[byte] {
+    var b = List[byte]()
+    var i = at
+    while i < q.len && i < at + 4096 {
+        (mut b).push(q[i])
+        i = i + 1
+    }
+    b
+}
+
+fn main() -> !int {
+    if os_name() == "windows" {
+        eprint("SKIP poll/socket_queue: Unix stream readiness unsupported on this host")
+        skipped()
+        return 0
+    }
+    var srv = unix.listen("queue.sock")?
+    var writer = unix.connect("queue.sock")?
+    var reader = net.accept(mut srv)?
+    net.set_deadline(mut reader, 2000)?
+    var w = poll.open()?
+    let kw = poll.add_socket(mut w, writer, poll.WRITE)?
+    let kr = poll.add_socket(mut w, reader, poll.READ)?
+    let total = 1048576
+    var q = List[byte]()
+    var i = 0
+    while i < total {
+        (mut q).push((i % 251) as byte)
+        i = i + 1
+    }
+    let first = send(mut writer, q)?
+    print("short_send={first > 0 && first < total}")
+    var at = if first > 0 then first else 0
+    var busy_seen = first == -1
+    while !busy_seen && at < total {
+        let n = send(mut writer, suffix(q, at))?
+        if n < 0 { busy_seen = true } else { at = at + n }
+    }
+    print("busy_before_reader={busy_seen && at < total}")
+    // Keep the reader out of this wait: its queued bytes are already READ.
+    var only_writer = poll.open()?
+    let ow = poll.add_socket(mut only_writer, writer, poll.WRITE)?
+    let t0 = time.monotonic_ns()
+    let full = poll.wait(mut only_writer, 0, 25)?
+    let t1 = time.monotonic_ns()
+    print("full_wait={full.ready.len == 0 && t1 - t0 >= 25000000}")
+    poll.remove(mut only_writer, ow)?
+    poll.close(take only_writer)?
+    var received = 0
+    var ordered = true
+    var turns = 0
+    var write_off = false
+    while (at < total || received < total) && turns < 10000 {
+        let ev = poll.wait(mut w, 0, 2000)?
+        for r in ev.ready {
+            if r.key == kw && (r.facts & poll.WRITE) != 0 && at < total {
+                let n = send(mut writer, suffix(q, at))?
+                if n > 0 { at = at + n }
+            }
+            if r.key == kr && (r.facts & poll.READ) != 0 && received < total {
+                time.sleep(time.millis(1))
+                let b = net.read_bytes(mut reader, 4096)?
+                for c in b {
+                    if c != (received % 251) as byte { ordered = false }
+                    received = received + 1
+                }
+            }
+        }
+        if at == total && !write_off {
+            poll.modify(mut w, kw, poll.READ)?
+            write_off = true
+        }
+        turns = turns + 1
+    }
+    print("queue_drained={at == total && received == total}")
+    print("bytes_in_order={ordered && received == total}")
+    let quiet = poll.wait(mut w, 0, 0)?
+    print("write_disabled={write_off && quiet.ready.len == 0}")
+    poll.remove(mut w, kr)?
+    poll.remove(mut w, kw)?
+    poll.close(take w)?
+    net.close(take writer)?
+    net.close(take reader)?
+    net.close_listener(take srv)?
+    0
+}

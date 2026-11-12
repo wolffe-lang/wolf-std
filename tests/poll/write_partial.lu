@@ -116,9 +116,26 @@ fn main() -> !int {
         calls = calls + 1
     }
     print("took_until_busy={busy && took > 0}")
-    let t0 = time.monotonic_ns()
-    let full = poll.wait(mut w, signal.resize(), 25)?
-    let t1 = time.monotonic_ns()
+    var t0 = time.monotonic_ns()
+    var full = poll.wait(mut w, signal.resize(), 25)?
+    var t1 = time.monotonic_ns()
+    var settles = 0
+    // Linux's line discipline can move queued input after busy and make
+    // the master writable again, without a slave read. Fill and wait
+    // again until the deadline actually passes; never discard a wake.
+    while full.ready.len > 0 && settles < 128 {
+        var blocked = false
+        var attempts = 0
+        while !blocked && attempts < 1000 {
+            let n = write_from(mut m, pattern(0, 4096), 0)?
+            blocked = n < 0
+            attempts = attempts + 1
+        }
+        t0 = time.monotonic_ns()
+        full = poll.wait(mut w, signal.resize(), 25)?
+        t1 = time.monotonic_ns()
+        settles = settles + 1
+    }
     print("full={shown(full)} waited={t1 - t0 >= 25000000}")
     let _got = fs.read_chunk(mut s, 4096)?
     let after = poll.wait(mut w, signal.resize(), 2000)?
