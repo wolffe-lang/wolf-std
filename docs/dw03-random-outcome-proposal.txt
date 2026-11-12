@@ -1,0 +1,19 @@
+Future language improvement — recoverable OS randomness
+
+Add a recoverable sibling of os_random, preserving the existing trapping
+builtin for compatibility. The sibling should return exactly the requested
+number of OS-sourced bytes or explicit invalid-request, unqualified-provider
+and unavailable-provider outcomes, never a partial successful result or a
+predictable fallback. The pinned specification's [os.random.trap] currently
+states "Failure is a TRAP, never a silent fallback" and "There is deliberately
+NO error row on this surface"; [os.random.sole] says "os_random is the ONLY
+sanctioned source of cryptographic material in wolf". Those clauses prevent a
+library wrapper from offering honest named provider failures: a trap cannot
+be caught as an error row. Specify the sibling as another sanctioned OS-source
+entry, with short-read/EINTR and provider-readiness handling inside the runtime,
+and carry it through native, checked and reference implementations with forced
+provider-failure tests. Do not add deterministic seeding, an insecure option or
+a userspace generator. Until that separate contract is approved and released,
+callers check platform admission/readiness where documented and retain the
+existing uncatchable trap as the fail-closed backstop; a successful readiness
+check cannot promise that a later provider call will succeed.

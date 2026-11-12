@@ -1,7 +1,9 @@
 //! member: true
 //!
-//! std.bytes — the raw byte view of a string: the honesty valve D25 buys
-//! by refusing `s[i]` on `str`. Stability tier: core.
+//! std.bytes — raw byte operations, including shared equality with no
+//! early exit at source level for equal public lengths. Stability tier: core.
+//! The nine-function historical account below predates is_equal_fixed_work;
+//! that helper adds no timing certificate to the original byte operations.
 //!
 //! **This module had no code for five sprints, s37 gave it a producer, and
 //! s81 closed the circle.** `str.bytes()` produces the byte view
