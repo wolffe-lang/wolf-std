@@ -4,6 +4,7 @@
 //!
 //! BIP-173 generic checksum vectors, not Bitcoin address semantics.
 use std.bech32
+use std.str
 
 fn rejects(s: str) -> bool {
     let out = bech32.decode(s) else |parse| { return true }
@@ -14,6 +15,7 @@ fn main() -> !int {
     for s in ["A12UEL5L", "a12uel5l", "an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1tt5tgs", "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw", "11qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqc8247j", "split1checkupstagehandshakeupstreamerranterredcaperred2y9e3w", "?1ezyfcl"] {
         let d = bech32.decode(s)?
         let text = bech32.encode(d.hrp, d.data)?
+        assert(text == str.lower(s))
         let again = bech32.decode(text)?
         assert(again.hrp == d.hrp)
     }
@@ -22,5 +24,20 @@ fn main() -> !int {
     }
     assert(bech32.encode("a", List[byte]())? == "a12uel5l")
     assert(bech32.encode("A", List[byte]())? == "a12uel5l")
+    let alphabet_vector = bech32.decode("abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw")?
+    assert(alphabet_vector.data.len == 32)
+    for i in 0..32 { assert(alphabet_vector.data[i] as int == i) }
+    var bad_hrp = false
+    let bad_text = bech32.encode("", List[byte]()) else |parse| {
+        bad_hrp = true
+        ""
+    }
+    assert(bad_hrp && bad_text == "")
+    var bad_word = false
+    let bad_data = bech32.encode("a", [32 as byte]) else |parse| {
+        bad_word = true
+        ""
+    }
+    assert(bad_word && bad_data == "")
     0
 }

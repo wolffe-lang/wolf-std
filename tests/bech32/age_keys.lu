@@ -8,6 +8,7 @@ use std.bech32
 use std.bytes
 use std.hex
 use std.str
+use std.x.crypto.curve25519
 
 fn rejects(s: str, hrp: str, n: int) -> bool {
     let out = bech32.decode_bytes(s, hrp, n) else |parse| { return true }
@@ -21,6 +22,7 @@ fn main() -> !int {
     assert(hex.encode(sk) == "4242424242424242424242424242424242424242424242424242424242424242")
     assert(str.upper(bech32.encode_bytes("age-secret-key-", sk)?) == identity)
     let pk = bech32.decode_bytes(recipient, "age", 32)?
+    assert(bytes.is_equal_fixed_work(curve25519.x25519_base(sk), pk))
     assert(bech32.encode_bytes("age", pk)? == recipient)
     assert(rejects(identity, "age", 32))
     assert(rejects(recipient, "age", 31))
