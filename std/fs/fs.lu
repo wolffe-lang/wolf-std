@@ -2509,6 +2509,34 @@ pub fn set_nonblock(mut f: File, on: bool) -> () ! {invalid, io, unsupported} {
 /// fs.remove("doc-write-some.tmp")?
 /// n == 4 && none == 0 && text == "wolf"
 /// ```
+///
+/// **The partial-write loop** (sc82): a server keeps one output queue per
+/// client and never parks on one. The handle is non-blocking; each call
+/// takes what fits, and the queue's offset moves by the count; `busy`
+/// means "nothing fits now", and the server waits for `WRITE` on the
+/// handle (`std.poll`) before writing again. A pty master holds some
+/// kilobytes (20480 bytes on PAX) and a pipe 64 KiB on linux, so a large
+/// queue is written in parts. Here a fifo opened read and write, which
+/// nobody reads, is the slow client: 16 lists of 8192 bytes are more than
+/// it holds, and the loop stops at `busy` with part of the queue taken
+/// (windows has no fifo, and the example asserts only what it made).
+///
+/// ```wolf-doc-example
+/// var chunk = List[byte]()
+/// for i in 0..8192 { (mut chunk).push(120 as byte) }
+/// var made = true
+/// fs.mkfifo("doc-write-some.fifo", 0o600) else |_| { made = false }
+/// var f = fs.stdin()
+/// if made { f = fs.open_mode("doc-write-some.fifo", 3)? }
+/// if made { fs.set_nonblock(mut f, true)? }
+/// var took = 0
+/// var busy = !made
+/// for turn in 0..16 { if !busy { took = took + (fs.write_some(mut f, chunk) else |e| match e { busy => { busy = true; 0 }, invalid => 0, io => 0 }) } }
+/// if made { fs.close(take f)? }
+/// if made { fs.remove("doc-write-some.fifo")? }
+/// busy == true
+/// (took > 0 && took < 16 * 8192) == made
+/// ```
 pub fn write_some(mut f: File, b: List[byte]) -> int ! {busy, invalid, io} {
     fs_write_some(f.fd, b)?
 }
