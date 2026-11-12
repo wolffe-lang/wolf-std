@@ -3,7 +3,7 @@
 ## Unreleased
 
 **The runtime-backed wait (sc83), targeting wolf 0.2.40 / lupin 0.1.62.**
-Implementation and row drafts; the new-runtime measurements and pin move
+Implementation and row drafts; all-tier measurements and the pin move
 are still pending.
 
 - `std.poll` lazily owns a readiness set, one wait for files, sockets and
