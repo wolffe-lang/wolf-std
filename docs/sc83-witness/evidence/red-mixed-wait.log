@@ -1,0 +1,22 @@
+START red-mixed-wait-0.2.39
+47df969d9eb9883703735f3f2fc61125187d0772
+wolf 0.2.39 (wolfgang, pin 3fc86f7)
+paired with lupin 0.1.61 (reference interpreter), pin 5f1f1c949582f53121e4047bc83c86f23ff72240
+lupin 0.1.61 (wolf-interp, reference interpreter at pin 5f1f1c9)
+FAIL poll/waiter_rows.lu:lupin:files_and_sockets want 'files_and_sockets=0 2', got 'files_and_sockets=unsupported'
+FAIL poll/waiter_rows.lu:lupin:sockets_with_meanings want 'sockets_with_meanings=0 1', got 'sockets_with_meanings=unsupported'
+FAIL poll/waiter_rows.lu:lupin:socket_write want 'socket_write=0 2', got 'socket_write=unsupported'
+FAIL poll/waiter_rows.lu:lupin:files_no_meanings want 'files_no_meanings=0 1', got 'files_no_meanings=unsupported'
+FAIL poll/waiter_rows.lu:wolfc:files_and_sockets want 'files_and_sockets=0 2', got 'files_and_sockets=unsupported'
+FAIL poll/waiter_rows.lu:wolfc:sockets_with_meanings want 'sockets_with_meanings=0 1', got 'sockets_with_meanings=unsupported'
+FAIL poll/waiter_rows.lu:wolfc:socket_write want 'socket_write=0 2', got 'socket_write=unsupported'
+FAIL poll/waiter_rows.lu:wolfc:files_no_meanings want 'files_no_meanings=0 1', got 'files_no_meanings=unsupported'
+FAIL poll/waiter_rows.lu:native:files_and_sockets want 'files_and_sockets=0 2', got 'files_and_sockets=unsupported'
+FAIL poll/waiter_rows.lu:native:sockets_with_meanings want 'sockets_with_meanings=0 1', got 'sockets_with_meanings=unsupported'
+FAIL poll/waiter_rows.lu:native:socket_write want 'socket_write=0 2', got 'socket_write=unsupported'
+FAIL poll/waiter_rows.lu:native:files_no_meanings want 'files_no_meanings=0 1', got 'files_no_meanings=unsupported'
+  ok   poll/mixed_refused.lu:lupin: unsupported, by name: `os_term_open_pty` makes a pseudo-terminal and opens its master and its slave (`posix_openpt`, `grantpt`, `unlockpt`): std has no call for it, and this machine 
+FAIL poll/mixed_refused.lu:wolfc:one_waiter want 'one_waiter=client1:1 client2:1 listener:1 master1:1 master2:1 pipe:1', got 'one_waiter=unsupported'
+FAIL poll/mixed_refused.lu:native:one_waiter want 'one_waiter=client1:1 client2:1 listener:1 master1:1 master2:1 pipe:1', got 'one_waiter=unsupported'
+  rows: 2 tests, 5 red lane(s)
+END red-mixed-wait-0.2.39 exit=1

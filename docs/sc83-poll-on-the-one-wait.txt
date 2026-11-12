@@ -8,25 +8,57 @@ Read the wolf specification, prelude, readiness corpus and s290 note at ead70b82
 
 ## Inputs verified
 
-Base: wolf-std be1d10fa. Development toolchain: wolf-lang ead70b82, built from a fixed checkout. Final gates require released wolf 0.2.40 and lupin 0.1.62; the pins have not moved yet. Read the README, API conventions, poll/net/unix/signal/term modules, sc82 design, poll rows and ledger, wolf-std issues 144 and 147, and the runtime contracts before implementation.
+Base: wolf-std be1d10fa. Development toolchain target: wolf-lang ead70b82, to be built from a fixed checkout; this build is queued. Final gates require released wolf 0.2.40 and lupin 0.1.62; the pins have not moved yet. Read the README, API conventions, poll/net/unix/signal/term modules, sc82 design, poll rows and ledger, wolf-std issues 144 and 147, and the runtime contracts before implementation.
 
 ## Prediction
 
+First committed at cbe64e4, before test edits. The subsequent decisions retain modify/remove's error rows, retain Windows' narrow fallback, and correct the capacity/cost points to 256. These are recorded changes to the initial prediction, not claims about measurements.
+
 Keep every public poll signature. Open a readiness set lazily for each Waiter; changes update it, waits harvest it once, close releases it without closing the registered handles. When opening a set answers the unsupported error row, keep entries for os_wait_ready. Report events in the runtime's order, explicitly unspecified, once per registered entry. Do not sort or scan all keys per persistent-set wait. READ, WRITE, HANGUP and ERROR are the runtime facts unchanged. A signal and ready handles share one answer. Shape errors remain invalid before host operations.
 
-Retire files-and-sockets, sockets-with-meanings, socket-WRITE and files-without-meanings refusals on checked and native Linux and macOS. waiter_rows changes its four lines to 0 2, 0 1, 0 2 and 0 1; mixed_refused answers all six names. signal_during_wait answers the ready file with its pending meaning. pty_hangup reports HANGUP=4 and end facts=5. sockets_all_ready reports READ|HANGUP after peer close. Its first pty wake must not assume the child is still alive or that a shell leaves terminal attributes untouched. Additional rows will hold add/modify/remove across waits, runtime handle-close removal, pipe write error (Linux ERROR, macOS HANGUP), simultaneous socket/signal readiness and empty deadlines.
+Retire files-and-sockets, sockets-with-meanings, socket-WRITE and files-without-meanings refusals on checked and native Linux and macOS. waiter_rows initially changed its four expected lines to 0 2, 0 1, 0 2 and 0 1; the current portable row checks those exact pairs and prints booleans, while checking unsupported on Windows. mixed_refused answers all six names. signal_during_wait answers the ready file with its pending meaning. pty_hangup reports HANGUP=4 and end facts=5. sockets_all_ready reports READ|HANGUP after peer close. Its first pty wake must not assume the child is still alive or that a shell leaves terminal attributes untouched. Additional rows will hold add/modify/remove across waits, runtime handle-close removal, pipe write error (Linux ERROR, macOS HANGUP), simultaneous socket/signal readiness and empty deadlines.
 
-lupin 0.1.62 refuses readiness calls at run by builtin name: os_ready_open for rows reaching a registration or wait first, os_term_open_pty for pty-first rows, os_signal_listen for signal-first rows. Its write_some rows execute; Unix credential reads refuse net_peer_cred at run. A refused run is not an unsupported error row caught and printed by the test. Ledger changes follow measurement, never precede it. Windows/tier-2 readiness posture needs explicit reconciliation with sc82's previously served narrow socket path before a tier promise changes.
+lupin 0.1.62 refuses readiness calls at run by builtin name: os_ready_open for rows reaching a registration or wait first, os_term_open_pty for pty-first rows, os_signal_listen for signal-first rows. Its write_some rows execute; Unix credential reads refuse net_peer_cred at run. A refused run is not an unsupported error row caught and printed by the test. Ledger changes follow measurement, never precede it. Windows retains its existing sockets-only READ path with no meanings through net.wait; the readiness fallback otherwise adopts the runtime's unsupported posture. modify/remove retain {invalid, io}: explicitly handle os_ready_set's unreachable unsupported outcome as io. A set that opened cannot meet that outcome on the same serving host; set_mutation checks add/change/remove, absent/forged handles and a closed set directly, then the std lifecycle.
 
 Add net.write_some(mut s: Socket, b: List[byte]) -> int ! {busy, closed, invalid, io}: delegate one send, never park, return zero for an empty buffer after checking the handle; invalid is unreachable for typed byte lists. TCP loopback and Unix rows cover empty, 4096-byte buffers, short send, fill to busy, wrong-kind/forged/closed handles, peer close, and ordered drain. A 1 MiB queue advances only by counts returned, enables WRITE while queued, drains through a slow reader, and disables WRITE when empty. No write-all wrapper or queue type is added.
 
 Add unix.Credentials { pid, uid, gid } and unix.peer_credentials(s: net.Socket) -> Credentials ! {io, unsupported}, delegating net_peer_cred. Linux keeps pid and effective ids after peer close; macOS reports pid while connected and -1 after close, retaining ids. Rows compare effective ids and pid while connected, and wrong-kind/forged/closed rows. A native forked child is measured without changing credentials; no privilege-dependent second-user claim.
 
-Expected steady-state costs at 1, 64 and 1,000 handles: native readiness-only sets make one kernel wait with O(ready) runtime work and O(ready) std conversion, with no per-wait registration or scan of held keys. Polled entries add O(polled) and one poll; checked sets scan O(N), respectively 1/64/1,000 entries. One-shot fallback builds O(N) elements (up to 2N with both interests), duplicates O(N) descriptors and makes one poll, versus sc82's k+1 sweeps. These are contract-based predictions, not benchmark measurements. Adds currently scan keys O(N) to preserve lowest-free-key and duplicate rules; that does not make steady-state waits scan keys.
+Expected steady-state costs at 1, 64 and 256 handles (corrected from the initial 1,000-handle prediction to the runtime's smallest serving-set bound): native readiness-only sets make one kernel wait with O(ready) runtime work and O(ready) std conversion, with no per-wait registration or scan of held keys. Polled entries add O(polled) and one poll; checked sets scan O(N), respectively 1/64/256 entries. Every Waiter is bounded to 256 entries on every host; registration 257 answers io, shape and duplicate errors still invalid first, and the refusal does not insert an entry or lose its key. One-shot fallback builds O(N) elements (up to 2N with both interests), duplicates O(N) descriptors and makes one poll, versus sc82's k+1 sweeps. These are contract-based predictions, not benchmark measurements. Adds currently scan keys O(N) to preserve lowest-free-key and duplicate rules; that does not make steady-state waits scan keys.
 
 ## Evidence index
 
-Pending: red-first records at changed expectations; fixed-head Linux checked/native and lupin records; macOS checked/native; the final gauntlet; a pushed mixed-wait plant and its named red. No readiness measurement on PAX has been made.
+Red first, before production edits: changed expectations at 47df969, measured with released wolf 0.2.39/lupin 0.1.61. docs/sc83-witness/evidence/red-mixed-wait.log holds the four named waiter_rows refusals on checked/native and mixed_refused's one_waiter on both, plus the old lupin path (END red-mixed-wait-0.2.39 exit=1). The first attempted take used older PATH binaries; it is discarded, not cited as matching-pin evidence.
+
+The new surface rows were committed at 0251b33 before the wrappers. docs/sc83-witness/evidence/red-new-surface.log holds their red take (END red-new-surface exit=1). set_mutation, write_some and peer_credentials were fail(E0301) on checked/native. capacity reached run: registration_257=256, unchanged_after_refusal=false, then error invalid when re-adding the incorrectly inserted spare; both compiler tiers exited 1. The source at that commit and the original records are the evidence, not a later retake after changing the code.
+
+Implementation and additional row sources are in the branch. They remain UNVERIFIED against the new runtime while the development toolchain is queued. In particular no new-runtime green, current ledger classification, macOS serving result, Linux result, final gauntlet, plant red or PAX measurement is claimed.
+
+## Expected tier postures (not measurements)
+
+The 21-row surface runner is docs/sc83-witness/rows.py. It is independent of the ledger so the candidate can be measured before changing recorded cells. Its six protocol/fixture unit checks are test_rows.py. The final gauntlet separately runs std-test and ledger-check. No ledger cell is advanced by a prediction.
+
+- waiter_rows, sockets_all_ready, deadline, capacity, set_mutation, error_hangup and socket_queue: checked/native execute on Linux and macOS; lupin refuses os_ready_open at run.
+- files_all_ready, mixed_refused, fairness, write_partial and pty_hangup: checked/native execute; lupin refuses os_term_open_pty at run.
+- signal_during_wait and signal_socket: checked/native execute; lupin refuses os_signal_listen at run.
+- net/write_some: all three execute, including the empty/4096-byte/busy/count/closed and bad-handle rows, without using std.poll.
+- net/unix/peer_credentials: checked/native execute; lupin refuses net_peer_cred at run.
+- net/unix/peer_credentials_child: native executes the different-pid client. Checked reports os_fork's unsupported error row, with a loud SKIP (not a fork measurement); the same-process credential row covers checked. lupin refuses os_fork at run. No different-uid client is claimed.
+- write_some_invalid_row: all three must satisfy fail(E0401), not reach a send. The three comptime rows must satisfy fail(E0701).
+
+Windows retains the narrow socket-read and no-meaning empty deadline paths. The wide/Unix/pty rows either check the host's actual unsupported row or explicitly print SKIP with its reason on stderr. A SKIP is not a serving-tier measurement. The runner checks named run refusals and does not turn them into caught unsupported marks or golden stdout.
+
+## PAX handoff
+
+There is no PAX/QEMU leg in this repository's harness. Build and run these 17 run rows as static Linux binaries against the matching musl runtime: poll/{waiter_rows,files_all_ready,sockets_all_ready,mixed_refused,fairness,deadline,signal_during_wait,write_partial,pty_hangup,capacity,set_mutation,error_hangup,signal_socket,socket_queue}, net/write_some, and net/unix/{peer_credentials,peer_credentials_child}. Each needs its own working directory: the compiler treats sibling entry files as one package. PAX needs /bin/sh, printf and sleep accepting 0.3 seconds for the existing child rows. No shell is assumed to leave a pty's controlling status or attributes alone.
+
+On Linux, copy ONE row to an owned empty directory as main.lu, then build it with:
+
+    WOLF_RT_LIB="$MUSL_RUNTIME" "$WOLF" build main.lu --std-root "$STD" --linker "$STATIC_MUSL_CC" -o probe
+
+STATIC_MUSL_CC is a cc-shaped executable wrapper invoking the existing musl C driver with -static, not a raw ld or shell text passed as --linker. Verify that readelf -l probe has no INTERP and readelf -d probe has no NEEDED entry. Copy probe to PAX, run it in its own directory, capture stdout/stderr and exit, and compare to that row's check directive. Run without any other row sharing that directory. The four rejection rows are compiler checks on Linux, not PAX executables.
+
+Measure, do not infer: the 4096-byte Unix direction's partial count and busy; the 20480-byte pty direction's full/room cycle; every ready mixed entry in one call; signal plus ready handles; the 257th std registration's io and unchanged waiter; pipe READ|HANGUP and write-side ERROR; and pid/effective ids from the same-process and forked Unix peers. A host io (including the system-wide epoll-object limit) is a red or an explicitly unmeasured environment, not a SKIP that counts as proof. No PAX result is recorded yet.
 
 ## Done-when
 

@@ -1,0 +1,8 @@
+# The planted refusal must fail mixed_refused's one_waiter by name.
+floor 35
+rig lib.sh committed=../../..:HEAD:docs/sc83-witness/rig/lib.sh
+rig step.sh committed=../../..:HEAD:docs/sc83-witness/rig/step.sh
+rig plant.manifest committed=../../..:HEAD:docs/sc83-witness/rig/plant.manifest
+rig ../rows.py committed=../../..:HEAD:docs/sc83-witness/rows.py
+step toolchain image=localhost/r41-toolchain:1 tools=python3,git,sha256sum script=step.sh -- toolchain
+step mixed-wait needs=toolchain image=localhost/r41-toolchain:1 tools=python3,sh,sleep script=step.sh -- rows poll/mixed_refused.lu --lanes wolfc,native
