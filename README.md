@@ -39,8 +39,14 @@ without notice.
 Every function names the capability it reaches and records which
 execution rungs run it.
 
-The library is pre-alpha, with the compiler. The newest surfaces are
-wolf 0.2.39's sessions and pseudo-terminals: `std.process`'s
+The library is pre-alpha, with the compiler. The newest surface is
+`std.poll`: an owned waiter over files and sockets that answers every
+ready entry, never only the first, with a set of signals and a deadline,
+for a server that waits in one place on pty masters, pipes, a listener
+and its clients. At wolf 0.2.39 one waiter holds files or sockets, not
+both; the runtime call that would serve both is named in
+`docs/sc82-one-wait.md`. Before it, wolf 0.2.39's sessions and
+pseudo-terminals: `std.process`'s
 `start_session`, `lead_session` and `own_session` put a child, or this
 process, in a session of its own, and `std.term`'s `open_pty`,
 `pty_name`, `set_size`, `attr`, `set_attr` and `open_controlling` give a
@@ -77,7 +83,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 647 tests. A test that passes deeper than its ledger entry claims
+all 656 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
