@@ -1,0 +1,37 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.chacha20, mem.region.cap.1, mem.region.account.2
+//!
+//! Fixed-size chunk lifetimes: a region is allocation release, not erasure.
+//! Run larger repeated-stream/RSS witnesses only on capped Linux.
+use std.bytes
+use std.x.crypto.chacha20
+use std.x.crypto.sha2
+
+fn main() -> int {
+    let before = live_region_bytes()
+    for i in 0..4 {
+        region chunk(cap: 134217728) {
+            let key = sha2.hkdf256("salt".bytes(), "labelled test key".bytes(), "payload".bytes(), 32)
+            var plain = List[byte]()
+            (mut plain).reserve(65536)
+            for n in 0..65536 { (mut plain).push((n % 256) as byte) }
+            var nonce = List[byte]()
+            for _ in 0..11 { (mut nonce).push(0 as byte) }
+            (mut nonce).push(i as byte)
+            let boxed = chacha20.seal(key, nonce, List[byte](), plain)
+            let back = chacha20.open(key, nonce, List[byte](), boxed) else List[byte]()
+            assert(bytes.is_equal_fixed_work(plain, back))
+            var bad = copy boxed
+            bad[bad.len - 1] = ((bad[bad.len - 1] as int + 1) % 256) as byte
+            var rejected = false
+            let hush = chacha20.open(key, nonce, List[byte](), bad) else |tag| {
+                rejected = true
+                List[byte]()
+            }
+            assert(rejected && hush.len == 0)
+        }
+        assert(live_region_bytes() == before)
+    }
+    0
+}
