@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="quiet=none\nquiet_25_waited=true\nall_ready=client1:1 client2:1 listener:1\nagain=client1:1 client2:1 listener:1\nafter_read=client2:1 listener:1\nafter_accept=client2:1\npeer_gone=client2:1 read closed\nkeys_after_remove=none")
+//! check: run(exit=0, stdout="quiet=none\nquiet_25_waited=true\nall_ready=client1:1 client2:1 listener:1\nagain=client1:1 client2:1 listener:1\nafter_read=client2:1 listener:1\nafter_accept=client2:1\npeer_gone_fact_as_host=true read closed\nkeys_after_remove=none")
 //! phase: run
 //! conforms: std.poll, std.net, std.time, os.net.wait, err.row
 //!
@@ -13,8 +13,9 @@
 //! ready, and the read says `closed`. Facts are printed by entry name in
 //! name order: the waiter promises no order.
 //!
-//! Every machine and host serves the sockets path (`net.wait`): lupin
-//! 0.1.61 and windows included.
+//! Linux/macOS serve the readiness-set path, including READ|HANGUP after
+//! peer close. Windows preserves net.wait's READ-only fallback. lupin
+//! 0.1.62 refuses os_ready_open by name at run.
 
 use std.net
 use std.poll
@@ -99,7 +100,8 @@ fn main() -> !int {
         utf8 => "utf8",
         io => "io",
     }
-    print("peer_gone={gone} read {end}")
+    let want_gone = if os_name() == "windows" then "client2:1" else "client2:5"
+    print("peer_gone_fact_as_host={gone == want_gone} read {end}")
     poll.remove(mut w, kl)?
     poll.remove(mut w, k1)?
     poll.remove(mut w, k2)?

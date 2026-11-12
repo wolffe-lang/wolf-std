@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="open_len=0\ninterest_zero=invalid\ninterest_four=invalid\nnegative_handle=invalid\nmarked_handle=invalid\nkeys=0 1 2\nlen=3\nfile_twice=invalid\nlistener_twice=invalid\nmodify_unknown=invalid\nmodify_interest=invalid\nmodify_listener_write=invalid\nmodify_served=ok\nremove_unknown=invalid\nremove_served=ok\nremove_twice=invalid\nkey_reused=1 len=3\ndeadline_below=invalid\nsend_only_meaning=invalid\nnegative_meanings=invalid\nfiles_and_sockets=0 2\nsockets_with_meanings=0 1\nsocket_write=0 2\nfiles_no_meanings=0 1\nempty_forever=invalid\nempty_look=0 0\nclosed=ok")
+//! check: run(exit=0, stdout="open_len=0\ninterest_zero=invalid\ninterest_four=invalid\nnegative_handle=invalid\nmarked_handle=invalid\nkeys=0 1 2\nlen=3\nfile_twice=invalid\nlistener_twice=invalid\nmodify_unknown=invalid\nmodify_interest=invalid\nmodify_listener_write=invalid\nmodify_served=ok\nremove_unknown=invalid\nremove_served=ok\nremove_twice=invalid\nkey_reused=1 len=3\ndeadline_below=invalid\nsend_only_meaning=invalid\nnegative_meanings=invalid\nfiles_and_sockets=true\nsockets_with_meanings=true\nsocket_write=true\nfiles_no_meanings=true\nempty_forever=invalid\nempty_look=0 0\nclosed=ok")
 //! phase: run
 //! conforms: std.poll, std.fs, std.net, std.signal, os.signal.wait.fds, os.net.wait, err.row
 //!
@@ -10,16 +10,13 @@
 //! a key no live entry holds, `modify` an interest outside the three and
 //! a listener's `WRITE`; a removed key is the next add's, and the others
 //! keep theirs. `wait`'s shape: a deadline below -1, a send-only meaning
-//! and a negative set are `invalid`. Then the four combinations the pin
-//! cannot wait on in one call, each `unsupported` on every host (the
-//! module header; `docs/sc82-one-wait.md`'s M1): files and a listener;
-//! a listener and a socket with meanings; a socket with `WRITE`; files
-//! with no meanings. An empty waiter with no meanings and no deadline is
-//! `invalid` (nothing could end it); with deadline 0 it answers nothing
-//! at once. `close` consumes the waiter.
+//! and a negative set are invalid. The four formerly refused combinations
+//! now return the expected meaning/count pair on serving hosts: 0/2,
+//! 0/1, 0/2 and 0/1. Windows checks its unsupported error row instead,
+//! explicitly on stderr. Empty/no-meaning/no-deadline remains invalid.
 //!
-//! Every line is decided by std before any host call, so every machine
-//! and host prints the same lines: lupin, windows included.
+//! lupin refuses os_ready_open by name at its first valid add; the shape
+//! errors before it are not a substitute for that run-time posture.
 
 use std.fs
 use std.net
@@ -80,6 +77,8 @@ fn wait_row(mut w: poll.Waiter, meanings: int, deadline: int) -> str {
 }
 
 fn main() -> !int {
+    let windows = os_name() == "windows"
+    if windows { eprint("SKIP poll/waiter_rows: wide waits unsupported on this host; checking refusal rows") }
     var w = poll.open()?
     print("open_len={poll.len(w)}")
     fs.write_text("sc82-waiter.tmp", "x")?
@@ -127,22 +126,22 @@ fn main() -> !int {
     let s2 = wait_row(mut w, -1, 0)
     print("negative_meanings={s2}")
     let c0 = wait_row(mut w, resize, 0)
-    print("files_and_sockets={c0}")
+    print("files_and_sockets={c0 == if windows then "unsupported" else "0 2"}")
     poll.remove(mut w, 0)?
     poll.remove(mut w, 2)?
     let port = net.port(srv)?
     var cli = net.connect(net.loopback(port))?
     let kc = poll.add_socket(mut w, cli, poll.READ)?
     let c1 = wait_row(mut w, resize, 0)
-    print("sockets_with_meanings={c1}")
+    print("sockets_with_meanings={c1 == if windows then "unsupported" else "0 1"}")
     poll.modify(mut w, kc, poll.READ | poll.WRITE)?
     let c2 = wait_row(mut w, 0, 0)
-    print("socket_write={c2}")
+    print("socket_write={c2 == if windows then "unsupported" else "0 2"}")
     poll.remove(mut w, kc)?
     poll.remove(mut w, 1)?
     let kf = poll.add_file(mut w, f, poll.READ)?
     let c3 = wait_row(mut w, 0, 0)
-    print("files_no_meanings={c3}")
+    print("files_no_meanings={c3 == if windows then "unsupported" else "0 1"}")
     poll.remove(mut w, kf)?
     let e0 = wait_row(mut w, 0, -1)
     print("empty_forever={e0}")

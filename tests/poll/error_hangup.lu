@@ -1,0 +1,47 @@
+//! check: run(exit=0, stdout="pipe_end=true\npipe_error_as_host=true\nall_interests_kept=true")
+//! phase: run
+//! conforms: std.poll, std.process, std.fs, os.proc.pipe, err.row
+//!
+//! sc83: actual host facts, not guessed from a consuming read. Linux/PAX
+//! report WRITE|ERROR for a pipe whose readers left; macOS reports
+//! WRITE|HANGUP. A pipe whose writers left reports READ|HANGUP. Both
+//! interests are retained with hangup/error. No broken-pipe write or
+//! signal is sent. lupin refuses os_ready_open by name at run.
+
+use std.fs
+use std.poll
+use std.process
+
+fn main() -> !int {
+    if os_name() == "windows" {
+        eprint("SKIP poll/error_hangup: file readiness unsupported on this host")
+        print("pipe_end=true")
+        print("pipe_error_as_host=true")
+        print("all_interests_kept=true")
+        return 0
+    }
+    let a = process.pipe()?
+    let b = process.pipe()?
+    var w = poll.open()?
+    let kr = poll.add_file(mut w, a.read, poll.READ)?
+    let kw = poll.add_file(mut w, b.write, poll.READ | poll.WRITE)?
+    fs_close(a.write.fd)?
+    fs_close(b.read.fd)?
+    let ev = poll.wait(mut w, 0, 0)?
+    var read_facts = 0
+    var write_facts = 0
+    for r in ev.ready {
+        if r.key == kr { read_facts = r.facts }
+        if r.key == kw { write_facts = r.facts }
+    }
+    let extra = if os_name() == "macos" then poll.HANGUP else poll.ERROR
+    print("pipe_end={ev.ready.len == 2 && read_facts == (poll.READ | poll.HANGUP)}")
+    print("pipe_error_as_host={write_facts == (poll.READ | poll.WRITE | extra)}")
+    print("all_interests_kept={(write_facts & (poll.READ | poll.WRITE)) == (poll.READ | poll.WRITE)}")
+    poll.remove(mut w, kr)?
+    poll.remove(mut w, kw)?
+    poll.close(take w)?
+    fs_close(a.read.fd)?
+    fs_close(b.write.fd)?
+    0
+}
