@@ -1,0 +1,16 @@
+//! check: fail(E0401)
+//! phase: typecheck
+//! conforms: std.net, type.byte
+//!
+//! sc83: invalid is retained for the builtin's wrong-width FFI caller,
+//! but typed List[byte] cannot hold 256. No socket send is reached.
+
+use std.net
+
+fn main() -> !int {
+    var s = net.Socket { fd: -1 }
+    var b = List[byte]()
+    (mut b).push(256)
+    let _n = net.write_some(mut s, b)?
+    0
+}

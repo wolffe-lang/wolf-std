@@ -1,0 +1,16 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.net, comptime.sandbox, comptime.sandbox.net
+//!
+//! sc83: even an empty non-parking send reaches the net capability and
+//! is refused at comptime before its handle or buffer is inspected.
+
+comptime fn probe() -> int ! {busy, closed, invalid, io} {
+    net_write_some(-1, List[byte]())
+}
+
+fn main() -> !int {
+    const N = probe() else -1
+    print("{N}")
+    0
+}
