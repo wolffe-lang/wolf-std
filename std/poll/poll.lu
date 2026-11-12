@@ -1,207 +1,120 @@
 //! member: true
 //!
 //! std.poll — one wait over files, sockets and signals, answering every
-//! entry that is ready. Stability tier: core.
+//! ready entry once. Stability tier: core.
 //!
-//! **What it is for.** A server that owns pseudo-terminal masters, a pipe,
-//! a listening socket and its clients, a timer and signals (a terminal
-//! multiplexer: dozens of pty masters, a Unix listener, its clients,
-//! `child()` and `reload()`) waits in ONE place and learns of EVERY handle
-//! that is ready, so that no busy handle starves the rest. The two narrow
-//! forms stay as they are: `signal.wait_fds` (files and signals, the
-//! lowest ready index) and `net.wait` (sockets, read readiness, no
-//! signals).
+//! Keep one owned Waiter across the server loop: open, add_file,
+//! add_socket and add_listener; modify interests as output queues fill or
+//! empty; remove entries before closing their handles; close the waiter.
+//! Files and sockets share one wait with signal meanings and a monotonic
+//! deadline. A meaning never hides ready handles.
 //!
-//! **The `Waiter`.** An owned set of entries a server keeps across its
-//! loop: `open`, then `add_file`, `add_socket` and `add_listener` (each
-//! answering the entry's KEY), `modify` an entry's interest, `remove` it,
-//! `wait`, and `close` at the end. An entry's interest is `READ`, `WRITE`
-//! or both; a ready entry's facts are `READ`, `WRITE`, `HANGUP` and
-//! `ERROR`. The `Waiter` is shaped for a readiness set the kernel holds
-//! (epoll on linux and PAX, kqueue on macOS), so that a wait costs what
-//! is ready rather than what is held; at this pin the runtime has no such
-//! set, and the `Waiter` holds a list (below). `close` frees nothing at
-//! this pin, and a program calls it anyway: the day the set lands, it is
-//! what frees it.
+//! The readiness set opens lazily on the first valid add or wait. Native
+//! Linux and macOS hold it in the kernel: O(ready) per wait, plus O(polled)
+//! for descriptors the kernel set cannot hold (regular files included).
+//! The checked machine keeps a set of its own and scans O(N). Where set
+//! opening answers unsupported, a list feeds os_wait_ready: O(N), up to
+//! two elements per entry. Results follow runtime order, unspecified for
+//! a persistent set and key order for the list fallback. A persistent-set
+//! wait neither sorts results nor scans the held keys.
 //!
-//! The loop, as prose (the example would need `std.fs`, `std.net` and
-//! `std.signal`, and §4's extractor imports one module):
+//! A waiter holds at most 256 entries, matching the smallest serving
+//! runtime's set bound. Registration 257 answers io without changing it;
+//! shape and duplicate errors still answer invalid first. A runtime handle
+//! close removes its registration; remove before close to release std's
+//! bookkeeping and reuse its key.
 //!
-//! ```text
-//! var w = poll.open()?
-//! let k_master = poll.add_file(mut w, p.master, poll.READ)?
-//! let k_listen = poll.add_listener(mut w, srv)?
-//! signal.listen(signal.child() | signal.reload())?
-//! loop {
-//!     let ev = poll.wait(mut w, signal.child() | signal.reload(), timer_ms)?
-//!     if ev.meaning == signal.child() { reap every child }
-//!     for r in ev.ready {
-//!         if r.key == k_listen { accept; add the client with READ }
-//!         else if (r.facts & poll.READ) != 0 { read; an end removes the entry }
-//!         if (r.facts & poll.WRITE) != 0 { write what fits from the queue }
-//!     }
-//! }
-//! poll.close(take w)?
-//! ```
+//! READ and WRITE are interests and facts; HANGUP and ERROR are real host
+//! facts, returned with the applicable interest. A read loop tests READ
+//! and lets its read name the end: eof, closed, or a pty master's io on
+//! Linux. A non-blocking writer uses fs.write_some or net.write_some,
+//! retains unsent bytes and enables WRITE only while its queue has bytes.
+//! busy means wait for room and retry, never discard the unsent bytes.
 //!
-//! **A write that would block is a count, not a failure.** A server keeps
-//! one output queue per client and never parks on one: the handle is
-//! non-blocking (`fs.set_nonblock`), `fs.write_some` takes what fits and
-//! answers how many bytes, or `busy` when nothing fits; the server drops
-//! that many from the front of the queue, and while the queue holds
-//! bytes the entry's interest is `READ | WRITE` (`modify`), `READ` again
-//! once it is empty. That is the whole loop for a pty master and a pipe
-//! (a pty master holds about 14 KiB on linux and 20480 bytes on PAX, so
-//! the partial write is the normal case). `tests/poll/write_partial.lu`
-//! runs it. A socket has no such write at this pin (`std.net`'s header,
-//! the contract `write_some`).
+//! Linux and macOS serve every combination. Windows preserves its narrow
+//! sockets-only READ wait, no meanings, through net.wait (only READ facts
+//! known there), and its empty deadline-only waits with no meanings.
+//! Other fallback combinations use os_wait_ready and its host refusal.
+//! PAX uses the static Linux binary. lupin 0.1.62 refuses readiness calls
+//! at run by builtin name, not a caught unsupported error mark.
 //!
-//! **What `wait` serves at this pin, and what it refuses.** Decided
-//! before the host, so a caller can tell a combination from a failure:
-//!
-//! - files (a pty master, a pipe, a terminal, a regular file), with read
-//!   and write interest, and a non-empty set of meanings: served over
-//!   `signal.wait_fds` (the files path, below);
-//! - sockets and listeners, read interest, no meanings: served over
-//!   `net.wait`;
-//! - no entries: the meanings and the deadline alone;
-//! - **`unsupported`** on every host: files and sockets in one waiter;
-//!   sockets with a set of meanings; a socket with write interest; files
-//!   with no meanings. The runtime has no call that waits on both of its
-//!   handle tables, hears a signal beside a socket, or waits on a file
-//!   with no meaning to hear (`signal.wait_fds` refuses an empty set).
-//!   The call that would serve all four is named, with its contract, in
-//!   `docs/sc82-one-wait.md` ("Missing below std", M1); when it lands,
-//!   these four are served and no signature here changes.
-//!
-//! **The files path.** `signal.wait_fds` answers only the lowest ready
-//! file. `wait` asks it once with the caller's deadline, then, with
-//! deadline 0, over the entries past each one it answered, until none
-//! is: a wake with k ready entries costs k + 1 looks, each a `poll(2)`
-//! over the entries still to look at with a duplicate of each. The list
-//! starts one past the last entry the previous wait answered, so the
-//! order rotates and no entry waits behind others even while meanings
-//! keep arriving. A meaning taken ends the sweep: `wait` answers it with
-//! the entries found before it, and the others answer the next wait at
-//! once (readiness is level-triggered).
-//!
-//! **`HANGUP` and `ERROR` are declared and never set at this pin**:
-//! `signal.wait_fds` calls a hangup ready to read and does not say which,
-//! so a hung-up entry answers `READ`, and the read that follows names the
-//! end (`eof` for a pipe, `closed` for a socket, `io` for a pty master on
-//! linux whose last slave descriptor closed, `eof` on macOS). Once the
-//! runtime reports them they are set together with the interest the
-//! entry asked, so a loop that tests `READ` alone keeps working.
-//!
-//! **Errors are rows, never traps** (D30, §14), and every row is decided
-//! in this order: the shape (`invalid`), then the combination
-//! (`unsupported`), then the host (`signal.wait_fds`'s and `net.wait`'s
-//! rows, unchanged).
-//!
-//! **Hosts.** linux, macOS and freebsd serve both paths; windows answers
-//! the files path `unsupported` (`signal.wait_fds`'s posture) and serves
-//! the sockets path (`WSAPoll`); PAX runs the linux binary. lupin 0.1.61
-//! serves the sockets path and refuses the files path by name
-//! (`os_signal_wait_fds`: it has no `poll`).
-//!
-//! **Capability:** `exec` for a wait that reaches `signal.wait_fds`
-//! (signal control), `net` for one that reaches `net.wait`; both refused
-//! at comptime (D33), as their delegates are. `open`, `add_*`, `modify`,
-//! `remove`, `len`, `close` and the constants reach nothing at this pin
-//! and are comptime-safe.
+//! Capability exec for sets/waits, net for the Windows narrow fallback;
+//! refused at comptime. open, len and constants are pure. modify/remove
+//! retain {invalid, io}: unsupported from a set change is explicitly
+//! handled as io. A set that opened cannot meet it on that same host;
+//! tests/poll/set_mutation.lu holds that fact.
 
 use std.fs
 use std.net
 use std.signal
 use std.time
 
-/// An entry's interest and a ready entry's fact: there is something to
-/// read (a byte, the end of input, a hangup, a pending connection on a
-/// listener).
+/// Interest and fact: a read or accept would not park, including an end.
 ///
 /// ```wolf-doc-example
 /// poll.READ == 1
 /// ```
 pub const READ: int = 1
 
-/// An entry's interest and a ready entry's fact: the handle takes a write
-/// now (room for at least one byte, or a write that would fail at once).
+/// Interest and fact: room for a byte, or a write that would fail at once.
 ///
 /// ```wolf-doc-example
 /// poll.WRITE == 2
 /// ```
 pub const WRITE: int = 2
 
-/// A ready entry's fact: the other end hung up. **Never set at this pin**
-/// (the module header): a hangup answers `READ`, and the read names it.
+/// Fact: the other end hung up, accompanied by an applicable interest.
 ///
 /// ```wolf-doc-example
 /// poll.HANGUP == 4
 /// ```
 pub const HANGUP: int = 4
 
-/// A ready entry's fact: the handle has a pending error. **Never set at
-/// this pin** (the module header): an error answers the interest asked,
-/// and the call that follows answers its row.
+/// Fact: a host error, accompanied by the requested interest.
 ///
 /// ```wolf-doc-example
 /// poll.ERROR == 8
 /// ```
 pub const ERROR: int = 8
 
-// Entry kinds, one per key: a free key, a file of the fs table, a stream
-// and a listener of the net table.
 const FREE: int = 0
-
 const FILE: int = 1
-
 const SOCKET: int = 2
-
 const LISTENER: int = 3
-
-// The largest handle number an entry takes: bit 61 and above are the
-// runtime's marks on a wait element (bit 62 `signal.WAIT_WRITE`, bit 61
-// the net table in the call M1 asks for), so a number with one of them
-// set names no handle.
+const NET: int = 2305843009213693952
 const HANDLE_MAX: int = 2305843009213693951
-
-// The largest set of meanings the shape takes: the twenty listenable
-// meanings are the bits 1 .. 524288 (`std.signal`'s table).
 const MEANINGS_MAX: int = 1048575
+const CAPACITY: int = 256
 
-/// An owned set of entries, each a handle and its interest, named by its
-/// key. The fields are the module's bookkeeping, one list each indexed by
-/// key, and never part of the API: `set` is the kernel set the runtime
-/// will hold (-1 at this pin), `next` the key the files path looks at
-/// first.
+/// An owned waiter holding at most 256 entries, named by stable keys.
+/// Fields are bookkeeping, not an API for constructing a waiter: set is
+/// -1 before acquisition, -2 for the list fallback, else a runtime set.
+/// Entry handles remain the caller's.
 pub struct Waiter {
     set: int,
     kinds: List[int],
     handles: List[int],
     interests: List[int],
     count: int,
-    next: int,
 }
 
-/// One ready entry: its key and its facts (`READ`, `WRITE`; `HANGUP` and
-/// `ERROR` once the runtime reports them).
+/// One ready entry: its key and READ/WRITE/HANGUP/ERROR facts.
 pub struct Ready {
     key: int,
     facts: int,
 }
 
-/// What ended one `wait`: `meaning`, the meaning taken off the queue (0
-/// when none was), and `ready`, every entry found ready, each once, in no
-/// promised order. An empty `ready` and meaning 0: the deadline passed.
+/// Every ready entry once, in runtime order (unspecified for a set), and
+/// one meaning taken off the queue, or 0. Both may arrive together.
+/// Empty ready and meaning 0 means the deadline passed.
 pub struct Events {
     meaning: int,
     ready: List[Ready],
 }
 
-/// A new, empty waiter. Rows: `io` is the kernel set's (a host that will
-/// not give one, the descriptor limit) and is **not reached at this pin**,
-/// where the waiter is a list; it is declared so that the signature does
-/// not move when the set lands. Comptime-safe at this pin.
+/// A new empty waiter; acquire its host set lazily at add/wait. Pure,
+/// comptime-safe. The reserved io row stays unchanged; acquisition failures
+/// are reported by the first add or wait, not this constructor.
 ///
 /// ```wolf-doc-example
 /// var w = poll.open()?
@@ -215,28 +128,41 @@ pub fn open() -> Waiter ! {io} {
         handles: List[int](),
         interests: List[int](),
         count: 0,
-        next: 0,
     }
 }
 
-/// How many entries `w` holds. Total.
+/// The number of entries added and not removed. Total and pure.
 pub fn len(w: Waiter) -> int {
     w.count
 }
 
-/// Close `w`, consuming it. At this pin there is nothing of the host's to
-/// free and the call always succeeds; `io` is the kernel set's close,
-/// **not reached at this pin**, declared so that the signature does not
-/// move. The handles the entries name are the caller's, and stay open.
+/// Close the set, consuming w, leaving its entry handles open. io for a
+/// failed close or forged set. Capability exec when acquired; comptime
+/// refuses the host call. A never-acquired or fallback waiter has no set.
 pub fn close(take w: Waiter) -> () ! {io} {
-    let _held = w.count
+    if w.set >= 0 {
+        os_ready_close(w.set)?
+    }
 }
 
 fn is_net(kind: int) -> bool {
     kind == SOCKET || kind == LISTENER
 }
 
-// The key of a live entry of `kind`'s table holding `h`, or -1.
+fn marked(kind: int, h: int) -> int {
+    if is_net(kind) { return h + NET }
+    h
+}
+
+fn acquire(mut w: Waiter) -> () ! {io} {
+    if w.set == -1 {
+        w.set = os_ready_open() else |e| match e {
+            unsupported => -2,
+            io => { return io },
+        }
+    }
+}
+
 fn find(w: Waiter, kind: int, h: int) -> int {
     var k = 0
     for kd in w.kinds {
@@ -248,67 +174,50 @@ fn find(w: Waiter, kind: int, h: int) -> int {
     -1
 }
 
-fn add(mut w: Waiter, kind: int, h: int, interest: int) -> int ! {invalid} {
-    if interest < READ || interest > READ + WRITE {
+fn add(mut w: Waiter, kind: int, h: int, interest: int) -> int ! {invalid, io, unsupported} {
+    if interest < READ || interest > READ + WRITE || h < 0 || h > HANDLE_MAX {
         return invalid
     }
-    if h < 0 || h > HANDLE_MAX {
-        return invalid
-    }
-    if find(w, kind, h) >= 0 {
-        return invalid
-    }
+    if find(w, kind, h) >= 0 { return invalid }
+    if w.count >= CAPACITY { return io }
     var k = 0
-    while k < w.kinds.len && w.kinds[k] != FREE {
-        k = k + 1
+    while k < w.kinds.len && w.kinds[k] != FREE { k = k + 1 }
+    acquire(mut w)?
+    if w.set >= 0 {
+        os_ready_set(w.set, marked(kind, h), interest, k)?
     }
+    // Publish the key only after the runtime accepted the registration.
     if k < w.kinds.len {
         w.kinds[k] = kind
         w.handles[k] = h
         w.interests[k] = interest
-        w.count = w.count + 1
-        return k
+    } else {
+        (mut w.kinds).push(kind)
+        (mut w.handles).push(h)
+        (mut w.interests).push(interest)
     }
-    (mut w.kinds).push(kind)
-    (mut w.handles).push(h)
-    (mut w.interests).push(interest)
     w.count = w.count + 1
     k
 }
 
-/// Add the file `f` (a pty master, a pipe end, a terminal, a regular
-/// file) with `interest` (`READ`, `WRITE` or `READ | WRITE`), and answer
-/// its key: the lowest key no live entry holds, stable while the entry
-/// lives. A file and a socket may share a number (they are handles of two
-/// tables), so each is added by its own call.
-///
-/// Rows: `invalid` for an interest outside those three, a handle number
-/// below 0 or with bit 61 or above set, and a file this waiter already
-/// holds (`modify` changes an entry); `io` (a closed or forged handle) and
-/// `unsupported` (a host with no set for files) are the kernel set's and
-/// **not reached at this pin**, where a closed or forged handle is the
-/// wait's `io`. Remove an entry before closing its handle. Comptime-safe
-/// at this pin. The example is prose (a handle comes from `std.fs`):
-/// `let k = poll.add_file(mut w, p.master, poll.READ)?`.
+/// Add f with READ, WRITE or both; return the lowest free key, stable
+/// until removal. invalid for duplicates, invalid interest, negative or
+/// wait-marked handles. io for capacity (256), a closed/forged handle or
+/// host failure; unsupported where registration is unsupported. Remove
+/// before closing f. Capability exec; refused at comptime.
 pub fn add_file(mut w: Waiter, f: fs.File, interest: int) -> int ! {invalid, io, unsupported} {
     add(mut w, FILE, f.fd, interest)?
 }
 
-/// Add the connected socket `s` (TCP or Unix-domain) with `interest`, and
-/// answer its key, as `add_file` does. Rows: `add_file`'s, a socket this
-/// waiter already holds included. A socket with `WRITE` is accepted here
-/// and refused by `wait` at this pin (`unsupported`: no socket write
-/// waits, and none writes part of a list, until the runtime has one).
-/// Comptime-safe at this pin. Prose example: `let k = poll.add_socket(mut
-/// w, client, poll.READ)?`.
+/// Add a TCP or Unix stream with READ, WRITE or both. Keys and rows are
+/// add_file's; file and net handle numbers belong to separate tables.
+/// Capability exec; refused at comptime.
 pub fn add_socket(mut w: Waiter, s: net.Socket, interest: int) -> int ! {invalid, io, unsupported} {
     add(mut w, SOCKET, s.fd, interest)?
 }
 
-/// Add the listener `l` with `READ` (a connection is pending), and answer
-/// its key, as `add_file` does. Rows: `add_file`'s, a listener this waiter
-/// already holds included. Comptime-safe at this pin. Prose example: `let
-/// k = poll.add_listener(mut w, srv)?`.
+/// Add l with READ (a pending connection). Keys and rows are add_file's.
+/// Capability exec; refused at comptime.
 pub fn add_listener(mut w: Waiter, l: net.Listener) -> int ! {invalid, io, unsupported} {
     add(mut w, LISTENER, l.fd, READ)?
 }
@@ -317,70 +226,71 @@ fn live(w: Waiter, key: int) -> bool {
     key >= 0 && key < w.kinds.len && w.kinds[key] != FREE
 }
 
-/// Change the interest of the entry `key` to `interest` (`READ`, `WRITE`
-/// or `READ | WRITE`): what a server does when a client's output queue
-/// fills or empties. Rows: `invalid` for a key no live entry holds, an
-/// interest outside those three, and a listener's interest other than
-/// `READ`; `io` is the kernel set's, **not reached at this pin**.
-/// Comptime-safe at this pin.
+fn change(w: Waiter, key: int, interest: int) -> () ! {invalid, io} {
+    if w.set >= 0 {
+        os_ready_set(w.set, marked(w.kinds[key], w.handles[key]), interest, key) else |e| {
+            match e {
+                invalid => { return invalid },
+                io => { return io },
+                // A set opens only on a serving host; its set calls cannot
+                // become unsupported on that same host. Handle this
+                // unreachable outcome explicitly to retain the public row.
+                unsupported => { return io },
+            }
+        }
+    }
+}
+
+/// Change key's interest to READ, WRITE or both. invalid for a non-live
+/// key, bad interest, or WRITE on a listener; io for a runtime failure.
+/// An opened set cannot answer unsupported on this host; that delegate
+/// outcome is handled as io. Capability exec when acquired; refused at
+/// comptime. No host call is needed on the list fallback.
 pub fn modify(mut w: Waiter, key: int, interest: int) -> () ! {invalid, io} {
-    if !live(w, key) {
+    if !live(w, key) || interest < READ || interest > READ + WRITE {
         return invalid
     }
-    if interest < READ || interest > READ + WRITE {
-        return invalid
-    }
-    if w.kinds[key] == LISTENER && interest != READ {
-        return invalid
-    }
+    if w.kinds[key] == LISTENER && interest != READ { return invalid }
+    change(w, key, interest)?
     w.interests[key] = interest
 }
 
-/// Remove the entry `key`; its key is free for the next add, and every
-/// other entry keeps its own. Do it before closing the entry's handle.
-/// Rows: `invalid` for a key no live entry holds; `io` is the kernel
-/// set's, **not reached at this pin**. Comptime-safe at this pin.
+/// Remove key before closing its handle; the key becomes free. invalid
+/// for a non-live key; io for a runtime failure, including an already
+/// closed handle removed by the runtime. An opened set cannot answer
+/// unsupported on this host; that delegate outcome is handled as io.
+/// Capability exec when acquired; refused at comptime.
 pub fn remove(mut w: Waiter, key: int) -> () ! {invalid, io} {
-    if !live(w, key) {
-        return invalid
-    }
+    if !live(w, key) { return invalid }
+    change(w, key, 0)?
     w.kinds[key] = FREE
     w.handles[key] = -1
     w.interests[key] = 0
     w.count = w.count - 1
 }
 
-/// **Wait until at least one entry is ready, a meaning in `meanings` is
-/// delivered, or `deadline_ms` passes, and answer EVERY ready entry**
-/// with its facts, and the meaning taken (0 when none). An empty `ready`
-/// with meaning 0 is the deadline. `meanings` is a set of listenable
-/// meanings (`signal.child() | signal.reload()`), listened for first
-/// (`signal.listen`), or 0 for none. `deadline_ms` is `signal.wait_fds`'s:
-/// **0** looks once and never parks, **-1** never passes, any other is
-/// measured on the monotonic clock and never answered early. Readiness is
-/// level-triggered: an entry stays ready until it is read, written or
-/// accepted, and answers every wait until then.
+fn events(flat: List[int], meaning: int) -> Events {
+    var ready = List[Ready]()
+    var i = 0
+    while i < flat.len {
+        (mut ready).push(Ready { key: flat[i], facts: flat[i + 1] })
+        i = i + 2
+    }
+    Events { meaning: meaning, ready: ready }
+}
+
+/// Wait for every ready entry and one signal meaning, together. meanings
+/// is 0 or a set listened for through std.signal; deadline_ms is 0 for a
+/// look, -1 for no deadline, otherwise monotonic milliseconds, never
+/// answered early. Level-triggered: readiness remains until consumed.
 ///
-/// What is served at this pin, and how (the module header): files with a
-/// set of meanings over `signal.wait_fds`, k + 1 looks for k ready
-/// entries; sockets and listeners, read interest and no meanings, over
-/// `net.wait`; no entries, the meanings and the deadline alone. A meaning
-/// taken on the first look is answered alone, as `signal.wait_fds`
-/// answers it; one taken later ends the sweep with the entries found
-/// before it.
-///
-/// Rows, in the order they are decided: **`invalid`** for a deadline
-/// below -1, a `meanings` holding a bit that is no listenable meaning, and
-/// a waiter with no entries and no meanings and deadline -1 (nothing could
-/// end it); **`unsupported`**, on every host at this pin, for files and
-/// sockets in one waiter, sockets with meanings, a socket with `WRITE`,
-/// and files with no meanings; then the host's: `unsupported` for files
-/// on windows, `io` for a closed or forged handle (either table) and a
-/// failure of the poll itself. Never traps.
-///
-/// `mut w`: the files path rotates where it starts. Capability `exec`
-/// (the files path, `signal.wait_fds`) or `net` (the sockets path,
-/// `net.wait`); refused at comptime (D33).
+/// invalid for a deadline below -1, a non-listenable meaning bit, or an
+/// empty waiter with no meanings and no deadline. io for a host failure;
+/// unsupported where the host or tier does not serve the call. Linux and
+/// macOS serve files+sockets, signals+sockets, socket WRITE and files
+/// without meanings. Windows retains its narrow socket READ case and
+/// empty no-meaning deadline waits. Capability exec (net on that narrow
+/// fallback); refused at comptime. Never traps for a host failure.
 ///
 /// ```wolf-doc-example
 /// var w = poll.open()?
@@ -390,57 +300,31 @@ pub fn remove(mut w: Waiter, key: int) -> () ! {invalid, io} {
 /// ev.meaning == 0
 /// ```
 pub fn wait(mut w: Waiter, meanings: int, deadline_ms: int) -> Events ! {invalid, io, unsupported} {
-    if deadline_ms < -1 {
-        return invalid
+    if deadline_ms < -1 || meanings < 0 || meanings > MEANINGS_MAX { return invalid }
+    if w.count == 0 && meanings == 0 && deadline_ms == -1 { return invalid }
+    acquire(mut w)?
+    if w.set >= 0 {
+        let (flat, meaning) = os_ready_wait(w.set, meanings, deadline_ms)?
+        return events(flat, meaning)
     }
-    if meanings < 0 || meanings > MEANINGS_MAX {
-        return invalid
-    }
-    if w.count == 0 {
-        if meanings == 0 {
-            if deadline_ms == -1 {
-                return invalid
-            }
-            if deadline_ms > 0 {
-                time.sleep(time.millis(deadline_ms))
-            }
+    if os_name() == "windows" && meanings == 0 {
+        if w.count == 0 {
+            if deadline_ms > 0 { time.sleep(time.millis(deadline_ms)) }
             return Events { meaning: 0, ready: List[Ready]() }
         }
-        let wk = signal.wait_fds(List[fs.File](), meanings, deadline_ms)?
-        return Events { meaning: wk.meaning, ready: List[Ready]() }
-    }
-    var files = 0
-    var nets = 0
-    var net_write = false
-    var k = 0
-    for kd in w.kinds {
-        if kd == FILE {
-            files = files + 1
-        } else if is_net(kd) {
-            nets = nets + 1
-            if w.interests[k] & WRITE != 0 {
-                net_write = true
-            }
+        var narrow = true
+        for kd in w.kinds {
+            if kd == FILE { narrow = false }
         }
-        k = k + 1
-    }
-    if files > 0 && nets > 0 {
-        return unsupported
-    }
-    if nets > 0 {
-        if meanings != 0 || net_write {
-            return unsupported
+        for interest in w.interests {
+            if interest & WRITE != 0 { narrow = false }
         }
-        return sockets_path(w, deadline_ms)?
+        if narrow { return sockets_path(w, deadline_ms)? }
     }
-    if meanings == 0 {
-        return unsupported
-    }
-    files_path(mut w, meanings, deadline_ms)?
+    one_shot(w, meanings, deadline_ms)?
 }
 
-// The sockets path: one `net.wait` over every live net entry, in key
-// order; its answer is the subset in that order.
+// Preserve Windows' old sockets-only READ wait, which knows no fact bits.
 fn sockets_path(w: Waiter, deadline_ms: int) -> Events ! {io} {
     var fds = List[int]()
     var keys = List[int]()
@@ -456,9 +340,7 @@ fn sockets_path(w: Waiter, deadline_ms: int) -> Events ! {io} {
     var ready = List[Ready]()
     var i = 0
     for h in got {
-        while i < fds.len && fds[i] != h {
-            i = i + 1
-        }
+        while i < fds.len && fds[i] != h { i = i + 1 }
         if i < fds.len {
             (mut ready).push(Ready { key: keys[i], facts: READ })
             i = i + 1
@@ -467,70 +349,39 @@ fn sockets_path(w: Waiter, deadline_ms: int) -> Events ! {io} {
     Events { meaning: 0, ready: ready }
 }
 
-// The files path: the elements in key order rotated to start at
-// `w.next`, a read element and a write element (`signal.WAIT_WRITE`) for
-// an entry with both interests, adjacent; then the sweep.
-fn files_path(mut w: Waiter, meanings: int, deadline_ms: int) -> Events ! {
-    invalid,
-    io,
-    unsupported,
-} {
-    let n = w.kinds.len
+fn one_shot(w: Waiter, meanings: int, deadline_ms: int) -> Events ! {invalid, io, unsupported} {
     var elems = List[int]()
-    var ekeys = List[int]()
-    var efacts = List[int]()
-    var j = 0
-    while j < n {
-        let key = (w.next + j) % n
-        if w.kinds[key] == FILE {
-            let h = w.handles[key]
-            let want = w.interests[key]
-            if want & READ != 0 {
+    var keys = List[int]()
+    var k = 0
+    for kd in w.kinds {
+        if kd != FREE {
+            let h = marked(kd, w.handles[k])
+            if w.interests[k] & READ != 0 {
                 (mut elems).push(h)
-                (mut ekeys).push(key)
-                (mut efacts).push(READ)
+                (mut keys).push(k)
             }
-            if want & WRITE != 0 {
+            if w.interests[k] & WRITE != 0 {
                 (mut elems).push(h + signal.WAIT_WRITE)
-                (mut ekeys).push(key)
-                (mut efacts).push(WRITE)
+                (mut keys).push(k)
             }
         }
-        j = j + 1
+        k = k + 1
     }
+    let (flat, meaning) = os_wait_ready(elems, meanings, deadline_ms)?
     var ready = List[Ready]()
-    var meaning = 0
-    var start = 0
-    var look = deadline_ms
-    while start < elems.len {
-        var sub = List[fs.File]()
-        var i = start
-        while i < elems.len {
-            (mut sub).push(fs.File { fd: elems[i] })
-            i = i + 1
-        }
-        let wk = signal.wait_fds(sub, meanings, look)?
-        look = 0
-        if wk.meaning != 0 {
-            meaning = wk.meaning
-            break
-        }
-        if wk.ready < 0 {
-            break
-        }
-        let at = start + wk.ready
-        let key = ekeys[at]
+    var i = 0
+    while i < flat.len {
+        let key = keys[flat[i]]
+        let facts = flat[i + 1]
         let last = ready.len - 1
+        // The one-shot promises element order and an entry's read/write
+        // elements are adjacent, so coalescing needs no key scan or map.
         if last >= 0 && ready[last].key == key {
-            let both = ready[last].facts | efacts[at]
-            ready[last] = Ready { key: key, facts: both }
+            ready[last] = Ready { key: key, facts: ready[last].facts | facts }
         } else {
-            (mut ready).push(Ready { key: key, facts: efacts[at] })
+            (mut ready).push(Ready { key: key, facts: facts })
         }
-        start = at + 1
-    }
-    if ready.len > 0 {
-        w.next = (ready[ready.len - 1].key + 1) % n
+        i = i + 2
     }
     Events { meaning: meaning, ready: ready }
 }
