@@ -8,7 +8,7 @@ Read the wolf specification, prelude, readiness corpus and s290 note at ead70b82
 
 ## Inputs verified
 
-Base: wolf-std be1d10fa. Development toolchain target: wolf-lang ead70b82, to be built from a fixed checkout; this build is queued. Final gates require released wolf 0.2.40 and lupin 0.1.62; the pins have not moved yet. Read the README, API conventions, poll/net/unix/signal/term modules, sc82 design, poll rows and ledger, wolf-std issues 144 and 147, and the runtime contracts before implementation.
+Base: wolf-std be1d10fa. Development toolchain built from the fixed wolf-lang ead70b82 checkout: wolf 0.2.39+dev.unknown, compiler sha256 83582d8b0b41f02d44157100deb0a3610551e3c2efbc1cdffaa35b2b9253bcad, runtime ef762e9741bf37f3534e7f5a518ca97b91b0d198b4aab4145d4de5a744f62b8d. It is a development build, not a released pin. Final gates require released wolf 0.2.40 and lupin 0.1.62; the pins have not moved yet. Read the README, API conventions, poll/net/unix/signal/term modules, sc82 design, poll rows and ledger, wolf-std issues 144 and 147, and the runtime contracts before implementation.
 
 ## Prediction
 
@@ -32,7 +32,15 @@ Red first, before production edits: changed expectations at 47df969, measured wi
 
 The new surface rows were committed at 0251b33 before the wrappers. docs/sc83-witness/evidence/red-new-surface.log holds their red take (END red-new-surface exit=1). set_mutation, write_some and peer_credentials were fail(E0301) on checked/native. capacity reached run: registration_257=256, unchanged_after_refusal=false, then error invalid when re-adding the incorrectly inserted spare; both compiler tiers exited 1. The source at that commit and the original records are the evidence, not a later retake after changing the code.
 
-Implementation and additional row sources are in the branch. They remain UNVERIFIED against the new runtime while the development toolchain is queued. In particular no new-runtime green, current ledger classification, macOS serving result, Linux result, final gauntlet, plant red or PAX measurement is claimed.
+The first compiler-only Linux record at 7a831f1 had seven red cells: an unused import; the checked queue's step budget; two inferred-main error-return shapes declined natively; and the byte-list comptime probe on both compiler tiers. The ordinary row defects were fixed separately. The queue now bulk-materializes and compares an ASCII payload with a 251-byte period, still 1 MiB and under the SAME checked step budget.
+
+The fresh record at 7d8002a has 20 of the 21 rows satisfied on BOTH checked and native Linux, including all four retired refusals, the mixed six, simultaneous signals, hangup/error facts, 256/257 capacity, persistent-set mutation/close, partial sends, the 1 MiB slow-reader queue, same-process and native forked Unix credentials. Checked's forked-client row explicitly SKIPs its fork; the same-process row actually measures checked credentials. The remaining two red cells are the one byte-list comptime probe (below). This is not a green gauntlet.
+
+The compiler-only plant sc83-plant-candidate at 0c3fb86, based on 7a831f1, reintroduces the mixed refusal in one file/hunk. Its preflighted record is verified red by the exact one_waiter token on both compiler tiers. The record paths and digests are in the handoff; raw records contain machine paths and are not copied into public prose.
+
+The byte-list comptime prediction MISSED: net/comptime_refuses_write_some expected fail(E0701), but both compiler tiers refuse List construction at resolve, by name, before net_write_some can be evaluated. No claim that this source measured the builtin's D33 barrier is justified. A decision is pending whether to retain the source with that honest compiler posture, or omit the unisolatable probe and document the gap. Nothing is silently marked green or reclassified in the ledger.
+
+No lupin 0.1.62, macOS serving-tier, released-pin full-gauntlet, audit or PAX result is claimed. For macOS, wait for the published wolf 0.2.40 instead of doing a duplicate compiler build.
 
 ## Expected tier postures (not measurements)
 
@@ -44,7 +52,7 @@ The 21-row surface runner is docs/sc83-witness/rows.py. It is independent of the
 - net/write_some: all three execute, including the empty/4096-byte/busy/count/closed and bad-handle rows, without using std.poll.
 - net/unix/peer_credentials: checked/native execute; lupin refuses net_peer_cred at run.
 - net/unix/peer_credentials_child: native executes the different-pid client. Checked reports os_fork's unsupported error row, with a loud SKIP (not a fork measurement); the same-process credential row covers checked. lupin refuses os_fork at run. No different-uid client is claimed.
-- write_some_invalid_row: all three must satisfy fail(E0401), not reach a send. The three comptime rows must satisfy fail(E0701).
+- write_some_invalid_row: all three must satisfy fail(E0401), not reach a send. The three comptime rows were initially predicted to satisfy fail(E0701); the byte-list exception measured above is unresolved, not waived.
 
 Windows retains the narrow socket-read and no-meaning empty deadline paths. The wide/Unix/pty rows either check the host's actual unsupported row or explicitly print SKIP with its reason on stderr. A SKIP is not a serving-tier measurement. The runner checks named run refusals and does not turn them into caught unsupported marks or golden stdout.
 
