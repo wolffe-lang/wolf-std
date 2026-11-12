@@ -1,9 +1,15 @@
 //! check: fail(E0701)
 //! phase: typecheck
-//! conforms: std.net, comptime.sandbox, comptime.sandbox.net
+//! conforms: std.net, comptime.sandbox, comptime.sandbox.net, type.list.lit.value
 //!
-//! sc83: even an empty non-parking send reaches the net capability and
-//! is refused at comptime before its handle or buffer is inspected.
+//! sc83: fail(E0701) is the normative check IF the send is reached.
+//! Compiler posture: unsupported at resolve, by name: `List` construction
+//! at comptime. A List cannot be constructed by this edition's scalar
+//! evaluator, so a builtin taking one is unreachable there. This source
+//! has NOT measured net_write_some's own comptime barrier.
+//! See [type.list.lit.value] and wolf-lang#101; keep the named posture
+//! until container construction is supported. Measure lupin at 0.1.62,
+//! rather than inferring its answer from either compiler tier.
 
 comptime fn probe() -> int ! {busy, closed, invalid, io} {
     net_write_some(-1, List[byte]())

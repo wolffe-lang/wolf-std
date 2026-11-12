@@ -68,6 +68,22 @@ def key(line):
     return re.split(r"=|: ", line, maxsplit=1)[0]
 
 
+def expected_refusal(test, lane, windows=False):
+    if test == "net/comptime_refuses_write_some.lu" and lane in ("wolfc", "native"):
+        # [type.list.lit.value], current-edition scalar CTFE: argument
+        # construction fails before the send's own comptime barrier.
+        return "resolve", "`List` construction at comptime"
+    if lane == "lupin" and test in REFUSALS and not (windows and test in WINDOWS_RUN):
+        return "run", f"`{REFUSALS[test]}`"
+    return None
+
+
+def matches_refusal(record, phase, named):
+    reason = record.get("x-unsupported") or record.get("x-unsupported-construct") or ""
+    return (record.get("verdict") == "unsupported" and record.get("phase_reached") == phase
+            and named in reason and not record.get("warnings"))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("rows", nargs="*")
@@ -108,17 +124,15 @@ def main():
                 continue
             for line in p.stderr.splitlines():
                 print(f"  {label} stderr: {line}", flush=True)
-            refused = lane == "lupin" and test in REFUSALS
-            if os.name == "nt" and test in WINDOWS_RUN:
-                refused = False
-            if refused:
+            refusal = expected_refusal(test, lane, windows=os.name == "nt")
+            if refusal is not None:
+                phase, named = refusal
                 reason = record.get("x-unsupported") or record.get("x-unsupported-construct") or ""
-                named = REFUSALS[test]
-                if record.get("verdict") != "unsupported" or record.get("phase_reached") != "run" or f"`{named}`" not in reason or record.get("warnings"):
-                    print(f"FAIL {label}:refusal expected run refusal naming `{named}`, got {record}", flush=True)
+                if not matches_refusal(record, phase, named):
+                    print(f"FAIL {label}:refusal expected {phase} refusal naming {named}, got {record}", flush=True)
                     failures += 1
                 else:
-                    print(f"  PASS {label}: unsupported at run by name: {reason}", flush=True)
+                    print(f"  PASS {label}: unsupported at {phase} by name: {reason}", flush=True)
                 continue
             if record.get("verdict") != verdict:
                 print(f"FAIL {label}:verdict want {verdict}, got {record}", flush=True)
