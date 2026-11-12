@@ -37,7 +37,7 @@ fn pax_ready() -> () ! {entropy_unqualified} {
 /// Capability `env`; refused at comptime. No traps on this path.
 ///
 /// ```wolf-doc-example
-/// random.require_ready()?
+/// random.require_ready() else |entropy_unqualified| { }
 /// ```
 pub fn require_ready() -> () ! {entropy_unqualified} {
     let platform = os_name()
