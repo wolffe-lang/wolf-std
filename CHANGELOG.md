@@ -2,7 +2,22 @@
 
 ## Unreleased
 
-**One wait (sc82): `std.poll`.** A server that owns pty masters, pipes, a
+**The runtime-backed wait (sc83), targeting wolf 0.2.40 / lupin 0.1.62.**
+Implementation and row drafts; the new-runtime measurements and pin move
+are still pending.
+
+- `std.poll` lazily owns a readiness set, one wait for files, sockets and
+  meanings together, real `HANGUP`/`ERROR` facts, no sweep of narrow waits.
+  At most 256 entries per waiter; the 257th registration is `io` without
+  changing it. `modify` and `remove` keep their existing error rows.
+- `net.write_some` makes one non-parking send and counts the bytes taken,
+  or answers `busy`; `unix.peer_credentials` reports a connected Unix
+  peer's pid and effective user/group ids. macOS reports pid -1 after
+  peer close. The Windows narrow socket-read fallback is retained.
+- The prediction, red-first evidence and remaining gates are in
+  `docs/sc83-poll-on-the-one-wait.txt`.
+
+**One wait (sc82), at wolf 0.2.39: `std.poll`.** A server that owns pty masters, pipes, a
 listener and its clients, a timer and signals waits in one place and
 learns of every ready handle, so no busy handle starves the rest.
 
