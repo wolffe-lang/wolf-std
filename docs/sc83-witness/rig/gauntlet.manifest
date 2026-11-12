@@ -1,0 +1,23 @@
+# Final released-pin take. The caller runs --keep-going and --preflight.
+floor 35
+rig lib.sh committed=../../..:HEAD:docs/sc83-witness/rig/lib.sh
+rig step.sh committed=../../..:HEAD:docs/sc83-witness/rig/step.sh
+rig gauntlet.manifest committed=../../..:HEAD:docs/sc83-witness/rig/gauntlet.manifest
+rig ../rows.py committed=../../..:HEAD:docs/sc83-witness/rows.py
+rig ../test_rows.py committed=../../..:HEAD:docs/sc83-witness/test_rows.py
+step row-runner-unit image=localhost/r41-toolchain:1 tools=python3 script=step.sh -- row-unit
+step toolchain image=localhost/r41-toolchain:1 tools=python3,git,sha256sum script=step.sh -- toolchain
+step sc83-rows needs=toolchain image=localhost/r41-toolchain:1 tools=python3,sh,sleep script=step.sh -- rows
+step fmt image=localhost/r41-toolchain:1 script=step.sh -- cargo fmt --all --check
+step clippy image=localhost/r41-toolchain:1 script=step.sh -- cargo clippy --workspace --all-targets -- -D warnings
+step test image=localhost/r41-toolchain:1 script=step.sh -- cargo test --workspace
+step sync-pin image=localhost/r41-toolchain:1 tools=git script=step.sh -- xtask sync-pin
+step doctor image=localhost/r41-toolchain:1 script=step.sh -- xtask doctor
+step ledger-check image=localhost/r41-toolchain:1 script=step.sh -- xtask ledger-check
+step lint-conventions image=localhost/r41-toolchain:1 script=step.sh -- xtask std-test --lint-conventions
+step fmt-lu image=localhost/r41-toolchain:1 script=step.sh -- xtask fmt-lu
+step gen-vectors image=localhost/r41-toolchain:1 script=step.sh -- xtask gen-vectors --check
+step time-oracle image=localhost/r41-toolchain:1 tools=date script=step.sh -- xtask time-oracle
+step ulp image=localhost/r41-toolchain:1 script=step.sh -- xtask ulp
+step std-test image=localhost/r41-toolchain:1 script=step.sh -- xtask std-test
+step doc-examples image=localhost/r41-toolchain:1 script=step.sh -- xtask doc-examples
