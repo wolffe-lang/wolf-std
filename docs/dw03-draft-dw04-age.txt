@@ -1,0 +1,170 @@
+DRAFT — Ordinary age v1 codec in denward
+
+Status: proposed follow-on contract, not authorization to implement or release.
+Recommended home: an internal denward module, not a new std public API.
+Start only after the location decision and the primitive/randomness contracts
+are approved. Record the actual public repository base when launching.
+
+Forbidden
+
+No new cryptography. Implement the published binary age v1 X25519 profile
+exactly. No armor, plugins, SSH recipients, scrypt, hybrid/PQ recipients,
+threshold recovery, custom AAD, altered labels, reduced tags, random chunk
+nonces, extra envelope, append/resume or rewrap-in-place. Defer other recipient
+profiles through explicit unsupported outcomes, not weakened constructions.
+Never read any external cryptographic implementation source. Use published
+specifications and vector files as data; reference tools are binaries only.
+Never use real identities, secrets in argv/environment/logs, deterministic
+production entropy, plaintext spools, or a partial decrypt as backup success.
+
+Inputs verified
+
+At launch record the approved std/compiler/runtime heads, archive and binary
+SHA-256 values, their versions, and the primitive qualification record paths.
+They are an indivisible review set; a later pin or code edit requires retakes.
+Freeze exact codec API names from the reviewed std change, not this draft.
+Do not duplicate raw-base64 or Bech32 inside denward.
+
+Use C2SP/C2SP age.md at fc7f312aff098ed080f3dd5a3da4fd820be17a2e,
+SHA-256 b0a767b91a184c536e8a04002f7bba7521388fee3989f5891e23cc1aaa00232f,
+RFCs 7748/5869/2104/8439/4648 and BIP-173. Pin a published age vector-data
+revision and inventory every relevant case. Fetch no generator or reference
+implementation source. Pin reference binaries by release and digest, and use
+explicit native X25519 recipients rather than a changing tool default.
+
+Do not call baseline PAX randomness for creation or key generation. Use only
+the approved ready-or-named-error std contract against the qualified PAX ABI.
+Keep the pending platform call behind one function; fail unqualified while it
+is pending. Deterministic decryption has no entropy prerequisite. Test-only
+entropy injection is not exported by a production entry point.
+
+Prediction
+
+Before code, commit the exact transcript, key-derivation, stanza, nonce,
+chunk/final/EOF and error expectations, caps and test names. Predict every
+published vector as valid/invalid/unsupported/out-of-budget. Commit failing
+published-vector or rejection rows before the code that changes their result.
+
+Implementation sequence:
+
+1. Key text. Use std's BIP-173 codec. Native recipients use HRP age;
+   identities use AGE-SECRET-KEY- for presentation. Accept only wholly lower
+   or wholly upper case according to the specification; checksum over the
+   lowercase form. Require exactly 32 decoded bytes and canonical conversion
+   padding. Do not accept Bech32m, another HRP or another recipient profile.
+   Never include identity text or secret bytes in an error.
+2. Bounded raw header parser. Preserve original header bytes through and
+   including --- for the HMAC transcript. Do not parse/re-encode that
+   transcript. Enforce exact version, LF and spaces, strict unpadded standard
+   base64, and 64-column body lines ending in a line shorter than 64. Parse
+   unknown valid stanzas and preserve them in the MAC; never execute them.
+   Malformed supported X25519 stanzas are errors, not unknown recipients.
+   Validate exactly two X25519 arguments, a 32-byte ephemeral share and a
+   32-byte body before trying unwrap. Retain scrypt exclusivity rejection
+   even though deriving a scrypt recipient is outside this release.
+3. X25519 wrapping. Fresh 16-byte file key per file and fresh 32-byte scalar
+   per stanza/file. Compute E = X25519_base(scalar), S = X25519(scalar,R),
+   refuse zero. HKDF-SHA-256(salt=E||R, ikm=S,
+   info=age-encryption.org/v1/X25519, length=32). Use std AEAD with twelve
+   zero nonce bytes, empty AAD, and the 16-byte file key. No altered salt,
+   label, length or encryption construction. Distinct recipients independently
+   wrap the same file key; recovery is OR, not two-factor authentication.
+4. Header HMAC. Derive H with HKDF-SHA-256(empty salt, F, header, 32).
+   Authenticate the exact original bytes through ---, excluding its following
+   space and MAC text. Strictly decode and compare the entire 32-byte tag
+   through the approved shared comparison; never ordinary list equality.
+   No payload plaintext is released before header authentication.
+5. Payload. Fresh 16-byte payload nonce, deriving P with
+   HKDF-SHA-256(salt=nonce, ikm=F, info=payload, length=32). Chunks carry at
+   most 65536 plaintext bytes plus the full 16-byte AEAD tag, empty AAD,
+   nonce=11-byte big-endian counter||final-byte. Counter starts at zero;
+   final-byte is 0 or 1. Empty input has one empty final chunk; nonempty
+   input cannot have an empty final chunk. An exact multiple ends with a
+   full final chunk, not an extra empty chunk. One-byte or one-chunk
+   lookahead distinguishes final input without unbounded buffering.
+6. Decryption. Buffer a complete ciphertext chunk/tag and authenticate before
+   exposing its plaintext. Short reads are not EOF. Require a successfully
+   authenticated final chunk and immediate EOF; reject appended bytes or a
+   second concatenated file. Fail before counter/accounting overflow. An
+   authenticated prefix may reach an internal sink but is never a complete
+   backup, verified archive or authorization to restore a target.
+7. Lifetimes. Bound a per-chunk region and trace key/ciphertext/plaintext
+   copies, including errors. Record actual RSS at two large stream sizes in
+   a memory-capped Linux container, with a small parent for rusage. Regions
+   are allocation lifetimes, not secret erasure; do not claim wiping, mlock,
+   swap exclusion or dump protection absent separate qualified support.
+
+The intended resource profile, subject to the approved downstream contract:
+1 MiB total raw header, 64 stanzas/identity attempts, 4096 bytes per argument
+line, signed-64 byte accounting and 256 MiB total process RSS for X25519.
+Validate before allocation/KDF work. Exceeding a cap is a named refusal, not
+a panic or implicit policy downgrade. Do not treat these bounds as universal
+age-format maxima. Do not silently alter an approved cap or error taxonomy.
+
+Evidence index
+
+Each record must identify exact source and toolchain heads, target/backend,
+binary digests, image digest, step script hashes, timeout/memory/output caps,
+skips and every END line. Read exit statuses, not a pipeline's final command.
+Run host preflight alone before queueing the one prepared Linux take. Build
+from committed snapshots, never a live tree. Follow the launching contract's
+host locks, CPU limits, disk/memory floors and long-job hand-back rules.
+
+Required named test groups:
+
+* Published primitive regressions at the implementation pins, with checked,
+  native and per-file lupin posture. Do not relabel budget refusals passes.
+* Published binary-X25519/header/HMAC/STREAM vector inventory. Compare full
+  success plaintext hashes and expected authenticated-prefix behavior on
+  failure. Distinguish unsupported profiles and declared resource limits.
+* Black-box reference interoperability in both directions on Linux and
+  macOS, then both directions involving PAX. Explicit native X25519 profile,
+  two independent test recipients, wrong identity and each OR recovery path.
+  Empty/1/65535/65536/65537/131072-byte/all-byte/ragged streams. Reference
+  exit 0 must cover the entire output; round trips with only one tool do not
+  prove interoperability. Container has no host secrets or network.
+* MAC/tag mutation at every position; AAD/ciphertext/nonce/header mutations;
+  zero agreement; malformed known stanzas including a malformed stanza
+  alongside a usable one. A sink spy observes zero bytes from the failed
+  chunk and no restore-target writes before whole-stream verification.
+* Truncation at every framing seam, missing/falsified final state, dropped,
+  duplicated, swapped or spliced chunks, and appended data/second files.
+  Exact-multiple and empty cases are mandatory. Do not interpret an
+  authenticated prefix or a successful final filesystem write as success.
+* Parser/codec grammar and mutation tests under fixed allocation/output/time
+  limits on Linux. Include huge lines, caps one below/at/above, CRLF,
+  NUL/high bytes, residual bits, malformed unknown stanzas and exact newline
+  boundaries. Record coverage/time/seed and minimized counterexamples.
+* Provider unqualified/unavailable, zero-progress/partial/error and
+  interruption injection, showing no ciphertext publication and no fallback.
+  Secrets remain outside argv/environment/stdout/stderr/JSON/logs and test
+  failure messages. Measure lifetimes; do not log samples or keys.
+* Repeated 64 KiB AEAD and key-derivation lifecycle within the declared
+  memory cap; independent chunk counter-boundary/overflow seam tests without
+  shrinking the production counter or writing impossible volumes.
+
+One off-line plant must fail by a named published vector or rejection row;
+choose an omitted-final validation or canonical-decoding defect. Keep it off
+the implementation branch. A green test harness that never detected its
+intended defect is not a qualified gate. No waiting on hosted CI: read its
+status once after a push and hand the watch back.
+
+Done-when
+
+Open PR at the labelled, locally qualified head, with five sections, a
+Footprint line, exact pin set, records/digests/END lines, and plant red by
+name. The independent review is a separate lane, not the implementing lane's
+self-check. Its reviewer independently reconstructs the stanza/transcript/
+nonce/final/EOF checklist from the specification, reads the exact code and
+selected generated machine code, checks primitive arguments and lifetimes,
+and reproduces a hostile-file row plus both interop directions with its own
+expected outcomes. Any code/pin change invalidates affected earlier evidence.
+
+This codec PR is not backup-release authorization. Integration still owes
+ciphertext-only creation, durable publication, full-archive preflight before
+restore mutation, a trusted ciphertext receipt, and an independently retained
+recovery-key rehearsal. Anybody with a public recipient can encrypt to it:
+age is not backup-author authentication or freshness/rollback protection.
+No formal proof, professional audit, FIPS certification, universal constant
+time, perfect erasure, post-quantum protection, whole-system encryption or
+resistance to a compromised kernel/recovery endpoint is claimed.
