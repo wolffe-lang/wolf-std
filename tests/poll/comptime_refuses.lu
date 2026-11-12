@@ -1,0 +1,16 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.poll, comptime.sandbox
+//!
+//! sc83: readiness-set acquisition is an exec capability, not comptime
+//! state. Probe the builtin, as the existing capability rows do.
+
+comptime fn probe() -> int ! {io, unsupported} {
+    os_ready_open()
+}
+
+fn main() -> !int {
+    const SET = probe() else -1
+    print("{SET}")
+    0
+}
