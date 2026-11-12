@@ -1,0 +1,25 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.x.crypto.curve25519, err.row
+//!
+//! RFC 7748 section 5: every noncanonical u in p..2^255-1 is reduced mod p.
+use std.hex
+use std.bytes
+use std.x.crypto.curve25519
+
+fn main() -> int {
+    let scalar = hex.decode("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4") else List[byte]()
+    for i in 0..19 {
+        var canonical = List[byte]()
+        (mut canonical).push(i as byte)
+        for _ in 0..31 { (mut canonical).push(0 as byte) }
+        var large = List[byte]()
+        (mut large).push((237 + i) as byte)
+        for _ in 0..30 { (mut large).push(255 as byte) }
+        (mut large).push(127 as byte)
+        let a = curve25519.x25519(scalar, canonical) else |zero| { List[byte]() }
+        let b = curve25519.x25519(scalar, large) else |zero| { List[byte]() }
+        assert(bytes.is_equal_fixed_work(a, b))
+    }
+    0
+}
