@@ -5547,11 +5547,11 @@ wolfc = "run"
 native = "run"
 
 # `child()` during a wait, and a pending meaning before a ready file.
-# lupin refuses `os_signal_listen` by name; windows prints the lines for
-# the listen's `io`.
+# lupin never listens: it refuses `os_signal_listen` by name on every host
+# (`signal/heard.lu`'s cell). windows prints the lines for the listen's
+# `io`.
 [tests."poll/signal_during_wait.lu"]
 lupin = "unsupported"
-lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
