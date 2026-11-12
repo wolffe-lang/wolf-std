@@ -291,6 +291,13 @@ pub struct Wake {
 /// meaning, reading the file `ready` names, and ending an escape
 /// sequence when neither came. From wolf 0.2.35 an element may wait for a
 /// write instead (`WAIT_WRITE`, s254).
+///
+/// **The narrow form** (sc82): it answers the lowest ready file alone, so
+/// a loop that serves what it answers starves the files after a busy one
+/// unless it rotates the list itself, and it takes no socket. `std.poll`
+/// is the wide form: an owned waiter over files and sockets that answers
+/// every ready entry, with its facts, and a meaning, built over this call.
+/// This call is unchanged.
 pub fn wait_fds(files: List[fs.File], set: int, deadline_ms: int) -> Wake ! {
     invalid,
     io,
