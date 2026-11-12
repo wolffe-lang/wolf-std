@@ -78,7 +78,9 @@ fn wait_row(mut w: poll.Waiter, meanings: int, deadline: int) -> str {
 
 fn main() -> !int {
     let windows = os_name() == "windows"
-    if windows { eprint("SKIP poll/waiter_rows: wide waits unsupported on this host; checking refusal rows") }
+    if windows {
+        eprint("SKIP poll/waiter_rows: wide waits unsupported on this host; checking refusal rows")
+    }
     var w = poll.open()?
     print("open_len={poll.len(w)}")
     fs.write_text("sc82-waiter.tmp", "x")?

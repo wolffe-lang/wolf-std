@@ -37,7 +37,9 @@ fn main() -> !int {
     let extra = if os_name() == "macos" then poll.HANGUP else poll.ERROR
     print("pipe_end={ev.ready.len == 2 && read_facts == (poll.READ | poll.HANGUP)}")
     print("pipe_error_as_host={write_facts == (poll.READ | poll.WRITE | extra)}")
-    print("all_interests_kept={(write_facts & (poll.READ | poll.WRITE)) == (poll.READ | poll.WRITE)}")
+    print(
+        "all_interests_kept={(write_facts & (poll.READ | poll.WRITE)) == (poll.READ | poll.WRITE)}",
+    )
     poll.remove(mut w, kr)?
     poll.remove(mut w, kw)?
     poll.close(take w)?

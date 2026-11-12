@@ -88,11 +88,11 @@ fn main() -> !int {
     while (at < total || received < total) && turns < 10000 {
         let ev = poll.wait(mut w, 0, 2000)?
         for r in ev.ready {
-            if r.key == kw && (r.facts & poll.WRITE) != 0 && at < total {
+            if r.key == kw && r.facts & poll.WRITE != 0 && at < total {
                 let n = send(mut writer, suffix(q, at))?
                 if n > 0 { at = at + n }
             }
-            if r.key == kr && (r.facts & poll.READ) != 0 && received < total {
+            if r.key == kr && r.facts & poll.READ != 0 && received < total {
                 time.sleep(time.millis(1))
                 let b = net.read_bytes(mut reader, 4096)?
                 for c in b {

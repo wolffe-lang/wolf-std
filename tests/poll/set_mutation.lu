@@ -69,7 +69,9 @@ fn main() -> !int {
     let kw = poll.add_file(mut w, write, poll.READ)?
     poll.modify(mut w, kw, poll.WRITE)?
     let changed = poll.wait(mut w, 0, 0)?
-    print("modified={changed.ready.len == 1 && changed.ready[0].key == kw && changed.ready[0].facts == poll.WRITE}")
+    print(
+        "modified={changed.ready.len == 1 && changed.ready[0].key == kw && changed.ready[0].facts == poll.WRITE}",
+    )
     poll.remove(mut w, kw)?
     let removed = poll.wait(mut w, 0, 0)?
     print("removed={removed.ready.len == 0}")
@@ -79,7 +81,9 @@ fn main() -> !int {
     // The runtime removes a closed handle before closing the descriptor.
     // The remaining read end answers READ|HANGUP, never the closed key.
     let after = poll.wait(mut w, 0, 0)?
-    print("closed_handle_removed={after.ready.len == 1 && after.ready[0].key == key && after.ready[0].facts == (poll.READ | poll.HANGUP)}")
+    print(
+        "closed_handle_removed={after.ready.len == 1 && after.ready[0].key == key && after.ready[0].facts == (poll.READ | poll.HANGUP)}",
+    )
     poll.close(take w)?
     fs.close(take read)?
     0

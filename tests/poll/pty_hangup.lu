@@ -71,7 +71,9 @@ fn main() -> !int {
     var w = poll.open()?
     let km = poll.add_file(mut w, m, poll.READ)?
     let first = poll.wait(mut w, signal.resize(), 5000)?
-    print("first_wait_read={first.ready.len == 1 && first.ready[0].key == km && (first.ready[0].facts & poll.READ) != 0}")
+    print(
+        "first_wait_read={first.ready.len == 1 && first.ready[0].key == km && (first.ready[0].facts & poll.READ) != 0}",
+    )
     // Read until the relay's end: the child's byte, then the end row.
     var got = ""
     var end = "none"
