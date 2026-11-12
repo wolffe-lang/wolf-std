@@ -72,7 +72,169 @@ Evidence index
 
 At this prediction commit: source and document reading only. No baseline take,
 vector run, assembly review, platform measurement, gauntlet, plant, push or PR.
-The audit and follow-on draft will be added as separate documentation chunks.
+The audit and follow-on draft are documentation-only follow-up chunks below.
+
+Audit at the base (source reading, not qualification)
+
+Primitive | Existing function | Published-vector coverage recorded | Gap and disposition
+X25519 | curve25519.x25519_base / x25519 ! {zero} | RFC 7748 section 5.2 two evaluations, section 6.1 agreement, 1/1000-iteration checkpoints; 518 Wycheproof cases recorded by the nursery register | Secret-output misclassification and a branch on each output byte. Plan OR fold plus secrecy correction, committed red first; implementation not started.
+HKDF-SHA-256 | sha2.hkdf256 / hkdf256_extract / hkdf256_expand | RFC 5869 A.1-A.3 assert PRK, OKM and one-call equality; 83 valid SHA-256 Wycheproof cases recorded | age's extract-then-expand n=32 path matches the source construction; no output bug established on that path. Re-run, add exact age-argument integration witnesses downstream, and correct the expand PRK wording; no security qualification yet.
+HMAC-SHA-256 | sha2.hmac256 | RFC 4231 cases 1-7; case 5 checks only its published 128-bit truncation, others full-width; 131-byte keys in cases 6/7 | The existing public generic comparison is in tls.handshake.ct_eq, not a shared byte module. A new shared home is a public-surface decision. No primitive-output fix established.
+ChaCha20-Poly1305 | chacha20.seal / open ! {tag} | RFC 8439 worked examples and A.1-A.5 (28 vectors recorded); Wycheproof 256 valid and 60 invalid, nine invalid nonce sizes outside the calling contract | open already folds all 16 bytes and returns tag before stream_xor. Existing negative rows observe returned values, not computation/erasure or every mismatch position. Add behavior/code inspection and position matrix; retract blanket timing claims only with approved wording.
+
+Source citations and quoted gaps:
+
+* std/x/crypto/curve25519/curve25519.lu:914-915 says "the reject-on-zero
+  test is on the PUBLIC output." Lines 943-951 repeat "public output"
+  and implement `if !(v as int == 0)` inside the byte loop. This is secret
+  material: the only intentional disclosure is the final all-zero verdict,
+  not the pattern of zero bytes. RFC 7748 section 6.1 describes an OR of all
+  bytes; section 5.1 separately warns that fixed field-operation sequences
+  do not eliminate all side channels. This finding is from the function's
+  source; no machine-timing exploit has been measured.
+* The curve module header at lines 7-10 says both curves "are constant-time
+  by construction in portable code"; its signing path is explicitly outside
+  this audit. X25519's arithmetic cswap is fixed-looking source, not a
+  machine-code certificate. Checked arithmetic, runtime representation,
+  division instructions and optimizer behavior still require pinned review.
+* std/x/crypto/chacha20/chacha20.lu:7-8 says its "constant-time story is true
+  by construction in portable code"; lines 93-101 conclude there is "no
+  value-dependent branch anywhere". Source control flow does not warrant a
+  claim about all generated instructions or all execution tiers. The native
+  default/release binaries and checked/lupin runtimes have not been reviewed
+  here. The source of open at lines 792-819 does verify before decryption;
+  that is narrower than an assertion of no possible plaintext leakage.
+* tests/x/crypto/chacha20/flipped_tag_row.lu mutates the last tag byte of
+  the RFC 8439 section 2.8.2 example and asserts an empty fallback; the
+  truncated_box_row also observes the tag row. Neither proves no internal
+  plaintext computation, no residual copies, or full-stream completeness.
+* std/x/crypto/sha2/sha2.lu:982-984 says PRK "must be at least one block's
+  worth of entropy per the RFC". RFC 5869 section 2.3 says "a pseudorandom
+  key of at least HashLen octets", normally Extract's output: 32 bytes for
+  SHA-256, not the 64-byte compression block, and not a claim that an API
+  can inspect entropy. The one-call age path always produces 32 bytes.
+  The standalone expand path constructs pads directly rather than invoking
+  hmac256's long-key reduction, so PRKs longer than 64 bytes warrant a
+  separate issue/test outside the selected age path; no such behavior was
+  measured or changed by this lane.
+* std/base64/base64.lu:24-31 distinguishes strict padded decode from the
+  lenient and URL variants. None is strict unpadded standard base64. Raw
+  encoding/decoding is to live in this module, not in a downstream copy.
+  Bech32 is absent. Its generic checks and byte conversion must remain
+  separate: a valid checksum does not guarantee canonical 32-byte key data.
+
+Existing per-file posture (historical ledger, not new passes):
+
+* rfc4231_hmac, rfc5869_hkdf, x25519_rfc7748_s52,
+  x25519_rfc7748_s61_dh, reject_zero_row, all rfc8439_a* rows,
+  flipped_tag_row and truncated_box_row: lupin/checked/native = run/run/run.
+* hkdf256 full Wycheproof: run/unsupported/run; smoke: run/run/run.
+* X25519 1000-chain, shared Wycheproof parts 1-12 and full zero corpus:
+  unsupported/unsupported/run. Part 13 and both smoke files: run/run/run.
+* ChaCha20-Poly1305 full valid/invalid parts and smoke files:
+  run/run/run. No capacity skip is counted as a measured pass.
+
+Random-byte contract blocker
+
+The public specification at the pinned wolf commit, spec/11-os.md section 2,
+provides os_random(int) -> List[int]. Its platform contract is Linux
+getrandom(flags=0), continuing short reads and EINTR; macOS getentropy in
+256-byte chunks. These are specification statements, not a new inspection
+of runtime or OS implementation code. std.rand itself remains seeded PCG32
+and explicitly says "It is NOT cryptographically secure" (lines 21-23).
+
+[os.random.trap] states: "Failure is a TRAP, never a silent fallback" and
+"There is deliberately NO error row on this surface". [os.random.sole]
+requires every cryptographic byte source to bottom out in os_random. The
+trap is assert and is not catchable as an error row (API-CONVENTIONS section
+13; spec/05 [conf.trap.exit]). A std wrapper can narrow the successful
+List[int] to List[byte], but cannot turn unavailable/unqualified readiness
+into distinct named errors. Testing success or prechecking a platform name
+cannot repair this loss of information. Calling a device or foreign function
+instead would evade [os.random.sole], and would not settle PAX readiness.
+
+Approval required, not implemented:
+A. Add an upstream recoverable sibling primitive, preserving os_random's
+   existing trapping behavior. Its approved contract distinguishes invalid
+   request, unqualified provider and unavailable provider, guarantees all-or-
+   error delivery, and forbids fallback. std wraps it as byte values and
+   keeps one PAX adapter pending the final kernel ABI. Recommended.
+B. Change os_random itself to return rows. This changes a ruled language
+   surface and existing callers; require a separate compatibility decision.
+C. Keep the trapping builtin and weaken the requested std surface. This
+   does not meet the named-error acceptance gate; not recommended.
+
+Do not emulate recovery by catching a proc fault or translating every assert
+into entropy_unavailable: allocation, programming errors and provider failure
+would be conflated, and provider qualification still could not be observed.
+Until the approved PAX call exists, a PAX adapter must refuse
+entropy_unqualified without trying its legacy successful random-byte path.
+No guessed flag, device, capability filename or errno is proposed here.
+
+Shared comparison and claim approval required
+
+std.x.tls.handshake.ct_eq already exists publicly (lines 635-656). It returns
+false for unequal public lengths and unconditionally folds XOR differences
+for equal lengths. This corrects the earlier assumption that no public helper
+exists. Do not create a second implementation merely because its current
+home is inconvenient.
+
+A. Add one shared pure byte comparison, provisionally
+   bytes.is_equal_fixed_work(a, b), and route the selected AEAD path and
+   future age header MAC through it, preserving TLS's existing public entry
+   if that entry is later delegated in its own scoped change. This adds a
+   public API beyond the two codecs and random surface. Recommended only
+   after approval. Document equal/public lengths, every-byte accumulation,
+   and the fact that source fixed work is not universal constant time.
+B. Keep the existing public ct_eq and couple age/AEAD to a TLS handshake
+   module. No new public function, but an unrelated nursery dependency and
+   larger review/import surface. Not recommended.
+C. Duplicate private comparison loops in consumers. Small immediate diff,
+   but multiple owners and no single selected-path obligation. Not recommended.
+
+Proposed claim boundary for approval: a source-level no-early-exit byte fold,
+with behavior rows and separately identified default/release generated-code
+observations at exact pins. No universal fixed-time guarantee, no timing
+certificate for lupin or checked execution, and no claim that arithmetic
+operation counts prove instruction latency or secret erasure. Existing
+security overclaims should be reduced, not replaced with another guarantee.
+
+Where the age codec should live
+
+A std module would let multiple tools share one format implementation, but
+requires a new public streaming/error/resource API and a resolution of the
+nursery dependencies. Its independent reviewer must read the std revision
+plus compiler/runtime pins; a std release and consumer pin bump accompany
+format fixes. Neither nursery status nor std's gates replaces that reading.
+
+An internal denward module keeps the format and its resource-admission API
+next to the only current consumer, without expanding std or graduating its
+crypto residents. Generic text codecs and random-byte adaptation remain std's
+single-owned reusable parts. denward pins the reviewed std/compiler/runtime
+set, and its independent reviewer reads both that exact set and the complete
+format implementation. A later second consumer can motivate extraction by a
+separate surface decision. Recommend the internal denward module, conditional
+on approval; no format implementation was written here.
+The draft is docs/dw03-draft-dw04-age.txt. Both locations still require the
+same independent hostile-input and interoperability evidence before use.
+
+Document pins and limits
+
+age specification: C2SP/C2SP fc7f312aff098ed080f3dd5a3da4fd820be17a2e,
+age.md SHA-256 b0a767b91a184c536e8a04002f7bba7521388fee3989f5891e23cc1aaa00232f.
+BIP-173: bitcoin/bips b34d9f751791d4feb22feff4f2ed00bcac83961b,
+bip-0173.mediawiki SHA-256 b19eab06b264bbd15ad7f7d640fa34de8f4a8809fba8a6ecc3e165545b27a543.
+Both the moving and immutable BIP document downloads matched; only the
+specification document, not repository implementation files, was fetched.
+The RFCs came from rfc-editor.org/rfc/rfcNNNN.txt. These inputs are not test
+results. No external implementation source, including referenced libraries
+in the RFC bibliography, was followed or read.
+
+README was read against this documentation-only change and remains current:
+module list, 656-test count, build instructions and newest-surface prose did
+not change. No compiler/runtime pin, module, ledger or CI file was edited.
+The .txt note and draft use the contract's text-file fallback under the
+file-writing restriction; no permission-system refusal occurred.
 
 Done-when
 
