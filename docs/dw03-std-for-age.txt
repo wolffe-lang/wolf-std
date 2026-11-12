@@ -1,0 +1,86 @@
+dw03 — Standard-library prerequisites for age v1
+
+Forbidden
+
+No new cryptographic construction, generator, cipher, recipient scheme or key
+format. Only the published age v1 specification, RFCs 7748, 5869, 2104, 4231,
+8439 and 4648, BIP-173, published vector data, and this library's own sources
+and tests are inputs. No external cryptographic implementation source was
+read. No changes to poll or net. No change to existing public signatures,
+semantics or security guarantees without approval beyond the two codecs and
+random-byte surface expressly requested.
+
+Inputs verified
+
+Base: be1d10fa2798cc6bc2a1fd0b2e559e283469c9bf.
+The binary pins in vendor/tools.toml are wolf 0.2.39, conforming to
+3fc86f77795afbbd6fbe483fef76c08e7f13a840, and lupin 0.1.61, conforming to
+5f1f1c949582f53121e4047bc83c86f23ff72240. No binary has yet been acquired or
+executed by this lane. The existing ledger has 656 test files. Its entries
+are historical posture records, not new execution evidence.
+
+Prediction
+
+Written before implementation. The RFC-vector outputs should not change.
+The selected one-call HKDF path produces a 32-byte PRK before expansion;
+HMAC's long-key reduction is already present. AEAD open already authenticates
+before calling stream_xor. The initial confirmed source changes needed are
+the X25519 zero check and the secrecy/timing documentation, not a replacement
+cipher or ladder.
+
+Expect a source-behavior inspection to reject is_zero_bytes: its per-byte if
+reads the shared secret. Replace it with an unconditional OR fold only after
+a committed red inspection row. Preserve the zero error and all RFC outputs.
+Test each nonzero-byte position and the all-zero input; the behavior row must
+also inspect executed control flow or generated code, since output equality
+alone cannot detect a branchy comparison. Source shape is not a timing proof.
+
+For AEAD, add rejection at every tag position using the published RFC 8439
+box, AAD/ciphertext mutation, empty plaintext, and every box length below 16.
+Assert the tag row and no returned plaintext. Separately inspect that the
+failure edge precedes decryption; a black-box rejection row cannot prove that
+plaintext was never computed internally. Preserve the published A.5 answer.
+
+For X25519, retain RFC 7748 section 5.2, section 6.1 and chain rows; add named
+rows for top-bit masking, scalar-clamp equivalence and all 19 noncanonical
+u-coordinates reduced modulo p, preserving the zero refusal. Full native
+Wycheproof/chain evidence is separate from checked/lupin smoke evidence.
+
+For base64, add encode_raw/decode_raw beside the padded pair; never change
+decode or use the lenient/URL profile. RFC 4648 section 10 vectors with the
+age-specified omitted padding must pass. Padding, whitespace, URL characters,
+non-ASCII, a one-character tail, and nonzero residual bits must return parse.
+Keep parsing linear and avoid repeatedly copying the unconsumed input.
+
+For Bech32, use the BIP-173 checksum, not Bech32m. Test its generic valid and
+invalid checksum strings, mixed case, invalid HRPs and characters. Pin the
+published age X25519 recipient and labelled test identity examples, exact
+32-byte decoded length, and zero/short conversion padding. The age document
+removes the data-part length limit; do not accidentally promise every age
+recipient profile from the two classical key examples. No secret input in an
+error or diagnostic. These encoders are not assumed fixed-time.
+
+For random bytes, expect no production fallback, deterministic seed or weak
+source. Linux uses initialized getrandom(flags=0); macOS uses getentropy in
+at most 256-byte calls. Short progress and EINTR belong at the OS adapter;
+zero progress and provider failure cannot be success. Keep the pending PAX
+adapter behind one function and refuse until its exact contract is available.
+The pinned os_random contract is trapping, so the named-error requirement
+needs an upstream contract decision before an implementation can be honest.
+
+Evidence index
+
+At this prediction commit: source and document reading only. No baseline take,
+vector run, assembly review, platform measurement, gauntlet, plant, push or PR.
+The audit and follow-on draft will be added as separate documentation chunks.
+
+Done-when
+
+Not met. Required after decisions: red-first fixes and codecs; random-byte
+adapter against an approved recoverable primitive; checked/native records on
+Linux and macOS at exact final pins, per-row lupin posture, default/release
+machine-code review, a named red plant, and independent second reading.
+No claim of cryptographic readiness, constant-time machine behavior, secure
+erasure or release authorization follows from this note.
+
+Footprint: notes
