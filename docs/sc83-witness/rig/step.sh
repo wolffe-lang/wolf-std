@@ -10,7 +10,7 @@ cd "$CO" || exit 2
 what=${1:?}
 shift
 case "$what" in
-    preflight)
+    preflight|release-preflight)
         bad=0
         [ "$IMAGE" = localhost/r41-toolchain:1 ] || { printf 'REFUSED manifest-image-mismatch\n'; bad=1; }
         [ -x "$P" ] || { printf 'REFUSED no-engine\n'; bad=1; }
@@ -21,6 +21,24 @@ case "$what" in
             command -v "$tool" >/dev/null || { printf 'REFUSED no-tool %s\n' "$tool"; bad=1; }
         done
         [ "$bad" -eq 0 ] || exit 75
+        if [ "$what" = release-preflight ]; then
+            wolf_version=$("$WOLF/wolf" --version) || exit 75
+            lupin_version=$("$LUPIN" --version) || exit 75
+            case "$wolf_version" in
+                'wolf 0.2.40 ('*) ;;
+                *) printf 'REFUSED released-wolf-0.2.40-required\n'; exit 75 ;;
+            esac
+            case "$lupin_version" in
+                'lupin 0.1.62 ('*) ;;
+                *) printf 'REFUSED released-lupin-0.1.62-required\n'; exit 75 ;;
+            esac
+            # A registry directory alone does not prove this lockfile's
+            # dependency manifests and sources are all available offline.
+            ctr cargo metadata --offline --locked --format-version=1 >/dev/null || {
+                printf 'REFUSED incomplete-offline-std-dependencies\n'
+                exit 75
+            }
+        fi
         printf 'preflight: engine, image, toolchain digests and offline registry checked\n'
         ;;
     toolchain)
