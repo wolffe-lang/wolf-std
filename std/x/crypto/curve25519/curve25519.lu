@@ -5,10 +5,11 @@
 //! Stability tier: x — the D53 crypto ladder's THIRD rung (campaign
 //! stdc-crypto, sprint sc18). Chosen before Weierstrass P-256 because
 //! both curves share one field, are specified in implementation-grade
-//! detail in their RFCs, and are constant-time by construction in
-//! portable code: the Montgomery ladder's swap is arithmetic selection,
-//! no S-boxes, no secret-indexed tables (the "no tables" thesis the
-//! ChaCha rung began). P-256's hardened ladder is a named D-question
+//! detail in their RFCs. X25519's source-level Montgomery ladder swap
+//! is arithmetic selection, with no secret-indexed tables. Source shape
+//! is not a fixed-time certification of generated code or runtime calls;
+//! review the exact backend/runtime pins separately. Ed25519 signing has
+//! the secret-bit branch documented below. P-256's hardened ladder is a named D-question
 //! for the rung that proves ACME demands it; the pinned local test CA
 //! speaks Ed25519.
 //!
@@ -911,8 +912,12 @@ fn pow2(n: int) -> int {
 /// Traps `assert` on a scalar or u-coordinate that is not 32 bytes (a
 /// caller contract violation); a non-byte element is a type error since
 /// sc35.
-/// ct: the ladder and cswap are constant-time by construction (see
-/// their headers); the reject-on-zero test is on the PUBLIC output.
+/// ct: the ladder and cswap have fixed source-level schedules (see
+/// their headers). The shared secret is CONFIDENTIAL, including at the
+/// zero check; its bytes are OR-folded without a per-byte branch. Only
+/// the final zero/nonzero verdict is disclosed. This is not a fixed-time
+/// certification of compiled code or of any interpreter/runtime tier.
+/// Do not log or hex-render a real shared secret; examples use test keys.
 ///
 /// Diffie-Hellman — two parties reach the same shared secret. This
 /// example imports one module (§4), so it builds keys from strings; the
@@ -940,16 +945,15 @@ pub fn x25519(scalar: List[byte], u_bytes: List[byte]) -> List[byte] ! {zero} {
     out
 }
 
-/// True iff all 32 bytes are zero (X25519's reject-on-zero, on the
-/// public output). ct: on public data.
+/// True iff all 32 shared-secret bytes are zero (RFC 7748 section 6.1).
+/// ct: confidential input, unconditional OR fold at source level; only
+/// the final comparison may branch at the caller. No timing certificate.
 fn is_zero_bytes(b: List[byte]) -> bool {
-    var all_zero = true
+    var acc: wrapping[u64] = 0
     for v in b {
-        if !(v as int == 0) {
-            all_zero = false
-        }
+        acc = acc | v as int as wrapping[u64]
     }
-    all_zero
+    acc == 0
 }
 
 /// X25519 against the standard base point u = 9 (RFC 7748 s6.1's key
