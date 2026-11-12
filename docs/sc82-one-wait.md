@@ -191,8 +191,8 @@ Committed first, at `497f8dd` (`docs/sc82-prediction.md`), before any measuremen
 - [x] Prediction first (`497f8dd`), the design and the missing calls next (`ea8e952`), scored above.
 - [x] The rows runner and rig (`5bfa2ae`); the rows red first (`31edb4d`), recorded red by name there.
 - [x] `std.poll` (`2d86e26`); every row green on linux on the lanes its ledger names.
-- [x] The partial-write example (`441c6e1`); the narrow forms' docs (`abb7e48`, `bf8dabf`); the M2 and M3 contracts (`bf8dabf`, `d5d842e`).
-- [x] README (`b64d13f`, the newest surface and the count, 656) and CHANGELOG (`a159ec0`).
+- [x] The partial-write example (`441c6e1`, its handler put on one statement line at `dfb13b9`: §4's extractor reads any line holding `>`, a `match` arm's `=>` included, as an assertion); the narrow forms' docs (`abb7e48`, `bf8dabf`); the M2 and M3 contracts (`bf8dabf`, `d5d842e`).
+- [x] README (`b64d13f`, the newest surface and the count, 656) and CHANGELOG (`a159ec0`); lupin never listens, so `poll/signal_during_wait` has no `lupin-windows` cell (`5135a08`).
 - [ ] The green record at the final head and the plant's record (red by name): the PR's.
 - [ ] macOS: CI's `tier all`. windows: the full tier's rig. PAX: the rows above, for a PAX lane.
 - [ ] M1, M2 and M3 in the runtime, then the follow-on that retires `std.poll`'s four refusals and ships `net.write_some` and `unix.peer_credentials`.
