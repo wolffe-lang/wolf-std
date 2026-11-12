@@ -1,0 +1,51 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.base64, err.row
+//!
+//! RFC 4648 section 10 with age's omitted padding; strict rejections.
+use std.base64
+use std.bytes
+
+fn rejects(s: str) {
+    var missed = false
+    let out = base64.decode_raw(s) else |parse| {
+        missed = true
+        List[byte]()
+    }
+    assert(missed)
+    assert(out.len == 0)
+}
+
+fn row(plain: str, text: str) {
+    assert(base64.encode_raw(plain.bytes()) == text)
+    let out = base64.decode_raw(text) else "wrong".bytes()
+    assert(bytes.is_equal_fixed_work(out, plain.bytes()))
+}
+
+fn main() -> int {
+    row("", "")
+    row("f", "Zg")
+    row("fo", "Zm8")
+    row("foo", "Zm9v")
+    row("foob", "Zm9vYg")
+    row("fooba", "Zm9vYmE")
+    row("foobar", "Zm9vYmFy")
+    assert(base64.encode_raw([255 as byte, 239 as byte]) == "/+8")
+    for s in ["=", "Zg=", "Zg==", "Zm8=", "Zm9v=", "Z", "Zh", "Zm9", "Z g", "Zg\n", "Zg\r", "Zg\t", "_-8", "é", "Zg\0", "Zg=Z"] {
+        rejects(s)
+    }
+    // Exhaust every possible noncanonical residual sextet.
+    let alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    for i in 0..64 {
+        if i % 16 != 0 { rejects("A{alphabet[i..i + 1]}") }
+        if i % 4 != 0 { rejects("AA{alphabet[i..i + 1]}") }
+    }
+    var all = List[byte]()
+    for i in 0..256 { (mut all).push(i as byte) }
+    for n in [0, 1, 2, 3, 4, 5, 31, 32, 33, 63, 64, 65, 255, 256] {
+        let b = all[0..n]
+        let back = base64.decode_raw(base64.encode_raw(b)) else List[byte]()
+        assert(bytes.is_equal_fixed_work(b, back))
+    }
+    0
+}

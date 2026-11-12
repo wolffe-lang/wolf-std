@@ -1,0 +1,42 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.bech32, err.row
+//!
+//! Published age specification X25519 test identity/recipient examples.
+//! This is labelled public test material, never a real recovery identity.
+use std.bech32
+use std.bytes
+use std.hex
+use std.str
+
+fn rejects(s: str, hrp: str, n: int) -> bool {
+    let out = bech32.decode_bytes(s, hrp, n) else |parse| { return true }
+    out.len == 999
+}
+
+fn main() -> !int {
+    let identity = "AGE-SECRET-KEY-1GFPYYSJZGFPYYSJZGFPYYSJZGFPYYSJZGFPYYSJZGFPYYSJZGFPQ4EGAEX"
+    let recipient = "age1zvkyg2lqzraa2lnjvqej32nkuu0ues2s82hzrye869xeexvn73equnujwj"
+    let sk = bech32.decode_bytes(identity, "age-secret-key-", 32)?
+    assert(hex.encode(sk) == "4242424242424242424242424242424242424242424242424242424242424242")
+    assert(str.upper(bech32.encode_bytes("age-secret-key-", sk)?) == identity)
+    let pk = bech32.decode_bytes(recipient, "age", 32)?
+    assert(bech32.encode_bytes("age", pk)? == recipient)
+    assert(rejects(identity, "age", 32))
+    assert(rejects(recipient, "age", 31))
+    assert(rejects(recipient, "age", 33))
+    // Valid checksums with invalid 5-to-8 padding: never accept by checksum alone.
+    assert(rejects(bech32.encode("age", [0 as byte])?, "age", 0))
+    assert(rejects(bech32.encode("age", [0 as byte, 1 as byte])?, "age", 1))
+    var words = bech32.decode(recipient)?.data
+    let last = words[51] as int
+    words[51] = (last + 1) as byte
+    assert(rejects(bech32.encode("age", words)?, "age", 32))
+    for n in [0, 1, 2, 3, 4, 5, 16, 31, 32, 40] {
+        var b = List[byte]()
+        for i in 0..n { (mut b).push((i * 7 % 256) as byte) }
+        let back = bech32.decode_bytes(bech32.encode_bytes("age", b)?, "age", n)?
+        assert(bytes.is_equal_fixed_work(b, back))
+    }
+    0
+}

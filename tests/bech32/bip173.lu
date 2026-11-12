@@ -1,0 +1,26 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.bech32, err.row
+//!
+//! BIP-173 generic checksum vectors, not Bitcoin address semantics.
+use std.bech32
+
+fn rejects(s: str) -> bool {
+    let out = bech32.decode(s) else |parse| { return true }
+    out.hrp.len == 0
+}
+
+fn main() -> !int {
+    for s in ["A12UEL5L", "a12uel5l", "an83characterlonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1tt5tgs", "abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw", "11qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqc8247j", "split1checkupstagehandshakeupstreamerranterredcaperred2y9e3w", "?1ezyfcl"] {
+        let d = bech32.decode(s)?
+        let text = bech32.encode(d.hrp, d.data)?
+        let again = bech32.decode(text)?
+        assert(again.hrp == d.hrp)
+    }
+    for s in [" 1nwldj5", "\u{7f}1axkwrx", "\u{80}1eym55h", "an84characterslonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1569pvx", "pzry9x0s0muk", "1pzry9x0s0muk", "x1b4n0q5v", "li1dgmt3", "de1lg7wt\u{ff}", "A1G7SGD8", "10a06t8", "1qzzfhee", "a12UEL5L", "A12uel5l", "a1lqfn3a"] {
+        assert(rejects(s))
+    }
+    assert(bech32.encode("a", List[byte]())? == "a12uel5l")
+    assert(bech32.encode("A", List[byte]())? == "a12uel5l")
+    0
+}

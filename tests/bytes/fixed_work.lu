@@ -1,0 +1,20 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.bytes, arith.wrapping
+//!
+//! Equality and every mismatch position; source/code inspection is separate.
+use std.bytes
+
+fn main() -> int {
+    let a = "0123456789abcdef0123456789abcdef".bytes()
+    assert(bytes.is_equal_fixed_work(a, a))
+    assert(bytes.is_equal_fixed_work("".bytes(), "".bytes()))
+    assert(!bytes.is_equal_fixed_work(a, "short".bytes()))
+    for i in 0..32 {
+        var b = copy a
+        b[i] = 255 as byte
+        assert(!bytes.is_equal_fixed_work(a, b))
+        assert(!bytes.is_equal_fixed_work(b, a))
+    }
+    0
+}
