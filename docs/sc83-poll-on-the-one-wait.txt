@@ -1,0 +1,33 @@
+# sc83: poll on the runtime's one wait
+
+Footprint: cross-cutting
+
+## Forbidden
+
+Read the wolf specification, prelude, readiness corpus and s290 note at ead70b82, not compiler or runtime implementation source. No libc or kernel implementation source is an input. Host behaviour is measured through programs using the public builtins.
+
+## Inputs verified
+
+Base: wolf-std be1d10fa. Development toolchain: wolf-lang ead70b82, built from a fixed checkout. Final gates require released wolf 0.2.40 and lupin 0.1.62; the pins have not moved yet. Read the README, API conventions, poll/net/unix/signal/term modules, sc82 design, poll rows and ledger, wolf-std issues 144 and 147, and the runtime contracts before implementation.
+
+## Prediction
+
+Keep every public poll signature. Open a readiness set lazily for each Waiter; changes update it, waits harvest it once, close releases it without closing the registered handles. When opening a set answers the unsupported error row, keep entries for os_wait_ready. Report events in the runtime's order, explicitly unspecified, once per registered entry. Do not sort or scan all keys per persistent-set wait. READ, WRITE, HANGUP and ERROR are the runtime facts unchanged. A signal and ready handles share one answer. Shape errors remain invalid before host operations.
+
+Retire files-and-sockets, sockets-with-meanings, socket-WRITE and files-without-meanings refusals on checked and native Linux and macOS. waiter_rows changes its four lines to 0 2, 0 1, 0 2 and 0 1; mixed_refused answers all six names. signal_during_wait answers the ready file with its pending meaning. pty_hangup reports HANGUP=4 and end facts=5. sockets_all_ready reports READ|HANGUP after peer close. Its first pty wake must not assume the child is still alive or that a shell leaves terminal attributes untouched. Additional rows will hold add/modify/remove across waits, runtime handle-close removal, pipe write error (Linux ERROR, macOS HANGUP), simultaneous socket/signal readiness and empty deadlines.
+
+lupin 0.1.62 refuses readiness calls at run by builtin name: os_ready_open for rows reaching a registration or wait first, os_term_open_pty for pty-first rows, os_signal_listen for signal-first rows. Its write_some rows execute; Unix credential reads refuse net_peer_cred at run. A refused run is not an unsupported error row caught and printed by the test. Ledger changes follow measurement, never precede it. Windows/tier-2 readiness posture needs explicit reconciliation with sc82's previously served narrow socket path before a tier promise changes.
+
+Add net.write_some(mut s: Socket, b: List[byte]) -> int ! {busy, closed, invalid, io}: delegate one send, never park, return zero for an empty buffer after checking the handle; invalid is unreachable for typed byte lists. TCP loopback and Unix rows cover empty, 4096-byte buffers, short send, fill to busy, wrong-kind/forged/closed handles, peer close, and ordered drain. A 1 MiB queue advances only by counts returned, enables WRITE while queued, drains through a slow reader, and disables WRITE when empty. No write-all wrapper or queue type is added.
+
+Add unix.Credentials { pid, uid, gid } and unix.peer_credentials(s: net.Socket) -> Credentials ! {io, unsupported}, delegating net_peer_cred. Linux keeps pid and effective ids after peer close; macOS reports pid while connected and -1 after close, retaining ids. Rows compare effective ids and pid while connected, and wrong-kind/forged/closed rows. A native forked child is measured without changing credentials; no privilege-dependent second-user claim.
+
+Expected steady-state costs at 1, 64 and 1,000 handles: native readiness-only sets make one kernel wait with O(ready) runtime work and O(ready) std conversion, with no per-wait registration or scan of held keys. Polled entries add O(polled) and one poll; checked sets scan O(N), respectively 1/64/1,000 entries. One-shot fallback builds O(N) elements (up to 2N with both interests), duplicates O(N) descriptors and makes one poll, versus sc82's k+1 sweeps. These are contract-based predictions, not benchmark measurements. Adds currently scan keys O(N) to preserve lowest-free-key and duplicate rules; that does not make steady-state waits scan keys.
+
+## Evidence index
+
+Pending: red-first records at changed expectations; fixed-head Linux checked/native and lupin records; macOS checked/native; the final gauntlet; a pushed mixed-wait plant and its named red. No readiness measurement on PAX has been made.
+
+## Done-when
+
+Prediction committed before source or test edits. Then changed expectations committed and witnessed red before implementation. Final released pins, all-tier rows, Linux and macOS records, plant, README refresh and audit remain due. There is no PAX leg in the existing harness: a PAX lane must build the native rows statically on Linux with the matching musl runtime, run them in separate scratch directories, and compare directives. Its 4096-byte Unix queue, 20480-byte pty queue and 256-registration-per-set bound must be measured, not inferred from Linux greens.
