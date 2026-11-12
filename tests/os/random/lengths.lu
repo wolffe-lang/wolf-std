@@ -1,0 +1,14 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.os.random, os.random.fill
+//!
+//! OS bytes lengths only; never print sampled bytes or statistical claims.
+use std.os.random
+
+fn main() -> !int {
+    random.require_ready()?
+    for n in [0, 1, 16, 32, 64, 256, 257, 4096] {
+        assert(random.bytes(n)?.len == n)
+    }
+    0
+}
