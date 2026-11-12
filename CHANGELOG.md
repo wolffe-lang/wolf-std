@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+**One wait (sc82): `std.poll`.** A server that owns pty masters, pipes, a
+listener and its clients, a timer and signals waits in one place and
+learns of every ready handle, so no busy handle starves the rest.
+
+- `std.poll` is new: `Waiter`, an owned set of entries; `open()`,
+  `add_file(w, f, interest)`, `add_socket(w, s, interest)` and
+  `add_listener(w, l)`, each answering the entry's key; `modify`,
+  `remove`, `len` and `close`; and `wait(w, meanings, deadline_ms)`,
+  which answers every ready entry with its facts (`READ`, `WRITE`) and
+  the meaning it took. `HANGUP` and `ERROR` are declared and not yet set.
+- At wolf 0.2.39 a waiter holds files (with a set of meanings) or
+  sockets (read interest, no meanings). Files and sockets together,
+  sockets with meanings or `WRITE`, and files with no meanings answer
+  `unsupported` on every host, held by rows. The runtime calls that would
+  serve them, a socket write that says what it took, and a Unix peer's
+  credentials are stated in `docs/sc82-one-wait.md`; `std.net` and
+  `std.net.unix` carry the last two as contracts.
+- `fs.write_some` gains the partial-write loop as a runnable example;
+  `signal.wait_fds` and `net.wait` are unchanged and documented as the
+  narrow forms.
+
 **Sessions and pseudo-terminals (sc81), at wolf 0.2.39 and lupin 0.1.61.**
 An ssh server can run each remote command in a session of its own and
 answer a terminal request by running a login shell on a pty.
