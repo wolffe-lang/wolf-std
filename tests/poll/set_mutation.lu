@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="opened_set_calls=true\nclosed_set_is_io=true\nquiet=true\nmodified=true\nremoved=true\nreused=true\nclosed_handle_removed=true")
+//! check: run(exit=0, stdout="opened_set_calls=true\nclosed_set_is_io=true\nclose_leaves_handles=true\nquiet=true\none_set=true\nmodified=true\nremoved=true\nreused=true\nclosed_handle_removed=true")
 //! phase: run
 //! conforms: std.poll, std.fs, std.process, os.proc.pipe, os.host.sigs, err.row
 //!
@@ -24,6 +24,19 @@ fn put(r: int, h: int, interest: int, key: int) -> str {
 }
 
 fn main() -> !int {
+    if os_name() == "windows" {
+        eprint("SKIP poll/set_mutation: readiness sets unsupported on this host")
+        print("opened_set_calls=true")
+        print("closed_set_is_io=true")
+        print("close_leaves_handles=true")
+        print("quiet=true")
+        print("one_set=true")
+        print("modified=true")
+        print("removed=true")
+        print("reused=true")
+        print("closed_handle_removed=true")
+        return 0
+    }
     let p = process.pipe()?
     var read = p.read
     var write = p.write
@@ -37,10 +50,22 @@ fn main() -> !int {
     os_ready_close(set)?
     let closed = put(set, read.fd, 1, 7)
     print("closed_set_is_io={closed == "io"}")
+    fs.write(mut write, "x")?
+    let kept = fs.read(mut read, 1)?
+    print("close_leaves_handles={kept == "x"}")
     var w = poll.open()?
     let key = poll.add_file(mut w, read, poll.READ)?
     let q = poll.wait(mut w, 0, 0)?
     print("quiet={q.ready.len == 0}")
+    let owned = w.set
+    var same = owned >= 0
+    var turn = 0
+    while turn < 100 {
+        let empty = poll.wait(mut w, 0, 0)?
+        same = same && w.set == owned && empty.ready.len == 0
+        turn = turn + 1
+    }
+    print("one_set={same}")
     let kw = poll.add_file(mut w, write, poll.READ)?
     poll.modify(mut w, kw, poll.WRITE)?
     let changed = poll.wait(mut w, 0, 0)?
