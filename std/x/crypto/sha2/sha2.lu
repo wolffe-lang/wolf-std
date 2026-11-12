@@ -979,9 +979,10 @@ pub fn hkdf256_extract(salt: List[byte], ikm: List[byte]) -> List[byte] {
 /// HKDF-Expand over HMAC-SHA-256 (RFC 5869 §2.3). Traps `assert` when
 /// `n` is negative or exceeds 255 * 32 (the RFC's hard cap: the counter
 /// is one byte) — the length is the caller's parameter, not data (§2's
-/// trap rule). `n == 0` is the empty output. `prk` must be at least one
-/// block's worth of entropy per the RFC; this module does not police
-/// entropy, only lengths.
+/// trap rule). `n == 0` yields empty output. `prk` is a pseudorandom key of at
+/// least HashLen octets (32 for SHA-256), normally Extract's output;
+/// this module cannot inspect entropy. The selected extract-then-expand
+/// path always supplies exactly 32 bytes.
 /// ct: the T(i) chain's shape depends on `n` and `info.len` (public);
 /// no branch reads a byte of `prk` or the running T.
 ///
