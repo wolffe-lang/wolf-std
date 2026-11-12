@@ -135,9 +135,64 @@ net_peer_cred(fd: int) -> (int, int, int) ! {io, unsupported}
 
 ### Rows for a PAX lane
 
-Build each row's native binary on linux with the pinned wolf (`conform-run --native` builds and runs it; `wolf build` gives the binary), copy it to PAX, run it in a scratch directory, and compare its standard output with the row's directive line by line. The rows need `/bin/sh`, `printf` and `sleep` on PAX. Run: `poll/waiter_rows`, `poll/files_all_ready`, `poll/sockets_all_ready`, `poll/mixed_refused`, `poll/fairness`, `poll/deadline`, `poll/signal_during_wait`, `poll/write_partial` and `poll/pty_hangup`. `poll/write_partial` does not print the room it measured, so PAX's 20480-byte pty master holds it as linux's does.
+Build each row's native binary on linux with the pinned wolf and this branch's `std/` (`wolf build --std-root <checkout>/std tests/poll/<row>.lu` in a scratch directory of its own), copy it to PAX, run it in a scratch directory, and compare its standard output with the row's directive line by line (`docs/sc82-witness/rows.py`'s rule). The rows need `/bin/sh`, `printf` and `sleep` on PAX. Run: `poll/waiter_rows`, `poll/files_all_ready`, `poll/sockets_all_ready`, `poll/mixed_refused`, `poll/fairness`, `poll/deadline`, `poll/signal_during_wait`, `poll/write_partial` and `poll/pty_hangup`. `poll/write_partial` prints no room, so PAX's 20480-byte pty master holds it as linux's 14 KiB does. `poll/pty_hangup` expects a pty master's read at the end to be `io` on every host but macOS; if PAX answers `eof`, that is a host cell to record, not a fix to make.
 
 ## Forbidden
 
 - No libc source, no kernel source and no source of the compiler's or the interpreter's crates was read. wolf-lang was read at the tag only in `spec/11-os.md` and `spec/prelude.json`, and its trunk's log since the tag.
 - Host behaviour is measured black-box through the rows.
+- **Unchanged:** CI, the rig's code, the pins, and every module's behaviour; `std.fs`, `std.signal`, `std.net` and `std.net.unix` change only in their docs.
+
+## Inputs verified
+
+- **Base:** trunk `77cf321`, branch `sc82`.
+- **Toolchain:** the binaries the repository pins, by digest: `wolf` `cf00e296…`, `libwolf_rt.a` `0d6e9ecd…`, `lupin` `486234ae…`; `--version` reads `wolf 0.2.39 (wolfgang, pin 3fc86f7)` and `lupin 0.1.61 (wolf-interp, reference interpreter at pin 5f1f1c9)`. The rig's preflight checks the three digests before every take.
+- **Read first:** API-CONVENTIONS §1–§4, §13 and §14 (the refusal rule and its sc11 debt clause, the sc08 rule on unreachable tags, the sc36 module-per-family rule); `std.signal` (`wait_fds`, `WAIT_WRITE`), `std.net` (`wait`, the handle types, what is deliberately absent), `std.net.unix`, `std.term` (`Pty`), `std.fs` (`set_nonblock`, `write_some`), `std.process` (`pipe`, `start_session`); the ledger's vocabulary; sc81's note and rig.
+
+## Prediction
+
+Committed first, at `497f8dd` (`docs/sc82-prediction.md`), before any measurement; the design and the missing calls followed at `ea8e952`.
+
+- **P0, what the pin cannot do:** held, and measured where it could be: no std code waits on both tables. One correction to the starting brief, found by a probe: a net handle given to `signal.wait_fds` is not always `io`. The two tables number from 0 independently, so a net handle's number is often an open fs handle's too (the first listener a program makes is 0, which is standard input as an fs handle), and the wait then waits on that other file and answers it ready. It is `io` only when the number is not open in the fs table. The `Waiter` keeps each entry's table, which is the reason it has three add calls.
+- **The surface:** held as predicted, name for name, rows as listed.
+- **P1, red first:** held on the compiler lanes, `fail(E0301)` at the `use std.poll` for every row at the rows tip `31edb4d`. **Missed on lupin for the five rows that open a pty and `poll/signal_during_wait`:** lupin resolves lazily and reaches `os_term_open_pty` (or `os_signal_listen`) before the first `poll` name, so its refusal there already names the builtin the ledger expects, and those cells were green at the rows tip. lupin's cells for `poll/waiter_rows`, `poll/sockets_all_ready` and `poll/deadline` were red (`poll.open` does not resolve).
+- **P2, the rows:** held on linux, every line as predicted, on both compiler lanes, from the first run. `poll/deadline`'s lupin cell is `unsupported` at `os_signal_wait_fds`, as P3 says, so its sockets half is held on lupin by `poll/sockets_all_ready`'s 25 ms line instead.
+- **P3, lupin:** held, and each refusal names the predicted builtin: `os_term_open_pty` (the five rows that open a pty), `os_signal_wait_fds` (`poll/deadline`), `os_signal_listen` (`poll/signal_during_wait`, not in the prediction's list: lupin never listens, on any host, so that cell carries no `lupin-windows`).
+- **P4, the platforms:** linux measured; macOS by CI's `tier all`, windows by the full tier's rig; PAX not measured (the rows above are for a PAX lane).
+- **P5, the plant:** see the PR's records.
+
+## Evidence index
+
+### Rows
+
+| row | holds | lanes |
+|---|---|---|
+| `poll/waiter_rows` | the add, modify and remove rows; keys in add order, a removed key reused; `wait`'s shape (`invalid`); the four combinations (`unsupported`); an empty waiter's no-deadline `invalid` and its look | all three, every host |
+| `poll/files_all_ready` | two pty masters, a pipe's two ends and a regular file: one wait answers all five, master1 with `READ \| WRITE`; the narrow form answers index 0; level-triggered; the read facts go after the reads | checked, native |
+| `poll/sockets_all_ready` | a TCP listener with a dial pending and two clients with bytes: all three in one wait; nothing at 0 and at 25 ms (no sooner); the read, the accept and the peer's close | all three, every host |
+| `poll/mixed_refused` | the multiplexer's six (two pty masters, a Unix listener with a dial pending, two clients, a pipe), all ready: one waiter `unsupported`, each half served alone, three and three | checked, native |
+| `poll/fairness` | a pipe kept readable at key 0 beside a pty master: every turn answers the pipe, the turns the master holds a byte answer it too; the narrow form answers index 0 on all ten | checked, native |
+| `poll/deadline` | 0, 25 ms and -1 on the sockets path, an empty waiter, the files path, and meanings alone | checked, native (lupin refuses at the files path) |
+| `poll/signal_during_wait` | `child()` ends a 10 s wait on a quiet pipe after the child's 300 ms; a meaning pending before the wait is answered alone and the ready file next | checked, native |
+| `poll/write_partial` | a pty master non-blocking: room, `write_some` until `busy`, the 25 ms deadline over a full master, room after a read; a 65536-byte queue drained through the loop, waiting for room at least once, read back in order | checked, native |
+| `poll/pty_hangup` | a pty child that prints `x` and ends: `READ`, `x`, `READ` again, the read's `io` (linux; `eof` on macOS), no `HANGUP` fact at this pin, status 0 | checked, native |
+
+`docs/sc82-witness/rows.py` runs each row on lupin, the checked machine and native, holds each line to its directive (`FAIL <test>:<lane>:<key>` at column 0 for a red line), and holds each lupin refusal to its builtin by name. `docs/sc82-witness/rig/` is the recorder's rig, sc81's by value: `gauntlet.manifest` (the rows, then every `cargo xtask ci` step and `ulp`) and `short.manifest` (the rows alone, for the red take and the plant).
+
+### What the rows and probes showed on linux
+
+- A pty master holds 13824 to 15360 bytes before `write_some` answers `busy` (the slave raw and unread); a fifo opened read and write holds 65536.
+- A pty master whose last slave descriptor closed is ready to read, and its read is `io` (5 in `os_error()`), with or without a child.
+- `net.wait` over an empty set with a positive deadline answers at once rather than waiting it out, so `std.poll` sleeps that deadline itself for a waiter with no entries and no meanings.
+- `child()` from the row's own child wakes a files-path wait, and a meaning pending before a wait is answered on the first look with no entry.
+
+## Done-when
+
+- [x] Prediction first (`497f8dd`), the design and the missing calls next (`ea8e952`), scored above.
+- [x] The rows runner and rig (`5bfa2ae`); the rows red first (`31edb4d`), recorded red by name there.
+- [x] `std.poll` (`2d86e26`); every row green on linux on the lanes its ledger names.
+- [x] The partial-write example (`441c6e1`); the narrow forms' docs (`abb7e48`, `bf8dabf`); the M2 and M3 contracts (`bf8dabf`, `d5d842e`).
+- [x] README (`b64d13f`, the newest surface and the count, 656) and CHANGELOG (`a159ec0`).
+- [ ] The green record at the final head and the plant's record (red by name): the PR's.
+- [ ] macOS: CI's `tier all`. windows: the full tier's rig. PAX: the rows above, for a PAX lane.
+- [ ] M1, M2 and M3 in the runtime, then the follow-on that retires `std.poll`'s four refusals and ships `net.write_some` and `unix.peer_credentials`.
