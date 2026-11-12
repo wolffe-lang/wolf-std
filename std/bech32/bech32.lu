@@ -1,0 +1,203 @@
+//! member: true
+//!
+//! std.bech32 — BIP-173 checksummed base32. Stability tier: core.
+//! The checksum is Bech32 (constant 1), NOT Bech32m. This module has
+//! no Bitcoin address or witness-version semantics. Generic data are
+//! 5-bit words in List[byte]; the byte helpers additionally check exact
+//! decoded length and canonical 8-to-5 padding for native age keys.
+//! BIP-173's 90-character bound applies here. Native X25519 age keys
+//! fit; this is not the age extension for arbitrarily long PQ keys.
+//! Decoders reject mixed case and normalize HRPs to lowercase. Encoders
+//! produce lowercase; callers may uppercase the WHOLE result for an age
+//! identity's presentation. Neither direction corrects errors or renders
+//! input in an error. All failures are `parse`, not traps. Pure,
+//! comptime-safe. The alphabet/checksum/conversion branch and index on
+//! values; this is NOT a fixed-time secret-key encoder or decoder.
+
+/// A validated lowercase HRP and 5-bit data words, excluding checksum.
+/// The words are encoding data, not necessarily whole or canonical bytes.
+pub struct Decoded {
+    hrp: str,
+    data: List[byte],
+}
+
+fn alphabet() -> str { "qpzry9x8gf2tvdw0s3jn54khce6mua7l" }
+
+fn lower(c: int) -> int {
+    if c >= 65 && c <= 90 { return c + 32 }
+    c
+}
+
+// BIP-173 Specification / Checksum: one bech32_polymod iteration.
+fn step(chk: wrapping[u64], v: int) -> wrapping[u64] {
+    let top = chk >> 25
+    var next = ((chk & 0x1ffffff) << 5) ^ v as wrapping[u64]
+    if (top & 1) != 0 { next = next ^ 0x3b6a57b2 }
+    if (top & 2) != 0 { next = next ^ 0x26508e6d }
+    if (top & 4) != 0 { next = next ^ 0x1ea119fa }
+    if (top & 8) != 0 { next = next ^ 0x3d4233dd }
+    if (top & 16) != 0 { next = next ^ 0x2a1462b3 }
+    next
+}
+
+fn hrp_state(hrp: List[byte]) -> wrapping[u64] {
+    var chk: wrapping[u64] = 1
+    for c in hrp { chk = step(chk, c as int / 32) }
+    chk = step(chk, 0)
+    for c in hrp { chk = step(chk, c as int % 32) }
+    chk
+}
+
+fn value(c: byte) -> int {
+    var i: int = 0
+    for a in alphabet().bytes() {
+        if a == c { return i }
+        i = i + 1
+    }
+    0 - 1
+}
+
+fn power(n: int) -> int {
+    var p: int = 1
+    for _ in 0..n { p = p * 2 }
+    p
+}
+
+/// BIP-173 encoding of 5-bit `data` words. HRP must be 1..83 printable
+/// ASCII characters; uppercase letters are normalized to lowercase.
+/// Raises `parse` on invalid HRP, a word above 31, or total length above
+/// 90 characters. Total over its input types; pure, comptime-safe.
+///
+/// ```wolf-doc-example
+/// bech32.encode("a", List[byte]())? == "a12uel5l"
+/// ```
+pub fn encode(hrp: str, data: List[byte]) -> str ! {parse} {
+    if hrp.len < 1 || hrp.len > 83 { return parse }
+    if data.len > 90 - hrp.len - 7 { return parse }
+    var h = List[byte]()
+    for c in hrp.bytes() {
+        let v = c as int
+        if v < 33 || v > 126 { return parse }
+        (mut h).push(lower(v) as byte)
+    }
+    var chk = hrp_state(h)
+    var out = copy h
+    (mut out).push(49 as byte)
+    let chars = alphabet().bytes()
+    for d in data {
+        let v = d as int
+        if v > 31 { return parse }
+        chk = step(chk, v)
+        (mut out).push(chars[v])
+    }
+    for _ in 0..6 { chk = step(chk, 0) }
+    chk = chk ^ 1
+    let sum = chk as int
+    for i in 0..6 { (mut out).push(chars[sum / power(5 * (5 - i)) % 32]) }
+    str_from_utf8(out) else ""
+}
+
+/// Validates BIP-173 syntax/case/checksum and returns lowercase HRP and
+/// 5-bit data excluding checksum. Raises `parse` on any failure, including
+/// non-ASCII, missing/empty HRP, short checksum and length outside 8..90.
+/// Uses the LAST separator. No correction, no input in diagnostics.
+/// Total over UTF-8; pure, comptime-safe.
+///
+/// ```wolf-doc-example
+/// let d = bech32.decode("A12UEL5L")?
+/// d.hrp == "a"
+/// d.data.len == 0
+/// ```
+pub fn decode(s: str) -> Decoded ! {parse} {
+    if s.len < 8 || s.len > 90 { return parse }
+    var text = List[byte]()
+    var upper_seen = false
+    var lower_seen = false
+    var sep: int = 0 - 1
+    var i: int = 0
+    for c in s.bytes() {
+        let v = c as int
+        if v < 33 || v > 126 { return parse }
+        if v >= 65 && v <= 90 { upper_seen = true }
+        if v >= 97 && v <= 122 { lower_seen = true }
+        if v == 49 { sep = i }
+        (mut text).push(lower(v) as byte)
+        i = i + 1
+    }
+    if upper_seen && lower_seen { return parse }
+    if sep < 1 || sep > 83 || text.len - sep - 1 < 6 { return parse }
+    let h = text[0..sep]
+    var chk = hrp_state(h)
+    var data = List[byte]()
+    i = sep + 1
+    while i < text.len {
+        let v = value(text[i])
+        if v < 0 { return parse }
+        chk = step(chk, v)
+        if i < text.len - 6 { (mut data).push(v as byte) }
+        i = i + 1
+    }
+    if chk != 1 { return parse }
+    Decoded { hrp: str_from_utf8(h) else "", data: data }
+}
+
+/// Encodes bytes as MSB-first 5-bit words with zero padding, then Bech32.
+/// Rows/traps as `encode`; the output must fit BIP-173's 90 characters.
+/// Native age uses HRP `age` or `age-secret-key-`, and 32 input bytes.
+/// Pure, comptime-safe. Not fixed-time; never log a real identity.
+///
+/// ```wolf-doc-example
+/// let s = bech32.encode_bytes("age", "x".bytes())?
+/// bech32.decode_bytes(s, "age", 1)?.len == 1
+/// ```
+pub fn encode_bytes(hrp: str, b: List[byte]) -> str ! {parse} {
+    // At most 51 whole bytes can fit even under the shortest HRP.
+    if b.len > 51 { return parse }
+    var words = List[byte]()
+    var acc: int = 0
+    var bits: int = 0
+    for v in b {
+        acc = acc * 256 + v as int
+        bits = bits + 8
+        while bits >= 5 {
+            bits = bits - 5
+            let factor = power(bits)
+            (mut words).push((acc / factor) as byte)
+            acc = acc % factor
+        }
+    }
+    if bits > 0 { (mut words).push((acc * power(5 - bits)) as byte) }
+    encode(hrp, words)?
+}
+
+/// Decodes canonical MSB-first bytes with exactly `n` bytes and the
+/// specified lowercase `hrp`. Raises `parse` for any Bech32 failure,
+/// a different HRP/length, negative n, five or more residual bits, or
+/// nonzero residual bits. A valid checksum alone is NOT enough.
+/// Pure, comptime-safe; total, no traps, no input in errors.
+///
+/// ```wolf-doc-example
+/// let s = bech32.encode_bytes("age", "x".bytes())?
+/// let b = bech32.decode_bytes(s, "age", 1)?
+/// b.len == 1
+/// ```
+pub fn decode_bytes(s: str, hrp: str, n: int) -> List[byte] ! {parse} {
+    if n < 0 { return parse }
+    let decoded = decode(s)?
+    if decoded.hrp != hrp { return parse }
+    var out = List[byte]()
+    var acc: int = 0
+    var bits: int = 0
+    for v in decoded.data {
+        acc = acc * 32 + v as int
+        bits = bits + 5
+        if bits >= 8 {
+            bits = bits - 8
+            let factor = power(bits)
+            (mut out).push((acc / factor) as byte)
+            acc = acc % factor
+        }
+    }
+    if bits >= 5 || acc != 0 || out.len != n { return parse }
+    out
+}
