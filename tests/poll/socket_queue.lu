@@ -33,13 +33,10 @@ fn send(mut s: net.Socket, b: List[byte]) -> int ! {closed, invalid, io} {
     }
 }
 
-fn suffix(q: List[byte], at: int) -> List[byte] {
-    var b = List[byte]()
-    var i = at
-    while i < q.len && i < at + 4096 {
-        (mut b).push(q[i])
-        i = i + 1
-    }
+fn suffix(payload: str, at: int) -> List[byte] {
+    let end = if at + 4096 < payload.len then at + 4096 else payload.len
+    // This bound byte view deliberately materializes one small byte list.
+    let b = payload[at..end].bytes()
     b
 }
 
@@ -57,18 +54,19 @@ fn main() -> !int {
     let kw = poll.add_socket(mut w, writer, poll.WRITE)?
     let kr = poll.add_socket(mut w, reader, poll.READ)?
     let total = 1048576
-    var q = List[byte]()
-    var i = 0
-    while i < total {
-        (mut q).push((i % 251) as byte)
-        i = i + 1
-    }
+    // A 251-byte period catches duplication across 4096-byte boundaries.
+    // Bulk construction and comparison keep this an I/O row, not a million
+    // interpreter loop iterations; the checked step budget is unchanged.
+    let pattern = "0123456789abcdef".repeat(15) + "abcdefghijk"
+    let repeated = pattern.repeat(4178)
+    let payload = repeated[0..total]
+    let q = payload.bytes()
     let first = send(mut writer, q)?
     print("short_send={first > 0 && first < total}")
     var at = if first > 0 then first else 0
     var busy_seen = first == -1
     while !busy_seen && at < total {
-        let n = send(mut writer, suffix(q, at))?
+        let n = send(mut writer, suffix(payload, at))?
         if n < 0 { busy_seen = true } else { at = at + n }
     }
     print("busy_before_reader={busy_seen && at < total}")
@@ -89,16 +87,14 @@ fn main() -> !int {
         let ev = poll.wait(mut w, 0, 2000)?
         for r in ev.ready {
             if r.key == kw && r.facts & poll.WRITE != 0 && at < total {
-                let n = send(mut writer, suffix(q, at))?
+                let n = send(mut writer, suffix(payload, at))?
                 if n > 0 { at = at + n }
             }
             if r.key == kr && r.facts & poll.READ != 0 && received < total {
                 time.sleep(time.millis(1))
-                let b = net.read_bytes(mut reader, 4096)?
-                for c in b {
-                    if c != (received % 251) as byte { ordered = false }
-                    received = received + 1
-                }
+                let b = net.read(mut reader, 4096)?
+                if b != payload[received..received + b.len] { ordered = false }
+                received = received + b.len
             }
         }
         if at == total && !write_off {
