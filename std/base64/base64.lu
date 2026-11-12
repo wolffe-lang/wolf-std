@@ -29,6 +29,10 @@
 //! `decode_lenient` relaxes padding and canonicity for input that came
 //! from somewhere less careful. `url_decode` is §5's alphabet with
 //! optional padding, because `url_encode` omits it.
+//! `encode_raw`/`decode_raw` are strict UNPADDED standard base64 for
+//! age v1: no padding, whitespace, alternate alphabet or nonzero unused
+//! bits. Their walks are linear in input/output length. Encoding and
+//! decoding branch/index on byte values: neither is a fixed-time codec.
 //!
 //! Round-tripping is the doctrine: `decode(encode(b))` is `b` for every
 //! byte sequence, held over the shared adversarial fixtures in
@@ -41,6 +45,63 @@
 //! `base64` because a row tag that shares a name with a module in scope
 //! resolves to the MODULE, silently (F-0036) — and this module is named
 //! `base64`.
+
+/// RFC 4648 section 4 standard-alphabet base64 without padding, as age
+/// specifies. Empty bytes encode to empty text. Pure, comptime-safe;
+/// total, no rows or traps on well-typed input. Not fixed-time.
+///
+/// ```wolf-doc-example
+/// base64.encode_raw("f".bytes()) == "Zg"
+/// base64.encode_raw("foo".bytes()) == "Zm9v"
+/// ```
+pub fn encode_raw(b: List[byte]) -> str {
+    let alphabet = alphabet_std().bytes()
+    var out = List[byte]()
+    var acc: int = 0
+    var bits: int = 0
+    for v in b {
+        acc = acc * 256 + v as int
+        bits = bits + 8
+        while bits >= 6 {
+            bits = bits - 6
+            let factor = pow2(bits)
+            (mut out).push(alphabet[acc / factor])
+            acc = acc % factor
+        }
+    }
+    if bits > 0 { (mut out).push(alphabet[acc * pow2(6 - bits)]) }
+    str_from_utf8(out) else ""
+}
+
+/// Strict unpadded standard base64. Raises `parse` on padding, any
+/// nonalphabet byte (including whitespace, URL characters and non-ASCII),
+/// a one-character residual group, or nonzero unused trailing bits.
+/// Empty text succeeds with empty bytes. Total over UTF-8, no traps.
+/// Pure, comptime-safe; not fixed-time. Never includes input in errors.
+///
+/// ```wolf-doc-example
+/// let b = base64.decode_raw("Zg")?
+/// base64.encode_raw(b) == "Zg"
+/// ```
+pub fn decode_raw(s: str) -> List[byte] ! {parse} {
+    var out = List[byte]()
+    var acc: int = 0
+    var bits: int = 0
+    for c in s.bytes() {
+        let v = value_in(c as int, alphabet_std())
+        if v < 0 { return parse }
+        acc = acc * 64 + v
+        bits = bits + 6
+        if bits >= 8 {
+            bits = bits - 8
+            let factor = pow2(bits)
+            (mut out).push((acc / factor) as byte)
+            acc = acc % factor
+        }
+    }
+    if bits >= 6 || acc != 0 { return parse }
+    out
+}
 
 /// The standard alphabet (RFC 4648 §4). Private.
 fn alphabet_std() -> str {
