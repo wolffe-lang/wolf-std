@@ -1,0 +1,159 @@
+//! check: run(exit=0, stdout="open_len=0\ninterest_zero=invalid\ninterest_four=invalid\nnegative_handle=invalid\nmarked_handle=invalid\nkeys=0 1 2\nlen=3\nfile_twice=invalid\nlistener_twice=invalid\nmodify_unknown=invalid\nmodify_interest=invalid\nmodify_listener_write=invalid\nmodify_served=ok\nremove_unknown=invalid\nremove_served=ok\nremove_twice=invalid\nkey_reused=1 len=3\ndeadline_below=invalid\nsend_only_meaning=invalid\nnegative_meanings=invalid\nfiles_and_sockets=unsupported\nsockets_with_meanings=unsupported\nsocket_write=unsupported\nfiles_no_meanings=unsupported\nempty_forever=invalid\nempty_look=0 0\nclosed=ok")
+//! phase: run
+//! conforms: std.poll, std.fs, std.net, std.signal, os.signal.wait.fds, os.net.wait, err.row
+//!
+//! **sc82: `std.poll`'s waiter, the rows decided before the host.** The
+//! adds: an interest outside `READ`, `WRITE` and both, a negative handle
+//! number and one with a wait mark set (`signal.WAIT_WRITE`'s bit 62) are
+//! `invalid`; keys are 0, 1, 2 in the order added; a file and a listener
+//! the waiter already holds are `invalid`. `modify` and `remove` refuse
+//! a key no live entry holds, `modify` an interest outside the three and
+//! a listener's `WRITE`; a removed key is the next add's, and the others
+//! keep theirs. `wait`'s shape: a deadline below -1, a send-only meaning
+//! and a negative set are `invalid`. Then the four combinations the pin
+//! cannot wait on in one call, each `unsupported` on every host (the
+//! module header; `docs/sc82-one-wait.md`'s M1): files and a listener;
+//! a listener and a socket with meanings; a socket with `WRITE`; files
+//! with no meanings. An empty waiter with no meanings and no deadline is
+//! `invalid` (nothing could end it); with deadline 0 it answers nothing
+//! at once. `close` consumes the waiter.
+//!
+//! Every line is decided by std before any host call, so every machine
+//! and host prints the same lines: lupin, windows included.
+
+use std.fs
+use std.net
+use std.poll
+use std.signal
+
+fn add_row(mut w: poll.Waiter, f: fs.File, interest: int) -> str {
+    let k = poll.add_file(mut w, f, interest) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "{k}"
+}
+
+fn listener_row(mut w: poll.Waiter, l: net.Listener) -> str {
+    let k = poll.add_listener(mut w, l) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "{k}"
+}
+
+fn modify_row(mut w: poll.Waiter, key: int, interest: int) -> str {
+    poll.modify(mut w, key, interest) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn remove_row(mut w: poll.Waiter, key: int) -> str {
+    poll.remove(mut w, key) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    "ok"
+}
+
+fn wait_row(mut w: poll.Waiter, meanings: int, deadline: int) -> str {
+    let ev = poll.wait(mut w, meanings, deadline) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "{ev.meaning} {ev.ready.len}"
+}
+
+fn main() -> !int {
+    var w = poll.open()?
+    print("open_len={poll.len(w)}")
+    fs.write_text("sc82-waiter.tmp", "x")?
+    var f = fs.open("sc82-waiter.tmp")?
+    var g = fs.open("sc82-waiter.tmp")?
+    var srv = net.listen(net.loopback(0))?
+    let resize = signal.resize()
+    let r0 = add_row(mut w, f, 0)
+    print("interest_zero={r0}")
+    let r4 = add_row(mut w, f, 4)
+    print("interest_four={r4}")
+    let rn = add_row(mut w, fs.File { fd: -1 }, poll.READ)
+    print("negative_handle={rn}")
+    let rm = add_row(mut w, fs.File { fd: f.fd + signal.WAIT_WRITE }, poll.READ)
+    print("marked_handle={rm}")
+    let k0 = add_row(mut w, f, poll.READ)
+    let k1 = listener_row(mut w, srv)
+    let k2 = add_row(mut w, g, poll.READ | poll.WRITE)
+    print("keys={k0} {k1} {k2}")
+    print("len={poll.len(w)}")
+    let f2 = add_row(mut w, f, poll.WRITE)
+    print("file_twice={f2}")
+    let l2 = listener_row(mut w, srv)
+    print("listener_twice={l2}")
+    let m0 = modify_row(mut w, 99, poll.READ)
+    print("modify_unknown={m0}")
+    let m1 = modify_row(mut w, 0, 0)
+    print("modify_interest={m1}")
+    let m2 = modify_row(mut w, 1, poll.WRITE)
+    print("modify_listener_write={m2}")
+    let m3 = modify_row(mut w, 2, poll.READ)
+    print("modify_served={m3}")
+    let d0 = remove_row(mut w, -1)
+    print("remove_unknown={d0}")
+    let d1 = remove_row(mut w, 1)
+    print("remove_served={d1}")
+    let d2 = remove_row(mut w, 1)
+    print("remove_twice={d2}")
+    let again = listener_row(mut w, srv)
+    print("key_reused={again} len={poll.len(w)}")
+    let s0 = wait_row(mut w, resize, -2)
+    print("deadline_below={s0}")
+    let s1 = wait_row(mut w, signal.kill(), 0)
+    print("send_only_meaning={s1}")
+    let s2 = wait_row(mut w, -1, 0)
+    print("negative_meanings={s2}")
+    let c0 = wait_row(mut w, resize, 0)
+    print("files_and_sockets={c0}")
+    poll.remove(mut w, 0)?
+    poll.remove(mut w, 2)?
+    let port = net.port(srv)?
+    var cli = net.connect(net.loopback(port))?
+    let kc = poll.add_socket(mut w, cli, poll.READ)?
+    let c1 = wait_row(mut w, resize, 0)
+    print("sockets_with_meanings={c1}")
+    poll.modify(mut w, kc, poll.READ | poll.WRITE)?
+    let c2 = wait_row(mut w, 0, 0)
+    print("socket_write={c2}")
+    poll.remove(mut w, kc)?
+    poll.remove(mut w, 1)?
+    let kf = poll.add_file(mut w, f, poll.READ)?
+    let c3 = wait_row(mut w, 0, 0)
+    print("files_no_meanings={c3}")
+    poll.remove(mut w, kf)?
+    let e0 = wait_row(mut w, 0, -1)
+    print("empty_forever={e0}")
+    let e1 = wait_row(mut w, 0, 0)
+    print("empty_look={e1}")
+    poll.close(take w)?
+    print("closed=ok")
+    net.close(take cli)?
+    net.close_listener(take srv)?
+    fs.close(take f)?
+    fs.close(take g)?
+    fs.remove("sc82-waiter.tmp")?
+    0
+}

@@ -1,0 +1,91 @@
+//! check: run(exit=0, stdout="child_during_wait=true\nno_entry=true\nchild_status=0\nmeaning_first=512 none\nfile_next=0 file:1")
+//! phase: run
+//! conforms: std.poll, std.signal, std.process, std.fs, std.time, os.signal.wait.fds, os.signal.raise, os.proc.pipe, err.row
+//!
+//! **sc82: a meaning delivered during a wait.** The row listens for
+//! `child()` and `user()`, starts `/bin/sh -c 'sleep 0.3'`, and waits on a
+//! quiet pipe's read end with `child()` and a 10 s deadline: the child's
+//! end wakes the wait with `child()` and no entry, no sooner than 200 ms
+//! after it began (the child's `sleep`, less the time it took to start).
+//! Then a meaning already pending and a ready file: `user()` raised to
+//! this process before the wait is answered alone (`512 none`), as
+//! `signal.wait_fds` answers it, and the file answers the next wait. When
+//! the runtime's one wait lands (`docs/sc82-one-wait.md`, M1) a meaning no
+//! longer hides a ready entry, and that line answers both.
+//!
+//! The only signals are the row's own child's end and its own `raise`.
+//! **windows** answers the listen for `child()` `io` (only four meanings
+//! are heard there), and the row prints its lines for that reason.
+//! **lupin** 0.1.61 refuses `os_signal_listen` by name.
+
+use std.fs
+use std.poll
+use std.process
+use std.signal
+use std.time
+
+fn every_line() {
+    print("child_during_wait=true")
+    print("no_entry=true")
+    print("child_status=0")
+    print("meaning_first=512 none")
+    print("file_next=0 file:1")
+}
+
+fn named(ev: poll.Events, names: List[str]) -> str {
+    var s = ""
+    for r in ev.ready {
+        if s != "" {
+            s = s + " "
+        }
+        s = s + "{names[r.key]}:{r.facts}"
+    }
+    if s == "" {
+        return "{ev.meaning} none"
+    }
+    "{ev.meaning} {s}"
+}
+
+fn main() -> !int {
+    signal.listen(signal.child() | signal.user()) else |e| {
+        match e {
+            io => {
+                every_line()
+                return 0
+            },
+        }
+    }
+    var pp = process.pipe()?
+    var r = pp.read
+    var pw = pp.write
+    var w = poll.open()?
+    let kr = poll.add_file(mut w, r, poll.READ)?
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, "sleep 0.3")
+    let t0 = time.monotonic_ns()
+    var ch = process.start(c)?
+    let ev = poll.wait(mut w, signal.child(), 10000)?
+    let t1 = time.monotonic_ns()
+    print("child_during_wait={ev.meaning == signal.child() && t1 - t0 >= 200000000}")
+    print("no_entry={ev.ready.len == 0}")
+    let st = process.wait_status(take ch)?
+    print("child_status={st}")
+    poll.remove(mut w, kr)?
+    fs.write_text("sc82-signal.tmp", "x")?
+    var f = fs.open("sc82-signal.tmp")?
+    let _kf = poll.add_file(mut w, f, poll.READ)?
+    var names = List[str]()
+    (mut names).push("file")
+    signal.raise(signal.user())?
+    let first = poll.wait(mut w, signal.user() | signal.child(), 0)?
+    print("meaning_first={named(first, names)}")
+    let next = poll.wait(mut w, signal.user() | signal.child(), 0)?
+    print("file_next={named(next, names)}")
+    poll.close(take w)?
+    fs.close(take f)?
+    fs.close(take r)?
+    fs.close(take pw)?
+    fs.remove("sc82-signal.tmp")?
+    0
+}

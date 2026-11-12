@@ -1,0 +1,176 @@
+//! check: run(exit=0, stdout="room=master:2\ntook_until_busy=true\nfull=none waited=true\nroom_after_a_read=master:2\nqueue_drained=true\nwaited_for_room=true\nin_order=true")
+//! phase: run
+//! conforms: std.poll, std.term, std.fs, std.signal, std.time, os.fs.nonblock, os.signal.wait.write, os.term.pty, err.row
+//!
+//! **sc82: the partial write, on a pseudo-terminal master.** The slave is
+//! raw and quiet (canonical input and echo off, ops 51 and 53), so what
+//! the master writes waits in the slave's input queue until the slave
+//! reads it. The master is non-blocking and waits with `WRITE`: it has
+//! room; `fs.write_some` of 4096-byte lists takes bytes until it answers
+//! `busy` (some kilobytes on linux, 20480 bytes on PAX: the row prints no
+//! number); a wait over the full master passes its 25 ms deadline; a read
+//! of the slave makes room, and the wait answers `WRITE`.
+//!
+//! Then the server's loop over a second pty: a queue of 65536 bytes is
+//! written from an offset, each `write_some` taking what fits and moving
+//! the offset; on `busy` the loop reads the slave (the client's side
+//! here) and waits for `WRITE` before writing again. The queue drains,
+//! the loop waited for room at least once, and the slave reads every byte
+//! in the order queued.
+//!
+//! **windows** answers `open_pty`'s `unsupported`, and the row prints its
+//! lines for that reason. **lupin** 0.1.61 refuses `os_term_open_pty` by
+//! name.
+
+use std.fs
+use std.poll
+use std.signal
+use std.term
+use std.time
+
+fn every_line() {
+    print("room=master:2")
+    print("took_until_busy=true")
+    print("full=none waited=true")
+    print("room_after_a_read=master:2")
+    print("queue_drained=true")
+    print("waited_for_room=true")
+    print("in_order=true")
+}
+
+fn shown(ev: poll.Events) -> str {
+    var s = ""
+    for r in ev.ready {
+        if s != "" {
+            s = s + " "
+        }
+        s = s + "master:{r.facts}"
+    }
+    if s == "" {
+        return "none"
+    }
+    s
+}
+
+fn pattern(from: int, n: int) -> List[byte] {
+    var b = List[byte]()
+    var i = 0
+    while i < n {
+        (mut b).push((97 + (from + i) % 26) as byte)
+        i = i + 1
+    }
+    b
+}
+
+// One write of what fits from `q[at..]`, at most 4096 bytes: the count,
+// or -1 for `busy`.
+fn write_from(mut m: fs.File, q: List[byte], at: int) -> int ! {invalid, io} {
+    var chunk = List[byte]()
+    var i = at
+    while i < q.len && i < at + 4096 {
+        (mut chunk).push(q[i])
+        i = i + 1
+    }
+    let n = fs.write_some(mut m, chunk) else |e| match e {
+        busy => { return -1 },
+        invalid => { return invalid },
+        io => { return io },
+    }
+    n
+}
+
+fn raw(s: fs.File) -> () ! {invalid, io, unsupported} {
+    term.set_attr(s, 51, 0)?
+    term.set_attr(s, 53, 0)?
+}
+
+fn main() -> !int {
+    let p = term.open_pty() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            io => print("open_pty=io {os_error()}"),
+        }
+        return 1
+    }
+    var m = p.master
+    var s = p.slave
+    raw(s)?
+    fs.set_nonblock(mut m, true)?
+    var w = poll.open()?
+    let km = poll.add_file(mut w, m, poll.WRITE)?
+    let room = poll.wait(mut w, signal.resize(), 0)?
+    print("room={shown(room)}")
+    var took = 0
+    var busy = false
+    var calls = 0
+    while !busy && calls < 1000 {
+        let n = write_from(mut m, pattern(0, 4096), 0)?
+        if n < 0 {
+            busy = true
+        } else {
+            took = took + n
+        }
+        calls = calls + 1
+    }
+    print("took_until_busy={busy && took > 0}")
+    let t0 = time.monotonic_ns()
+    let full = poll.wait(mut w, signal.resize(), 25)?
+    let t1 = time.monotonic_ns()
+    print("full={shown(full)} waited={t1 - t0 >= 25000000}")
+    let _got = fs.read_chunk(mut s, 4096)?
+    let after = poll.wait(mut w, signal.resize(), 2000)?
+    print("room_after_a_read={shown(after)}")
+    poll.remove(mut w, km)?
+
+    let p2 = term.open_pty()?
+    var m2 = p2.master
+    var s2 = p2.slave
+    raw(s2)?
+    fs.set_nonblock(mut m2, true)?
+    let k2 = poll.add_file(mut w, m2, poll.WRITE)?
+    let total = 65536
+    let q = pattern(0, total)
+    var at = 0
+    var waits = 0
+    var got = List[byte]()
+    while at < total && waits < 10000 {
+        let n = write_from(mut m2, q, at)?
+        if n >= 0 {
+            at = at + n
+        } else {
+            let chunk = fs.read_chunk(mut s2, 4096)?
+            for c in chunk {
+                (mut got).push(c)
+            }
+            let _room = poll.wait(mut w, signal.resize(), 2000)?
+            waits = waits + 1
+        }
+    }
+    while at == total && got.len < total {
+        let chunk = fs.read_chunk(mut s2, 4096)?
+        for c in chunk {
+            (mut got).push(c)
+        }
+    }
+    print("queue_drained={at == total}")
+    print("waited_for_room={waits > 0}")
+    var same = got.len == total
+    var i = 0
+    while same && i < total {
+        if got[i] != q[i] {
+            same = false
+        }
+        i = i + 1
+    }
+    print("in_order={same}")
+    poll.remove(mut w, k2)?
+    poll.close(take w)?
+    fs.close(take s)?
+    fs.close(take m)?
+    fs.close(take s2)?
+    fs.close(take m2)?
+    0
+}

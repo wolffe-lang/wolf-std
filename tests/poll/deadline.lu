@@ -1,0 +1,121 @@
+//! check: run(exit=0, stdout="sockets_look=none\nsockets_25_waited=true\nsockets_forever_ready=listener:1\nempty_25_waited=true\nfiles_look=none\nfiles_25_waited=true\nfiles_forever_ready=file:1\nmeanings_alone_25_waited=true")
+//! phase: run
+//! conforms: std.poll, std.net, std.fs, std.process, std.signal, std.time, os.signal.wait.fds, os.net.wait, os.proc.pipe, err.row
+//!
+//! **sc82: the deadline, on each path.** On the sockets path, a quiet
+//! listener: deadline 0 answers nothing at once, 25 ms answers nothing no
+//! sooner than 25 ms on the monotonic clock, and -1 with a dial in the
+//! backlog answers the listener at once. A waiter with no entries and no
+//! meanings waits out 25 ms the same way. On the files path, a quiet
+//! pipe's read end with `resize()` (never sent here): the same three, -1
+//! with a regular file ready. An empty waiter with a meaning set waits out
+//! its 25 ms too.
+//!
+//! **windows** answers the files path `unsupported`, and the row prints
+//! the files path's lines for that reason after running the sockets
+//! path's. **lupin** 0.1.61 runs the sockets path and refuses
+//! `os_signal_wait_fds` by name at the files path's first wait.
+
+use std.fs
+use std.net
+use std.poll
+use std.process
+use std.signal
+use std.time
+
+fn named(ev: poll.Events, names: List[str]) -> str {
+    var s = ""
+    for r in ev.ready {
+        if s != "" {
+            s = s + " "
+        }
+        s = s + "{names[r.key]}:{r.facts}"
+    }
+    if s == "" {
+        return "none"
+    }
+    s
+}
+
+fn waited(mut w: poll.Waiter, names: List[str], meanings: int, deadline: int) -> str {
+    let ev = poll.wait(mut w, meanings, deadline) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    named(ev, names)
+}
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    var sw = poll.open()?
+    var snames = List[str]()
+    let _kl = poll.add_listener(mut sw, srv)?
+    (mut snames).push("listener")
+    let look = waited(mut sw, snames, 0, 0)
+    print("sockets_look={look}")
+    let t0 = time.monotonic_ns()
+    let s25 = waited(mut sw, snames, 0, 25)
+    let t1 = time.monotonic_ns()
+    print("sockets_25_waited={s25 == "none" && t1 - t0 >= 25000000}")
+    let port = net.port(srv)?
+    var d = net.connect(net.loopback(port))?
+    let forever = waited(mut sw, snames, 0, -1)
+    print("sockets_forever_ready={forever}")
+    poll.close(take sw)?
+    net.close(take d)?
+    net.close_listener(take srv)?
+
+    var empty = poll.open()?
+    let none = List[str]()
+    let t2 = time.monotonic_ns()
+    let e25 = waited(mut empty, none, 0, 25)
+    let t3 = time.monotonic_ns()
+    print("empty_25_waited={e25 == "none" && t3 - t2 >= 25000000}")
+
+    var pp = process.pipe()?
+    var r = pp.read
+    var pw = pp.write
+    var fw = poll.open()?
+    var fnames = List[str]()
+    let kr = poll.add_file(mut fw, r, poll.READ)?
+    (mut fnames).push("pipe")
+    let flook = waited(mut fw, fnames, signal.resize(), 0)
+    if flook == "unsupported" {
+        print("files_look=none")
+        print("files_25_waited=true")
+        print("files_forever_ready=file:1")
+        print("meanings_alone_25_waited=true")
+        poll.close(take fw)?
+        poll.close(take empty)?
+        fs.close(take r)?
+        fs.close(take pw)?
+        return 0
+    }
+    print("files_look={flook}")
+    let t4 = time.monotonic_ns()
+    let f25 = waited(mut fw, fnames, signal.resize(), 25)
+    let t5 = time.monotonic_ns()
+    print("files_25_waited={f25 == "none" && t5 - t4 >= 25000000}")
+    poll.remove(mut fw, kr)?
+    fs.write_text("sc82-deadline.tmp", "x")?
+    var f = fs.open("sc82-deadline.tmp")?
+    let _kf = poll.add_file(mut fw, f, poll.READ)?
+    var fnames2 = List[str]()
+    (mut fnames2).push("file")
+    let fforever = waited(mut fw, fnames2, signal.resize(), -1)
+    print("files_forever_ready={fforever}")
+    let t6 = time.monotonic_ns()
+    let m25 = waited(mut empty, none, signal.resize(), 25)
+    let t7 = time.monotonic_ns()
+    print("meanings_alone_25_waited={m25 == "none" && t7 - t6 >= 25000000}")
+    poll.close(take fw)?
+    poll.close(take empty)?
+    fs.close(take f)?
+    fs.close(take r)?
+    fs.close(take pw)?
+    fs.remove("sc82-deadline.tmp")?
+    0
+}

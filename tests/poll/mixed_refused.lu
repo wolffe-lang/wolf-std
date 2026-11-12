@@ -1,0 +1,164 @@
+//! check: run(exit=0, stdout="one_waiter=unsupported\nfiles=master1:1 master2:1 pipe:1\nsockets=client1:1 client2:1 listener:1")
+//! phase: run
+//! conforms: std.poll, std.term, std.net, std.net.unix, std.fs, std.process, std.signal, os.signal.wait.fds, os.net.wait, os.net.unix, os.term.pty, os.proc.pipe, err.row
+//!
+//! **sc82: the multiplexer's set, all ready at once.** Two pseudo-terminal
+//! masters, each with a byte from its slave; a Unix-domain listener with a
+//! dial in its backlog; two accepted clients, each with a byte from its
+//! peer; a pipe holding a byte. Six entries, every one ready.
+//!
+//! One waiter holding all six is **`unsupported`** at this pin: the
+//! runtime has no call that waits on its fs table and its net table at
+//! once (`docs/sc82-one-wait.md`, "Missing below std", M1). This line is
+//! the one that flips when M1 lands, to all six entries in one wait. Until
+//! then each half is served alone: the files with a meaning set (three
+//! entries), the sockets with none (three entries). Facts are printed by
+//! entry name in name order.
+//!
+//! **windows** answers `open_pty`'s `unsupported` (and has no Unix-domain
+//! socket), and the row prints its lines for that reason. **lupin** 0.1.61
+//! refuses `os_term_open_pty` by name.
+
+use std.fs
+use std.net
+use std.net.unix
+use std.poll
+use std.process
+use std.signal
+use std.sort
+use std.str
+use std.term
+use std.time
+
+fn every_line() {
+    print("one_waiter=unsupported")
+    print("files=master1:1 master2:1 pipe:1")
+    print("sockets=client1:1 client2:1 listener:1")
+}
+
+fn named(ev: poll.Events, names: List[str]) -> str {
+    var parts = List[str]()
+    for r in ev.ready {
+        (mut parts).push("{names[r.key]}:{r.facts}")
+    }
+    sort.sort_strs(mut parts)
+    if ev.meaning != 0 {
+        (mut parts).push("meaning:{ev.meaning}")
+    }
+    if parts.len == 0 {
+        return "none"
+    }
+    str.join(" ", parts)
+}
+
+fn waited(mut w: poll.Waiter, names: List[str], meanings: int, deadline: int) -> str {
+    let ev = poll.wait(mut w, meanings, deadline) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    named(ev, names)
+}
+
+fn main() -> !int {
+    let p1 = term.open_pty() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            io => print("open_pty=io {os_error()}"),
+        }
+        return 1
+    }
+    let p2 = term.open_pty()?
+    var m1 = p1.master
+    var s1 = p1.slave
+    var m2 = p2.master
+    var s2 = p2.slave
+    var pp = process.pipe()?
+    var r = pp.read
+    var pw = pp.write
+    fs.remove("sc82-mixed.sock") else |_| {}
+    var srv = unix.listen("sc82-mixed.sock")?
+    var d1 = unix.connect("sc82-mixed.sock")?
+    var d2 = unix.connect("sc82-mixed.sock")?
+    var a1 = net.accept(mut srv)?
+    var a2 = net.accept(mut srv)?
+    var d3 = unix.connect("sc82-mixed.sock")?
+    fs.write(mut s1, "a")?
+    fs.write(mut s2, "b")?
+    fs.write(mut pw, "c")?
+    net.write(mut d1, "1")?
+    net.write(mut d2, "2")?
+
+    var all = poll.open()?
+    var all_names = List[str]()
+    let _x1 = poll.add_file(mut all, m1, poll.READ)?
+    (mut all_names).push("master1")
+    let _x2 = poll.add_file(mut all, m2, poll.READ)?
+    (mut all_names).push("master2")
+    let _x3 = poll.add_file(mut all, r, poll.READ)?
+    (mut all_names).push("pipe")
+    let _x4 = poll.add_listener(mut all, srv)?
+    (mut all_names).push("listener")
+    let _x5 = poll.add_socket(mut all, a1, poll.READ)?
+    (mut all_names).push("client1")
+    let _x6 = poll.add_socket(mut all, a2, poll.READ)?
+    (mut all_names).push("client2")
+    let one = waited(mut all, all_names, signal.child(), 2000)
+    print("one_waiter={one}")
+    poll.close(take all)?
+
+    var fw = poll.open()?
+    var fnames = List[str]()
+    let _f1 = poll.add_file(mut fw, m1, poll.READ)?
+    (mut fnames).push("master1")
+    let _f2 = poll.add_file(mut fw, m2, poll.READ)?
+    (mut fnames).push("master2")
+    let _f3 = poll.add_file(mut fw, r, poll.READ)?
+    (mut fnames).push("pipe")
+    var files = waited(mut fw, fnames, signal.resize(), 2000)
+    var n = 0
+    while files != "master1:1 master2:1 pipe:1" && n < 100 {
+        time.sleep(time.millis(10))
+        files = waited(mut fw, fnames, signal.resize(), 2000)
+        n = n + 1
+    }
+    print("files={files}")
+    poll.close(take fw)?
+
+    var sw = poll.open()?
+    var snames = List[str]()
+    let _s1 = poll.add_listener(mut sw, srv)?
+    (mut snames).push("listener")
+    let _s2 = poll.add_socket(mut sw, a1, poll.READ)?
+    (mut snames).push("client1")
+    let _s3 = poll.add_socket(mut sw, a2, poll.READ)?
+    (mut snames).push("client2")
+    var socks = waited(mut sw, snames, 0, 2000)
+    n = 0
+    while socks != "client1:1 client2:1 listener:1" && n < 100 {
+        time.sleep(time.millis(10))
+        socks = waited(mut sw, snames, 0, 2000)
+        n = n + 1
+    }
+    print("sockets={socks}")
+    poll.close(take sw)?
+
+    net.close(take a1)?
+    net.close(take a2)?
+    net.close(take d1)?
+    net.close(take d2)?
+    net.close(take d3)?
+    net.close_listener(take srv)?
+    fs.close(take r)?
+    fs.close(take pw)?
+    fs.close(take s1)?
+    fs.close(take s2)?
+    fs.close(take m1)?
+    fs.close(take m2)?
+    0
+}

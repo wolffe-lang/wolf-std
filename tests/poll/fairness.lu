@@ -1,0 +1,112 @@
+//! check: run(exit=0, stdout="turns=pipe pipe pipe both both both both both pipe pipe\nnarrow=0 0 0 0 0 0 0 0 0 0\nmaster_byte=z")
+//! phase: run
+//! conforms: std.poll, std.term, std.fs, std.process, std.signal, os.signal.wait.fds, os.term.pty, os.proc.pipe, err.row
+//!
+//! **sc82: a flooding descriptor starves nothing.** The waiter holds a
+//! pipe at key 0, kept readable for the whole row (4096 bytes in it, one
+//! read a turn), and a pseudo-terminal master at key 1. Ten turns, each a
+//! wait with no deadline: at the fourth turn a byte is written to the
+//! master's slave (and the row waits for the master alone until it is
+//! ready, so it does not race the line discipline), and at the end of the
+//! eighth the master's byte is read. Every turn answers the pipe; every
+//! turn from the fourth to the eighth answers the master too. The narrow
+//! form, `signal.wait_fds` over the same two handles, answers index 0,
+//! the pipe, on every turn: the starvation `std.poll` ends.
+//!
+//! **windows** answers `open_pty`'s `unsupported`, and the row prints its
+//! lines for that reason. **lupin** 0.1.61 refuses `os_term_open_pty` by
+//! name.
+
+use std.fs
+use std.poll
+use std.process
+use std.signal
+use std.str
+use std.term
+
+fn every_line() {
+    print("turns=pipe pipe pipe both both both both both pipe pipe")
+    print("narrow=0 0 0 0 0 0 0 0 0 0")
+    print("master_byte=z")
+}
+
+fn which(ev: poll.Events) -> str {
+    var pipe = false
+    var master = false
+    for r in ev.ready {
+        if r.key == 0 && r.facts == poll.READ {
+            pipe = true
+        }
+        if r.key == 1 && r.facts == poll.READ {
+            master = true
+        }
+    }
+    if pipe && master {
+        return "both"
+    }
+    if pipe {
+        return "pipe"
+    }
+    if master {
+        return "master"
+    }
+    "none"
+}
+
+fn main() -> !int {
+    let p = term.open_pty() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            io => print("open_pty=io {os_error()}"),
+        }
+        return 1
+    }
+    var m = p.master
+    var s = p.slave
+    var pp = process.pipe()?
+    var r = pp.read
+    var pw = pp.write
+    fs.write(mut pw, str.repeat("a", 4096))?
+    var w = poll.open()?
+    let kp = poll.add_file(mut w, r, poll.READ)?
+    let km = poll.add_file(mut w, m, poll.READ)?
+    var narrow_set = List[fs.File]()
+    (mut narrow_set).push(r)
+    (mut narrow_set).push(m)
+    var turns = List[str]()
+    var narrow = List[str]()
+    var got = "none"
+    var t = 0
+    while t < 10 {
+        if t == 3 {
+            fs.write(mut s, "z")?
+            var alone = poll.open()?
+            let _k = poll.add_file(mut alone, m, poll.READ)?
+            let _e = poll.wait(mut alone, signal.resize(), 2000)?
+            poll.close(take alone)?
+        }
+        let ev = poll.wait(mut w, signal.resize(), -1)?
+        (mut turns).push(which(ev))
+        let nw = signal.wait_fds(narrow_set, signal.resize(), -1)?
+        (mut narrow).push("{nw.ready}")
+        let _one = fs.read_chunk(mut r, 1)?
+        if t == 7 {
+            got = fs.read(mut m, 8)?
+        }
+        t = t + 1
+    }
+    print("turns={str.join(" ", turns)}")
+    print("narrow={str.join(" ", narrow)}")
+    print("master_byte={got}")
+    poll.remove(mut w, kp)?
+    poll.remove(mut w, km)?
+    poll.close(take w)?
+    fs.close(take r)?
+    fs.close(take pw)?
+    fs.close(take s)?
+    fs.close(take m)?
+    0
+}

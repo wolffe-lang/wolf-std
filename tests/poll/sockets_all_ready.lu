@@ -1,0 +1,116 @@
+//! check: run(exit=0, stdout="quiet=none\nquiet_25_waited=true\nall_ready=client1:1 client2:1 listener:1\nagain=client1:1 client2:1 listener:1\nafter_read=client2:1 listener:1\nafter_accept=client2:1\npeer_gone=client2:1 read closed\nkeys_after_remove=none")
+//! phase: run
+//! conforms: std.poll, std.net, std.time, os.net.wait, err.row
+//!
+//! **sc82: every ready socket in one wait.** A TCP listener on loopback
+//! and two accepted clients, each with `READ`, in one waiter with no
+//! meanings. Quiet first: nothing at deadline 0, and nothing at a 25 ms
+//! deadline, which passes no sooner than 25 ms on the monotonic clock.
+//! Then a third dial waits in the backlog and each client's peer writes a
+//! byte: ONE wait answers all three, and the next the same
+//! (level-triggered). A read of client1's byte drops it; the accept of
+//! the pending dial drops the listener; client2's peer closing keeps it
+//! ready, and the read says `closed`. Facts are printed by entry name in
+//! name order: the waiter promises no order.
+//!
+//! Every machine and host serves the sockets path (`net.wait`): lupin
+//! 0.1.61 and windows included.
+
+use std.net
+use std.poll
+use std.sort
+use std.str
+use std.time
+
+fn named(ev: poll.Events, names: List[str]) -> str {
+    var parts = List[str]()
+    for r in ev.ready {
+        (mut parts).push("{names[r.key]}:{r.facts}")
+    }
+    sort.sort_strs(mut parts)
+    if ev.meaning != 0 {
+        (mut parts).push("meaning:{ev.meaning}")
+    }
+    if parts.len == 0 {
+        return "none"
+    }
+    str.join(" ", parts)
+}
+
+fn waited(mut w: poll.Waiter, names: List[str], deadline: int) -> str {
+    let ev = poll.wait(mut w, 0, deadline) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    named(ev, names)
+}
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    let port = net.port(srv)?
+    var d1 = net.connect(net.loopback(port))?
+    var d2 = net.connect(net.loopback(port))?
+    var a1 = net.accept(mut srv)?
+    var a2 = net.accept(mut srv)?
+    var w = poll.open()?
+    var names = List[str]()
+    let kl = poll.add_listener(mut w, srv)?
+    (mut names).push("listener")
+    let k1 = poll.add_socket(mut w, a1, poll.READ)?
+    (mut names).push("client1")
+    let k2 = poll.add_socket(mut w, a2, poll.READ)?
+    (mut names).push("client2")
+    let quiet = waited(mut w, names, 0)
+    print("quiet={quiet}")
+    let t0 = time.monotonic_ns()
+    let quiet25 = waited(mut w, names, 25)
+    let t1 = time.monotonic_ns()
+    print("quiet_25_waited={quiet25 == "none" && t1 - t0 >= 25000000}")
+    var d3 = net.connect(net.loopback(port))?
+    net.write(mut d1, "1")?
+    net.write(mut d2, "2")?
+    // A byte on loopback can reach the accepted end a moment after the
+    // write returns; wait for both before the row's look.
+    var n = 0
+    var all = waited(mut w, names, 2000)
+    while all != "client1:1 client2:1 listener:1" && n < 100 {
+        time.sleep(time.millis(10))
+        all = waited(mut w, names, 2000)
+        n = n + 1
+    }
+    print("all_ready={all}")
+    let again = waited(mut w, names, 0)
+    print("again={again}")
+    let _one = net.read(mut a1, 8)?
+    let after_read = waited(mut w, names, 0)
+    print("after_read={after_read}")
+    var a3 = net.accept(mut srv)?
+    let after_accept = waited(mut w, names, 0)
+    print("after_accept={after_accept}")
+    let _two = net.read(mut a2, 8)?
+    net.close(take d2)?
+    let gone = waited(mut w, names, 2000)
+    let end = net.read(mut a2, 8) else |e| match e {
+        closed => "closed",
+        timeout => "timeout",
+        utf8 => "utf8",
+        io => "io",
+    }
+    print("peer_gone={gone} read {end}")
+    poll.remove(mut w, kl)?
+    poll.remove(mut w, k1)?
+    poll.remove(mut w, k2)?
+    let empty = waited(mut w, names, 0)
+    print("keys_after_remove={empty}")
+    poll.close(take w)?
+    net.close(take a1)?
+    net.close(take a2)?
+    net.close(take a3)?
+    net.close(take d1)?
+    net.close(take d3)?
+    net.close_listener(take srv)?
+    0
+}

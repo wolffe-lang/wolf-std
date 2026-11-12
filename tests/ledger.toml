@@ -5498,3 +5498,76 @@ native = "run"
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
+
+# sc82 — `std.poll`, one wait over files, sockets and signals. Every row
+# is `docs/sc82-witness/rows.py`'s too. The rows decided by std before
+# any host call run on every machine and host.
+[tests."poll/waiter_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# Every ready file in one wait: lupin refuses `os_term_open_pty` by name;
+# windows prints the lines for `open_pty`'s `unsupported`.
+[tests."poll/files_all_ready.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# Every ready socket in one wait, over `net.wait`: every machine and host.
+[tests."poll/sockets_all_ready.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# The multiplexer's set: one waiter is `unsupported` at this pin (M1),
+# each half served alone. lupin refuses `os_term_open_pty` by name.
+[tests."poll/mixed_refused.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# A flooding pipe beside a pty master: every turn answers both. lupin
+# refuses `os_term_open_pty` by name.
+[tests."poll/fairness.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# The deadline on both paths: lupin runs the sockets path and refuses
+# `os_signal_wait_fds` by name at the files path; windows prints the
+# files path's lines for its `unsupported`.
+[tests."poll/deadline.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# `child()` during a wait, and a pending meaning before a ready file.
+# lupin refuses `os_signal_listen` by name; windows prints the lines for
+# the listen's `io`.
+[tests."poll/signal_during_wait.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# The partial write on a pty master, and a server's queue drained through
+# it. lupin refuses `os_term_open_pty` by name.
+[tests."poll/write_partial.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+# A pty's end when its child ends: `READ`, then the read's `io` (linux) or
+# `eof` (macOS); no `HANGUP` fact at this pin. lupin refuses
+# `os_term_open_pty` by name.
+[tests."poll/pty_hangup.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"

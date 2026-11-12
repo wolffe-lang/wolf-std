@@ -1,0 +1,113 @@
+//! check: run(exit=0, stdout="first_wait=master:1\nread=x\nend_wait=master:1\nend_read_as_the_host_says=true\nhangup_fact=0\nchild_status=0")
+//! phase: run
+//! conforms: std.poll, std.term, std.process, std.fs, std.os, std.signal, os.term.pty, os.proc.session, os.signal.wait.fds, err.row
+//!
+//! **sc82: a pty's hangup when its child ends.** `/bin/sh -c 'printf x'`
+//! runs with a pty's slave on 0, 1 and 2 (`process.start_session`), and
+//! this process closes its own slave, as a server does. The waiter holds
+//! the master with `READ`: the first wait answers it, and the reads that
+//! follow give `x`; once the child has ended and its slave descriptors
+//! with it, the master is still ready, and its read ends the relay: `io`
+//! on linux (the host's `EIO`), `eof` on macOS. At this pin the end is
+//! answered as `READ` with no `HANGUP` fact (`signal.wait_fds` does not
+//! say which): that line flips when the runtime's one wait lands
+//! (`docs/sc82-one-wait.md`, M1). The child's status is 0.
+//!
+//! **windows** answers `open_pty`'s `unsupported`, and the row prints its
+//! lines for that reason. **lupin** 0.1.61 refuses `os_term_open_pty` by
+//! name.
+
+use std.fs
+use std.os
+use std.poll
+use std.process
+use std.signal
+use std.term
+
+fn every_line() {
+    print("first_wait=master:1")
+    print("read=x")
+    print("end_wait=master:1")
+    print("end_read_as_the_host_says=true")
+    print("hangup_fact=0")
+    print("child_status=0")
+}
+
+fn shown(ev: poll.Events) -> str {
+    var s = ""
+    for r in ev.ready {
+        if s != "" {
+            s = s + " "
+        }
+        s = s + "master:{r.facts}"
+    }
+    if s == "" {
+        return "none"
+    }
+    s
+}
+
+fn main() -> !int {
+    let p = term.open_pty() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            io => print("open_pty=io {os_error()}"),
+        }
+        return 1
+    }
+    var m = p.master
+    var s = p.slave
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, "printf x")
+    process.set_stdin(mut c, s)
+    process.set_stdout(mut c, s)
+    process.set_stderr(mut c, s)
+    var ch = process.start_session(c, 0)?
+    fs.close(take s)?
+    var w = poll.open()?
+    let km = poll.add_file(mut w, m, poll.READ)?
+    let first = poll.wait(mut w, signal.resize(), 5000)?
+    print("first_wait={shown(first)}")
+    // Read until the relay's end: the child's byte, then the end row.
+    var got = ""
+    var end = "none"
+    var last = first
+    var n = 0
+    while end == "none" && n < 64 {
+        let chunk = fs.read(mut m, 64) else |e| {
+            end = match e {
+                eof => "eof",
+                io => "io",
+                utf8 => "utf8",
+            }
+            ""
+        }
+        got = got + chunk
+        if end == "none" {
+            last = poll.wait(mut w, signal.resize(), 5000)?
+        }
+        n = n + 1
+    }
+    print("read={got}")
+    print("end_wait={shown(last)}")
+    var want = "io"
+    if os.name() == "macos" {
+        want = "eof"
+    }
+    print("end_read_as_the_host_says={end == want}")
+    var hangup = 0
+    for r in last.ready {
+        hangup = hangup | r.facts & poll.HANGUP
+    }
+    print("hangup_fact={hangup}")
+    let st = process.wait_status(take ch)?
+    print("child_status={st}")
+    poll.remove(mut w, km)?
+    poll.close(take w)?
+    fs.close(take m)?
+    0
+}

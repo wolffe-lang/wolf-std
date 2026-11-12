@@ -1,0 +1,144 @@
+//! check: run(exit=0, stdout="quiet=file:1 master1:2 pipe_w:2\nall_ready=file:1 master1:3 master2:1 pipe:1 pipe_w:2\nnarrow_form=0 0\nagain=file:1 master1:3 master2:1 pipe:1 pipe_w:2\nafter_reads=file:1 master1:2 pipe_w:2")
+//! phase: run
+//! conforms: std.poll, std.term, std.fs, std.process, std.signal, os.signal.wait.fds, os.signal.wait.write, os.term.pty, os.proc.pipe, err.row
+//!
+//! **sc82: every ready file in one wait.** Two pseudo-terminal masters
+//! (master1 with `READ | WRITE`, master2 with `READ`), a pipe's read end
+//! (`READ`) and its write end (`WRITE`), and a regular file (`READ`), in
+//! one waiter, waited on with `resize()` (never sent here). Quiet first:
+//! the file is always ready to read, a master with room and the pipe's
+//! write end are ready to write. Then a byte written to each slave and to
+//! the pipe: ONE wait answers all five entries, master1 with both facts
+//! — where `signal.wait_fds` over the same handles answers index 0 alone.
+//! Readiness is level-triggered, so the next wait answers the same; once
+//! master2's and the pipe's bytes and master1's are read, the three read
+//! facts go. Facts are printed by entry name in name order: the waiter
+//! promises no order.
+//!
+//! **windows** answers `open_pty`'s `unsupported`, and the row prints its
+//! lines for that reason. **lupin** 0.1.61 refuses `os_term_open_pty` by
+//! name.
+
+use std.fs
+use std.poll
+use std.process
+use std.signal
+use std.sort
+use std.str
+use std.term
+
+fn every_line() {
+    print("quiet=file:1 master1:2 pipe_w:2")
+    print("all_ready=file:1 master1:3 master2:1 pipe:1 pipe_w:2")
+    print("narrow_form=0 0")
+    print("again=file:1 master1:3 master2:1 pipe:1 pipe_w:2")
+    print("after_reads=file:1 master1:2 pipe_w:2")
+}
+
+fn named(ev: poll.Events, names: List[str]) -> str {
+    var parts = List[str]()
+    for r in ev.ready {
+        (mut parts).push("{names[r.key]}:{r.facts}")
+    }
+    sort.sort_strs(mut parts)
+    if ev.meaning != 0 {
+        (mut parts).push("meaning:{ev.meaning}")
+    }
+    if parts.len == 0 {
+        return "none"
+    }
+    str.join(" ", parts)
+}
+
+fn waited(mut w: poll.Waiter, names: List[str], deadline: int) -> str {
+    let ev = poll.wait(mut w, signal.resize(), deadline) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    named(ev, names)
+}
+
+fn main() -> !int {
+    let p1 = term.open_pty() else |e| {
+        match e {
+            unsupported => {
+                every_line()
+                return 0
+            },
+            io => print("open_pty=io {os_error()}"),
+        }
+        return 1
+    }
+    let p2 = term.open_pty()?
+    var m1 = p1.master
+    var s1 = p1.slave
+    var m2 = p2.master
+    var s2 = p2.slave
+    var pp = process.pipe()?
+    var r = pp.read
+    var pw = pp.write
+    fs.write_text("sc82-files.tmp", "x")?
+    var f = fs.open("sc82-files.tmp")?
+    var w = poll.open()?
+    var names = List[str]()
+    let k1 = poll.add_file(mut w, m1, poll.READ | poll.WRITE)?
+    (mut names).push("master1")
+    let k2 = poll.add_file(mut w, m2, poll.READ)?
+    (mut names).push("master2")
+    let kr = poll.add_file(mut w, r, poll.READ)?
+    (mut names).push("pipe")
+    let kw = poll.add_file(mut w, pw, poll.WRITE)?
+    (mut names).push("pipe_w")
+    let kf = poll.add_file(mut w, f, poll.READ)?
+    (mut names).push("file")
+    let quiet = waited(mut w, names, 0)
+    print("quiet={quiet}")
+    fs.write(mut s1, "a")?
+    fs.write(mut s2, "b")?
+    fs.write(mut pw, "c")?
+    // A byte written to a slave reaches its master through the line
+    // discipline's queue; wait for each master alone first, so the row
+    // does not race it.
+    var one = poll.open()?
+    let o1 = poll.add_file(mut one, m1, poll.READ)?
+    let _w1 = poll.wait(mut one, signal.resize(), 2000)?
+    poll.remove(mut one, o1)?
+    let o2 = poll.add_file(mut one, m2, poll.READ)?
+    let _w2 = poll.wait(mut one, signal.resize(), 2000)?
+    poll.remove(mut one, o2)?
+    poll.close(take one)?
+    let all = waited(mut w, names, -1)
+    print("all_ready={all}")
+    var narrow = List[fs.File]()
+    (mut narrow).push(m1)
+    (mut narrow).push(m2)
+    (mut narrow).push(r)
+    (mut narrow).push(f)
+    let nw = signal.wait_fds(narrow, signal.resize(), 0)?
+    print("narrow_form={nw.meaning} {nw.ready}")
+    let again = waited(mut w, names, 0)
+    print("again={again}")
+    let _a = fs.read(mut m1, 8)?
+    let _b = fs.read(mut m2, 8)?
+    let _c = fs.read(mut r, 8)?
+    let after = waited(mut w, names, 0)
+    print("after_reads={after}")
+    poll.remove(mut w, k1)?
+    poll.remove(mut w, k2)?
+    poll.remove(mut w, kr)?
+    poll.remove(mut w, kw)?
+    poll.remove(mut w, kf)?
+    poll.close(take w)?
+    fs.close(take f)?
+    fs.close(take r)?
+    fs.close(take pw)?
+    fs.close(take s1)?
+    fs.close(take s2)?
+    fs.close(take m1)?
+    fs.close(take m2)?
+    fs.remove("sc82-files.tmp")?
+    0
+}
