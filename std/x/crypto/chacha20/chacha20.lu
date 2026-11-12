@@ -359,7 +359,7 @@ fn require_chacha_inputs(key: List[byte], counter: int, nonce: List[byte]) {
 /// is not 32 bytes, a nonce that is not 12, or a counter outside
 /// 0..2^32-1; total otherwise (sc35: a non-byte element is a type
 /// error).
-/// ct: constant-time by construction — the rounds are add-rotate-xor
+/// ct: fixed source-level schedule — the rounds are add-rotate-xor
 /// on 32-bit words with literal rotation amounts; every branch is a
 /// fixed loop bound and every index is a fixed offset or a loop
 /// counter, so no branch and no memory address depends on a secret,

@@ -1731,8 +1731,9 @@ fn fe_a24() -> Fe {
 /// spelling. **Total** — the non-byte element it used to trap on is a
 /// type error since sc35.
 /// ct: NOT constant-time — the alphabet slice is indexed by each byte's
-/// VALUE. Render public values (keys, signatures, shared secrets are
-/// public once computed); a constant-time encoder is c28-tier work.
+/// VALUE. Render only public keys, signatures or LABELLED test vectors.
+/// Private scalars and shared secrets remain confidential after computation;
+/// never log them. This renderer offers no fixed-time guarantee.
 ///
 /// ```wolf-doc-example
 /// curve25519.to_hex("abc".bytes()) == "616263"
