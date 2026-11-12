@@ -77,9 +77,9 @@
 //! one, and both say so in their own docs: `port` answers `io` because a
 //! path has no port, and `close_listener` UNLINKS the path it bound.
 //!
-//! **Blocking, and what that means for a program.** Every operation blocks
-//! the whole process: `accept` waits for a connection, `read` waits for
-//! bytes. There is no reactor, no task parking and no `select` at this tier
+//! **Blocking, and what that means for a program.** `accept` waits for a
+//! connection and `read` waits for bytes. `write_some` is the non-parking
+//! exception: it sends what fits or answers busy; std.poll waits for room. There is no reactor, no task parking and no `select` at this tier
 //! — X6's completion-io posture is the s35 reactor's story and reaches std
 //! when the builtin tier does. Two consequences a caller must design
 //! around: a server written over these functions serves one connection at
@@ -115,25 +115,13 @@
 //! - `write_all` — **not shipped because `write` already is one.** The
 //!   builtin writes the whole `str` or raises; a short write is not
 //!   observable, so a `write_all` loop here would be ceremony documenting
-//!   a hazard that does not exist at this pin. The name is reserved for the
-//!   day a partial-write surface appears, and `write`'s doc states the
-//!   completeness it relies on.
-//! - `write_some(mut s: Socket, b: List[byte]) -> int ! {busy, closed,
-//!   invalid, io}` — **a contract (sc82), not shipped**: ONE send that
-//!   never parks, answering how many bytes the host took (at least 1 for
-//!   a non-empty list), `busy` when it can take none now, `closed` for a
-//!   peer that has gone, `invalid` for a list of the wrong element width.
-//!   It is the partial-write surface `write_all`'s line above waits for,
-//!   and what a server that keeps one output queue per client needs:
-//!   every write here drains the whole list, so one client that stops
-//!   reading parks the whole loop (a Unix stream holds 4096 bytes each way
-//!   on PAX). A file has it (`std.fs`'s `set_nonblock` and `write_some`);
-//!   a socket has no builtin for it at this pin. The call it needs,
-//!   `net_write_some(fd: int, bytes: List[byte]) -> int ! {busy, closed,
-//!   invalid, io}`, is stated in `docs/sc82-one-wait.md` ("Missing below
-//!   std", M2), and the function ships in the change after it lands
-//!   (API-CONVENTIONS §14, sc11). With it, a socket's `WRITE` interest in
-//!   `std.poll` is served too.
+//!   a hazard that does not exist at this pin. write_some is the partial
+//!   complement; write and write_bytes still drain the whole input.
+//! - ~~`write_some`~~ — **HERE now (sc83, wolf 0.2.40)**: one send, never
+//!   parks, counts the bytes taken, busy when nothing fits. Both TCP and
+//!   Unix streams use it, including PAX's 4096-byte Unix buffer. The
+//!   server retains its queue and asks std.poll for WRITE until drained.
+//!   lupin 0.1.62 serves this send too; the function below states its rows.
 //! - `shutdown(mut s, half)` — an orderly half-close. No builtin, so a
 //!   writer cannot say "I am done sending" without closing the whole
 //!   socket (F-0049).
@@ -541,6 +529,37 @@ pub fn read_bytes(mut s: Socket, max: int) -> List[byte] ! {closed, timeout, io}
 /// ```
 pub fn write_bytes(mut s: Socket, b: List[byte]) -> () ! {closed, invalid, io} {
     net_write_bytes(s.fd, b)?
+}
+
+/// Send a prefix of b in one non-parking send, returning its byte count:
+/// at least 1 for non-empty b, 0 for empty b (the handle is still checked).
+/// A socket deadline does not apply. The unsent suffix stays the caller's;
+/// retain it and enable std.poll.WRITE until the queue is drained.
+///
+/// Rows: busy when nothing fits now; closed for a peer gone, without
+/// SIGPIPE; invalid for a wrong-width list (unreachable for typed byte
+/// lists, retained for the builtin's FFI caller); io for a listener,
+/// forged/closed handle or other host failure. Never traps.
+///
+/// Capability net; refused at comptime. Delegates to net_write_some, one
+/// send with no list copy in the builtin. TCP and Unix streams, both
+/// compiler tiers and lupin 0.1.62. Unlike write_bytes, it never drains
+/// the whole list on the caller's behalf.
+///
+/// ```wolf-doc-example
+/// var srv = net.listen(net.loopback(0))?
+/// var cli = net.connect(net.loopback(net.port(srv)?))?
+/// var peer = net.accept(mut srv)?
+/// let n = net.write_some(mut cli, [128 as byte])?
+/// n == 1
+/// let b = net.read_bytes(mut peer, 1)?
+/// b.len == 1 && b[0] == 128 as byte
+/// net.close(take cli)?
+/// net.close(take peer)?
+/// net.close_listener(take srv)?
+/// ```
+pub fn write_some(mut s: Socket, b: List[byte]) -> int ! {busy, closed, invalid, io} {
+    net_write_some(s.fd, b)?
 }
 
 /// Arm (`ms > 0`) or clear (`ms <= 0`) a deadline BUDGET on `s`: every
@@ -1146,12 +1165,11 @@ pub fn adopt_listener(fd: int) -> Listener ! {unsupported, io} {
 /// it with `spawn` freely. Every tier-1 host answers this question and
 /// every tier serves it.
 ///
-/// **The narrow form** (sc82): sockets alone, read readiness alone, no
-/// signal. `std.poll` is the wide form, an owned waiter over sockets and
-/// files with a set of meanings, whose sockets path is this call; a
-/// waiter that mixes files and sockets is refused there by name until the
-/// runtime has one wait over both (`docs/sc82-one-wait.md`). This call
-/// is unchanged.
+/// **The narrow form:** sockets alone, read readiness alone, no signal.
+/// std.poll is the wide form: an owned waiter over files and sockets,
+/// their read/write/hangup/error facts, signal meanings and a deadline.
+/// It uses the runtime readiness set; this call remains unchanged and
+/// supplies poll's narrow Windows fallback.
 ///
 /// Capability `net`; refused at comptime (D33). Delegates to `net_wait`.
 ///
