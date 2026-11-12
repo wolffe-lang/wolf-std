@@ -38,13 +38,13 @@ The fresh record at 7d8002a has 20 of the 21 rows satisfied on BOTH checked and 
 
 The compiler-only plant sc83-plant-candidate at 0c3fb86, based on 7a831f1, reintroduces the mixed refusal in one file/hunk. Its preflighted record is verified red by the exact one_waiter token on both compiler tiers. The record paths and digests are in the handoff; raw records contain machine paths and are not copied into public prose.
 
-The byte-list comptime prediction MISSED: net/comptime_refuses_write_some expected fail(E0701), but both compiler tiers refuse List construction at resolve, by name, before net_write_some can be evaluated. No claim that this source measured the builtin's D33 barrier is justified. A decision is pending whether to retain the source with that honest compiler posture, or omit the unisolatable probe and document the gap. Nothing is silently marked green or reclassified in the ledger.
+The byte-list comptime prediction MISSED: net/comptime_refuses_write_some expected fail(E0701), but both compiler tiers refuse List construction at resolve, by name, before net_write_some can be evaluated. Keep the source as a posture witness: fail(E0701) stays the reachable normative check, while the observed compiler classification is unsupported with the named List-construction reason. This has NOT measured the send's own comptime barrier. The existing current-edition limit is [type.list.lit.value] in spec/10-types.md §12, already tracked and closed in wolf-lang#101; no new upstream issue is needed. The public paragraph is docs/sc83-witness/comptime-list-limit.txt. The main ledger remains untouched pending the released reference measurement; docs/sc83-witness/ledger-draft.toml records only the observed compiler projection.
 
 No lupin 0.1.62, macOS serving-tier, released-pin full-gauntlet, audit or PAX result is claimed. For macOS, wait for the published wolf 0.2.40 instead of doing a duplicate compiler build.
 
 ## Expected tier postures (not measurements)
 
-The 21-row surface runner is docs/sc83-witness/rows.py. It is independent of the ledger so the candidate can be measured before changing recorded cells. Its six protocol/fixture unit checks are test_rows.py. The final gauntlet separately runs std-test and ledger-check. No ledger cell is advanced by a prediction.
+The 21-row surface runner is docs/sc83-witness/rows.py. It is independent of the ledger so the candidate can be measured before changing recorded cells. Its seven protocol/fixture unit checks are test_rows.py. The final gauntlet separately runs std-test and ledger-check. No ledger cell is advanced by a prediction.
 
 - waiter_rows, sockets_all_ready, deadline, capacity, set_mutation, error_hangup and socket_queue: checked/native execute on Linux and macOS; lupin refuses os_ready_open at run.
 - files_all_ready, mixed_refused, fairness, write_partial and pty_hangup: checked/native execute; lupin refuses os_term_open_pty at run.
@@ -52,7 +52,7 @@ The 21-row surface runner is docs/sc83-witness/rows.py. It is independent of the
 - net/write_some: all three execute, including the empty/4096-byte/busy/count/closed and bad-handle rows, without using std.poll.
 - net/unix/peer_credentials: checked/native execute; lupin refuses net_peer_cred at run.
 - net/unix/peer_credentials_child: native executes the different-pid client. Checked reports os_fork's unsupported error row, with a loud SKIP (not a fork measurement); the same-process credential row covers checked. lupin refuses os_fork at run. No different-uid client is claimed.
-- write_some_invalid_row: all three must satisfy fail(E0401), not reach a send. The three comptime rows were initially predicted to satisfy fail(E0701); the byte-list exception measured above is unresolved, not waived.
+- write_some_invalid_row: all three must satisfy fail(E0401), not reach a send. The three comptime rows were initially predicted to satisfy fail(E0701); the byte-list exception is retained as a named resolve-time compiler posture, not claimed as an E0701 measurement. Its reference classification remains unmeasured until lupin 0.1.62 is available.
 
 Windows retains the narrow socket-read and no-meaning empty deadline paths. The wide/Unix/pty rows either check the host's actual unsupported row or explicitly print SKIP with its reason on stderr. A SKIP is not a serving-tier measurement. The runner checks named run refusals and does not turn them into caught unsupported marks or golden stdout.
 
@@ -67,6 +67,12 @@ On Linux, copy ONE row to an owned empty directory as main.lu, then build it wit
 STATIC_MUSL_CC is a cc-shaped executable wrapper invoking the existing musl C driver with -static, not a raw ld or shell text passed as --linker. Verify that readelf -l probe has no INTERP and readelf -d probe has no NEEDED entry. Copy probe to PAX, run it in its own directory, capture stdout/stderr and exit, and compare to that row's check directive. Run without any other row sharing that directory. The four rejection rows are compiler checks on Linux, not PAX executables.
 
 Measure, do not infer: the 4096-byte Unix direction's partial count and busy; the 20480-byte pty direction's full/room cycle; every ready mixed entry in one call; signal plus ready handles; the 257th std registration's io and unchanged waiter; pipe READ|HANGUP and write-side ERROR; and pid/effective ids from the same-process and forked Unix peers. A host io (including the system-wide epoll-object limit) is a red or an explicitly unmeasured environment, not a SKIP that counts as proof. No PAX result is recorded yet.
+
+## Release hold
+
+Waiting for published wolf 0.2.40 and lupin 0.1.62. No unresolved surface decision remains. Do not open a merge PR or run the final released-pin manifest against the development binary. The compiler classification draft deliberately omits every reference cell. Fill those from actual 0.1.62 observations, including the byte-list comptime row, then update tests/ledger.toml and the released pins in their own commits.
+
+The final Linux manifest is docs/sc83-witness/rig/gauntlet.manifest. Its release-preflight requires bare published version identities, verified binary digests and a complete offline Cargo dependency graph; doctor gates every binary-consuming step. Take it at a fresh immutable release-pinned head with --keep-going and --preflight, then make and record a one-hunk mixed-wait plant based on that exact head. Keep previous records unchanged; a pin or rig change is a new take, not a resume. macOS checked/native, PAX and the audit remain unmeasured/unrun as stated above.
 
 ## Done-when
 
