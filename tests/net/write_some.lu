@@ -33,7 +33,13 @@ fn row(mut s: net.Socket, b: List[byte]) -> str {
     "{n}"
 }
 
-fn exercise(name: str, mut s: net.Socket, mut peer: net.Socket) -> () ! {busy, closed, invalid, io, timeout} {
+fn exercise(name: str, mut s: net.Socket, mut peer: net.Socket) -> () ! {
+    busy,
+    closed,
+    invalid,
+    io,
+    timeout,
+} {
     net.set_deadline(mut s, 1)?
     net.set_deadline(mut peer, 2000)?
     let empty = net.write_some(mut s, List[byte]())?
