@@ -1,0 +1,12 @@
+# Candidate compiler take: the reference release/pin is still pending.
+# LUPIN is identified by digest in toolchain, NOT executed in sc83-compiler-rows.
+floor 35
+rig lib.sh committed=../../..:HEAD:docs/sc83-witness/rig/lib.sh
+rig step.sh committed=../../..:HEAD:docs/sc83-witness/rig/step.sh
+rig development.manifest committed=../../..:HEAD:docs/sc83-witness/rig/development.manifest
+rig ../rows.py committed=../../..:HEAD:docs/sc83-witness/rows.py
+rig ../test_rows.py committed=../../..:HEAD:docs/sc83-witness/test_rows.py
+step toolchain image=localhost/r41-toolchain:1 tools=python3,git,sha256sum script=step.sh -- toolchain
+step source-format needs=toolchain image=localhost/r41-toolchain:1 script=step.sh -- wolf-fmt
+step row-runner-unit image=localhost/r41-toolchain:1 tools=python3 script=step.sh -- row-unit
+step sc83-compiler-rows needs=toolchain image=localhost/r41-toolchain:1 tools=python3,sh,sleep script=step.sh -- rows --lanes wolfc,native

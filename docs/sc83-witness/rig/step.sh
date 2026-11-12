@@ -29,6 +29,7 @@ case "$what" in
             cargo --version; python3 --version; uname -srm
             grep Cpus_allowed_list /proc/self/status'
         ;;
+    wolf-fmt) ctr bash -c '"$WOLF_BIN" fmt --check std tests' ;;
     row-unit) ctr python3 -I docs/sc83-witness/test_rows.py ;;
     rows) ctr python3 -I docs/sc83-witness/rows.py "$@" ;;
     cargo) ctr cargo "$@" ;;
