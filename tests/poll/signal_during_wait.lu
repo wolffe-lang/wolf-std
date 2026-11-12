@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="child_during_wait=true\nno_entry=true\nchild_status=0\nmeaning_first=512 none\nfile_next=0 file:1")
+//! check: run(exit=0, stdout="child_during_wait=true\nno_entry=true\nchild_status=0\nmeaning_first=512 file:1\nfile_next=0 file:1")
 //! phase: run
 //! conforms: std.poll, std.signal, std.process, std.fs, std.time, os.signal.wait.fds, os.signal.raise, os.proc.pipe, err.row
 //!
@@ -7,11 +7,9 @@
 //! quiet pipe's read end with `child()` and a 10 s deadline: the child's
 //! end wakes the wait with `child()` and no entry, no sooner than 200 ms
 //! after it began (the child's `sleep`, less the time it took to start).
-//! Then a meaning already pending and a ready file: `user()` raised to
-//! this process before the wait is answered alone (`512 none`), as
-//! `signal.wait_fds` answers it, and the file answers the next wait. When
-//! the runtime's one wait lands (`docs/sc82-one-wait.md`, M1) a meaning no
-//! longer hides a ready entry, and that line answers both.
+//! Then a pending user() meaning and a ready file are answered TOGETHER
+//! (512 file:1); the file remains level-ready on the next wait. Unlike
+//! signal.wait_fds, the readiness-set wait never hides a ready entry.
 //!
 //! The only signals are the row's own child's end and its own `raise`.
 //! **windows** answers the listen for `child()` `io` (only four meanings
@@ -28,7 +26,7 @@ fn every_line() {
     print("child_during_wait=true")
     print("no_entry=true")
     print("child_status=0")
-    print("meaning_first=512 none")
+    print("meaning_first=512 file:1")
     print("file_next=0 file:1")
 }
 

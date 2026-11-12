@@ -7,13 +7,10 @@
 //! dial in its backlog; two accepted clients, each with a byte from its
 //! peer; a pipe holding a byte. Six entries, every one ready.
 //!
-//! One waiter holding all six is **`unsupported`** at this pin: the
-//! runtime has no call that waits on its fs table and its net table at
-//! once (`docs/sc82-one-wait.md`, "Missing below std", M1). This line is
-//! the one that flips when M1 lands, to all six entries in one wait. Until
-//! then each half is served alone: the files with a meaning set (three
-//! entries), the sockets with none (three entries). Facts are printed by
-//! entry name in name order.
+//! One waiter answers all six in ONE call. Each half is also served
+//! alone. Facts are printed by entry name in name order. Before the
+//! measured call, individual barriers ensure each byte has arrived;
+//! there is no retry-and-union loop around that call.
 //!
 //! **windows** answers `open_pty`'s `unsupported` (and has no Unix-domain
 //! socket), and the row prints its lines for that reason. **lupin** 0.1.61
@@ -31,7 +28,8 @@ use std.term
 use std.time
 
 fn every_line() {
-    print("one_waiter=unsupported")
+    eprint("SKIP poll/mixed_refused: pseudo-terminals unsupported on this host")
+    print("one_waiter=client1:1 client2:1 listener:1 master1:1 master2:1 pipe:1")
     print("files=master1:1 master2:1 pipe:1")
     print("sockets=client1:1 client2:1 listener:1")
 }
@@ -93,6 +91,24 @@ fn main() -> !int {
     fs.write(mut pw, "c")?
     net.write(mut d1, "1")?
     net.write(mut d2, "2")?
+
+    // Writes can return before a pty's line discipline or a socket's
+    // receive queue has published its byte. Wait on each independently,
+    // consuming nothing, before measuring the single mixed wait.
+    var barrier = poll.open()?
+    let b1 = poll.add_file(mut barrier, m1, poll.READ)?
+    let _m1_ready = poll.wait(mut barrier, 0, 2000)?
+    poll.remove(mut barrier, b1)?
+    let b2 = poll.add_file(mut barrier, m2, poll.READ)?
+    let _m2_ready = poll.wait(mut barrier, 0, 2000)?
+    poll.remove(mut barrier, b2)?
+    let b3 = poll.add_socket(mut barrier, a1, poll.READ)?
+    let _a1_ready = poll.wait(mut barrier, 0, 2000)?
+    poll.remove(mut barrier, b3)?
+    let b4 = poll.add_socket(mut barrier, a2, poll.READ)?
+    let _a2_ready = poll.wait(mut barrier, 0, 2000)?
+    poll.remove(mut barrier, b4)?
+    poll.close(take barrier)?
 
     var all = poll.open()?
     var all_names = List[str]()

@@ -1,0 +1,71 @@
+//! check: run(exit=0, stdout="both_ready=true\nboth_with_meaning=true\nquiet_socket_signal=true\nchild_status=0")
+//! phase: run
+//! conforms: std.poll, std.net, std.process, std.signal, std.fs, os.signal.raise, os.proc.pipe, err.row
+//!
+//! sc83: a pending meaning accompanies a ready pipe AND a ready socket.
+//! Then a real child's end wakes a quiet socket wait. Signals are only
+//! this program's raise and its own child's end. lupin refuses
+//! os_signal_listen by name; Windows reports its child-listen refusal.
+
+use std.fs
+use std.net
+use std.poll
+use std.process
+use std.signal
+
+fn main() -> !int {
+    if os_name() == "windows" {
+        eprint("SKIP poll/signal_socket: child signals unsupported on this host")
+        print("both_ready=true")
+        print("both_with_meaning=true")
+        print("quiet_socket_signal=true")
+        print("child_status=0")
+        return 0
+    }
+    signal.listen(signal.user() | signal.child())?
+    let p = process.pipe()?
+    var read = p.read
+    var write = p.write
+    var srv = net.listen(net.loopback(0))?
+    var cli = net.connect(net.loopback(net.port(srv)?))?
+    var peer = net.accept(mut srv)?
+    var w = poll.open()?
+    let kr = poll.add_file(mut w, read, poll.READ)?
+    let ks = poll.add_socket(mut w, peer, poll.READ)?
+    fs.write(mut write, "p")?
+    net.write(mut cli, "s")?
+    var barrier = poll.open()?
+    let bk = poll.add_socket(mut barrier, peer, poll.READ)?
+    let br = poll.wait(mut barrier, 0, 2000)?
+    poll.remove(mut barrier, bk)?
+    poll.close(take barrier)?
+    print("both_ready={br.ready.len == 1}")
+    signal.raise(signal.user())?
+    let ev = poll.wait(mut w, signal.user(), 0)?
+    var pipe = false
+    var socket = false
+    for r in ev.ready {
+        if r.key == kr && r.facts == poll.READ { pipe = true }
+        if r.key == ks && r.facts == poll.READ { socket = true }
+    }
+    print("both_with_meaning={ev.meaning == signal.user() && ev.ready.len == 2 && pipe && socket}")
+    let _p = fs.read(mut read, 1)?
+    let _s = net.read(mut peer, 1)?
+    poll.remove(mut w, kr)?
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, "sleep 0.3")
+    var ch = process.start(c)?
+    let quiet = poll.wait(mut w, signal.child(), 5000)?
+    print("quiet_socket_signal={quiet.meaning == signal.child() && quiet.ready.len == 0}")
+    let status = process.wait_status(take ch)?
+    print("child_status={status}")
+    poll.remove(mut w, ks)?
+    poll.close(take w)?
+    net.close(take cli)?
+    net.close(take peer)?
+    net.close_listener(take srv)?
+    fs.close(take read)?
+    fs.close(take write)?
+    0
+}

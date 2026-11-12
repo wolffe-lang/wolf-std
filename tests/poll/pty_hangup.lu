@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="first_wait=master:1\nread=x\nend_wait=master:1\nend_read_as_the_host_says=true\nhangup_fact=0\nchild_status=0")
+//! check: run(exit=0, stdout="first_wait_read=true\nread=x\nend_wait=master:5\nend_read_as_the_host_says=true\nhangup_fact=4\nchild_status=0")
 //! phase: run
 //! conforms: std.poll, std.term, std.process, std.fs, std.os, std.signal, os.term.pty, os.proc.session, os.signal.wait.fds, err.row
 //!
@@ -8,10 +8,10 @@
 //! the master with `READ`: the first wait answers it, and the reads that
 //! follow give `x`; once the child has ended and its slave descriptors
 //! with it, the master is still ready, and its read ends the relay: `io`
-//! on linux (the host's `EIO`), `eof` on macOS. At this pin the end is
-//! answered as `READ` with no `HANGUP` fact (`signal.wait_fds` does not
-//! say which): that line flips when the runtime's one wait lands
-//! (`docs/sc82-one-wait.md`, M1). The child's status is 0.
+//! on linux (the host's EIO), eof on macOS. The end now answers READ |
+//! HANGUP. The child's status is 0. A shell may acquire its controlling
+//! terminal and change its attributes; neither is asserted here. The
+//! first wake may already include HANGUP if the child exited quickly.
 //!
 //! **windows** answers `open_pty`'s `unsupported`, and the row prints its
 //! lines for that reason. **lupin** 0.1.61 refuses `os_term_open_pty` by
@@ -25,11 +25,11 @@ use std.signal
 use std.term
 
 fn every_line() {
-    print("first_wait=master:1")
+    print("first_wait_read=true")
     print("read=x")
-    print("end_wait=master:1")
+    print("end_wait=master:5")
     print("end_read_as_the_host_says=true")
-    print("hangup_fact=0")
+    print("hangup_fact=4")
     print("child_status=0")
 }
 
@@ -71,7 +71,7 @@ fn main() -> !int {
     var w = poll.open()?
     let km = poll.add_file(mut w, m, poll.READ)?
     let first = poll.wait(mut w, signal.resize(), 5000)?
-    print("first_wait={shown(first)}")
+    print("first_wait_read={first.ready.len == 1 && first.ready[0].key == km && (first.ready[0].facts & poll.READ) != 0}")
     // Read until the relay's end: the child's byte, then the end row.
     var got = ""
     var end = "none"
