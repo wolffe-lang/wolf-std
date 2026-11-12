@@ -1,0 +1,134 @@
+//! check: run(exit=0, stdout="tcp_empty=true\ntcp_4096=true\ntcp_busy=true\ntcp_bytes=true\nunix_empty=true\nunix_4096=true\nunix_busy=true\nunix_bytes=true\nforged=io\nlistener=io\nclosed_handle=io\nempty_closed_handle=io")
+//! phase: run
+//! conforms: std.net, std.net.unix, os.net.io, os.host.sigs, err.row
+//!
+//! sc83: one non-parking send on both stream families. Each sends a full
+//! 4096-byte list, then fills the unread stream to busy; every returned
+//! count is drained and verified. The armed deadline is irrelevant to
+//! write_some. lupin serves this row; it calls no readiness builtin.
+//! Windows runs TCP, then reports the Unix-family refusal on stderr.
+
+use std.net
+use std.net.unix
+
+fn sent(mut s: net.Socket, b: List[byte]) -> int ! {closed, invalid, io} {
+    net.write_some(mut s, b) else |e| match e {
+        busy => -1,
+        closed => { return closed },
+        invalid => { return invalid },
+        io => { return io },
+    }
+}
+
+fn row(mut s: net.Socket, b: List[byte]) -> str {
+    let n = net.write_some(mut s, b) else |e| {
+        return match e {
+            busy => "busy",
+            closed => "closed",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    "{n}"
+}
+
+fn exercise(name: str, mut s: net.Socket, mut peer: net.Socket) -> () ! {busy, closed, invalid, io, timeout} {
+    net.set_deadline(mut s, 1)?
+    let empty = net.write_some(mut s, List[byte]())?
+    print("{name}_empty={empty == 0}")
+    var b = List[byte]()
+    var i = 0
+    while i < 4096 {
+        (mut b).push((i % 256) as byte)
+        i = i + 1
+    }
+    let first = sent(mut s, b)?
+    print("{name}_4096={first > 0 && first <= 4096}")
+    var took = first
+    var blocked = false
+    var calls = 0
+    var counts = List[int]()
+    (mut counts).push(first)
+    while !blocked && calls < 8192 {
+        let n = sent(mut s, b)?
+        if n == -1 {
+            blocked = true
+        } else {
+            took = took + n
+            (mut counts).push(n)
+        }
+        calls = calls + 1
+    }
+    print("{name}_busy={blocked}")
+    net.set_deadline(mut peer, 2000)?
+    var bytes_ok = first > 0
+    // Each send starts at b[0], including after a short send. Keep the
+    // counts, rather than assuming stream reads preserve send boundaries.
+    var send_at = 0
+    var in_send = 0
+    var read = 0
+    while read < took {
+        let chunk = net.read_bytes(mut peer, 4096)?
+        for c in chunk {
+            if c != (in_send % 256) as byte {
+                bytes_ok = false
+            }
+            in_send = in_send + 1
+            if in_send == counts[send_at] {
+                send_at = send_at + 1
+                in_send = 0
+            }
+            read = read + 1
+        }
+    }
+    print("{name}_bytes={bytes_ok && read == took}")
+}
+
+fn main() -> !int {
+    var srv = net.listen(net.loopback(0))?
+    var cli = net.connect(net.loopback(net.port(srv)?))?
+    var peer = net.accept(mut srv)?
+    exercise("tcp", mut cli, mut peer)?
+    net.close(take peer)?
+    let old = cli.fd
+    net.close(take cli)?
+    var forged = net.Socket { fd: 1000000 }
+    var listener = net.Socket { fd: srv.fd }
+    var stale = net.Socket { fd: old }
+    let forged_row = row(mut forged, [120 as byte])
+    let listener_row = row(mut listener, [120 as byte])
+    let stale_row = row(mut stale, [120 as byte])
+    let empty_stale = row(mut stale, List[byte]())
+    net.close_listener(take srv)?
+    var us = unix.listen("write-some.sock") else |e| {
+        match e {
+            unsupported => {
+                eprint("SKIP net/write_some: Unix stream unsupported on this host")
+                print("unix_empty=true")
+                print("unix_4096=true")
+                print("unix_busy=true")
+                print("unix_bytes=true")
+                print("forged={forged_row}")
+                print("listener={listener_row}")
+                print("closed_handle={stale_row}")
+                print("empty_closed_handle={empty_stale}")
+                return 0
+            },
+            exists => { return exists },
+            not_found => { return not_found },
+            denied => { return denied },
+            io => { return io },
+        }
+    }
+    var uc = unix.connect("write-some.sock")?
+    var up = net.accept(mut us)?
+    exercise("unix", mut uc, mut up)?
+    net.close(take uc)?
+    net.close(take up)?
+    net.close_listener(take us)?
+    print("forged={forged_row}")
+    print("listener={listener_row}")
+    print("closed_handle={stale_row}")
+    print("empty_closed_handle={empty_stale}")
+    0
+}

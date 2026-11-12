@@ -1,0 +1,56 @@
+//! check: run(exit=0, stdout="holds_256=true\nregistration_257=io\nunchanged_after_refusal=true\nduplicate_at_capacity=invalid\nmodify_at_capacity=true\nremove_then_add=true")
+//! phase: run
+//! conforms: std.poll, std.fs, err.row
+//!
+//! sc83: every Waiter holds at most 256 entries, including polled files.
+//! The 257th registration is io, with no entry inserted and no key lost.
+//! Shape and duplicate errors still precede capacity. Removing one makes
+//! room and reuses its key. lupin refuses os_ready_open by name at run.
+
+use std.fs
+use std.poll
+
+fn add(mut w: poll.Waiter, f: fs.File) -> str {
+    let k = poll.add_file(mut w, f, poll.READ) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "{k}"
+}
+
+fn main() -> !int {
+    fs.write_text("capacity.data", "x")?
+    var w = poll.open()?
+    var files = List[fs.File]()
+    var keys_ok = true
+    var i = 0
+    while i < 256 {
+        let f = fs.open("capacity.data")?
+        let k = poll.add_file(mut w, f, poll.READ)?
+        keys_ok = keys_ok && k == i
+        (mut files).push(f)
+        i = i + 1
+    }
+    let spare = fs.open("capacity.data")?
+    print("holds_256={keys_ok && poll.len(w) == 256}")
+    let full = add(mut w, spare)
+    print("registration_257={full}")
+    print("unchanged_after_refusal={poll.len(w) == 256}")
+    let duplicate = add(mut w, files[0])
+    print("duplicate_at_capacity={duplicate}")
+    poll.modify(mut w, 255, poll.WRITE)?
+    print("modify_at_capacity={poll.len(w) == 256}")
+    poll.remove(mut w, 0)?
+    let reused = poll.add_file(mut w, spare, poll.READ)?
+    print("remove_then_add={reused == 0 && poll.len(w) == 256}")
+    poll.close(take w)?
+    for f in files {
+        fs_close(f.fd)?
+    }
+    fs_close(spare.fd)?
+    fs.remove("capacity.data")?
+    0
+}
