@@ -1,0 +1,61 @@
+//! check: run(exit=0, stdout="opened_set_calls=true\nclosed_set_is_io=true\nquiet=true\nmodified=true\nremoved=true\nreused=true\nclosed_handle_removed=true")
+//! phase: run
+//! conforms: std.poll, std.fs, std.process, os.proc.pipe, os.host.sigs, err.row
+//!
+//! sc83: a set that opened never answers unsupported to os_ready_set on
+//! this serving host: add/change/remove succeed; invalid handles give io.
+//! This holds the otherwise-unreachable outcome handled by modify/remove.
+//! The std Waiter then survives changes and runtime handle-close removal.
+//! lupin refuses os_ready_open at run, by name, not a caught error mark.
+
+use std.fs
+use std.poll
+use std.process
+
+fn put(r: int, h: int, interest: int, key: int) -> str {
+    os_ready_set(r, h, interest, key) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let p = process.pipe()?
+    var read = p.read
+    var write = p.write
+    let set = os_ready_open()?
+    let a = put(set, read.fd, 1, 7)
+    let m = put(set, read.fd, 3, 8)
+    let d = put(set, read.fd, 0, 8)
+    let absent = put(set, read.fd, 0, 8)
+    let bad = put(set, 1000000, 1, 9)
+    print("opened_set_calls={a == "ok" && m == "ok" && d == "ok" && absent == "io" && bad == "io"}")
+    os_ready_close(set)?
+    let closed = put(set, read.fd, 1, 7)
+    print("closed_set_is_io={closed == "io"}")
+    var w = poll.open()?
+    let key = poll.add_file(mut w, read, poll.READ)?
+    let q = poll.wait(mut w, 0, 0)?
+    print("quiet={q.ready.len == 0}")
+    let kw = poll.add_file(mut w, write, poll.READ)?
+    poll.modify(mut w, kw, poll.WRITE)?
+    let changed = poll.wait(mut w, 0, 0)?
+    print("modified={changed.ready.len == 1 && changed.ready[0].key == kw && changed.ready[0].facts == poll.WRITE}")
+    poll.remove(mut w, kw)?
+    let removed = poll.wait(mut w, 0, 0)?
+    print("removed={removed.ready.len == 0}")
+    let again = poll.add_file(mut w, write, poll.WRITE)?
+    print("reused={again == kw && key != again}")
+    fs.close(take write)?
+    // The runtime removes a closed handle before closing the descriptor.
+    // The remaining read end answers READ|HANGUP, never the closed key.
+    let after = poll.wait(mut w, 0, 0)?
+    print("closed_handle_removed={after.ready.len == 1 && after.ready[0].key == key && after.ready[0].facts == (poll.READ | poll.HANGUP)}")
+    poll.close(take w)?
+    fs.close(take read)?
+    0
+}
