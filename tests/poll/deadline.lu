@@ -13,8 +13,8 @@
 //!
 //! **windows** answers the files path `unsupported`, and the row prints
 //! the files path's lines for that reason after running the sockets
-//! path's. **lupin** 0.1.61 runs the sockets path and refuses
-//! `os_signal_wait_fds` by name at the files path's first wait.
+//! path's. lupin 0.1.62 refuses os_ready_open at run when the listener
+//! is first registered; the refusal must name that builtin.
 
 use std.fs
 use std.net
@@ -84,6 +84,9 @@ fn main() -> !int {
     (mut fnames).push("pipe")
     let flook = waited(mut fw, fnames, signal.resize(), 0)
     if flook == "unsupported" {
+        eprint(
+            "SKIP poll/deadline: files and meanings unsupported on this host; socket deadlines measured",
+        )
         print("files_look=none")
         print("files_25_waited=true")
         print("files_forever_ready=file:1")
