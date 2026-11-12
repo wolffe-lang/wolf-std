@@ -238,6 +238,11 @@ pub fn connect(path: str) -> net.Socket ! {unsupported, refused, not_found, deni
 /// The peer's process id, effective user id and effective group id, as
 /// recorded when the Unix stream connected. pid is -1 when not available.
 /// Pure data, no capability; fields are named integers, not host structs.
+///
+/// ```wolf-doc-example
+/// let c = unix.Credentials { pid: -1, uid: 0, gid: 0 }
+/// c.pid == 0 - 1
+/// ```
 pub struct Credentials {
     pid: int,
     uid: int,

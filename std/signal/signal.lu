@@ -296,8 +296,9 @@ pub struct Wake {
 /// a loop that serves what it answers starves the files after a busy one
 /// unless it rotates the list itself, and it takes no socket. `std.poll`
 /// is the wide form: an owned waiter over files and sockets that answers
-/// every ready entry, with its facts, and a meaning, built over this call.
-/// This call is unchanged.
+/// every ready entry with its facts AND a meaning, over the runtime's
+/// readiness set rather than repeated calls to this narrow wait. This
+/// call is unchanged.
 pub fn wait_fds(files: List[fs.File], set: int, deadline_ms: int) -> Wake ! {
     invalid,
     io,
