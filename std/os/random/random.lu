@@ -1,0 +1,70 @@
+//! member: true
+//!
+//! std.os.random — OS-sourced bytes, never a userspace generator.
+//! Stability tier: core. Capability `env` (platform admission) and Random
+//! (os_random); categorically refused at comptime. This is not std.rand's
+//! seeded PCG stream, and never seeds, retries with, or falls back to it.
+//!
+//! The pinned language contract [os.random.platform] specifies Linux
+//! getrandom(flags=0), continuing short reads/EINTR and waiting for the
+//! initialized kernel pool; macOS getentropy in <=256-byte requests.
+//! These are the runtime's calls, not new std bindings. [os.random.trap]
+//! makes provider failure an UNCAUGHT assert trap, not an error row.
+//! This wrapper cannot convert that trap to entropy_unavailable. A
+//! readiness admission can prevent a known unqualified draw, not promise
+//! future provider health; a provider can fail after a successful check.
+//! On Linux/macOS require_ready admits the documented OS-call contract,
+//! NOT a snapshot that the pool is initialized or the next call succeeds.
+//! Linux can still wait. PAX admission stays behind one private function
+//! pending the kernel's exact readable capability/ABI; until then it
+//! refuses by name before any legacy random call. No guessed CPUID,
+//! processor/vendor, flag, file or errno can authorize that draw.
+//!
+//! Ordinary lists/regions are not secure erasure, locking or dump policy.
+//! Never log samples or claim unpredictability from statistical tests.
+
+// The only PAX seam. Replace only against its reviewed kernel contract.
+fn pax_ready() -> () ! {entropy_unqualified} {
+    entropy_unqualified
+}
+
+/// Checks that this platform is admitted for the documented OS-source
+/// contract. `entropy_unqualified` refuses PAX until its strict capability
+/// adapter lands, and any platform outside this Linux/macOS profile.
+/// It does not draw bytes or test provider liveness. Callers requiring a
+/// named refusal must check readiness before a draw; bytes also checks it.
+/// No error is caught or converted to a deterministic fallback.
+/// Capability `env`; refused at comptime. No traps on this path.
+///
+/// ```wolf-doc-example
+/// random.require_ready()?
+/// ```
+pub fn require_ready() -> () ! {entropy_unqualified} {
+    let platform = os_name()
+    if platform == "pax" { return pax_ready()? }
+    if platform != "linux" && platform != "macos" { return entropy_unqualified }
+}
+
+/// Exactly n OS-sourced bytes, or the named platform-admission refusal
+/// `entropy_unqualified`. n==0 succeeds without drawing or admission.
+/// Negative n traps assert (the language's caller contract). OS provider
+/// failure STILL TRAPS assert per [os.random.trap], including after an
+/// admission check. There is deliberately no claimed entropy_unavailable
+/// row. No fallback, seeding, partial successful result or caught trap.
+/// Linux waits for initialization; macOS uses the runtime's getentropy.
+/// Capabilities `env` and Random; refused at comptime. Memory is O(n);
+/// callers bound n before allocation. This does not promise secret erasure.
+///
+/// ```wolf-doc-example
+/// random.bytes(0)?.len == 0
+/// ```
+pub fn bytes(n: int) -> List[byte] ! {entropy_unqualified} {
+    assert(n >= 0)
+    if n == 0 { return List[byte]() }
+    require_ready()?
+    let raw = os_random(n)
+    var out = List[byte]()
+    (mut out).reserve(n)
+    for b in raw { (mut out).push(b as int as byte) }
+    out
+}

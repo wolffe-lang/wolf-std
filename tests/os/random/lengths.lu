@@ -3,9 +3,17 @@
 //! conforms: std.os.random, os.random.fill
 //!
 //! OS bytes lengths only; never print sampled bytes or statistical claims.
+use std.os
 use std.os.random
 
 fn main() -> !int {
+    if os.name() != "linux" && os.name() != "macos" {
+        var refused = false
+        random.require_ready() else |entropy_unqualified| { refused = true }
+        assert(refused)
+        assert(random.bytes(0)?.len == 0)
+        return 0
+    }
     random.require_ready()?
     for n in [0, 1, 16, 32, 64, 256, 257, 4096] {
         assert(random.bytes(n)?.len == n)
