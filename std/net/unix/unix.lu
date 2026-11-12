@@ -110,6 +110,21 @@
 //!   answers `io` here, because a path has no port. Measured on all three
 //!   lanes and pinned in `tests/net/unix/echo.lu`; nothing in this module
 //!   shadows it
+//! - `peer_credentials(s: net.Socket) -> Credentials ! {io, unsupported}`,
+//!   with `Credentials { pid: int, uid: int, gid: int }` — **a contract
+//!   (sc82), not shipped**: the pid, uid and gid of the process at the
+//!   other end of a connected stream, as the host recorded them when the
+//!   connection was made, so that a server can refuse a client of another
+//!   user before it reads a byte. `pid` is -1 where the host gives none.
+//!   `SO_PEERCRED` on linux and PAX; `LOCAL_PEERCRED` with
+//!   `LOCAL_PEERPID` on macOS; `LOCAL_PEERCRED` on freebsd; `unsupported`
+//!   by name on windows, as the family is there. A TCP stream, a listener,
+//!   a forged or a closed handle are `io`. No builtin answers it at this
+//!   pin; the call it needs, `net_peer_cred(fd: int) -> (int, int, int) !
+//!   {io, unsupported}`, is stated in `docs/sc82-one-wait.md` ("Missing
+//!   below std", M3), and the function ships in the change after it lands
+//!   (API-CONVENTIONS §14, sc11), with a row that reads a client's ids
+//!   back from the server's end
 //!
 //! **Paths.** §14's rule, unchanged: a path is a `str`, the separator is
 //! `/`, and every test and example here uses a RELATIVE path in the
