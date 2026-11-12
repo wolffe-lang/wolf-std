@@ -153,6 +153,31 @@
 //! its standard and the toolchain did not take the shortcut; the border
 //! post is the same function the sc05 contract described, four lines long.
 
+/// Byte equality with no early exit at source level for equal lengths.
+/// Unequal lengths return false immediately: lengths are public inputs.
+/// Equal-length inputs visit every pair, OR-fold their XOR differences,
+/// and test the accumulated result once. Empty inputs compare equal.
+/// Total: no error row, no traps on well-typed inputs. Pure, comptime-safe.
+/// This source contract is NOT a fixed-time certification of generated
+/// code, runtime operations, allocation, or any execution tier. Review
+/// generated code separately at the exact compiler/backend/runtime pins.
+///
+/// ```wolf-doc-example
+/// bytes.is_equal_fixed_work("abc".bytes(), "abc".bytes()) == true
+/// bytes.is_equal_fixed_work("abc".bytes(), "abd".bytes()) == false
+/// bytes.is_equal_fixed_work("".bytes(), "x".bytes()) == false
+/// ```
+ pub fn is_equal_fixed_work(a: List[byte], b: List[byte]) -> bool {
+    if a.len != b.len { return false }
+    var diff: wrapping[u64] = 0
+    var i: int = 0
+    while i < a.len {
+        diff = diff | (a[i] as int as wrapping[u64] ^ b[i] as int as wrapping[u64])
+        i = i + 1
+    }
+    diff == 0
+}
+
 /// The number of bytes in `b`. O(1). Total: no error row, no traps.
 ///
 /// ```wolf-doc-example

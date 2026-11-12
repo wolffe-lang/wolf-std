@@ -4,16 +4,17 @@
 //! AEAD_CHACHA20_POLY1305 construction (RFC 8439). Stability tier: x —
 //! the D53 crypto ladder's second rung (campaign stdc-crypto, sprint
 //! sc17). This is the cipher that needs no tables: add-rotate-xor on
-//! public data-flow, no S-boxes, no secret-indexed loads, so its
-//! constant-time story is true by construction in portable code — which
-//! is why it lands before AES-GCM (that rung owes a D-question on
+//! public data-flow, no S-boxes, no secret-indexed loads. These are source-
+//! level obligations, not a fixed-time certification of generated code or
+//! runtime operations. Backend and runtime review at exact pins is separate.
+//! AES-GCM (that rung owes a D-question on
 //! hardware intrinsics vs bitslicing vs c28-verified masking; named in
 //! the sc17 contract, not smuggled here).
 //!
 //! **The nursery banner (D31).** `std.x.crypto.chacha20` is not
 //! `std.crypto`: its path, names and behaviour may change or vanish in
 //! one sprint; no other std module may depend on it (it may depend on
-//! the facade, and does: nothing — self-contained on purpose); its
+//! the facade, and does: `std.bytes` for shared equality); its
 //! reason and graduation trigger live in `std/x/README.md`. Poly1305
 //! lives IN this module rather than beside it because a nursery
 //! resident may not depend on another resident — the graduation move
@@ -96,9 +97,12 @@
 //! every input element, key bytes included, and this header promised
 //! "it leaves with F-0035's real byte type". The type arrived and it
 //! left, so there is no value-dependent branch anywhere on the cipher
-//! or MAC path. The tag comparison in `open` is the module's one
-//! load-bearing ct claim and is marked as c28's FIRST verification
-//! target. `to_hex` is NOT constant-time and says so.
+//! or MAC path at source level. Generated instructions and runtime
+//! operations are separate review obligations, not certified here. The
+//! tag comparison delegates to `bytes.is_equal_fixed_work`; `to_hex`
+//! is NOT constant-time and says so.
+
+use std.bytes
 
 // ---------------------------------------------------------------------
 // Byte <-> word helpers (the endianness seam, written and tested first:
@@ -763,16 +767,13 @@ pub fn seal(
 /// (§2's rule) — and NO PLAINTEXT IS COMPUTED on that path: the error
 /// row is the entire result, so a forged box can never leak a byte.
 /// Traps `assert` only on the caller's own inputs (key/nonce lengths).
-/// ct: THE LOAD-BEARING CLAIM, and c28's FIRST VERIFICATION TARGET
-/// (D53). The tag comparison is a full-width accumulate-then-single-
-/// check: all sixteen byte pairs are XORed and OR-folded into one
-/// accumulator unconditionally, and exactly one comparison — against
-/// zero, after the fold — decides the outcome. Never byte-early-exit:
-/// a compare that returns at the first differing byte leaks the
-/// matching prefix length as time, which is remote-recoverable
-/// forgery, and c28's verifier is expected to prove this loop free of
-/// secret-dependent branches. Everything else is `seal`'s obligation
-/// set, with no recorded exception left since sc35.
+/// ct: `bytes.is_equal_fixed_work` accumulates every tag-byte difference
+/// before the final test: no early exit at source level. Unequal public
+/// lengths are rejected structurally. Neither this fold nor the cipher's
+/// fixed-looking source certifies instruction latency, runtime behavior or
+/// constant time on any tier; inspect generated default/release code at
+/// the exact compiler/runtime pins separately. Vector tests establish
+/// outputs and rejection, not absence of timing or memory side channels.
 ///
 /// ```wolf-doc-example
 /// let key = "wolf sc17: a 32-byte chacha key!".bytes()
@@ -806,13 +807,7 @@ pub fn open(
     }
     let otk = poly_key(key, nonce)
     let want = poly1305(otk, mac_data(aad, ct))
-    var acc: wrapping[u64] = 0
-    var i: int = 0
-    for wb in want {
-        acc = acc | wb as int as wrapping[u64] ^ got[i] as int as wrapping[u64]
-        i = i + 1
-    }
-    let ok = acc == 0
+    let ok = bytes.is_equal_fixed_work(want, got)
     if !ok {
         return tag
     }
