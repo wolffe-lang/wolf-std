@@ -169,12 +169,12 @@
 /// bytes.is_equal_fixed_work("abc".bytes(), "abd".bytes()) == false
 /// bytes.is_equal_fixed_work("".bytes(), "x".bytes()) == false
 /// ```
- pub fn is_equal_fixed_work(a: List[byte], b: List[byte]) -> bool {
+pub fn is_equal_fixed_work(a: List[byte], b: List[byte]) -> bool {
     if a.len != b.len { return false }
     var diff: wrapping[u64] = 0
     var i: int = 0
     while i < a.len {
-        diff = diff | (a[i] as int as wrapping[u64] ^ b[i] as int as wrapping[u64])
+        diff = diff | a[i] as int as wrapping[u64] ^ b[i] as int as wrapping[u64]
         i = i + 1
     }
     diff == 0

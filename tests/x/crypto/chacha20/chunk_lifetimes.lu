@@ -4,6 +4,7 @@
 //!
 //! Fixed-size chunk lifetimes: a region is allocation release, not erasure.
 //! Run larger repeated-stream/RSS witnesses only on capped Linux.
+
 use std.bytes
 use std.x.crypto.chacha20
 use std.x.crypto.sha2
@@ -12,7 +13,12 @@ fn main() -> int {
     let before = live_region_bytes()
     for i in 0..4 {
         region chunk(cap: 134217728) {
-            let key = sha2.hkdf256("salt".bytes(), "labelled test key".bytes(), "payload".bytes(), 32)
+            let key = sha2.hkdf256(
+                "salt".bytes(),
+                "labelled test key".bytes(),
+                "payload".bytes(),
+                32,
+            )
             var plain = List[byte]()
             (mut plain).reserve(65536)
             for n in 0..65536 { (mut plain).push((n % 256) as byte) }

@@ -3,14 +3,21 @@
 //! conforms: std.x.crypto.curve25519, err.row
 //!
 //! RFC 7748 section 5 masking/clamping requirements applied to section 5.2.
+
 use std.hex
 use std.bytes
 use std.x.crypto.curve25519
 
 fn main() -> int {
-    let scalar = hex.decode("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4") else List[byte]()
-    let u = hex.decode("e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c") else List[byte]()
-    let want = hex.decode("c3da55379de9c6908e94ea4df28d084f32eccf03491c71f754b4075577a28552") else List[byte]()
+    let scalar = hex.decode(
+        "a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4",
+    ) else List[byte]()
+    let u = hex.decode(
+        "e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c",
+    ) else List[byte]()
+    let want = hex.decode(
+        "c3da55379de9c6908e94ea4df28d084f32eccf03491c71f754b4075577a28552",
+    ) else List[byte]()
     var high = copy u
     high[31] = (u[31] as int + 128) as byte
     let masked = curve25519.x25519(scalar, high) else List[byte]()

@@ -31,12 +31,12 @@ fn lower(c: int) -> int {
 // BIP-173 Specification / Checksum: one bech32_polymod iteration.
 fn step(chk: wrapping[u64], v: int) -> wrapping[u64] {
     let top = chk >> 25
-    var next = ((chk & 0x1ffffff) << 5) ^ v as wrapping[u64]
-    if (top & 1) != 0 { next = next ^ 0x3b6a57b2 }
-    if (top & 2) != 0 { next = next ^ 0x26508e6d }
-    if (top & 4) != 0 { next = next ^ 0x1ea119fa }
-    if (top & 8) != 0 { next = next ^ 0x3d4233dd }
-    if (top & 16) != 0 { next = next ^ 0x2a1462b3 }
+    var next = (chk & 0x1ffffff) << 5 ^ v as wrapping[u64]
+    if top & 1 != 0 { next = next ^ 0x3b6a57b2 }
+    if top & 2 != 0 { next = next ^ 0x26508e6d }
+    if top & 4 != 0 { next = next ^ 0x1ea119fa }
+    if top & 8 != 0 { next = next ^ 0x3d4233dd }
+    if top & 16 != 0 { next = next ^ 0x2a1462b3 }
     next
 }
 

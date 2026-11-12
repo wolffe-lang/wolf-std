@@ -3,12 +3,15 @@
 //! conforms: std.x.crypto.curve25519, err.row
 //!
 //! RFC 7748 section 5: every noncanonical u in p..2^255-1 is reduced mod p.
+
 use std.hex
 use std.bytes
 use std.x.crypto.curve25519
 
 fn main() -> int {
-    let scalar = hex.decode("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4") else List[byte]()
+    let scalar = hex.decode(
+        "a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4",
+    ) else List[byte]()
     for i in 0..19 {
         var canonical = List[byte]()
         (mut canonical).push(i as byte)

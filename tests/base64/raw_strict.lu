@@ -3,6 +3,7 @@
 //! conforms: std.base64, err.row
 //!
 //! RFC 4648 section 10 with age's omitted padding; strict rejections.
+
 use std.base64
 use std.bytes
 
@@ -31,7 +32,24 @@ fn main() -> int {
     row("fooba", "Zm9vYmE")
     row("foobar", "Zm9vYmFy")
     assert(base64.encode_raw([255 as byte, 239 as byte]) == "/+8")
-    for s in ["=", "Zg=", "Zg==", "Zm8=", "Zm9v=", "Z", "Zh", "Zm9", "Z g", "Zg\n", "Zg\r", "Zg\t", "_-8", "é", "Zg\0", "Zg=Z"] {
+    for s in [
+        "=",
+        "Zg=",
+        "Zg==",
+        "Zm8=",
+        "Zm9v=",
+        "Z",
+        "Zh",
+        "Zm9",
+        "Z g",
+        "Zg\n",
+        "Zg\r",
+        "Zg\t",
+        "_-8",
+        "é",
+        "Zg\0",
+        "Zg=Z",
+    ] {
         rejects(s)
     }
     // Exhaust every possible noncanonical residual sextet.
