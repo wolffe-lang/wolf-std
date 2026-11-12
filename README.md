@@ -28,7 +28,7 @@ Text and data: `str` `strbuf` `fmt` `unicode` `bytes` `hex` `base64`
 
 Numbers: `math` `rand`
 
-The os tier: `fs` `io` `net` `time` `env` `process` `os` `signal` `term`
+The os tier: `fs` `io` `net` `time` `env` `process` `os` `signal` `term` `poll`
 
 Testing: `testing`
 
@@ -50,9 +50,13 @@ recoverable provider-error guarantee or fallback is claimed. See
 Before them, `std.poll`: an owned waiter over files and sockets that answers every
 ready entry, never only the first, with a set of signals and a deadline,
 for a server that waits in one place on pty masters, pipes, a listener
-and its clients. At wolf 0.2.39 one waiter holds files or sockets, not
-both; the runtime call that would serve both is named in
-`docs/sc82-one-wait.md`. Before it, wolf 0.2.39's sessions and
+and its clients. The development branch now uses wolf 0.2.40's readiness
+sets: files, sockets and signal meanings together, real hangup/error
+facts, at most 256 entries per waiter. `net.write_some` sends what fits
+without parking, and `net.unix.peer_credentials` reports a Unix peer's
+pid and effective ids. This work still awaits the released toolchain
+pins and serving-tier measurements; see
+`docs/sc83-poll-on-the-one-wait.txt`. Before it, wolf 0.2.39's sessions and
 pseudo-terminals: `std.process`'s
 `start_session`, `lead_session` and `own_session` put a child, or this
 process, in a session of its own, and `std.term`'s `open_pty`,
@@ -90,7 +94,9 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 666 tests. A test that passes deeper than its ledger entry claims
+the 666 previously measured tests. Twelve new readiness/socket row
+sources are currently drafts pending the new-runtime measurements and
+ledger update. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
