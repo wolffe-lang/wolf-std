@@ -20,7 +20,9 @@
 //!
 //! A waiter holds at most 256 entries, matching the smallest serving
 //! runtime's set bound. Registration 257 answers io without changing it;
-//! shape and duplicate errors still answer invalid first. A runtime handle
+//! shape and duplicate errors still answer invalid first. The capacity
+//! refusal makes no host call and does not replace os_error's last result.
+//! A runtime handle
 //! close removes its registration; remove before close to release std's
 //! bookkeeping and reuse its key.
 //!
