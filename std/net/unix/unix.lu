@@ -4,16 +4,17 @@
 //! filesystem PATH instead of a host and a port (`AF_UNIX`).
 //! Stability tier: core.
 //!
-//! **Two functions, and that is the whole module.** `listen(path)` binds
-//! and listens; `connect(path)` dials. What either answers is an ORDINARY
-//! `std.net` value — `listen` returns a `net.Listener`, `connect` returns
+//! **Two address calls and peer credentials.** listen(path) binds and
+//! listens; connect(path) dials; peer_credentials reads the connected
+//! peer's pid and effective ids. The address calls answer ordinary
+//! std.net values; credentials are the one family-specific query.
+//! `listen` returns a `net.Listener`, `connect` returns
 //! a `net.Socket` — so `net.accept`, `net.read`/`net.write`, the byte pair,
 //! `net.set_deadline`/`net.set_listener_deadline`, `net.close` and
 //! `net.close_listener` serve a unix socket call for call, with the
 //! semantics their own docs state. There is no unix-flavoured read, no
-//! unix-flavoured close, and no second handle type: the address family is
-//! the only thing that differs, so the address call is the only thing this
-//! module adds (`[os.net.unix]`, s136 / wolf-lang#227).
+//! unix-flavoured close, and no second handle type. Stream operations
+//! remain shared; peer_credentials is the Unix-family query.
 //!
 //! **Why it is a module and not two more functions in `std.net`.** wolf
 //! has no overloading, so `listen` and `connect` cannot mean two things in
@@ -110,21 +111,11 @@
 //!   answers `io` here, because a path has no port. Measured on all three
 //!   lanes and pinned in `tests/net/unix/echo.lu`; nothing in this module
 //!   shadows it
-//! - `peer_credentials(s: net.Socket) -> Credentials ! {io, unsupported}`,
-//!   with `Credentials { pid: int, uid: int, gid: int }` — **a contract
-//!   (sc82), not shipped**: the pid, uid and gid of the process at the
-//!   other end of a connected stream, as the host recorded them when the
-//!   connection was made, so that a server can refuse a client of another
-//!   user before it reads a byte. `pid` is -1 where the host gives none.
-//!   `SO_PEERCRED` on linux and PAX; `LOCAL_PEERCRED` with
-//!   `LOCAL_PEERPID` on macOS; `LOCAL_PEERCRED` on freebsd; `unsupported`
-//!   by name on windows, as the family is there. A TCP stream, a listener,
-//!   a forged or a closed handle are `io`. No builtin answers it at this
-//!   pin; the call it needs, `net_peer_cred(fd: int) -> (int, int, int) !
-//!   {io, unsupported}`, is stated in `docs/sc82-one-wait.md` ("Missing
-//!   below std", M3), and the function ships in the change after it lands
-//!   (API-CONVENTIONS §14, sc11), with a row that reads a client's ids
-//!   back from the server's end
+//! - ~~`peer_credentials`~~ — **HERE now (sc83, wolf 0.2.40)**, with
+//!   Credentials below: Linux and PAX report SO_PEERCRED; macOS reports
+//!   LOCAL_PEERCRED and LOCAL_PEERPID, pid -1 after the peer has closed;
+//!   FreeBSD reports getpeereid and pid -1. Windows answers unsupported.
+//!   lupin 0.1.62 refuses a Unix credential read at run by builtin name.
 //!
 //! **Paths.** §14's rule, unchanged: a path is a `str`, the separator is
 //! `/`, and every test and example here uses a RELATIVE path in the
@@ -242,4 +233,32 @@ pub fn listen(path: str) -> net.Listener ! {unsupported, exists, not_found, deni
 /// `tests/net/unix/rows.lu` and `tests/net/unix/refused_row.lu`.
 pub fn connect(path: str) -> net.Socket ! {unsupported, refused, not_found, denied, io} {
     net.Socket { fd: net_connect_unix(path)? }
+}
+
+/// The peer's process id, effective user id and effective group id, as
+/// recorded when the Unix stream connected. pid is -1 when not available.
+/// Pure data, no capability; fields are named integers, not host structs.
+pub struct Credentials {
+    pid: int,
+    uid: int,
+    gid: int,
+}
+
+/// The credentials at the other end of connected s, accepted or dialed.
+/// Linux/PAX keep all three after peer close. macOS keeps uid and gid but
+/// reports pid -1 after close; ask at accept if the pid is needed. FreeBSD
+/// reports the effective ids and pid -1. No user database lookup is made.
+///
+/// Rows: io for TCP, a listener, forged/closed handles or host failure;
+/// unsupported on Windows. Never traps. Capability net; refused at
+/// comptime. Delegates to net_peer_cred. Both compiler tiers serve it;
+/// lupin 0.1.62 refuses a live Unix stream's query by name at run.
+///
+/// Prose example (accept/close need std.net): after accepting a Unix
+/// stream, let c = unix.peer_credentials(peer)?; compare c.uid to the
+/// server's allowed effective uid before reading a request. Runnable
+/// rows: tests/net/unix/peer_credentials.lu and peer_credentials_child.lu.
+pub fn peer_credentials(s: net.Socket) -> Credentials ! {io, unsupported} {
+    let (p, u, g) = net_peer_cred(s.fd)?
+    Credentials { pid: p, uid: u, gid: g }
 }
