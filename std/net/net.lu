@@ -118,6 +118,22 @@
 //!   a hazard that does not exist at this pin. The name is reserved for the
 //!   day a partial-write surface appears, and `write`'s doc states the
 //!   completeness it relies on.
+//! - `write_some(mut s: Socket, b: List[byte]) -> int ! {busy, closed,
+//!   invalid, io}` — **a contract (sc82), not shipped**: ONE send that
+//!   never parks, answering how many bytes the host took (at least 1 for
+//!   a non-empty list), `busy` when it can take none now, `closed` for a
+//!   peer that has gone, `invalid` for a list of the wrong element width.
+//!   It is the partial-write surface `write_all`'s line above waits for,
+//!   and what a server that keeps one output queue per client needs:
+//!   every write here drains the whole list, so one client that stops
+//!   reading parks the whole loop (a Unix stream holds 4096 bytes each way
+//!   on PAX). A file has it (`std.fs`'s `set_nonblock` and `write_some`);
+//!   a socket has no builtin for it at this pin. The call it needs,
+//!   `net_write_some(fd: int, bytes: List[byte]) -> int ! {busy, closed,
+//!   invalid, io}`, is stated in `docs/sc82-one-wait.md` ("Missing below
+//!   std", M2), and the function ships in the change after it lands
+//!   (API-CONVENTIONS §14, sc11). With it, a socket's `WRITE` interest in
+//!   `std.poll` is served too.
 //! - `shutdown(mut s, half)` — an orderly half-close. No builtin, so a
 //!   writer cannot say "I am done sending" without closing the whole
 //!   socket (F-0049).
@@ -1129,6 +1145,13 @@ pub fn adopt_listener(fd: int) -> Listener ! {unsupported, io} {
 /// task nor disturbs the reactor's registrations, so a program may mix
 /// it with `spawn` freely. Every tier-1 host answers this question and
 /// every tier serves it.
+///
+/// **The narrow form** (sc82): sockets alone, read readiness alone, no
+/// signal. `std.poll` is the wide form, an owned waiter over sockets and
+/// files with a set of meanings, whose sockets path is this call; a
+/// waiter that mixes files and sockets is refused there by name until the
+/// runtime has one wait over both (`docs/sc82-one-wait.md`). This call
+/// is unchanged.
 ///
 /// Capability `net`; refused at comptime (D33). Delegates to `net_wait`.
 ///
