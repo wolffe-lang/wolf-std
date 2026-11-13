@@ -323,8 +323,25 @@ Default x86 X25519 retains IDIV instructions in fe_carry (40), fe_freeze (38),
 clamp (2) and ladder (4), with secret-derived arithmetic operands. RFC 7748
 section 5.1 explicitly warns about operand-dependent division timing. This
 lane has not qualified their latency on the intended CPUs and does not claim
-these default paths are fixed-time. The examined release counterparts have
-no IDIV, but that is not proof of a side-channel-free release path or runtime.
+these default paths are fixed-time.
+
+CORRECTION (sc84, wolf-std#151). The sentence that stood here, "The examined
+release counterparts have no IDIV", was true of IDIV and false of division:
+the count looked for IDIV only. At bb002f3 the x86-64 release ladder extracts
+every scalar bit with an unsigned 8-bit DIV of the clamped secret scalar byte
+(`div %sil`, 255 times per scalar multiplication), and release Bech32
+decoding and encoding divide identity bits on both targets (x86-64 `idiv`/`div`,
+arm64 `sdiv`). Default builds on both targets divide secret-derived operands
+in more places than this note listed: X25519 fe_carry 40, fe_freeze 38,
+fe_tobytes 62, clamp 2 and ladder 2 (of 4), Poly1305 poly1305 50, absorb 19
+and push_tag_word 7, and Bech32 decode_bytes, encode_bytes and encode; the
+alphabet scan also left early on each secret character (wolf-std#151).
+After sc84 the four modules divide nowhere, in either tier, and
+`cargo xtask codegen` fails on any division instruction in their objects
+on the host target; each module's header states what remains. That is an instruction-level
+statement: no latency was measured, the compiler is not audited, and it is
+still not proof of a side-channel-free release path or runtime.
+
 Arithmetic cswap has checked-overflow guards, not a branch-free machine-code
 certificate; valid carried-limb/swap bounds must justify their untaken edges.
 
