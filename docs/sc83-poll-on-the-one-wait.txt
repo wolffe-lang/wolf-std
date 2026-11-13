@@ -45,7 +45,7 @@ At b7a9390, Mac preflight passed, the harness compiled with two workers, doctor 
 
 Released lupin 0.1.62 executed net/write_some and satisfied the byte-domain E0401 check. Its other named refusals were captured before changing their ledger cells. The first collector incorrectly equated phase_reached with the refusal point: lupin records its last completed rung as resolve and separately reports x-unsupported-at=run. The collector now checks the latter when present, with a red-first regression test. It still requires the named builtin/comptime function and rejects wrong phases, warnings and unexpected heals.
 
-The main ledger now has all 679 tests. The compiler-only ledger draft is retained as an archived pre-release projection, not the current ledger. Windows-only run cells test explicit guards/refusal branches, not unavailable capabilities; hosted results must confirm those cells before merge.
+The main ledger now has all 680 tests. The compiler-only ledger draft is retained as an archived pre-release projection, not the current ledger. Windows-only run cells test explicit guards/refusal branches, not unavailable capabilities; hosted results must confirm those cells before merge.
 
 ### Comptime posture
 
@@ -53,20 +53,20 @@ net/comptime_refuses_write_some keeps fail(E0701) as the reachable normative che
 
 ### Host-dependent rows and merge gates
 
-The focused runner has 23 rows, including the corrected term/pty_child and the pure constructor/shape-guard regression, plus eight protocol/fixture unit checks. The documentation capability policy was seen red at 9874993 before poll joined the Exec facades (doc-capability-policy exit=101). Every admitted block must still execute on at least one lane; pure_rows independently pins pure construction, constants and pre-host shape guards on all three machines. The final gauntlet separately runs the whole standard suite, doc examples, formatting, lint, Rust checks and numeric/oracle gates.
+The focused runner has 24 rows, including the corrected term/pty_child, pure constructor/shape guards and a white-box fallback-registration regression, plus eight protocol/fixture unit checks. The documentation capability policy was seen red at 9874993 before poll joined the Exec facades (doc-capability-policy exit=101). Every admitted block must still execute on at least one lane; pure_rows independently pins pure construction, constants and pre-host shape guards on all three machines. The final gauntlet separately runs the whole standard suite, doc examples, formatting, lint, Rust checks and numeric/oracle gates.
 
 - term/pty_child: the spawn map itself gives no controlling terminal, but a shell may take the mapped slave after exec. The row accepts only a normal read-end report with status 0, or a reported controlling terminal followed by SIGHUP and pipe EOF. Actual observations go to stderr. It normalizes CR LF and does not assume unchanged shell terminal attributes. This corrects the row/doc behind #147, not os_spawn_session.
 - poll/pty_hangup: the master's final read is io on Linux and eof on macOS; both must report READ|HANGUP. The first wake may already carry hangup, so only its READ bit is required.
 - poll/error_hangup: a pipe's write end with all readers gone carries ERROR on Linux, HANGUP on macOS, together with every requested interest. The read end carries READ|HANGUP.
 - unix peer credentials: effective ids remain after close; Linux retains pid, macOS gives -1 after close. The forked client stays connected through an acknowledgement before the pid is checked. No different-uid client is claimed; checked loudly skips its unsupported fork and is covered by the same-process credential row.
 - Socket/pty partial counts and buffer capacities are host-dependent; tests assert counts, bytes, busy and recovery, not a Linux capacity. Positive deadlines may finish late but never early.
-- Windows retains only the existing socket-READ/no-meaning and empty-deadline fallback. Wide readiness, Unix and pty legs explicitly report their unavailable host posture. FreeBSD is described only by the runtime contract, not claimed as a tested std lane. A SKIP is never a serving-tier measurement.
+- Windows retains only the existing socket-READ/no-meaning and empty-deadline fallback. Fallback adds validate fs handles with non-consuming metadata and net handles with a zero-deadline look before publishing a key; a forced-fallback regression was red on all three machines before that fix. These validations add the delegate's fs/net capability respectively, not a new error tag. The pty-child row only accepts the host's unsupported branch on Windows; a serving-host refusal is a test failure. Wide readiness, Unix and pty legs explicitly report their unavailable host posture. FreeBSD is described only by the runtime contract, not claimed as a tested std lane. A SKIP is never a serving-tier measurement.
 
 Before merge require hosted tier all: rig AND gates on Ubuntu, macOS and Windows. The usual tier full omits the macOS rig and is not sufficient for these process/socket/timing rows. Record paths/digests and every END line are supplied in the handoff and PR evidence, without publishing private machine paths in this note. No hosted green is claimed before its verdict arrives.
 
 ### PAX handoff
 
-There is no PAX/QEMU leg in this repository's harness. Build these 19 run probes as static Linux binaries with the matching released musl runtime: poll/{waiter_rows,files_all_ready,sockets_all_ready,mixed_refused,fairness,deadline,signal_during_wait,write_partial,pty_hangup,capacity,set_mutation,error_hangup,signal_socket,socket_queue,pure_rows}, net/write_some, net/unix/{peer_credentials,peer_credentials_child}, term/pty_child. Stage ONE source per owned directory as main.lu, since sibling entries otherwise form one package.
+There is no PAX/QEMU leg in this repository's harness. Build these 20 run probes as static Linux binaries with the matching released musl runtime: poll/{waiter_rows,files_all_ready,sockets_all_ready,mixed_refused,fairness,deadline,signal_during_wait,write_partial,pty_hangup,capacity,set_mutation,error_hangup,signal_socket,socket_queue,pure_rows,fallback_validation}, net/write_some, net/unix/{peer_credentials,peer_credentials_child}, term/pty_child. Stage ONE source per owned directory as main.lu, since sibling entries otherwise form one package.
 
     WOLF_RT_LIB="$MUSL_RUNTIME" "$WOLF" build main.lu --std-root "$STD" --linker "$STATIC_MUSL_CC" -o probe
 

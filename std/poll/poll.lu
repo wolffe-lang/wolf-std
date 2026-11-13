@@ -39,8 +39,11 @@
 //! PAX uses the static Linux binary. lupin 0.1.62 refuses readiness calls
 //! at run by builtin name, not a caught unsupported error mark.
 //!
-//! Capability exec for sets/waits, net for the Windows narrow fallback;
-//! refused at comptime. open, len and constants are pure. modify/remove
+//! Capability exec for sets/waits, net for the Windows narrow fallback.
+//! Fallback adds validate through fs metadata or a zero-deadline net look
+//! (fs or net respectively); they publish no key before validation.
+//! All host calls are refused at comptime. open, len and constants are
+//! pure. modify/remove
 //! retain {invalid, io}: unsupported from a set change is explicitly
 //! handled as io. A set that opened cannot meet it on that same host;
 //! tests/poll/set_mutation.lu holds that fact.
@@ -194,8 +197,16 @@ fn add(mut w: Waiter, kind: int, h: int, interest: int) -> int ! {invalid, io, u
     acquire(mut w)?
     if w.set >= 0 {
         os_ready_set(w.set, marked(kind, h), interest, k)?
+    } else if is_net(kind) {
+        // The list fallback has no registration call to validate its
+        // table handle. A zero-deadline look validates without parking
+        // or consuming stream bytes/connections from the caller.
+        let _valid = net.wait([h], 0)?
+    } else {
+        // Metadata checks the fs table without changing the file offset.
+        let _valid = fs_fstat(h)?
     }
-    // Publish the key only after the runtime accepted the registration.
+    // Publish the key only after validation succeeded on either path.
     if k < w.kinds.len {
         w.kinds[k] = kind
         w.handles[k] = h
@@ -213,20 +224,23 @@ fn add(mut w: Waiter, kind: int, h: int, interest: int) -> int ! {invalid, io, u
 /// until removal. invalid for duplicates, invalid interest, negative or
 /// wait-marked handles. io for capacity (256), a closed/forged handle or
 /// host failure; unsupported where registration is unsupported. Remove
-/// before closing f. Capability exec; refused at comptime.
+/// before closing f. Capability exec for a set, fs for fallback handle
+/// validation; refused at comptime.
 pub fn add_file(mut w: Waiter, f: fs.File, interest: int) -> int ! {invalid, io, unsupported} {
     add(mut w, FILE, f.fd, interest)?
 }
 
 /// Add a TCP or Unix stream with READ, WRITE or both. Keys and rows are
 /// add_file's; file and net handle numbers belong to separate tables.
-/// Capability exec; refused at comptime.
+/// Capability exec for a set, net for fallback handle validation;
+/// refused at comptime.
 pub fn add_socket(mut w: Waiter, s: net.Socket, interest: int) -> int ! {invalid, io, unsupported} {
     add(mut w, SOCKET, s.fd, interest)?
 }
 
 /// Add l with READ (a pending connection). Keys and rows are add_file's.
-/// Capability exec; refused at comptime.
+/// Capability exec for a set, net for fallback handle validation;
+/// refused at comptime.
 pub fn add_listener(mut w: Waiter, l: net.Listener) -> int ! {invalid, io, unsupported} {
     add(mut w, LISTENER, l.fd, READ)?
 }
