@@ -39,8 +39,7 @@ class RowReader(unittest.TestCase):
         test = "net/comptime_refuses_write_some.lu"
         for lane in ("wolfc", "native"):
             self.assertEqual(ROWS["expected_refusal"](test, lane), ("resolve", "`List` construction at comptime"))
-        # The reference cell must be measured after its release, not guessed.
-        self.assertIsNone(ROWS["expected_refusal"](test, "lupin"))
+        self.assertEqual(ROWS["expected_refusal"](test, "lupin"), ("run", "`probe` is a `comptime fn`"))
         record = {"verdict": "unsupported", "phase_reached": "resolve", "warnings": [],
                   "x-unsupported-construct": "`List` construction at comptime (no mutable container model)"}
         check = ROWS["matches_refusal"]
@@ -49,6 +48,17 @@ class RowReader(unittest.TestCase):
         self.assertFalse(check(dict(record, verdict="fail(E0701)"), "resolve", "`List` construction at comptime"))
         self.assertFalse(check(dict(record, warnings=["unexpected"]), "resolve", "`List` construction at comptime"))
         self.assertFalse(check(record, "resolve", "`net_write_some`"))
+
+    def test_lupin_refusal_point_is_not_last_completed_phase(self):
+        record = {"impl": "lupin", "verdict": "unsupported", "phase_reached": "resolve",
+                  "x-unsupported-at": "run", "x-unsupported": "`os_ready_open` needs a kernel set",
+                  "warnings": []}
+        check = ROWS["matches_refusal"]
+        self.assertTrue(check(record, "run", "`os_ready_open`"))
+        self.assertFalse(check(record, "resolve", "`os_ready_open`"))
+        without_point = dict(record)
+        del without_point["x-unsupported-at"]
+        self.assertFalse(check(without_point, "run", "`os_ready_open`"))
 
     def test_windows_postures_are_explicit(self):
         self.assertNotIn("poll/signal_during_wait.lu", ROWS["WINDOWS_RUN"])
