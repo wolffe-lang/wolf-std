@@ -41,13 +41,17 @@
 //!
 //! **Poly1305 is CHECKED `int` arithmetic, all the way down** — the
 //! sc17 probe delta's finding. Five 26-bit limbs in 64-bit
-//! accumulators, carries spelled `/`/`%` (no bitwise operators on
-//! plain `int` — that spelling costs the checked lane, F-0026), the
-//! §2.5 clamp as `%`/`-` arithmetic, and the final conditional
-//! subtraction as an arithmetic select. The bound proof lives on
-//! `absorb`; because X3's checked arithmetic traps on any overflow, a
-//! violated bound would be a trap the vectors catch, not a silent
-//! wrap. No `wrapping[T]` appears anywhere in the MAC.
+//! accumulators, carries spelled as literal shifts and masks (`>> 26`,
+//! `& 67108863`) on limbs the bound proof keeps non-negative, where
+//! they are the same numbers `/` and `%` were; the §2.5 clamp as masks;
+//! and the final conditional subtraction as an arithmetic select. Until
+//! sc84 the carries were `/`/`%`, because a plain-`int` shift or mask
+//! cost the checked lane (F-0026); every lane runs them since wolf
+//! 0.2.31, and a default build compiled each `/`/`%` to a hardware
+//! divide of the one-time key and the accumulator (wolf-std#151). The
+//! bound proof lives on `absorb`; because X3's checked arithmetic traps
+//! on any overflow, a violated bound would be a trap the vectors catch,
+//! not a silent wrap. No `wrapping[T]` appears anywhere in the MAC.
 //!
 //! **Lanes, measured at the sc18 pin (wolf 21b129e)**: ALL THREE run
 //! every body. The checked tier's F-0091 operator refusal that kept
@@ -401,7 +405,7 @@ pub fn stream_xor(
     data: List[byte],
 ) -> List[byte] {
     require_chacha_inputs(key, counter, nonce)
-    let blocks = (data.len + 63) / 64
+    let blocks = data.len + 63 >> 6
     if blocks > 0 {
         if counter + blocks - 1 > 4294967295 {
             assert(false, "chacha20: message spans past the 32-bit block counter (RFC 8439 s2.4)")
@@ -413,10 +417,10 @@ pub fn stream_xor(
     var ks = List[byte]()
     var pos: int = 0
     for m in data {
-        if pos % 64 == 0 {
-            ks = keystream_block(kw, counter + pos / 64, nw)
+        if pos & 63 == 0 {
+            ks = keystream_block(kw, counter + (pos >> 6), nw)
         }
-        (mut out).push(xor_byte(m as int, ks[pos % 64] as int) as byte)
+        (mut out).push(xor_byte(m as int, ks[pos & 63] as int) as byte)
         pos = pos + 1
     }
     out
@@ -426,9 +430,9 @@ pub fn stream_xor(
 // RFC 8439 §2.5 — Poly1305. The accumulator and clamped r ride as five
 // 26-bit limbs in checked-int 64-bit accumulators; s is the final
 // 128-bit addend. Everything below is plain checked arithmetic: carries
-// are `/`/`%` by 2^26, the clamp is `%`/`-` by powers of two, and the
-// final conditional subtraction is an arithmetic select — no bitwise
-// operator on plain `int` anywhere (F-0026), and no branch on a secret.
+// are `>> 26` and `& 67108863` on non-negative limbs, the clamp is a
+// mask, and the final conditional subtraction is an arithmetic select —
+// no division (sc84) and no branch on a secret.
 // ---------------------------------------------------------------------
 
 /// An in-progress Poly1305 computation: the five accumulator limbs,
@@ -469,10 +473,10 @@ struct Poly {
 /// 2^57.00 worst-case over the RFC vectors and 3000 random cases in
 /// the sc17 probe delta. X3 enforces the proof at every operation.
 fn absorb(mut st: Poly, chunk: List[int]) {
-    let n0 = le32i(chunk[0], chunk[1], chunk[2], chunk[3]) % 67108864
-    let n1 = le32i(chunk[3], chunk[4], chunk[5], chunk[6]) / 4 % 67108864
-    let n2 = le32i(chunk[6], chunk[7], chunk[8], chunk[9]) / 16 % 67108864
-    let n3 = le32i(chunk[9], chunk[10], chunk[11], chunk[12]) / 64 % 67108864
+    let n0 = le32i(chunk[0], chunk[1], chunk[2], chunk[3]) & 67108863
+    let n1 = le32i(chunk[3], chunk[4], chunk[5], chunk[6]) >> 2 & 67108863
+    let n2 = le32i(chunk[6], chunk[7], chunk[8], chunk[9]) >> 4 & 67108863
+    let n3 = le32i(chunk[9], chunk[10], chunk[11], chunk[12]) >> 6 & 67108863
     let n4 = le32i(chunk[13], chunk[14], chunk[15], chunk[16])
     let h0 = st.h0 + n0
     let h1 = st.h1 + n1
@@ -484,23 +488,23 @@ fn absorb(mut st: Poly, chunk: List[int]) {
     let d2 = h0 * st.r2 + h1 * st.r1 + h2 * st.r0 + h3 * st.m4 + h4 * st.m3
     let d3 = h0 * st.r3 + h1 * st.r2 + h2 * st.r1 + h3 * st.r0 + h4 * st.m4
     let d4 = h0 * st.r4 + h1 * st.r3 + h2 * st.r2 + h3 * st.r1 + h4 * st.r0
-    var c = d0 / 67108864
-    st.h0 = d0 % 67108864
+    var c = d0 >> 26
+    st.h0 = d0 & 67108863
     let e1 = d1 + c
-    c = e1 / 67108864
-    st.h1 = e1 % 67108864
+    c = e1 >> 26
+    st.h1 = e1 & 67108863
     let e2 = d2 + c
-    c = e2 / 67108864
-    st.h2 = e2 % 67108864
+    c = e2 >> 26
+    st.h2 = e2 & 67108863
     let e3 = d3 + c
-    c = e3 / 67108864
-    st.h3 = e3 % 67108864
+    c = e3 >> 26
+    st.h3 = e3 & 67108863
     let e4 = d4 + c
-    c = e4 / 67108864
-    st.h4 = e4 % 67108864
+    c = e4 >> 26
+    st.h4 = e4 & 67108863
     let f0 = st.h0 + c * 5
-    st.h0 = f0 % 67108864
-    st.h1 = st.h1 + f0 / 67108864
+    st.h0 = f0 & 67108863
+    st.h1 = st.h1 + (f0 >> 26)
 }
 
 /// The Poly1305 one-time authenticator (RFC 8439 §2.5): a 16-byte tag
@@ -512,7 +516,7 @@ fn absorb(mut st: Poly, chunk: List[int]) {
 /// under one r,s pair forfeits the MAC; the AEAD below derives a fresh
 /// key per nonce.
 /// ct: the limb schedule is fixed and data-independent — every block
-/// runs the same adds, multiplies and `/`/`%` carries; block
+/// runs the same adds, multiplies and shift-and-mask carries; block
 /// boundaries depend on the LENGTH alone; the final conditional
 /// subtraction of p is an arithmetic select, not a branch — with no
 /// recorded exception left since sc35.
@@ -535,24 +539,24 @@ pub fn poly1305(key: List[byte], msg: List[byte]) -> List[byte] {
     (mut rb).push(key[0] as int)
     (mut rb).push(key[1] as int)
     (mut rb).push(key[2] as int)
-    (mut rb).push(key[3] as int % 16)
-    (mut rb).push(key[4] as int - key[4] as int % 4)
+    (mut rb).push(key[3] as int & 15)
+    (mut rb).push(key[4] as int - (key[4] as int & 3))
     (mut rb).push(key[5] as int)
     (mut rb).push(key[6] as int)
-    (mut rb).push(key[7] as int % 16)
-    (mut rb).push(key[8] as int - key[8] as int % 4)
+    (mut rb).push(key[7] as int & 15)
+    (mut rb).push(key[8] as int - (key[8] as int & 3))
     (mut rb).push(key[9] as int)
     (mut rb).push(key[10] as int)
-    (mut rb).push(key[11] as int % 16)
-    (mut rb).push(key[12] as int - key[12] as int % 4)
+    (mut rb).push(key[11] as int & 15)
+    (mut rb).push(key[12] as int - (key[12] as int & 3))
     (mut rb).push(key[13] as int)
     (mut rb).push(key[14] as int)
-    (mut rb).push(key[15] as int % 16)
-    let r0 = le32i(rb[0], rb[1], rb[2], rb[3]) % 67108864
-    let r1 = le32i(rb[3], rb[4], rb[5], rb[6]) / 4 % 67108864
-    let r2 = le32i(rb[6], rb[7], rb[8], rb[9]) / 16 % 67108864
-    let r3 = le32i(rb[9], rb[10], rb[11], rb[12]) / 64 % 67108864
-    let r4 = le32i(rb[12], rb[13], rb[14], rb[15]) / 256 % 67108864
+    (mut rb).push(key[15] as int & 15)
+    let r0 = le32i(rb[0], rb[1], rb[2], rb[3]) & 67108863
+    let r1 = le32i(rb[3], rb[4], rb[5], rb[6]) >> 2 & 67108863
+    let r2 = le32i(rb[6], rb[7], rb[8], rb[9]) >> 4 & 67108863
+    let r3 = le32i(rb[9], rb[10], rb[11], rb[12]) >> 6 & 67108863
+    let r4 = le32i(rb[12], rb[13], rb[14], rb[15]) >> 8 & 67108863
     var st = Poly {
         h0: 0,
         h1: 0,
@@ -591,49 +595,49 @@ pub fn poly1305(key: List[byte], msg: List[byte]) -> List[byte] {
     var h2 = st.h2
     var h3 = st.h3
     var h4 = st.h4
-    var c = h1 / 67108864
-    h1 = h1 % 67108864
+    var c = h1 >> 26
+    h1 = h1 & 67108863
     h2 = h2 + c
-    c = h2 / 67108864
-    h2 = h2 % 67108864
+    c = h2 >> 26
+    h2 = h2 & 67108863
     h3 = h3 + c
-    c = h3 / 67108864
-    h3 = h3 % 67108864
+    c = h3 >> 26
+    h3 = h3 & 67108863
     h4 = h4 + c
-    c = h4 / 67108864
-    h4 = h4 % 67108864
+    c = h4 >> 26
+    h4 = h4 & 67108863
     h0 = h0 + c * 5
-    c = h0 / 67108864
-    h0 = h0 % 67108864
+    c = h0 >> 26
+    h0 = h0 & 67108863
     h1 = h1 + c
     // If h >= 2^130 - 5, subtract p — computed as g = h + 5 with the
     // carry out of limb 4 as the select bit, applied ARITHMETICALLY
     // (over is 0 or 1; no branch reads the accumulator).
     var g0 = h0 + 5
-    c = g0 / 67108864
-    g0 = g0 % 67108864
+    c = g0 >> 26
+    g0 = g0 & 67108863
     var g1 = h1 + c
-    c = g1 / 67108864
-    g1 = g1 % 67108864
+    c = g1 >> 26
+    g1 = g1 & 67108863
     var g2 = h2 + c
-    c = g2 / 67108864
-    g2 = g2 % 67108864
+    c = g2 >> 26
+    g2 = g2 & 67108863
     var g3 = h3 + c
-    c = g3 / 67108864
-    g3 = g3 % 67108864
+    c = g3 >> 26
+    g3 = g3 & 67108863
     var g4 = h4 + c
-    let over = g4 / 67108864
-    g4 = g4 % 67108864
+    let over = g4 >> 26
+    g4 = g4 & 67108863
     h0 = h0 + over * (g0 - h0)
     h1 = h1 + over * (g1 - h1)
     h2 = h2 + over * (g2 - h2)
     h3 = h3 + over * (g3 - h3)
     h4 = h4 + over * (g4 - h4)
     // h mod 2^128 as four 32-bit words (limb seams at 26/52/78/104).
-    let w0 = h0 + h1 % 64 * 67108864
-    let w1 = h1 / 64 + h2 % 4096 * 1048576
-    let w2 = h2 / 4096 + h3 % 262144 * 16384
-    let w3 = h3 / 262144 + h4 % 16777216 * 256
+    let w0 = h0 + (h1 & 63) * 67108864
+    let w1 = (h1 >> 6) + (h2 & 4095) * 1048576
+    let w2 = (h2 >> 12) + (h3 & 262143) * 16384
+    let w3 = (h3 >> 18) + (h4 & 16777215) * 256
     // tag = (h + s) mod 2^128, little-endian (§2.5.1's "add s" step;
     // s is the key's second half, an ordinary 128-bit LE number).
     let s0 = le32i(key[16] as int, key[17] as int, key[18] as int, key[19] as int)
@@ -642,26 +646,26 @@ pub fn poly1305(key: List[byte], msg: List[byte]) -> List[byte] {
     let s3 = le32i(key[28] as int, key[29] as int, key[30] as int, key[31] as int)
     var out = List[byte]()
     var t = w0 + s0
-    c = t / 4294967296
-    push_tag_word(mut out, t % 4294967296)
+    c = t >> 32
+    push_tag_word(mut out, t & 4294967295)
     t = w1 + s1 + c
-    c = t / 4294967296
-    push_tag_word(mut out, t % 4294967296)
+    c = t >> 32
+    push_tag_word(mut out, t & 4294967295)
     t = w2 + s2 + c
-    c = t / 4294967296
-    push_tag_word(mut out, t % 4294967296)
+    c = t >> 32
+    push_tag_word(mut out, t & 4294967295)
     t = w3 + s3 + c
-    push_tag_word(mut out, t % 4294967296)
+    push_tag_word(mut out, t & 4294967295)
     out
 }
 
 /// Four little-endian bytes of a 32-bit word, in the plain-int domain
 /// (Poly1305's serialization half of the endianness seam).
 fn push_tag_word(mut out: List[byte], w: int) {
-    (mut out).push((w % 256) as byte)
-    (mut out).push((w / 256 % 256) as byte)
-    (mut out).push((w / 65536 % 256) as byte)
-    (mut out).push((w / 16777216 % 256) as byte)
+    (mut out).push((w & 255) as byte)
+    (mut out).push((w >> 8 & 255) as byte)
+    (mut out).push((w >> 16 & 255) as byte)
+    (mut out).push((w >> 24 & 255) as byte)
 }
 
 // ---------------------------------------------------------------------
@@ -693,13 +697,13 @@ fn mac_data(aad: List[byte], ct: List[byte]) -> List[byte] {
     for b in aad {
         (mut out).push(b)
     }
-    while !(out.len % 16 == 0) {
+    while !(out.len & 15 == 0) {
         (mut out).push(0 as byte)
     }
     for b in ct {
         (mut out).push(b)
     }
-    while !(out.len % 16 == 0) {
+    while !(out.len & 15 == 0) {
         (mut out).push(0 as byte)
     }
     push_len64_le(mut out, aad.len)
@@ -713,8 +717,8 @@ fn push_len64_le(mut out: List[byte], n: int) {
     var v = n
     var k: int = 0
     while k < 8 {
-        (mut out).push((v % 256) as byte)
-        v = v / 256
+        (mut out).push((v & 255) as byte)
+        v = v >> 8
         k = k + 1
     }
 }
@@ -836,8 +840,8 @@ pub fn to_hex(b: List[byte]) -> str {
     var out = ""
     for raw in b {
         let v = raw as int
-        let hi = v / 16
-        let lo = v % 16
+        let hi = v >> 4
+        let lo = v & 15
         let hd = alphabet[hi..hi + 1]
         let ld = alphabet[lo..lo + 1]
         out = "{out}{hd}{ld}"
