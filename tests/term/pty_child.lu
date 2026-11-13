@@ -73,8 +73,12 @@ fn main() -> !int {
     let p = term.open_pty() else |e| {
         match e {
             unsupported => {
-                every_line()
-                return 0
+                if os_name() == "windows" {
+                    every_line()
+                    return 0
+                }
+                eprint("FAIL term/pty_child: serving host refused open_pty")
+                return 1
             },
             io => print("open_pty=io {os_error()}"),
         }
