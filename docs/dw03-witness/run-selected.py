@@ -54,10 +54,11 @@ for row in rows:
             want_verdict = 'unsupported' if posture=='unsupported' else expected
             ok = result.returncode==0 and record['verdict']==want_verdict and not record.get('warnings')
             if golden and want_verdict.startswith('exit('):
-                # The protocol compares stdout without a final line terminator.
+                # Match xtask/record.rs: exact bytes, optionally ONE added newline.
                 want_stdout = json.loads(golden[1])
                 actual_hash = record.get('stdout_sha256') or hashlib.sha256(b'').hexdigest()
-                ok &= actual_hash == hashlib.sha256(want_stdout.encode()).hexdigest()
+                allowed = {hashlib.sha256(s.encode()).hexdigest() for s in [want_stdout, want_stdout+'\n']}
+                ok &= actual_hash in allowed
             detail = record['verdict']
             if posture == 'unsupported': detail += ' (not measured: ledger budget posture)'
             if not ok: detail += ' expected='+want_verdict+' warnings='+str(record.get('warnings'))
