@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="three_terminals=true\nnot_controlling=true\nreads_the_size=true\nreads_the_master=true\nread_ends_on_master_close=true\nchild_status=0")
+//! check: run(exit=0, stdout="three_terminals=true\ncontrolling_reported=true\nreads_the_size=true\nreads_the_master=true\nend_as_shell=true\nchild_status_as_shell=true")
 //! phase: run
 //! conforms: std.term, std.process, os.term.pty, os.term.size.set, os.term.attr, os.proc.session, os.proc.fds, err.row
 //!
@@ -7,13 +7,16 @@
 //! 30 by 100 and its echo and output processing are turned off on the
 //! master (ops 53 and 70) before the spawn; the slave is the child's 0, 1
 //! and 2, and a pipe its 3. The child, `/bin/sh`, finds a terminal on each
-//! of 0, 1 and 2; finds no controlling terminal (`/dev/tty` does not open:
-//! a map never makes one, which is why a server forks for a terminal
-//! request, `term/pty_session.lu`); reads the size set on the master with
-//! `stty size`; and reads the line the master writes, printing it back,
-//! which the master reads. When the master closes, the shell's next read
-//! of its terminal ends, and it says so on the pipe. It ends with 0. This
-//! process closes its slave after the spawn, as a server does.
+//! of 0, 1 and 2, reports whether /dev/tty opens, reads the size set on
+//! the master, and echoes the line the master writes. The spawn map does
+//! not make a controlling terminal, but a shell can take it after exec:
+//! bash does on this shape, dash does not. Closing the master can end
+//! the read normally (status 0 and a pipe report) or hang up a shell that
+//! took the terminal (SIGHUP and pipe EOF). Only those two end shapes
+//! pass. No assumption is made that the shell keeps output processing
+//! unchanged: CR LF is normalized before matching the child's output.
+//! The observed terminal/status/end are reported on stderr. This process
+//! closes its slave after the spawn, as a server does.
 //!
 //! **windows** answers `open_pty`'s `unsupported` on every machine, and
 //! the row prints its lines for that reason. **lupin** 0.1.61 refuses
@@ -21,16 +24,18 @@
 
 use std.fs
 use std.process
+use std.signal
 use std.str
 use std.term
 
 fn every_line() {
+    eprint("SKIP term/pty_child: pseudo-terminals unsupported on this host")
     print("three_terminals=true")
-    print("not_controlling=true")
+    print("controlling_reported=true")
     print("reads_the_size=true")
     print("reads_the_master=true")
-    print("read_ends_on_master_close=true")
-    print("child_status=0")
+    print("end_as_shell=true")
+    print("child_status_as_shell=true")
 }
 
 fn script() -> str {
@@ -58,7 +63,7 @@ fn read_until(mut m: fs.File, want: str) -> str {
         let chunk = fs.read(mut m, 256) else |_| {
             return got
         }
-        got = got + chunk
+        got = str.replace(got + chunk, "\r\n", "\n")
         n = n + 1
     }
     got
@@ -95,16 +100,26 @@ fn main() -> !int {
     fs.close(take qw)?
     let head = read_until(mut m, "30 100\n")
     print("three_terminals={str.contains(head, "terminals=3\n")}")
-    print("not_controlling={str.contains(head, "controlling=no\n")}")
+    let controlling = str.contains(head, "controlling=yes\n")
+    let not_controlling = str.contains(head, "controlling=no\n")
+    print("controlling_reported={controlling || not_controlling}")
     print("reads_the_size={str.contains(head, "30 100\n")}")
     fs.write(mut m, "hello\n")?
     let echoed = read_until(mut m, "got=hello\n")
     print("reads_the_master={str.contains(echoed, "got=hello\n")}")
     fs.close(take m)?
-    let report = fs.read(mut qr, 64) else "nothing"
+    let report = fs.read(mut qr, 64) else |e| match e {
+        eof => "pipe_eof",
+        io => "pipe_io",
+        utf8 => "pipe_utf8",
+    }
     fs.close(take qr)?
-    print("read_ends_on_master_close={report == "second=ended\n"}")
     let st = process.wait_status(take ch)?
-    print("child_status={st}")
+    let hup = 0 - signal.number(signal.reload())?
+    let normal = st == 0 && report == "second=ended\n"
+    let hung_up = controlling && st == hup && report == "pipe_eof"
+    print("end_as_shell={normal || hung_up}")
+    print("child_status_as_shell={st == 0 || (controlling && st == hup)}")
+    eprint("pty_child observation: controlling={controlling} status={st} end={report}")
     0
 }

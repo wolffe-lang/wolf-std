@@ -785,20 +785,21 @@ pub fn start_foreground(c: Command, group: int, tty: fs.File, defaults: int) -> 
 /// **s290 (`[os.proc.session]`, sc81): start `c` as the leader of a new
 /// session**, WITHOUT waiting for it. The child's session id, group id and
 /// process id are one number (`pid(child)`, and `group_of(child)` names its
-/// group); it is in no group of this process's session, and it has no
-/// controlling terminal: no key, hangup or background stop of this
-/// process's terminal reaches it or anything it starts, and `/dev/tty`
-/// does not open in it. `defaults` and the descriptor map are placed as
-/// `start_job` places them. Nothing of this process moves: its session,
-/// its group and its terminal stay as they were.
+/// group). The spawn itself gives it no controlling terminal; `defaults`
+/// and the descriptor map are placed as `start_job` places them. This
+/// describes the child before exec, not what the program may do afterwards.
+/// Nothing of this process moves: its session, group and terminal stay
+/// as they were.
 ///
 /// **A terminal is not given here.** A pty's slave in the map
 /// (`set_stdin`, `set_stdout`, `set_stderr`) is a terminal on those
-/// descriptors, but not the child's CONTROLLING terminal: the map never
-/// makes one, so the child gets no job control, no interrupt from the
-/// terminal's keys and no `resize()`. A program that must have one forks,
-/// calls `lead_session` and `std.term.open_controlling` in the child, and
-/// execs (`std.term.Pty` says the order).
+/// descriptors, but the map itself never makes it controlling. A program
+/// may take that terminal after exec: bash does in this shape, dash does
+/// not. If it does, closing the last master can hang up its session.
+/// Do not infer the running program's terminal state from the spawn map.
+/// A server that requires a controlling terminal forks, calls
+/// `lead_session` and `std.term.open_controlling` in the child, then execs
+/// (`std.term.Pty` says the order).
 ///
 /// Rows, in `start_job`'s order: `not_found` for an empty argv (decided
 /// here, on every host); `invalid` for a map the builders could not make
