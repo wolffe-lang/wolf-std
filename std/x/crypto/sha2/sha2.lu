@@ -1027,7 +1027,7 @@ pub fn hkdf256_expand(prk: List[byte], info: List[byte], n: int) -> List[byte] {
 fn counter_absorb256(take block: Sha256, i: int) -> Sha256 {
     var st = block
     var one = List[byte]()
-    (mut one).push((i % 256) as byte)
+    (mut one).push((i & 255) as byte)
     update256(mut st, one)
     st
 }
@@ -1082,7 +1082,7 @@ pub fn hkdf384_expand(prk: List[byte], info: List[byte], n: int) -> List[byte] {
         for b in info {
             (mut chunk).push(b)
         }
-        (mut chunk).push((i % 256) as byte)
+        (mut chunk).push((i & 255) as byte)
         t = hmac384(prk, chunk)
         for b in t {
             if okm.len < n {
@@ -1128,7 +1128,7 @@ pub fn hkdf512_expand(prk: List[byte], info: List[byte], n: int) -> List[byte] {
         for b in info {
             (mut chunk).push(b)
         }
-        (mut chunk).push((i % 256) as byte)
+        (mut chunk).push((i & 255) as byte)
         t = hmac512(prk, chunk)
         for b in t {
             if okm.len < n {
@@ -1170,8 +1170,8 @@ pub fn to_hex(b: List[byte]) -> str {
     var out = ""
     for raw in b {
         let v = raw as int
-        let hi = v / 16
-        let lo = v % 16
+        let hi = v >> 4
+        let lo = v & 15
         let hd = alphabet[hi..hi + 1]
         let ld = alphabet[lo..lo + 1]
         out = "{out}{hd}{ld}"
