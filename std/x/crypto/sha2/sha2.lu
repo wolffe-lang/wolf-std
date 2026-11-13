@@ -87,7 +87,11 @@
 //! elements with no comparison at all, so the digest path has NO
 //! value-dependent branch left. `to_hex` is still NOT constant-time (it
 //! indexes an alphabet by the byte's value) and says so. HMAC's key path
-//! branches on the key's LENGTH alone, never on key bytes.
+//! branches on the key's LENGTH alone, never on key bytes. These are
+//! source-level obligations, not a fixed-time certification of generated
+//! instructions, runtime operations or any execution tier. Review the
+//! exact compiler/backend/runtime pins separately; vectors prove outputs,
+//! not absence of timing, cache, allocation or residual-copy leakage.
 //!
 //! No error rows anywhere in this module: every function is total over
 //! its documented domain, and since sc35 there is exactly ONE failure
