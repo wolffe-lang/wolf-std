@@ -1,0 +1,42 @@
+// sc84 census entry: every public function of the four secret-handling
+// modules, fed from argv so nothing is a compile-time constant.
+use std.bech32
+use std.x.crypto.chacha20
+use std.x.crypto.curve25519
+use std.x.crypto.sha2
+
+fn main() -> int {
+    let a = env_args_bytes()
+    if a.len < 4 { return 2 }
+    let k = copy a[1]
+    let u = copy a[2]
+    let n = copy a[3]
+    let s = str_from_utf8(a[1]) else ""
+    var acc: int = 0
+    let ssec = curve25519.x25519(k, u) else List[byte]()
+    acc = acc + ssec.len
+    acc = acc + curve25519.x25519_base(k).len
+    let pk = curve25519.public(k)
+    let sig = curve25519.sign(k, u)
+    if curve25519.verify(pk, u, sig) { acc = acc + 1 }
+    if curve25519.verify_strict(pk, u, sig) { acc = acc + 1 }
+    acc = acc + curve25519.to_hex(ssec).len
+    let box = chacha20.seal(k, n, u, u)
+    let opened = chacha20.open(k, n, box, u) else List[byte]()
+    acc = acc + opened.len + chacha20.poly1305(k, u).len + chacha20.poly_key(k, n).len
+    acc = acc + chacha20.block(k, 1, n).len + chacha20.to_hex(box).len
+    acc = acc + sha2.sum256(u).len + sha2.hmac256(k, u).len + sha2.hkdf256(n, k, u, 32).len
+    acc = acc + sha2.hkdf256_extract(n, k).len + sha2.hkdf256_expand(k, u, 64).len
+    acc = acc + sha2.sum512(u).len + sha2.sum384(u).len + sha2.hmac512(k, u).len
+    acc = acc + sha2.hmac384(k, u).len + sha2.hkdf512(n, k, u, 32).len + sha2.hkdf384(n, k, u, 32).len
+    acc = acc + sha2.to_hex(u).len
+    let id = bech32.decode_bytes(s, "age-secret-key-", 32) else List[byte]()
+    acc = acc + id.len
+    let d = bech32.decode(s) else bech32.Decoded { hrp: "", data: List[byte]() }
+    acc = acc + d.data.len
+    let enc = bech32.encode_bytes("age-secret-key-", k) else ""
+    acc = acc + enc.len
+    let enc2 = bech32.encode("age", d.data) else ""
+    acc = acc + enc2.len
+    acc % 256
+}
