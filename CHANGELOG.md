@@ -2,9 +2,8 @@
 
 ## Unreleased
 
-**The runtime-backed wait (sc83), targeting wolf 0.2.40 / lupin 0.1.62.**
-Implementation and row drafts; all-tier measurements and the pin move
-are still pending.
+**The runtime-backed wait (sc83), at wolf 0.2.40 / lupin 0.1.62.**
+The pins now carry the runtime calls that complete the one-wait surface.
 
 - `std.poll` lazily owns a readiness set, one wait for files, sockets and
   meanings together, real `HANGUP`/`ERROR` facts, no sweep of narrow waits.
@@ -14,7 +13,10 @@ are still pending.
   or answers `busy`; `unix.peer_credentials` reports a connected Unix
   peer's pid and effective user/group ids. macOS reports pid -1 after
   peer close. The Windows narrow socket-read fallback is retained.
-- The prediction, red-first evidence and remaining gates are in
+- The pty-child row and start_session docs distinguish the spawn's
+  pre-exec state from a shell taking the mapped slave afterwards; both
+  normal EOF and a controlling shell's SIGHUP are checked (#147).
+- The prediction, red-first evidence and host-dependent gates are in
   `docs/sc83-poll-on-the-one-wait.txt`.
 
 **One wait (sc82), at wolf 0.2.39: `std.poll`.** A server that owns pty masters, pipes, a

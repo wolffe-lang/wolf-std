@@ -114,7 +114,8 @@
 //! - ~~`peer_credentials`~~ — **HERE now (sc83, wolf 0.2.40)**, with
 //!   Credentials below: Linux and PAX report SO_PEERCRED; macOS reports
 //!   LOCAL_PEERCRED and LOCAL_PEERPID, pid -1 after the peer has closed;
-//!   FreeBSD reports getpeereid and pid -1. Windows answers unsupported.
+//!   The runtime contract also describes FreeBSD's getpeereid and pid -1;
+//!   no tested std serving lane is claimed there. Windows is unsupported.
 //!   lupin 0.1.62 refuses a Unix credential read at run by builtin name.
 //!
 //! **Paths.** §14's rule, unchanged: a path is a `str`, the separator is
@@ -251,8 +252,9 @@ pub struct Credentials {
 
 /// The credentials at the other end of connected s, accepted or dialed.
 /// Linux/PAX keep all three after peer close. macOS keeps uid and gid but
-/// reports pid -1 after close; ask at accept if the pid is needed. FreeBSD
-/// reports the effective ids and pid -1. No user database lookup is made.
+/// reports pid -1 after close; ask at accept if the pid is needed. The
+/// runtime specifies FreeBSD ids and pid -1, but that std lane has not been
+/// measured. No user database lookup is made.
 ///
 /// Rows: io for TCP, a listener, forged/closed handles or host failure;
 /// unsupported on Windows. Never traps. Capability net; refused at

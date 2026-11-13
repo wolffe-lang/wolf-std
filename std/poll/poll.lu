@@ -22,9 +22,8 @@
 //! runtime's set bound. Registration 257 answers io without changing it;
 //! shape and duplicate errors still answer invalid first. The capacity
 //! refusal makes no host call and does not replace os_error's last result.
-//! A runtime handle
-//! close removes its registration; remove before close to release std's
-//! bookkeeping and reuse its key.
+//! A runtime handle close removes its registration; remove before close
+//! to release std's bookkeeping and reuse its key.
 //!
 //! READ and WRITE are interests and facts; HANGUP and ERROR are real host
 //! facts, returned with the applicable interest. A read loop tests READ
@@ -121,9 +120,10 @@ pub struct Events {
     ready: List[Ready],
 }
 
-/// A new empty waiter; acquire its host set lazily at add/wait. Pure,
-/// comptime-safe. The reserved io row stays unchanged; acquisition failures
-/// are reported by the first add or wait, not this constructor.
+/// A new empty waiter; acquire its host set lazily at add/wait. Pure
+/// construction, but this edition's comptime engine cannot materialize
+/// its List fields ([type.list.lit.value]). The reserved io row stays
+/// unchanged; acquisition failures belong to the first add/wait.
 ///
 /// ```wolf-doc-example
 /// var w = poll.open()?
