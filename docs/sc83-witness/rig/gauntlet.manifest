@@ -8,11 +8,13 @@ rig step.sh committed=../../..:HEAD:docs/sc83-witness/rig/step.sh
 rig gauntlet.manifest committed=../../..:HEAD:docs/sc83-witness/rig/gauntlet.manifest
 rig ../rows.py committed=../../..:HEAD:docs/sc83-witness/rows.py
 rig ../test_rows.py committed=../../..:HEAD:docs/sc83-witness/test_rows.py
+rig ../pty-write-room.c committed=../../..:HEAD:docs/sc83-witness/pty-write-room.c
 step row-runner-unit image=localhost/r41-toolchain:1 tools=python3 script=step.sh -- row-unit
 step toolchain image=localhost/r41-toolchain:1 tools=python3,git,sha256sum script=step.sh -- toolchain
 step doctor needs=toolchain image=localhost/r41-toolchain:1 script=step.sh -- xtask doctor
 step sc83-rows needs=doctor,row-runner-unit image=localhost/r41-toolchain:1 tools=python3,sh,sleep script=step.sh -- rows
 step sc83-shared needs=doctor,row-runner-unit image=localhost/r41-toolchain:1 tools=python3,sh,sleep script=step.sh -- rows --shared-stage
+step pty-kernel needs=toolchain image=localhost/r41-toolchain:1 tools=cc script=step.sh -- pty-kernel
 step fmt image=localhost/r41-toolchain:1 script=step.sh -- cargo fmt --all --check
 step clippy image=localhost/r41-toolchain:1 script=step.sh -- cargo clippy --workspace --all-targets -- -D warnings
 step test image=localhost/r41-toolchain:1 script=step.sh -- cargo test --workspace

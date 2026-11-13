@@ -48,6 +48,13 @@ case "$what" in
             grep Cpus_allowed_list /proc/self/status'
         ;;
     wolf-fmt) ctr bash -c '"$WOLF_BIN" fmt --check std tests' ;;
+    pty-kernel) ctr bash -c 'set -e
+        cc -std=c11 -Wall -Wextra -Werror docs/sc83-witness/pty-write-room.c -o "$TMPDIR/pty-write-room"
+        for delay in 0 100 1000; do
+            printf "START kernel-probe chunk=4096 delay=%s\n" "$delay"
+            "$TMPDIR/pty-write-room" 4096 "$delay"
+            printf "END kernel-probe chunk=4096 delay=%s exit=0\n" "$delay"
+        done' ;;
     row-unit) ctr python3 -I docs/sc83-witness/test_rows.py ;;
     rows) ctr python3 -I docs/sc83-witness/rows.py "$@" ;;
     cargo) ctr cargo "$@" ;;
