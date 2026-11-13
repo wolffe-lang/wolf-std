@@ -1,0 +1,60 @@
+// Standalone diagnostic, not a normalized conformance row.
+use std.fs
+use std.net
+use std.poll
+use std.process
+use std.signal
+use std.time
+
+fn measure(mut w: poll.Waiter, kind: str, meanings: int, iteration: int) -> !int {
+    let start = time.monotonic_ns()
+    let ev = poll.wait(mut w, meanings, 25) else |e| {
+        print("unsupported_or_error path={kind} error={e}")
+        return 1
+    }
+    let end = time.monotonic_ns()
+    print("sample path={kind} i={iteration} start={start} end={end} elapsed={end - start} ready={ev.ready.len} meaning={ev.meaning}")
+    0
+}
+
+fn main() -> !int {
+    print("clock=time.monotonic_ns unit=ns repetitions=128 timeout_ms=25")
+    var srv = net.listen(net.loopback(0))?
+    var sw = poll.open()?
+    let _key = poll.add_listener(mut sw, srv)?
+    var empty = poll.open()?
+    var pp = process.pipe()?
+    var r = pp.read
+    var pw = pp.write
+    var fw = poll.open()?
+    let _file = poll.add_file(mut fw, r, poll.READ)?
+    var file_cap = true
+    let file_look = poll.wait(mut fw, signal.resize(), 0) else |e| {
+        print("file_look={e}")
+        file_cap = false
+        poll.Events { meaning: 0, ready: List[poll.Ready]() }
+    }
+    // An unsupported look must not be counted as a measured file timeout.
+    print("file_look_ready={file_look.ready.len} file_measured={file_cap}")
+    for i in 0..128 {
+        let s = measure(mut sw, "sockets", 0, i)?
+        let e = measure(mut empty, "empty", 0, i)?
+        if s != 0 || e != 0 { return 1 }
+        let start = time.monotonic_ns()
+        let got = net.wait([srv.fd], 25)?
+        let end = time.monotonic_ns()
+        print("sample path=net i={i} start={start} end={end} elapsed={end - start} ready={got.len} meaning=0")
+        if file_cap {
+            let f = measure(mut fw, "files", signal.resize(), i)?
+            let m = measure(mut empty, "meanings", signal.resize(), i)?
+            if f != 0 || m != 0 { return 1 }
+        }
+    }
+    poll.close(take fw)?
+    poll.close(take sw)?
+    poll.close(take empty)?
+    fs.close(take r)?
+    fs.close(take pw)?
+    net.close_listener(take srv)?
+    0
+}
