@@ -24,7 +24,7 @@ Core: `list` `map` `set` `deque` `option` `errors` `iter` `range` `cmp`
 `sort` `search` `mem` `pool` `ops` `prelude`
 
 Text and data: `str` `strbuf` `fmt` `unicode` `bytes` `hex` `base64`
-`json`
+`bech32` `json`
 
 Numbers: `math` `rand`
 
@@ -39,8 +39,15 @@ without notice.
 Every function names the capability it reaches and records which
 execution rungs run it.
 
-The library is pre-alpha, with the compiler. The newest surface is
-`std.poll`: an owned waiter over files and sockets that answers every
+The library is pre-alpha, with the compiler. The newest additions are
+strict unpadded standard base64, BIP-173 Bech32, and
+`bytes.is_equal_fixed_work` (no early exit at source level, not a timing
+certificate). `std.os.random` wraps the language's OS bytes with platform
+admission: Linux/macOS use the documented OS contract; PAX refuses until
+its strict capability adapter lands. Provider failure still traps; no
+recoverable provider-error guarantee or fallback is claimed. See
+`docs/dw03-std-for-age.txt` for the selected primitive audit and limits.
+Before them, `std.poll`: an owned waiter over files and sockets that answers every
 ready entry, never only the first, with a set of signals and a deadline,
 for a server that waits in one place on pty masters, pipes, a listener
 and its clients. At wolf 0.2.39 one waiter holds files or sockets, not
@@ -83,7 +90,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 656 tests. A test that passes deeper than its ledger entry claims
+all 666 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
