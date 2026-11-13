@@ -1,7 +1,9 @@
 /* Black-box Linux pty/poll/epoll probe; no implementation source input.
  * Match write_partial's ICANON/ECHO-off setup, fill/refill until quiet,
  * then report the kernel's answers after every bounded slave read.
- * Usage: probe READ_SIZE (1..4096). No EPOLLET/ONESHOT or re-arming.
+ * Usage: probe READ_SIZE (1..4096) [WRITE_DELAY_US (0..1000)].
+ * No EPOLLET/ONESHOT or re-arming. The optional delay models time between
+ * write_some calls without changing the bytes, flags or registration.
  */
 #define _XOPEN_SOURCE 600
 #include <errno.h>
@@ -23,6 +25,7 @@ static int look(int ep, int ms) {
     if (n < 0) die("epoll_wait");
     return n ? (int)ev.events : 0;
 }
+static unsigned write_delay;
 static long fill(int m) {
     char b[4096]; memset(b, 'x', sizeof b);
     long total = 0;
@@ -33,15 +36,17 @@ static long fill(int m) {
             die("write");
         }
         total += n;
+        if (write_delay) usleep(write_delay);
     }
     fprintf(stderr, "fill bound reached\n"); exit(3);
 }
 int main(int argc, char **argv) {
-    int chunk = argc == 2 ? atoi(argv[1]) : 4096;
-    if (chunk < 1 || chunk > 4096) return 2;
+    int chunk = argc >= 2 ? atoi(argv[1]) : 4096;
+    write_delay = argc >= 3 ? (unsigned)atoi(argv[2]) : 0;
+    if (chunk < 1 || chunk > 4096 || write_delay > 1000) return 2;
     setvbuf(stdout, NULL, _IOLBF, 0);
     struct utsname u; if (uname(&u)) die("uname");
-    printf("kernel=%s %s chunk=%d\n", u.sysname, u.release, chunk);
+    printf("kernel=%s %s chunk=%d write_delay_us=%u\n", u.sysname, u.release, chunk, write_delay);
     int m = posix_openpt(O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (m < 0 || grantpt(m) || unlockpt(m)) die("open master");
     char *name = ptsname(m); if (!name) die("ptsname");
