@@ -415,7 +415,8 @@ jobs:\n\
                 "fmt-lu",
                 "gen-vectors --check",
                 "doc-examples",
-                "ulp"
+                "ulp",
+                "codegen"
             ]
         );
         assert!(workflow_only(seven).is_empty());
