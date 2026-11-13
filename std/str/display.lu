@@ -4,6 +4,7 @@
 //! Flags sum to two columns; a woman-technologist ZWJ cluster sums to four;
 //! heart plus VS16 sums to one. An emoji-shaping terminal may draw them narrower.
 //! A future shaped_display_width family can coexist without renaming this API.
+
 use std.unicode
 use std.unicode.tables
 
@@ -11,17 +12,23 @@ use std.unicode.tables
 // Only bounded suffix state is kept: RI parity, EP Extend* ZWJ, and the
 // InCB consonant/linker state needed by GB9c. Byte offsets remain byte offsets.
 struct DisplayScan {
-    started: bool
-    previous: int
-    regional: int
-    pictographic: bool
-    zwj_after_pictographic: bool
-    conjunct: int
+    started: bool,
+    previous: int,
+    regional: int,
+    pictographic: bool,
+    zwj_after_pictographic: bool,
+    conjunct: int,
 }
 
 fn display_scan() -> DisplayScan {
-    DisplayScan { started: false, previous: 0, regional: 0,
-        pictographic: false, zwj_after_pictographic: false, conjunct: 0 }
+    DisplayScan {
+        started: false,
+        previous: 0,
+        regional: 0,
+        pictographic: false,
+        zwj_after_pictographic: false,
+        conjunct: 0,
+    }
 }
 
 fn display_boundary(mut state: DisplayScan, c: char) -> bool {
@@ -34,7 +41,7 @@ fn display_boundary(mut state: DisplayScan, c: char) -> bool {
         boundary = false
     } else if previous == 1 && current == 2 {
         boundary = false // GB3 CR x LF
-    } else if (previous >= 1 && previous <= 3) || (current >= 1 && current <= 3) {
+    } else if previous >= 1 && previous <= 3 || current >= 1 && current <= 3 {
         boundary = true // GB4/GB5 controls
     } else if previous == 9 && (current == 9 || current == 10 || current == 12 || current == 13) {
         boundary = false // GB6 L x (L | V | LV | LVT)
