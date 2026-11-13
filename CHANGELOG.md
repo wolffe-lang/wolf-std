@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+**No division on secrets (sc84, wolf-std#151).** The crypto modules and
+Bech32 compute the same answers without dividing, so neither build tier
+puts a hardware divide on a key.
+
+- `std.x.crypto.curve25519` reads each scalar bit with a shift instead of
+  `kb / pow2(t % 8) % 2`, which the x86-64 release tier compiled to a
+  `div` of the secret scalar byte on every ladder step. Field carries,
+  freezing, byte encoding, the clamp and signing's scalar reduction are
+  shifts and masks; `floordiv` and `pow2` are gone.
+- `std.x.crypto.chacha20`'s Poly1305 carries, clamp and tag words, and
+  `std.x.crypto.sha2`'s HKDF counter and hex nibbles, are shifts and masks.
+- `std.bech32` reads its alphabet in a constant 32-step pass instead of
+  returning at the match, folds case and the checksum generator without
+  branches, regroups bits by shifts, and refuses an invalid character
+  only after reading the whole string. Encoding picks each character the
+  same way instead of indexing the alphabet. One decoder and one encoder
+  serve every caller; answers are unchanged, and a new row pins every
+  character, position and byte width.
+- `cargo xtask codegen`, a new gate step (and a step of `ci` and the
+  workflow's `gates` job): it builds the four modules' default and
+  release objects on the host target, fails by function and offset on any
+  integer division instruction, and runs their published-vector rows in
+  the release tier. Windows hosts skip it loudly. It is an
+  instruction-level gate, not a timing measurement.
+- `docs/dw03-std-for-age.txt`'s "no IDIV in the release counterparts" is
+  corrected in place.
+
 **The runtime-backed wait (sc83), at wolf 0.2.40 / lupin 0.1.62.**
 The pins now carry the runtime calls that complete the one-wait surface.
 
