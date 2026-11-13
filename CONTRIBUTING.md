@@ -18,7 +18,7 @@ The gates, all green before any push:
 ```sh
 cargo xtask ci     # fmt --check, clippy -D warnings, cargo test, sync-pin,
                    # doctor, ledger-check, lint-conventions, std-test,
-                   # doc-examples, ulp
+                   # doc-examples, ulp, codegen
 ```
 
 ## The coupling doctrine
