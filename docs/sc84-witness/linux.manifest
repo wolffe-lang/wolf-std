@@ -1,4 +1,5 @@
-# sc84: the final Linux take. The gate first, then the whole local gate
+# sc84: the final Linux take. The plan job's wiring proofs, the gate,
+# then the whole local gate
 # (which runs it again as its last step).
 engine ./linux-engine.sh --env=PATH=/opt/s263-rust/bin:/usr/local/bin:/usr/bin:/bin
 floor 35 ../..
@@ -7,5 +8,7 @@ rig linux-engine.sh committed=../..:HEAD:docs/sc84-witness/linux-engine.sh
 rig linux-step.sh committed=../..:HEAD:docs/sc84-witness/linux-step.sh
 rig linux-inner.sh committed=../..:HEAD:docs/sc84-witness/linux-inner.sh
 rig linux-preflight.sh committed=../..:HEAD:docs/sc84-witness/linux-preflight.sh
+rig ci-wiring.sh committed=../..:HEAD:docs/sc84-witness/ci-wiring.sh
+step ci-wiring tools=python3,git script=ci-wiring.sh
 step codegen image=localhost/r41-toolchain:1 tools=bash,cargo,rustc,clang,objdump,setsid,timeout script=linux-step.sh -- codegen
 step standard-ci image=localhost/r41-toolchain:1 tools=bash,python3,git,cargo,rustc,rustfmt,cargo-clippy,clang,gcc,objdump,setsid,timeout script=linux-step.sh -- ci
