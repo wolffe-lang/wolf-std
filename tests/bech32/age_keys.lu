@@ -28,6 +28,16 @@ fn main() -> !int {
     assert(rejects(identity, "age", 32))
     assert(rejects(recipient, "age", 31))
     assert(rejects(recipient, "age", 33))
+    assert(rejects(recipient, "age", 0 - 1))
+    assert(rejects("a12UEL5L", "a", 0))
+    var too_big = List[byte]()
+    for _ in 0..52 { (mut too_big).push(0 as byte) }
+    var refused_size = false
+    let oversized = bech32.encode_bytes("a", too_big) else |parse| {
+        refused_size = true
+        ""
+    }
+    assert(refused_size && oversized == "")
     // Valid checksums with invalid 5-to-8 padding: never accept by checksum alone.
     assert(rejects(bech32.encode("age", [0 as byte])?, "age", 0))
     assert(rejects(bech32.encode("age", [0 as byte, 1 as byte])?, "age", 1))

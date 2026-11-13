@@ -64,5 +64,23 @@ fn main() -> !int {
         ""
     }
     assert(bad_word && bad_data == "")
+    for hrp in [" ", "\u{7f}", "\u{80}", str.repeat("a", 84)] {
+        var refused = false
+        let encoded = bech32.encode(hrp, List[byte]()) else |parse| {
+            refused = true
+            ""
+        }
+        assert(refused && encoded == "")
+    }
+    let max_hrp = str.repeat("a", 83)
+    let max_text = bech32.encode(max_hrp, List[byte]())?
+    assert(max_text.len == 90)
+    assert(bech32.decode(max_text)?.hrp == max_hrp)
+    var oversized = false
+    let too_long = bech32.encode(max_hrp, [0 as byte]) else |parse| {
+        oversized = true
+        ""
+    }
+    assert(oversized && too_long == "")
     0
 }
