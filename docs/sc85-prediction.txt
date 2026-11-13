@@ -1,0 +1,11 @@
+# Short deadlines on Windows
+
+## Prediction
+
+The existing stdout diagnostic and its unit test remain unchanged. The original hosted native failure printed sockets_25_waited=false; the other seven lines matched their directive. This identifies the failed predicate, not its cause.
+
+Before changing a bound or implementation, measure 128 quiet socket waits and 128 empty waits on the hosted Windows runner, recording start and end with time.monotonic_ns, the same clock as the row. Measure net.wait directly too. Probe file readiness once and report unsupported explicitly rather than counting its normalized output as a measured wait. A supported file path gets the same repetitions. Report minimum, maximum, quantiles and early-return counts without retrying a failed measurement.
+
+Prediction: the narrow Windows socket fallback delegates a timeout whose rounding can return before 25 ms on this clock; empty waits use a different timer. If that is observed, first compare the platform's documented timeout promise against poll's advertised monotonic deadline. Preserve the no-early-return assertion if it is the library's promise, and repair its fallback rather than hide an early return with tolerance. If the measured discrepancy is instead solely the clock or an overstrong row promise, document that evidence before changing the row.
+
+After the evidence chooses the fix, test the exact defect, inspect the adjacent poll/net/time timing rows, and plant one deliberate break in one file and one hunk. Run both CI wiring proofs first in every local take, then the complete final-head gauntlet. No measurement or green result is claimed by this prediction.
