@@ -1,0 +1,113 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.bech32, err.row
+//!
+//! Every BIP-173 data character in both cases at every word value, every
+//! other printable character refused at a data position, a one-character
+//! change at every position caught by the checksum, and the 8-to-5
+//! conversion at byte lengths 0 to 51. The expected strings were computed
+//! from BIP-173's character table and checksum definition by
+//! docs/sc84-witness/bech32_oracle.py, which shares no code with std.bech32.
+//! sc84 pins these answers across the rewrite that removed division and
+//! early exits from the codec.
+
+use std.bech32
+use std.bytes
+use std.str
+
+fn charset() -> str { "qpzry9x8gf2tvdw0s3jn54khce6mua7l" }
+
+fn rejects(s: str) -> bool {
+    let out = bech32.decode(s) else |parse| { return true }
+    out.hrp.len == 0
+}
+
+fn rejects_bytes(s: str, hrp: str, n: int) -> bool {
+    let out = bech32.decode_bytes(s, hrp, n) else |parse| { return true }
+    out.len == 999
+}
+
+fn pattern(n: int) -> List[byte] {
+    var b = List[byte]()
+    for i in 0..n { (mut b).push((i * 37 + n) as byte) }
+    b
+}
+
+fn main() -> !int {
+    // Every word value in order: decode both cases, encode back.
+    let every = "a1qpzry9x8gf2tvdw0s3jn54khce6mua7l80ks2u"
+    var words = List[byte]()
+    for i in 0..32 { (mut words).push(i as byte) }
+    assert(bech32.encode("a", words)? == every)
+    for s in [every, str.upper(every)] {
+        let d = bech32.decode(s)?
+        assert(d.hrp == "a")
+        assert(bytes.is_equal_fixed_work(d.data, words))
+    }
+    // Every printable character outside the lowercase table refused at a
+    // data position of a lowercase string (an uppercase letter is mixed
+    // case there, `1` moves the separator, the rest are not in the table).
+    let chars = charset().bytes()
+    let text = every.bytes()
+    var refused: int = 0
+    for c in 33..127 {
+        var listed = false
+        for a in chars {
+            if a as int == c { listed = true }
+        }
+        if !listed {
+            var t = copy text
+            t[5] = c as byte
+            assert(rejects(str_from_utf8(t) else ""))
+            refused = refused + 1
+        }
+    }
+    assert(refused == 94 - 32)
+    // A one-character change at every data and checksum position.
+    var p: int = 2
+    while p < text.len {
+        var t = copy text
+        let old = t[p]
+        var next: int = 0
+        for i in 0..32 {
+            if chars[i] == old { next = (i + 1) % 32 }
+        }
+        t[p] = chars[next]
+        assert(rejects(str_from_utf8(t) else ""))
+        p = p + 1
+    }
+    // The 8-to-5 conversion, known answers and round trips.
+    let known = [
+        "a12uel5l",
+        "a1qy089ch6",
+        "a1qgnseu0r8f",
+        "a1qv5y6e3e306",
+        "a1qs55uuc20s33l",
+        "a1q54y7ayeq8lnx7",
+        "a1razxnr4nmr7jy3mvjxmdkqp9ffhefww7qv5y6u5hhnssv26sw5u2cxzg",
+        "a1ypzk4ra5m8lzxjrdj2macqfxfdcftwklqs55uuuchh3qwtz3w6dsh3rrht",
+        "a1y9rxhy94mtljgjtwjwud6q38f3cedwlqq54y7ayehm3sst2jw7wvzcuk4c4",
+        "a1xdv8mgk8asgnvkuq5h9w79pet6p63n0jzu7xrp4t6r6350my3xhd87qagfncevwklvsy2650knvlug6gd5tjqle3",
+    ]
+    let lengths = [0, 1, 2, 3, 4, 5, 31, 32, 33, 51]
+    for i in 0..10 {
+        let n = lengths[i]
+        let b = pattern(n)
+        assert(bech32.encode_bytes("a", b)? == known[i])
+        assert(bytes.is_equal_fixed_work(bech32.decode_bytes(known[i], "a", n)?, b))
+        assert(bytes.is_equal_fixed_work(bech32.decode_bytes(str.upper(known[i]), "a", n)?, b))
+        assert(rejects_bytes(known[i], "a", n + 1))
+    }
+    for n in 0..52 {
+        let b = pattern(n)
+        let s = bech32.encode_bytes("a", b)?
+        assert(bytes.is_equal_fixed_work(bech32.decode_bytes(s, "a", n)?, b))
+    }
+    var ones = List[byte]()
+    for _ in 0..32 { (mut ones).push(255 as byte) }
+    let all_ones = "age1lllllllllllllllllllllllllllllllllllllllllllllllllllskxlyh4"
+    assert(bech32.encode_bytes("age", ones)? == all_ones)
+    assert(bytes.is_equal_fixed_work(bech32.decode_bytes(all_ones, "age", 32)?, ones))
+    assert(bech32.encode_bytes("age", [255 as byte])? == "age1luyvfgxs")
+    0
+}
