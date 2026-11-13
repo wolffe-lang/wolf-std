@@ -301,8 +301,40 @@ a separately named helper is not evidence that comparison was omitted.
 
 This is NOT a complete instruction-latency/runtime/allocator proof for the
 ladder, SHA-256 or Poly1305, nor timing certification of checked or lupin.
-Linux x86-64 generated-code review remains a separate evidence leg until its
-capture is actually read. The independent reviewer must inspect the final
+The Linux x86-64 captures at 361458f were subsequently read. That full take
+FAILED overall: standard-ci exited 101 because the network-isolated container
+had no prepared Cargo dependency cache. Six preceding steps exited zero;
+those completed code observations are valid for the unchanged implementation,
+not a green full-take verdict. The rig now checks offline dependency resolution
+before queueing and mounts a prepared Cargo home read-only; the gate itself
+is unchanged, invoked through the frozen expansion of its existing alias.
+
+In the inspected x86 default shared equality and zero helpers, byte XOR/OR
+accumulation precedes the final result test; public lengths, indices, bounds
+and checked index-overflow guards remain. In release AEAD open, the dynamic
+tag comparison is an inlined vector/scalar XOR/OR fold whose failure edge
+returns before stream_xor. The release base-point path uses an eight-byte-
+unrolled OR reduction before its final zero verdict. The equality test's
+comparison to a known PUBLIC literal is scalarized into prefix comparisons
+by the optimizer: source fixed work is emphatically not a promise about every
+compiled call context. The actual dynamic AEAD tag path was examined separately.
+
+Default x86 X25519 retains IDIV instructions in fe_carry (40), fe_freeze (38),
+clamp (2) and ladder (4), with secret-derived arithmetic operands. RFC 7748
+section 5.1 explicitly warns about operand-dependent division timing. This
+lane has not qualified their latency on the intended CPUs and does not claim
+these default paths are fixed-time. The examined release counterparts have
+no IDIV, but that is not proof of a side-channel-free release path or runtime.
+Arithmetic cswap has checked-overflow guards, not a branch-free machine-code
+certificate; valid carried-limb/swap bounds must justify their untaken edges.
+
+The Linux lifetime witness ran 4 and 256 repeated 64 KiB chunks (262144 and
+16777216 plaintext bytes). Both reported peak RSS 12832 KiB, equal to their
+small Python parent's measured inherited floor. Treat that as an upper-bound
+observation, not an exact intrinsic child peak or a proof of arbitrary-stream
+memory complexity. Region release still means allocation lifetime, not erasure.
+
+The independent reviewer must inspect the final
 exact pin set, arithmetic bounds, optimizer transformations and secret-copy
 lifetimes. No secret wipe, swap/dump exclusion or fixed-time secret-text
 encoding is claimed. Only the small reference-vector/test-key programs were
