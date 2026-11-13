@@ -80,7 +80,12 @@ const WOLFC_WAIVERS: &[(&str, &str, &str)] = &[];
 ///    name, so its examples run on the checked lane alone. The honesty this
 ///    list encodes is the same either way: the example ran somewhere, and
 ///    the lanes that refused said so.
-const CAPABILITY_MODULES: &[&str] = &["fs", "io", "net", "time", "env", "process", "x.json"];
+/// sc83 adds `poll`: its readiness-set operations are Exec, deliberately
+/// refused by the reference machine. Pure constructor/constants still run;
+/// every individual example must execute on at least one serving lane.
+const CAPABILITY_MODULES: &[&str] = &[
+    "fs", "io", "net", "time", "env", "process", "poll", "x.json",
+];
 
 /// The waiver `CAPABILITY_MODULES` must not become: ONE FUNCTION of an
 /// otherwise equal-laned module whose tier a named implementation has not
