@@ -1,0 +1,18 @@
+engine podman --env=PATH=/opt/s263-rust/bin:/usr/local/bin:/usr/bin:/bin
+floor 35 ../../..
+rig linux.manifest committed=../..:HEAD:docs/dw03-witness/linux.manifest
+rig linux-step.sh committed=../..:HEAD:docs/dw03-witness/linux-step.sh
+rig linux-inner.sh committed=../..:HEAD:docs/dw03-witness/linux-inner.sh
+rig linux-preflight.sh committed=../..:HEAD:docs/dw03-witness/linux-preflight.sh
+rig run-selected.py committed=../..:HEAD:docs/dw03-witness/run-selected.py
+rig source-obligations.py committed=../..:HEAD:docs/dw03-witness/source-obligations.py
+rig private-guards.py committed=../..:HEAD:docs/dw03-witness/private-guards.py
+rig capture-code.py committed=../..:HEAD:docs/dw03-witness/capture-code.py
+rig bounded-linux.py committed=../..:HEAD:docs/dw03-witness/bounded-linux.py
+step source-obligations image=localhost/r41-toolchain:1 tools=bash,python3 script=linux-step.sh -- source
+step private-guards image=localhost/r41-toolchain:1 tools=bash,python3,clang,gcc script=linux-step.sh -- guards
+step primitive-selected image=localhost/r41-toolchain:1 tools=bash,python3,clang,gcc script=linux-step.sh -- selected
+step release-selected image=localhost/r41-toolchain:1 tools=bash,python3,clang,gcc script=linux-step.sh -- release
+step generated-code image=localhost/r41-toolchain:1 tools=bash,python3,clang,nm,objdump script=linux-step.sh -- code
+step bounded-lifetimes image=localhost/r41-toolchain:1 tools=bash,python3,clang,prlimit,timeout script=linux-step.sh -- bounded
+step standard-ci image=localhost/r41-toolchain:1 tools=bash,python3,git,cargo,rustc,rustfmt,cargo-clippy,clang,gcc,timeout,setsid script=linux-step.sh -- ci

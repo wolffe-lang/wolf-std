@@ -15,9 +15,11 @@ Inputs verified
 Base: be1d10fa2798cc6bc2a1fd0b2e559e283469c9bf.
 The binary pins in vendor/tools.toml are wolf 0.2.39, conforming to
 3fc86f77795afbbd6fbe483fef76c08e7f13a840, and lupin 0.1.61, conforming to
-5f1f1c949582f53121e4047bc83c86f23ff72240. No binary has yet been acquired or
-executed by this lane. The existing ledger has 656 test files. Its entries
-are historical posture records, not new execution evidence.
+5f1f1c949582f53121e4047bc83c86f23ff72240. At prediction time no binary had
+been acquired or executed. Both pinned archives were subsequently acquired
+by release digest and their --version pins verified. The base ledger had
+656 test files; ten new rows bring it to 666. Historical ledger coverage is
+not substituted for this lane's execution records.
 
 Prediction
 
@@ -70,9 +72,60 @@ needs an upstream contract decision before an implementation can be honest.
 
 Evidence index
 
-At this prediction commit: source and document reading only. No baseline take,
-vector run, assembly review, platform measurement, gauntlet, plant, push or PR.
-The audit and follow-on draft are documentation-only follow-up chunks below.
+At the prediction commit only source/document reading had occurred. The
+following implementation follows the recorded decisions, not a newly claimed
+cryptographic certification:
+
+* One bytes.is_equal_fixed_work helper, AEAD delegation, X25519 secret-byte
+  OR fold, corrected rendering/secrecy wording and HashLen documentation.
+  The TLS helper remains in place, with no TLS/poll/net source edit.
+* base64.encode_raw/decode_raw use the standard alphabet with strict
+  residual-bit checks and linear walks, preserving the original codecs.
+* std.bech32 owns BIP-173 checksum and byte conversion. Its 90-character
+  generic bound covers native X25519 age keys, not longer age PQ profiles.
+* std.os.random.require_ready and bytes use the sanctioned trapping builtin.
+  Linux/macOS admission means their documented OS-call guarantee, not a
+  snapshot of pool initialization or future provider health. PAX refuses
+  through one pending private capability seam. No trap is caught. The future
+  recoverable sibling proposal is docs/dw03-random-outcome-proposal.txt.
+
+Red-first source rows were committed in b4e4680 (zero fold, shared-secret
+classification, HKDF wording, shared equality and AEAD delegation); the raw
+codec/vector APIs were observed as fail(E0301) before they existed. The
+random rows were committed in 19383eb and observed fail(E0301) before the
+adapter existed. The rendering-doc row was added red in a9a009d before its
+fix. Note that conform-run's own process exit 0 means it emitted a record,
+not that the program passed: docs/dw03-witness/run-selected.py checks the
+protocol verdict, warnings and stdout goldens explicitly.
+
+Development takes executed the eight small new rows on macOS checked/native/
+lupin, the RFC 4231 and 5869 files, RFC 8439 A.5, and the new tag-position and
+mask/clamp rows successfully. The full 19-coordinate noncanonical row and
+four 64 KiB chunk-lifetime row ran natively; checked explicitly refused each
+with step budget exhausted, and lupin with its 50000000-step budget. These
+refusals are recorded unsupported, not claimed as primitive passes. Final
+exact-head records, generated-code captures and the local plant accompany
+the review hand-back. The one Linux take uses the committed manifest,
+preflight, image pin and keep-going recorder; queued or running work is not
+a green qualification result.
+
+Witness sources: docs/dw03-witness/source-obligations.py (narrow source
+checks, not a verifier), private-guards.py (copied private zero helper with
+every nonzero-byte position, and a test-copy platform substitution proving
+the pending PAX refusal; NOT a kernel readiness measurement), capture-code.py
+(default/release objects for separate review), run-selected.py (actual
+protocol outcomes) and bounded-linux.py (capped process-RSS at two fixed
+stream lengths, with the small parent's RSS floor). The Linux manifest also
+runs the repository's existing cargo xtask ci. No new CI wiring or pin.
+
+Archive SHA-256 values:
+macOS wolf 0.2.39: 63de947671c240fc8be3e3480bb36321b0a6ac0b5e12e16bdae164d9050cfde0
+macOS lupin 0.1.61: 7236424618f5bbf1e5f7693cd6333df90b715e1401b08b795668cbb1425ed5af
+Linux wolf 0.2.39: 53f75d2b2dd79c0532b21920bc9f073098154aa0133caa2405209a1ef2af0457
+Linux lupin 0.1.61: 61ce849eac0b531803e5bdf1fe07d91d3d69ecb57f83c5e7eb7c5d553cbef41b
+
+The following audit preserves the base's quoted gaps and original options;
+implementation/disposition above supersedes its pre-decision future tense.
 
 Audit at the base (source reading, not qualification)
 
@@ -153,7 +206,10 @@ into distinct named errors. Testing success or prechecking a platform name
 cannot repair this loss of information. Calling a device or foreign function
 instead would evade [os.random.sole], and would not settle PAX readiness.
 
-Approval required, not implemented:
+Decision: retain the trapping builtin for the first release, with admission
+before drawing, and document the recoverable sibling as future work. The
+original options below are retained as the record of the contract conflict,
+not an unimplemented blocker:
 A. Add an upstream recoverable sibling primitive, preserving os_random's
    existing trapping behavior. Its approved contract distinguishes invalid
    request, unqualified provider and unavailable provider, guarantees all-or-
@@ -171,7 +227,11 @@ Until the approved PAX call exists, a PAX adapter must refuse
 entropy_unqualified without trying its legacy successful random-byte path.
 No guessed flag, device, capability filename or errno is proposed here.
 
-Shared comparison and claim approval required
+Shared comparison and claim decision (original options)
+
+Decision: implement option A below, retaining TLS's existing helper and
+limiting the promise to no early exit at source level. Generated-code
+observations remain a separate, pin-specific review, not certification.
 
 std.x.tls.handshake.ct_eq already exists publicly (lines 635-656). It returns
 false for unequal public lengths and unconditionally folds XOR differences
@@ -213,8 +273,8 @@ crypto residents. Generic text codecs and random-byte adaptation remain std's
 single-owned reusable parts. denward pins the reviewed std/compiler/runtime
 set, and its independent reviewer reads both that exact set and the complete
 format implementation. A later second consumer can motivate extraction by a
-separate surface decision. Recommend the internal denward module, conditional
-on approval; no format implementation was written here.
+separate surface decision. Decision: the codec lives in an internal denward
+module. No format implementation belongs in this std change.
 The draft is docs/dw03-draft-dw04-age.txt. Both locations still require the
 same independent hostile-input and interoperability evidence before use.
 
@@ -230,19 +290,20 @@ The RFCs came from rfc-editor.org/rfc/rfcNNNN.txt. These inputs are not test
 results. No external implementation source, including referenced libraries
 in the RFC bibliography, was followed or read.
 
-README was read against this documentation-only change and remains current:
-module list, 656-test count, build instructions and newest-surface prose did
-not change. No compiler/runtime pin, module, ledger or CI file was edited.
+README was read and updated for Bech32, the guarded random surface, the
+source-level equality limitation and 666 tests. Build/install instructions
+and existing poll prose are preserved. No compiler/runtime pin or CI file
+was edited; the test ledger records the measured new-row postures.
 The .txt note and draft use the contract's text-file fallback under the
 file-writing restriction; no permission-system refusal occurred.
 
 Done-when
 
-Not met. Required after decisions: red-first fixes and codecs; random-byte
-adapter against an approved recoverable primitive; checked/native records on
-Linux and macOS at exact final pins, per-row lupin posture, default/release
-machine-code review, a named red plant, and independent second reading.
-No claim of cryptographic readiness, constant-time machine behavior, secure
-erasure or release authorization follows from this note.
+Not a release authorization. Final exact-head platform records, the named
+plant and independent second reading are still required; the review hand-back
+states which are measured and which remain queued or not measured. PAX's
+capability seam remains deliberately refusing until its exact ABI is reviewed.
+No claim of cryptographic readiness, fixed-time machine behavior, secure
+erasure or authorization to use real backup keys follows from this note.
 
-Footprint: notes
+Footprint: module

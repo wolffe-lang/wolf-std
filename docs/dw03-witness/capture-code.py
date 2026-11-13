@@ -22,9 +22,12 @@ for name,row in [('equality','bytes/fixed_work.lu'),('x25519','x/crypto/curve255
         cmd=[a.wolf,'build',str(entry),'--std-root',str(a.repo/'std'),'--emit=obj','-o',str(obj)]
         if backend=='release': cmd.append('--release')
         subprocess.run(cmd,check=True)
-        symbols=subprocess.check_output(['nm',str(obj)],text=True)
-        (stage/(backend+'.symbols')).write_text(symbols)
-        dis=['otool','-tvV',str(obj)] if shutil.which('otool') else ['objdump','-dr',str(obj)]
-        result=subprocess.check_output(dis,text=True)
-        (stage/(backend+'.asm')).write_text(result)
+        objects = [obj] if obj.exists() else sorted(stage.glob(backend+'.*.o'))
+        if not objects: raise RuntimeError('compiler produced no object files')
+        for module in objects:
+            symbols=subprocess.check_output(['nm',str(module)],text=True)
+            module.with_suffix('.symbols').write_text(symbols)
+            dis=['otool','-tvV',str(module)] if shutil.which('otool') else ['objdump','-dr',str(module)]
+            result=subprocess.check_output(dis,text=True)
+            module.with_suffix('.asm').write_text(result)
         print('PASS captured-object '+name+'/'+backend+' (review material, not a timing verdict)',flush=True)

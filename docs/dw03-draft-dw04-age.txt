@@ -1,9 +1,10 @@
 DRAFT — Ordinary age v1 codec in denward
 
-Status: proposed follow-on contract, not authorization to implement or release.
-Recommended home: an internal denward module, not a new std public API.
-Start only after the location decision and the primitive/randomness contracts
-are approved. Record the actual public repository base when launching.
+Status: draft follow-on contract, not authorization to implement or release.
+Chosen home: an internal denward module, not a new std public API. The reviewer
+reads that implementation and the pinned std/compiler/runtime set together.
+Start after the primitive qualification gate is met; record the actual public
+repository base when launching.
 
 Forbidden
 
@@ -32,11 +33,16 @@ revision and inventory every relevant case. Fetch no generator or reference
 implementation source. Pin reference binaries by release and digest, and use
 explicit native X25519 recipients rather than a changing tool default.
 
-Do not call baseline PAX randomness for creation or key generation. Use only
-the approved ready-or-named-error std contract against the qualified PAX ABI.
-Keep the pending platform call behind one function; fail unqualified while it
-is pending. Deterministic decryption has no entropy prerequisite. Test-only
-entropy injection is not exported by a production entry point.
+Do not call baseline PAX randomness for creation or key generation. Use
+std.os.random's guarded OS-source surface after the tool checks documented
+readiness. Linux/macOS have the OS-call contract (Linux may wait for pool
+initialization), not a separate liveness query. PAX must use its reviewed
+strict readable capability/ABI; while pending, std refuses entropy_unqualified
+before drawing. Provider failure still traps per os_random's existing contract;
+never pretend to catch it or fall back. The tool owns named admission errors,
+private .part cleanup and new-session behavior after interruption. Deterministic
+decryption has no entropy prerequisite. Test-only entropy injection is not
+exported by a production entry point.
 
 Prediction
 

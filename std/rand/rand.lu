@@ -8,9 +8,9 @@
 //! is constructed from a seed the caller supplies, and the same seed
 //! gives the same stream on every implementation and every OS — the
 //! stream is part of the observable contract and `tests/rand/` pins it
-//! value by value. Seeding from the operating system arrives with
-//! stdc02's os tier and will be a separate constructor, never a hidden
-//! default.
+//! value by value. OS-sourced bytes now live separately in std.os.random,
+//! with platform admission and the language's provider-failure trap. That
+//! surface neither seeds nor changes this generator; no hidden default.
 //!
 //! **The generator is PCG32** (O'Neill's XSH-RR variant over a 64-bit
 //! LCG): 64 bits of state, a 63-bit odd stream increment, a 32-bit
@@ -20,7 +20,8 @@
 //! because 64 bits of state is what `wrapping[u64]` gives us with no
 //! bit-twiddling the checked tier cannot lower. It is NOT
 //! cryptographically secure and this header says so once, loudly: a
-//! caller who needs unpredictability needs stdc02's csprng, not this.
+//! caller needing OS-source unpredictability uses std.os.random's guarded
+//! interface, never this PCG stream.
 //!
 //! **`Rng` is a struct with free functions, not methods.** The contract
 //! writes `Rng.new(seed)`; an `impl` block's methods cannot be called
