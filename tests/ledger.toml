@@ -37,9 +37,22 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# At lupin 0.1.62 this large row was never a successful run: its
+# 50000000-evaluation-step refusal took about 31 s on an arm64 Mac and
+# exceeded the unchanged 60 s ceiling on hosted macOS. Keep the full
+# four-65536-byte checked/native take, and loudly skip only the slow
+# reference cell; chunk_lifetimes_small measures the same lifetime/AEAD
+# shape to completion on all lanes, not the large row's size properties.
+# Seen red: hosted run 43408775848, macOS job 131829751651; failed-job log
+# SHA256 f6243677f8f0558abb4f93104d490d105e1182ea8f72979b24e63ad3701cbe50.
 [tests."x/crypto/chacha20/chunk_lifetimes.lu"]
-lupin = "unsupported"
+lupin = "slow"
 wolfc = "unsupported"
+native = "run"
+
+[tests."x/crypto/chacha20/chunk_lifetimes_small.lu"]
+lupin = "run"
+wolfc = "run"
 native = "run"
 
 [tests."x/crypto/curve25519/rfc7748_mask_clamp.lu"]
