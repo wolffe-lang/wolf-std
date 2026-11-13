@@ -35,6 +35,9 @@ for image in sorted(images):
  probe='for t in bash python3 git clang gcc cargo rustc rustfmt cargo-clippy timeout prlimit nm objdump setsid; do command -v "$t" >/dev/null || exit 1; done; python3 -c "import tomllib"; cargo --version; rustc --version'
  subprocess.run([engine[0], 'run', '--rm', '--network', 'none', '--memory', '256m', *engine[1:], actual, 'bash', '-c', probe], check=True)
 print('PASS resolved manifest engine and declared image tool probe', flush=True)
+for image in sorted(images):
+ subprocess.run([engine[0], 'run', '--rm', '--network', 'none', '--memory', '256m', *engine[1:], '--volume', str(root)+':'+str(root), '--workdir', str(root), '--env', 'CARGO_NET_OFFLINE=true', image, 'cargo', 'metadata', '--offline', '--locked', '--format-version', '1'], stdout=subprocess.DEVNULL, check=True)
+print('PASS build dependencies resolve offline inside the declared engine', flush=True)
 PY
 test -x "$DW03_TOOLS/wolf/wolf"
 test -r "$DW03_TOOLS/wolf/libwolf_rt.a"
