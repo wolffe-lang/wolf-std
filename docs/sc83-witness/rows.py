@@ -73,6 +73,12 @@ def expected_refusal(test, lane, windows=False):
         # [type.list.lit.value], current-edition scalar CTFE: argument
         # construction fails before the send's own comptime barrier.
         return "resolve", "`List` construction at comptime"
+    if lane == "lupin" and test in {
+        "poll/comptime_refuses.lu", "net/comptime_refuses_write_some.lu",
+        "net/unix/comptime_refuses_credentials.lu",
+    }:
+        # Measured at released 0.1.62, not inferred from the compiler.
+        return "run", "`probe` is a `comptime fn`"
     if lane == "lupin" and test in REFUSALS and not (windows and test in WINDOWS_RUN):
         return "run", f"`{REFUSALS[test]}`"
     return None
@@ -80,7 +86,10 @@ def expected_refusal(test, lane, windows=False):
 
 def matches_refusal(record, phase, named):
     reason = record.get("x-unsupported") or record.get("x-unsupported-construct") or ""
-    return (record.get("verdict") == "unsupported" and record.get("phase_reached") == phase
+    # Lupin reports its last completed rung separately from the point of
+    # refusal: released 0.1.62 has phase_reached=resolve and x-unsupported-at=run.
+    at = record.get("x-unsupported-at") or record.get("phase_reached")
+    return (record.get("verdict") == "unsupported" and at == phase
             and named in reason and not record.get("warnings"))
 
 
