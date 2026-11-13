@@ -13,7 +13,9 @@ fn measure(mut w: poll.Waiter, kind: str, meanings: int, iteration: int) -> !int
         return 1
     }
     let end = time.monotonic_ns()
-    print("sample path={kind} i={iteration} start={start} end={end} elapsed={end - start} ready={ev.ready.len} meaning={ev.meaning}")
+    print(
+        "sample path={kind} i={iteration} start={start} end={end} elapsed={end - start} ready={ev.ready.len} meaning={ev.meaning}",
+    )
     0
 }
 
@@ -43,7 +45,9 @@ fn main() -> !int {
         let start = time.monotonic_ns()
         let got = net.wait([srv.fd], 25)?
         let end = time.monotonic_ns()
-        print("sample path=net i={i} start={start} end={end} elapsed={end - start} ready={got.len} meaning=0")
+        print(
+            "sample path=net i={i} start={start} end={end} elapsed={end - start} ready={got.len} meaning=0",
+        )
         if file_cap {
             let f = measure(mut fw, "files", signal.resize(), i)?
             let m = measure(mut empty, "meanings", signal.resize(), i)?

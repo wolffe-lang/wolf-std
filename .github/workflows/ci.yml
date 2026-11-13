@@ -315,6 +315,9 @@ jobs:
           ls -l .wolf-bin
           ".wolf-bin/wolf$exe" --version
           ".wolf-bin/lupin$exe" --version
+      - name: short deadline measurement (Windows native, one bounded sample)
+        if: runner.os == 'Windows'
+        run: python3 -I docs/sc85-witness/measure.py
       - name: doctor
         run: cargo xtask doctor
       - name: ledger-check
