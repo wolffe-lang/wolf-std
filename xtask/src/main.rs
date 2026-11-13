@@ -3,17 +3,20 @@
 //! wolf-interp (binaries and pinned data are the only couplings).
 //!
 //! Subcommands: `std-test`, `doc-examples`, `ulp`, `doctor`, `sync-pin`,
-//! `ledger-check`, `fmt-lu`, `time-oracle`, `ci`.
+//! `ledger-check`, `fmt-lu`, `time-oracle`, `codegen`, `ci`.
 //!
-//! `ci` is the thirteen-step local gate, and since sc41 it ends by naming
+//! `ci` is the fourteen-step local gate, and since sc41 it ends by naming
 //! which of those `.github/workflows/ci.yml` also runs (F-0113).
 //! The twelfth is sc45's `fmt-lu` (F-0117, wolf-std#21): `cargo fmt
 //! --all --check` gated the Rust and nothing gated the wolf, so D34 was
 //! asserted in commit messages for a dozen sprints and enforced by
-//! nobody. sc70 adds the thirteenth, the cross-host `time-oracle`.
+//! nobody. sc70 adds the thirteenth, the cross-host `time-oracle`, and
+//! sc84 the fourteenth, `codegen`: no integer division in the objects
+//! generated for the secret-handling crypto modules (wolf-std#151).
 
 mod anchors;
 mod bins;
+mod codegen;
 mod directive;
 mod doc_examples;
 mod doctor;
@@ -66,12 +69,14 @@ fn main() {
         Some("gen-vectors") => genvec::gen_vectors(args.iter().any(|a| a == "--check")),
         Some("doctor") => doctor::doctor(),
         Some("sync-pin") => sync_pin::sync_pin(),
+        // sc84: no integer division in the crypto modules' objects.
+        Some("codegen") => codegen::codegen(),
         Some("ci") => ci(),
         other => {
             eprintln!(
                 "usage: cargo xtask \
                  <std-test [--lint-conventions]|doc-examples|ulp|ledger-check\
-                 |gen-vectors [--check]|fmt-lu|doctor|sync-pin|time-oracle|ci>{}",
+                 |gen-vectors [--check]|fmt-lu|doctor|sync-pin|time-oracle|codegen|ci>{}",
                 other.map(|o| format!(" (got `{o}`)")).unwrap_or_default()
             );
             std::process::exit(2);
@@ -141,6 +146,7 @@ fn run_step(name: &str, repo: &Path, cargo: &str) -> Result<(), String> {
         "doc-examples" => doc_examples::doc_examples(),
         "ulp" => ulp::ulp(),
         "time-oracle" => time_oracle::time_oracle(),
+        "codegen" => codegen::codegen(),
         other => Err(format!(
             "ci: `{other}` is in workflow::CI_STEPS with no runner behind it — \
              add a match arm to run_step or take it out of the list"

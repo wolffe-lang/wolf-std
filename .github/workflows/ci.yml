@@ -769,6 +769,13 @@ jobs:
         run: cargo xtask doc-examples
       - name: ulp
         run: cargo xtask ulp
+      # sc84, wolf-std#151: no integer division in the objects generated
+      # for curve25519, chacha20/Poly1305, sha2 and bech32 (default and
+      # release, the runner's own target), and their release builds still
+      # answer the published vectors. Windows SKIPs it loudly (COFF, no
+      # disassembler acquired); ubuntu and macOS carry it.
+      - name: codegen (no division in the crypto modules' objects; release vector rows)
+        run: cargo xtask codegen
 
   # The run's verdict, and its name: `tier full`, `tier pr` or `tier noop`.
   # It needs every job, runs unless the run was cancelled, and fails unless
