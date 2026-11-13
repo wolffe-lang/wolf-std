@@ -3,8 +3,10 @@
 Unicode 15.1.0 normative data is vendored without modification in `15.1.0/`.
 `sources.json` records each original URL and SHA-256. The license is
 [Unicode-3.0](15.1.0/license.txt), copyright Unicode, Inc. Its notice applies
-also to the derived tables and conformance fixtures. No C-library or
-terminal implementation source is used.
+also to the derived tables and conformance fixtures. The generator's UCD
+parsing and interval-tree emission adapt warren's GPL-3.0-or-later generator;
+its header identifies that provenance. No third-party C-library or terminal
+implementation source is used.
 
 Regenerate with the pinned compiler formatter:
 

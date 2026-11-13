@@ -11,7 +11,8 @@
 //! additive display-column operations. General category queries, case
 //! mapping/folding and normalization remain outside this surface.
 //! Widths follow glibc 2.39 `wcwidth` under C.UTF-8, independently of the
-//! caller's locale: ambiguous characters are narrow. No terminal probing
+//! caller's locale: ambiguous characters use a narrow base policy, with
+//! the stated C-library exceptions taking precedence. No terminal probing
 //! or emoji shaping is performed. See docs/sc86-display-width.md.
 //!
 //! **THE CURRENCY IS `char` NOW (sc25), AND THE INT INTERIM IS GONE.**

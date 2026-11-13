@@ -1,6 +1,13 @@
 # Display width
 
-## Scope and prediction
+## Forbidden
+
+No third-party terminal emulator or C-library source is used. References
+are normative Unicode data, published specifications, the organisation's
+own measurement materials and black-box C calls. Scalar compatibility is
+not a claim about every terminal, and an unsupported executor is not a pass.
+
+## Prediction
 
 Add a locale-independent display-column family without changing byte-counted
 `str.len` or `fmt.pad_left`, `pad_right` and `center`. Unicode 15.1.0 data
@@ -12,8 +19,9 @@ Before implementation, the predictions are:
 - Every one of the 287,346 assigned scalars agrees with black-box `wcwidth`
   in glibc 2.39 under `C.UTF-8`, with NUL returning zero and other controls
   returning absence rather than a negative width.
-- The unadjusted Unicode derivation disagrees on exactly the 350 scalars below;
-  each exception is necessary, with no catch-all compatibility adjustment.
+- Before compatibility exceptions, after nonprinting classification, the
+  Unicode derivation disagrees on exactly the 350 scalars below; each
+  exception is necessary, with no catch-all compatibility adjustment.
 - Grapheme segmentation passes all Unicode 15.1.0 GraphemeBreakTest cases,
   including Indic conjuncts, regional-indicator parity and emoji ZWJ rules.
 - Every scalar, segmentation, truncation and padding row executes on native,
@@ -23,16 +31,19 @@ Before implementation, the predictions are:
   time; other lookup is a generated balanced decision tree. String walks are
   linear in UTF-8 bytes, with bounded segmentation state, not prefix rescans.
 
-## API and decisions
+## Inputs, verified
 
-Recommended public API, all core tier:
+### API and decisions
+
+Public API, all core tier:
 
 - `unicode.display_width(c: char) -> int ! {none}`: zero, one or two columns;
   `none` for a nonprinting scalar. No invalid scalar can be a `char`.
 - `str.graphemes(s: str) -> List[str]`: Unicode 15.1.0 default extended
   grapheme clusters, as byte-offset slices of the input.
-- `str.display_width(s: str) -> int ! {none}`: the sum of scalar widths,
-  walking complete graphemes; `none` if any scalar is nonprinting.
+- `str.display_width(s: str) -> int ! {none}`: the sum of scalar widths
+  across graphemes; `none` if any scalar is nonprinting. Addition is grouping
+  independent, so a direct scalar walk computes this without allocating clusters.
 - `str.truncate_display(s: str, columns: int) -> str ! {none}`: the longest
   prefix of complete graphemes whose summed widths fit. Validate the whole
   input before returning, including an omitted suffix. Zero-width graphemes
@@ -42,7 +53,9 @@ Recommended public API, all core tier:
   spaces to a minimum column count; never truncate. Negative columns trap
   `assert`. `none` has the same meaning as for width.
 
-Ambiguous East Asian width is always narrow, independent of locale. NUL is
+Ambiguous East Asian width uses the narrow base policy, independent of
+locale; the listed C-library exceptions take precedence (including U+3248–324F).
+NUL is
 zero; all other Cc controls, Zl/Zp separators, unassigned scalars and
 noncharacters are nonprinting. Private-use scalars are narrow. No function reads the locale,
 terminal or environment, interprets escapes, expands tabs, or measures fonts.
@@ -61,7 +74,7 @@ classification code lives under `std.unicode.tables`, following §10. Existing
 byte-oriented formatting is intentionally unchanged, following §11. No
 new general-purpose locale or ambiguous-width knob is proposed.
 
-## Data and exact exceptions
+### Data and exact exceptions
 
 Source data: Unicode 15.1.0 `UnicodeData.txt`, `EastAsianWidth.txt`,
 `emoji-data.txt`, `DerivedCoreProperties.txt`, `GraphemeBreakProperty.txt`
@@ -90,10 +103,19 @@ indicator occupies one. These are observed compatibility decisions, not
 claims about Unicode assigning terminal widths. Warren's public measurement
 files are `notes/wr01-the-emulator.md` (width-policy section),
 `tests/vt/width-divergences.json` and
-`tests/vt/reference/width-columns/result.json`. No terminal or libc source
-was read.
+`tests/vt/reference/width-columns/result.json`.
 
-## Validation and size budget
+The following warren files were read: `tools/vt/generate_widths.py`,
+`tools/vt/width_sweep.py`, `tests/vt/width_vector_rows.py` and the vector test
+entry `src/vt_width_vector.lu`. Its width implementation, renderer and parser
+were not read. UCD property/range parsing and balanced interval-tree emission
+in this generator are adapted from its GPL-3.0-or-later generator, with the
+license identified in the generator header. Assignment/control/separator
+policy, compatibility validation, grapheme classification and conformance
+fixtures, ledger generation, formatting integration and public APIs are new
+here. No third-party emulator or C-library source was read.
+
+## Evidence index
 
 The black-box oracle must run in the digest-pinned Linux image with glibc
 2.39 and `C.UTF-8`; record its image id, libc version and locale. Compare
@@ -116,7 +138,7 @@ Report the generated source size and interval count separately; source bytes
 are not binary bytes. The implementation is not accepted until these figures
 and the exact-head recorder evidence are present.
 
-## Limits and delivery
+## Done-when
 
 This is a deterministic compatibility model, not a prediction for every
 terminal. Fonts, ambiguous-width preferences, emoji shaping and Unicode

@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Derive committed Wolf tables and exhaustive fixtures from pinned UCD data.
 
+UCD property/range parsing and balanced interval-tree emission are adapted
+from wolffe-lang/warren tools/vt/generate_widths.py (GPL-3.0-or-later).
+The scalar assignment/control policy, explicit compatibility validation,
+grapheme classifications/corpora, ledger and formatter integration are new.
 Use Python -I. This reads data only, never third-party implementation source.
 The five compatibility classes are black-box observations, not UCD properties.
 """

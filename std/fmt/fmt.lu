@@ -23,13 +23,11 @@
 //!
 //! **Width is measured in BYTES** (§9's one currency, applied). `len` is
 //! bytes everywhere in std, so `pad_left("é", 3)` adds one byte of fill,
-//! not two, and a column of CJK text will not line up in a terminal. This
-//! is honest rather than convenient: display width needs East Asian Width
-//! tables and grapheme segmentation (the F-0019 budget decision), and a
-//! function that pretended to count columns would be wrong on exactly the
-//! text that makes people care. When the tables land, the display-width
-//! family joins them under its own name — `pad_left` will keep meaning
-//! bytes.
+//! not two, and a column of CJK text will not line up in a terminal.
+//! Display columns are a separate family: `std.str.display_width`,
+//! `truncate_display` and `pad_display_left`/`pad_display_right` use the
+//! pinned Unicode tables with C-compatible additive scalar widths and
+//! grapheme-safe cuts. This module's padding and truncation still count bytes.
 //!
 //! **What is the language's, the implementation's, and std's** (§8's
 //! question again). The language owns interpolation and its (unspecified)
