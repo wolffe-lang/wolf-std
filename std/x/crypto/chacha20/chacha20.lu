@@ -105,6 +105,19 @@
 //! operations are separate review obligations, not certified here. The
 //! tag comparison delegates to `bytes.is_equal_fixed_work`; `to_hex`
 //! is NOT constant-time and says so.
+//!
+//! **No division (sc84, wolf-std#151).** Neither the cipher nor the MAC
+//! divides: Poly1305's carries, clamp, limb seams and tag words are
+//! shifts and masks, and so are the stream's block positions. At wolf
+//! 0.2.39 the default build compiled 76 hardware divides into
+//! `poly1305`, `absorb` and `push_tag_word`, on the one-time key and the
+//! accumulator. `cargo xtask codegen` builds this module's default and
+//! release objects on the host target and fails on any integer division
+//! instruction in them, and runs the RFC 8439 rows in the release tier.
+//! It is not a timing measurement (no latency was measured on any CPU),
+//! it says nothing about the interpreters, and the compiler that makes
+//! the objects is not audited; a target the gate is not run on is not
+//! covered by it.
 
 use std.bytes
 
