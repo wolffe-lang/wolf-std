@@ -219,17 +219,113 @@ Each was weighed and the recommended option implemented.
    macOS), not pinned; the gate prints its version line, and its
    self-check fails if the probe's division is not seen.
 
+## Results against the prediction
+
+- **Red first, as predicted.** The gate (`41a02f1`) and its Linux rig
+  (`da27890`) were committed on the base library. At `da27890` the gate
+  was red on x86-64 Linux with exactly the seven release divisions of the
+  census and 275 default ones. The first arm64 run, at the same commit,
+  was red with the two predicted release divisions and 275 default ones,
+  and it showed a fault in the gate: LLVM's objdump labels the start of a
+  Mach-O section with an assembler temporary (`ltmp0`) and hides the
+  function that begins there, so a division in that function would have
+  been named `ltmp0`. `2a7ca45` takes names from the object's symbol
+  table and reports each offset from its function's start. Both targets
+  were taken red again at `2a7ca45`: x86-64 `ladder +0x23d div %sil`,
+  `ge_scalarmult +0x539 div %sil`, `decode_bytes +0x143 idiv %rcx` and
+  `+0x150 div %ecx`, `encode_bytes +0x122 idiv %rcx` and `+0x135 div
+  %ecx`, `encode +0x53d div %rcx`; arm64 `decode_bytes +0x138 sdiv`,
+  `encode_bytes +0x118 sdiv`; 275 default lines on each.
+- **Green after the fix, both targets, both tiers.** From `4c3f9d9` on,
+  the gate finds no integer division in any function: on x86-64, 68
+  release functions (21,083 instructions) and 156 default functions; on
+  arm64, 465 release labels (cold splits and outlined code counted
+  separately; 21,095 instructions) and 156 default functions. The fifteen
+  release rows, the RFC 7748 1000-iteration chain among them, pass on
+  both. The self-check saw the probe's division every time.
+- **The branches went with them.** Read in the fixed objects: the x86-64
+  release `decode` has no jump table and no data-dependent branch; its
+  23 conditional jumps are loop counters, list-capacity checks, overflow
+  guards and the four verdicts. The alphabet pass is 32 compares and
+  multiplies with no exit, and the checksum step's generator terms are
+  shift-and-mask selections. arm64 release `decode` has the same shape.
+- **Answers unchanged.** Every row of `bech32`, `x/crypto/curve25519`,
+  `x/crypto/chacha20`, `x/crypto/sha2` and `bytes` was run on lupin, the
+  checked machine and native at the fixed code: 333 runs, each verdict the
+  ledger's (12 more are compile-time rows the whole gate covers; one
+  `slow` lupin posture answered as before). The ledger moves only by the
+  new row, `run` on all three lanes.
+- **Not predicted:** `wolf fmt` drops parentheses the precedence table
+  makes redundant, so several rewritten lines read as `x + y & m` and
+  `next ^ 0 - (top & 1) & k`; they are the canonical form and mean what
+  the parenthesised spelling meant.
+
 ## Claim and limits
 
-To be written with the evidence.
+What the four modules now claim, at wolf 0.2.39:
+
+- The default and release objects generated for
+  `std.x.crypto.curve25519`, `std.x.crypto.chacha20`,
+  `std.x.crypto.sha2` and `std.bech32` contain no integer division
+  instruction on x86-64 Linux or arm64 macOS, and `cargo xtask codegen`
+  fails if one appears on the host target it runs on.
+- At source level, X25519's ladder reads the secret scalar without a
+  division or a branch, and Bech32 reads and writes data characters
+  without a division, a branch, an early exit or an index on their
+  value; the remaining branches are on lengths, the HRP, the separator's
+  position and the published verdicts.
+
+What they do not claim:
+
+- No timing was measured, and nothing is said about the latency of the
+  instructions that remain (multiplies, shifts) on any CPU.
+- The compiler is not audited. The gate re-reads the objects of the
+  pinned compiler on each run; another compiler version is covered only
+  when the gate runs with it.
+- Only the host target is scanned on a run: the Linux and macOS legs
+  between them cover x86-64 and arm64; Windows objects (COFF) are not
+  scanned, and no other target is built.
+- The gate does not gate branches; the census read them at this pin.
+  Checked-arithmetic overflow guards and bounds checks remain, with
+  secret operands and a direction that is the same for every valid input.
+- Ed25519 signing still adds on each secret scalar bit behind a branch,
+  and every `to_hex` indexes by value; both are documented in place.
+- The interpreters (lupin and the checked machine) execute no generated
+  code and are not covered.
+- Release objects hold what the gate's entry reaches; the entry calls
+  every public function of the four modules, and the default tier, which
+  emits every function, is scanned too.
 
 ## Evidence index
 
-To be filled at the final head.
+Records stay with the lane; each is cited by its SHA-256 and quoted where
+it matters.
+
+- Census at `bb002f3`: `docs/sc84-witness/census/` (the entry, the
+  capture and scan scripts, the division tables of both targets).
+- Gate red, x86-64, at `da27890`: record SHA-256
+  `e8cb77456a84c06bd69347cc37d0baf4ceaa314c16474fb5efe947c23c74fd88`,
+  `END codegen exit=1`, 282 `FAIL` lines (7 release, 275 default).
+- Gate red, x86-64, at `2a7ca45`: record SHA-256
+  `bcf9e9e2c471b5e4bf5eac329e8f5cb2a0de6cbea958a4d7d19328dbb7e72fdd`,
+  `END codegen exit=1`, 282 `FAIL` lines.
+- Gate red, arm64, at `da27890` and `2a7ca45` (gate logs, the recorder's
+  Mac rig did not exist yet): SHA-256
+  `3303ba9cd1577029ac5219ec0b813e9b0d03420a455c312991d3d722a2dfeec3` and
+  `916c4ab45eded3a948c6230dfe5295a39961d562af2729b895ea07db1c4fe47c`,
+  `codegen exit=1`, 277 `FAIL` lines each (2 release, 275 default).
+- Gate green, arm64, at `4c3f9d9`: log SHA-256
+  `16863173a7286d726f769354a9795824d64243c3420e8a998cdead7875b5f205`.
+- The final records (the whole Linux take, the Mac take and the plant)
+  are taken at the final head and cited in the pull request, since a
+  record cannot name the commit that would carry it.
+- The Bech32 known answers: `docs/sc84-witness/bech32_oracle.py`, written
+  from BIP-173's text and checked against its published vector
+  `abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw`.
 
 ## Done-when
 
 The PR is open at a head whose local gauntlet record is green and whose
 plant record is red by name at the gate; the census, the decisions and
 this note's claim match the code; README and CONTRIBUTING name the new
-step.
+step. Fixes wolf-std#151.
