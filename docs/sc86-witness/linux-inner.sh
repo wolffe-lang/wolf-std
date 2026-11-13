@@ -16,6 +16,8 @@ case "$1" in
     oracle) python3 -I xtask/unicode/oracle.py ;;
     assigned|grapheme|family) python3 -I xtask/unicode/rows.py "$1" ;;
     generation) python3 -I xtask/unicode/generate.py --check --wolf "$WOLF_BIN" ;;
+    invariants) python3 -I xtask/unicode/generate-test.py ;;
+    size) python3 -I xtask/unicode/size.py ;;
     ci) timeout 6500 cargo run --frozen -q -p xtask -- ci ;;
     *) printf 'unknown step %s\n' "$1"; exit 64 ;;
 esac

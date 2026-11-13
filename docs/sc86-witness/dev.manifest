@@ -9,9 +9,13 @@ rig wiring.sh committed=../..:HEAD:docs/sc86-witness/wiring.sh
 rig ../../xtask/unicode/generate.py committed=../..:HEAD:xtask/unicode/generate.py
 rig ../../xtask/unicode/oracle.py committed=../..:HEAD:xtask/unicode/oracle.py
 rig ../../xtask/unicode/rows.py committed=../..:HEAD:xtask/unicode/rows.py
+rig ../../xtask/unicode/generate-test.py committed=../..:HEAD:xtask/unicode/generate-test.py
+rig ../../xtask/unicode/size.py committed=../..:HEAD:xtask/unicode/size.py
 step ci-wiring tools=python3,git script=wiring.sh
-step format image=localhost/r41-toolchain:1 tools=bash,python3,cargo,setsid script=linux-step.sh -- format
+step unicode-invariants image=localhost/r41-toolchain:1 tools=bash,python3,setsid script=linux-step.sh -- invariants
+step unicode-generation image=localhost/r41-toolchain:1 tools=bash,python3,setsid script=linux-step.sh -- generation
 step width-c-oracle image=localhost/r41-toolchain:1 tools=bash,python3,setsid script=linux-step.sh -- oracle
 step width-family image=localhost/r41-toolchain:1 tools=bash,python3,clang,setsid script=linux-step.sh -- family
 step width-grapheme image=localhost/r41-toolchain:1 tools=bash,python3,clang,setsid script=linux-step.sh -- grapheme
 step width-assigned image=localhost/r41-toolchain:1 tools=bash,python3,clang,setsid script=linux-step.sh -- assigned
+step width-binary-size image=localhost/r41-toolchain:1 tools=bash,python3,clang,size,nm,setsid script=linux-step.sh -- size
