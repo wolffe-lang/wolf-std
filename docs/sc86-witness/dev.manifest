@@ -1,0 +1,17 @@
+engine ./linux-engine.sh --env=PATH=/opt/s263-rust/bin:/usr/local/bin:/usr/bin:/bin
+floor 35 ../..
+rig dev.manifest committed=../..:HEAD:docs/sc86-witness/dev.manifest
+rig linux-engine.sh committed=../..:HEAD:docs/sc86-witness/linux-engine.sh
+rig linux-step.sh committed=../..:HEAD:docs/sc86-witness/linux-step.sh
+rig linux-inner.sh committed=../..:HEAD:docs/sc86-witness/linux-inner.sh
+rig linux-preflight.sh committed=../..:HEAD:docs/sc86-witness/linux-preflight.sh
+rig wiring.sh committed=../..:HEAD:docs/sc86-witness/wiring.sh
+rig ../../xtask/unicode/generate.py committed=../..:HEAD:xtask/unicode/generate.py
+rig ../../xtask/unicode/oracle.py committed=../..:HEAD:xtask/unicode/oracle.py
+rig ../../xtask/unicode/rows.py committed=../..:HEAD:xtask/unicode/rows.py
+step ci-wiring tools=python3,git script=wiring.sh
+step format image=localhost/r41-toolchain:1 tools=bash,python3,cargo,setsid script=linux-step.sh -- format
+step width-c-oracle image=localhost/r41-toolchain:1 tools=bash,python3,setsid script=linux-step.sh -- oracle
+step width-family image=localhost/r41-toolchain:1 tools=bash,python3,clang,setsid script=linux-step.sh -- family
+step width-grapheme image=localhost/r41-toolchain:1 tools=bash,python3,clang,setsid script=linux-step.sh -- grapheme
+step width-assigned image=localhost/r41-toolchain:1 tools=bash,python3,clang,setsid script=linux-step.sh -- assigned
