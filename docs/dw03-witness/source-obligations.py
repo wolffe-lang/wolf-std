@@ -35,6 +35,7 @@ check("x25519-shared-secret-doc", "test is on the PUBLIC output" not in curve an
 check("x25519-rendering-doc", "shared secrets are\n/// public once computed" not in curve)
 sha = (root / "std/x/crypto/sha2/sha2.lu").read_text()
 check("hkdf-hashlen-doc", "prk` must be at least one" not in sha and "HashLen" in sha)
+check("sha2-source-contract-doc", "not a fixed-time certification" in sha)
 fold = body("std/bytes/bytes.lu", "is_equal_fixed_work")
 loop = fold[fold.find("while"):]
 check("equality-source-fold", "MISSING" not in fold and "while" in fold and not re.search(r"\b(if|return|break)\b", loop) and "^" in loop and "|" in loop)
