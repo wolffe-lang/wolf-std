@@ -10,6 +10,7 @@
 //! WRITE wake. Disable WRITE when the queue empties. lupin refuses
 //! os_ready_open by name before constructing the large queue.
 
+use std.fs
 use std.net
 use std.net.unix
 use std.poll
@@ -46,8 +47,17 @@ fn main() -> !int {
         skipped()
         return 0
     }
-    var srv = unix.listen("queue.sock")?
-    var writer = unix.connect("queue.sock")?
+    let path = "queue.sock"
+    // A reference refusal after bind leaves this test's owned path behind
+    // in std-test's shared directory. Retry exists, not other bind errors.
+    var srv = unix.listen(path) else |e| match e {
+        exists => { fs.remove(path)?; unix.listen(path)? },
+        unsupported => { return unsupported },
+        not_found => { return not_found },
+        denied => { return denied },
+        io => { return io },
+    }
+    var writer = unix.connect(path)?
     var reader = net.accept(mut srv)?
     net.set_deadline(mut reader, 2000)?
     var w = poll.open()?
