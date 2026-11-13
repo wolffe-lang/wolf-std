@@ -255,6 +255,19 @@ Each was weighed and the recommended option implemented.
   ledger's (12 more are compile-time rows the whole gate covers; one
   `slow` lupin posture answered as before). The ledger moves only by the
   new row, `run` on all three lanes.
+- **Missed, and how.** The hosted plan job's `local gate wiring proof`
+  step runs `ci/local-gate-test.py`, which holds every job of the
+  workflow against its recorded reference in `ci/local-gate-baseline.json`;
+  a deliberate change to a job updates that reference in the same commit.
+  The first final head (`8392d94`) added the `codegen` step to the `gates`
+  job without updating its reference, so the hosted full run was red in
+  `plan`. The local take had run `cargo xtask ci`, whose own drift check
+  compares cargo command lines only, and never the plan job's two Python
+  proofs. `c8b24d7` records the step in the reference (the diff of the
+  recorded job is exactly the seven added lines), and `7caa673` makes both
+  proofs (`ci/tiers-test.py`, `ci/local-gate-test.py`) the first step of
+  the Linux and Mac takes; run at `8392d94`, that step is red on exactly
+  this assertion.
 - **Not predicted:** `wolf fmt` drops parentheses the precedence table
   makes redundant, so several rewritten lines read as `x + y & m` and
   `next ^ 0 - (top & 1) & k`; they are the canonical form and mean what
