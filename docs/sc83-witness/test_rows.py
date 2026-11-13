@@ -34,6 +34,7 @@ class RowReader(unittest.TestCase):
         self.assertEqual(ROWS["REFUSALS"]["poll/waiter_rows.lu"], "os_ready_open")
         self.assertEqual(ROWS["REFUSALS"]["net/unix/peer_credentials.lu"], "net_peer_cred")
         self.assertNotIn("net/write_some.lu", ROWS["REFUSALS"])
+        self.assertNotIn("poll/pure_rows.lu", ROWS["REFUSALS"])
 
     def test_compiler_list_comptime_posture(self):
         test = "net/comptime_refuses_write_some.lu"

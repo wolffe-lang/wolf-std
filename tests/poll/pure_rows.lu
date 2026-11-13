@@ -1,0 +1,44 @@
+//! check: run(exit=0, stdout="constants=true\nempty=true\ninvalid_add=true\ninvalid_wait=true")
+//! phase: run
+//! conforms: std.poll, std.fs, err.row
+//!
+//! The readiness capability's doc admission must not hide a regression in
+//! pure construction/constants or shape guards. This row runs on all three
+//! machines without acquiring a host set, including on Windows.
+
+use std.fs
+use std.poll
+
+fn invalid_add(mut w: poll.Waiter) -> bool {
+    let _key = poll.add_file(mut w, fs.File { fd: -1 }, poll.READ) else |e| {
+        return match e {
+            invalid => true,
+            io => false,
+            unsupported => false,
+        }
+    }
+    false
+}
+
+fn invalid_wait(mut w: poll.Waiter) -> bool {
+    let _ev = poll.wait(mut w, 0, -1) else |e| {
+        return match e {
+            invalid => true,
+            io => false,
+            unsupported => false,
+        }
+    }
+    false
+}
+
+fn main() -> !int {
+    print("constants={poll.READ == 1 && poll.WRITE == 2 && poll.HANGUP == 4 && poll.ERROR == 8}")
+    var w = poll.open()?
+    print("empty={poll.len(w) == 0}")
+    let add = invalid_add(mut w)
+    let wait = invalid_wait(mut w)
+    print("invalid_add={add}")
+    print("invalid_wait={wait}")
+    poll.close(take w)?
+    0
+}

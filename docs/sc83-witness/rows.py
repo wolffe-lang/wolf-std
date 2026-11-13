@@ -37,6 +37,7 @@ REFUSALS = {
 }
 ROWS = list(REFUSALS) + [
     "net/write_some.lu",
+    "poll/pure_rows.lu",
     "net/write_some_invalid_row.lu",
     "poll/comptime_refuses.lu",
     "net/comptime_refuses_write_some.lu",
