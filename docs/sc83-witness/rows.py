@@ -33,6 +33,7 @@ REFUSALS = {
     "poll/socket_queue.lu": "os_ready_open",
     "net/unix/peer_credentials.lu": "net_peer_cred",
     "net/unix/peer_credentials_child.lu": "os_fork",
+    "term/pty_child.lu": "os_term_open_pty",
 }
 ROWS = list(REFUSALS) + [
     "net/write_some.lu",
