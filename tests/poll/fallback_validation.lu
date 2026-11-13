@@ -1,0 +1,62 @@
+//! check: run(exit=0, stdout="file_forged=io\nsocket_forged=io\nfile_closed=io\nsocket_closed=io\nunchanged=true")
+//! phase: run
+//! conforms: std.poll, std.fs, std.net, err.row
+//!
+//! White-box fallback regression: -2 is the exact list-fallback state that
+//! a host without a readiness set selects. Force that internal state so
+//! every tier tests add-time validation without needing a Windows host.
+//! No readiness-set service or private-field construction is a public API.
+
+use std.fs
+use std.net
+use std.poll
+
+fn file_row(mut w: poll.Waiter, h: int) -> str {
+    let k = poll.add_file(mut w, fs.File { fd: h }, poll.READ) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "key:{k}"
+}
+
+fn socket_row(mut w: poll.Waiter, h: int) -> str {
+    let k = poll.add_socket(mut w, net.Socket { fd: h }, poll.READ) else |e| {
+        return match e {
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "key:{k}"
+}
+
+fn main() -> !int {
+    fs.write_text("fallback.data", "x")?
+    var f = fs.open("fallback.data")?
+    let old_file = f.fd
+    fs.close(take f)?
+    var srv = net.listen(net.loopback(0))?
+    var cli = net.connect(net.loopback(net.port(srv)?))?
+    var peer = net.accept(mut srv)?
+    let old_socket = cli.fd
+    net.close(take cli)?
+    var w = poll.open()?
+    w.set = -2
+    let forged_file = file_row(mut w, 1000000)
+    let forged_socket = socket_row(mut w, 1000000)
+    let closed_file = file_row(mut w, old_file)
+    let closed_socket = socket_row(mut w, old_socket)
+    print("file_forged={forged_file}")
+    print("socket_forged={forged_socket}")
+    print("file_closed={closed_file}")
+    print("socket_closed={closed_socket}")
+    print("unchanged={poll.len(w) == 0}")
+    poll.close(take w)?
+    net.close(take peer)?
+    net.close_listener(take srv)?
+    fs.remove("fallback.data")?
+    0
+}
