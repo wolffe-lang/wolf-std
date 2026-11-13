@@ -45,7 +45,7 @@ At b7a9390, Mac preflight passed, the harness compiled with two workers, doctor 
 
 Released lupin 0.1.62 executed net/write_some and satisfied the byte-domain E0401 check. Its other named refusals were captured before changing their ledger cells. The first collector incorrectly equated phase_reached with the refusal point: lupin records its last completed rung as resolve and separately reports x-unsupported-at=run. The collector now checks the latter when present, with a red-first regression test. It still requires the named builtin/comptime function and rejects wrong phases, warnings and unexpected heals.
 
-The main ledger now has all 680 tests. The compiler-only ledger draft is retained as an archived pre-release projection, not the current ledger. Windows-only run cells test explicit guards/refusal branches, not unavailable capabilities; hosted results must confirm those cells before merge.
+The main ledger now has all 681 tests. The compiler-only ledger draft is retained as an archived pre-release projection, not the current ledger. Windows-only run cells test explicit guards/refusal branches, not unavailable capabilities; hosted results must confirm those cells before merge.
 
 ### Comptime posture
 
@@ -71,6 +71,14 @@ The independent Linux C probe docs/sc83-witness/pty-write-room.c reproduces that
 The manuals explain the portable contract, not a fixed drain threshold: pty(7) documents asynchronous master/slave data flow and processing delay; poll(2) defines POLLOUT as writing now being possible; epoll(7) documents default level-triggered behavior and EPOLLET as opt-in. ioctl_tty(2), formerly tty_ioctl(2), lists queue/flow-control diagnostics, not a promise that one slave read makes the master writable. Inputs: https://man7.org/linux/man-pages/man7/pty.7.html, https://man7.org/linux/man-pages/man2/poll.2.html, https://man7.org/linux/man-pages/man7/epoll.7.html and https://man7.org/linux/man-pages/man2/ioctl_tty.2.html. No kernel or libc implementation source was read.
 
 This is a host-dependent row assumption, not a std re-arming correction. write_partial now drains until WRITE is reported, bounded by 128 read/write look pairs and counted bytes/reads on stderr. It waits for slave READ before each read, so an empty input queue cannot park the fixture. It still requires actual WRITE recovery, a no-early full deadline and all queued bytes in order; it does not accept a timeout as success or change interests to force a wake.
+
+### Hosted reference-cost red
+
+Tier-all run 43408775848 at dbb9eea was red only in the macOS rig. Its sole actual red cell was x/crypto/chacha20/chunk_lifetimes on lupin: the unchanged 60-second wall ceiling expired before the reference returned its known 50000000-evaluation-step refusal. The nearby poll/error_hangup unsupported/host-ledger lines were expected classifications, not failures. The failed-job log SHA256 is f6243677f8f0558abb4f93104d490d105e1182ea8f72979b24e63ad3701cbe50 (job 131829751651). No poll or crypto library implementation changed in response.
+
+A single arm64 Mac diagnostic take reached that exact runtime refusal after 30.969 seconds under the same 60-second ceiling. Static stderr breadcrumbs were not exposed when the runtime refusal discarded captured output; they did not yield phase timings. That diagnostic remains outside the published branch. The original four-65536-byte chunk_lifetimes source is unchanged. Its checked and native cells are unchanged and still invoked; only its reference cell is now slow, a loud named skip rather than run or a fictional unsupported record after timeout.
+
+The small sibling chunk_lifetimes_small has four fresh regions, per-region key derivation, distinct nonces, authenticated round trips, altered-tag rejection and a return to the live-region baseline after every region. Each plaintext is one 64-byte ChaCha block. All three lanes must complete it. It cannot witness the large row's 64 KiB allocation/copy sizes, full byte-value pattern or RSS, and neither row claims erasure. The reference ceiling and native workload were not widened or reduced. The new sibling and classification were committed together with the hosted red log's digest; the full final-head gate must show both genuine small-row execution and the large row's explicit slow reference skip.
 
 Before merge require hosted tier all: rig AND gates on Ubuntu, macOS and Windows. The usual tier full omits the macOS rig and is not sufficient for these process/socket/timing rows. Record paths/digests and every END line are supplied in the handoff and PR evidence, without publishing private machine paths in this note. No hosted green is claimed before its verdict arrives.
 
