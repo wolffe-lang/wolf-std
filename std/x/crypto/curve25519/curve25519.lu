@@ -220,7 +220,11 @@ fn fe_one() -> Fe {
 /// multiply column (< 2^59, the bound proof on `fe_mul`), and two
 /// passes suffice because the first reduces every limb below 2^27 and
 /// the second cleans the single 19-fold carry. Total — no branch, all
-/// arithmetic.
+/// arithmetic. Every limb arriving here is non-negative (sums and
+/// products of carried limbs; `fe_sub` adds 2p first), so each carry is
+/// spelled as a literal shift and a mask (`>> 26`, `& 67108863`), which
+/// for a non-negative value is the same number as `/` and `%` by 2^26
+/// and compiles to no division in either tier (sc84, wolf-std#151).
 /// ct: fixed schedule, data-independent.
 fn fe_carry(f: Fe) -> Fe {
     var d0: int = f.l0
@@ -234,65 +238,65 @@ fn fe_carry(f: Fe) -> Fe {
     var d8: int = f.l8
     var d9: int = f.l9
     var c: int = 0
-    c = d0 / 67108864
-    d0 = d0 % 67108864
+    c = d0 >> 26
+    d0 = d0 & 67108863
     d1 = d1 + c
-    c = d1 / 33554432
-    d1 = d1 % 33554432
+    c = d1 >> 25
+    d1 = d1 & 33554431
     d2 = d2 + c
-    c = d2 / 67108864
-    d2 = d2 % 67108864
+    c = d2 >> 26
+    d2 = d2 & 67108863
     d3 = d3 + c
-    c = d3 / 33554432
-    d3 = d3 % 33554432
+    c = d3 >> 25
+    d3 = d3 & 33554431
     d4 = d4 + c
-    c = d4 / 67108864
-    d4 = d4 % 67108864
+    c = d4 >> 26
+    d4 = d4 & 67108863
     d5 = d5 + c
-    c = d5 / 33554432
-    d5 = d5 % 33554432
+    c = d5 >> 25
+    d5 = d5 & 33554431
     d6 = d6 + c
-    c = d6 / 67108864
-    d6 = d6 % 67108864
+    c = d6 >> 26
+    d6 = d6 & 67108863
     d7 = d7 + c
-    c = d7 / 33554432
-    d7 = d7 % 33554432
+    c = d7 >> 25
+    d7 = d7 & 33554431
     d8 = d8 + c
-    c = d8 / 67108864
-    d8 = d8 % 67108864
+    c = d8 >> 26
+    d8 = d8 & 67108863
     d9 = d9 + c
-    c = d9 / 33554432
-    d9 = d9 % 33554432
+    c = d9 >> 25
+    d9 = d9 & 33554431
     d0 = d0 + c * 19
-    c = d0 / 67108864
-    d0 = d0 % 67108864
+    c = d0 >> 26
+    d0 = d0 & 67108863
     d1 = d1 + c
-    c = d1 / 33554432
-    d1 = d1 % 33554432
+    c = d1 >> 25
+    d1 = d1 & 33554431
     d2 = d2 + c
-    c = d2 / 67108864
-    d2 = d2 % 67108864
+    c = d2 >> 26
+    d2 = d2 & 67108863
     d3 = d3 + c
-    c = d3 / 33554432
-    d3 = d3 % 33554432
+    c = d3 >> 25
+    d3 = d3 & 33554431
     d4 = d4 + c
-    c = d4 / 67108864
-    d4 = d4 % 67108864
+    c = d4 >> 26
+    d4 = d4 & 67108863
     d5 = d5 + c
-    c = d5 / 33554432
-    d5 = d5 % 33554432
+    c = d5 >> 25
+    d5 = d5 & 33554431
     d6 = d6 + c
-    c = d6 / 67108864
-    d6 = d6 % 67108864
+    c = d6 >> 26
+    d6 = d6 & 67108863
     d7 = d7 + c
-    c = d7 / 33554432
-    d7 = d7 % 33554432
+    c = d7 >> 25
+    d7 = d7 & 33554431
     d8 = d8 + c
-    c = d8 / 67108864
-    d8 = d8 % 67108864
+    c = d8 >> 26
+    d8 = d8 & 67108863
     d9 = d9 + c
-    c = d9 / 33554432
-    d9 = d9 % 33554432
+    c = d9 >> 25
+    d9 = d9 & 33554431
     d0 = d0 + c * 19
     Fe { l0: d0, l1: d1, l2: d2, l3: d3, l4: d4, l5: d5, l6: d6, l7: d7, l8: d8, l9: d9 }
 }
@@ -531,7 +535,9 @@ fn fe_cswap(swap: int, f: Fe, g: Fe) -> FePair {
 /// value is < 2^256; add 19 and the carry out of bit 255 is 1 exactly
 /// when the value is >= p, so that carry (q) selects a conditional
 /// subtraction of p — applied by adding q*19 into limb 0 and masking
-/// the 2^255 bit off limb 9, all arithmetic, no branch. Total.
+/// the 2^255 bit off limb 9, all arithmetic, no branch. Total. The
+/// limbs are non-negative, so the carries are shifts and masks, as in
+/// `fe_carry`.
 /// ct: fixed schedule, data-independent.
 fn fe_freeze(f: Fe) -> Fe {
     let h = fe_carry(f)
@@ -546,34 +552,34 @@ fn fe_freeze(f: Fe) -> Fe {
     var g8 = h.l8
     var g9 = h.l9
     var c: int = 0
-    c = g0 / 67108864
-    g0 = g0 % 67108864
+    c = g0 >> 26
+    g0 = g0 & 67108863
     g1 = g1 + c
-    c = g1 / 33554432
-    g1 = g1 % 33554432
+    c = g1 >> 25
+    g1 = g1 & 33554431
     g2 = g2 + c
-    c = g2 / 67108864
-    g2 = g2 % 67108864
+    c = g2 >> 26
+    g2 = g2 & 67108863
     g3 = g3 + c
-    c = g3 / 33554432
-    g3 = g3 % 33554432
+    c = g3 >> 25
+    g3 = g3 & 33554431
     g4 = g4 + c
-    c = g4 / 67108864
-    g4 = g4 % 67108864
+    c = g4 >> 26
+    g4 = g4 & 67108863
     g5 = g5 + c
-    c = g5 / 33554432
-    g5 = g5 % 33554432
+    c = g5 >> 25
+    g5 = g5 & 33554431
     g6 = g6 + c
-    c = g6 / 67108864
-    g6 = g6 % 67108864
+    c = g6 >> 26
+    g6 = g6 & 67108863
     g7 = g7 + c
-    c = g7 / 33554432
-    g7 = g7 % 33554432
+    c = g7 >> 25
+    g7 = g7 & 33554431
     g8 = g8 + c
-    c = g8 / 67108864
-    g8 = g8 % 67108864
+    c = g8 >> 26
+    g8 = g8 & 67108863
     g9 = g9 + c
-    let q = g9 / 33554432
+    let q = g9 >> 25
     var r0 = h.l0 + q * 19
     var r1 = h.l1
     var r2 = h.l2
@@ -584,34 +590,34 @@ fn fe_freeze(f: Fe) -> Fe {
     var r7 = h.l7
     var r8 = h.l8
     var r9 = h.l9
-    c = r0 / 67108864
-    r0 = r0 % 67108864
+    c = r0 >> 26
+    r0 = r0 & 67108863
     r1 = r1 + c
-    c = r1 / 33554432
-    r1 = r1 % 33554432
+    c = r1 >> 25
+    r1 = r1 & 33554431
     r2 = r2 + c
-    c = r2 / 67108864
-    r2 = r2 % 67108864
+    c = r2 >> 26
+    r2 = r2 & 67108863
     r3 = r3 + c
-    c = r3 / 33554432
-    r3 = r3 % 33554432
+    c = r3 >> 25
+    r3 = r3 & 33554431
     r4 = r4 + c
-    c = r4 / 67108864
-    r4 = r4 % 67108864
+    c = r4 >> 26
+    r4 = r4 & 67108863
     r5 = r5 + c
-    c = r5 / 33554432
-    r5 = r5 % 33554432
+    c = r5 >> 25
+    r5 = r5 & 33554431
     r6 = r6 + c
-    c = r6 / 67108864
-    r6 = r6 % 67108864
+    c = r6 >> 26
+    r6 = r6 & 67108863
     r7 = r7 + c
-    c = r7 / 33554432
-    r7 = r7 % 33554432
+    c = r7 >> 25
+    r7 = r7 & 33554431
     r8 = r8 + c
-    c = r8 / 67108864
-    r8 = r8 % 67108864
+    c = r8 >> 26
+    r8 = r8 & 67108863
     r9 = r9 + c
-    r9 = r9 % 33554432
+    r9 = r9 & 33554431
     Fe { l0: r0, l1: r1, l2: r2, l3: r3, l4: r4, l5: r5, l6: r6, l7: r7, l8: r8, l9: r9 }
 }
 
@@ -636,9 +642,10 @@ fn fe_iszero(f: Fe) -> bool {
 /// Decode 32 little-endian bytes to a field element (RFC 7748 s5:
 /// the most-significant BIT of the last byte is masked off before
 /// decoding — X25519 u-coordinates are 255-bit). The caller guarantees
-/// exactly 32 byte-valued elements. ct: fixed offsets.
+/// exactly 32 byte-valued elements. Bytes are non-negative, so the
+/// limb seams are literal shifts and masks. ct: fixed offsets.
 fn fe_frombytes(b: List[byte]) -> Fe {
-    let m31 = b[31] as int % 128
+    let m31 = b[31] as int & 127
     let b0 = b[0] as int
     let b1 = b[1] as int
     let b2 = b[2] as int
@@ -670,56 +677,57 @@ fn fe_frombytes(b: List[byte]) -> Fe {
     let b28 = b[28] as int
     let b29 = b[29] as int
     let b30 = b[30] as int
-    let l0 = (b0 + b1 * 256 + b2 * 65536 + b3 * 16777216) % 67108864
-    let l1 = (b3 / 4 + b4 * 64 + b5 * 16384 + b6 * 4194304) % 33554432
-    let l2 = (b6 / 8 + b7 * 32 + b8 * 8192 + b9 * 2097152) % 67108864
-    let l3 = (b9 / 32 + b10 * 8 + b11 * 2048 + b12 * 524288) % 33554432
-    let l4 = (b12 / 64 + b13 * 4 + b14 * 1024 + b15 * 262144) % 67108864
-    let l5 = (b16 + b17 * 256 + b18 * 65536 + b19 * 16777216) % 33554432
-    let l6 = (b19 / 2 + b20 * 128 + b21 * 32768 + b22 * 8388608) % 67108864
-    let l7 = (b22 / 8 + b23 * 32 + b24 * 8192 + b25 * 2097152) % 33554432
-    let l8 = (b25 / 16 + b26 * 16 + b27 * 4096 + b28 * 1048576) % 67108864
-    let l9 = b28 / 64 + b29 * 4 + b30 * 1024 + m31 * 262144
+    let l0 = b0 + b1 * 256 + b2 * 65536 + b3 * 16777216 & 67108863
+    let l1 = (b3 >> 2) + b4 * 64 + b5 * 16384 + b6 * 4194304 & 33554431
+    let l2 = (b6 >> 3) + b7 * 32 + b8 * 8192 + b9 * 2097152 & 67108863
+    let l3 = (b9 >> 5) + b10 * 8 + b11 * 2048 + b12 * 524288 & 33554431
+    let l4 = (b12 >> 6) + b13 * 4 + b14 * 1024 + b15 * 262144 & 67108863
+    let l5 = b16 + b17 * 256 + b18 * 65536 + b19 * 16777216 & 33554431
+    let l6 = (b19 >> 1) + b20 * 128 + b21 * 32768 + b22 * 8388608 & 67108863
+    let l7 = (b22 >> 3) + b23 * 32 + b24 * 8192 + b25 * 2097152 & 33554431
+    let l8 = (b25 >> 4) + b26 * 16 + b27 * 4096 + b28 * 1048576 & 67108863
+    let l9 = (b28 >> 6) + b29 * 4 + b30 * 1024 + m31 * 262144
     fe_carry(Fe { l0: l0, l1: l1, l2: l2, l3: l3, l4: l4, l5: l5, l6: l6, l7: l7, l8: l8, l9: l9 })
 }
 
 /// Encode a field element as 32 little-endian bytes (RFC 7748 s5),
-/// canonical (< p). ct: freezes (fixed), then fixed byte extraction.
+/// canonical (< p). ct: freezes (fixed), then fixed byte extraction by
+/// literal shifts and masks of the non-negative frozen limbs.
 fn fe_tobytes(fin: Fe) -> List[byte] {
     let f = fe_freeze(fin)
     var out = List[byte]()
-    (mut out).push((f.l0 % 256) as byte)
-    (mut out).push((f.l0 / 256 % 256) as byte)
-    (mut out).push((f.l0 / 65536 % 256) as byte)
-    (mut out).push(((f.l0 / 16777216 + f.l1 * 4) % 256) as byte)
-    (mut out).push((f.l1 / 64 % 256) as byte)
-    (mut out).push((f.l1 / 16384 % 256) as byte)
-    (mut out).push(((f.l1 / 4194304 + f.l2 * 8) % 256) as byte)
-    (mut out).push((f.l2 / 32 % 256) as byte)
-    (mut out).push((f.l2 / 8192 % 256) as byte)
-    (mut out).push(((f.l2 / 2097152 + f.l3 * 32) % 256) as byte)
-    (mut out).push((f.l3 / 8 % 256) as byte)
-    (mut out).push((f.l3 / 2048 % 256) as byte)
-    (mut out).push(((f.l3 / 524288 + f.l4 * 64) % 256) as byte)
-    (mut out).push((f.l4 / 4 % 256) as byte)
-    (mut out).push((f.l4 / 1024 % 256) as byte)
-    (mut out).push((f.l4 / 262144 % 256) as byte)
-    (mut out).push((f.l5 % 256) as byte)
-    (mut out).push((f.l5 / 256 % 256) as byte)
-    (mut out).push((f.l5 / 65536 % 256) as byte)
-    (mut out).push(((f.l5 / 16777216 + f.l6 * 2) % 256) as byte)
-    (mut out).push((f.l6 / 128 % 256) as byte)
-    (mut out).push((f.l6 / 32768 % 256) as byte)
-    (mut out).push(((f.l6 / 8388608 + f.l7 * 8) % 256) as byte)
-    (mut out).push((f.l7 / 32 % 256) as byte)
-    (mut out).push((f.l7 / 8192 % 256) as byte)
-    (mut out).push(((f.l7 / 2097152 + f.l8 * 16) % 256) as byte)
-    (mut out).push((f.l8 / 16 % 256) as byte)
-    (mut out).push((f.l8 / 4096 % 256) as byte)
-    (mut out).push(((f.l8 / 1048576 + f.l9 * 64) % 256) as byte)
-    (mut out).push((f.l9 / 4 % 256) as byte)
-    (mut out).push((f.l9 / 1024 % 256) as byte)
-    (mut out).push((f.l9 / 262144 % 256) as byte)
+    (mut out).push((f.l0 & 255) as byte)
+    (mut out).push((f.l0 >> 8 & 255) as byte)
+    (mut out).push((f.l0 >> 16 & 255) as byte)
+    (mut out).push(((f.l0 >> 24) + f.l1 * 4 & 255) as byte)
+    (mut out).push((f.l1 >> 6 & 255) as byte)
+    (mut out).push((f.l1 >> 14 & 255) as byte)
+    (mut out).push(((f.l1 >> 22) + f.l2 * 8 & 255) as byte)
+    (mut out).push((f.l2 >> 5 & 255) as byte)
+    (mut out).push((f.l2 >> 13 & 255) as byte)
+    (mut out).push(((f.l2 >> 21) + f.l3 * 32 & 255) as byte)
+    (mut out).push((f.l3 >> 3 & 255) as byte)
+    (mut out).push((f.l3 >> 11 & 255) as byte)
+    (mut out).push(((f.l3 >> 19) + f.l4 * 64 & 255) as byte)
+    (mut out).push((f.l4 >> 2 & 255) as byte)
+    (mut out).push((f.l4 >> 10 & 255) as byte)
+    (mut out).push((f.l4 >> 18 & 255) as byte)
+    (mut out).push((f.l5 & 255) as byte)
+    (mut out).push((f.l5 >> 8 & 255) as byte)
+    (mut out).push((f.l5 >> 16 & 255) as byte)
+    (mut out).push(((f.l5 >> 24) + f.l6 * 2 & 255) as byte)
+    (mut out).push((f.l6 >> 7 & 255) as byte)
+    (mut out).push((f.l6 >> 15 & 255) as byte)
+    (mut out).push(((f.l6 >> 23) + f.l7 * 8 & 255) as byte)
+    (mut out).push((f.l7 >> 5 & 255) as byte)
+    (mut out).push((f.l7 >> 13 & 255) as byte)
+    (mut out).push(((f.l7 >> 21) + f.l8 * 16 & 255) as byte)
+    (mut out).push((f.l8 >> 4 & 255) as byte)
+    (mut out).push((f.l8 >> 12 & 255) as byte)
+    (mut out).push(((f.l8 >> 20) + f.l9 * 64 & 255) as byte)
+    (mut out).push((f.l9 >> 2 & 255) as byte)
+    (mut out).push((f.l9 >> 10 & 255) as byte)
+    (mut out).push((f.l9 >> 18 & 255) as byte)
     out
 }
 
@@ -805,20 +813,21 @@ fn require_32(b: List[byte]) {
     }
 }
 
-/// RFC 7748 s5's scalar clamp, verbatim as arithmetic: clear the low
-/// three bits of byte 0 (`- % 8`), clear the top bit of byte 31
-/// (`% 128`) and set the second-top bit (`+ 64` after `% 64`). No
-/// bitwise operator on plain `int` (that spelling costs the checked
-/// lane, F-0026); the arithmetic is exact. ct: fixed.
+/// RFC 7748 s5's scalar clamp: clear the low three bits of byte 0
+/// (`b - (b & 7)`), clear the top bit of byte 31 and set the second-top
+/// bit (`(b & 63) + 64`). Masks on a byte's value, exact for 0..255 and
+/// no division in either tier (sc84; the plain-`int` mask the checked
+/// lane once refused, F-0026, runs on every lane since wolf 0.2.31).
+/// The branches read the public index `i`, never a byte. ct: fixed.
 fn clamp(scalar: List[byte]) -> List[byte] {
     var k = List[byte]()
     var i: int = 0
     for raw in scalar {
         let b = raw as int
         if i == 0 {
-            (mut k).push((b - b % 8) as byte)
+            (mut k).push((b - (b & 7)) as byte)
         } else if i == 31 {
-            (mut k).push((b % 64 + 64) as byte)
+            (mut k).push(((b & 63) + 64) as byte)
         } else {
             (mut k).push(raw)
         }
