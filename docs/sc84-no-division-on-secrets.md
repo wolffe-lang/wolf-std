@@ -22,12 +22,19 @@ here is a timing measurement.
 
 ## Inputs verified
 
-- Base: trunk `bb002f3ed4f4cf87f62e50da3391cb224dc1ebc1`.
+- Base: trunk `bb002f3ed4f4cf87f62e50da3391cb224dc1ebc1`, then rebased
+  onto `b6b557ebf9638feced0548bad0e2bfcc047993ea` (see "The rebase").
 - wolf 0.2.39 (`3fc86f77`) and lupin 0.1.61 (`5f1f1c94`), the pins in
   `vendor/tools.toml`. Archive SHA-256, each read twice before use:
   macOS arm64 wolf `63de9476…cfde0`, lupin `72364246…25ed5af`; Linux
   x86-64 wolf `53f75d2b…f0457`, lupin `61ce849e…ef41b` (the full digests
   are in `docs/dw03-std-for-age.txt`; they match).
+- After the rebase: wolf 0.2.40 (`b333b9da`) and lupin 0.1.62, the new
+  pins. Release-reported archive SHA-256, matched twice before use:
+  macOS arm64 wolf `3f18a56562fb089da05a50a612e031cd297f20a617b9e6e7ada768fbeb69e72b`,
+  lupin `228790ef3aef7605a2f9524abdcb6de5c8a5fa179437d82f3d3af262495a4e7f`;
+  Linux x86-64 wolf `bc2020e0b7400c18162a6072c299c65c0582ea74a0eba22aaa57ca04ae13e7e1`,
+  lupin `3b3bf9c23a9e545a4a99e65a5183d0c5e71e91d6bfb8a189147e2701c03e177f`.
 - Disassemblers: GNU objdump 2.42 (x86-64 ELF) and Apple LLVM objdump /
   otool 21 (arm64 Mach-O). The release tier compiles through clang 18.1.3
   on Linux and the Apple toolchain on macOS.
@@ -273,9 +280,42 @@ Each was weighed and the recommended option implemented.
   `next ^ 0 - (top & 1) & k`; they are the canonical form and mean what
   the parenthesised spelling meant.
 
+## The rebase
+
+The change was first made on `bb002f3` (branch
+`sc84-no-division-on-secrets`, kept as the before-rebase ref; the commit
+ids cited above are on it) and then rebased onto `b6b557e`, which brought
+the sc83 `std.poll` work and the wolf 0.2.40 / lupin 0.1.62 pins. What the
+rebase changed:
+
+- Nothing in the four modules or the gate: trunk's change since `bb002f3`
+  touches `std/poll`, `std/net`, `std/net/unix`, `std/process`,
+  `std/signal`, their tests, one new chacha20 lifetime row
+  (`chunk_lifetimes_small.lu`), the pins and `xtask/src/doc_examples.rs`.
+  `git diff bb002f3 b6b557e` is empty for `std/x`, `std/bech32`,
+  `std/bytes`, `xtask/src/{main,workflow,codegen}.rs`, `.github/` and `ci/`.
+- Textual merges: `CHANGELOG.md` (this entry now sits above sc83's) and
+  `README.md`, whose ledger count is now 682 with the new Bech32 row;
+  `tests/ledger.toml` took the row without conflict.
+- The `gates` job reference in `ci/local-gate-baseline.json`, regenerated
+  from the rebased workflow with the test's own normalisation, equals the
+  committed one, and its difference from trunk's is exactly the seven
+  added step lines.
+- `docs/sc84-witness/linux-preflight.sh` now reads the versions it checks
+  from `vendor/tools.toml` instead of naming 0.2.39 and 0.1.61.
+- Re-measured with wolf 0.2.40, the same as at 0.2.39: at the rebased
+  gate commit (base crypto code) the gate is red with the same seven
+  x86-64 and two arm64 release divisions and 275 default ones on each, and
+  at the rebased fix it is green on both targets in both tiers, with all
+  fifteen release rows passing (gate logs, SHA-256: x86-64 red
+  `847dd99c57a311e1f1a73a6cddbac2ee5acb23747663afb7d554f10dc39534d9`,
+  green `adfdaa9fe0b0a5b6d17be435845d049169caac39ea0d4c51b8d92bd86fd390fc`;
+  arm64 red `c8b54b06c9157edf09e4353a5a5a0f5fab65d60fb614aeb5ba2f64cb344e1e89`,
+  green `d39fb9a6ec6c1ed6d897a7d264a801f1bae540bd823a2cd4693882eb98b0c578`).
+
 ## Claim and limits
 
-What the four modules now claim, at wolf 0.2.39:
+What the four modules now claim, at wolf 0.2.39 and again at 0.2.40:
 
 - The default and release objects generated for
   `std.x.crypto.curve25519`, `std.x.crypto.chacha20`,
