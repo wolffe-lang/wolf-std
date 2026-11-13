@@ -879,7 +879,7 @@ fn ladder(k: List[byte], u: Fe) -> FePair {
     var swap: int = 0
     var t: int = 254
     while t >= 0 {
-        let kt = scalar_bit(k, t)
+        let kt = k[t >> 3] as int / [1, 2, 4, 8, 16, 32, 64, 128][t & 7] % 2
         swap = swap + kt - 2 * swap * kt
         let sx = fe_cswap(swap, x2, x3)
         x2 = sx.a
