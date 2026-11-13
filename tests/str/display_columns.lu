@@ -1,9 +1,10 @@
 //! check: run(exit=0)
 //! phase: run
-//! conforms: std.str, type.char, mem.str
+//! conforms: std.str, std.fmt, type.char, mem.str
 //! Additive C-compatible widths; clusters protect cuts, not emoji shaping.
 
 use std.str
+use std.fmt
 
 fn main() -> !int {
     assert(str.display_width("")? == 0)
@@ -47,5 +48,13 @@ fn main() -> !int {
     assert(str.graphemes("👩‍💻").len == 1)
     assert(str.graphemes("\r\n").len == 1)
     assert(str.graphemes("").len == 0)
+    assert(str.display_width("각")? == 2)
+    assert(str.truncate_display("각x", 1)? == "")
+    assert(str.truncate_display("각x", 2)? == "각")
+    assert((str.display_width("\u{1B}[31mA") else 99) == 99)
+    assert(fmt.pad_left("é", 3) == " é")
+    assert(fmt.pad_right("中", 4) == "中 ")
+    assert(str.pad_display_left("é", 3)? == "  é")
+    assert(str.pad_display_right("中", 4)? == "中  ")
     0
 }
