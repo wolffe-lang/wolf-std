@@ -39,7 +39,16 @@ without notice.
 Every function names the capability it reaches and records which
 execution rungs run it.
 
-The library is pre-alpha, with the compiler. The newest additions are
+The library is pre-alpha, with the compiler. The newest change is to how
+the crypto code is written, not what it computes: X25519 and Ed25519,
+ChaCha20-Poly1305, SHA-2 with HMAC and HKDF, and Bech32 no longer divide
+anywhere, in release or default builds, and Bech32 reads its alphabet
+and checksum without a branch or an early exit on a data character.
+`cargo xtask codegen` holds the first half: it fails on any integer
+division in those modules' generated objects on the host target. It is
+an instruction-level statement, not a timing measurement, and Ed25519
+signing still branches on its secret scalar's bits; see
+`docs/sc84-no-division-on-secrets.md`. Before it, the additions were
 strict unpadded standard base64, BIP-173 Bech32, and
 `bytes.is_equal_fixed_work` (no early exit at source level, not a timing
 certificate). `std.os.random` wraps the language's OS bytes with platform
@@ -114,6 +123,7 @@ cargo xtask fmt-lu                       # wolf formatting, checked without rewr
 cargo xtask sync-pin                     # verify the vendored upstream snapshot against PIN
 cargo xtask gen-vectors --check          # verify the committed crypto vector tests
 cargo xtask time-oracle                  # local time against the host's date command
+cargo xtask codegen                      # no integer division in the crypto modules' objects
 cargo xtask ci                           # all of it, behind fmt/clippy/test
 ```
 
