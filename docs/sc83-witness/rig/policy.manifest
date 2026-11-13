@@ -1,0 +1,7 @@
+# Narrow policy regression: red before poll joins its Exec capability peers.
+floor 35
+rig lib.sh committed=../../..:HEAD:docs/sc83-witness/rig/lib.sh
+rig step.sh committed=../../..:HEAD:docs/sc83-witness/rig/step.sh
+rig policy.manifest committed=../../..:HEAD:docs/sc83-witness/rig/policy.manifest
+step toolchain image=localhost/r41-toolchain:1 tools=python3,git,sha256sum script=step.sh -- toolchain
+step doc-capability-policy image=localhost/r41-toolchain:1 tools=cargo script=step.sh -- cargo test --offline --locked -- --exact doc_examples::tests::capability_modules_are_the_unequal_lane_facades

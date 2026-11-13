@@ -795,10 +795,13 @@ mod tests {
         // for BOTH reasons at once: `Exec` is a capability an
         // implementation may decline entirely (lupin does, by design) and
         // the trio's native rung is unwritten, so its examples run on the
-        // checked lane alone.
+        // checked lane alone. sc83 adds poll: its owned descriptor wait
+        // is an Exec capability, deliberately refused by the interpreter.
+        // Constants and the pure constructor still execute; every block
+        // retains the requirement that at least one lane actually runs it.
         assert_eq!(
             CAPABILITY_MODULES,
-            &["fs", "io", "net", "time", "env", "process", "x.json"]
+            &["fs", "io", "net", "time", "env", "process", "poll", "x.json"]
         );
     }
 
