@@ -101,6 +101,8 @@ def main():
     ap.add_argument("rows", nargs="*")
     ap.add_argument("--lanes", default="lupin,wolfc,native")
     ap.add_argument("--timeout", type=int, default=180)
+    ap.add_argument("--shared-stage", action="store_true",
+                    help="reuse each row's directory across tiers, like std-test")
     args = ap.parse_args()
     if not set(args.rows) <= set(ROWS):
         ap.error("unknown row (paths are relative to tests/)")
@@ -117,8 +119,9 @@ def main():
         for lane in lanes:
             label = f"{test}:{lane}"
             envvar, flags = LANES[lane]
-            work = scratch / lane / test.replace("/", "_").removesuffix(".lu")
-            work.mkdir(parents=True)
+            stage = "shared" if args.shared_stage else lane
+            work = scratch / stage / test.replace("/", "_").removesuffix(".lu")
+            work.mkdir(parents=True, exist_ok=True)
             entry = work / "main.lu"
             entry.write_text(source)
             command = [os.environ[envvar], "conform-run", *flags, "--std-root", str(ROOT / "std"), str(entry), "--json"]
