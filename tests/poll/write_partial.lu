@@ -1,4 +1,4 @@
-//! check: run(exit=0, stdout="room=master:2\ntook_until_busy=true\nfull=none waited=true\nroom_after_a_read=master:2\nqueue_drained=true\nwaited_for_room=true\nin_order=true")
+//! check: run(exit=0, stdout="room=master:2\ntook_until_busy=true\nfull=none waited=true\nroom_after_draining=master:2\ndrain_bounded=true\nqueue_drained=true\nwaited_for_room=true\nin_order=true")
 //! phase: run
 //! conforms: std.poll, std.term, std.fs, std.signal, std.time, os.fs.nonblock, os.signal.wait.write, os.term.pty, err.row
 //!
@@ -8,8 +8,11 @@
 //! reads it. The master is non-blocking and waits with `WRITE`: it has
 //! room; `fs.write_some` of 4096-byte lists takes bytes until it answers
 //! `busy` (some kilobytes on linux, 20480 bytes on PAX: the row prints no
-//! number); a wait over the full master passes its 25 ms deadline; a read
-//! of the slave makes room, and the wait answers `WRITE`.
+//! number); a wait over the full master passes its 25 ms deadline. Slave
+//! reads drain until WRITE is reported, at most 128 reads and 128 bounded
+//! read/write looks. Neither tty buffering nor its writable/wakeup threshold
+//! promises room after exactly one read. Counts and bytes go to stderr.
+//! The standalone C probe records poll/epoll without std or re-arming.
 //!
 //! Then the server's loop over a second pty: a queue of 65536 bytes is
 //! written from an offset, each `write_some` taking what fits and moving
@@ -33,7 +36,8 @@ fn every_line() {
     print("room=master:2")
     print("took_until_busy=true")
     print("full=none waited=true")
-    print("room_after_a_read=master:2")
+    print("room_after_draining=master:2")
+    print("drain_bounded=true")
     print("queue_drained=true")
     print("waited_for_room=true")
     print("in_order=true")
@@ -130,6 +134,7 @@ fn main() -> !int {
         while !blocked && attempts < 1000 {
             let n = write_from(mut m, pattern(0, 4096), 0)?
             blocked = n < 0
+            if n > 0 { took = took + n }
             attempts = attempts + 1
         }
         t0 = time.monotonic_ns()
@@ -138,9 +143,32 @@ fn main() -> !int {
         settles = settles + 1
     }
     print("full={shown(full)} waited={t1 - t0 >= 25000000}")
-    let _got = fs.read_chunk(mut s, 4096)?
-    let after = poll.wait(mut w, signal.resize(), 2000)?
-    print("room_after_a_read={shown(after)}")
+    // Tty buffering and wakeup thresholds vary: one read need not make
+    // the master writable. Wait before each read so an empty slave cannot
+    // park us, and count both the reads and the bytes actually drained.
+    var drain = poll.open()?
+    let ks = poll.add_file(mut drain, s, poll.READ)?
+    var after = poll.Events { meaning: 0, ready: List[poll.Ready]() }
+    var reads = 0
+    var drained = 0
+    var looks = 0
+    while after.ready.len == 0 && looks < 128 {
+        if drained < took {
+            let readable = poll.wait(mut drain, 0, 25)?
+            if readable.ready.len > 0 {
+                let chunk = fs.read_chunk(mut s, 4096)?
+                drained = drained + chunk.len
+                reads = reads + 1
+            }
+        }
+        after = poll.wait(mut w, signal.resize(), 25)?
+        looks = looks + 1
+    }
+    print("room_after_draining={shown(after)}")
+    print("drain_bounded={reads > 0 && reads <= 128 && drained > 0 && drained <= took}")
+    eprint("pty write recovery: reads={reads} drained={drained} filled={took} looks={looks}")
+    poll.remove(mut drain, ks)?
+    poll.close(take drain)?
     poll.remove(mut w, km)?
 
     let p2 = term.open_pty()?
