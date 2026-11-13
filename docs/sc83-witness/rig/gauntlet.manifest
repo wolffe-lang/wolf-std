@@ -12,6 +12,7 @@ step row-runner-unit image=localhost/r41-toolchain:1 tools=python3 script=step.s
 step toolchain image=localhost/r41-toolchain:1 tools=python3,git,sha256sum script=step.sh -- toolchain
 step doctor needs=toolchain image=localhost/r41-toolchain:1 script=step.sh -- xtask doctor
 step sc83-rows needs=doctor,row-runner-unit image=localhost/r41-toolchain:1 tools=python3,sh,sleep script=step.sh -- rows
+step sc83-shared needs=doctor,row-runner-unit image=localhost/r41-toolchain:1 tools=python3,sh,sleep script=step.sh -- rows --shared-stage
 step fmt image=localhost/r41-toolchain:1 script=step.sh -- cargo fmt --all --check
 step clippy image=localhost/r41-toolchain:1 script=step.sh -- cargo clippy --workspace --all-targets -- -D warnings
 step test image=localhost/r41-toolchain:1 script=step.sh -- cargo test --workspace
