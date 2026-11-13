@@ -117,6 +117,25 @@ here. No third-party emulator or C-library source was read.
 
 ## Evidence index
 
+The initial API row at `808217f` failed at resolution because
+`unicode.display_width` did not exist. The first C census at `57901db`
+exposed a correction to the initial nonprinting description: U+2028 and
+U+2029 (Zl/Zp) return -1 as well as the non-NUL Cc controls. The explicit
+separator regression is `97cad56`; the classification fix is `671bd69`.
+These are nonprinting-category cases, separate from the 350 width exceptions.
+
+At `24586cf`, the C oracle compared all 287,346 assigned scalars and exactly
+350 compatibility exceptions under glibc 2.39 / C.UTF-8. Its width-plus-one
+byte vector, in assigned-scalar order, has SHA-256
+`5408c51e8b09b38fab139614693855ca3174e973fe74fe86f55e1c4867a3dcdb`.
+The portable assigned census, all 1,187 grapheme cases and the API/trap family
+then passed on native, checked and lupin. This preliminary take is not an
+acceptance record: its size harness failed because object emission produces
+one object per module. That measurement harness is corrected in `8ba5a7f`.
+The expanded Hangul/byte-padding integration row at `cae39ba` also passed
+all three executors. Exact-head acceptance, binary-size figures and the
+recorder plant remain required before this change is ready.
+
 The black-box oracle must run in the digest-pinned Linux image with glibc
 2.39 and `C.UTF-8`; record its image id, libc version and locale. Compare
 every assigned scalar, count every exception, and reject an additional or
@@ -152,6 +171,7 @@ emoji-shaping terminal may draw the examples narrower than these widths.
 
 Run wiring proofs first in every take, record a one-file one-hunk plant using
 recorder plant mode,
-then run the exact-head gauntlet and one audit. CI wiring changes, if any,
-update their recorded baseline in the same commit. Footprint will be
-cross-cutting if generation tooling or workflow wiring changes.
+then run the exact-head gauntlet and one audit. The footprint is cross-cutting
+because shared generation tooling changes. No workflow command or recorded
+wiring baseline changes: the existing `gen-vectors --check` gate now also
+checks Unicode outputs, and its generator invariants run in `cargo test`.
