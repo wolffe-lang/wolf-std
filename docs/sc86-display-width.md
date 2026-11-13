@@ -47,10 +47,8 @@ zero; all other Cc controls, unassigned scalars and noncharacters are
 nonprinting. Private-use scalars are narrow. No function reads the locale,
 terminal or environment, interprets escapes, expands tabs, or measures fonts.
 
-**Composition policy needs a decision before implementation.** The scalar
-compatibility requirement does not determine a grapheme's width. Recommend
-additive scalar widths within each grapheme, matching `wcswidth` and the
-measured flag pairs. This makes `"🇺🇸"` two columns, but `"👩‍💻"` four rather
+**Composition policy: additive scalar widths.** Each grapheme contributes
+the sum of its scalars' widths, matching `wcswidth` and the measured flag pairs. This makes `"🇺🇸"` two columns, but `"👩‍💻"` four rather
 than two, and `"❤️"` one rather than two. ZWJ and variation selectors have
 zero scalar width; they do not request shaping in this model. Segmentation
 protects these clusters from being split, not from being overestimated.
@@ -125,11 +123,13 @@ terminal. Fonts, ambiguous-width preferences, emoji shaping and Unicode
 versions differ. Grapheme boundaries are text boundaries, not rendering
 measurements. Escape sequences and cursor movement are outside this family.
 
-The composition decision above blocks implementation: additive scalar widths
-and emoji-shaped grapheme widths produce observably different answers for
-ordinary terminal text, so tests must not silently choose between them.
-After that decision, implement the recommendation, run wiring proofs first
-in every take, record a one-file one-hunk plant using recorder plant mode,
+The additive family keeps the names above. A future, separately specified
+`shaped_display_width` and `truncate_shaped_display` family can coexist with
+it without changing these answers or renaming any current function. An
+emoji-shaping terminal may draw the examples narrower than these widths.
+
+Run wiring proofs first in every take, record a one-file one-hunk plant using
+recorder plant mode,
 then run the exact-head gauntlet and one audit. CI wiring changes, if any,
 update their recorded baseline in the same commit. Footprint will be
 cross-cutting if generation tooling or workflow wiring changes.
