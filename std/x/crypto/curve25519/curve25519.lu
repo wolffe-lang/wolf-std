@@ -89,6 +89,28 @@
 //! signature and a message are all `List[byte]` and cannot carry a
 //! non-byte. `to_hex` is this module's own rendering (the
 //! sha2/chacha20 precedent), `std.hex.encode` the facade spelling.
+//!
+//! **No division (sc84, wolf-std#151).** Nothing in this module divides.
+//! At wolf 0.2.39 the x86-64 release ladder compiled its scalar-bit
+//! extraction (`kb / pow2(t % 8) % 2`) to a hardware `div` of the secret
+//! scalar byte on each of its 255 steps, and every default build divided
+//! the field's limbs in `fe_carry`, `fe_freeze` and `fe_tobytes`, the
+//! clamp, the ladder, and signing's scalar reduction. The scalar bit is
+//! now a shift of the byte by its public position on a `wrapping[u64]`
+//! word (`scalar_bit`); the field's carries and byte seams are literal
+//! shifts and masks on limbs the bound proofs keep non-negative, where
+//! they equal `/` and `%`; signing's signed carries are floor shifts
+//! (`[type.int.shift]`). `cargo xtask codegen` builds this module's
+//! default and release objects on the host target and fails on any
+//! integer division instruction in them, and runs the RFC 7748 rows, the
+//! 1000-iteration chain among them, and RFC 8032 §7.1 in the release
+//! tier. What it does not change: Ed25519 signing still gates the add of
+//! its double-and-add on each secret bit (a branch; the fixed-sequence
+//! version is a named follow-on), and `to_hex` indexes by value.
+//! It is not a timing measurement (no latency was measured on any CPU),
+//! it says nothing about the interpreters, and the compiler that makes
+//! the objects is not audited; a target the gate is not run on is not
+//! covered by it.
 
 use std.x.crypto.sha2
 
