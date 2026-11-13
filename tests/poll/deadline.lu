@@ -3,17 +3,21 @@
 //! conforms: std.poll, std.net, std.fs, std.process, std.signal, std.time, os.signal.wait.fds, os.net.wait, os.proc.pipe, err.row
 //!
 //! **sc82: the deadline, on each path.** On the sockets path, a quiet
-//! listener: deadline 0 answers nothing at once, 25 ms answers nothing no
-//! sooner than 25 ms on the monotonic clock, and -1 with a dial in the
-//! backlog answers the listener at once. A waiter with no entries and no
-//! meanings waits out 25 ms the same way. On the files path, a quiet
+//! listener: deadline 0 answers nothing at once, 128 quiet 25 ms waits
+//! each answer nothing no sooner than 25 ms on the monotonic clock, and
+//! -1 with a dial in the backlog answers the listener at once. A waiter
+//! with no entries and no meanings waits out 25 ms the same way. On the files path, a quiet
 //! pipe's read end with `resize()` (never sent here): the same three, -1
 //! with a regular file ready. An empty waiter with a meaning set waits out
 //! its 25 ms too.
 //!
 //! **windows** answers the files path `unsupported`, and the row prints
 //! the files path's lines for that reason after running the sockets
-//! path's. lupin 0.1.62 refuses os_ready_open at run when the listener
+//! path's. Those normalized file/meaning lines are not measurements.
+//! A Windows socket timer can expire before 25 ms on this clock; poll's
+//! monotonic deadline, not the raw timer's granularity, is the promise
+//! checked here (wolf-std#155). Readiness may still return immediately.
+//! lupin 0.1.62 refuses os_ready_open at run when the listener
 //! is first registered; the refusal must name that builtin.
 
 use std.fs
@@ -56,10 +60,14 @@ fn main() -> !int {
     (mut snames).push("listener")
     let look = waited(mut sw, snames, 0, 0)
     print("sockets_look={look}")
-    let t0 = time.monotonic_ns()
-    let s25 = waited(mut sw, snames, 0, 25)
-    let t1 = time.monotonic_ns()
-    print("sockets_25_waited={s25 == "none" && t1 - t0 >= 25000000}")
+    var sockets_waited = true
+    for _ in 0..128 {
+        let t0 = time.monotonic_ns()
+        let s25 = waited(mut sw, snames, 0, 25)
+        let t1 = time.monotonic_ns()
+        if s25 != "none" || t1 - t0 < 25000000 { sockets_waited = false }
+    }
+    print("sockets_25_waited={sockets_waited}")
     let port = net.port(srv)?
     var d = net.connect(net.loopback(port))?
     let forever = waited(mut sw, snames, 0, -1)
