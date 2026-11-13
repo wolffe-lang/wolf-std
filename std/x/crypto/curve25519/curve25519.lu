@@ -843,7 +843,12 @@ fn clamp(scalar: List[byte]) -> List[byte] {
 /// `fe_cswap`, arithmetic, never a branch. Returns x2/z2 (the caller
 /// inverts z2). ct: the loop bound is fixed (255), every step runs the
 /// same field ops, and the only secret input — the scalar bit — enters
-/// solely as `fe_cswap`'s multiplier.
+/// solely as `fe_cswap`'s multiplier. The bit is read by `scalar_bit`, a
+/// shift of the secret byte by the public position: no division and no
+/// branch. Until sc84 it was `kb / pow2(t % 8) % 2`, and because `pow2`
+/// answered through a branch chain the x86-64 release tier compiled
+/// that to a hardware `div` of the secret byte on every step
+/// (wolf-std#151).
 fn ladder(k: List[byte], u: Fe) -> FePair {
     var x2 = fe_one()
     var z2 = fe_zero()
@@ -852,8 +857,7 @@ fn ladder(k: List[byte], u: Fe) -> FePair {
     var swap: int = 0
     var t: int = 254
     while t >= 0 {
-        let kb = k[t / 8] as int
-        let kt = kb / pow2(t % 8) % 2
+        let kt = scalar_bit(k, t)
         swap = swap + kt - 2 * swap * kt
         let sx = fe_cswap(swap, x2, x3)
         x2 = sx.a
@@ -882,31 +886,15 @@ fn ladder(k: List[byte], u: Fe) -> FePair {
     FePair { a: fx.a, b: fz.a }
 }
 
-/// 2^n for n in 0..7 (the ladder's bit selector; a shift on plain
-/// `int` costs the checked lane, F-0026). ct: fixed.
-fn pow2(n: int) -> int {
-    if n == 0 {
-        return 1
-    }
-    if n == 1 {
-        return 2
-    }
-    if n == 2 {
-        return 4
-    }
-    if n == 3 {
-        return 8
-    }
-    if n == 4 {
-        return 16
-    }
-    if n == 5 {
-        return 32
-    }
-    if n == 6 {
-        return 64
-    }
-    128
+/// Bit `t` (0..255) of a 32-byte little-endian scalar, as 0 or 1: byte
+/// `t >> 3`, shifted right by `t & 7` as a `wrapping[u64]` word and
+/// masked to its low bit. `t` is the ladder's public position; the byte
+/// is secret. A wrapping shift takes its count modulo 64 and has no
+/// range check, so nothing here divides or branches on either (sc84,
+/// wolf-std#151). ct: fixed.
+fn scalar_bit(k: List[byte], t: int) -> int {
+    let word = k[t >> 3] as int as wrapping[u64]
+    (word >> (t & 7) as wrapping[u64] & 1) as int
 }
 
 /// X25519 (RFC 7748 s5): the Diffie-Hellman scalar multiplication on
@@ -1232,8 +1220,7 @@ fn ge_scalarmult(n: List[byte], p: Ge) -> Ge {
     var t: int = 255
     while t >= 0 {
         q = ge_double(q)
-        let nb = n[t / 8] as int
-        let bit = nb / pow2(t % 8) % 2
+        let bit = scalar_bit(n, t)
         if bit == 1 {
             q = ge_add(q, p)
         }
