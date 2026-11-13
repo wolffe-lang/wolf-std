@@ -204,7 +204,9 @@ fn add(mut w: Waiter, kind: int, h: int, interest: int) -> int ! {invalid, io, u
         let _valid = net.wait([h], 0)?
     } else {
         // Metadata checks the fs table without changing the file offset.
-        let _valid = fs_fstat(h)?
+        // Registration exposes host validation failures as io, including
+        // metadata's denied/not_found outcomes, without widening its row.
+        let _valid = fs_fstat(h) else |_e| { return io }
     }
     // Publish the key only after validation succeeded on either path.
     if k < w.kinds.len {
