@@ -1,0 +1,9 @@
+//! check: run(exit=trap(assert))
+//! phase: run
+//! conforms: std.str, conf.trap.set
+use std.str
+
+fn main() -> !int {
+    str.truncate_display("x", 0 - 1)?
+    0
+}

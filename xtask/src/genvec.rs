@@ -207,6 +207,25 @@ pub fn gen_vectors(check_only: bool) -> Result<(), String> {
             Mode::CheckPresence
         }
     };
+    // Unicode tables and both exhaustive corpora share this existing CI gate.
+    // No workflow command is added or silently left outside the drift check.
+    let mut unicode = std::process::Command::new("python3");
+    unicode
+        .args(["-I", "xtask/unicode/generate.py"])
+        .current_dir(&repo);
+    if check_only {
+        unicode.arg("--check");
+    }
+    if let Some(ref binary) = wolf {
+        unicode.arg("--wolf").arg(binary);
+    } else {
+        unicode.arg("--presence-only");
+    }
+    let generated = crate::exec::run(unicode, std::time::Duration::from_secs(300))?;
+    print!("{}", generated.stdout);
+    if generated.timed_out || generated.status != Some(0) {
+        return Err(format!("unicode generation failed: {}", generated.stderr));
+    }
     let mut drift: Vec<String> = Vec::new();
     let mut written = 0usize;
     let fmt = |name: &str, text: &str| -> Result<String, String> {
