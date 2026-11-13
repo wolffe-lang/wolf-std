@@ -39,6 +39,7 @@
 //! code); and timing. No instruction-latency measurement is claimed.
 
 use crate::{bins, exec, stage};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
@@ -163,7 +164,8 @@ impl Tier {
     }
 }
 
-/// One integer division found in a listing.
+/// One integer division found in a listing; `offset` is from the start
+/// of its function.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Division {
     pub function: String,
@@ -196,6 +198,7 @@ pub fn codegen() -> Result<(), String> {
         return Ok(());
     };
     let objdump = std::env::var("OBJDUMP").unwrap_or_else(|_| "objdump".to_string());
+    let nm = std::env::var("NM").unwrap_or_else(|_| "nm".to_string());
     let version = tool_line(&objdump, &["--version"]).map_err(|e| {
         format!(
             "codegen: no usable disassembler (`{objdump} --version`: {e}); \
@@ -219,7 +222,7 @@ pub fn codegen() -> Result<(), String> {
     for tier in [Tier::Default, Tier::Release] {
         let dir = scratch.join(format!("probe-{}", tier.name()));
         let objects = build_objects(&wolf.path, &std_root, &dir, PROBE, tier)?;
-        let found: usize = scan_objects(&objdump, &objects)?
+        let found: usize = scan_objects(&objdump, &nm, &objects)?
             .iter()
             .map(|f| f.divisions.len())
             .sum();
@@ -243,7 +246,7 @@ pub fn codegen() -> Result<(), String> {
     for tier in [Tier::Release, Tier::Default] {
         let dir = scratch.join(format!("entry-{}", tier.name()));
         let objects = build_objects(&wolf.path, &std_root, &dir, ENTRY, tier)?;
-        let functions = scan_objects(&objdump, &objects)?;
+        let functions = scan_objects(&objdump, &nm, &objects)?;
         coverage(tier, &functions)?;
         let mut count = 0;
         for f in &functions {
@@ -363,9 +366,21 @@ fn build_objects(
     Ok(objects)
 }
 
-fn scan_objects(objdump: &str, objects: &[PathBuf]) -> Result<Vec<Function>, String> {
+fn scan_objects(objdump: &str, nm: &str, objects: &[PathBuf]) -> Result<Vec<Function>, String> {
     let mut all = Vec::new();
     for obj in objects {
+        let mut cmd = Command::new(nm);
+        cmd.arg(obj);
+        let got = exec::run(cmd, Duration::from_secs(60))?;
+        if got.timed_out || got.status != Some(0) {
+            return Err(format!(
+                "codegen: `{nm}` on {} failed: {:?}\n{}",
+                stage::show(obj),
+                got.status,
+                got.stderr.trim_end()
+            ));
+        }
+        let names = symbol_names(&got.stdout);
         let mut cmd = Command::new(objdump);
         cmd.arg("-d").arg("--no-show-raw-insn").arg(obj);
         let got = exec::run(cmd, Duration::from_secs(120))?;
@@ -377,7 +392,7 @@ fn scan_objects(objdump: &str, objects: &[PathBuf]) -> Result<Vec<Function>, Str
                 got.stderr.trim_end()
             ));
         }
-        all.extend(parse_listing(&got.stdout));
+        all.extend(parse_listing(&got.stdout, &names));
     }
     Ok(all)
 }
@@ -414,11 +429,21 @@ fn coverage(tier: Tier, functions: &[Function]) -> Result<(), String> {
 }
 
 /// Parse `objdump -d --no-show-raw-insn` text (GNU on ELF, LLVM on
-/// Mach-O) into functions and their integer divisions.
-pub fn parse_listing(text: &str) -> Vec<Function> {
+/// Mach-O) into functions and their integer divisions. `names` maps an
+/// address to the object's own symbol there (from `nm`): LLVM's objdump
+/// labels the start of a Mach-O section with an assembler temporary
+/// (`ltmp0`) and hides the function that begins at the same address, so
+/// a temporary label takes the real name when the symbol table has one.
+pub fn parse_listing(text: &str, names: &HashMap<u64, String>) -> Vec<Function> {
     let mut out: Vec<Function> = Vec::new();
+    let mut start = 0;
     for line in text.lines() {
-        if let Some(name) = label(line) {
+        if let Some((addr, name)) = label(line) {
+            let name = match names.get(&addr) {
+                Some(real) if is_temporary(name) => real.as_str(),
+                _ => name,
+            };
+            start = addr;
             out.push(Function {
                 name: demangle(name),
                 instructions: 0,
@@ -427,14 +452,14 @@ pub fn parse_listing(text: &str) -> Vec<Function> {
             continue;
         }
         let Some(cur) = out.last_mut() else { continue };
-        let Some((offset, mnemonic, operands)) = instruction(line) else {
+        let Some((address, mnemonic, operands)) = instruction(line) else {
             continue;
         };
         cur.instructions += 1;
         if is_integer_division(&mnemonic) {
             cur.divisions.push(Division {
                 function: cur.name.clone(),
-                offset,
+                offset: address.saturating_sub(start),
                 instruction: format!("{mnemonic} {operands}").trim().to_string(),
             });
         }
@@ -442,14 +467,45 @@ pub fn parse_listing(text: &str) -> Vec<Function> {
     out
 }
 
-/// `0000000000000000 <symbol>:` → `symbol`.
-fn label(line: &str) -> Option<&str> {
+/// An assembler-local label rather than a function: `ltmp0`, `L…`,
+/// `.L…`, `l_…`. Wolf's own symbols begin `_W`, `__W` or `main`.
+fn is_temporary(name: &str) -> bool {
+    name.starts_with("ltmp")
+        || name.starts_with('L')
+        || name.starts_with(".L")
+        || name.starts_with("l_")
+}
+
+/// `nm` output (`ADDRESS TYPE NAME`, GNU or LLVM) → the first symbol at
+/// each address that is not an assembler temporary.
+pub fn symbol_names(text: &str) -> HashMap<u64, String> {
+    let mut names = HashMap::new();
+    for line in text.lines() {
+        let mut words = line.split_whitespace();
+        let (Some(addr), Some(_kind), Some(name), None) =
+            (words.next(), words.next(), words.next(), words.next())
+        else {
+            continue;
+        };
+        let Ok(addr) = u64::from_str_radix(addr, 16) else {
+            continue;
+        };
+        if !is_temporary(name) {
+            names.entry(addr).or_insert_with(|| name.to_string());
+        }
+    }
+    names
+}
+
+/// `0000000000000000 <symbol>:` → (0, `symbol`).
+fn label(line: &str) -> Option<(u64, &str)> {
     let line = line.trim_end();
     let (addr, rest) = line.split_once(' ')?;
     if addr.is_empty() || !addr.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
-    rest.strip_prefix('<')?.strip_suffix(">:")
+    let name = rest.strip_prefix('<')?.strip_suffix(">:")?;
+    Some((u64::from_str_radix(addr, 16).ok()?, name))
 }
 
 /// `     23d:\tdiv    %sil` → (0x23d, "div", "%sil").
@@ -604,7 +660,7 @@ Disassembly of section __TEXT,__text:
 
     #[test]
     fn gnu_x86_divisions_are_found_by_function_and_offset() {
-        let f = parse_listing(GNU_X86);
+        let f = parse_listing(GNU_X86, &HashMap::new());
         assert_eq!(f.len(), 2);
         assert_eq!(f[0].name, "std.x.crypto.curve25519.ladder");
         let found: Vec<(u64, &str)> = f[0]
@@ -627,12 +683,34 @@ Disassembly of section __TEXT,__text:
 
     #[test]
     fn llvm_arm64_divisions_are_found_and_float_divides_are_not() {
-        let f = parse_listing(LLVM_ARM64);
+        let f = parse_listing(LLVM_ARM64, &HashMap::new());
         assert_eq!(f[0].name, "std.bech32.decode_bytes");
         let offsets: Vec<u64> = f[0].divisions.iter().map(|d| d.offset).collect();
         assert_eq!(offsets, vec![0x8f8, 0x900]);
         assert_eq!(f[0].divisions[0].instruction, "sdiv x28, x21, x27");
         assert_eq!(f[1].name, "std.bech32.decode.cold.1");
+    }
+
+    #[test]
+    fn a_temporary_label_takes_the_symbol_tables_name() {
+        let listing = "
+0000000000000000 <ltmp0>:
+       0:      \tstp\tx20, x19, [sp, #-0x20]!
+      10:      \tudiv\tw1, w2, w3
+
+0000000000000020 <__Wstd.bech32.step$22>:
+      20:      \tsdiv\tx1, x2, x3
+";
+        let nm = "0000000000000000 t ltmp0\n\
+                  0000000000000000 T __Wstd.bech32.hrp_state$6aa17b7b44e0b5d5\n\
+                  0000000000000020 T __Wstd.bech32.step$22\n\
+                                   U _wolf_rt_alloc\n";
+        let names = symbol_names(nm);
+        let f = parse_listing(listing, &names);
+        assert_eq!(f[0].name, "std.bech32.hrp_state");
+        assert_eq!(f[0].divisions[0].offset, 0x10);
+        assert_eq!(f[1].name, "std.bech32.step");
+        assert_eq!(f[1].divisions[0].offset, 0);
     }
 
     #[test]
@@ -662,7 +740,7 @@ Disassembly of section __TEXT,__text:
 
     #[test]
     fn coverage_refuses_a_listing_without_the_modules() {
-        let f = parse_listing(GNU_X86);
+        let f = parse_listing(GNU_X86, &HashMap::new());
         assert!(coverage(Tier::Release, &f).is_err());
     }
 
