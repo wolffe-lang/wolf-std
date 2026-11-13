@@ -39,7 +39,8 @@
 //! PAX uses the static Linux binary. lupin 0.1.62 refuses readiness calls
 //! at run by builtin name, not a caught unsupported error mark.
 //!
-//! Capability exec for sets/waits, net for the Windows narrow fallback.
+//! Capability exec for sets/waits, net for the Windows narrow fallback,
+//! and Clock for its positive deadlines.
 //! Fallback adds validate through fs metadata or a zero-deadline net look
 //! (fs or net respectively); they publish no key before validation.
 //! All host calls are refused at comptime. open, len and constants are
@@ -306,8 +307,9 @@ fn events(flat: List[int], meaning: int) -> Events {
 
 /// Wait for every ready entry and one signal meaning, together. meanings
 /// is 0 or a set listened for through std.signal; deadline_ms is 0 for a
-/// look, -1 for no deadline, otherwise monotonic milliseconds, never
-/// answered early. Level-triggered: readiness remains until consumed.
+/// look, -1 for no deadline, otherwise monotonic milliseconds. A timeout
+/// is never answered early; ready entries may answer before the deadline.
+/// Level-triggered: readiness remains until consumed.
 ///
 /// invalid for a deadline below -1, a non-listenable meaning bit, or an
 /// empty waiter with no meanings and no deadline. io for a host failure;
@@ -315,7 +317,8 @@ fn events(flat: List[int], meaning: int) -> Events {
 /// macOS serve files+sockets, signals+sockets, socket WRITE and files
 /// without meanings. Windows retains its narrow socket READ case and
 /// empty no-meaning deadline waits. Capability exec (net on that narrow
-/// fallback); refused at comptime. Never traps for a host failure.
+/// fallback, plus Clock for positive deadlines); refused at comptime.
+/// Never traps for a host failure.
 ///
 /// ```wolf-doc-example
 /// var w = poll.open()?
@@ -361,7 +364,17 @@ fn sockets_path(w: Waiter, deadline_ms: int) -> Events ! {io} {
         }
         k = k + 1
     }
-    let got = net.wait(fds, deadline_ms)?
+    let started = if deadline_ms > 0 { time.monotonic_ns() } else { 0 }
+    var got = net.wait(fds, deadline_ms)?
+    // A Windows socket timeout can expire before this monotonic budget.
+    // Retry only empty answers, keeping one start and rounding the
+    // remaining fraction up to milliseconds. Do not multiply the caller's
+    // deadline by a million: the full positive int range is valid here.
+    while got.len == 0 && deadline_ms > 0 {
+        let elapsed_ms = (time.monotonic_ns() - started) / 1000000
+        if elapsed_ms >= deadline_ms { break }
+        got = net.wait(fds, deadline_ms - elapsed_ms)?
+    }
     var ready = List[Ready]()
     var i = 0
     for h in got {
