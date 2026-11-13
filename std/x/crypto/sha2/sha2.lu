@@ -93,6 +93,16 @@
 //! exact compiler/backend/runtime pins separately; vectors prove outputs,
 //! not absence of timing, cache, allocation or residual-copy leakage.
 //!
+//! **No division (sc84, wolf-std#151).** Nothing in this module divides:
+//! the HKDF block counter and `to_hex`'s nibbles are masks and shifts.
+//! `cargo xtask codegen` builds this module's default and release objects
+//! on the host target and fails on any integer division instruction in
+//! them, with curve25519, chacha20 and bech32 beside it.
+//! It is not a timing measurement (no latency was measured on any CPU),
+//! it says nothing about the interpreters, and the compiler that makes
+//! the objects is not audited; a target the gate is not run on is not
+//! covered by it.
+//!
 //! No error rows anywhere in this module: every function is total over
 //! its documented domain, and since sc35 there is exactly ONE failure
 //! mode left — an out-of-range HKDF length, a caller contract violation
