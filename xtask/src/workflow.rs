@@ -37,7 +37,7 @@ pub struct Step {
     pub command: &'static str,
 }
 
-/// The thirteen steps, in the order `ci()` runs them. This list is the
+/// The fourteen steps, in the order `ci()` runs them. This list is the
 /// gauntlet: `ci()` iterates it, so a step cannot exist here without
 /// running, or run without being here.
 pub const CI_STEPS: &[Step] = &[
@@ -99,6 +99,14 @@ pub const CI_STEPS: &[Step] = &[
     Step {
         name: "ulp",
         command: "cargo xtask ulp",
+    },
+    // sc84, wolf-std#151: the objects generated for the secret-handling
+    // crypto modules hold no integer division, default or release, and
+    // their release builds still give the published answers. It sits in
+    // `gates` beside `doc-examples`, where the toolchain is acquired.
+    Step {
+        name: "codegen",
+        command: "cargo xtask codegen",
     },
 ];
 
@@ -407,7 +415,8 @@ jobs:\n\
                 "fmt-lu",
                 "gen-vectors --check",
                 "doc-examples",
-                "ulp"
+                "ulp",
+                "codegen"
             ]
         );
         assert!(workflow_only(seven).is_empty());
