@@ -278,6 +278,36 @@ module. No format implementation belongs in this std change.
 The draft is docs/dw03-draft-dw04-age.txt. Both locations still require the
 same independent hostile-input and interoperability evidence before use.
 
+Generated-code observations, separate from the source promise
+
+At the pinned macOS arm64 compiler, default objects for the shared equality
+helper load both bytes, EOR/OR them, and perform the outcome comparison after
+the public-index loop. Length mismatch, bounds checks and index-overflow
+checks remain. The default X25519 zero helper loads/ORs every byte and tests
+only the accumulated result after its loop. The release equality witness
+inlines/vectorizes the XOR/OR reduction; its scalar tail still folds bytes
+before the outcome branch. The release base-point path similarly inlines a
+vector/scalar OR reduction before the final zero verdict. These are scoped
+observations of those objects, not claims about every call context or target.
+
+The default cswap and its release inlining in the ladder use arithmetic
+multiply/selection and include checked-overflow branches. The valid-domain
+argument is swap in {0,1} and carried limbs below 2^26: differences/products
+and the selected outputs fit int; merely counting branches would not prove
+or disprove a side-channel property. AEAD object relocations place Poly1305
+and the shared comparison before stream_xor, consistent with the source's
+failure return before decryption. The release fold may inline, so absence of
+a separately named helper is not evidence that comparison was omitted.
+
+This is NOT a complete instruction-latency/runtime/allocator proof for the
+ladder, SHA-256 or Poly1305, nor timing certification of checked or lupin.
+Linux x86-64 generated-code review remains a separate evidence leg until its
+capture is actually read. The independent reviewer must inspect the final
+exact pin set, arithmetic bounds, optimizer transformations and secret-copy
+lifetimes. No secret wipe, swap/dump exclusion or fixed-time secret-text
+encoding is claimed. Only the small reference-vector/test-key programs were
+used for the objects; no real identity or sampled OS bytes were printed.
+
 Document pins and limits
 
 age specification: C2SP/C2SP fc7f312aff098ed080f3dd5a3da4fd820be17a2e,
