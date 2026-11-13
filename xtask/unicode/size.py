@@ -30,20 +30,31 @@ def main():
         for mode, suffix in [('executable', '.bin'), ('object', '.o')]:
             target = out / (name + suffix)
             command = [os.environ['WOLF_BIN'], 'build', '--std-root', str(ROOT / 'std'),
-                       str(source), '-o', str(target)]
+                       str(source), '--no-cache', '-o', str(target)]
             if mode == 'object':
                 command += ['--emit=obj']
             result = subprocess.run(command, capture_output=True, text=True, timeout=120)
             if result.returncode:
                 raise ValueError('size build ' + name + ': ' + result.stdout + result.stderr)
-            row[mode + '_bytes'] = target.stat().st_size
-            sections = subprocess.check_output(['size', '-A', str(target)], text=True)
-            row[mode + '_sections'] = sections
+            artifacts = [target] if target.is_file() else []
             if mode == 'object':
-                symbols = subprocess.check_output(['nm', '-S', '--size-sort', str(target)], text=True)
+                artifacts += sorted(out.glob(name + '.*.o'))
+            if not artifacts:
+                raise ValueError('size build emitted no ' + mode + ' for ' + name)
+            row[mode + '_bytes'] = sum(p.stat().st_size for p in artifacts)
+            row[mode + '_sections'] = {p.name: subprocess.check_output(
+                ['size', '-A', str(p)], text=True) for p in artifacts}
+            if mode == 'object':
+                symbols = '\n'.join(subprocess.check_output(
+                    ['nm', '-S', '--size-sort', str(p)], text=True) for p in artifacts)
                 row['table_symbols'] = [line for line in symbols.splitlines()
                     if any(word in line for word in ('column_class', 'grapheme_class',
                                                       'conjunct_class', 'pictographic_class'))]
+            else:
+                expected = 8 if name == 'string' else 1
+                observed = subprocess.run([str(target), 'A'], capture_output=True, timeout=60)
+                if observed.returncode != expected:
+                    raise ValueError('size consumer behavior differs: ' + name)
         rows[name] = row
     rows['generated_source_bytes'] = (ROOT / 'std/unicode/tables/tables.lu').stat().st_size
     rows['compiler'] = subprocess.check_output([os.environ['WOLF_BIN'], '--version'], text=True).splitlines()[0]

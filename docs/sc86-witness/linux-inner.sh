@@ -15,9 +15,18 @@ case "$1" in
         ;;
     oracle) python3 -I xtask/unicode/oracle.py ;;
     assigned|grapheme|family) python3 -I xtask/unicode/rows.py "$1" ;;
+    assigned-plant) python3 -I xtask/unicode/rows.py assigned --plant-ascii ;;
     generation) python3 -I xtask/unicode/generate.py --check --wolf "$WOLF_BIN" ;;
     invariants) python3 -I xtask/unicode/generate-test.py ;;
     size) python3 -I xtask/unicode/size.py ;;
+    quick)
+        cargo fmt --all --check
+        cargo clippy --workspace --all-targets -- -D warnings
+        cargo test --workspace --quiet
+        cargo run --frozen -q -p xtask -- ledger-check
+        cargo run --frozen -q -p xtask -- std-test --lint-conventions
+        cargo run --frozen -q -p xtask -- fmt-lu
+        ;;
     ci) timeout 6500 cargo run --frozen -q -p xtask -- ci ;;
     *) printf 'unknown step %s\n' "$1"; exit 64 ;;
 esac

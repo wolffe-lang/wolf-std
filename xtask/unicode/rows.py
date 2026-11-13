@@ -17,6 +17,8 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('family', choices=('assigned', 'grapheme', 'family'))
+    parser.add_argument('--plant-ascii', action='store_true',
+                        help='plant only: first assigned part on all three lanes, not a full census')
     args = parser.parse_args()
     patterns = {'assigned': ['tests/unicode/display_assigned_*.lu'],
                 'grapheme': ['tests/str/grapheme_ucd_*.lu'],
@@ -26,6 +28,11 @@ def main():
     expected_count = {'assigned': 36, 'grapheme': 19, 'family': 5}[args.family]
     if len(tests) != expected_count:
         raise ValueError('fixture census differs: ' + str(len(tests)))
+    if args.plant_ascii:
+        if args.family != 'assigned':
+            raise ValueError('--plant-ascii is only an assigned-row plant selection')
+        tests = tests[:1]
+        print('MEASURE plant selection: first assigned part only, all three lanes; not a full census', flush=True)
     failures = []
     for name, variable, flags in [('native', 'WOLF_BIN', ['--native']),
                                   ('checked', 'WOLF_BIN', ['--checked']),
