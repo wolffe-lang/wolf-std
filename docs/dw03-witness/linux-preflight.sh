@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -eu
-: "${DW03_ROOT:?}" "${DW03_TOOLS:?}" "${DW03_OUT:?}" "${DW03_IMAGE:?}"
+: "${DW03_ROOT:?}" "${DW03_TOOLS:?}" "${DW03_OUT:?}" "${DW03_IMAGE:?}" "${DW03_CARGO_HOME:?}"
 python3 -I - "$DW03_ROOT" <<'PY'
 import os
 from pathlib import Path
@@ -35,8 +35,10 @@ for image in sorted(images):
  probe='for t in bash python3 git clang gcc cargo rustc rustfmt cargo-clippy timeout prlimit nm objdump setsid; do command -v "$t" >/dev/null || exit 1; done; python3 -c "import tomllib"; cargo --version; rustc --version'
  subprocess.run([engine[0], 'run', '--rm', '--network', 'none', '--memory', '256m', *engine[1:], actual, 'bash', '-c', probe], check=True)
 print('PASS resolved manifest engine and declared image tool probe', flush=True)
+cargo_home=Path(os.environ['DW03_CARGO_HOME']).resolve()
+assert (cargo_home/'registry').is_dir(), 'prepare the lane-owned Cargo home before the take'
 for image in sorted(images):
- subprocess.run([engine[0], 'run', '--rm', '--network', 'none', '--memory', '256m', *engine[1:], '--volume', str(root)+':'+str(root), '--workdir', str(root), '--env', 'CARGO_NET_OFFLINE=true', image, 'cargo', 'metadata', '--offline', '--locked', '--format-version', '1'], stdout=subprocess.DEVNULL, check=True)
+ subprocess.run([engine[0], 'run', '--rm', '--network', 'none', '--memory', '256m', *engine[1:], '--volume', str(root)+':'+str(root), '--workdir', str(root), '--volume', str(cargo_home)+':'+str(cargo_home)+':ro', '--env', 'CARGO_HOME='+str(cargo_home), '--env', 'CARGO_NET_OFFLINE=true', image, 'cargo', 'metadata', '--offline', '--locked', '--format-version', '1'], stdout=subprocess.DEVNULL, check=True)
 print('PASS build dependencies resolve offline inside the declared engine', flush=True)
 PY
 test -x "$DW03_TOOLS/wolf/wolf"
