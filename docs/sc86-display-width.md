@@ -43,8 +43,8 @@ Recommended public API, all core tier:
   `assert`. `none` has the same meaning as for width.
 
 Ambiguous East Asian width is always narrow, independent of locale. NUL is
-zero; all other Cc controls, unassigned scalars and noncharacters are
-nonprinting. Private-use scalars are narrow. No function reads the locale,
+zero; all other Cc controls, Zl/Zp separators, unassigned scalars and
+noncharacters are nonprinting. Private-use scalars are narrow. No function reads the locale,
 terminal or environment, interprets escapes, expands tabs, or measures fonts.
 
 **Composition policy: additive scalar widths.** Each grapheme contributes

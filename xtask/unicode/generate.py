@@ -107,7 +107,7 @@ def derive(data):
                     widths[cp] = 0
     # Control and assignment policy is separate from the 350 exceptions.
     for cp, cat in enumerate(cats):
-        if cat in ('Cn', 'Cs', 'Cc'):
+        if cat in ('Cn', 'Cs', 'Cc', 'Zl', 'Zp'):
             widths[cp] = -1
     widths[0] = 0
     exceptions = []
@@ -261,6 +261,20 @@ def outputs():
                     'grapheme': len(ranges(gcb, 0)), 'conjunct': len(ranges(incb, 0)),
                     'pictographic': len(ranges(ep, 0))}}
     result['vendor/unicode/derived.json'] = json.dumps(metadata, indent=2) + '\n'
+    ledger = (ROOT / 'tests/ledger.toml').read_text()
+    end_marker = '# END generated Unicode ledger\n\n'
+    if ledger.startswith('# BEGIN generated Unicode ledger\n'):
+        require(end_marker in ledger, 'unfinished Unicode ledger')
+        ledger = ledger.split(end_marker, 1)[1]
+    fixtures = sorted(name.removeprefix('tests/') for name in result if name.startswith('tests/'))
+    fixtures += ['str/display_columns.lu', 'unicode/display_scalar.lu',
+                 'str/display_truncate_negative_trap.lu',
+                 'str/display_pad_left_negative_trap.lu',
+                 'str/display_pad_right_negative_trap.lu']
+    block = '# BEGIN generated Unicode ledger\n'
+    for name in fixtures:
+        block += '[tests."%s"]\nlupin = "run"\nwolfc = "run"\nnative = "run"\n\n' % name
+    result['tests/ledger.toml'] = block + end_marker + ledger
     return result
 
 

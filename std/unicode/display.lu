@@ -1,12 +1,13 @@
 //! member: true
 //! Scalar display columns from pinned Unicode data and measured exceptions.
 //! Stability tier: core. No locale, terminal probing or emoji shaping.
+
 use std.unicode.tables
 
 /// The additive display-column width of `c`: 0, 1 or 2, using Unicode
 /// 15.1.0 plus the documented C-library compatibility exceptions.
-/// Raises `none` for nonprinting scalars: Cc except NUL, unassigned code
-/// points and noncharacters. NUL is zero, private-use characters are one,
+/// Raises `none` for nonprinting scalars: Cc except NUL, Zl/Zp separators,
+/// unassigned code points and noncharacters. NUL is zero, private-use characters are one,
 /// and ambiguous East Asian width is always narrow. No traps.
 /// This is not a font measurement; an emoji-shaping terminal may differ.
 ///
