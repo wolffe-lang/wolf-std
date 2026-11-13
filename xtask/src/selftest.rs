@@ -11,6 +11,20 @@ use std::process::Command;
 use std::time::Duration;
 
 #[test]
+fn unicode_generator_invariants() {
+    let mut cmd = Command::new("python3");
+    cmd.args(["-I", "xtask/unicode/generate-test.py"])
+        .current_dir(repo_root());
+    let got = exec::run(cmd, Duration::from_secs(120)).unwrap();
+    assert!(
+        !got.timed_out && got.status == Some(0),
+        "Unicode generator tests failed:\n{}\n{}",
+        got.stdout,
+        got.stderr
+    );
+}
+
+#[test]
 fn pins_are_well_formed() {
     let repo = repo_root();
     let pin = std::fs::read_to_string(repo.join("vendor/upstream/PIN")).unwrap();

@@ -4,19 +4,16 @@
 //! v1, spelled as functions where it can be and as a filing where it
 //! cannot. Stability tier: core.
 //!
-//! **The posture, in one paragraph.** v1 ships three things and no more:
-//! UTF-8 validity as a type invariant (`str` is valid UTF-8 by
-//! construction, D24 — the language's, not this module's), byte-offset
-//! slicing that refuses to split a code point (D25, also the language's),
-//! and the ASCII-true classification below, named so that no caller can
-//! mistake it for Unicode-true classification. NOT in v1: general category
-//! tables, case mapping and folding, normalization (NFC/NFD/NFKC/NFKD),
-//! and grapheme segmentation data. Those are a BUDGET decision — table
-//! size, generation, and the maintenance cost of tracking Unicode
-//! releases — filed upstream (F-0018) with the recommendation that they
-//! land in penumbra or `std/x` rather than core, so that a core that must
-//! be welded to the compiler does not carry megabytes of derived data.
-//! Report 07's nursery clock applies to whichever nursery takes them.
+//! UTF-8 validity and checked byte slicing belong to the language.
+//! This module provides ASCII-true classification and Unicode 15.1.0
+//! display widths, from committed generated data in `std.unicode.tables`.
+//! `std.str` uses the same data for extended grapheme segmentation and
+//! additive display-column operations. General category queries, case
+//! mapping/folding and normalization remain outside this surface.
+//! Widths follow glibc 2.39 `wcwidth` under C.UTF-8, independently of the
+//! caller's locale: ambiguous characters use a narrow base policy, with
+//! the stated C-library exceptions taking precedence. No terminal probing
+//! or emoji shaping is performed. See docs/sc86-display-width.md.
 //!
 //! **THE CURRENCY IS `char` NOW (sc25), AND THE INT INTERIM IS GONE.**
 //! From sc03 to sc24 this module spelled a code point as an `int`

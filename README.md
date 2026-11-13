@@ -40,7 +40,12 @@ Every function names the capability it reaches and records which
 execution rungs run it.
 
 The library is pre-alpha, with the compiler. The newest additions are
-strict unpadded standard base64, BIP-173 Bech32, and
+Unicode 15.1.0 extended graphemes and additive display columns:
+`unicode.display_width`, `str.display_width`, `str.truncate_display` and
+`str.pad_display_left`/`pad_display_right`. They use C-compatible scalar
+widths, not emoji shaping; byte lengths and `fmt` padding are unchanged.
+See `docs/sc86-display-width.md` for the policy and exact exceptions.
+Before them, strict unpadded standard base64, BIP-173 Bech32, and
 `bytes.is_equal_fixed_work` (no early exit at source level, not a timing
 certificate). `std.os.random` wraps the language's OS bytes with platform
 admission: Linux/macOS use the documented OS contract; PAX refuses until
@@ -94,7 +99,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 681 tests. A test that passes deeper than its ledger entry claims
+all 741 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
@@ -112,7 +117,7 @@ cargo xtask ledger-check                 # every test has a ledger row, and ever
 cargo xtask std-test --lint-conventions  # test-authoring conventions, without running tests
 cargo xtask fmt-lu                       # wolf formatting, checked without rewriting
 cargo xtask sync-pin                     # verify the vendored upstream snapshot against PIN
-cargo xtask gen-vectors --check          # verify the committed crypto vector tests
+cargo xtask gen-vectors --check          # verify crypto vectors and Unicode tables/corpora
 cargo xtask time-oracle                  # local time against the host's date command
 cargo xtask ci                           # all of it, behind fmt/clippy/test
 ```

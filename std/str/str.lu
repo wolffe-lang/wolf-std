@@ -79,7 +79,8 @@
 //! `chars()` in the v0 `List[int]` currency, and refused `'a'` at lex —
 //! a mid-sprint re-acquisition brought s121, and every claim in this
 //! header was re-measured against the binary that will be pinned.
-//! What remains is two:
+//! What remains is the pair below. `graphemes` now executes from pinned
+//! Unicode 15.1.0 segmentation tables; see display.lu.
 //!
 //! ```text
 //! chars(s: str) -> List[(int, char)]
@@ -115,12 +116,6 @@
 //!     generic container instantiation on purpose). `char_offsets` below is the offset
 //!     half; the
 //!     day tuple lists land they fuse into this one function.
-//! graphemes(s: str) -> List[str]
-//!     Extended grapheme clusters, as slices of `s`. A std call and never
-//!     the default unit (D24). Needs segmentation TABLES — a later tier
-//!     (the #18 ruling put the data in committed generated wolf source
-//!     when it comes) and not a primitive gap: nothing about this pin's
-//!     `str` brings it closer, and sc24 deliberately does not start it.
 //! ```
 //!
 //! **THE BYTE VIEW IS A VIEW NOW, AND FOUR BODIES HERE ARE WRITTEN AGAINST
@@ -182,10 +177,10 @@
 //! **PADDING LIVES IN `std.fmt`** (§11: the format spec is a spelling and
 //! std owns the operations). `pad_left`, `pad_right`, `center`, their
 //! `_with` fill variants and `with_sign` are `std.fmt`'s, not this
-//! module's — one concept, one name, one home (§1). This module has no
-//! width family and will not grow one; when display width (East Asian
-//! Width plus graphemes) becomes computable it arrives under its own name
-//! in the module that owns the tables.
+//! module's byte-padding family. The separate `display_width`,
+//! `truncate_display` and `pad_display_left`/`pad_display_right` family
+//! counts additive C-compatible scalar columns, with extended grapheme
+//! boundaries protecting cuts. Its data lives in `std.unicode.tables`.
 //!
 //! **THE PARSE FAMILY MOVED (sc05).** `parse_int` and `parse_float` were
 //! shipped here by sc03 because this is where the boundary-safe probe was
@@ -198,19 +193,10 @@
 //! than "honest but approximate". Nothing in `std.str` calls them, so
 //! this module no longer carries a digit table at all.
 //!
-//! **The unicode posture, written down** (the sprint's filed decision).
-//! What ships in v1: UTF-8 validity as a type invariant (the language's),
-//! byte-offset slicing that refuses to split a code point (the language's),
-//! and ASCII-true classification named as such (`std.unicode`, over the
-//! `int` code points `code_points` now produces). What is NOT here and is
-//! a budget decision filed upstream, not a silent gap: category tables,
-//! full case mapping, normalization, and grapheme segmentation data. The
-//! evidence: the implementations' `lower`/`upper` already perform SIMPLE
-//! UNICODE case mapping (`"ÉA".lower()` is `"éa"`, observed on every
-//! lane), which is MORE than the sprint contract promised and means the
-//! tables are already being carried somewhere — so the decision to make
-//! is where they live and who pays for them, not whether to start
-//! (F-0018, with `std.unicode`'s posture).
+//! Unicode 15.1.0 width and grapheme data is committed generated source
+//! under `std.unicode.tables`. General category queries, full case mapping
+//! and normalization remain outside this surface. Existing builtin case
+//! conversions are still delegated to and documented on their functions.
 
 use std.strbuf
 

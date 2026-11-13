@@ -1,0 +1,39 @@
+//! check: run(exit=0)
+//! phase: run
+//! conforms: std.unicode, type.char
+//! Named compatibility classes plus nonprinting and private-use boundaries.
+
+use std.unicode
+
+fn main() -> !int {
+    assert(unicode.display_width('A')? == 1)
+    assert(unicode.display_width('中')? == 2)
+    assert(unicode.display_width('\u{301}')? == 0)
+    assert(unicode.display_width('\u{AD}')? == 1)
+    assert(unicode.display_width('\u{1160}')? == 0)
+    assert(unicode.display_width('\u{11FF}')? == 0)
+    assert(unicode.display_width('\u{D7B0}')? == 0)
+    assert(unicode.display_width('\u{D7C6}')? == 0)
+    assert(unicode.display_width('\u{D7CB}')? == 0)
+    assert(unicode.display_width('\u{D7FB}')? == 0)
+    assert(unicode.display_width('\u{FFF9}')? == 0)
+    assert(unicode.display_width('\u{1343F}')? == 0)
+    assert(unicode.display_width('\u{3248}')? == 2)
+    assert(unicode.display_width('\u{4DFF}')? == 2)
+    assert(unicode.display_width('🇺')? == 1)
+    assert(unicode.display_width('\u{FE0F}')? == 0)
+    assert(unicode.display_width('\0')? == 0)
+    assert((unicode.display_width('\t') else 99) == 99)
+    assert((unicode.display_width('\u{7F}') else 99) == 99)
+    assert((unicode.display_width('\u{9F}') else 99) == 99)
+    assert((unicode.display_width('\u{2028}') else 99) == 99)
+    assert((unicode.display_width('\u{2029}') else 99) == 99)
+    assert((unicode.display_width('\u{378}') else 99) == 99)
+    assert((unicode.display_width('\u{FDD0}') else 99) == 99)
+    assert((unicode.display_width('\u{FFFF}') else 99) == 99)
+    assert((unicode.display_width('\u{10FFFF}') else 99) == 99)
+    assert(unicode.display_width('\u{E000}')? == 1)
+    assert(unicode.display_width('\u{F0000}')? == 1)
+    assert(unicode.display_width('\u{10FFFD}')? == 1)
+    0
+}

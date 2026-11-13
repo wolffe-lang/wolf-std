@@ -1,0 +1,11 @@
+engine ./linux-engine.sh --env=PATH=/opt/s263-rust/bin:/usr/local/bin:/usr/bin:/bin
+floor 35 ../..
+rig plant.manifest committed=../..:HEAD:docs/sc86-witness/plant.manifest
+rig linux-engine.sh committed=../..:HEAD:docs/sc86-witness/linux-engine.sh
+rig linux-step.sh committed=../..:HEAD:docs/sc86-witness/linux-step.sh
+rig linux-inner.sh committed=../..:HEAD:docs/sc86-witness/linux-inner.sh
+rig linux-preflight.sh committed=../..:HEAD:docs/sc86-witness/linux-preflight.sh
+rig wiring.sh committed=../..:HEAD:docs/sc86-witness/wiring.sh
+rig ../../xtask/unicode/rows.py committed=../..:HEAD:xtask/unicode/rows.py
+step ci-wiring tools=python3,git script=wiring.sh
+step width-assigned image=localhost/r41-toolchain:1 tools=bash,python3,clang,setsid script=linux-step.sh -- assigned-plant

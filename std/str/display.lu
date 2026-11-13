@@ -1,0 +1,200 @@
+//! member: true
+//! Additive display columns and Unicode 15.1.0 extended grapheme boundaries.
+//! Stability tier: core. Byte lengths and byte-oriented formatting are unchanged.
+//! Flags sum to two columns; a woman-technologist ZWJ cluster sums to four;
+//! heart plus VS16 sums to one. An emoji-shaping terminal may draw them narrower.
+//! A future shaped_display_width family can coexist without renaming this API.
+
+use std.unicode
+use std.unicode.tables
+
+// UAX #29 revision 43, default extended grapheme rules GB3..GB999.
+// Only bounded suffix state is kept: RI parity, EP Extend* ZWJ, and the
+// InCB consonant/linker state needed by GB9c. Byte offsets remain byte offsets.
+struct DisplayScan {
+    started: bool,
+    previous: int,
+    regional: int,
+    pictographic: bool,
+    zwj_after_pictographic: bool,
+    conjunct: int,
+}
+
+fn display_scan() -> DisplayScan {
+    DisplayScan {
+        started: false,
+        previous: 0,
+        regional: 0,
+        pictographic: false,
+        zwj_after_pictographic: false,
+        conjunct: 0,
+    }
+}
+
+fn display_boundary(mut state: DisplayScan, c: char) -> bool {
+    let current = tables.grapheme_class(c)
+    let conjunct = tables.conjunct_class(c)
+    let pictographic = tables.pictographic_class(c) == 1
+    let previous = state.previous
+    var boundary = state.started
+    if !state.started {
+        boundary = false
+    } else if previous == 1 && current == 2 {
+        boundary = false // GB3 CR x LF
+    } else if previous >= 1 && previous <= 3 || current >= 1 && current <= 3 {
+        boundary = true // GB4/GB5 controls
+    } else if previous == 9 && (current == 9 || current == 10 || current == 12 || current == 13) {
+        boundary = false // GB6 L x (L | V | LV | LVT)
+    } else if (previous == 12 || previous == 10) && (current == 10 || current == 11) {
+        boundary = false // GB7 (LV | V) x (V | T)
+    } else if (previous == 13 || previous == 11) && current == 11 {
+        boundary = false // GB8 (LVT | T) x T
+    } else if current == 4 || current == 5 || current == 8 || previous == 7 {
+        boundary = false // GB9, GB9a, GB9b
+    } else if conjunct == 1 && state.conjunct == 2 {
+        boundary = false // GB9c InCB consonant ... linker ... x consonant
+    } else if pictographic && previous == 5 && state.zwj_after_pictographic {
+        boundary = false // GB11 EP Extend* ZWJ x EP
+    } else if previous == 6 && current == 6 && state.regional == 1 {
+        boundary = false // GB12/GB13 odd RI x RI
+    }
+    state.regional = if current == 6 { 1 - state.regional } else { 0 }
+    state.zwj_after_pictographic = current == 5 && state.pictographic
+    if pictographic {
+        state.pictographic = true
+    } else if current != 4 {
+        state.pictographic = false
+    }
+    if conjunct == 1 {
+        state.conjunct = 1
+    } else if (conjunct == 2 || conjunct == 3) && state.conjunct > 0 {
+        if conjunct == 3 { state.conjunct = 2 }
+    } else {
+        state.conjunct = 0
+    }
+    state.previous = current
+    state.started = true
+    boundary
+}
+
+/// Unicode 15.1.0 default extended grapheme clusters as slices of `s`.
+/// Total, with no rows or traps. The output list allocates; its strings
+/// borrow the input bytes. CRLF is one cluster; empty input has no clusters.
+/// Grapheme boundaries are not font measurements or cursor positions.
+///
+/// ```wolf-doc-example
+/// let pieces = str.graphemes("e\u{301}🇺🇸👩‍💻")
+/// pieces.len == 3
+/// pieces[0] == "e\u{301}"
+/// pieces[1] == "🇺🇸"
+/// pieces[2] == "👩‍💻"
+/// str.graphemes("").len == 0
+/// ```
+pub fn graphemes(s: str) -> List[str] {
+    var out = List[str]()
+    var state = display_scan()
+    var offset = 0
+    var start = 0
+    for c in s.chars() {
+        if display_boundary(mut state, c) {
+            (mut out).push(s[start..offset])
+            start = offset
+        }
+        offset += unicode.utf8_len(c)
+    }
+    if offset > start { (mut out).push(s[start..offset]) }
+    out
+}
+
+/// Sum of the scalar display widths in `s`, in columns, not bytes.
+/// Raises `none` if any scalar is nonprinting (including tabs/newlines).
+/// NUL contributes zero. No traps: a valid string's sum is bounded by its
+/// byte length. Addition is independent of grapheme grouping; truncation
+/// uses the same sum but cuts only between complete graphemes.
+/// Flags sum to 2, woman-technologist to 4 and heart plus VS16 to 1.
+/// ZWJ and variation selectors contribute zero, without requesting shaping.
+/// An emoji-shaping terminal may draw these clusters narrower. A separately
+/// specified shaped_display_width can coexist with this additive contract.
+///
+/// ```wolf-doc-example
+/// str.display_width("aé中")? == 4
+/// str.display_width("e\u{301}")? == 1
+/// str.display_width("🇺🇸")? == 2
+/// str.display_width("👩‍💻")? == 4
+/// str.display_width("❤️")? == 1
+/// (str.display_width("\t") else 99) == 99
+/// ```
+pub fn display_width(s: str) -> int ! {none} {
+    var width = 0
+    for c in s.chars() { width += unicode.display_width(c)? }
+    width
+}
+
+/// Longest prefix of complete graphemes whose additive widths fit `columns`.
+/// Raises `none` for a nonprinting scalar anywhere in `s`, even an omitted
+/// suffix. Negative `columns` traps `assert` (caller contract). Zero-width
+/// clusters fit a zero budget. No ellipsis is added. The result borrows `s`.
+///
+/// ```wolf-doc-example
+/// str.truncate_display("e\u{301}中x", 2)? == "e\u{301}"
+/// str.truncate_display("🇺🇸x", 1)? == ""
+/// str.truncate_display("👩‍💻x", 4)? == "👩‍💻"
+/// str.truncate_display("\u{301}x", 0)? == "\u{301}"
+/// (str.truncate_display("a\t", 0) else "bad") == "bad"
+/// ```
+pub fn truncate_display(s: str, columns: int) -> str ! {none} {
+    assert(columns >= 0)
+    let total = display_width(s)?
+    if total <= columns { return s }
+    var state = display_scan()
+    var offset = 0
+    var accepted = 0
+    var used = 0
+    var cluster_width = 0
+    for c in s.chars() {
+        if display_boundary(mut state, c) {
+            if cluster_width > columns - used { return s[0..accepted] }
+            used += cluster_width
+            accepted = offset
+            cluster_width = 0
+        }
+        cluster_width += unicode.display_width(c)?
+        offset += unicode.utf8_len(c)
+    }
+    if cluster_width <= columns - used { return s }
+    s[0..accepted]
+}
+
+/// Pad on the left with ASCII spaces to at least `columns` additive columns.
+/// Raises `none` for any nonprinting scalar; negative `columns` traps
+/// `assert`. Never truncate or split a grapheme. Allocation is proportional
+/// to the added spaces and result bytes; `fmt.pad_left` still counts bytes.
+///
+/// ```wolf-doc-example
+/// str.pad_display_left("中", 3)? == " 中"
+/// str.pad_display_left("e\u{301}", 3)? == "  e\u{301}"
+/// str.pad_display_left("🇺🇸", 1)? == "🇺🇸"
+/// ```
+pub fn pad_display_left(s: str, columns: int) -> str ! {none} {
+    assert(columns >= 0)
+    let width = display_width(s)?
+    if width >= columns { return s }
+    " ".repeat(columns - width) + s
+}
+
+/// Pad on the right with ASCII spaces to at least `columns` additive columns.
+/// Raises `none` for any nonprinting scalar; negative `columns` traps
+/// `assert`. Never truncate or split a grapheme. Allocation is proportional
+/// to the added spaces and result bytes; `fmt.pad_right` still counts bytes.
+///
+/// ```wolf-doc-example
+/// str.pad_display_right("中", 3)? == "中 "
+/// str.pad_display_right("❤️", 2)? == "❤️ "
+/// str.pad_display_right("👩‍💻", 3)? == "👩‍💻"
+/// ```
+pub fn pad_display_right(s: str, columns: int) -> str ! {none} {
+    assert(columns >= 0)
+    let width = display_width(s)?
+    if width >= columns { return s }
+    s + " ".repeat(columns - width)
+}
