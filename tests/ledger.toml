@@ -5553,11 +5553,13 @@ lupin = "unsupported"
 wolfc = "run"
 native = "run"
 
-# sc82 — `std.poll`, one wait over files, sockets and signals. Every row
-# is `docs/sc82-witness/rows.py`'s too. The rows decided by std before
-# any host call run on every machine and host.
+# sc83: wolf 0.2.40 / lupin 0.1.62. Compiler rows execute through the
+# readiness set; the interpreter's named run refusals are checked by
+# docs/sc83-witness/rows.py. Its record reports x-unsupported-at=run even
+# though phase_reached names the last completed rung, resolve.
 [tests."poll/waiter_rows.lu"]
-lupin = "run"
+lupin = "unsupported"
+lupin-windows = "run" # explicit host refusal branches, as the prior row
 wolfc = "run"
 native = "run"
 
@@ -5569,14 +5571,15 @@ lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
-# Every ready socket in one wait, over `net.wait`: every machine and host.
+# The persistent set runs on the compiler tiers; lupin names os_ready_open.
+# Windows retains the existing net.wait read-only fallback.
 [tests."poll/sockets_all_ready.lu"]
-lupin = "run"
+lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
-# The multiplexer's set: one waiter is `unsupported` at this pin (M1),
-# each half served alone. lupin refuses `os_term_open_pty` by name.
+# One wait answers the full mixed set; lupin names os_term_open_pty first.
 [tests."poll/mixed_refused.lu"]
 lupin = "unsupported"
 lupin-windows = "run"
@@ -5591,9 +5594,9 @@ lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
-# The deadline on both paths: lupin runs the sockets path and refuses
-# `os_signal_wait_fds` by name at the files path; windows prints the
-# files path's lines for its `unsupported`.
+# Deadlines use the readiness set: lupin now names os_ready_open on the
+# first registration. Windows retains its measured narrow socket path and
+# explicitly reports the unavailable file/signal leg.
 [tests."poll/deadline.lu"]
 lupin = "unsupported"
 lupin-windows = "run"
@@ -5617,11 +5620,85 @@ lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
-# A pty's end when its child ends: `READ`, then the read's `io` (linux) or
-# `eof` (macOS); no `HANGUP` fact at this pin. lupin refuses
-# `os_term_open_pty` by name.
+# A pty's end carries READ|HANGUP; the read is io on Linux, eof on macOS.
+# lupin refuses os_term_open_pty by name.
 [tests."poll/pty_hangup.lu"]
 lupin = "unsupported"
 lupin-windows = "run"
 wolfc = "run"
 native = "run"
+
+# sc83 new rows. Released 0.1.62 measured before assigning reference cells.
+# Windows-only run cells exercise explicit guards/refusal branches, NOT
+# the unavailable Unix/pty/readiness capability. The hosted all-tier matrix
+# must confirm those host cells before merge; no Windows serving claim.
+[tests."poll/capacity.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+[tests."poll/set_mutation.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+[tests."poll/error_hangup.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+[tests."poll/signal_socket.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+[tests."poll/socket_queue.lu"]
+lupin = "unsupported"
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+[tests."poll/comptime_refuses.lu"]
+lupin = "unsupported" # 0.1.62 names probe's unsupported comptime fn
+wolfc = "run"
+native = "run"
+
+[tests."net/write_some.lu"]
+lupin = "run" # 0.1.62 serves the one-send primitive, TCP and Unix
+wolfc = "run"
+native = "run"
+
+[tests."net/write_some_invalid_row.lu"]
+lupin = "run" # fail(E0401), not a send
+wolfc = "run"
+native = "run"
+
+[tests."net/comptime_refuses_write_some.lu"]
+# fail(E0701) remains normative if reachable. The compiler cannot build a
+# List at comptime ([type.list.lit.value], wolf-lang#101); the reference
+# names its unsupported comptime fn. Neither measures this send's barrier.
+lupin = "unsupported"
+wolfc = "unsupported"
+native = "unsupported"
+
+[tests."net/unix/peer_credentials.lu"]
+lupin = "unsupported" # net_peer_cred, at run
+lupin-windows = "run"
+wolfc = "run"
+native = "run"
+
+[tests."net/unix/peer_credentials_child.lu"]
+lupin = "unsupported" # os_fork, at run
+lupin-windows = "run"
+wolfc = "run" # explicit unsupported-fork SKIP, not a checked fork proof
+native = "run"
+
+[tests."net/unix/comptime_refuses_credentials.lu"]
+lupin = "unsupported" # unsupported comptime fn, as the existing probes
+wolfc = "run"
+native = "run"
+

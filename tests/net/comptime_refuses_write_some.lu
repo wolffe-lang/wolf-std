@@ -8,8 +8,9 @@
 //! evaluator, so a builtin taking one is unreachable there. This source
 //! has NOT measured net_write_some's own comptime barrier.
 //! See [type.list.lit.value] and wolf-lang#101; keep the named posture
-//! until container construction is supported. Measure lupin at 0.1.62,
-//! rather than inferring its answer from either compiler tier.
+//! until container construction is supported. Released lupin 0.1.62
+//! independently refuses the unsupported `probe` comptime fn at run;
+//! its send barrier has not been measured here either.
 
 comptime fn probe() -> int ! {busy, closed, invalid, io} {
     net_write_some(-1, List[byte]())
