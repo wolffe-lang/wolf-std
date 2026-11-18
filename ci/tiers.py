@@ -105,14 +105,14 @@ def full_leg(job, leg):
 # them all, the full tier the legs full_leg keeps, every other tier the legs
 # pr_leg keeps.
 MATRIX = {
-    "rig": [{"os": "ubuntu-latest"}, {"os": "macos-latest"}, {"os": "windows-latest"}],
-    "gates": [{"os": "ubuntu-latest"}, {"os": "macos-latest"}, {"os": "windows-latest"}],
+    "rig": [{"os": "ubuntu-24.04"}, {"os": "macos-latest"}, {"os": "windows-latest"}],
+    "gates": [{"os": "ubuntu-24.04"}, {"os": "macos-latest"}, {"os": "windows-latest"}],
 }
 
 
 def pr_leg(job, leg):
     """Whether the pull-request tier runs this leg of a matrix job."""
-    return leg.get("os") == "ubuntu-latest"
+    return leg.get("os") == "ubuntu-24.04"
 
 
 def full_leg(job, leg):

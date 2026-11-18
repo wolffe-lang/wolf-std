@@ -79,7 +79,7 @@ FULL_JOBS = ["rig", "gates"]
 PUSH_BRANCHES = "trunk"
 OTHER_HOST_JOBS = ()
 # The hosts before tl28 (.github/workflows/ci.yml at trunk cceda63).
-_H = [{"os": "ubuntu-latest"}, {"os": "macos-latest"}, {"os": "windows-latest"}]
+_H = [{"os": "ubuntu-24.04"}, {"os": "macos-latest"}, {"os": "windows-latest"}]
 BEFORE_HOSTS = {"matrix_rig": _H, "matrix_gates": _H}
 ALL_HOSTS = BEFORE_HOSTS
 PR_HOSTS = {"matrix_rig": _H[:1], "matrix_gates": _H[:1]}
