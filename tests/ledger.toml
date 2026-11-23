@@ -5082,6 +5082,19 @@ lupin = "unsupported"
 wolfc = "run"
 native = "run"
 
+# `fs/copy_chunk_rows.lu`: 300,000 bytes file to file in 65,536-byte calls,
+# `max` 0, `eof`, the source's position, a copy to standard output, a
+# closed and two forged handles. lupin 0.1.62 serves `fs_copy_chunk`.
+[tests."fs/copy_chunk_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_copy_chunk.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
 [tests."os/comptime_refuses_name.lu"]
 lupin = "unsupported"
 wolfc = "run"

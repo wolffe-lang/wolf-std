@@ -1,0 +1,100 @@
+//! check: run(exit=0, stdout="total=300000 same=true\nzero=0\nat_end=eof\noffset=300000\nto_stdout=wolf\nshown=15\nclosed=io\nforged_src=io\nforged_dst=io")
+//! phase: run
+//! conforms: std.fs, os.fs.copy, os.fs.std, os.fs.tell, err.row
+//!
+//! **`fs.copy_chunk`** (wolf-std#141, `[os.fs.copy]`). 300,000 bytes, more
+//! than one transfer on every host (macOS, freebsd and windows move at most
+//! 256 KiB a call), are copied file to file in calls of at most 65,536
+//! bytes until `eof`: the total and every byte agree, and the source's
+//! position is the total. `max` 0 answers 0 without asking the host; a
+//! source at its end is `eof`. A file holding one line is copied to
+//! standard output, in order with `print`. A closed source and a forged
+//! handle on either side are `io`. Every lane serves the call; the checked
+//! machine and lupin move the bytes through a buffer of their own. A
+//! failed copy prints its line (a total of -1) rather than leaving `main`,
+//! so a wrong answer is red by the line that names it.
+
+use std.fs
+
+fn copy_all(mut src: fs.File, mut dst: fs.File, max: int) -> int ! {io} {
+    var total = 0
+    loop {
+        let n = fs.copy_chunk(mut src, mut dst, max) else |e| match e {
+            eof => { break },
+            io => { return io },
+        }
+        total = total + n
+    }
+    total
+}
+
+fn row(mut src: fs.File, mut dst: fs.File) -> str {
+    let n = fs.copy_chunk(mut src, mut dst, 4) else |e| {
+        return match e {
+            eof => "eof",
+            io => "io",
+        }
+    }
+    "moved {n}"
+}
+
+fn main() -> !int {
+    var block = List[byte]()
+    for i in 0..1000 {
+        (mut block).push((i % 251) as byte)
+    }
+    var w = fs.create("copy-rows-a.tmp")?
+    for _ in 0..300 {
+        fs.write_chunk(mut w, block)?
+    }
+    fs.close(take w)?
+
+    var src = fs.open("copy-rows-a.tmp")?
+    var dst = fs.create("copy-rows-b.tmp")?
+    let total = copy_all(mut src, mut dst, 65536) else 0 - 1
+    fs.close(take dst)?
+    let a = fs.read_bytes("copy-rows-a.tmp")?
+    let b = fs.read_bytes("copy-rows-b.tmp")?
+    var same = a.len == b.len
+    var i = 0
+    while same && i < a.len {
+        same = a[i] == b[i]
+        i = i + 1
+    }
+    print("total={total} same={same}")
+
+    var sink = fs.create("copy-rows-c.tmp")?
+    let zero = fs.copy_chunk(mut src, mut sink, 0)?
+    print("zero={zero}")
+    let at_end = row(mut src, mut sink)
+    print("at_end={at_end}")
+    let offset = fs.tell(mut src)?
+    print("offset={offset}")
+
+    fs.write_text("copy-rows-line.tmp", "to_stdout=wolf\n")?
+    var line = fs.open("copy-rows-line.tmp")?
+    var out = fs.stdout()
+    let shown = copy_all(mut line, mut out, 1048576) else 0 - 1
+    fs.close(take line)?
+    print("shown={shown}")
+
+    let n = src.fd
+    fs.close(take src)?
+    var closed = fs.File { fd: n }
+    let after_close = row(mut closed, mut sink)
+    print("closed={after_close}")
+    var forged = fs.File { fd: 999999 }
+    var head = fs.open("copy-rows-a.tmp")?
+    let forged_src = row(mut forged, mut sink)
+    print("forged_src={forged_src}")
+    let forged_dst = row(mut head, mut forged)
+    print("forged_dst={forged_dst}")
+    fs.close(take head)?
+    fs.close(take sink)?
+
+    fs.remove("copy-rows-a.tmp")?
+    fs.remove("copy-rows-b.tmp")?
+    fs.remove("copy-rows-c.tmp")?
+    fs.remove("copy-rows-line.tmp")?
+    0
+}

@@ -1,0 +1,24 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.copy
+//!
+//! **D33 for `fs.copy_chunk` (wolf-std#141), held one level down at
+//! `fs_copy_chunk`**: a compile may not move a file's bytes. The row is
+//! handled locally (F-0069). `main` calls the wrapper with `max` 0, which
+//! asks no host, to keep the import used and name the function.
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_copy_chunk(3, 4, 1) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const Z = probe()
+    var a = fs.stdin()
+    var b = fs.stdout()
+    let n = fs.copy_chunk(mut a, mut b, 0) else 0 - 1
+    print("n: {n} z: {Z}")
+    0
+}
