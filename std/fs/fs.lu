@@ -67,7 +67,9 @@
 //! `fs_fstat_record`, `fs_lock`, `fs_unlock`, `fs_mkfifo`,
 //! `fs_set_nonblock`, `fs_write_some`), with open-mode bit 16
 //! (`NOFOLLOW`, this module's first constants beside `LOCK_SHARED` and
-//! `LOCK_EXCLUSIVE`) — so their
+//! `LOCK_EXCLUSIVE`), and two handle calls wolf-std#141 asked for: wolf
+//! 0.2.26's `fs_copy_chunk` (`[os.fs.copy]`) and wolf 0.2.37's
+//! `fs_set_mode_fd` (`[os.fs.mode.fd]`) — so their
 //! semantics are part of this module's contract and are documented per
 //! function. std owns everything else:
 //! the `File` value, the consuming `close`, the mode choice behind
