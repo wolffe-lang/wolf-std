@@ -1487,6 +1487,35 @@ pub fn has_answer(v: FileSystem, word: int) -> bool {
     v.have & bit != 0
 }
 
+/// **The record of the file system that holds what `path` names**, a
+/// final symbolic link followed: what `df` and `stat -f` print, from one
+/// host call (`statfs(2)`; macOS adds a `pathconf` for `name_max`).
+///
+/// `[os.fs.statfs]` (wolf-std#141). Linux answers every word, `flags`
+/// where the kernel marks them valid; macOS answers every word; windows
+/// answers `blocks`, `free` and `available` in bytes with `fragment_size`
+/// 1, and none of the rest (`has_answer` says which). The free counts move
+/// under any writer, so two reads may differ; a file's record is its
+/// directory's.
+///
+/// Rows: `not_found` when nothing is at `path`, `denied` when the host
+/// refuses, `io` otherwise (a path holding a NUL included), the host's
+/// number in `os_error()`: `stat`'s rows. Never traps.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_statfs`.
+/// lupin 0.1.62 answers a missing path's row and refuses a record by name,
+/// since it has no `statfs` of its own (wolf-interp#315).
+///
+/// ```wolf-doc-example
+/// let v = fs.statfs(".")?
+/// fs.has_answer(v, 0) && fs.has_answer(v, 5) && v.fragment_size > 0
+/// v.available <= v.free && v.free <= v.blocks
+/// ```
+pub fn statfs(path: str) -> FileSystem ! IoErrors {
+    let words = fs_statfs(path)?
+    file_system(words)
+}
+
 /// The target a symbolic link stores, as the host stored it: bytes,
 /// verbatim — a name need not be UTF-8 (`str_from_utf8` when it is).
 /// Not resolved and not checked: a dangling link reads back its target.
