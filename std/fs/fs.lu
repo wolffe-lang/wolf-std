@@ -1129,7 +1129,7 @@ pub fn write_chunk(mut f: File, b: List[byte]) -> () ! {invalid, io} {
 /// total == 6 && none == 0 && text == "wolves"
 /// ```
 pub fn copy_chunk(mut src: File, mut dst: File, max: int) -> int ! {eof, io} {
-    fs_copy_chunk(src.fd, dst.fd, max)?
+    fs_copy_chunk(dst.fd, src.fd, max)?
 }
 
 /// Close `f`, consuming it.
