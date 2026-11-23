@@ -1,0 +1,22 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.statfs
+//!
+//! **D33 for `fs.statfs` (wolf-std#141), held one level down at
+//! `fs_statfs`**: a compile may not read the host's file systems. The row
+//! is handled locally (F-0069). `main` names `fs.statfs` in a call the
+//! typecheck phase never runs, to keep the import used.
+
+use std.fs
+
+comptime fn probe() -> int {
+    let w = fs_statfs(".") else |_| { return 1 }
+    w.len
+}
+
+fn main() -> !int {
+    const Z = probe()
+    let e = fs.statfs("statfs-never-made.tmp/inner") else fs.file_system(List[int]())
+    print("have: {e.have} z: {Z}")
+    0
+}

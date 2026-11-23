@@ -1,0 +1,69 @@
+//! check: run(exit=0, stdout="have_self=true\nspace_answered=true\nfree_within_total=true\navailable_within_free=true\nfields_are_the_words=true\na_file_reads_its_file_system=true\nhas_answer_is_have=true\noutside=false")
+//! phase: run
+//! conforms: std.fs, os.fs.statfs, err.row
+//!
+//! **`fs.statfs`** (wolf-std#141, `[os.fs.statfs]`). The record of the
+//! working directory's file system: `have` answers itself; the space words
+//! (fragment size, blocks, free, available) are answered on every host,
+//! windows included, and ordered; each word that does not move under a
+//! writer (`have`, both sizes, `blocks`, `name_max`, `flags`,
+//! `type_number`, `id`) is the builtin's word at its index, read beside it;
+//! a file's record is its directory's; `has_answer` reads `have`'s bits,
+//! and nothing outside `0..12`. `files` is not compared: APFS reports a
+//! total that moves with the free space. lupin 0.1.62 refuses the record
+//! by name (wolf-interp#315).
+
+use std.fs
+
+fn raw(p: str) -> List[int] {
+    fs_statfs(p) else |_| {
+        return List[int]()
+    }
+}
+
+fn fixed_words(v: fs.FileSystem, w: List[int]) -> bool {
+    if w.len != 12 {
+        return false
+    }
+    v.have == w[0] &&
+        v.block_size == w[1] &&
+        v.fragment_size == w[2] &&
+        v.blocks == w[3] &&
+        v.name_max == w[8] &&
+        v.flags == w[9] &&
+        v.type_number == w[10] &&
+        v.id == w[11]
+}
+
+fn main() -> !int {
+    let v = fs.statfs(".")?
+    let w = raw(".")
+    print("have_self={fs.has_answer(v, 0)}")
+    let space = fs.has_answer(v, 2) &&
+        fs.has_answer(v, 3) &&
+        fs.has_answer(v, 4) &&
+        fs.has_answer(v, 5)
+    print("space_answered={space}")
+    print("free_within_total={v.free <= v.blocks}")
+    print("available_within_free={v.available <= v.free}")
+    print("fields_are_the_words={fixed_words(v, w)}")
+    fs.write_text("statfs-rows.tmp", "statfs")?
+    let f = fs.statfs("statfs-rows.tmp")?
+    fs.remove("statfs-rows.tmp")?
+    let same = f.fragment_size == v.fragment_size &&
+        f.blocks == v.blocks &&
+        f.type_number == v.type_number &&
+        f.id == v.id
+    print("a_file_reads_its_file_system={same}")
+    var agree = w.len == 12
+    var bit = 1
+    for i in 0..12 {
+        if w.len == 12 {
+            agree = agree && fs.has_answer(v, i) == (w[0] & bit != 0)
+        }
+        bit = bit * 2
+    }
+    print("has_answer_is_have={agree}")
+    print("outside={fs.has_answer(v, 0 - 1) || fs.has_answer(v, 12)}")
+    0
+}

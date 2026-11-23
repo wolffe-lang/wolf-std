@@ -5115,6 +5115,26 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# `fs/statfs_rows.lu`: the working directory's record, its space words, the
+# fixed words against the builtin's, a file's record, `has_answer`. lupin
+# 0.1.62 refuses a record by name ("std has no statfs", wolf-interp#315).
+[tests."fs/statfs_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+# `fs/statfs_missing_row.lu`: a missing path is `not_found`, on every lane
+# (lupin answers a missing path inside its tree with the row).
+[tests."fs/statfs_missing_row.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_statfs.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
 [tests."os/comptime_refuses_name.lu"]
 lupin = "unsupported"
 wolfc = "run"

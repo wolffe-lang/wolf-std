@@ -1,0 +1,24 @@
+//! check: run(exit=0, stdout="missing=not_found have=0")
+//! phase: run
+//! conforms: std.fs, os.fs.statfs, err.row
+//!
+//! **`fs.statfs`'s `not_found`** (wolf-std#141): a path under a missing
+//! directory is `not_found` on every host and every lane. lupin 0.1.62,
+//! which refuses a record by name, answers a missing path inside its tree
+//! with the row, so this is the call's row that runs on all three.
+
+use std.fs
+
+fn main() -> !int {
+    var missing = "a record"
+    let r = fs.statfs("statfs-no-such.tmp/inner") else |e| {
+        missing = match e {
+            not_found => "not_found",
+            denied => "denied",
+            io => "io",
+        }
+        fs.file_system(List[int]())
+    }
+    print("missing={missing} have={r.have}")
+    0
+}
