@@ -5155,19 +5155,23 @@ native = "run"
 # held-directory calls through a renamed directory, the names they make,
 # and the swapped-in link the walk does not follow. lupin 0.1.62 refuses
 # the calls by name ("std has no descriptor-relative call",
-# wolf-interp#321).
+# wolf-interp#321); on windows it answers their `unsupported` row after the
+# shape, as the runtime does, so each row prints its windows lines there.
 [tests."fs/at_walk_rows.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
 [tests."fs/at_make_rows.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
 [tests."fs/at_escape_rows.lu"]
 lupin = "unsupported"
+lupin-windows = "run"
 wolfc = "run"
 native = "run"
 
