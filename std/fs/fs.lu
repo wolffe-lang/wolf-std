@@ -2625,6 +2625,67 @@ pub fn open_at(dir: File, name: str, mode: int, perm: int) -> File ! {
     File { fd: fs_open_at(dir.fd, name, mode, perm)? }
 }
 
+/// **The record of `name` in the held directory `dir`**, a final link
+/// followed: `stat`'s twenty words as an `Info`, from one host call
+/// relative to the handle (`statx(2)` on linux, `fstatat(2)` elsewhere),
+/// so the record is of the name in that directory whatever its path is by
+/// now.
+///
+/// `[os.fs.at.stat]` (wolf-std#141). Rows: `invalid` for an empty or
+/// absolute `name`, before the host, and for a `dir` that is not a
+/// directory; `unsupported` on windows, after the shape; `not_found` for a
+/// missing name, a dangling link included; `denied`; `io` for a closed or
+/// forged handle and otherwise. Never traps. lupin 0.1.62 refuses the call
+/// by name (wolf-interp#321).
+///
+/// `dir` is read. Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_stat_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-stat-at.tmp")?
+/// fs.write_text("doc-stat-at.tmp/f", "wolves")?
+/// var held = true
+/// var d = fs.open_dir("doc-stat-at.tmp") else |_| { held = false; fs.stdin() }
+/// var answered = true
+/// let info = fs.stat_at(d, "f") else |_| { answered = false; fs.stat("doc-stat-at.tmp")? }
+/// fs.close(take d) else |_| { }
+/// fs.remove_dir_all("doc-stat-at.tmp")?
+/// (held && answered && info.kind == 0 && info.size == 6) || (!held && !answered)
+/// ```
+pub fn stat_at(dir: File, name: str) -> Info ! {denied, invalid, io, not_found, unsupported} {
+    let w = fs_stat_at(dir.fd, name)?
+    info_of(w)
+}
+
+/// **The record of `name` ITSELF in the held directory `dir`**, a link
+/// included (kind 3, its own size and times): `lstat` relative to the
+/// handle, the question a walk asks of each entry before it opens one. On
+/// a name that is not a link it is `stat_at`'s record; a dangling link is
+/// a record here and `not_found` there.
+///
+/// `[os.fs.at.lstat]` (wolf-std#141). Rows as `stat_at`'s. lupin 0.1.62
+/// refuses the call by name (wolf-interp#321).
+///
+/// `dir` is read. Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_lstat_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-lstat-at.tmp")?
+/// fs.write_text("doc-lstat-at.tmp/f", "x")?
+/// var linked = true
+/// fs.symlink("f", "doc-lstat-at.tmp/l") else |_| { linked = false }
+/// var d = fs.open_dir("doc-lstat-at.tmp") else |_| { linked = false; fs.stdin() }
+/// var kind = 0 - 1
+/// if linked { kind = fs.lstat_at(d, "l")?.kind }
+/// fs.close(take d) else |_| { }
+/// fs.remove_dir_all("doc-lstat-at.tmp")?
+/// kind == 3 || !linked
+/// ```
+pub fn lstat_at(dir: File, name: str) -> Info ! {denied, invalid, io, not_found, unsupported} {
+    let w = fs_lstat_at(dir.fd, name)?
+    info_of(w)
+}
+
 /// **s254 (`[os.fs.access]`, wolf 0.2.35): may this process do what
 /// `mode` asks of `path`**, by its REAL user and group ids — `access(2)`,
 /// a final link followed. `mode` is **0** (the name exists) or a sum of
