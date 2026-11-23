@@ -1081,6 +1081,55 @@ pub fn write_chunk(mut f: File, b: List[byte]) -> () ! {invalid, io} {
     fs_write_chunk(f.fd, b)?
 }
 
+/// One copy the host makes: at most `max` bytes from `src`'s position to
+/// `dst`'s, both advancing, and how many moved. It is `read_chunk` then
+/// `write_chunk` with the bytes never passing through the program, which
+/// is `cat`'s and `cp`'s inner loop.
+///
+/// `[os.fs.copy]` (wolf-std#141). One call moves at least one byte and at
+/// most `max` (the host clamps a call to 1 GiB). How many it moves is the
+/// host's choice: linux tries `copy_file_range`, `sendfile` and `splice`
+/// before a read and a write, while macOS, freebsd and windows read and
+/// write at most 256 KiB at a time. So a program loops until `eof` and
+/// relies on the total, never on the split. `max` at or below zero
+/// answers 0 without asking the host. The standard streams are handles
+/// too (`stdin()`, `stdout()`), and a copy to standard output keeps its
+/// order with `print`.
+///
+/// Rows: `eof` when `src` is already at its end, an outcome as for
+/// `read_chunk`; `io` for a closed or forged handle on either side
+/// (checked before `max`), and for a failure of the read or of the write,
+/// the host's number in `os_error()`. After an `io` a source that can seek
+/// stands just past what the sink took (`tell(mut src)` says where), so a
+/// retry starts from the truth; a pipe or a terminal cannot be put back.
+/// A caller that must say which side failed retries the read. There is no
+/// `invalid`: no argument can be malformed once the handles are checked.
+/// Never traps.
+///
+/// `mut src` and `mut dst`: both positions advance. Capability `fs`;
+/// refused at comptime (D33). Delegates to `fs_copy_chunk`, which every
+/// lane serves; the checked machine and lupin move the bytes through a
+/// buffer of their own, with the same bytes and offsets.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-copy-chunk-a.tmp", "wolves")?
+/// var src = fs.open("doc-copy-chunk-a.tmp")?
+/// var dst = fs.create("doc-copy-chunk-b.tmp")?
+/// var total = 0
+/// var more = true
+/// while more { total = total + (fs.copy_chunk(mut src, mut dst, 4) else |_| { more = false; 0 }) }
+/// let none = fs.copy_chunk(mut src, mut dst, 0)?
+/// fs.close(take src)?
+/// fs.close(take dst)?
+/// let text = fs.read_text("doc-copy-chunk-b.tmp")?
+/// fs.remove("doc-copy-chunk-a.tmp")?
+/// fs.remove("doc-copy-chunk-b.tmp")?
+/// total == 6 && none == 0 && text == "wolves"
+/// ```
+pub fn copy_chunk(mut src: File, mut dst: File, max: int) -> int ! {eof, io} {
+    fs_copy_chunk(src.fd, dst.fd, max)?
+}
+
 /// Close `f`, consuming it.
 ///
 /// Rows: `io` when the handle was already closed or is foreign. Never
