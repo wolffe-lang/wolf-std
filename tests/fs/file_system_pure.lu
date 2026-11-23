@@ -1,0 +1,62 @@
+//! check: run(exit=0, stdout="full=true\nname_max=81\nshort=true\nlong=true\nempty=true\noutside=false")
+//! phase: run
+//! conforms: std.fs, os.fs.statfs
+//!
+//! **`fs.file_system` and `fs.has_answer`** (wolf-std#141): pure, so they
+//! run on all three lanes. Twelve words land in their
+//! twelve fields; three words fill three fields and leave the rest 0 with
+//! their `have` bits cleared; words past the twelfth are ignored; no words
+//! is an empty record; `has_answer` says false outside `0..12`.
+
+use std.fs
+
+fn twelve() -> List[int] {
+    var w = List[int]()
+    (mut w).push(4095)
+    for i in 1..12 {
+        (mut w).push(i * 10 + 1)
+    }
+    w
+}
+
+fn each_field(v: fs.FileSystem) -> bool {
+    v.block_size == 11 &&
+        v.fragment_size == 21 &&
+        v.blocks == 31 &&
+        v.free == 41 &&
+        v.available == 51 &&
+        v.files == 61 &&
+        v.free_files == 71 &&
+        v.flags == 91 &&
+        v.type_number == 101 &&
+        v.id == 111
+}
+
+fn main() -> !int {
+    let v = fs.file_system(twelve())
+    print("full={v.have == 4095 && each_field(v) && fs.has_answer(v, 11)}")
+    print("name_max={v.name_max}")
+
+    var three = List[int]()
+    (mut three).push(4095)
+    (mut three).push(11)
+    (mut three).push(21)
+    let s = fs.file_system(three)
+    let short = s.have == 7 &&
+        s.block_size == 11 &&
+        s.fragment_size == 21 &&
+        s.blocks == 0 &&
+        s.id == 0
+    print("short={short && fs.has_answer(s, 2) && !fs.has_answer(s, 3)}")
+
+    var more = twelve()
+    (mut more).push(999)
+    (mut more).push(4096)
+    let l = fs.file_system(more)
+    print("long={l.have == 4095 && each_field(l) && l.name_max == 81}")
+
+    let e = fs.file_system(List[int]())
+    print("empty={e.have == 0 && e.block_size == 0 && e.id == 0 && !fs.has_answer(e, 0)}")
+    print("outside={fs.has_answer(v, 0 - 1) || fs.has_answer(v, 12)}")
+    0
+}
