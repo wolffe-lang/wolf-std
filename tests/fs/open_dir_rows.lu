@@ -1,0 +1,72 @@
+//! check: run(exit=0, stdout="directory_bit=32\nheld=true\nfile=invalid\nlink=true\nresolved=true\nmissing=true\nwrite_mode=invalid")
+//! phase: run
+//! conforms: std.fs, std.os, os.fs.open.directory, os.fs.open.nofollow, os.fs.open, os.fs.realpath, os.fs.symlink, os.uname, err.row
+//!
+//! **`fs.open_dir` and `fs.DIRECTORY`** (wolf-std#141,
+//! `[os.fs.open.directory]`). A directory is held; a file is `invalid`; a
+//! link to a directory is `invalid` too (the open refuses a final link),
+//! and the directory it names opens once the path is resolved with
+//! `fs.realpath`, which is how a program opens a linked directory on
+//! purpose; a missing name is `not_found`; the directory bit beside a
+//! writing mode is `invalid` before the host.
+//!
+//! **windows** refuses the bit before the host, so every open there is
+//! `invalid` (a missing name included), and it makes no symbolic link
+//! (`fs.symlink` answers `unsupported`): those lines are printed for that
+//! reason, held to their side by `os.name()`. lupin serves the bit.
+
+use std.fs
+use std.os
+
+fn tag(path: str) -> str {
+    var f = fs.open_dir(path) else |e| {
+        return match e {
+            not_found => "not_found",
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+        }
+    }
+    fs.close(take f) else |_| {}
+    "held"
+}
+
+fn main() -> !int {
+    let unix = os.name() != "windows"
+    fs.remove_dir_all("open-dir-rows.tmp") else |_| {}
+    fs.create_dir_all("open-dir-rows.tmp/d")?
+    fs.write_text("open-dir-rows.tmp/f", "x")?
+    print("directory_bit={fs.DIRECTORY}")
+    let d = tag("open-dir-rows.tmp/d")
+    print("held={(unix && d == "held") || (!unix && d == "invalid")}")
+    let f = tag("open-dir-rows.tmp/f")
+    print("file={f}")
+    var linked = true
+    fs.symlink("d", "open-dir-rows.tmp/l") else |_| { linked = false }
+    var l = "unlinked"
+    var resolved = "unresolved"
+    if linked {
+        l = tag("open-dir-rows.tmp/l")
+        let real = fs.realpath("open-dir-rows.tmp/l")?
+        resolved = tag(real)
+    }
+    print("link={(unix && l == "invalid") || (!unix && !linked)}")
+    print("resolved={(unix && resolved == "held") || (!unix && !linked)}")
+    let missing = tag("open-dir-rows.tmp/none")
+    print("missing={(unix && missing == "not_found") || (!unix && missing == "invalid")}")
+    var write_mode = "held"
+    var g = fs.open_mode("open-dir-rows.tmp/d", fs.DIRECTORY + 1) else |e| {
+        write_mode = match e {
+            not_found => "not_found",
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+        }
+        fs.File { fd: 0 - 1 }
+    }
+    fs.close(take g) else |_| {}
+    print("write_mode={write_mode}")
+    fs.remove_dir_all("open-dir-rows.tmp")?
+    0
+}
