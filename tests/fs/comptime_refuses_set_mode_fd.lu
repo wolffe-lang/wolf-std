@@ -1,0 +1,25 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.mode.fd
+//!
+//! **D33 for `fs.set_file_mode` (wolf-std#141), held one level down at
+//! `fs_set_mode_fd`**: a compile may not change a held file's mode. The
+//! row is handled locally (F-0069). `main` calls the wrapper with a mode
+//! past `0o7777`, which is refused before any host is asked, to keep the
+//! import used and name the function.
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_set_mode_fd(3, 0o600) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const Z = probe()
+    var f = fs.stdin()
+    var row = "set"
+    fs.set_file_mode(mut f, 0o10000) else |_| { row = "refused" }
+    print("row: {row} z: {Z}")
+    0
+}

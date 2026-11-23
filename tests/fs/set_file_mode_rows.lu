@@ -1,0 +1,77 @@
+//! check: run(exit=0, stdout="held=true\nname_kept=true\npast=invalid\nnegative=invalid\nforged=true\ndirectory=true")
+//! phase: run
+//! conforms: std.fs, std.os, os.fs.mode.fd, os.fs.mode, os.fs.fstat.record, os.fs.stat, os.uname, err.row
+//!
+//! **`fs.set_file_mode`** (wolf-std#141, `[os.fs.mode.fd]`). A file is held
+//! open, a second file is renamed over its name, and the handle form sets
+//! the HELD file's mode: the held record reads 0o600 and the file now under
+//! the name keeps its 0o640. A mode past `0o7777` and a negative one are
+//! `invalid` before the host on every host. A forged handle is `io`. A
+//! directory held open read-only takes the mode too.
+//!
+//! **windows** has no permission bits: the call answers `unsupported` after
+//! the shape (so `past` and `negative` are still `invalid` there), and no
+//! directory opens as a file (`fs.open` answers `denied`), so each line is
+//! printed for its windows reason, held to its side by `os.name()`. The
+//! rename is made on the other hosts only. lupin serves the call.
+
+use std.fs
+use std.os
+
+fn tag(f: fs.File, mode: int) -> str {
+    var g = f
+    fs.set_file_mode(mut g, mode) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            unsupported => "unsupported",
+        }
+    }
+    "set"
+}
+
+fn main() -> !int {
+    let unix = os.name() != "windows"
+    fs.remove("mode-rows-a.tmp") else |_| {}
+    fs.remove("mode-rows-b.tmp") else |_| {}
+    fs.write_text("mode-rows-a.tmp", "held")?
+    fs.set_mode("mode-rows-a.tmp", 0o644) else |_| {}
+    var f = fs.open("mode-rows-a.tmp")?
+    if unix {
+        fs.write_text("mode-rows-b.tmp", "named")?
+        fs.set_mode("mode-rows-b.tmp", 0o640)?
+        fs.move_file("mode-rows-b.tmp", "mode-rows-a.tmp")?
+    }
+    let set = tag(f, 0o600)
+    let held = fs.fstat_record(mut f)?
+    let named = fs.stat("mode-rows-a.tmp")?
+    print("held={(unix && set == "set" && held.mode == 0o600) || (!unix && set == "unsupported")}")
+    print("name_kept={!unix || (named.mode == 0o640 && named.ino != held.ino)}")
+    let past = tag(f, 0o10000)
+    print("past={past}")
+    let negative = tag(f, 0 - 1)
+    print("negative={negative}")
+    fs.close(take f)?
+
+    let forged = tag(fs.File { fd: 999999 }, 0o600)
+    print("forged={(unix && forged == "io") || (!unix && forged == "unsupported")}")
+
+    fs.remove_dir_all("mode-rows-d.tmp") else |_| {}
+    fs.create_dir("mode-rows-d.tmp")?
+    var opened = true
+    var d = fs.open("mode-rows-d.tmp") else |_| {
+        opened = false
+        fs.File { fd: 0 - 1 }
+    }
+    var on_dir = "unopened"
+    if opened {
+        on_dir = tag(d, 0o700)
+        fs.close(take d)?
+    }
+    let dinfo = fs.stat("mode-rows-d.tmp")?
+    print("directory={(unix && on_dir == "set" && dinfo.mode == 0o700) || (!unix && !opened)}")
+    fs.remove_dir_all("mode-rows-d.tmp")?
+    fs.remove("mode-rows-a.tmp")?
+    0
+}

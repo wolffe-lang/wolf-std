@@ -5090,7 +5090,20 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# `fs/set_file_mode_rows.lu`: the held file's mode set after another file
+# was renamed over its name, the shape, a forged handle, a held directory;
+# each line held to its windows side. lupin 0.1.62 serves `fs_set_mode_fd`.
+[tests."fs/set_file_mode_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
 [tests."fs/comptime_refuses_copy_chunk.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_set_mode_fd.lu"]
 lupin = "unsupported"
 wolfc = "run"
 native = "run"
