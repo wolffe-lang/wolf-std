@@ -2686,6 +2686,70 @@ pub fn lstat_at(dir: File, name: str) -> Info ! {denied, invalid, io, not_found,
     info_of(w)
 }
 
+/// **Remove the name `name` from the held directory `dir`**: a file, a
+/// link (never what it names) or a fifo, `remove` relative to the handle.
+///
+/// `[os.fs.at.remove]` (wolf-std#141). Rows: `invalid` for an empty or
+/// absolute `name`, before the host, and for a `dir` that is not a
+/// directory; `unsupported` on windows, after the shape; `not_found` for a
+/// missing name; `denied` where the host refuses, and on macOS for a
+/// directory (`EPERM`), which linux refuses `io` (`EISDIR`), as `remove`
+/// does; `io` for a closed or forged handle and otherwise. Never traps.
+/// lupin 0.1.62 refuses the call by name (wolf-interp#321).
+///
+/// `dir` is read. Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_remove_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-remove-at.tmp")?
+/// fs.write_text("doc-remove-at.tmp/f", "x")?
+/// var held = true
+/// var d = fs.open_dir("doc-remove-at.tmp") else |_| { held = false; fs.stdin() }
+/// if held { fs.remove_at(d, "f")? }
+/// fs.close(take d) else |_| { }
+/// let gone = !fs.exists("doc-remove-at.tmp/f")
+/// fs.remove_dir_all("doc-remove-at.tmp")?
+/// gone == held
+/// ```
+pub fn remove_at(dir: File, name: str) -> () ! {denied, invalid, io, not_found, unsupported} {
+    fs_remove_at(dir.fd, name)?
+}
+
+/// **Remove the EMPTY directory `name` from the held directory `dir`**:
+/// `remove_dir` relative to the handle. One that is not empty is `io`, and
+/// a file or a link is `invalid`, so a walk never removes through a link;
+/// with `open_dir_at` and `remove_at` it is `rm -r` as a walk that never
+/// names more than one component.
+///
+/// `[os.fs.at.remove.dir]` (wolf-std#141). Rows: `invalid` for an empty or
+/// absolute `name`, before the host, for a name that is a file or a link
+/// and for a `dir` that is not a directory (`ENOTDIR` in `os_error()`);
+/// `unsupported` on windows, after the shape; `not_found` for a missing
+/// name; `denied`; `io` for a directory that is not empty (`ENOTEMPTY`),
+/// for a closed or forged handle and otherwise. Never traps. lupin 0.1.62
+/// refuses the call by name (wolf-interp#321).
+///
+/// `dir` is read. Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_remove_dir_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-remove-dir-at.tmp/sub")?
+/// fs.create_dir_all("doc-remove-dir-at.tmp/full")?
+/// fs.write_text("doc-remove-dir-at.tmp/full/f", "x")?
+/// var held = true
+/// var d = fs.open_dir("doc-remove-dir-at.tmp") else |_| { held = false; fs.stdin() }
+/// var full = "removed"
+/// fs.remove_dir_at(d, "full") else |_| { full = "refused" }
+/// if held { fs.remove_dir_at(d, "sub")? }
+/// fs.close(take d) else |_| { }
+/// let gone = !fs.exists("doc-remove-dir-at.tmp/sub")
+/// fs.remove_dir_all("doc-remove-dir-at.tmp")?
+/// full == "refused" && gone == held
+/// ```
+pub fn remove_dir_at(dir: File, name: str) -> () ! {denied, invalid, io, not_found, unsupported} {
+    fs_remove_dir_at(dir.fd, name)?
+}
+
 /// **s254 (`[os.fs.access]`, wolf 0.2.35): may this process do what
 /// `mode` asks of `path`**, by its REAL user and group ids — `access(2)`,
 /// a final link followed. `mode` is **0** (the name exists) or a sum of
