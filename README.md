@@ -39,7 +39,9 @@ without notice.
 Every function names the capability it reaches and records which
 execution rungs run it.
 
-The library is pre-alpha, with the compiler. The newest additions are
+The library is pre-alpha, with the compiler. The newest addition is
+`std.fs.statfs`, the record of a file system (what `df` prints), as a
+`FileSystem` whose `have` word says what the host answered. Before it,
 two handle calls in `std.fs`: `copy_chunk`, a copy the host makes from
 one open file to another without the bytes passing through the program,
 and `set_file_mode`, the mode of the file a handle holds whatever its
@@ -107,7 +109,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 686 tests. A test that passes deeper than its ledger entry claims
+all 690 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+**The record of a file system in `std.fs` (wolf-std#141), at wolf 0.2.40
+/ lupin 0.1.62.**
+
+- `fs.statfs(path) -> FileSystem ! {not_found, denied, io}` answers the
+  record of the file system that holds `path`: block and fragment sizes,
+  blocks, free and available, files and free files, the longest name,
+  the read-only and set-id flags, the type number and the identity.
+  `available * fragment_size` is the room an unprivileged writer has.
+- `fs.FileSystem` names the twelve words; its `have` word says which ones
+  the host answered, and `fs.has_answer(v, word)` reads it. Windows
+  answers the space words only, in bytes.
+- **Build a `FileSystem` with `fs.file_system(words)`, not with a struct
+  literal.** If a later wolf answers another word, the struct gains a
+  field and a literal stops compiling; `file_system` keeps compiling.
+- The reference interpreter answers a missing path's `not_found` and
+  refuses a record by name (it has no `statfs`). New rows:
+  `tests/fs/statfs_rows.lu`, `tests/fs/statfs_missing_row.lu`,
+  `tests/fs/file_system_pure.lu` and a comptime refusal.
+
 **Two handle calls in `std.fs` (wolf-std#141), at wolf 0.2.40 / lupin
 0.1.62.** Both builtins shipped in earlier wolf releases and had no
 `std.fs` function.
