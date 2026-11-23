@@ -3366,7 +3366,7 @@ fn dir_fd(path: str) -> int ! {not_found, denied, invalid, io} {
 /// `open_dir_at`'s open of `name` in the held directory `dir`, `exists`
 /// coarsened to `io` as in `dir_fd`.
 fn dir_at_fd(dir: int, name: str) -> int ! {denied, invalid, io, not_found, unsupported} {
-    fs_open_at(dir, name, DIRECTORY + NOFOLLOW, 0) else |e| match e {
+    fs_open_at(dir, name, DIRECTORY, 0) else |e| match e {
         denied => { return denied },
         invalid => { return invalid },
         io => { return io },
