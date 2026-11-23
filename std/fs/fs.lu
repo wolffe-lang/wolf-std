@@ -2750,6 +2750,80 @@ pub fn remove_dir_at(dir: File, name: str) -> () ! {denied, invalid, io, not_fou
     fs_remove_dir_at(dir.fd, name)?
 }
 
+/// **Make the directory `name` in the held directory `dir`**, its
+/// permission bits `mode` less the umask from its first instant:
+/// `create_dir_mode` relative to the handle, one level.
+///
+/// `[os.fs.at.mkdir]` (wolf-std#141). Rows: `invalid`, before the host, for
+/// a `mode` outside `0..=0o777` and then for an empty or absolute `name`,
+/// and for a `dir` that is not a directory; `unsupported` on windows, after
+/// the shape; `exists` for a taken name, a dangling link included;
+/// `not_found` for a missing middle component; `denied`; `io` for a closed
+/// or forged handle and otherwise. Never traps. lupin 0.1.62 checks the
+/// shape and refuses the call by name (wolf-interp#321).
+///
+/// `dir` is read. Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_create_dir_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-create-dir-at.tmp")?
+/// var held = true
+/// var d = fs.open_dir("doc-create-dir-at.tmp") else |_| { held = false; fs.stdin() }
+/// if held { fs.create_dir_at(d, "sub", 0o755)? }
+/// var again = "made"
+/// fs.create_dir_at(d, "sub", 0o755) else |_| { again = "refused" }
+/// fs.close(take d) else |_| { }
+/// let made = fs.is_dir("doc-create-dir-at.tmp/sub")
+/// fs.remove_dir_all("doc-create-dir-at.tmp")?
+/// made == held && again == "refused"
+/// ```
+pub fn create_dir_at(dir: File, name: str, mode: int) -> () ! {
+    denied,
+    exists,
+    invalid,
+    io,
+    not_found,
+    unsupported,
+} {
+    fs_create_dir_at(dir.fd, name, mode)?
+}
+
+/// **Make `name` in the held directory `dir` a symbolic link whose target
+/// is `target`**, stored verbatim, never resolved or checked: `symlink`
+/// relative to the handle, the target first as there.
+///
+/// `[os.fs.at.symlink]` (wolf-std#141). Rows: `invalid`, before the host,
+/// for an empty `target` and then for an empty or absolute `name`, and for
+/// a `dir` that is not a directory; `unsupported` on windows, after the
+/// shape; `exists` for a taken name; `not_found` for a missing middle
+/// component; `denied`; `io` for a NUL in `target`, for a closed or forged
+/// handle and otherwise. Never traps. lupin 0.1.62 checks the shape and
+/// refuses the call by name (wolf-interp#321).
+///
+/// `dir` is read. Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_symlink_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-symlink-at.tmp")?
+/// var held = true
+/// var d = fs.open_dir("doc-symlink-at.tmp") else |_| { held = false; fs.stdin() }
+/// if held { fs.symlink_at("../elsewhere", d, "l")? }
+/// fs.close(take d) else |_| { }
+/// let t = fs.read_link("doc-symlink-at.tmp/l") else List[byte]()
+/// fs.remove_dir_all("doc-symlink-at.tmp")?
+/// t.len == 12 || !held
+/// ```
+pub fn symlink_at(target: str, dir: File, name: str) -> () ! {
+    denied,
+    exists,
+    invalid,
+    io,
+    not_found,
+    unsupported,
+} {
+    fs_symlink_at(target, dir.fd, name)?
+}
+
 /// **s254 (`[os.fs.access]`, wolf 0.2.35): may this process do what
 /// `mode` asks of `path`**, by its REAL user and group ids — `access(2)`,
 /// a final link followed. `mode` is **0** (the name exists) or a sum of
