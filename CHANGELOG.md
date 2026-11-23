@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+**Held directories in `std.fs` (wolf-std#141), at wolf 0.2.40 / lupin
+0.1.62.** A program can now hold a directory open and work on the names
+inside it, whatever the directory's path has become.
+
+- `fs.DIRECTORY` is open-mode bit 32. `fs.open_dir(path) -> File ! {not_found,
+  denied, invalid, io}` opens a directory, refusing anything else and a
+  final symbolic link. A linked directory (macOS's `/tmp`) is opened by
+  resolving its path first: `fs.open_dir(fs.realpath(path)?)`.
+- Calls relative to a held directory: `open_dir_at`, `open_at`,
+  `stat_at`, `lstat_at`, `remove_at`, `remove_dir_at`, `create_dir_at`,
+  `symlink_at`, `link_at` (a final link is linked itself),
+  `link_followed_at` (a final link is followed) and `entries_at`. The
+  held directory is an ordinary `fs.File`, passed by read, so one handle
+  may be both sides of a `link_at`; `entries_at` takes it `mut`.
+- A walk that goes down only by `open_dir_at` is not carried out of its
+  tree by a directory swapped for a link: `tests/fs/at_escape_rows.lu`.
+- `fs.open_mode`'s doc names bit 32; its signature and rows are unchanged.
+- Windows answers `unsupported` to the held-directory calls and refuses
+  bit 32 as `invalid`. The reference interpreter serves bit 32, checks
+  each call's shape and then refuses the call by name.
+- New rows: `tests/fs/open_dir_rows.lu`, `at_shape_rows.lu`,
+  `at_walk_rows.lu`, `at_make_rows.lu`, `at_escape_rows.lu`, and a
+  comptime refusal for each of the nine builtins.
+
 **The record of a file system in `std.fs` (wolf-std#141), at wolf 0.2.40
 / lupin 0.1.62.**
 

@@ -40,8 +40,15 @@ Every function names the capability it reaches and records which
 execution rungs run it.
 
 The library is pre-alpha, with the compiler. The newest addition is
-`std.fs.statfs`, the record of a file system (what `df` prints), as a
-`FileSystem` whose `have` word says what the host answered. Before it,
+held directories in `std.fs`: `open_dir` opens a directory as a `File`,
+and the `…_at` calls (`open_dir_at`, `open_at`, `stat_at`, `lstat_at`,
+`remove_at`, `remove_dir_at`, `create_dir_at`, `symlink_at`, `link_at`,
+`link_followed_at`, `entries_at`) look a name up in the directory a
+handle holds, whatever its path has become, so a walk that goes down by
+`open_dir_at` is not carried out of its tree by a directory swapped for
+a link. Before them, `std.fs.statfs`, the record of a file system (what
+`df` prints), as a `FileSystem` whose `have` word says what the host
+answered. Before it,
 two handle calls in `std.fs`: `copy_chunk`, a copy the host makes from
 one open file to another without the bytes passing through the program,
 and `set_file_mode`, the mode of the file a handle holds whatever its
@@ -109,7 +116,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 690 tests. A test that passes deeper than its ledger entry claims
+all 704 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
