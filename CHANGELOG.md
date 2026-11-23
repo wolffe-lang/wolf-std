@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+**Two handle calls in `std.fs` (wolf-std#141), at wolf 0.2.40 / lupin
+0.1.62.** Both builtins shipped in earlier wolf releases and had no
+`std.fs` function.
+
+- `fs.copy_chunk(mut src, mut dst, max) -> int ! {eof, io}` makes one
+  copy the host performs, at most `max` bytes from `src`'s position to
+  `dst`'s, both advancing, and answers how many bytes moved. A program
+  loops until `eof`: how many bytes one call moves is the host's choice.
+- `fs.set_file_mode(mut f, mode) -> () ! {denied, invalid, io,
+  unsupported}` sets the permission bits of the file a handle holds,
+  whatever its name is by now (`fchmod`). Windows answers `unsupported`.
+- Both run on all three lanes, the reference interpreter included. New
+  rows: `tests/fs/copy_chunk_rows.lu`, `tests/fs/set_file_mode_rows.lu`,
+  and a comptime refusal for each builtin.
+
 **No division on secrets (sc84, wolf-std#151).** The crypto modules and
 Bech32 compute the same answers without dividing, so neither build tier
 puts a hardware divide on a key.

@@ -39,7 +39,11 @@ without notice.
 Every function names the capability it reaches and records which
 execution rungs run it.
 
-The library is pre-alpha, with the compiler. The newest change is to how
+The library is pre-alpha, with the compiler. The newest additions are
+two handle calls in `std.fs`: `copy_chunk`, a copy the host makes from
+one open file to another without the bytes passing through the program,
+and `set_file_mode`, the mode of the file a handle holds whatever its
+name is by now. Before them, the change was to how
 the crypto code is written, not what it computes: X25519 and Ed25519,
 ChaCha20-Poly1305, SHA-2 with HMAC and HKDF, and Bech32 no longer divide
 anywhere, in release or default builds, and Bech32 reads its alphabet
@@ -103,7 +107,7 @@ compiles, links and runs it.
 
 The three refuse different shapes of program, so each test records
 what each rung achieved. `tests/ledger.toml` holds those records for
-all 682 tests. A test that passes deeper than its ledger entry claims
+all 686 tests. A test that passes deeper than its ledger entry claims
 fails CI, the same as one that passes shallower, so the ledger has to
 be kept accurate in both directions.
 
