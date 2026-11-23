@@ -1384,6 +1384,109 @@ pub fn answered(info: Info, word: int) -> bool {
     info.have / bit % 2 == 1
 }
 
+/// The record of a file system, what `df` and `stat -f` print: the twelve
+/// words `statfs` answers, named, with `have` saying which of them the host
+/// answered.
+///
+/// `[os.fs.statfs]` (wolf-std#141). The fields are the clause's words in
+/// order: 0 `have`, bit `i` set when word `i` was answered (bit 0 always);
+/// 1 `block_size`, the size the host prefers for a transfer, in bytes;
+/// 2 `fragment_size`, the unit of the next three, in bytes; 3 `blocks`,
+/// 4 `free` and 5 `available`, the total, the free, and the free a process
+/// that is not privileged may use, in fragments; 6 `files` and
+/// 7 `free_files`, the file serial numbers, total and free; 8 `name_max`,
+/// the longest name a directory entry may have, in bytes; 9 `flags`, bit 0
+/// read-only and bit 1 set-id bits ignored, the same two bits on every
+/// host; 10 `type_number`, the host's number for the file system's type
+/// (ext4 `0xef53`, tmpfs `0x1021994`); 11 `id`, the file system's identity.
+/// A word the host did not answer is 0 with its `have` bit clear
+/// (`has_answer`), never a guess. The counts are the host's unsigned
+/// words in an `int`'s 64 bits, and bytes are a count times
+/// `fragment_size`: the room a copy needs to find is
+/// `available * fragment_size`.
+///
+/// **Built by `statfs` or by `file_system`, never by a literal.** If a
+/// later wolf answers a thirteenth word, this struct gains a field, and a
+/// literal of it stops compiling (the CHANGELOG would say so). A program
+/// that has the words from elsewhere, a test or a replay, calls
+/// `file_system`, which keeps compiling.
+pub struct FileSystem {
+    have: int,
+    block_size: int,
+    fragment_size: int,
+    blocks: int,
+    free: int,
+    available: int,
+    files: int,
+    free_files: int,
+    name_max: int,
+    flags: int,
+    type_number: int,
+    id: int,
+}
+
+/// The `FileSystem` of `statfs`'s words in their order, `words[0]` being
+/// `have`. A word past the end of `words` is 0 with its `have` bit
+/// cleared, and a word past the twelfth is ignored. Total.
+///
+/// `statfs` builds its answer here, and so does a program that has the
+/// words from elsewhere. Pure, comptime-safe: it reaches nothing.
+///
+/// ```wolf-doc-example
+/// let v = fs.file_system([7, 4096, 512])
+/// v.block_size == 4096 && v.fragment_size == 512 && v.blocks == 0
+/// fs.has_answer(v, 2) && !fs.has_answer(v, 3)
+/// ```
+pub fn file_system(words: List[int]) -> FileSystem {
+    var mask = 0
+    var bit = 1
+    for i in 0..12 {
+        if i < words.len {
+            mask = mask + bit
+        }
+        bit = bit * 2
+    }
+    FileSystem {
+        have: statfs_word(words, 0) & mask,
+        block_size: statfs_word(words, 1),
+        fragment_size: statfs_word(words, 2),
+        blocks: statfs_word(words, 3),
+        free: statfs_word(words, 4),
+        available: statfs_word(words, 5),
+        files: statfs_word(words, 6),
+        free_files: statfs_word(words, 7),
+        name_max: statfs_word(words, 8),
+        flags: statfs_word(words, 9),
+        type_number: statfs_word(words, 10),
+        id: statfs_word(words, 11),
+    }
+}
+
+fn statfs_word(words: List[int], i: int) -> int {
+    if i < words.len {
+        return words[i]
+    }
+    0
+}
+
+/// Whether the host answered word `word` of `v` (`FileSystem`'s table);
+/// false for a word outside `0..12`. Total and pure.
+///
+/// ```wolf-doc-example
+/// let v = fs.file_system([1, 4096])
+/// fs.has_answer(v, 0) && !fs.has_answer(v, 1) && !fs.has_answer(v, 12)
+/// ```
+pub fn has_answer(v: FileSystem, word: int) -> bool {
+    if word < 0 || word >= 12 {
+        return false
+    }
+    var bit = 1
+    for _ in 0..word {
+        bit = bit * 2
+    }
+    v.have & bit != 0
+}
+
 /// The target a symbolic link stores, as the host stored it: bytes,
 /// verbatim — a name need not be UTF-8 (`str_from_utf8` when it is).
 /// Not resolved and not checked: a dangling link reads back its target.
