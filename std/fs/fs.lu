@@ -2900,6 +2900,49 @@ pub fn link_followed_at(src_dir: File, src: str, dst_dir: File, dst: str) -> () 
     fs_link_at(src_dir.fd, src, dst_dir.fd, dst, true)?
 }
 
+/// **The entries of the held directory `dir`**, in `entries`' shape: the
+/// host's order (not sorted), no `.` or `..`, each entry its own kind and
+/// its name's bytes, a name that is not UTF-8 listed like any other. Every
+/// call reads from the first entry.
+///
+/// `[os.fs.at.readdir]` (wolf-std#141). The listing is read through a
+/// duplicate of the handle that shares its position, so two listings of
+/// one handle at once would split the entries between them: `mut dir`
+/// makes that a compile error within a program, and a program that lists
+/// one directory in two tasks opens it twice. A kind the host's entry does
+/// not carry is asked of the entry without following it; an entry gone in
+/// between is kind 2.
+///
+/// Rows: `invalid` for a `dir` that is not a directory (`ENOTDIR`);
+/// `unsupported` on windows; `not_found`, `denied`; `io` for a closed or
+/// forged handle and otherwise. Never traps. lupin 0.1.62 refuses the call
+/// by name (wolf-interp#321).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_read_dir_entries_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-entries-at.tmp/sub")?
+/// fs.write_text("doc-entries-at.tmp/f", "x")?
+/// var held = true
+/// var d = fs.open_dir("doc-entries-at.tmp") else |_| { held = false; fs.stdin() }
+/// var n = 0
+/// if held { n = fs.entries_at(mut d)?.len }
+/// var again = 0
+/// if held { again = fs.entries_at(mut d)?.len }
+/// fs.close(take d) else |_| { }
+/// fs.remove_dir_all("doc-entries-at.tmp")?
+/// (held && n == 2 && again == 2) || (!held && n == 0)
+/// ```
+pub fn entries_at(mut dir: File) -> List[Entry] ! {denied, invalid, io, not_found, unsupported} {
+    let rows = fs_read_dir_entries_at(dir.fd)?
+    var out = List[Entry]()
+    for r in rows {
+        (mut out).push(Entry { kind: r[0] as int, name: r[1..] })
+    }
+    out
+}
+
 /// **s254 (`[os.fs.access]`, wolf 0.2.35): may this process do what
 /// `mode` asks of `path`**, by its REAL user and group ids — `access(2)`,
 /// a final link followed. `mode` is **0** (the name exists) or a sum of
