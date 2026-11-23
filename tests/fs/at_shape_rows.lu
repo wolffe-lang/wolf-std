@@ -1,0 +1,174 @@
+//! check: run(exit=0, stdout="open_at_empty=invalid\nopen_at_absolute=invalid\nopen_at_mode=invalid\nopen_at_perm=invalid\nopen_dir_at_empty=invalid\nstat_at_empty=invalid\nlstat_at_absolute=invalid\nremove_at_empty=invalid\nremove_dir_at_absolute=invalid\ncreate_dir_at_mode=invalid\ncreate_dir_at_empty=invalid\nsymlink_at_target=invalid\nsymlink_at_absolute=invalid\nlink_at_src=invalid\nlink_at_dst=invalid\nlink_followed_at_src=invalid")
+//! phase: run
+//! conforms: std.fs, os.fs.at, os.fs.at.open, os.fs.at.stat, os.fs.at.lstat, os.fs.at.remove, os.fs.at.remove.dir, os.fs.at.mkdir, os.fs.at.symlink, os.fs.at.link, err.row
+//!
+//! **The shapes the `…_at` calls refuse before any host is asked**
+//! (wolf-std#141, `[os.fs.at]`): an empty or absolute name on every call,
+//! a mode outside the six and a `perm` past `0o777` on `open_at`, a `mode`
+//! past `0o777` on `create_dir_at`, an empty target on `symlink_at`. Each is
+//! `invalid` with any handle, a forged one here, on every host and every
+//! lane: the shape comes before the host (windows' `unsupported`) and
+//! before the handle. lupin 0.1.62, which refuses the calls by name, checks
+//! the shape first, so this is the family's row that runs on all three.
+
+use std.fs
+
+fn opened(dir: fs.File, name: str, mode: int, perm: int) -> str {
+    var f = fs.open_at(dir, name, mode, perm) else |e| {
+        return match e {
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    fs.close(take f) else |_| {}
+    "opened"
+}
+
+fn opened_dir(dir: fs.File, name: str) -> str {
+    var f = fs.open_dir_at(dir, name) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    fs.close(take f) else |_| {}
+    "opened"
+}
+
+fn record(dir: fs.File, name: str, link: bool) -> str {
+    var t = "record"
+    if link {
+        let r = fs.lstat_at(dir, name) else |e| {
+            return match e {
+                denied => "denied",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+        t = "record {r.kind}"
+    } else {
+        let r = fs.stat_at(dir, name) else |e| {
+            return match e {
+                denied => "denied",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+        t = "record {r.kind}"
+    }
+    t
+}
+
+fn removed(dir: fs.File, name: str, directory: bool) -> str {
+    if directory {
+        fs.remove_dir_at(dir, name) else |e| {
+            return match e {
+                denied => "denied",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+    } else {
+        fs.remove_at(dir, name) else |e| {
+            return match e {
+                denied => "denied",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+    }
+    "removed"
+}
+
+fn made_dir(dir: fs.File, name: str, mode: int) -> str {
+    fs.create_dir_at(dir, name, mode) else |e| {
+        return match e {
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    "made"
+}
+
+fn made_link(target: str, dir: fs.File, name: str) -> str {
+    fs.symlink_at(target, dir, name) else |e| {
+        return match e {
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    "made"
+}
+
+fn linked(dir: fs.File, src: str, dst: str, follow: bool) -> str {
+    if follow {
+        fs.link_followed_at(dir, src, dir, dst) else |e| {
+            return match e {
+                cross_device => "cross_device",
+                denied => "denied",
+                exists => "exists",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+    } else {
+        fs.link_at(dir, src, dir, dst) else |e| {
+            return match e {
+                cross_device => "cross_device",
+                denied => "denied",
+                exists => "exists",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+    }
+    "linked"
+}
+
+fn main() -> !int {
+    let d = fs.File { fd: 999999 }
+    print("open_at_empty={opened(d, "", 0, 0)}")
+    print("open_at_absolute={opened(d, "/etc", 0, 0)}")
+    print("open_at_mode={opened(d, "f", 6, 0)}")
+    print("open_at_perm={opened(d, "f", 0, 0o1000)}")
+    print("open_dir_at_empty={opened_dir(d, "")}")
+    print("stat_at_empty={record(d, "", false)}")
+    print("lstat_at_absolute={record(d, "/etc", true)}")
+    print("remove_at_empty={removed(d, "", false)}")
+    print("remove_dir_at_absolute={removed(d, "/tmp", true)}")
+    print("create_dir_at_mode={made_dir(d, "x", 0o1000)}")
+    print("create_dir_at_empty={made_dir(d, "", 0o755)}")
+    print("symlink_at_target={made_link("", d, "x")}")
+    print("symlink_at_absolute={made_link("t", d, "/x")}")
+    print("link_at_src={linked(d, "", "x", false)}")
+    print("link_at_dst={linked(d, "x", "/y", false)}")
+    print("link_followed_at_src={linked(d, "/x", "y", true)}")
+    0
+}

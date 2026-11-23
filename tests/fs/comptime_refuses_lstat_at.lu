@@ -1,0 +1,24 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.at.lstat
+//!
+//! **D33 for `fs.lstat_at` (wolf-std#141), held one level down at
+//! `fs_lstat_at`**: a compile may not read a held directory's link. The row is handled
+//! locally (F-0069). `main` names `fs.lstat_at` in a call the typecheck
+//! phase never runs, to keep the import used.
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_lstat_at(3, "x") else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const Z = probe()
+    let d = fs.stdin()
+    let r = fs.lstat_at(d, "x") else |_| { fs.stat(".")? }
+    print("{r.kind}")
+    print("z: {Z}")
+    0
+}

@@ -1,0 +1,24 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.at.readdir
+//!
+//! **D33 for `fs.entries_at` (wolf-std#141), held one level down at
+//! `fs_read_dir_entries_at`**: a compile may not list a held directory. The row is handled
+//! locally (F-0069). `main` names `fs.entries_at` in a call the typecheck
+//! phase never runs, to keep the import used.
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_read_dir_entries_at(3) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const Z = probe()
+    var g = fs.stdin()
+    let es = fs.entries_at(mut g) else List[fs.Entry]()
+    print("{es.len}")
+    print("z: {Z}")
+    0
+}

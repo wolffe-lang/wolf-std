@@ -1,0 +1,215 @@
+//! check: run(exit=0, stdout="held=true\nopen_at=true\nstat_at=true\nlstat_at=true\nnot_through_link=true\nlink_removed=true\nremove_at=true\nnot_a_file=true\nnot_empty=true\nremove_dir_at=true\nlisting=true\nlisting_again=true\nfile_as_dir=true\nforged=true")
+//! phase: run
+//! conforms: std.fs, std.os, os.fs.at, os.fs.at.open, os.fs.at.stat, os.fs.at.lstat, os.fs.at.remove, os.fs.at.remove.dir, os.fs.at.readdir, os.fs.open.directory, os.fs.stat, os.uname, err.row
+//!
+//! **The held-directory walk through `std.fs`** (wolf-std#141,
+//! `[os.fs.at]`). A directory is held, then renamed, and every call through
+//! the handle reaches the renamed directory's entries: `open_at` reads the
+//! file; `stat_at` and `lstat_at` answer the records `stat` and `lstat`
+//! answer by the new path (kind, size, mode, link count, identity);
+//! `remove_dir_at` refuses a link (`invalid`) and `remove_at` removes it,
+//! never the file it names; `remove_at` removes the file and refuses a
+//! directory (`io` on linux, `denied` on macOS); `remove_dir_at` refuses a
+//! directory that is not empty (`io`) and removes an empty one; `entries_at`
+//! lists what is left and two written by path, the same twice. A file's
+//! handle given as a directory is `invalid`, and a forged handle `io`.
+//!
+//! **windows** opens no directory as a file and answers each call
+//! `unsupported` after the shape: each line is printed for that reason,
+//! held to its side by `os.name()`. lupin 0.1.62 refuses the calls by name
+//! (wolf-interp#321).
+
+use std.fs
+use std.os
+
+fn rm(dir: fs.File, name: str, directory: bool) -> str {
+    if directory {
+        fs.remove_dir_at(dir, name) else |e| {
+            return match e {
+                denied => "denied",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+    } else {
+        fs.remove_at(dir, name) else |e| {
+            return match e {
+                denied => "denied",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+    }
+    "ok"
+}
+
+fn rec(dir: fs.File, name: str, link: bool) -> fs.Info ! {
+    denied,
+    invalid,
+    io,
+    not_found,
+    unsupported,
+} {
+    if link {
+        return fs.lstat_at(dir, name)?
+    }
+    fs.stat_at(dir, name)?
+}
+
+fn rec_tag(dir: fs.File, name: str) -> str {
+    let r = fs.stat_at(dir, name) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    "record {r.kind}"
+}
+
+fn same(a: fs.Info, b: fs.Info) -> bool {
+    a.kind == b.kind &&
+        a.size == b.size &&
+        a.mode == b.mode &&
+        a.nlink == b.nlink &&
+        a.dev == b.dev &&
+        a.ino == b.ino
+}
+
+fn main() -> !int {
+    let unix = os.name() != "windows"
+    let root = "at-walk.tmp"
+    fs.remove_dir_all(root) else |_| {}
+    fs.create_dir_all(root + "/inner/sub")?
+    fs.create_dir_all(root + "/inner/full")?
+    fs.write_text(root + "/inner/full/x", "x")?
+    fs.write_text(root + "/inner/f", "wolves")?
+    var linked = true
+    fs.symlink("f", root + "/inner/l") else |_| { linked = false }
+    var served = true
+    var d = fs.open_dir(root + "/inner") else |_| {
+        served = false
+        fs.File { fd: 999999 }
+    }
+    print("held={served == unix}")
+    fs.move_file(root + "/inner", root + "/moved")?
+    let m = root + "/moved"
+
+    var text = "unopened"
+    var f = fs.open_at(d, "f", 0, 0) else |e| {
+        text = match e {
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+        fs.File { fd: 0 - 1 }
+    }
+    if text == "unopened" {
+        text = fs.read(mut f, 64) else "<unread>"
+    }
+    fs.close(take f) else |_| {}
+    print("open_at={(served && text == "wolves") || (!served && text == "unsupported")}")
+
+    var stat_ok = !served
+    var lstat_ok = !served
+    if served {
+        let a = rec(d, "f", false)?
+        let pa = fs.stat(m + "/f")?
+        stat_ok = same(a, pa)
+        if linked {
+            let b = rec(d, "l", true)?
+            let pb = fs.lstat(m + "/l")?
+            lstat_ok = b.kind == 3 && same(b, pb)
+        }
+    }
+    print("stat_at={stat_ok}")
+    print("lstat_at={lstat_ok}")
+
+    let through = rm(d, "l", true)
+    print(
+        "not_through_link={(served && (!linked || through == "invalid")) || (!served && through == "unsupported")}",
+    )
+    let unlinked = rm(d, "l", false)
+    print(
+        "link_removed={(served && (!linked || (unlinked == "ok" && fs.exists(m + "/f")))) || (!served && unlinked == "unsupported")}",
+    )
+    let gone = rm(d, "f", false)
+    let dir_refused = rm(d, "full", false)
+    print(
+        "remove_at={(served && gone == "ok" && !fs.exists(m + "/f")) || (!served && gone == "unsupported")}",
+    )
+    print(
+        "not_a_file={(served && (dir_refused == "io" || dir_refused == "denied")) || (!served && dir_refused == "unsupported")}",
+    )
+    let full = rm(d, "full", true)
+    print(
+        "not_empty={(served && full == "io" && fs.is_dir(m + "/full")) || (!served && full == "unsupported")}",
+    )
+    let sub = rm(d, "sub", true)
+    print(
+        "remove_dir_at={(served && sub == "ok" && !fs.exists(m + "/sub")) || (!served && sub == "unsupported")}",
+    )
+
+    fs.write_text(m + "/a", "1")?
+    fs.write_text(m + "/b", "2")?
+    var listed = "unsupported"
+    var again = "unsupported"
+    if served {
+        listed = names(mut d)?
+        again = names(mut d)?
+    }
+    print("listing={(served && listed == "3 a b full") || (!served && listed == "unsupported")}")
+    print("listing_again={again == listed}")
+
+    var file = fs.open(m + "/a")?
+    let as_dir = rec_tag(file, "x")
+    fs.close(take file)?
+    print("file_as_dir={(unix && as_dir == "invalid") || (!unix && as_dir == "unsupported")}")
+    let forged = rec_tag(fs.File { fd: 999999 }, "x")
+    print("forged={(unix && forged == "io") || (!unix && forged == "unsupported")}")
+
+    if served {
+        fs.close(take d)?
+    }
+    fs.remove_dir_all(root)?
+    0
+}
+
+/// The listing as `"<count> <names in order>"`, each name checked against
+/// its kind: `a` and `b` files, `full` a directory.
+fn names(mut dir: fs.File) -> str ! {denied, invalid, io, not_found, unsupported} {
+    let es = fs.entries_at(mut dir)?
+    var a = false
+    var b = false
+    var full = false
+    for e in es {
+        let n = str_from_utf8(e.name) else "?"
+        if n == "a" && e.kind == 0 {
+            a = true
+        } else if n == "b" && e.kind == 0 {
+            b = true
+        } else if n == "full" && e.kind == 1 {
+            full = true
+        }
+    }
+    var out = "{es.len}"
+    if a {
+        out = out + " a"
+    }
+    if b {
+        out = out + " b"
+    }
+    if full {
+        out = out + " full"
+    }
+    out
+}

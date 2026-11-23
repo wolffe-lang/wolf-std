@@ -5143,6 +5143,79 @@ lupin = "run"
 wolfc = "run"
 native = "run"
 
+# `fs/at_shape_rows.lu`: every held-directory call's shape refusals, before
+# the host and the handle; lupin 0.1.62 checks the shape before it refuses
+# the calls by name, so the row runs on all three.
+[tests."fs/at_shape_rows.lu"]
+lupin = "run"
+wolfc = "run"
+native = "run"
+
+# `fs/at_walk_rows.lu`, `fs/at_make_rows.lu`, `fs/at_escape_rows.lu`: the
+# held-directory calls through a renamed directory, the names they make,
+# and the swapped-in link the walk does not follow. lupin 0.1.62 refuses
+# the calls by name ("std has no descriptor-relative call",
+# wolf-interp#321).
+[tests."fs/at_walk_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/at_make_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/at_escape_rows.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_open_at.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_stat_at.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_lstat_at.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_remove_at.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_remove_dir_at.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_create_dir_at.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_symlink_at.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_link_at.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
+[tests."fs/comptime_refuses_read_dir_entries_at.lu"]
+lupin = "unsupported"
+wolfc = "run"
+native = "run"
+
 [tests."os/comptime_refuses_name.lu"]
 lupin = "unsupported"
 wolfc = "run"

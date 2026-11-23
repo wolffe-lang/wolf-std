@@ -1,0 +1,23 @@
+//! check: fail(E0701)
+//! phase: typecheck
+//! conforms: std.fs, comptime.sandbox, comptime.sandbox.fs, os.fs.at.link
+//!
+//! **D33 for `fs.link_at` (wolf-std#141), held one level down at
+//! `fs_link_at`**: a compile may not give a file a second name between held directories. The row is handled
+//! locally (F-0069). `main` names `fs.link_at` in a call the typecheck
+//! phase never runs, to keep the import used.
+
+use std.fs
+
+comptime fn probe() -> int {
+    fs_link_at(3, "a", 3, "b", false) else |_| { return 1 }
+    0
+}
+
+fn main() -> !int {
+    const Z = probe()
+    let d = fs.stdin()
+    fs.link_at(d, "a", d, "b") else |_| {}
+    print("z: {Z}")
+    0
+}

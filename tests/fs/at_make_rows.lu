@@ -1,0 +1,163 @@
+//! check: run(exit=0, stdout="made_after_move=true\ntarget_verbatim=true\nlink_kind=true\nlinked_itself=true\nlinked_target=true\nacross_two=true\ntaken=true")
+//! phase: run
+//! conforms: std.fs, std.os, os.fs.at, os.fs.at.mkdir, os.fs.at.symlink, os.fs.at.link, os.fs.at.lstat, os.fs.readlink, os.fs.stat, os.uname, err.row
+//!
+//! **Making names under a held directory** (wolf-std#141, `[os.fs.at]`).
+//! A directory is held and renamed, and `create_dir_at` makes a directory
+//! under the NEW name, not the old; `symlink_at`'s target reads back
+//! verbatim through `read_link`, and `lstat_at` says kind 3; `link_at`
+//! within ONE held directory (both handles the same, both read) links a
+//! link itself, and `link_followed_at` links the file it names; `link_at`
+//! between two held directories, after both moved, makes a second name of
+//! the file; each call answers `exists` on a taken name. `cross_device`
+//! needs two file systems and is not witnessed here.
+//!
+//! **windows** opens no directory as a file and answers each call
+//! `unsupported` after the shape: each line is printed for that reason,
+//! held to its side by `os.name()`. lupin 0.1.62 refuses the calls by name
+//! (wolf-interp#321).
+
+use std.fs
+use std.os
+
+fn held(path: str) -> fs.File {
+    fs.open_dir(path) else |_| {
+        return fs.File { fd: 999999 }
+    }
+}
+
+fn mk(dir: fs.File, name: str) -> str {
+    fs.create_dir_at(dir, name, 0o755) else |e| {
+        return match e {
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn ln_s(target: str, dir: fs.File, name: str) -> str {
+    fs.symlink_at(target, dir, name) else |e| {
+        return match e {
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    "ok"
+}
+
+fn ln(a: fs.File, src: str, b: fs.File, dst: str, follow: bool) -> str {
+    if follow {
+        fs.link_followed_at(a, src, b, dst) else |e| {
+            return match e {
+                cross_device => "cross_device",
+                denied => "denied",
+                exists => "exists",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+    } else {
+        fs.link_at(a, src, b, dst) else |e| {
+            return match e {
+                cross_device => "cross_device",
+                denied => "denied",
+                exists => "exists",
+                invalid => "invalid",
+                io => "io",
+                not_found => "not_found",
+                unsupported => "unsupported",
+            }
+        }
+    }
+    "ok"
+}
+
+fn main() -> !int {
+    let unix = os.name() != "windows"
+    let root = "at-make.tmp"
+    fs.remove_dir_all(root) else |_| {}
+    fs.create_dir_all(root + "/p")?
+    fs.create_dir_all(root + "/e0")?
+    let d = held(root + "/p")
+    let e = held(root + "/e0")
+    let served = d.fd != 999999 && e.fd != 999999
+    fs.move_file(root + "/p", root + "/q")?
+    fs.move_file(root + "/e0", root + "/e1")?
+    let q = root + "/q"
+
+    let made = mk(d, "new")
+    let placed = fs.is_dir(q + "/new") && !fs.exists(root + "/p")
+    print(
+        "made_after_move={(served && made == "ok" && placed) || (!served && made == "unsupported")}",
+    )
+
+    let sl = ln_s("../elsewhere/x", d, "l")
+    var target = ""
+    if sl == "ok" {
+        let raw = fs.read_link(q + "/l")?
+        target = str_from_utf8(raw)?
+    }
+    print(
+        "target_verbatim={(served && target == "../elsewhere/x") || (!served && sl == "unsupported")}",
+    )
+    var kind = 0 - 1
+    if served {
+        kind = fs.lstat_at(d, "l")?.kind
+    }
+    print("link_kind={(served && kind == 3) || !served}")
+
+    let itself = ln(d, "l", d, "hl", false)
+    var itself_ok = false
+    if served && itself == "ok" {
+        let a = fs.lstat(q + "/hl")?
+        let b = fs.lstat(q + "/l")?
+        itself_ok = a.kind == 3 && a.ino == b.ino
+    }
+    print("linked_itself={itself_ok || (!served && itself == "unsupported")}")
+
+    fs.write_text(q + "/f", "wolves")?
+    let lf = ln_s("f", d, "lf")
+    let followed = ln(d, "lf", d, "hf", true)
+    var followed_ok = false
+    if served && lf == "ok" && followed == "ok" {
+        let a = fs.lstat(q + "/hf")?
+        let b = fs.stat(q + "/f")?
+        followed_ok = a.kind == 0 && a.ino == b.ino
+    }
+    print("linked_target={followed_ok || (!served && followed == "unsupported")}")
+
+    let across = ln(d, "f", e, "g", false)
+    var across_ok = false
+    if served && across == "ok" {
+        let a = fs.stat(root + "/e1/g")?
+        let b = fs.stat(q + "/f")?
+        let text = fs.read_text(root + "/e1/g")?
+        across_ok = a.ino == b.ino && text == "wolves"
+    }
+    print("across_two={across_ok || (!served && across == "unsupported")}")
+
+    let t1 = mk(d, "new")
+    let t2 = ln_s("x", d, "l")
+    let t3 = ln(d, "f", d, "hl", false)
+    let all_exists = t1 == "exists" && t2 == "exists" && t3 == "exists"
+    let all_unsupported = t1 == "unsupported" && t2 == "unsupported" && t3 == "unsupported"
+    print("taken={(served && all_exists) || (!served && all_unsupported)}")
+
+    if served {
+        fs.close(take d)?
+        fs.close(take e)?
+    }
+    fs.remove_dir_all(root)?
+    0
+}

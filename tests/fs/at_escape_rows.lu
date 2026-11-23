@@ -1,0 +1,96 @@
+//! check: run(exit=0, stdout="component_link_refused=true\nbits_matter=true\nlink_removed_not_target=true\noutside_untouched=true")
+//! phase: run
+//! conforms: std.fs, std.os, os.fs.at, os.fs.at.open, os.fs.at.remove, os.fs.at.readdir, os.fs.open.directory, os.fs.open.nofollow, os.fs.symlink, os.uname, err.row
+//!
+//! **What the held-directory walk is for** (wolf-std#141, `[os.fs.at]`):
+//! a walk holding `tree` goes down by `fs.open_dir_at`, and a directory
+//! `d` under it is swapped, between two steps, for a link to a directory
+//! outside the tree. `open_dir_at(tree, "d")` is `invalid`: the walk is
+//! not carried out. The same open with the directory bit alone FOLLOWS
+//! the link and lists the outside directory's file, which is what makes
+//! this fixture an escape and the refusal the property (the link's target
+//! is relative to the link, `../outside`, so it resolves). `remove_at`
+//! then removes the link, and the outside file is still there, unchanged.
+//!
+//! **windows** makes no symbolic link and opens no directory as a file:
+//! each line is printed for that reason, held to its side by `os.name()`.
+//! lupin 0.1.62 refuses the calls by name (wolf-interp#321).
+
+use std.fs
+use std.os
+
+fn listing(dir: fs.File, name: str, mode: int) -> str {
+    var g = fs.open_at(dir, name, mode, 0) else |e| {
+        return match e {
+            denied => "denied",
+            exists => "exists",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    let es = fs.entries_at(mut g) else |_| { List[fs.Entry]() }
+    fs.close(take g) else |_| {}
+    var names = ""
+    for e in es {
+        names = names + (str_from_utf8(e.name) else "?")
+    }
+    "lists {names}"
+}
+
+fn descend(dir: fs.File, name: str) -> str {
+    var g = fs.open_dir_at(dir, name) else |e| {
+        return match e {
+            denied => "denied",
+            invalid => "invalid",
+            io => "io",
+            not_found => "not_found",
+            unsupported => "unsupported",
+        }
+    }
+    fs.close(take g) else |_| {}
+    "descended"
+}
+
+fn main() -> !int {
+    let unix = os.name() != "windows"
+    let root = "at-escape.tmp"
+    fs.remove_dir_all(root) else |_| {}
+    fs.create_dir_all(root + "/tree/d")?
+    fs.create_dir_all(root + "/outside")?
+    fs.write_text(root + "/outside/secret", "kept")?
+    var served = true
+    let tree = fs.open_dir(root + "/tree") else |_| {
+        served = false
+        fs.File { fd: 999999 }
+    }
+    let before = descend(tree, "d")
+    fs.move_file(root + "/tree/d", root + "/aside")?
+    var linked = true
+    fs.symlink("../outside", root + "/tree/d") else |_| { linked = false }
+    let swapped = served && linked && before == "descended"
+
+    let refused = descend(tree, "d")
+    print("component_link_refused={(swapped && refused == "invalid") || (!unix && !swapped)}")
+    let followed = listing(tree, "d", fs.DIRECTORY)
+    print("bits_matter={(swapped && followed == "lists secret") || (!unix && !swapped)}")
+
+    var removed = "unremoved"
+    if swapped {
+        fs.remove_at(tree, "d")?
+        removed = "removed"
+    }
+    let link_gone = !fs.exists(root + "/tree/d")
+    print(
+        "link_removed_not_target={(swapped && removed == "removed" && link_gone && fs.exists(root + "/outside/secret")) || (!unix && !swapped)}",
+    )
+    let kept = fs.read_text(root + "/outside/secret")?
+    print("outside_untouched={kept == "kept" && fs.is_dir(root + "/aside")}")
+
+    if served {
+        fs.close(take tree)?
+    }
+    fs.remove_dir_all(root)?
+    0
+}
