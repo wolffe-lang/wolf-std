@@ -2824,6 +2824,82 @@ pub fn symlink_at(target: str, dir: File, name: str) -> () ! {
     fs_symlink_at(target, dir.fd, name)?
 }
 
+/// **Make `dst` in the held directory `dst_dir` a second name of the file
+/// `src` names in the held directory `src_dir`**, a final link in `src`
+/// linked ITSELF (`link`'s rule, on every host). The two directories may
+/// be one handle: both are read.
+///
+/// `[os.fs.at.link]` (wolf-std#141). Never a replacement. Rows: `invalid`
+/// for an empty or absolute `src` or `dst`, before the host, and for a
+/// handle that is not a directory; `unsupported` on windows, after the
+/// shape; `exists` for a taken `dst`; `not_found` for a missing `src` or
+/// middle component; `cross_device` across two file systems (no test here
+/// can make two, so the row is stated and not witnessed); `denied` for a
+/// directory and where the host refuses; `io` for a closed or forged
+/// handle and otherwise. Never traps. lupin 0.1.62 checks the shape and
+/// refuses the call by name (wolf-interp#321).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_link_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-link-at.tmp")?
+/// fs.write_text("doc-link-at.tmp/a", "wolves")?
+/// var held = true
+/// var d = fs.open_dir("doc-link-at.tmp") else |_| { held = false; fs.stdin() }
+/// if held { fs.link_at(d, "a", d, "b")? }
+/// fs.close(take d) else |_| { }
+/// let b = fs.read_text("doc-link-at.tmp/b") else ""
+/// fs.remove_dir_all("doc-link-at.tmp")?
+/// (b == "wolves") == held
+/// ```
+pub fn link_at(src_dir: File, src: str, dst_dir: File, dst: str) -> () ! {
+    cross_device,
+    denied,
+    exists,
+    invalid,
+    io,
+    not_found,
+    unsupported,
+} {
+    fs_link_at(src_dir.fd, src, dst_dir.fd, dst, false)?
+}
+
+/// **`link_at` with a final link in `src` FOLLOWED**: the new name is a
+/// second name of what the link names (`AT_SYMLINK_FOLLOW`). macOS's
+/// `link(1)` follows and linux's does not, so a program that matches its
+/// host's `ln` picks this call on macOS and `link_at` on linux.
+///
+/// `[os.fs.at.link]` (wolf-std#141). Rows as `link_at`'s; a dangling link
+/// followed is `not_found`. lupin 0.1.62 checks the shape and refuses the
+/// call by name (wolf-interp#321).
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to `fs_link_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-link-followed-at.tmp")?
+/// fs.write_text("doc-link-followed-at.tmp/a", "x")?
+/// var linked = true
+/// fs.symlink("a", "doc-link-followed-at.tmp/l") else |_| { linked = false }
+/// var d = fs.open_dir("doc-link-followed-at.tmp") else |_| { linked = false; fs.stdin() }
+/// if linked { fs.link_followed_at(d, "l", d, "b")? }
+/// fs.close(take d) else |_| { }
+/// var kind = 0 - 1
+/// if linked { kind = fs.lstat("doc-link-followed-at.tmp/b")?.kind }
+/// fs.remove_dir_all("doc-link-followed-at.tmp")?
+/// kind == 0 || !linked
+/// ```
+pub fn link_followed_at(src_dir: File, src: str, dst_dir: File, dst: str) -> () ! {
+    cross_device,
+    denied,
+    exists,
+    invalid,
+    io,
+    not_found,
+    unsupported,
+} {
+    fs_link_at(src_dir.fd, src, dst_dir.fd, dst, true)?
+}
+
 /// **s254 (`[os.fs.access]`, wolf 0.2.35): may this process do what
 /// `mode` asks of `path`**, by its REAL user and group ids — `access(2)`,
 /// a final link followed. `mode` is **0** (the name exists) or a sum of
