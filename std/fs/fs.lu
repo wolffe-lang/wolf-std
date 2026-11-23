@@ -2153,6 +2153,43 @@ pub fn set_file_owner(mut f: File, uid: int, gid: int) -> () ! {denied, invalid,
     fs_set_owner_fd(f.fd, uid, gid)?
 }
 
+/// Set the permission bits of the file behind `f` to exactly `mode`:
+/// `fchmod`, the handle form of `set_mode`.
+///
+/// `[os.fs.mode.fd]` (wolf-std#141): the file the handle holds, whatever
+/// its name is by now, so a mode applied after a creation cannot land on
+/// another file renamed over the name in between. `mode` is `set_mode`'s
+/// twelve bits, written in octal (`0o600`); the umask plays no part. A
+/// handle over a directory is a directory's mode.
+///
+/// Rows: `invalid` when `mode` is outside `0..=0o7777`, decided before the
+/// host is asked; `denied` when this process does not own the file;
+/// `unsupported` on windows, which has no permission bits, after the
+/// shape; `io` for a closed or forged handle and for every other host
+/// refusal, the host's number in `os_error()` (macOS refuses a pipe's end
+/// with `EINVAL`, where linux sets the pipe's mode). Never traps.
+///
+/// `mut f`, as `set_file_owner`: the call acts on the file the handle
+/// names. Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_set_mode_fd`, which every lane serves.
+///
+/// ```wolf-doc-example
+/// fs.write_text("doc-set-file-mode.tmp", "x")?
+/// var f = fs.open("doc-set-file-mode.tmp")?
+/// var row = "set"
+/// fs.set_file_mode(mut f, 0o600) else |_| { row = "refused" }
+/// var past = "set"
+/// fs.set_file_mode(mut f, 0o10000) else |_| { past = "refused" }
+/// let held = fs.fstat_record(mut f)?
+/// fs.close(take f)?
+/// fs.remove("doc-set-file-mode.tmp")?
+/// past == "refused"
+/// (row == "set" && held.mode == 0o600) || (row == "refused" && !fs.answered(held, 4))
+/// ```
+pub fn set_file_mode(mut f: File, mode: int) -> () ! {denied, invalid, io, unsupported} {
+    fs_set_mode_fd(f.fd, mode)?
+}
+
 /// Make the file behind `f` exactly `len` bytes long.
 ///
 /// `[os.fs.truncate]` (wolf-lang#702): shorter, the tail gone; or
