@@ -2429,9 +2429,23 @@ pub fn sync_dir(path: str) -> () ! {denied, invalid, io, not_found, unsupported}
 /// ```
 pub const NOFOLLOW: int = 16
 
+/// The flag that makes an open refuse anything but a directory
+/// (`[os.fs.open.directory]`, wolf 0.2.37): bit 32, added to read mode 0
+/// or 5 of `open_mode` or `open_at`. `fs.open_mode(path, fs.DIRECTORY +
+/// fs.NOFOLLOW)` is `open_dir`. A name that is not a directory is then
+/// `invalid` (the host's `ENOTDIR` in `os_error()`), and a fifo is refused
+/// before it is opened, so the open never waits on one. Beside a writing
+/// mode the bit is `invalid` before the host, and so it is on windows,
+/// where no directory opens as a file.
+///
+/// ```wolf-doc-example
+/// fs.DIRECTORY == 32
+/// ```
+pub const DIRECTORY: int = 32
+
 /// **Open `path` in one of `[os.fs.open]`'s six modes, by number** — the
 /// moded open the named ones above are spellings of, and the only one
-/// that reaches modes 3 and 5 and the `NOFOLLOW` flag:
+/// that reaches modes 3 and 5 and the `NOFOLLOW` and `DIRECTORY` flags:
 ///
 /// - **0** read (`open`), **1** write, creating and truncating
 ///   (`create`), **2** append, creating (`open_append`);
@@ -2443,14 +2457,18 @@ pub const NOFOLLOW: int = 16
 ///   server's open, before `fstat` classifies the handle).
 ///
 /// `mode + NOFOLLOW` refuses a final symbolic link (`NOFOLLOW`'s doc);
-/// mode 4 answers `exists` on a link with or without it.
+/// mode 4 answers `exists` on a link with or without it. `DIRECTORY`
+/// added to mode 0 or 5 refuses anything but a directory (`DIRECTORY`'s
+/// doc; `open_dir` is mode 0 with both flags).
 ///
-/// Rows: `invalid` for a mode outside the six (with or without the flag)
-/// and any other bit above them, before the filesystem is touched; and
-/// for a final link under `NOFOLLOW`; `exists` for mode 4 on a taken
-/// name; `not_found` for a missing name (modes 0 and 5) or parent;
-/// `denied`; `io` otherwise. Never traps. lupin serves the six modes
-/// inside its tree, and the flag from 0.1.60 (wolf-interp#278).
+/// Rows: `invalid` for a mode outside the six (with or without the flags)
+/// and any other bit above them, and for `DIRECTORY` beside a writing
+/// mode, before the filesystem is touched; for a final link under
+/// `NOFOLLOW` and a name that is not a directory under `DIRECTORY`;
+/// `exists` for mode 4 on a taken name; `not_found` for a missing name
+/// (modes 0 and 5) or parent; `denied`; `io` otherwise. Never traps. lupin
+/// serves the six modes inside its tree, and both flags from 0.1.60
+/// (wolf-interp#278).
 ///
 /// Capability `fs`; refused at comptime (D33). Delegates to
 /// `fs_open_mode`.
@@ -2472,6 +2490,50 @@ pub const NOFOLLOW: int = 16
 /// ```
 pub fn open_mode(path: str, mode: int) -> File ! {not_found, denied, exists, invalid, io} {
     File { fd: fs_open_mode(path, mode)? }
+}
+
+/// **A held directory**: `path` opened read-only as a directory, a final
+/// symbolic link refused (`open_mode(path, DIRECTORY + NOFOLLOW)`), for
+/// the `…_at` calls, which look a name up in the directory the handle
+/// holds whatever its path has become.
+///
+/// `[os.fs.open.directory]`, `[os.fs.at]` (wolf-std#141). The handle is a
+/// `File`: `fstat_record`, `set_file_mode`, `set_file_owner` and `close`
+/// serve it, and a read of it is `io`. A walk that must stay inside a tree
+/// starts here and goes down only by `open_dir_at`, one name at a time. A
+/// link in a middle component of `path` is followed, as by every path call.
+///
+/// A link as the last component is refused even when it names a
+/// directory, so on macOS `open_dir("/tmp")` is `invalid` (`/tmp` is a link
+/// to `/private/tmp`); a program that means to open a linked directory
+/// resolves the path first, `open_dir(realpath(path)?)`, as the example
+/// does.
+///
+/// Rows: `invalid` for a name that is not a directory or is a link (the
+/// host's `ENOTDIR` in `os_error()`, on linux and macOS alike), and on
+/// windows for every path, before the host; `not_found` for a missing
+/// name; `denied`; `io` otherwise. Never traps. lupin serves it inside its
+/// tree.
+///
+/// Capability `fs`; refused at comptime (D33). Delegates to
+/// `fs_open_mode`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-open-dir.tmp/real")?
+/// var linked = true
+/// fs.symlink("real", "doc-open-dir.tmp/link") else |_| { linked = false }
+/// var direct = "held"
+/// var a = fs.open_dir("doc-open-dir.tmp/link") else |_| { direct = "refused"; fs.stdin() }
+/// let real = fs.realpath("doc-open-dir.tmp/link") else ""
+/// var resolved = "held"
+/// var b = fs.open_dir(real) else |_| { resolved = "refused"; fs.stdin() }
+/// fs.close(take a) else |_| { }
+/// fs.close(take b) else |_| { }
+/// fs.remove_dir_all("doc-open-dir.tmp")?
+/// (linked && direct == "refused" && resolved == "held") || (!linked && resolved == "refused")
+/// ```
+pub fn open_dir(path: str) -> File ! {not_found, denied, invalid, io} {
+    File { fd: dir_fd(path)? }
 }
 
 /// **s254 (`[os.fs.access]`, wolf 0.2.35): may this process do what
@@ -2876,3 +2938,17 @@ fn append_fd(path: str) -> int ! IoErrors {
         io => { return io },
     }
 }
+
+/// A held directory's descriptor for `path`, `open_dir`'s open, with the
+/// tag a read open cannot reach (`exists`, mode 4's) coarsened to `io`,
+/// `append_fd`'s rule.
+fn dir_fd(path: str) -> int ! {not_found, denied, invalid, io} {
+    fs_open_mode(path, DIRECTORY + NOFOLLOW) else |e| match e {
+        not_found => { return not_found },
+        denied => { return denied },
+        invalid => { return invalid },
+        exists => { return io },
+        io => { return io },
+    }
+}
+
