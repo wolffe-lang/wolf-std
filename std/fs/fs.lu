@@ -2536,6 +2536,95 @@ pub fn open_dir(path: str) -> File ! {not_found, denied, invalid, io} {
     File { fd: dir_fd(path)? }
 }
 
+/// **The directory `name` in the held directory `dir`**, opened the way
+/// `open_dir` opens a path: read-only, a directory or refused, a link
+/// refused. A walk that goes down only by this call cannot be carried out
+/// of its tree by a directory someone swaps for a link between two of its
+/// steps.
+///
+/// `[os.fs.at.open]` (wolf-std#141): `open_at(dir, name, DIRECTORY +
+/// NOFOLLOW, 0)`. One component is the confining use; `..` and a name with
+/// slashes are served as the host resolves them, as for `open_at`.
+///
+/// Rows: `invalid` for an empty or absolute `name`, before the host; for a
+/// name that is not a directory or is a link; and for a `dir` that is not
+/// a directory (`ENOTDIR` in `os_error()`); `unsupported` on windows, after
+/// the shape; `not_found` for a missing name; `denied`; `io` for a closed
+/// or forged handle and otherwise. Never traps. lupin 0.1.62 checks the
+/// shape and refuses the call by name (wolf-interp#321).
+///
+/// `dir` is read: the call acts on a name the directory holds, never on
+/// the handle, so one handle serves any number of calls. Capability `fs`;
+/// refused at comptime (D33). Delegates to `fs_open_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-open-dir-at.tmp/sub")?
+/// fs.write_text("doc-open-dir-at.tmp/f", "x")?
+/// var held = true
+/// var d = fs.open_dir("doc-open-dir-at.tmp") else |_| { held = false; fs.stdin() }
+/// var sub = "held"
+/// var s = fs.open_dir_at(d, "sub") else |_| { sub = "refused"; fs.stdin() }
+/// var file = "held"
+/// var f = fs.open_dir_at(d, "f") else |_| { file = "refused"; fs.stdin() }
+/// fs.close(take s) else |_| { }
+/// fs.close(take f) else |_| { }
+/// fs.close(take d) else |_| { }
+/// fs.remove_dir_all("doc-open-dir-at.tmp")?
+/// (held && sub == "held" && file == "refused") || (!held && sub == "refused")
+/// ```
+pub fn open_dir_at(dir: File, name: str) -> File ! {denied, invalid, io, not_found, unsupported} {
+    File { fd: dir_at_fd(dir.fd, name)? }
+}
+
+/// **`name` in the held directory `dir`, opened** in one of `open_mode`'s
+/// six modes with its flags, a file the call creates getting `perm` less
+/// the umask from its first instant: `openat(2)`, the open relative to a
+/// directory the program holds.
+///
+/// `[os.fs.at.open]` (wolf-std#141). `mode` is `open_mode`'s: 0 read, 1
+/// write creating and truncating, 2 append, 3 read and write creating, 4
+/// the exclusive create, 5 read without waiting; plus `NOFOLLOW`, and on 0
+/// and 5 `DIRECTORY`. `perm` is `create_with_mode`'s nine bits, only
+/// checked when nothing is created. `open_dir_at` is this call with
+/// `DIRECTORY + NOFOLLOW`.
+///
+/// Rows: `invalid`, before the host, for a mode outside the six or a bit
+/// above the flags, for `perm` outside `0..=0o777` and for an empty or
+/// absolute `name`; then for a final link under `NOFOLLOW`, a name that is
+/// not a directory under `DIRECTORY` and a `dir` that is not a directory;
+/// `unsupported` on windows, after the shape; `exists` for mode 4 on a
+/// taken name, a link included; `not_found` for a missing name (modes 0
+/// and 5) or middle component; `denied`; `io` for a closed or forged handle
+/// and otherwise. Never traps. lupin 0.1.62 checks the shape and refuses
+/// the call by name (wolf-interp#321).
+///
+/// `dir` is read, as in every `…_at` call. Capability `fs`; refused at
+/// comptime (D33). Delegates to `fs_open_at`.
+///
+/// ```wolf-doc-example
+/// fs.create_dir_all("doc-open-at.tmp")?
+/// var held = true
+/// var d = fs.open_dir("doc-open-at.tmp") else |_| { held = false; fs.stdin() }
+/// var made = true
+/// var f = fs.open_at(d, "new", 4, 0o600) else |_| { made = false; fs.stdin() }
+/// if made { fs.write(mut f, "wolves")? }
+/// fs.close(take f) else |_| { }
+/// fs.close(take d) else |_| { }
+/// let text = fs.read_text("doc-open-at.tmp/new") else ""
+/// fs.remove_dir_all("doc-open-at.tmp")?
+/// (held && made && text == "wolves") || (!held && !made)
+/// ```
+pub fn open_at(dir: File, name: str, mode: int, perm: int) -> File ! {
+    denied,
+    exists,
+    invalid,
+    io,
+    not_found,
+    unsupported,
+} {
+    File { fd: fs_open_at(dir.fd, name, mode, perm)? }
+}
+
 /// **s254 (`[os.fs.access]`, wolf 0.2.35): may this process do what
 /// `mode` asks of `path`**, by its REAL user and group ids — `access(2)`,
 /// a final link followed. `mode` is **0** (the name exists) or a sum of
@@ -2952,3 +3041,15 @@ fn dir_fd(path: str) -> int ! {not_found, denied, invalid, io} {
     }
 }
 
+/// `open_dir_at`'s open of `name` in the held directory `dir`, `exists`
+/// coarsened to `io` as in `dir_fd`.
+fn dir_at_fd(dir: int, name: str) -> int ! {denied, invalid, io, not_found, unsupported} {
+    fs_open_at(dir, name, DIRECTORY + NOFOLLOW, 0) else |e| match e {
+        denied => { return denied },
+        invalid => { return invalid },
+        io => { return io },
+        not_found => { return not_found },
+        unsupported => { return unsupported },
+        exists => { return io },
+    }
+}
