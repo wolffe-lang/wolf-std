@@ -205,6 +205,17 @@ carrier.
 - NEVER edit `vendor/upstream/` snapshots by hand. `sync-pin` treats a
   hand edit as corruption.
 
+## The scheduled run of `ci.yml`
+
+Every night `ci.yml` runs `tier all`, every job on every host, except at a
+commit whose `tier all` is already green from the last 144 hours: that night
+runs nothing, its last job is named `tier skipped`, and the run's page names
+the green run that covers it. A skipped night is green but tested nothing, so
+the last night that tested trunk is the last `tier all` check, not the last
+green scheduled run. A commit that does not move is still tested in full at
+least every seventh night. `nightly.yml`, the drift watch, is a workflow of
+its own and is never skipped.
+
 ## Commits
 
 Chunked (one logical change), terse imperative, <250 chars, tests in the
