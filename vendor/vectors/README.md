@@ -9,9 +9,9 @@ ci) and quoted by the hand-written
 `tests/x/crypto/chacha20/known_answers.lu` / `rfc8439_a*.lu`. Never edit a
 vendored file; re-vendor from the source and re-run the generator, each
 in its own commit. The spec documents themselves (FIPS 180-4, FIPS
-198-1, the RFC texts, the CAVP zip) are fetched into the planning repo's
-`refs/specs/` per the report-11 provenance discipline; what lives here
-is exactly the vector data the rig consumes.
+198-1, the CAVP zip) are not vendored, and an RFC text is vendored only
+where a section below names it; what lives here is exactly the vector
+data the rig consumes.
 
 ## Sources (retrieved 2026-08-26)
 
@@ -62,9 +62,8 @@ fe61d25f90e1bde4461d00eafe61049e5f29bd999f36b766df9cda90906ad53d  wycheproof/cha
   texts (`https://www.rfc-editor.org/rfc/`): the implementation
   authorities for `std.x.crypto.curve25519` (X25519 and Ed25519) and
   the source its hand-written vector tests quote. RFC 8446 §7.4.2 (the
-  reject-on-zero requirement the module cites) is fetched to the
-  planning repo's `refs/specs/` but not vendored here: it contributes a
-  cited RULE, not vector data.
+  reject-on-zero requirement the module cites) is not vendored for this
+  module: it contributes a cited RULE, not vector data.
 - `wycheproof/x25519_test.json`, `wycheproof/ed25519_test.json` —
   Project Wycheproof (C2SP), `testvectors_v1` at
   `https://github.com/C2SP/wycheproof/blob/master/testvectors_v1/`.
