@@ -18,7 +18,7 @@ construct a small v1 file and corrupt its counts, flags and indexes.
 ## Leap-aware fixtures (sc74)
 
 `right/{UTC,America/New_York,Europe/London}` are byte-identical copies
-from kasumi's system tzdata `2026e-1.1` (2026-10-25), public-domain data.
+from a Linux x86-64 host's system tzdata `2026e-1.1` (2026-10-25), public-domain data.
 SHA256, in that order:
 
 - `ba3f58c59f1dd7b807fb3fe09c4dbabac2465307d7f5044c18cdd7f721c44fcb`
