@@ -126,7 +126,16 @@ parser contract):
   (duplicates are errors): `check:`, `phase:`, `conforms:`, `member:`.
 - `[conf.directive.check]` `check: pass | fail(CODE) | run(exit=N |
   exit=nonzero | exit=trap | exit=trap(kind) [, stdout="…"])` — kinds
-  from `[conf.trap.set]`; unknown kinds/phases are errors. A
+  from `[conf.trap.set]`; unknown kinds/phases are errors. `pass`
+  promises that the program completes the static ladder and nothing
+  about running it: a full run's `exit(N)`, `trap(kind)` and `ub(…)`
+  all match it, as `[proto.cmp.pass]` reads a `pass` record against a
+  dynamic verdict. A row that wants a dynamic claim spells `run(…)`.
+  (Amended for wolf-lang#603 and wolf-interp#202:
+  `conc/atomic_race_plain.lu` is a data race by design; the checked
+  machine and the reference interpreter detect it as
+  `[conc.mm.race.3]` permits, and the interpreter's corpus walk called
+  that a mismatch.) A
   `fail(CODE)` expectation matches the failing code exactly.
   `exit=nonzero` matches an `exit(N)` verdict whose N is not 0 and
   nothing else: not a trap (a trap is its own outcome class, spelled
@@ -418,7 +427,8 @@ exhausted` arrived — an OOM where an honest refusal was owed.)
   cost, stated:** one host thread per task that has started and not
   finished, each with the tier's 64 MiB of reserved stack
   (`[exec.checked.budget]`), made at the task's first schedule and
-  gone at its end; the step and byte budgets are the run's, summed
+  gone at its end, and one for each dial waiting beside other tasks,
+  gone when it answers; the step and byte budgets are the run's, summed
   over its tasks. A host with no thread to give answers `unsupported`
   at the first schedule of a second task. A trap in a task is
   `[conc.task.fail]`'s failure, re-raised at its scope's exit, or the
@@ -429,7 +439,10 @@ exhausted` arrived — an OOM where an honest refusal was owed.)
   monitor as `error` — wolf-interp#228; ruled A (#63), 2026-10-11.) A run whose root domain is killed
   (`[conc.proc.root]`) exits 121, the native runtime's number. A host
   call that would park the machine's one running thread — an accept, a
-  read on a socket, a readiness wait over a set (`net_wait`), a write
+  read on a socket, a dial the kernel holds (`net_connect` or
+  `net_connect_within` to a listener whose backlog is full), a readiness
+  wait over a set
+  (`net_wait`), a write
   to a socket whose buffers are full (`net_write`, `net_write_bytes`,
   `net_writev`, `net_writev_head`), a signal wait, a sleep — waits a
   millisecond at a time while other tasks exist
@@ -448,7 +461,24 @@ exhausted` arrived — an OOM where an honest refusal was owed.)
   each write was one blocking call for all its bytes, so a write past
   the socket's buffers to a task of the same machine that would read
   them never let that task run — wolf-lang#777,
-  `crates/wolf_driver/tests/checked_net_write.rs`.)
+  `crates/wolf_driver/tests/checked_net_write.rs`.) A parked dial
+  makes its connect on that host thread of its own and asks for the
+  answer between waits; nothing joins the thread, so a task killed
+  while its dial waits ends at once and a run that ends first does not
+  wait for the connect; alone, the dial is the one blocking connect it
+  always was. (Until the fix for wolf-lang#718 a dial was one blocking
+  connect, so a program that dialled past its own listener's backlog
+  before accepting never let the accepting task run —
+  `crates/wolf_driver/tests/checked_net_dials.rs`.) While a task waits
+  in any of these host calls, the virtual clock of `[exec.checked.sched]`
+  follows real elapsed time: before each turn the task hands on, the
+  clock is raised to where it stood when the wait began plus the real
+  time the wait has taken, never lowered, so a `timeout` arm beside a
+  task parked in a read fires once the read has waited that long, as on
+  the native tiers. (Until the fix for wolf-lang#728 the clock moved
+  only when no task was ready, and a waiting task is ready again at
+  once, so such an arm never fired —
+  `crates/wolf_driver/tests/checked_kill_parked_read.rs`.)
 - `[exec.checked.sched]` **The schedule is deterministic and a seed
   selects it.** The scheduler is the reference interpreter's
   (`sched-ev/0`, spec/07): a first-in-first-out ready queue; a spawn
@@ -467,10 +497,11 @@ exhausted` arrived — an OOM where an honest refusal was owed.)
   lowest). **Equal seeds are equal runs** — the same verdict and the
   same output bytes (`[sched.stable]`), and a record made under a seed
   says `"seeded": true` (`[proto.seed.flag]`). `timeout` arms run on a
-  virtual clock that advances only when no task is ready
-  (`[conc.select.timeout]`); when no task is ready and no timer is
-  pending the run is `trap(deadlock)` (`[conc.deadlock.trap]`), its
-  roster on stderr. **What it does not do:** it explores nothing. One
+  virtual clock that jumps to the earliest timer when no task is ready
+  and, while a task waits on host I/O, follows real elapsed time
+  (`[exec.checked.task]`, `[conc.select.timeout]`); when no task is
+  ready and no timer is pending the run is `trap(deadlock)`
+  (`[conc.deadlock.trap]`), its roster on stderr. **What it does not do:** it explores nothing. One
   seed is one interleaving, so a seed that passes says nothing about
   the schedules it did not take (`wolf test --schedules=N` on the
   native tier and lupin's explorer are the tools for that), and
