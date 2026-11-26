@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate glibc.tsv using only RFC 8536 data and black-box date.
 
-Run on kasumi under the lane's CPU flock. The Ubuntu image is content
+Run on a Linux x86-64 host under the lane's CPU flock. The Ubuntu image is content
 addressed; tzdata is the byte-identical system copy beside this script.
 No runtime/source dependency and no package installation.
 """
