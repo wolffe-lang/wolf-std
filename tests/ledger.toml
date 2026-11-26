@@ -872,7 +872,7 @@ native = "run"
 # wolfc declines this body alone: "trait dispatch on a non-nominal
 # receiver" at `a < b` (wolf-lang#402, F-0135).
 lupin = "run"
-wolfc = "unsupported"
+wolfc = "run"  # 0.2.41 pin bump (02615972): wolf-lang#402 — a type parameter binds through `List[T]`, so `a < b` dispatches
 native = "run"
 
 [tests."list/get_hit_miss.lu"]
@@ -1085,7 +1085,7 @@ native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are 
 
 [tests."x/list_eq/dedup_and_affixes.lu"]
 lupin = "run"  # sc46 pin bump (lupin 0.1.34): wolf-interp#96 — dispatch through an IMPORTED module's trait executes
-wolfc = "unsupported"
+wolfc = "run"  # 0.2.41 pin bump (02615972): wolf-lang#402 — a type parameter binds through `List[T]`, so the trait call dispatches
 native = "run"  # sc49: `unsupported` -> `run` — std.cmp's Ordering impls are nested matches now (wolf-std#31 option 3), so the product-pattern decline (deep trees) @8506..8510 is gone
 
 # ---- sc06's three nursery residents, each with a diagnostic behind it ----
