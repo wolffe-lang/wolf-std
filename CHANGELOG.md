@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+**The pins move to wolf 0.2.41 and lupin 0.1.63.** No library surface
+changes.
+
+- The checked machine runs three rows it declined at 0.2.40:
+  `json/pretty_and_escape`, because a `match` reads a place scrutinee
+  instead of moving it (wolf-lang#882), and `list/sorted_tier` and
+  `x/list_eq/dedup_and_affixes`, because a type parameter binds through
+  `List[T]` (wolf-lang#402). `json/number_posture_and_depth` and
+  `json/parse_misses` still stop at the checked machine's call-depth
+  budget.
+- The data pin moves v0.2.40 -> v0.2.41 (`b333b9da` -> `02615972`). The
+  anchor registry gains six anchors and loses none. lupin's conformance
+  pin stays `5f1f1c94`.
+
 **Held directories in `std.fs` (wolf-std#141), at wolf 0.2.40 / lupin
 0.1.62.** A program can now hold a directory open and work on the names
 inside it, whatever the directory's path has become.
